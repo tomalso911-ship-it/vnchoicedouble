@@ -3524,8 +3524,6 @@ def update_supp_summary(pid):
     return jsonify(row_to_dict(new_row))
 
 # ===================== 静态首页 =====================
-# 本机模式页面缓存：{mtime, html} —— index.html 一改动就自动重建，不会用到旧页面
-_local_index_cache = {"mtime": None, "html": ""}
 
 
 @app.route("/")
@@ -3536,23 +3534,21 @@ def index():
     # 注意：只影响本机返回的这一份页面副本，磁盘上的 index.html 与线上 WEB 完全不变。
     try:
         src = os.path.join(BASE_DIR, "index.html")
-        st = os.stat(src)
-        if _local_index_cache["mtime"] != st.st_mtime:
-            with io.open(src, encoding="utf-8") as f:
-                html = f.read()
-            # 把 var CLOUD_ONLY = [ ... ]; 整段替换为空数组
-            html = re.sub(r"var CLOUD_ONLY\s*=\s*\[[\s\S]*?\];",
-                          "var CLOUD_ONLY = [];  /* 本机模式：全部接口走 localhost */",
-                          html, count=1)
-            _local_index_cache["mtime"] = st.st_mtime
-            _local_index_cache["html"] = html
-        return Response(_local_index_cache["html"], mimetype="text/html")
+        # 每次直接读盘并做 CLOUD_ONLY 替换，不依赖 mtime 内存缓存
+        # （Windows 上同一秒内多次保存 st_mtime 不变，会导致缓存不刷新、
+        #  前端一直看到旧版 HTML，表现为"改了代码却没效果"）。
+        with io.open(src, encoding="utf-8") as f:
+            html = f.read()
+        # 把 var CLOUD_ONLY = [ ... ]; 整段替换为空数组
+        html = re.sub(r"var CLOUD_ONLY\s*=\s*\[[\s\S]*?\];",
+                      "var CLOUD_ONLY = [];  /* 本机模式：全部接口走 localhost */",
+                      html, count=1)
+        return Response(html, mimetype="text/html")
     except Exception:
         # 兜底：任何异常都退回原文件，保证页面一定能打开
         return send_from_directory(BASE_DIR, "index.html")
 
 # ===== 精简版前端：仅 登录页 + 看板 + 签约项目（choice_lite.html） =====
-_local_lite_cache = {"mtime": None, "html": ""}
 
 
 @app.route("/lite")
@@ -3561,16 +3557,15 @@ def index_lite():
     与 index() 同机制：本机模式下把 CLOUD_ONLY 置空，所有接口走 localhost。"""
     try:
         src = os.path.join(BASE_DIR, "choice_lite.html")
-        st = os.stat(src)
-        if _local_lite_cache["mtime"] != st.st_mtime:
-            with io.open(src, encoding="utf-8") as f:
-                html = f.read()
-            html = re.sub(r"var CLOUD_ONLY\s*=\s*\[[\s\S]*?\];",
-                          "var CLOUD_ONLY = [];  /* 本机模式：全部接口走 localhost */",
-                          html, count=1)
-            _local_lite_cache["mtime"] = st.st_mtime
-            _local_lite_cache["html"] = html
-        return Response(_local_lite_cache["html"], mimetype="text/html")
+        # 每次直接读盘并做 CLOUD_ONLY 替换，不依赖 mtime 内存缓存
+        # （Windows 上同一秒内多次保存 st_mtime 不变，会导致缓存不刷新、
+        #  前端一直看到旧版 HTML，表现为"改了代码却没效果"）。
+        with io.open(src, encoding="utf-8") as f:
+            html = f.read()
+        html = re.sub(r"var CLOUD_ONLY\s*=\s*\[[\s\S]*?\];",
+                      "var CLOUD_ONLY = [];  /* 本机模式：全部接口走 localhost */",
+                      html, count=1)
+        return Response(html, mimetype="text/html")
     except Exception:
         return send_from_directory(BASE_DIR, "choice_lite.html")
 

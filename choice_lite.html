@@ -2524,6 +2524,20 @@ function _ovLoadChartLib(cb){
     display:inline-flex; align-items:center; justify-content:center; line-height:1; z-index:5;
   }
   .cust-pay-modal .mmax-btn, .cm-modal .mmax-btn, .gsr-modal .mmax-btn, .cpr-box .mmax-btn { top:11px; right:48px; }
+  /* 扩展 FROZEN 覆盖：所有含关闭/最大化按钮的头部都作为定位上下文 */
+  .cp-head, .cm-head, .cpr-head, .gsr-head, .addm-head, .addm-sum-head, .rpt-head, .appr-drawer-head { position:relative; }
+  .addm-head .addm-close, .addm-sum-head .addm-sum-close, .rpt-head .rpt-close, .appr-drawer-head .appr-drawer-close {
+    position:absolute; top:11px; right:16px; width:26px; height:26px; margin:0; padding:0;
+    display:inline-flex; align-items:center; justify-content:center; line-height:1; z-index:5;
+    background:none; border:none; border-radius:5px;
+  }
+  .addm-head .mmax-btn, .addm-sum-head .mmax-btn, .rpt-head .mmax-btn, .appr-drawer-head .mmax-btn { top:11px; right:48px; z-index:6; }
+  /* 浅色补充协议头部：按钮用深灰色保证可见 */
+  .addm-head .mmax-btn { color:#888; border-color:#bbb; }
+  .addm-head .mmax-btn:hover { color:#E53935; border-color:#E53935; }
+  /* 深色头部：最大化按钮用浅色保证可见 */
+  .rpt-head .mmax-btn, .appr-drawer-head .mmax-btn { color:#fff; border-color:rgba(255,255,255,.7); }
+  .rpt-head .mmax-btn:hover, .appr-drawer-head .mmax-btn:hover { color:#ffe3c8; border-color:#ffe3c8; background:rgba(255,255,255,.15); }
 .pt-editor-box .pt-close { position:absolute; top:7px; right:14px; font-size:22px; cursor:pointer; line-height:1; z-index:5; }
 .pt-editor-box .pt-close:hover { color:#ffe3c8 !important; }
   /* 兜底：所有模态框都必须具备最大化/关闭按钮 */
@@ -3908,15 +3922,42 @@ function _ovLoadChartLib(cb){
   #mask .modal-header .modal-actions .close { position:static; top:auto; right:auto; margin:0; }
   #mask .modal-header .modal-actions .close { width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center; font-size:20px; }
   /* 全站弹窗通用：最大化/关闭按钮统一放进 .modal-actions flex 容器，保证同一水平线 */
-  .modal-actions { position:absolute; top:11px; right:16px; z-index:10; display:inline-flex; align-items:center; gap:6px; color:#fff; }
+  .modal-actions { position:absolute; top:11px; right:16px; z-index:10; display:inline-flex; align-items:center; gap:6px; height:26px; color:#fff; }
   .modal-actions > .mmax-btn,
   .modal-actions > .close,
-  .modal-actions > [class*="-close"] { position:static !important; top:auto !important; right:auto !important; left:auto !important; margin:0 !important; }
+  .modal-actions > [class*="-close"] {
+    position:static !important; top:auto !important; right:auto !important; left:auto !important; bottom:auto !important; margin:0 !important;
+    width:26px !important; height:26px !important; display:flex !important; align-items:center !important; justify-content:center !important;
+    padding:0 !important; box-sizing:border-box !important; line-height:26px !important; cursor:pointer; background:none; border:none; border-radius:5px;
+  }
+  .modal-actions > .mmax-btn { font-size:16px; color:#fff; border:1px solid rgba(255,255,255,.7); }
   .modal-actions > .close,
-  .modal-actions > [class*="-close"] { width:26px; height:26px; display:inline-flex !important; align-items:center; justify-content:center; padding:0; background:none; border:none; font-size:20px; line-height:1; cursor:pointer; box-sizing:border-box; }
+  .modal-actions > [class*="-close"] { font-size:18px; color:#fff; }
+  .modal-actions > .mmax-btn:hover,
+  .modal-actions > .close:hover,
+  .modal-actions > [class*="-close"]:hover { background:rgba(255,255,255,.15); }
   /* 浅色头部弹窗：关闭/最大化按钮用深灰色，避免看不见 */
-  .addm-modal > .modal-actions,
-  .addm-modal > .modal-actions > .mmax-btn { color:#888; }
+  .addm-head .modal-actions,
+  .addm-head .modal-actions > .mmax-btn,
+  .addm-head .modal-actions > .close,
+  .addm-head .modal-actions > [class*="-close"] { color:#888; border-color:#bbb; }
+  .addm-head .modal-actions > .mmax-btn:hover,
+  .addm-head .modal-actions > .close:hover,
+  .addm-head .modal-actions > [class*="-close"]:hover { color:#E53935; border-color:#E53935; }
+  /* ⛔ 兜底：强制所有关闭/最大化按钮与弹窗盒体右上角共用同一 top:11px，
+     无论它们是否已被装入 .modal-actions、也无论各自的祖先定位上下文如何，
+     都保证两个按钮 Y 轴完全一致（消除"一高一低/表头高时错位"）。 */
+  .modal > .close,
+  .cust-pay-modal > .close, .cust-pay-modal .close,
+  .auth-modal .comm-close,
+  .cp-head .cp-close, .cm-head .cm-close, .gsr-head .gsr-close, .cpr-head .cpr-close,
+  .cpr-box .cpr-close, .cm-modal .cm-close, .gsr-modal .gsr-close, .cust-pay-modal .mmax-btn,
+  .cm-modal .mmax-btn, .gsr-modal .mmax-btn, .cpr-box .mmax-btn,
+  .detail-view-box > .dv-close, .pt-editor-box > .pt-close,
+  .addm-head .addm-close, .addm-sum-head .addm-sum-close,
+  .appr-drawer-head .appr-drawer-close, .rpt-head .rpt-close {
+    top:11px !important;
+  }
   .modal-tabs { display:flex; background:#fafafa; border-bottom:1px solid #eee; }
   .modal-tabs .tab { padding:10px 16px; cursor:pointer; font-size:14px; color:#666; border-bottom:2px solid transparent; }
   .modal-tabs .tab.active { color:#E53935; border-bottom-color:#E53935; background:#fff; font-weight:600; }
@@ -30371,6 +30412,7 @@ function _doExportOverviewPDF(){
     function injectMaxBtn(box) {
       if (!box || box.getAttribute('data-mmax-btn')) return;
       box.setAttribute('data-mmax-btn', '1');
+      box.setAttribute('data-modal-ctrl', '1');
 
       var isModal = box.classList.contains('modal');
 
@@ -30386,8 +30428,8 @@ function _doExportOverviewPDF(){
         window.toggleMaximize(box);
       });
 
-      // 查找或创建关闭按钮
-      var closeSel = '.close, .comm-close, .cp-close, .cm-close, .cpr-close, .gsr-close, .addm-close, .dv-close, .pt-close';
+      // 查找或创建关闭按钮（保持与 CSS FROZEN 头部关闭按钮选择器同步）
+      var closeSel = '.close, .comm-close, .cp-close, .cm-close, .cpr-close, .gsr-close, .addm-close, .addm-sum-close, .rpt-close, .appr-drawer-close, .dv-close, .pt-close';
       var closeBtn = box.querySelector(closeSel);
       if (!closeBtn && isModal) {
         closeBtn = document.createElement('button');
@@ -30407,40 +30449,28 @@ function _doExportOverviewPDF(){
         });
       }
 
-      // 标题栏：h2 / .modal-header 等
-      var head = box.querySelector('h2, h3, .modal-header, .cp-head, .cm-head, .cpr-head, .gsr-head, .addm-head, .drawer-header, .appr-drawer-head, .rpt-head, .dash-chart-lightbox-head');
+      // 确保弹窗盒子本身是可定位上下文（后续 .modal-actions 按盒体绝对定位）
+      var cs = window.getComputedStyle(box);
+      if (cs.position === 'static') box.style.position = 'relative';
 
       if (closeBtn) {
-        // 如果关闭按钮在 .modal-actions 容器里（如权限弹窗），保持原位置，仅并排插入最大化按钮
+        // 如果关闭按钮已在 .modal-actions 容器里，仅并排插入最大化按钮
         var actions = closeBtn.closest('.modal-actions');
         if (actions) {
           actions.insertBefore(btn, closeBtn);
           return;
         }
-        // 把关闭/最大化放进同一个 flex 容器，确保同一水平线垂直居中
+        // 把两个按钮装进同一个 flex 容器，整体固定在弹窗盒体右上角
         actions = document.createElement('div');
         actions.className = 'modal-actions';
-        // 先把关闭按钮移成 box 的直接子元素
-        if (closeBtn.parentElement !== box) {
-          if (head && head.parentElement === box) {
-            box.insertBefore(closeBtn, head.nextSibling);
-          } else {
-            box.appendChild(closeBtn);
-          }
-        }
         actions.appendChild(btn);
         actions.appendChild(closeBtn);
-        if (head && head.parentElement === box) {
-          box.insertBefore(actions, head.nextSibling);
-        } else {
-          box.appendChild(actions);
-        }
+        box.appendChild(actions);
         return;
       }
 
-      // 没有关闭按钮时，最大化按钮放到标题栏末尾或 box 末尾
-      if (head) head.appendChild(btn);
-      else box.appendChild(btn);
+      // 没有关闭按钮时，最大化按钮直接放到 box 末尾
+      box.appendChild(btn);
     }
 
     document.querySelectorAll(BOX_SEL).forEach(injectMaxBtn);
@@ -30473,7 +30503,6 @@ function _doExportOverviewPDF(){
     ];
 
     var closeSelectors = '.close,.comm-close,.cp-close,.cm-close,.cpr-close,.gsr-close,.addm-close,.dv-close,.pt-close,.addm-sum-close,.vault-close,.rpt-close,.mmax-close';
-    var headSelectors = 'h2,h3,.modal-header,.cp-head,.cm-head,.cpr-head,.gsr-head,.addm-head,.addm-sum-head,.drawer-header,.appr-drawer-head,.rpt-head,.dash-chart-lightbox-head,.vault-head,.vault-pin-title,.crm-mtl-title,.aa-title,.dc-title,.crm-orange-confirm-title';
 
     function closeModalBox(box) {
       box.classList.remove('mmax');
@@ -30494,22 +30523,23 @@ function _doExportOverviewPDF(){
       var box = p.box ? ov.querySelector(p.box) : ov;
       if (!box) box = ov;
       if (box.getAttribute('data-modal-ctrl')) return;
+      // 防止与 injectMaxBtn（按 BOX_SEL 批量注入）重复处理同一盒子，避免双容器/双按钮错位
+      if (box.querySelector('.mmax-btn')) { box.setAttribute('data-modal-ctrl', '1'); return; }
       box.setAttribute('data-modal-ctrl', '1');
 
       var cs = window.getComputedStyle(box);
       if (cs.position === 'static') box.style.position = 'relative';
 
       var existingClose = box.querySelector(closeSelectors);
-      var head = box.querySelector(headSelectors);
 
-      function place(el) {
-        if (existingClose && existingClose.parentElement && head && existingClose.parentElement === head) {
-          head.insertBefore(el, existingClose);
-        } else if (head) {
-          head.appendChild(el);
-        } else {
-          box.appendChild(el);
-        }
+      // 关闭按钮：没有现成关闭按钮时才创建兜底 ×
+      if (!existingClose) {
+        existingClose = document.createElement('button');
+        existingClose.type = 'button';
+        existingClose.className = 'mmax-close';
+        existingClose.setAttribute('title', '关闭');
+        existingClose.innerHTML = '&times;';
+        existingClose.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); closeModalBox(box); });
       }
 
       // 最大化按钮
@@ -30519,18 +30549,13 @@ function _doExportOverviewPDF(){
       maxBtn.setAttribute('title', '最大化 / 还原');
       maxBtn.textContent = '□';
       maxBtn.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); window.toggleMaximize(box); });
-      place(maxBtn);
 
-      // 关闭按钮：没有现成关闭按钮时才创建
-      if (!existingClose) {
-        var closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.className = 'mmax-close';
-        closeBtn.setAttribute('title', '关闭');
-        closeBtn.innerHTML = '&times;';
-        closeBtn.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); closeModalBox(box); });
-        if (head) head.appendChild(closeBtn); else box.appendChild(closeBtn);
-      }
+      // 统一装进 .modal-actions 容器，两个按钮作为一个整体固定在弹窗盒体右上角
+      var actions = document.createElement('div');
+      actions.className = 'modal-actions';
+      actions.appendChild(maxBtn);
+      actions.appendChild(existingClose);
+      box.appendChild(actions);
     }
 
     patches.forEach(ensureControls);
