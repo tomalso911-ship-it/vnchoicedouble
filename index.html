@@ -2071,13 +2071,13 @@ function _ovLoadChartLib(cb){
   body.ui-locked .th-label,
   body.ui-locked .th-filter-input { pointer-events:none; }
   .tb-item {
-    border:none; background:transparent; color:#2e7d32; cursor:pointer;
+    border:none; background:transparent; color:#000; cursor:pointer;
     font-size:15px; font-weight:600; padding:10px 18px; border-radius:8px;
     white-space:nowrap; transition: background .15s, color .15s;
     position:relative;   /* 供 .pend-badge 绝对定位 */
   }
-  .tb-item:hover { background:rgba(46,125,50,.12); color:#1b5e20; }
-  .tb-item.active { background:#D32F2F; color:#fff; }
+  .tb-item:hover { background:rgba(0,0,0,.1); color:#000; }
+  .tb-item.active { background:#fff; color:#D32F2F; margin:4px 0; padding:11px 16px; border-radius:22px; }
   /* ===== 待审批角标（Approvals 导航右上角红底白字数字） ===== */
   .pend-badge {
     position:absolute; top:2px; right:3px;
@@ -2101,32 +2101,32 @@ function _ovLoadChartLib(cb){
     background:rgba(46,125,50,.08); border:1px solid rgba(46,125,50,.2);
     border-radius:18px; padding:3px 8px;
   }
-  .lang-switch-label { font-size:11px; color:#4caf50; font-weight:600; margin-right:2px; }
+  .lang-switch-label { font-size:11px; color:#000; font-weight:600; margin-right:2px; }
   .lang-switch button {
     font-size:11px; font-weight:700; padding:3px 9px; border:none; border-radius:12px;
-    background:transparent; color:#558b2f; cursor:pointer; transition: all .15s; line-height:1.5;
+    background:transparent; color:#000; cursor:pointer; transition: all .15s; line-height:1.5;
   }
-  .lang-switch button:hover { color:#2e7d32; }
+  .lang-switch button:hover { color:#000; }
   .lang-switch button.active { background:#D32F2F; color:#fff; }
-  .tb-user { display:flex; align-items:center; gap:6px; color:#2e7d32; font-size:13px; white-space:nowrap; }
+  .tb-user { display:flex; align-items:center; gap:6px; color:#000; font-size:13px; white-space:nowrap; }
   .tb-user-avatar {
     width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
     background:#D32F2F; color:#fff; font-size:13px; font-weight:700;
   }
-  .tb-user-role { color:#4caf50; font-size:12px; }
+  .tb-user-role { color:#000; font-size:12px; }
   .tb-logout {
-    border:1px solid rgba(46,125,50,.35); background:transparent; color:#2e7d32;
+    border:1px solid rgba(0,0,0,.35); background:transparent; color:#000;
     font-size:12px; font-weight:600; padding:6px 14px; border-radius:6px; cursor:pointer;
     transition: background .15s, border-color .15s;
   }
-  .tb-logout:hover { background:rgba(46,125,50,.85); border-color:transparent; color:#fff; }
+  .tb-logout:hover { background:rgba(0,0,0,.85); border-color:transparent; color:#fff; }
   /* ===== 「适应屏幕」按钮 =====
      默认隐藏（电脑上不需要）；只在手机横屏/矮屏显示。
      默认不缩放，与浏览器 100% 一致，宽表格横向滚动查看；
      点一下把整张表整体缩放到容器宽度，一屏看完（字会变小）；再点还原。 */
   .tb-fit {
     display:none;
-    border:1px solid rgba(46,125,50,.35); background:transparent; color:#558b2f;
+    border:1px solid rgba(0,0,0,.35); background:transparent; color:#000;
     font-size:11px; font-weight:700; padding:5px 9px; border-radius:6px; cursor:pointer;
     white-space:nowrap; transition: background .15s, color .15s, border-color .15s;
   }
@@ -2487,7 +2487,7 @@ function _ovLoadChartLib(cb){
   }
   .mmax-btn:hover { color:#ffe3c8 !important; border-color:#ffe3c8 !important; }
   .modal .mmax-btn { top:11px; right:48px; }
-  .modal > h2 { display:flex; justify-content:space-between; align-items:center; }
+  .modal > h2 { display:flex; justify-content:space-between; align-items:center; position:relative; font-size:20.7px; }
   /* 浅色标题栏的弹窗（用户/审批等白底模态框）用深色边框，保证可见 */
   .auth-modal > .mmax-btn, .modal-mask .mmax-btn,
   .detail-view-box > .mmax-btn, .pt-editor-box > .mmax-btn { color:#888; border-color:#bbb; }
@@ -4385,9 +4385,13 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== Modal ==================== -->
 <div id="wonModal" class="modal-overlay">
-  <div class="modal" style="width:940px;">
-    <button class="close" onclick="closeWonModal()">&times;</button>
-    <h2 id="wonModalTitle">New Won</h2>
+  <div class="modal" style="width:940px;" data-mmax-btn="1">
+    <h2 id="wonModalTitle"><span class="mt">New Won</span>
+      <span class="modal-actions">
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
+        <button class="close" type="button" onclick="closeWonModal()" title="关闭">&times;</button>
+      </span>
+    </h2>
     <div style="max-height:65vh;overflow-y:auto;padding-right:6px;" id="modalBody">
       <!-- 动态由 JS 渲染 -->
     </div>
@@ -4400,9 +4404,13 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 水泥漏缝地板规格编辑弹窗 ==================== -->
 <div id="slatsSpecModal" class="modal-overlay">
-  <div class="modal" style="width:95vw;max-width:1200px;">
-    <button class="close" onclick="closeSlatsSpecModal()">&times;</button>
-    <h2 id="slatsSpecTitle" data-i18n="slats_spec_label">水泥漏缝地板规格</h2>
+  <div class="modal" style="width:95vw;max-width:1200px;" data-mmax-btn="1">
+    <h2 id="slatsSpecTitle"><span class="mt" data-i18n="slats_spec_label">水泥漏缝地板规格</span>
+      <span class="modal-actions">
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
+        <button class="close" type="button" onclick="closeSlatsSpecModal()" title="关闭">&times;</button>
+      </span>
+    </h2>
     <div style="max-height:65vh;overflow-y:auto;padding-right:6px;" id="slatsSpecBody">
       <div class="slats-spec-wrap">
         <div class="slats-spec-toolbar">
@@ -4475,9 +4483,13 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 水泥漏缝地板智能报告弹窗 ==================== -->
 <div id="slatsReportModal" class="modal-overlay">
-  <div class="modal" style="width:900px;">
-    <button class="close" onclick="closeSlatsReportModal()">&times;</button>
-    <h2 id="slatsReportTitle" data-i18n="slats_view_report_btn">查看智能报告</h2>
+  <div class="modal" style="width:900px;" data-mmax-btn="1">
+    <h2 id="slatsReportTitle"><span class="mt" data-i18n="slats_view_report_btn">查看智能报告</span>
+      <span class="modal-actions">
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
+        <button class="close" type="button" onclick="closeSlatsReportModal()" title="关闭">&times;</button>
+      </span>
+    </h2>
     <div style="max-height:65vh;overflow-y:auto;padding-right:6px;" id="slatsReportBody">
       <div class="slats-report-wrap">
         <div class="slats-report-section">
@@ -4619,9 +4631,13 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== CRM 项目模态框 ==================== -->
 <div id="crmModal" class="modal-overlay">
-  <div class="modal" style="width:960px;">
-    <button class="close" id="cbtnClose" onclick="closeCrmModal()">&times;</button>
-    <h2 id="crmModalTitle">New CRM</h2>
+  <div class="modal" style="width:960px;" data-mmax-btn="1">
+    <h2 id="crmModalTitle"><span class="mt">New CRM</span>
+      <span class="modal-actions">
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
+        <button class="close" type="button" id="cbtnClose" onclick="closeCrmModal()" title="关闭">&times;</button>
+      </span>
+    </h2>
     <div style="max-height:66vh;overflow-y:auto;padding-right:6px;" id="crmModalBody">
       <!-- 动态由 JS 渲染 -->
     </div>
@@ -4634,9 +4650,13 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 潜在项目报告 (CRM Report) ==================== -->
 <div id="crmReportModal" class="modal-overlay">
-  <div class="modal" style="width:1100px;">
-    <button class="close" onclick="closeCrmReport()">&times;</button>
-    <h2 id="crmReportTitle">Project Report</h2>
+  <div class="modal" style="width:1100px;" data-mmax-btn="1">
+    <h2 id="crmReportTitle"><span class="mt">Project Report</span>
+      <span class="modal-actions">
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
+        <button class="close" type="button" onclick="closeCrmReport()" title="关闭">&times;</button>
+      </span>
+    </h2>
     <div class="modal-sub" id="crmReportSub"></div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0 8px;" id="crmReportToolbar">
       <span id="crmReportCurLabel" style="font-size:13px;font-weight:700;color:#333;">Currency</span>
@@ -4673,9 +4693,13 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 全部项目概况 (Project Overview) ==================== -->
 <div id="overviewModal" class="modal-overlay">
-  <div class="modal" style="width:1100px;">
-    <button class="close" onclick="closeOverviewModal()">&times;</button>
-    <h2 id="ovTitle">全部项目概况</h2>
+  <div class="modal" style="width:1100px;" data-mmax-btn="1">
+    <h2 id="ovTitle"><span class="mt">全部项目概况</span>
+      <span class="modal-actions">
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
+        <button class="close" type="button" onclick="closeOverviewModal()" title="关闭">&times;</button>
+      </span>
+    </h2>
     <div class="modal-sub" id="ovSubtitle">全盘项目梳理</div>
     <div style="max-height:76vh;overflow-y:auto;padding-right:6px;" id="ovBody">
       <div style="padding:8px 0 6px;font-size:13px;color:#E53935;font-weight:700;" id="ovSec1Title">签约方统计</div>
@@ -4780,9 +4804,13 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 全部潜在项目概况 (CRM Overview) ==================== -->
 <div id="crmOverviewModal" class="modal-overlay">
-  <div class="modal" style="width:1200px;">
-    <button class="close" onclick="closeCrmOverviewModal()">&times;</button>
-    <h2 id="crmOvTitle">全部潜在项目概况</h2>
+  <div class="modal" style="width:1200px;" data-mmax-btn="1">
+    <h2 id="crmOvTitle"><span class="mt">全部潜在项目概况</span>
+      <span class="modal-actions">
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
+        <button class="close" type="button" onclick="closeCrmOverviewModal()" title="关闭">&times;</button>
+      </span>
+    </h2>
     <div class="modal-sub" id="crmOvSubtitle">潜在项目全盘梳理</div>
     <div style="max-height:78vh;overflow-y:auto;padding-right:6px;" id="crmOvBody">
       <!-- Section 1: Q1-Q7 汇总 -->
@@ -4870,9 +4898,13 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 失败项目报告 (Lost Report) ==================== -->
 <div id="lostReportModal" class="modal-overlay">
-  <div class="modal" style="width:1100px;">
-    <button class="close" onclick="closeLostReport()">&times;</button>
-    <h2 id="lostReportTitle">Project Report</h2>
+  <div class="modal" style="width:1100px;" data-mmax-btn="1">
+    <h2 id="lostReportTitle"><span class="mt">Project Report</span>
+      <span class="modal-actions">
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
+        <button class="close" type="button" onclick="closeLostReport()" title="关闭">&times;</button>
+      </span>
+    </h2>
     <div class="modal-sub" id="lostReportSub"></div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0 8px;" id="lostReportToolbar">
       <span id="lostReportCurLabel" style="font-size:13px;font-weight:700;color:#333;">Currency</span>
@@ -4892,9 +4924,13 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 全部失败项目概况 (Lost Overview) ==================== -->
 <div id="lostOverviewModal" class="modal-overlay">
-  <div class="modal" style="width:1050px;">
-    <button class="close" onclick="closeLostOverviewModal()">&times;</button>
-    <h2 id="lostOvTitle">全部失败项目概况</h2>
+  <div class="modal" style="width:1050px;" data-mmax-btn="1">
+    <h2 id="lostOvTitle"><span class="mt">全部失败项目概况</span>
+      <span class="modal-actions">
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
+        <button class="close" type="button" onclick="closeLostOverviewModal()" title="关闭">&times;</button>
+      </span>
+    </h2>
     <div style="max-height:76vh;overflow-y:auto;padding-right:6px;" id="lostOvBody">
       <div style="padding:8px 0 6px;font-size:13px;color:#E53935;font-weight:700;" id="lostOvSec1Title">失败项目总数与金额汇总</div>
       <!-- 货币选择标签：RMB/USD/VND -->
@@ -8372,7 +8408,7 @@ function openLostOverviewModal() {
   if (!permGuard('LOST-L1', t.lost_ov_title||'全部失败项目概况')) return;
   var modal = el('lostOverviewModal');
   if (!modal) return;
-  el('lostOvTitle').innerText = t.lost_ov_title || t.crm_ov_title || '全部失败项目概况';
+  var _lot = el('lostOvTitle'); if (_lot) { var _lots = _lot.querySelector('.mt'); if (_lots) _lots.textContent = t.lost_ov_title || t.crm_ov_title || '全部失败项目概况'; }
   el('lostOvSec1Title').innerText = t.lost_ov_sec1 || t.lost_ov_sec_total || t.crm_ov_sec_total || '失败项目总数与金额汇总';
   el('lostOvCurLabel').innerText = t.lost_ov_currency || t.crm_ov_currency || '货币';
   el('lostOvBtnClose').innerText = t.crm_ov_close || t.crm_report_close || 'Close';
@@ -30498,6 +30534,31 @@ function _doExportOverviewPDF(){
         });
       });
     }).observe(document.body, { childList: true, subtree: true });
+
+    // 弹窗打开时(title 可能被 innerText 清掉按钮)再补一次,保证任何弹窗(含将来)都有按钮
+    function reinjectMaxBtn(box) {
+      if (!box || box.getAttribute('data-mmax-btn') === '1') return;
+      var actions = box.querySelector('.modal-actions');
+      if (actions) actions.remove();
+      box.removeAttribute('data-mmax-btn');
+      box.removeAttribute('data-modal-ctrl');
+      injectMaxBtn(box);
+    }
+    var SHOW_OV = '.modal-overlay, .modal-mask, .cm-mask, .pt-editor-overlay, .detail-view-overlay, .export-confirm-overlay, .addm-overlay';
+    new MutationObserver(function(muts) {
+      muts.forEach(function(m) {
+        if (m.type !== 'attributes' || m.attributeName !== 'class') return;
+        var target = m.target;
+        if (!target.matches || !target.matches(SHOW_OV)) return;
+        if (!target.classList.contains('show')) return;
+        var box = target.querySelector(BOX_SEL);
+        if (box) reinjectMaxBtn(box);
+      });
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
+
+    // 暴露为全局:打开弹窗时再补一次按钮(兜底)
+    window.__injectMaxBtn = injectMaxBtn;
+    window.__reinjectMaxBtn = reinjectMaxBtn;
   })();
 
   /* ===== 兜底：为所有未在 injectMaxBtn 中覆盖的模态框补齐 □ 最大化 与 × 关闭按钮 ===== */

@@ -3565,7 +3565,9 @@ def index_lite():
         html = re.sub(r"var CLOUD_ONLY\s*=\s*\[[\s\S]*?\];",
                       "var CLOUD_ONLY = [];  /* 本机模式：全部接口走 localhost */",
                       html, count=1)
-        return Response(html, mimetype="text/html")
+        return Response(html, mimetype="text/html",
+                        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                                 "Pragma": "no-cache", "Expires": "0"})
     except Exception:
         return send_from_directory(BASE_DIR, "choice_lite.html")
 
