@@ -17259,7 +17259,7 @@ function saveSlatsSpec(){
     fetch('/api/won-projects/'+mid,{method:'PUT', credentials:'include', headers:(typeof authHeaders==='function'?authHeaders({'Content-Type':'application/json'}):{'Content-Type':'application/json'}), body:JSON.stringify({concrete_floor_spec:json})})
       .then(function(r){ return r.json().catch(function(){return {};}); })
       .then(function(d){
-        if(d && d.ok!==false){
+        if(d && !d.error){
           // 同步全局缓存，避免主表单重开时覆盖
           try{
             var p=globalWonData.find(function(x){ return x.id==mid; });
@@ -17278,7 +17278,13 @@ function saveSlatsSpec(){
     closeSlatsSpecModal();
   }
 }
-function closeSlatsSpecModal(){ el('slatsSpecModal').classList.remove('show'); }
+function closeSlatsSpecModal(){
+  var modal=el('slatsSpecModal'); if(!modal) return;
+  modal.classList.remove('show');
+  modal.style.display='none';
+  var box=modal.querySelector('.modal');
+  if(box){ box.classList.remove('mmax'); box.removeAttribute('data-mmax-style'); }
+}
 function openSlatsReportModal(){
   var modal=el('slatsReportModal'); if(!modal) return;
   var body=el('slatsReportBody'); if(!body) return;
