@@ -4418,9 +4418,10 @@ function _ovLoadChartLib(cb){
         <button class="close" type="button" onclick="closeSlatsSpecModal()" title="关闭">&times;</button>
       </span>
     </h2>
-    <div style="max-height:65vh;overflow-y:auto;padding-right:6px;" id="slatsSpecBody">
+    <div style="max-height:65vh;overflow:hidden;padding-right:6px;display:flex;flex-direction:column;" id="slatsSpecBody">
       <div class="slats-spec-wrap">
         <div class="slats-spec-toolbar">
+          <button type="button" class="btn btn-outline btn-sm" onclick="printModalById('slatsSpecModal')" data-i18n="btn_print">打印</button>
           <button type="button" class="btn btn-primary btn-sm" onclick="addSlatsSpecRow()">
             <span data-i18n="slats_table_add">+ 新增行</span>
           </button>
@@ -4547,9 +4548,9 @@ function _ovLoadChartLib(cb){
 
 <style>
 /* ===== 水泥漏缝地板规格表格 ===== */
-.slats-spec-wrap { margin-top: 8px; }
-.slats-spec-toolbar { margin-bottom: 10px; text-align: right; }
-.slats-spec-table-scroll { overflow-x: auto; border: 1px solid #e8e8e8; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.slats-spec-wrap { margin-top: 8px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.slats-spec-toolbar { margin-bottom: 10px; text-align: right; flex-shrink: 0; display: flex; justify-content: flex-end; gap: 8px; }
+.slats-spec-table-scroll { overflow: auto; flex: 1 1 auto; min-height: 0; border: 1px solid #e8e8e8; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
 .slats-spec-table { width: 100%; min-width: 1520px; border-collapse: separate; border-spacing: 0; font-size: 11px; background: #fff; }
 .slats-spec-table th,
 .slats-spec-table td { border-right: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; padding: 2px 1px; text-align: center; vertical-align: middle; }
@@ -4633,6 +4634,17 @@ function _ovLoadChartLib(cb){
   .print-target .slats-report-chart-wrap canvas{width:100% !important;height:auto !important;max-width:100% !important;}
   .print-target .slats-report-data-table-wrap{width:100% !important;max-width:none !important;flex:none !important;margin:0 auto !important;}
   .print-target .slats-report-data-table-wrap .slats-report-table{max-width:none !important;}
+
+  /* ===== 水泥漏缝地板规格表打印：取消滚动限制，表头恢复普通行，输出全部行 ===== */
+  .print-target #slatsSpecBody,
+  .print-target .slats-spec-wrap,
+  .print-target .slats-spec-table-scroll { max-height:none !important; height:auto !important; overflow:visible !important; flex:none !important; }
+  .print-target .slats-spec-table { min-width:0 !important; width:100% !important; }
+  .print-target .slats-spec-table thead th { position:static !important; }
+  .print-target .slats-spec-table tbody tr { page-break-inside:avoid; }
+  .print-target .slats-spec-toolbar { display:none !important; }
+  .print-target .slats-spec-input,
+  .print-target .slats-spec-select { border:none !important; background:transparent !important; box-shadow:none !important; }
 }
 </style>
 
