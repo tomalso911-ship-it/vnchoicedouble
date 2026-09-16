@@ -1558,7 +1558,12 @@ def api_me():
 # ============================================================
 def _dash_sum_with_fallback(primary, fallback, suffix):
     p = primary + "_" + suffix
-    f = fallback + "_" + suffix
+    # fallback 传 '0' 表示「没有备用列，按 0 计」；直接拼成 0_rmb 会被 SQLite
+    # 解析成非法 token（unrecognized token: "0_rmb"）导致 /api/dashboard-stats 500。
+    if not fallback or fallback == "0":
+        f = "0"
+    else:
+        f = fallback + "_" + suffix
     return (f"SUM(CASE WHEN {p} IS NULL THEN COALESCE(CAST({f} AS REAL),0) "
             f"ELSE CAST({p} AS REAL) END)")
 
@@ -1606,6 +1611,12 @@ def api_dashboard_stats():
         return jsonify({"ok": True, "crm": crm, "won": won, "lost": lost})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ==================== 汇率看板 ====================
+# 汇率数据统一由系统既有的 /api/fx-rates（见下方 api_fx_rates）提供：
+#   读库缓存 + 当月缺失后台补抓，返回 {ok, labels:[YYYY-MM], series:{usd_cny,usd_vnd,cny_vnd}}。
+# 此处不再重复定义路由，避免 Flask 端点名冲突导致应用无法启动。
 
 
 # ==================== 个人佣金 · 修改金额审批 ====================
@@ -3582,6 +3593,10 @@ def serve_vault():
 @app.route("/lost_table.js")
 def serve_lost_table():
     return send_from_directory(BASE_DIR, "lost_table.js", mimetype="application/javascript")
+
+@app.route("/vn_provinces.js")
+def serve_vn_provinces():
+    return send_from_directory(BASE_DIR, "vn_provinces.js", mimetype="application/javascript")
 
 # ===== PWA / 手机 APP 静态资源 =====
 @app.route("/manifest.json")
