@@ -25131,7 +25131,7 @@ function _openLivestockChartLightbox(itemKey) {
 
 // ===================== 历史汇率走势图表（真实历史汇率，免费数据源：雅虎财经）=====================
 // 三条曲线：美元兑人民币(USD->CNY)、美元兑越南盾(USD->VND)、人民币兑越南盾(CNY->VND)
-// 均随系统语言切换标题；标签显示 2 位小数，无货币符号。
+// 均随系统语言切换标题；标签按币种显示前置符号（RMB 为 ￥，VND 为 ₫ ）。
 function renderDashFxCharts() {
   var t = (typeof I18N !== 'undefined' && I18N[CUR_LANG]) ? I18N[CUR_LANG] : {};
   var L = function(k, d) { return t[k] || d; };
@@ -25167,9 +25167,9 @@ function renderDashFxCharts() {
           return Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         };
         var defs = [
-          { id: 'dashFxUsdCnyChart', key: 'usd_cny', color: '#C0563B', prec: 2 },
-          { id: 'dashFxCnyVndChart', key: 'cny_vnd', color: '#3B7DC0', prec: 0 },
-          { id: 'dashFxUsdVndChart', key: 'usd_vnd', color: '#27AE60', prec: 0 }
+          { id: 'dashFxUsdCnyChart', key: 'usd_cny', color: '#C0563B', prec: 2, sym: '￥' },
+          { id: 'dashFxCnyVndChart', key: 'cny_vnd', color: '#3B7DC0', prec: 0, sym: '₫ ' },
+          { id: 'dashFxUsdVndChart', key: 'usd_vnd', color: '#27AE60', prec: 0, sym: '₫ ' }
         ];
         defs.forEach(function(def){
           var ctx = document.getElementById(def.id);
@@ -25185,7 +25185,7 @@ function renderDashFxCharts() {
                 label: '',
                 data: data,
                 ovUnit: 'rate',
-                ovSymbol: '',
+                ovSymbol: def.sym,
                 ovPrecision: def.prec,
                 borderColor: def.color,
                 backgroundColor: def.color + '22',
@@ -28362,6 +28362,8 @@ var _ovDataLabelPlugin = {
         var label;
         if(isRate) {
           label = (v).toLocaleString(undefined,{minimumFractionDigits:0, maximumFractionDigits:prec});
+          // 汇率曲线若指定了货币符号，则前置显示（如 ￥6.70 / ₫ 3,879.4）
+          if(dsSym) label = dsSym + label;
         } else if(isMoney) {
           if (useFull) {
             // full 模式：优先使用 dataset 指定的小数位（ovPrecision）

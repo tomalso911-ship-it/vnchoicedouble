@@ -2278,6 +2278,8 @@ function _ovLoadChartLib(cb){
 .bd-map { grid-column:span 4; min-height:360px; }
 .bd-cal { grid-column:span 4; }
 .bd-fx { grid-column:span 12; }
+.bd-cal-today { box-shadow:inset 0 0 0 2px #ff3b3b !important; color:#ff6b6b !important; font-weight:800 !important; }
+.bd-cal-today-btn { width:auto !important; padding:0 8px; font-size:11px; background:#2e343b; color:#eceff2; border:1px solid #5a626c; border-radius:6px; cursor:pointer; }
 .bd-ph { grid-column:span 4; }
 #bdWorkers, #bdProd { grid-column:span 6; }
 .bd-map-body, .bd-cal-body, .bd-fx-body { flex:1; }
@@ -2296,9 +2298,14 @@ function _ovLoadChartLib(cb){
 .bd-hol-cn { box-shadow:inset 0 0 0 2px #4da3ff; }
 .bd-hol-dot { position:absolute; top:2px; right:2px; width:6px; height:6px; border-radius:50%; background:#ffd166; }
 .bd-cal-legend { font-size:11px; color:#aab4c0; margin-top:8px; display:flex; align-items:center; gap:6px; }
-.bd-hol-legend { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+.bd-hol-legend-header { display:flex; align-items:center; justify-content:space-between; margin-top:8px; font-size:11px; color:#aab4c0; }
+.bd-hol-legend-wrap { overflow:hidden; transition:max-height .25s ease; margin-top:4px; }
+.bd-hol-legend-wrap.collapsed { max-height:26px; }
+.bd-hol-legend { display:flex; flex-wrap:wrap; gap:5px; }
 .bd-hol-chip { display:inline-flex; align-items:center; gap:5px; background:#2e343b; border:1px solid #474e57; border-radius:8px; padding:3px 7px; font-size:11px; color:#eceff2; }
 .bd-hol-chip i { width:10px; height:10px; border-radius:3px; display:inline-block; }
+.bd-hol-toggle { background:#3a4048; color:#eceff2; border:1px solid #5a626c; border-radius:6px; width:28px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; margin:0; }
+.bd-hol-toggle:hover { background:#4d545d; }
 .bd-leg-vn, .bd-leg-cn { width:10px; height:10px; border-radius:3px; display:inline-block; }
 .bd-leg-vn { background:#ff5d73; } .bd-leg-cn { background:#4da3ff; }
 .bd-fx-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
@@ -5615,15 +5622,15 @@ var I18N = {
              dash_crm_section:"潜在项目", dash_crm_province:"按省份统计", dash_crm_bu:"按BU统计",
              dash_crm_construction:"按建设情况统计", dash_crm_salesperson:"按销售人员统计",
  bd_total_title:"项目总数 / 建成 · 在建", bd_total_all:"项目总数", bd_total_done:"建成项目", bd_total_doing:"在建项目",
- bd_map_title:"项目分布地图（越南）", bd_cal_title:"日历（中越法定假日）",
+ bd_map_title:"项目分布地图（越南）", bd_cal_title:"日历（中越法定假日）", bd_cal_today:"回到当天",
  bd_mon:"一", bd_tue:"二", bd_wed:"三", bd_thu:"四", bd_fri:"五", bd_sat:"六", bd_sun:"日",
  bd_hol_vn:"越南", bd_hol_cn:"中国",
  bd_top10_title:"项目进度", bd_t10_name:"项目", bd_t10_amt:"合同金额(VND)", bd_t10_prog:"进度",
  bd_no_data:"暂无数据", bd_pending_short:"待接入", bd_pending:"（待接入：数据模块未就绪）",
  bd_prog_title:"项目进度 / 生产进度", bd_photo_title:"现场图片", bd_worker_title:"施工人数", bd_prod_title:"生产数据",
  bd_fx_title:"汇率", bd_fx_cny_vnd:"人民币 → 越南盾", bd_fx_usd_vnd:"美元 → 越南盾", bd_fx_usd_cny:"美元 → 人民币", bd_fx_range:"区间",
- bd_clock_title:"日期 · 时间 · 天气", bd_wx_clear:"晴", bd_wx_cloudy:"多云", bd_wx_fog:"雾", bd_wx_rain:"雨", bd_wx_snow:"雪", bd_wx_shower:"阵雨", bd_wx_storm:"雷暴", bd_wx_na:"—", bd_wx_offline:"天气需联网获取",
- bd_next_holiday:"下一个大假", bd_hol_days:"天", bd_prodprog_title:"生产进度",
+ bd_clock_title:"日期 · 时间 · 天气", bd_wx_clear:"晴", bd_wx_cloudy:"多云", bd_wx_fog:"雾", bd_wx_rain:"雨", bd_wx_snow:"雪", bd_wx_shower:"阵雨", bd_wx_storm:"雷暴", bd_wx_na:"—", bd_wx_offline:"天气需联网获取", bd_wx_hum:"湿度", bd_wx_wind:"风力", bd_wx_wind_unit:"级",
+ bd_next_holiday:"下一个大假", bd_hol_days:"天", bd_hol_legend:"假日图例", bd_prodprog_title:"生产进度",
  bd_mat_rebar:"钢筋价格曲线", bd_mat_cement:"水泥价格曲线", bd_mat_sand:"黄砂价格曲线", bd_mat_gravel:"石子价格曲线", dash_crm_rate_rmb:"RMB-VND 汇率走势", dash_crm_rate_usd:"USD-VND 汇率走势",
              dash_won_section:"签约项目", dash_won_bu_bar:"各BU累计销售 vs 当年", dash_won_bu_pie_all:"各BU历年销售占比",
              dash_won_bu_pie_year:"各BU当年销售占比", dash_won_contract:"各年设备合同金额/实付/尚未支付",
@@ -6379,15 +6386,15 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
              dash_crm_section:"Potential Projects", dash_crm_province:"By Province", dash_crm_bu:"By BU",
              dash_crm_construction:"By Construction Stage", dash_crm_salesperson:"By Salesperson",
  bd_total_title:"Projects: Total / Completed · Ongoing", bd_total_all:"Total Projects", bd_total_done:"Completed", bd_total_doing:"Ongoing",
- bd_map_title:"Project Map (Vietnam)", bd_cal_title:"Calendar (CN/VN Public Holidays)",
+ bd_map_title:"Project Map (Vietnam)", bd_cal_title:"Calendar (CN/VN Public Holidays)", bd_cal_today:"Today",
  bd_mon:"Mon", bd_tue:"Tue", bd_wed:"Wed", bd_thu:"Thu", bd_fri:"Fri", bd_sat:"Sat", bd_sun:"Sun",
  bd_hol_vn:"Vietnam", bd_hol_cn:"China",
  bd_top10_title:"Project Progress", bd_t10_name:"Project", bd_t10_amt:"Contract Amount (VND)", bd_t10_prog:"Progress",
  bd_no_data:"No data", bd_pending_short:"Pending", bd_pending:"(Pending: data module not ready)",
  bd_prog_title:"Project Progress / Production Progress", bd_photo_title:"Site Photos", bd_worker_title:"Site Workers", bd_prod_title:"Production Data",
  bd_fx_title:"Exchange Rates", bd_fx_cny_vnd:"CNY → VND", bd_fx_usd_vnd:"USD → VND", bd_fx_usd_cny:"USD → CNY", bd_fx_range:"Range",
- bd_clock_title:"Date · Time · Weather", bd_wx_clear:"Clear", bd_wx_cloudy:"Cloudy", bd_wx_fog:"Fog", bd_wx_rain:"Rain", bd_wx_snow:"Snow", bd_wx_shower:"Showers", bd_wx_storm:"Thunderstorm", bd_wx_na:"—", bd_wx_offline:"Weather needs internet",
- bd_next_holiday:"Next Holiday", bd_hol_days:"d", bd_prodprog_title:"Production Progress",
+ bd_clock_title:"Date · Time · Weather", bd_wx_clear:"Clear", bd_wx_cloudy:"Cloudy", bd_wx_fog:"Fog", bd_wx_rain:"Rain", bd_wx_snow:"Snow", bd_wx_shower:"Showers", bd_wx_storm:"Thunderstorm", bd_wx_na:"—", bd_wx_offline:"Weather needs internet", bd_wx_hum:"Humidity", bd_wx_wind:"Wind", bd_wx_wind_unit:"lvl",
+ bd_next_holiday:"Next Holiday", bd_hol_days:"d", bd_hol_legend:"Holidays", bd_prodprog_title:"Production Progress",
  bd_mat_rebar:"Rebar Price Trend", bd_mat_cement:"Cement Price Trend", bd_mat_sand:"Sand Price Trend", bd_mat_gravel:"Gravel Price Trend", dash_crm_rate_rmb:"RMB-VND Rate Trend", dash_crm_rate_usd:"USD-VND Rate Trend",
              dash_won_section:"Signed Projects", dash_won_bu_bar:"BU Cumulative vs Current Year", dash_won_bu_pie_all:"BU Historical Sales Share",
              dash_won_bu_pie_year:"BU Current Year Sales Share", dash_won_contract:"Annual Contract Amount/Paid/Unpaid",
@@ -7146,15 +7153,15 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
              dash_crm_section:"Dự án tiềm năng", dash_crm_province:"Theo tỉnh", dash_crm_bu:"Theo BU",
              dash_crm_construction:"Theo giai đoạn xây dựng", dash_crm_salesperson:"Theo nhân viên kinh doanh",
  bd_total_title:"Tổng dự án / Hoàn thành · Đang thi công", bd_total_all:"Tổng số dự án", bd_total_done:"Đã hoàn thành", bd_total_doing:"Đang thi công",
- bd_map_title:"Bản đồ dự án (Việt Nam)", bd_cal_title:"Lịch (Ngày lễ VN & TQ)",
+ bd_map_title:"Bản đồ dự án (Việt Nam)", bd_cal_title:"Lịch (Ngày lễ VN & TQ)", bd_cal_today:"Hôm nay",
  bd_mon:"T2", bd_tue:"T3", bd_wed:"T4", bd_thu:"T5", bd_fri:"T6", bd_sat:"T7", bd_sun:"CN",
  bd_hol_vn:"Việt Nam", bd_hol_cn:"Trung Quốc",
  bd_top10_title:"Tiến độ dự án", bd_t10_name:"Dự án", bd_t10_amt:"Giá trị HĐ (VND)", bd_t10_prog:"Tiến độ",
  bd_no_data:"Không có dữ liệu", bd_pending_short:"Chờ tích hợp", bd_pending:"(Chờ tích hợp: mô-đun dữ liệu chưa sẵn sàng)",
  bd_prog_title:"Tiến độ dự án / Tiến độ sản xuất", bd_photo_title:"Hình ảnh công trường", bd_worker_title:"Số nhân công", bd_prod_title:"Dữ liệu sản xuất",
  bd_fx_title:"Tỷ giá hối đoái", bd_fx_cny_vnd:"CNY → VND", bd_fx_usd_vnd:"USD → VND", bd_fx_usd_cny:"USD → CNY", bd_fx_range:"Khoảng",
- bd_clock_title:"Ngày · Giờ · Thời tiết", bd_wx_clear:"Trời quang", bd_wx_cloudy:"Nhiều mây", bd_wx_fog:"Sương mù", bd_wx_rain:"Mưa", bd_wx_snow:"Tuyết", bd_wx_shower:"Mưa rào", bd_wx_storm:"Dông", bd_wx_na:"—", bd_wx_offline:"Thời tiết cần kết nối mạng",
- bd_next_holiday:"Kỳ nghỉ lớn tới", bd_hol_days:"ngày", bd_prodprog_title:"Tiến độ sản xuất",
+ bd_clock_title:"Ngày · Giờ · Thời tiết", bd_wx_clear:"Trời quang", bd_wx_cloudy:"Nhiều mây", bd_wx_fog:"Sương mù", bd_wx_rain:"Mưa", bd_wx_snow:"Tuyết", bd_wx_shower:"Mưa rào", bd_wx_storm:"Dông", bd_wx_na:"—", bd_wx_offline:"Thời tiết cần kết nối mạng", bd_wx_hum:"Độ ẩm", bd_wx_wind:"Gió", bd_wx_wind_unit:"cấp",
+ bd_next_holiday:"Kỳ nghỉ lớn tới", bd_hol_days:"ngày", bd_hol_legend:"Chú thích ngày lễ", bd_prodprog_title:"Tiến độ sản xuất",
  bd_mat_rebar:"Đường giá thép", bd_mat_cement:"Đường giá xi măng", bd_mat_sand:"Đường giá cát vàng", bd_mat_gravel:"Đường giá đá dăm", dash_crm_rate_rmb:"Xu hướng RMB-VND", dash_crm_rate_usd:"Xu hướng USD-VND",
              dash_won_section:"Dự án đã ký", dash_won_bu_bar:"BU Tích lũy vs Năm nay", dash_won_bu_pie_all:"Tỷ lệ BU các năm",
              dash_won_bu_pie_year:"Tỷ lệ BU năm nay", dash_won_contract:"Hợp đồng/Thanh toán/Chưa thanh toán theo năm",
@@ -23152,13 +23159,14 @@ function boardLoadWeather(provNames) {
   var lats = items.map(function(p) { return p.lat; }).join(',');
   var lngs = items.map(function(p) { return p.lng; }).join(',');
   var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lats + '&longitude=' + lngs +
-            '&current_weather=true&timezone=Asia%2FHo_Chi_Minh';
+            '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code' +
+            '&timezone=Asia%2FHo_Chi_Minh';
   fetch(url)
     .then(function(r) { return r.json(); })
     .then(function(d) {
       var arr = Array.isArray(d) ? d : [d];
       var cache = {};
-      arr.forEach(function(one, i) { if (items[i]) cache[items[i].vi] = (one && one.current_weather) || null; });
+      arr.forEach(function(one, i) { if (items[i]) cache[items[i].vi] = (one && one.current) || null; });
       __bdWxCache = cache; __bdWxAt = Date.now();
       boardRenderWx(el, items);
     })
@@ -23174,12 +23182,24 @@ function bdWxKey(code) {
   if (code <= 82) return 'bd_wx_shower';
   return 'bd_wx_storm';
 }
+// 风速(km/h) → 蒲福风级（风力几级）
+function bdBeaufort(kmh) {
+  if (kmh == null || isNaN(kmh)) return null;
+  var t = [[1,0],[5,1],[11,2],[19,3],[28,4],[38,5],[49,6],[61,7],[74,8],[88,9],[102,10],[117,11],[1e9,12]];
+  for (var i = 0; i < t.length; i++) { if (kmh <= t[i][0]) return t[i][1]; }
+  return 12;
+}
 function boardRenderWx(el, items) {
   var html = items.map(function(p) {
     var w = __bdWxCache ? __bdWxCache[p.vi] : null;
-    var temp = (w && w.temperature != null) ? Math.round(w.temperature) + '°C' : '—';
-    var txt = i18nVal(bdWxKey(w ? w.weathercode : null), '—');
-    return '<span class="bd-wx-chip"><b>' + escBd(bdName3(p)) + '</b> ' + temp + ' ' + escBd(txt) + '</span>';
+    var temp = (w && w.temperature_2m != null) ? Math.round(w.temperature_2m) + '°C' : '—';
+    var hum = (w && w.relative_humidity_2m != null) ? Math.round(w.relative_humidity_2m) + '%' : null;
+    var windLv = (w && w.wind_speed_10m != null) ? bdBeaufort(w.wind_speed_10m) : null;
+    var txt = i18nVal(bdWxKey(w ? w.weather_code : null), '—');
+    var parts = ['<b>' + escBd(bdName3(p)) + '</b> ' + temp + ' ' + escBd(txt)];
+    if (hum != null) parts.push(i18nVal('bd_wx_hum', '湿度') + ' ' + hum);
+    if (windLv != null) parts.push(i18nVal('bd_wx_wind', '风力') + ' ' + windLv + i18nVal('bd_wx_wind_unit', '级'));
+    return '<span class="bd-wx-chip">' + parts.join(' · ') + '</span>';
   }).join('');
   el.innerHTML = html || '<span class="bd-loading">' + i18nVal('bd_no_data', '暂无数据') + '</span>';
 }
@@ -23463,6 +23483,13 @@ function bdHolName(h){
   var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh';
   return (h && (h[L] || h.zh)) || '';
 }
+function bdToggleHolLegend(btn){
+  var wrap = document.getElementById('bdHolLegendWrap');
+  if(!wrap || !btn) return;
+  var collapsed = wrap.classList.toggle('collapsed');
+  btn.innerText = collapsed ? '⌄' : '⌃';
+  btn.setAttribute('aria-label', collapsed ? '展开' : '折叠');
+}
 function boardRenderCalendar(sec, year, month) {
   var body = document.getElementById('bdCalBody'); if (!body) return;
   var hol = bdHolMap();
@@ -23470,26 +23497,31 @@ function boardRenderCalendar(sec, year, month) {
   var startDow = (first.getDay()+6)%7;
   var days = new Date(year, month+1, 0).getDate();
   var dows = [i18nVal('bd_mon','一'),i18nVal('bd_tue','二'),i18nVal('bd_wed','三'),i18nVal('bd_thu','四'),i18nVal('bd_fri','五'),i18nVal('bd_sat','六'),i18nVal('bd_sun','日')];
-  var html = '<div class="bd-cal-nav"><button onclick="boardCalStep(-1)">‹</button><span>'+year+'-'+('0'+(month+1)).slice(-2)+'</span><button onclick="boardCalStep(1)">›</button></div>';
+  var html = '<div class="bd-cal-nav"><button onclick="boardCalStep(-1)">‹</button><span>'+year+'-'+('0'+(month+1)).slice(-2)+'</span><span style="display:flex;gap:6px;align-items:center;"><button onclick="boardCalStep(1)">›</button><button class="bd-cal-today-btn" type="button" onclick="boardCalGoToday()">'+i18nVal('bd_cal_today','回到当天')+'</button></span></div>';
   html += '<div class="bd-cal-grid bd-cal-dows">'+dows.map(function(d){ return '<div>'+d+'</div>'; }).join('')+'</div>';
   html += '<div class="bd-cal-grid">';
   for (var i=0;i<startDow;i++) html += '<div class="bd-cal-cell bd-cal-empty"></div>';
+  var today = new Date();
   for (var d=1; d<=days; d++) {
     var ym = year+'-'+('0'+(month+1)).slice(-2)+'-'+('0'+d).slice(-2);
     var h = hol[ym];
+    var isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === d;
+    var cls = 'bd-cal-cell' + (isToday ? ' bd-cal-today' : '');
     // 假期每一天都用该假日的专属颜色整格填充，鼠标悬停显示「名称 · X天」
     var style = h ? ' style="background:'+h.color+';color:#101418;font-weight:700;"' : '';
     var tip = h ? escBd(bdHolName(h)) + ' · ' + (h.days||1) + i18nVal('bd_hol_days','天') : '';
-    html += '<div class="bd-cal-cell"'+style+' title="'+tip+'">'+d+'</div>';
+    html += '<div class="'+cls+'"'+style+' title="'+tip+'">'+d+'</div>';
   }
   html += '</div>';
-  // 当年假期颜色图例：每种假日一个颜色 + 放假天数
+  // 当年假期颜色图例：每种假日一个颜色 + 放假天数（默认折叠，只显示一行）
   var yearHols = (BOARD_HOLIDAYS||[]).filter(function(h){ return String(h.from).slice(0,4) === String(year); })
                   .sort(function(a,b){ return a.from < b.from ? -1 : 1; });
-  html += '<div class="bd-hol-legend">'+yearHols.map(function(h){
+  html += '<div class="bd-hol-legend-header"><span>'+i18nVal('bd_hol_legend','假日图例')+'</span>'
+       +  '<button type="button" class="bd-hol-toggle" id="bdHolToggle" onclick="bdToggleHolLegend(this)" aria-label="展开">⌄</button></div>';
+  html += '<div class="bd-hol-legend-wrap collapsed" id="bdHolLegendWrap"><div class="bd-hol-legend">'+yearHols.map(function(h){
     return '<span class="bd-hol-chip"><i style="background:'+h.color+'"></i>'
          + escBd(bdHolName(h)) + ' ' + (h.days||1) + i18nVal('bd_hol_days','天') + '</span>';
-  }).join('')+'</div>';
+  }).join('')+'</div></div>';
   html += '<div class="bd-cal-legend"><span class="bd-leg-vn"></span>'+i18nVal('bd_hol_vn','越南')+'　<span class="bd-leg-cn"></span>'+i18nVal('bd_hol_cn','中国')+'</div>';
   // 下一个大假（越南 / 中国，三语）
   var nv = bdNextHoliday('vn'), nc = bdNextHoliday('cn');
@@ -23503,6 +23535,12 @@ function boardCalStep(delta) {
   if (m<0){ m=11; y--; } if (m>11){ m=0; y++; }
   var sec = document.getElementById('view-dashboard');
   boardRenderCalendar(sec, y, m);
+  if (typeof applyI18n==='function') applyI18n();
+}
+function boardCalGoToday() {
+  var n = new Date();
+  var sec = document.getElementById('view-dashboard');
+  boardRenderCalendar(sec, n.getFullYear(), n.getMonth());
   if (typeof applyI18n==='function') applyI18n();
 }
 // 某国的下一个大假：从今天起在 2026/2027 假日数据里找最近一条
