@@ -17984,17 +17984,21 @@ function slatsInputCell(type, value, opts){
   } else {
     inp.value=value||'';
   }
+  // 键盘方向键/Enter 导航（所有可编辑输入通用）
+  inp.onkeydown=function(e){ slatsInputKeyDown(this,e); };
   if(isComputed){
     inp.readOnly=true;
     inp.setAttribute('data-slats-computed', type);
   } else if(type==='int'){
     inp.setAttribute('data-slats-type','int');
-    inp.oninput=function(){ slatsSanitizeInt(this); if(hasDef) slatsUpdateDefaultStyle(this); };
+    inp.onfocus=function(){ slatsNumericFocus(this); };
+    inp.onmousedown=function(e){ slatsNumericMouseDown(this,e); };
+    inp.oninput=function(){ slatsSanitizeNumber(this,false); if(hasDef) slatsUpdateDefaultStyle(this); };
   }
-  else if(type==='thousands'){ inp.setAttribute('data-slats-type','thousands'); inp.oninput=function(){ slatsSanitizeThousands(this); }; inp.onblur=function(){ slatsFormatThousands(this); }; }
-  else if(type==='decimal'){ inp.setAttribute('data-slats-type','decimal'); inp.oninput=function(){ slatsSanitizeDecimal(this); }; }
-  else if(type==='decimal2'){ inp.setAttribute('data-slats-type','decimal2'); inp.oninput=function(){ slatsSanitizeDecimal2(this); }; inp.onblur=function(){ slatsFormatDecimal2(this); }; }
-  else if(type==='thousands2'){ inp.setAttribute('data-slats-type','thousands2'); inp.oninput=function(){ slatsSanitizeThousands2(this); }; inp.onblur=function(){ slatsFormatThousands2(this); }; }
+  else if(type==='thousands'){ inp.setAttribute('data-slats-type','thousands'); inp.onfocus=function(){ slatsNumericFocus(this); }; inp.onmousedown=function(e){ slatsNumericMouseDown(this,e); }; inp.oninput=function(){ slatsSanitizeNumber(this,false); }; inp.onblur=function(){ slatsFormatThousands(this); }; }
+  else if(type==='decimal'){ inp.setAttribute('data-slats-type','decimal'); inp.onfocus=function(){ slatsNumericFocus(this); }; inp.onmousedown=function(e){ slatsNumericMouseDown(this,e); }; inp.oninput=function(){ slatsSanitizeNumber(this,true); }; }
+  else if(type==='decimal2'){ inp.setAttribute('data-slats-type','decimal2'); inp.onfocus=function(){ slatsNumericFocus(this); }; inp.onmousedown=function(e){ slatsNumericMouseDown(this,e); }; inp.oninput=function(){ slatsSanitizeNumber(this,true); }; inp.onblur=function(){ slatsFormatDecimal2(this); }; }
+  else if(type==='thousands2'){ inp.setAttribute('data-slats-type','thousands2'); inp.onfocus=function(){ slatsNumericFocus(this); }; inp.onmousedown=function(e){ slatsNumericMouseDown(this,e); }; inp.oninput=function(){ slatsSanitizeNumber(this,true); }; inp.onblur=function(){ slatsFormatThousands2(this); }; }
   td.appendChild(inp);
   return td;
 }
@@ -18307,6 +18311,92 @@ function slatsFormatThousands2(inp){
   intPart=parseInt(intPart,10).toLocaleString('en-US');
   if(decPart.length>2) decPart=decPart.substring(0,2);
   inp.value=intPart+'.'+(decPart||'00');
+}
+// ===== 数字输入：Excel 式点击定位光标 + 方向键导航 =====
+function slatsNumericMouseDown(inp, e){
+  if(e.button!==0) return;
+  if(document.activeElement===inp) return;            // 已在编辑状态，不处理
+  var type=inp.getAttribute('data-slats-type');
+  if(!type) return;
+  inp._slatsClickFocus=true;
+  inp.value=inp.value.replace(/,/g,'');               // 预先去掉千分位，让浏览器按 raw 值定位光标
+}
+function slatsNumericFocus(inp){
+  if(inp._slatsClickFocus){ delete inp._slatsClickFocus; return; }
+  var type=inp.getAttribute('data-slats-type');
+  if(!type) return;
+  inp.value=inp.value.replace(/,/g,'');
+  inp.select();                                       // Tab 进入时全选，输入即替换
+}
+function slatsSanitizeNumber(inp, allowDot){
+  var start=inp.selectionStart||0;
+  var beforeSig=inp.value.substring(0,start).replace(/,/g,'').length;
+  var raw=inp.value.replace(/,/g,'');
+  var cleaned;
+  if(allowDot){
+    cleaned=raw.replace(/[^0-9.]/g,'');
+    var d=cleaned.indexOf('.');
+    if(d>=0){ cleaned=cleaned.substring(0,d)+'.'+cleaned.substring(d+1).replace(/\./g,'').substring(0,2); }
+  } else {
+    cleaned=raw.replace(/[^0-9]/g,'');
+  }
+  inp.value=cleaned;
+  var pos=Math.min(beforeSig, cleaned.length);
+  inp.setSelectionRange(pos,pos);
+}
+function slatsInputKeyDown(inp, e){
+  if(e.key==='Enter'){ e.preventDefault(); e.stopPropagation(); slatsMoveFocusToNext(inp); return; }
+  if(inp.tagName==='SELECT') return;                  // select 上下键用于改选项
+  if(e.key!=='ArrowRight' && e.key!=='ArrowLeft' && e.key!=='ArrowUp' && e.key!=='ArrowDown') return;
+  var start=inp.selectionStart||0, end=inp.selectionEnd||0, len=(inp.value||'').length;
+  if(e.key==='ArrowRight' && (start!==end || start!==len)) return;
+  if(e.key==='ArrowLeft' && (start!==end || start!==0)) return;
+  e.preventDefault(); e.stopPropagation();
+  var dir={'ArrowRight':1,'ArrowLeft':-1,'ArrowDown':2,'ArrowUp':-2}[e.key];
+  slatsMoveFocusByDir(inp, dir);
+}
+function slatsGetCurrentPos(inp){
+  var td=inp.closest && inp.closest('td'); if(!td) return null;
+  var tr=td.parentNode; if(!tr) return null;
+  var table=el('slatsSpecTable'); if(!table) return null;
+  var rows=table.querySelectorAll('tbody tr');
+  var r=-1; for(var i=0;i<rows.length;i++){ if(rows[i]===tr){ r=i; break; } }
+  if(r<0) return null;
+  var oci=parseInt(td.getAttribute('data-oci')||'-1',10);
+  return {r:r, oci:oci};
+}
+function slatsMoveFocusByDir(inp, dir){
+  var pos=slatsGetCurrentPos(inp); if(!pos) return;
+  var table=el('slatsSpecTable'); if(!table) return;
+  var rows=table.querySelectorAll('tbody tr');
+  var target=null;
+  if(dir===1 || dir===-1){
+    var c=pos.oci+dir;
+    while(c>=0 && c<22 && !target){
+      var cell=rows[pos.r].children;
+      for(var k=0;k<cell.length;k++){
+        if(parseInt(cell[k].getAttribute('data-oci')||'-1',10)===c){
+          var f=cell[k].querySelector('input:not([readonly]), select');
+          if(f){ target=f; break; }
+        }
+      }
+      c+=dir;
+    }
+  } else {
+    var step=(dir===2?1:-1);
+    var rr=pos.r+step;
+    while(rr>=0 && rr<rows.length && !target){
+      var cell=rows[rr].children;
+      for(var k=0;k<cell.length;k++){
+        if(parseInt(cell[k].getAttribute('data-oci')||'-1',10)===pos.oci){
+          var f=cell[k].querySelector('input:not([readonly]), select');
+          if(f){ target=f; break; }
+        }
+      }
+      rr+=step;
+    }
+  }
+  if(target) target.focus();
 }
 function refreshSlatsSelectOptions(){
   var table=el('slatsSpecTable'); if(!table) return;
