@@ -1093,10 +1093,11 @@ function _ovLoadChartLib(cb){
     .cp-cal-week span { text-align:center;font-size:10px;color:#999;font-weight:700;padding:2px 0; }
     .cp-cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:2px; }
     .cp-cal-grid button { width:100%;aspect-ratio:1/1;border:none;background:transparent;font-size:11px;color:#333;border-radius:5px;cursor:pointer;padding:0; }
-    .cp-cal-grid button:hover:not(.empty):not(.selected) { background:#FDECEA;color:#E53935; }
+    .cp-cal-grid button:hover:not(.empty):not(.selected):not(.disabled) { background:#FDECEA;color:#E53935; }
     .cp-cal-grid button.empty { visibility:hidden; }
     .cp-cal-grid button.today { box-shadow:inset 0 0 0 1.5px #E53935;color:#E53935;font-weight:700; }
     .cp-cal-grid button.selected { background:#E53935;color:#fff;font-weight:700; }
+    .cp-cal-grid button.disabled { color:#bbb;background:#f5f5f5;cursor:not-allowed; }
     .cp-cal-foot { display:flex;justify-content:space-between;align-items:center;gap:4px;margin-top:6px;padding-top:5px;border-top:1px dashed #eee; }
     .cp-cal-foot .cp-cal-fmt { font-size:9.5px;color:#bbb; }
     .cp-cal-foot .cp-cal-today { border:1px solid #E53935;background:#fff;color:#E53935;font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer; }
@@ -3312,15 +3313,34 @@ function _ovLoadChartLib(cb){
       .prod-tab.active{background:#E53935;color:#fff;font-weight:600;}
       .prod-tab-body{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;}
       .prod-form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;}
+      .prod-form-row{display:flex;flex-wrap:wrap;gap:10px;width:100%;align-items:flex-end;}
+      .prod-form-row .prod-field{flex:1 1 140px;min-width:0;}
+      .prod-form-row .prod-field:first-child{flex:0 0 160px;}
+      .prod-role-grid{display:grid;grid-template-columns:repeat(5, minmax(0, 1fr));gap:10px;width:100%;}
+      @media (max-width:680px){ .prod-role-grid{grid-template-columns:repeat(3, minmax(0, 1fr));} }
+      @media (max-width:420px){ .prod-role-grid{grid-template-columns:repeat(2, minmax(0, 1fr));} }
       .prod-field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
       .prod-field input,.prod-field select,.prod-field textarea{padding:6px 8px;border:1px solid #ccc;border-radius:8px;font-size:13px;}
       .prod-btn{background:#E53935;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;}
       .prod-btn.sec{background:#6c757d;}
+      .prod-op{background:#fff;border:1px solid #ddd;border-radius:6px;padding:2px 7px;cursor:pointer;font-size:15px;line-height:1;}
+      .prod-op:hover{background:#f0f4ff;border-color:#E53935;}
       .prod-table{width:100%;border-collapse:collapse;font-size:13px;}
-      .prod-table th,.prod-table td{border:1px solid #eee;padding:6px 8px;text-align:left;}
-      .prod-table th{background:#f7f9f4;}
+      .prod-table th,.prod-table td{border:1px solid #eee;padding:5px 6px;text-align:left;}
+      .prod-table th{background:#f7f9f4;font-size:11px;white-space:normal;vertical-align:bottom;}
+      .prod-table td{white-space:normal;word-break:break-word;}
       .prod-table tbody tr:nth-child(even){background:#fafafa;}
       .prod-table tbody tr:hover{background:#f0f4ff;}
+      .prod-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;}
+      .prod-trend-sec{margin-top:18px;}
+      .prod-btn.mini{padding:5px 12px;font-size:12px;}
+      .prod-btn.mini.on{background:#E53935;color:#fff;border-color:#E53935;}
+      .prod-canvas-card{border:1px solid #eee;border-radius:12px;padding:12px 12px 8px;margin-top:10px;background:#fff;position:relative;}
+      .prod-canvas-tip{position:absolute;pointer-events:none;display:none;background:rgba(33,33,33,.92);color:#fff;font-size:11px;line-height:1.6;padding:6px 9px;border-radius:6px;z-index:30;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25);}
+      .prod-role-toggles{display:flex;flex-wrap:wrap;gap:8px 14px;margin:8px 0 4px;font-size:12px;}
+      .prod-role-toggles label{display:inline-flex;align-items:center;gap:4px;cursor:pointer;}
+      .prod-trend-tip{font-size:12px;color:#666;margin:4px 0 0;}
+      .prod-trend-nodata{color:#888;padding:20px;text-align:center;}
       .prod-empty{color:#888;padding:24px;text-align:center;}
       .prod-sec-title{font-weight:700;margin:14px 0 8px;font-size:14px;border-left:4px solid #E53935;padding-left:8px;}
       .prod-kpi{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
@@ -3330,15 +3350,20 @@ function _ovLoadChartLib(cb){
     <script>
     /* ===================== 生产管理子系统（现场工厂） ===================== */
     var PROD_LS = 'prod_factory_';
-    var PROD_WORKERS = [['welder','焊工'],['forklift','叉车工'],['loader','铲车工'],['mixer','搅拌机工'],['press','打板机操作工'],['repair','修水泥板工'],['cook','厨师'],['temp','其他临时工']];
+    var PROD_WORKERS = [['manager','厂长'],['machinist','机器维修员'],['welder','焊工'],['forklift','叉车工'],['loader','铲车工'],['mixer','搅拌机工'],['press','打板机操作工'],['repair','修水泥板工'],['cook','厨师'],['temp','其他临时工'],['keeper','材料看管员']];
     var PROD_TABS = [['A','工厂概况'],['B','生产计划'],['C','人员(日)'],['D','原料库存'],['E','每日生产'],['H','成品库存'],['F','设备与故障'],['G','交付']];
     var PROD_CUR = null;
     var PROD_ACTIVE_TAB = 'A';
+    var PROD_TABC_SELDATE = '';
+    var PROD_TREND_RANGE = 'all';
+    var PROD_TREND_ROLES = {};
+    var PROD_TREND_RESIZE = false;
+    var PROD_TREND_DATA = null;
     /* ===== 生产管理三语包（zh/en/vi），随系统 CUR_LANG 切换 ===== */
     var PROD_I18N = {
       zh: {
-        prod_tab_A:'工厂概况', prod_tab_B:'生产计划', prod_tab_C:'人员(日)', prod_tab_D:'原料库存', prod_tab_E:'每日生产', prod_tab_H:'成品库存', prod_tab_F:'设备与故障', prod_tab_G:'交付',
-        prod_overview:'工厂概况', lbl_addr:'现场地址', lbl_line:'生产线', opt_line_1:'1条', opt_line_2:'2条', opt_line_3:'3条', opt_line_4:'4条', lbl_shift:'班次', opt_shift_1:'1班/天', opt_shift_2:'2班/天', btn_save:'保存',
+        prod_tab_A:'工厂概况&速览', prod_tab_B:'生产计划', prod_tab_C:'日记录:人工/天气', prod_tab_D:'原料库存', prod_tab_E:'每日生产', prod_tab_H:'成品库存', prod_tab_F:'设备与故障', prod_tab_G:'交付',
+        prod_overview:'工厂概况', lbl_contract_date:'合同签约日', lbl_contract_signing_date:'合同签订日期', lbl_addr:'现场地址', lbl_line:'生产线', opt_line_1:'1条', opt_line_2:'2条', opt_line_3:'3条', opt_line_4:'4条', lbl_shift:'班次', opt_shift_1:'1班/天', opt_shift_2:'2班/天', btn_save:'保存',
         sec_usage:'项目用量分解（规格 × 栋舍，源自签约项目规格表）', empty_no_spec:'本项目尚未录入水泥漏缝地板规格。请回到「签约项目」打开该项目，点“编辑”填写“水泥漏缝地板规格”。',
         th_spec:'规格(长×宽×高 mm)', thr_house:'栋舍', th_total:'总需求量', th_shared:'共用情况', share_excl:'专属', share_cross_pre:'跨', share_cross_suf:'共用',
         sec_mat_spec:'按规格 × 栋舍 的材料用量', sec_mat_house:'按栋舍 × 规格 的材料用量', th_qty_whole:'数量/整场', th_rebar:'钢筋', th_cement:'水泥/吨', th_sand:'黄砂/吨', th_gravel:'石子/吨', thr_total:'总计',
@@ -3356,18 +3381,18 @@ function _ovLoadChartLib(cb){
         sec_inbound:'入库（采购直录）', thr_qty2:'数量', lbl_note:'备注', btn_inbound:'入库', sec_outbound:'出库', btn_outbound:'出库', thr_type:'类型', type_in:'入库', type_out:'出库',
         sec_mat_req:'材料需求（按规格自动计算，指导采购）', kpi_cement:'水泥', kpi_sand:'黄砂', kpi_gravel:'石子', thr_material:'材料', thr_demand:'需求(吨)', thr_gap:'缺口', not_created:'未建物资',
         note_d:'注：需求按规格体积折算标准板(1500×600×70)后，套用水泥24.4/黄砂22.6/石子68 kg·每标准板计算，与系统“智能报告”完全一致。',
-        sec_daily:'每日生产 / 盘点', btn_add_spec:'+ 产出规格', btn_add_mat:'+ 耗料', btn_save_prod:'保存当日生产', sec_history:'历史产出', thr_good:'良品', thr_bad:'不良', thr_mat_used:'耗料', lbl_spec:'规格', lbl_good2:'良品', lbl_bad2:'不良', btn_x:'×', lbl_mat_name:'耗料名称',
+        sec_daily:'每日生产 / 盘点', btn_add_spec:'+ 产出规格', btn_add_mat:'+ 耗料', btn_save_prod:'保存当日生产', btn_auto_hist:'自动补录历史产出', auto_hist_confirm:'将清空 31-08 至今的每日产出并重新随机灌入，确定吗？', toast_auto_hist:'已自动补录历史产出', sec_history:'历史产出', thr_good:'良品', thr_bad:'不良', thr_mat_used:'耗料', lbl_spec:'规格', lbl_good2:'良品', lbl_bad2:'不良', btn_x:'×', lbl_mat_name:'耗料名称',
         sec_finished:'成品库存（水泥漏缝地板，按规格）', kpi_prod_in:'累计生产入库', kpi_out2:'累计出库', kpi_balance:'结余', thr_produced:'生产入库', thr_out3:'出库', thr_balance2:'结余', empty_finished:'暂无成品。请在「每日生产」录入产出后自动累计。',
         sec_equip:'设备台账与高价值工具等级表', lbl_grade:'等级', lbl_maint:'保养说明', btn_add_equip:'添加设备/工具', thr_grade2:'等级', thr_maint2:'保养', sec_fault:'设备故障记录', lbl_equip:'设备', lbl_down:'停机(h)', lbl_reason:'原因', lbl_repair:'维修', btn_add_fault:'记录故障', thr_down2:'停机(h)', thr_reason2:'原因', thr_repair2:'维修',
         sec_delivery:'交付（出库，自动过账成品库存）', lbl_spec2:'规格', thr_qty3:'出库数量', lbl_client:'客户', btn_deliver:'出库交付', thr_client2:'客户', empty_delivery:'暂无成品规格，请先在每日生产录入产出。',
         toast_inv_saved:'库存计划已保存', toast_saved:'已保存', toast_sched:'排程已更新', toast_priority:'优先猪舍已设置', toast_name_req:'请填名称', toast_prod_saved:'已保存，并自动过账成品入库 + 生产耗料出库', toast_deliver_req:'请选规格并填数量', toast_delivered:'已出库，成品库存结余已更新',
         card_contract:'合同', card_spec:'规格', card_status:'状态：', card_due:'交期：', card_output:'累计产出', card_delivered:'已交付', empty_card:'暂无签约项目。请先在「签约项目」中录入数据，刷新后即可在此看到对应的现场工厂。',
         factory_label:'工厂', factory_suffix:' · 现场工厂',
-        prod_role_welder:'焊工', prod_role_forklift:'叉车工', prod_role_loader:'铲车工', prod_role_mixer:'搅拌机工', prod_role_press:'打板机操作工', prod_role_repair:'修水泥板工', prod_role_cook:'厨师', prod_role_temp:'其他临时工'
+        prod_role_welder:'焊工', prod_role_forklift:'叉车工', prod_role_loader:'铲车工', prod_role_mixer:'搅拌机工', prod_role_press:'打板机操作工', prod_role_repair:'修水泥板工', prod_role_cook:'厨师', prod_role_temp:'其他临时工', prod_role_keeper:'材料看管员', sec_labor:'人工', sec_weather:'天气', wx_am:'上午天气', wx_pm:'下午天气', wx_temp:'温度', wx_cond:'天气', wx_hum:'湿度', wx_wind:'风力', wx_notyet:'未录入', btn_backfill_wx:'补抓历史天气', toast_wx_loading:'正在补抓历史天气…', toast_wx_backfilled:'已补抓历史天气', toast_wx_noprov:'未取到工厂省份，无法补抓天气', toast_wx_fail:'历史天气获取失败', op_actions:'操作', op_edit:'编辑', op_del:'删除', wx_backfill_hint:'该日期天气缺失，点击下方按钮补录', trend_title:'趋势图', trend_all:'全部', trend_7:'近7天', trend_30:'近30天', trend_labor:'人工数量曲线', trend_weather:'温度&湿度曲线（晴雨带）', trend_total:'总人工数', trend_sun:'晴', trend_rain:'雨', trend_cloud:'多云', trend_sun_days:'天晴朗', trend_rain_days:'天下雨', trend_cloud_days:'天多云', trend_nodata:'暂无历史数据', prod_role_manager:'厂长', prod_role_machinist:'机器维修员', lbl_recorder:'填表人', thr_recorder:'填表人', lbl_holiday:'春节', opt_yes:'是', opt_no:'否', prod_status_wait:'待排产', toast_copied:'已复制该行'
       },
       en: {
-        prod_tab_A:'Factory Overview', prod_tab_B:'Production Plan', prod_tab_C:'Staff (daily)', prod_tab_D:'Raw Material Stock', prod_tab_E:'Daily Production', prod_tab_H:'Finished Goods Stock', prod_tab_F:'Equipment & Failures', prod_tab_G:'Delivery',
-        prod_overview:'Factory Overview', lbl_addr:'Site Address', lbl_line:'Production Line', opt_line_1:'1 line', opt_line_2:'2 lines', opt_line_3:'3 lines', opt_line_4:'4 lines', lbl_shift:'Shift', opt_shift_1:'1 shift/day', opt_shift_2:'2 shifts/day', btn_save:'Save',
+        prod_tab_A:'Factory Overview & Quick View', prod_tab_B:'Production Plan', prod_tab_C:'Daily: Labor/Weather', prod_tab_D:'Raw Material Stock', prod_tab_E:'Daily Production', prod_tab_H:'Finished Goods Stock', prod_tab_F:'Equipment & Failures', prod_tab_G:'Delivery',
+        prod_overview:'Factory Overview', lbl_contract_date:'Contract Signing Date', lbl_contract_signing_date:'Contract Signing Date', lbl_addr:'Site Address', lbl_line:'Production Line', opt_line_1:'1 line', opt_line_2:'2 lines', opt_line_3:'3 lines', opt_line_4:'4 lines', lbl_shift:'Shift', opt_shift_1:'1 shift/day', opt_shift_2:'2 shifts/day', btn_save:'Save',
         sec_usage:'Project Usage Breakdown (Spec × House, from signed project spec sheet)', empty_no_spec:'This project has not entered concrete slatted floor specs. Please go back to "Signed Projects", open the project, click "Edit" and fill in "Concrete Slatted Floor Specs".',
         th_spec:'Spec (L×W×H mm)', thr_house:'House', th_total:'Total Demand', th_shared:'Sharing', share_excl:' exclusive', share_cross_pre:'shared by ', share_cross_suf:'',
         sec_mat_spec:'Material Usage by Spec × House', sec_mat_house:'Material Usage by House × Spec', th_qty_whole:'Qty / Whole Site', th_rebar:'Rebar', th_cement:'Cement/Tons', th_sand:'Sand/Tons', th_gravel:'Gravel/Tons', thr_total:'Grand Total',
@@ -3385,18 +3410,18 @@ function _ovLoadChartLib(cb){
         sec_inbound:'Inbound (direct purchase log)', thr_qty2:'Qty', lbl_note:'Remark', btn_inbound:'Receive', sec_outbound:'Outbound', btn_outbound:'Issue', thr_type:'Type', type_in:'Inbound', type_out:'Outbound',
         sec_mat_req:'Material demand (auto by spec, guides purchasing)', kpi_cement:'Cement', kpi_sand:'Sand', kpi_gravel:'Gravel', thr_material:'Material', thr_demand:'Demand (tons)', thr_gap:'Gap', not_created:'not created',
         note_d:'Note: demand = spec volume converted to standard slab (1500×600×70), using cement 24.4 / sand 22.6 / gravel 68 kg per standard slab; identical to system "Smart Report".',
-        sec_daily:'Daily Production / Inventory', btn_add_spec:'+ Output spec', btn_add_mat:'+ Material used', btn_save_prod:'Save daily production', sec_history:'Historical output', thr_good:'Good', thr_bad:'Defect', thr_mat_used:'Material used', lbl_spec:'Spec', lbl_good2:'Good', lbl_bad2:'Defect', btn_x:'×', lbl_mat_name:'Material name',
+        sec_daily:'Daily Production / Inventory', btn_add_spec:'+ Output spec', btn_add_mat:'+ Material used', btn_save_prod:'Save daily production', btn_auto_hist:'Auto-fill History Output', auto_hist_confirm:'This will clear daily output from 31-08 to today and re-randomize. Continue?', toast_auto_hist:'History output auto-filled', sec_history:'Historical output', thr_good:'Good', thr_bad:'Defect', thr_mat_used:'Material used', lbl_spec:'Spec', lbl_good2:'Good', lbl_bad2:'Defect', btn_x:'×', lbl_mat_name:'Material name',
         sec_finished:'Finished Goods Stock (concrete slatted floor, by spec)', kpi_prod_in:'Cumulative produced inbound', kpi_out2:'Cumulative outbound', kpi_balance:'Balance', thr_produced:'Produced inbound', thr_out3:'Outbound', thr_balance2:'Balance', empty_finished:'No finished goods yet. They accumulate automatically after you enter output in "Daily Production".',
         sec_equip:'Equipment ledger & high-value tool grade table', lbl_grade:'Grade', lbl_maint:'Maintenance note', btn_add_equip:'Add equipment/tool', thr_grade2:'Grade', thr_maint2:'Maintenance', sec_fault:'Equipment failure log', lbl_equip:'Equipment', lbl_down:'Downtime(h)', lbl_reason:'Reason', lbl_repair:'Repair', btn_add_fault:'Log failure', thr_down2:'Downtime(h)', thr_reason2:'Reason', thr_repair2:'Repair',
         sec_delivery:'Delivery (outbound, auto-posts finished stock)', lbl_spec2:'Spec', thr_qty3:'Outbound qty', lbl_client:'Client', btn_deliver:'Deliver outbound', thr_client2:'Client', empty_delivery:'No finished spec yet; please enter output in Daily Production first.',
         toast_inv_saved:'Inventory plan saved', toast_saved:'Saved', toast_sched:'Schedule updated', toast_priority:'Priority house set', toast_name_req:'Please enter name', toast_prod_saved:'Saved, and auto-posted finished inbound + production material outbound', toast_deliver_req:'Please select spec and enter qty', toast_delivered:'Outbound done, finished stock balance updated',
         card_contract:'Contract', card_spec:'Spec', card_status:'Status: ', card_due:'Due: ', card_output:'Cumulative output', card_delivered:'Delivered', empty_card:'No signed projects yet. Please enter data in "Signed Projects" first; refresh to see the corresponding on-site factory here.',
         factory_label:'Factory', factory_suffix:' · On-site Factory',
-        prod_role_welder:'Welder', prod_role_forklift:'Forklift Operator', prod_role_loader:'Loader Operator', prod_role_mixer:'Mixer Operator', prod_role_press:'Slab Press Operator', prod_role_repair:'Slab Repairer', prod_role_cook:'Cook', prod_role_temp:'Other Temporary Workers'
+        prod_role_welder:'Welder', prod_role_forklift:'Forklift Operator', prod_role_loader:'Loader Operator', prod_role_mixer:'Mixer Operator', prod_role_press:'Slab Press Operator', prod_role_repair:'Slab Repairer', prod_role_cook:'Cook', prod_role_temp:'Other Temporary Workers', prod_role_keeper:'Material Keeper', sec_labor:'Labor', sec_weather:'Weather', wx_am:'Morning', wx_pm:'Afternoon', wx_temp:'Temp', wx_cond:'Condition', wx_hum:'Humidity', wx_wind:'Wind', wx_notyet:'Not recorded', btn_backfill_wx:'Backfill Weather', toast_wx_loading:'Backfilling historical weather…', toast_wx_backfilled:'Historical weather backfilled', toast_wx_noprov:'Factory province not found', toast_wx_fail:'Failed to fetch historical weather', op_actions:'Actions', op_edit:'Edit', op_del:'Delete', wx_backfill_hint:'Weather for this date is missing. Click below to backfill.', trend_title:'Trends', trend_all:'All', trend_7:'Last 7d', trend_30:'Last 30d', trend_labor:'Labor Count', trend_weather:'Temp & Humidity (sun/rain band)', trend_total:'Total', trend_sun:'Sun', trend_rain:'Rain', trend_cloud:'Cloudy', trend_sun_days:' sunny days', trend_rain_days:' rainy days', trend_cloud_days:' cloudy days', trend_nodata:'No history', prod_role_manager:'Factory Manager', prod_role_machinist:'Machine Repairman', lbl_recorder:'Recorder', thr_recorder:'Recorder', lbl_holiday:'TET', opt_yes:'Yes', opt_no:'No', prod_status_wait:'Pending Scheduling', toast_copied:'Row copied'
       },
       vi: {
-        prod_tab_A:'Tổng quan nhà máy', prod_tab_B:'Kế hoạch sản xuất', prod_tab_C:'Nhân sự (theo ngày)', prod_tab_D:'Kho nguyên liệu', prod_tab_E:'Sản xuất hàng ngày', prod_tab_H:'Kho thành phẩm', prod_tab_F:'Thiết bị & Sự cố', prod_tab_G:'Giao hàng',
-        prod_overview:'Tổng quan nhà máy', lbl_addr:'Địa chỉ công trường', lbl_line:'Dây chuyền sản xuất', opt_line_1:'1 dây chuyền', opt_line_2:'2 dây chuyền', opt_line_3:'3 dây chuyền', opt_line_4:'4 dây chuyền', lbl_shift:'Ca làm việc', opt_shift_1:'1 ca/ngày', opt_shift_2:'2 ca/ngày', btn_save:'Lưu',
+        prod_tab_A:'Tổng quan nhà máy & Xem nhanh', prod_tab_B:'Kế hoạch sản xuất', prod_tab_C:'Nhật ký: Nhân công/Thời tiết', prod_tab_D:'Kho nguyên liệu', prod_tab_E:'Sản xuất hàng ngày', prod_tab_H:'Kho thành phẩm', prod_tab_F:'Thiết bị & Sự cố', prod_tab_G:'Giao hàng',
+        prod_overview:'Tổng quan nhà máy', lbl_contract_date:'Ngày ký hợp đồng', lbl_contract_signing_date:'Ngày ký hợp đồng', lbl_addr:'Địa chỉ công trường', lbl_line:'Dây chuyền sản xuất', opt_line_1:'1 dây chuyền', opt_line_2:'2 dây chuyền', opt_line_3:'3 dây chuyền', opt_line_4:'4 dây chuyền', lbl_shift:'Ca làm việc', opt_shift_1:'1 ca/ngày', opt_shift_2:'2 ca/ngày', btn_save:'Lưu',
         sec_usage:'Phân tích lượng dùng dự án (Quy cách × Chuồng, từ bảng quy cách dự án ký)', empty_no_spec:'Dự án này chưa nhập quy cách sàn khe hở bê tông. Vui lòng quay lại "Dự án ký", mở dự án, nhấn "Sửa" và điền "Quy cách sàn khe hở bê tông".',
         th_spec:'Quy cách (D×R×C mm)', thr_house:'Chuồng', th_total:'Tổng nhu cầu', th_shared:'Dùng chung', share_excl:' riêng', share_cross_pre:'dùng chung ', share_cross_suf:'',
         sec_mat_spec:'Lượng vật liệu theo Quy cách × Chuồng', sec_mat_house:'Lượng vật liệu theo Chuồng × Quy cách', th_qty_whole:'SL / Toàn công trường', th_rebar:'Thép', th_cement:'Xi măng/Tấn', th_sand:'Cát/Tấn', th_gravel:'Sỏi/Tấn', thr_total:'Tổng cộng',
@@ -3414,14 +3439,14 @@ function _ovLoadChartLib(cb){
         sec_inbound:'Nhập kho (ghi mua trực tiếp)', thr_qty2:'SL', lbl_note:'Ghi chú', btn_inbound:'Nhập', sec_outbound:'Xuất kho', btn_outbound:'Xuất', thr_type:'Loại', type_in:'Nhập', type_out:'Xuất',
         sec_mat_req:'Nhu cầu vật liệu (tự động theo quy cách, hướng dẫn mua)', kpi_cement:'Xi măng', kpi_sand:'Cát', kpi_gravel:'Sỏi', thr_material:'Vật liệu', thr_demand:'Nhu cầu (tấn)', thr_gap:'Thiếu hụt', not_created:'chưa tạo',
         note_d:'Lưu ý: nhu cầu = thể tích quy cách quy đổi tấm chuẩn (1500×600×70), dùng xi măng 24.4 / cát 22.6 / sỏi 68 kg mỗi tấm chuẩn; hoàn toàn khớp "Báo cáo thông minh" hệ thống.',
-        sec_daily:'Sản xuất hàng ngày / Kiểm kê', btn_add_spec:'+ Quy cách đầu ra', btn_add_mat:'+ Vật liệu dùng', btn_save_prod:'Lưu SX ngày', sec_history:'Sản lượng lịch sử', thr_good:'Tốt', thr_bad:'Lỗi', thr_mat_used:'Vật liệu dùng', lbl_spec:'Quy cách', lbl_good2:'Tốt', lbl_bad2:'Lỗi', btn_x:'×', lbl_mat_name:'Tên vật liệu',
+        sec_daily:'Sản xuất hàng ngày / Kiểm kê', btn_add_spec:'+ Quy cách đầu ra', btn_add_mat:'+ Vật liệu dùng', btn_save_prod:'Lưu SX ngày', btn_auto_hist:'Tự động điền lịch sử SX', auto_hist_confirm:'Thao tác sẽ xóa dữ liệu sản xuất từ 31-08 đến nay và điền ngẫu nhiên lại. Tiếp tục?', toast_auto_hist:'Đã tự động điền lịch sử SX', sec_history:'Sản lượng lịch sử', thr_good:'Tốt', thr_bad:'Lỗi', thr_mat_used:'Vật liệu dùng', lbl_spec:'Quy cách', lbl_good2:'Tốt', lbl_bad2:'Lỗi', btn_x:'×', lbl_mat_name:'Tên vật liệu',
         sec_finished:'Kho thành phẩm (sàn khe hở bê tông, theo quy cách)', kpi_prod_in:'Tổng SX nhập kho', kpi_out2:'Tổng xuất kho', kpi_balance:'Tồn', thr_produced:'Nhập kho SX', thr_out3:'Xuất kho', thr_balance2:'Tồn', empty_finished:'Chưa có thành phẩm. Tự động cộng dồn sau khi nhập đầu ra tại "Sản xuất hàng ngày".',
         sec_equip:'Sổ thiết bị & bảng cấp công cụ giá trị cao', lbl_grade:'Cấp', lbl_maint:'Ghi chú bảo trì', btn_add_equip:'Thêm thiết bị/công cụ', thr_grade2:'Cấp', thr_maint2:'Bảo trì', sec_fault:'Nhật ký sự cố thiết bị', lbl_equip:'Thiết bị', lbl_down:'Dừng (h)', lbl_reason:'Nguyên nhân', lbl_repair:'Sửa chữa', btn_add_fault:'Ghi sự cố', thr_down2:'Dừng (h)', thr_reason2:'Nguyên nhân', thr_repair2:'Sửa chữa',
         sec_delivery:'Giao hàng (xuất kho, tự động ghi nhận tồn kho thành phẩm)', lbl_spec2:'Quy cách', thr_qty3:'SL xuất kho', lbl_client:'Khách hàng', btn_deliver:'Xuất giao hàng', thr_client2:'Khách hàng', empty_delivery:'Chưa có quy cách thành phẩm, vui lòng nhập đầu ra tại Sản xuất hàng ngày trước.',
         toast_inv_saved:'Đã lưu kế hoạch tồn kho', toast_saved:'Đã lưu', toast_sched:'Lịch trình đã cập nhật', toast_priority:'Đã đặt chuồng ưu tiên', toast_name_req:'Vui lòng nhập tên', toast_prod_saved:'Đã lưu, tự động ghi nhận nhập kho thành phẩm + xuất vật liệu SX', toast_deliver_req:'Vui lòng chọn quy cách và nhập số lượng', toast_delivered:'Đã xuất kho, tồn kho thành phẩm đã cập nhật',
         card_contract:'Hợp đồng', card_spec:'Quy cách', card_status:'Trạng thái: ', card_due:'Hạn giao: ', card_output:'Tổng đầu ra', card_delivered:'Đã giao', empty_card:'Chưa có dự án ký. Vui lòng nhập dữ liệu tại "Dự án ký" trước; làm mới để xem nhà máy tương ứng tại đây.',
         factory_label:'Nhà máy', factory_suffix:' · Nhà máy tại công trường',
-        prod_role_welder:'Thợ hàn', prod_role_forklift:'Lái xe nâng', prod_role_loader:'Lái xe xúc', prod_role_mixer:'Vận hành máy trộn', prod_role_press:'Vận hành máy ép tấm', prod_role_repair:'Thợ sửa tấm xi măng', prod_role_cook:'Đầu bếp', prod_role_temp:'Công nhân tạm thời khác'
+        prod_role_welder:'Thợ hàn', prod_role_forklift:'Lái xe nâng', prod_role_loader:'Lái xe xúc', prod_role_mixer:'Vận hành máy trộn', prod_role_press:'Vận hành máy ép tấm', prod_role_repair:'Thợ sửa tấm xi măng', prod_role_cook:'Đầu bếp', prod_role_temp:'Công nhân tạm thời khác', prod_role_keeper:'Người trông vật liệu', sec_labor:'Nhân công', sec_weather:'Thời tiết', wx_am:'Sáng', wx_pm:'Chiều', wx_temp:'Nhiệt độ', wx_cond:'Tình trạng', wx_hum:'Độ ẩm', wx_wind:'Gió', wx_notyet:'Chưa ghi', btn_backfill_wx:'Bù thời tiết lịch sử', toast_wx_loading:'Đang bù thời tiết lịch sử…', toast_wx_backfilled:'Đã bù thời tiết lịch sử', toast_wx_noprov:'Không tìm thấy tỉnh nhà máy', toast_wx_fail:'Lỗi lấy thời tiết lịch sử', op_actions:'Thao tác', op_edit:'Sửa', op_del:'Xóa', wx_backfill_hint:'Thời tiết ngày này bị thiếu, nhấn nút bên dưới để bổ sung.', trend_title:'Xu hướng', trend_all:'Tất cả', trend_7:'7 ngày', trend_30:'30 ngày', trend_labor:'Số nhân công', trend_weather:'Nhiệt độ & Độ ẩm (dải nắng/mưa)', trend_total:'Tổng', trend_sun:'Nắng', trend_rain:'Mưa', trend_cloud:'Nhiều mây', trend_sun_days:' ngày nắng', trend_rain_days:' ngày mưa', trend_cloud_days:' ngày nhiều mây', trend_nodata:'Chưa có dữ liệu', prod_role_manager:'Giám đốc nhà máy', prod_role_machinist:'Thợ sửa máy', lbl_recorder:'Người lập biểu', thr_recorder:'Người lập biểu', lbl_holiday:'TET', opt_yes:'Có', opt_no:'Không', prod_status_wait:'Chờ lập lịch', toast_copied:'Đã sao chép dòng'
       }
     };
     function pt(k){
@@ -3433,9 +3458,14 @@ function _ovLoadChartLib(cb){
       return k;
     }
     function prod_el(id){ return document.getElementById(id); }
+    function prod_loginUser(){
+      try { var el = document.querySelector('#tbUserName'); if(el){ var v = (el.value!=null && el.value!=='') ? el.value : (el.textContent||el.innerText||''); return String(v).trim(); } } catch(e){}
+      return '';
+    }
     function prod_val(id){ var e = prod_el(id); return e ? e.value : ''; }
     function prod_esc(s){ s = String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
     function prod_fmtNum(n){ return Math.round(Number(n)||0).toLocaleString('en-US'); }
+    function prod_fmtNumRed(n){ var v=Number(n)||0; var s=prod_fmtNum(n); return v>0?'<span style="color:#E53935;font-weight:600">'+s+'</span>':s; }
     function prod_pad(n){ return n<10?'0'+n:''+n; }
     function prod_today(){ var t=new Date(); return t.getFullYear()+'-'+prod_pad(t.getMonth()+1)+'-'+prod_pad(t.getDate()); }
     function prod_toast(m){ if(typeof showToast==='function') showToast(m); else alert(m); }
@@ -3446,10 +3476,11 @@ function _ovLoadChartLib(cb){
     function prod_save(f){ try { localStorage.setItem(PROD_LS+f.id, JSON.stringify(f)); } catch(e){} }
     function prod_fld(label,id,val){ return '<div class="prod-field"><label>'+label+'</label><input id="'+id+'" value="'+prod_esc(val)+'"></div>'; }
     /* 标准日期选择器（与 #w_contract_date 一致）：显示 DD-MM-YYYY，内部仍存 YYYY-MM-DD（由 dmyToYmd 在保存时转换） */
-    function prod_dateFld(label,id,valYmd,onInput){
+    function prod_dateFld(label,id,valYmd,onInput,maxDate){
       var disp = (typeof ymdToDmy==='function') ? ymdToDmy(valYmd||'') : (valYmd||'');
       var oi = onInput ? ' oninput="'+onInput+'"' : '';
-      return '<div class="prod-field"><label>'+label+'</label><div class="cp-date-input-wrapper"><input type="text" id="'+id+'" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)"'+oi+' style="width:100%;cursor:pointer;" value="'+prod_esc(disp)+'"></div></div>';
+      var dm = maxDate ? ' data-max="'+prod_esc(ymdToDmy(maxDate))+'"' : '';
+      return '<div class="prod-field"><label>'+label+'</label><div class="cp-date-input-wrapper"><input type="text" id="'+id+'" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)"'+oi+dm+' style="width:100%;cursor:pointer;" value="'+prod_esc(disp)+'"></div></div>';
     }
     /* 读取签约项目里的水泥漏缝地板规格（concrete_floor_spec，与系统智能报告同源） */
     function prod_slatsRows(){
@@ -3555,20 +3586,21 @@ function _ovLoadChartLib(cb){
       usedSizes.forEach(function(s){ h+='<th>'+pt('th_rebar')+'φ'+s+' (Tons)</th>'; });
       h+='<th>'+pt('th_cement')+'</th><th>'+pt('th_sand')+'</th><th>'+pt('th_gravel')+'</th></tr></thead><tbody>';
       var fmt1=function(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}); };
+      var fmt1Red=function(n){ var v=Number(n)||0; var s=fmt1(n); return v>0?'<span style="color:#E53935;font-weight:600">'+s+'</span>':s; };
       sorted.forEach(function(o){
         var rt={}; usedSizes.forEach(function(s){ rt[s]=o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
         h+='<tr>';
         if(groupBy==='spec') h+='<td>'+prod_esc(o.spec)+'</td><td>'+prod_esc(prod_phName(o.ph))+'</td>';
         else h+='<td>'+prod_esc(prod_phName(o.ph))+'</td><td>'+prod_esc(o.spec)+'</td>';
-        h+='<td>'+prod_fmtNum(o.qty)+'</td>';
-        usedSizes.forEach(function(s){ h+='<td>'+fmt1(rt[s])+'</td>'; });
-        h+='<td>'+fmt1(o.cement)+'</td><td>'+fmt1(o.sand)+'</td><td>'+fmt1(o.gravel)+'</td></tr>';
+        h+='<td>'+prod_fmtNumRed(o.qty)+'</td>';
+        usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(rt[s])+'</td>'; });
+        h+='<td>'+fmt1Red(o.cement)+'</td><td>'+fmt1Red(o.sand)+'</td><td>'+fmt1Red(o.gravel)+'</td></tr>';
       });
       var totRt={}; usedSizes.forEach(function(s){ totRt[s]=totals.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
       h+='<tr style="font-weight:700;background:#eef2f7"><td colspan="2">'+pt('thr_total')+'</td>';
-      h+='<td>'+prod_fmtNum(totals.qty)+'</td>';
-      usedSizes.forEach(function(s){ h+='<td>'+fmt1(totRt[s])+'</td>'; });
-      h+='<td>'+fmt1(totals.cement)+'</td><td>'+fmt1(totals.sand)+'</td><td>'+fmt1(totals.gravel)+'</td></tr>';
+      h+='<td>'+prod_fmtNumRed(totals.qty)+'</td>';
+      usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(totRt[s])+'</td>'; });
+      h+='<td>'+fmt1Red(totals.cement)+'</td><td>'+fmt1Red(totals.sand)+'</td><td>'+fmt1Red(totals.gravel)+'</td></tr>';
       h+='</tbody></table>';
       return h;
     }
@@ -3607,12 +3639,12 @@ function _ovLoadChartLib(cb){
       prod_toast(pt('toast_inv_saved'));
       prod_renderTab('B');
     }
-    /* 越南无效工作日集合：读取日历 BOARD_HOLIDAYS 中 vn 标记的假期；越南春节额外扩展「前7天 + 后10天」为无效 */
+    /* 越南无效工作日集合：读取日历 BOARD_HOLIDAYS 中 vn 标记的假期；仅春节额外扩展「前7天 + 后10天」为无效 */
     function prod_vnHolidaySet(){
       var set = {};
       (typeof BOARD_HOLIDAYS!=='undefined' ? BOARD_HOLIDAYS : []).forEach(function(h){
         if(!h.vn) return;
-        var isTet = (h.zh==='春节') || ((h.vi||'').indexOf('Tết')>=0) || ((h.en||'').indexOf('Lunar')>=0) || ((h.en||'').indexOf('Spring')>=0);
+        var isTet = (h.zh==='春节');
         if(isTet){
           for(var i=-7;i<=10;i++){ set[bdYmd(bdDateAdd(h.from, i))] = 1; }
         } else {
@@ -3627,6 +3659,9 @@ function _ovLoadChartLib(cb){
       if(status.indexOf('交付')>=0) return 'st-done';
       if(status.indexOf('产')>=0 && status.indexOf('待')<0) return 'st-doing';
       return 'st-wait';
+    }
+    function prod_statusText(status){
+      return status==='待排产' ? pt('prod_status_wait') : status;
     }
     function prod_renderProduction(){
       var box = prod_el('prod-cards'); if(!box) return;
@@ -3647,7 +3682,7 @@ function _ovLoadChartLib(cb){
           + '<div class="pc-title">'+prod_esc(client)+(prov?' · '+prod_esc(prov):'')+'</div>'
           + '<span class="pc-chip">'+pt('card_contract')+' '+prod_esc(String(code))+'</span>'
           + '<span class="pc-chip">'+pt('card_spec')+' '+prod_esc(spec)+'</span>'
-          + '<div class="pc-row">'+pt('card_status')+'<span class="prod-status '+prod_stcls(status)+'">'+prod_esc(status)+'</span></div>'
+          + '<div class="pc-row">'+pt('card_status')+'<span class="prod-status '+prod_stcls(status)+'">'+prod_esc(prod_statusText(status))+'</span></div>'
           + '<div class="pc-row">'+pt('card_due')+prod_esc(due)+'</div>'
           + '<div class="pc-row">'+pt('card_output')+' '+produced+' / '+pt('card_delivered')+' '+delivered+'</div>'
           + '</div>';
@@ -3656,6 +3691,7 @@ function _ovLoadChartLib(cb){
     }
     function prod_open(id){
       PROD_CUR = id;
+      prodStartWeatherTimer();
       prod_el('prod-list').style.display = 'none';
       prod_el('prod-detail').style.display = 'block';
       var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==id; }) : null;
@@ -3670,19 +3706,18 @@ function _ovLoadChartLib(cb){
     function prod_renderTabs(active){
       PROD_ACTIVE_TAB = active;
       var box = prod_el('prod-tabs'); var h = '';
-      PROD_TABS.forEach(function(t){ h += '<div class="prod-tab'+(t[0]===active?' active':'')+'" onclick="prod_renderTab(\''+t[0]+'\')">'+pt('prod_tab_'+t[0])+'</div>'; });
+      PROD_TABS.forEach(function(t){ h += '<div class="prod-tab'+(t[0]===active?' active':'')+'" data-key="'+t[0]+'" onclick="prod_renderTab(\''+t[0]+'\')">'+pt('prod_tab_'+t[0])+'</div>'; });
       box.innerHTML = h;
       prod_renderTab(active);
     }
     function prod_renderTab(key){
       PROD_ACTIVE_TAB = key;
-      var lab = ''; for(var i=0;i<PROD_TABS.length;i++){ if(PROD_TABS[i][0]===key){ lab=PROD_TABS[i][1]; break; } }
       var tabs = prod_el('prod-tabs').children;
-      for(var j=0;j<tabs.length;j++){ tabs[j].classList.toggle('active', tabs[j].textContent===lab); }
+      for(var j=0;j<tabs.length;j++){ tabs[j].classList.toggle('active', tabs[j].getAttribute('data-key')===key); }
       var body = prod_el('prod-tab-body'); var f = prod_get(PROD_CUR);
-      if(key==='A') body.innerHTML = prod_tabA(f);
-      else if(key==='B') body.innerHTML = prod_tabB(f);
-      else if(key==='C') body.innerHTML = prod_tabC(f);
+      if(key==='A'){ body.innerHTML = prod_tabA(f); prod_syncContractDate(); }
+      else if(key==='B'){ body.innerHTML = prod_tabB(f); prod_syncContractDate(); }
+      else if(key==='C'){ body.innerHTML = prod_tabC(f); prod_drawTrends(); }
       else if(key==='D') body.innerHTML = prod_tabD(f);
       else if(key==='E') body.innerHTML = prod_tabE(f);
       else if(key==='H') body.innerHTML = prod_tabH(f);
@@ -3697,10 +3732,45 @@ function _ovLoadChartLib(cb){
       h += '</select></div>';
       return h;
     }
+    function prod_contractDateFromData(){
+      if(typeof globalWonData!=='undefined' && globalWonData && PROD_CUR){
+        var p = globalWonData.find(function(x){ return x.id==PROD_CUR; });
+        if(p && p.contract_date) return cpDisplayDate(p.contract_date);
+      }
+      return '';
+    }
+    function prod_contractDateDisp(){
+      var cEl = document.querySelector('#w_contract_date');
+      var raw = (cEl && cEl.value) ? cEl.value : prod_contractDateFromData();
+      return raw ? ymdToDmy(raw) : '';
+    }
+    function prod_contractDateRaw(){
+      var cEl = document.querySelector('#w_contract_date');
+      return (cEl && cEl.value) ? cEl.value : prod_contractDateFromData();
+    }
+    function prod_onContractDateInput(){
+      var cEl = document.querySelector('#w_contract_date');
+      if(!cEl) return;
+      var raw = cEl.value || '';
+      var paEl = document.getElementById('pa_contract_date');
+      if(paEl) paEl.value = raw;
+      var dmy = raw ? ymdToDmy(raw) : '';
+      var others = document.querySelectorAll('.prod-contract-disp:not(#pa_contract_date)');
+      for(var i=0;i<others.length;i++) others[i].value = dmy;
+    }
+    function prod_syncContractDate(){
+      var cEl = document.querySelector('#w_contract_date');
+      if(!cEl) return;
+      cEl.removeEventListener('input', prod_onContractDateInput);
+      cEl.addEventListener('input', prod_onContractDateInput);
+      prod_onContractDateInput();
+    }
     function prod_tabA(f){
       var p = f.profile||{};
+      var cDate = prod_contractDateRaw();
       return '<div class="prod-sec-title">'+pt('prod_overview')+'</div>'
         + '<div class="prod-form">'
+        + '<div class="prod-field"><label>'+pt('lbl_contract_date')+'</label><input id="pa_contract_date" class="prod-contract-disp" value="'+prod_esc(cDate)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
         + prod_fld(pt('lbl_addr'),'pa_addr',p.address||'')
         + prod_sel(pt('lbl_line'),'pa_cap',[pt('opt_line_1'),pt('opt_line_2'),pt('opt_line_3'),pt('opt_line_4')],p.capacityNote||'')
         + prod_sel(pt('lbl_shift'),'pa_shift',[pt('opt_shift_1'),pt('opt_shift_2')],p.shifts||'')
@@ -3729,8 +3799,8 @@ function _ovLoadChartLib(cb){
           var sp = mm.specs[k]; var houses = mm.houseOrder.filter(function(h){ return sp.houses[h] != null; });
           var shared = houses.length>1 ? pt('share_cross_pre')+houses.map(prod_phName).join('+')+pt('share_cross_suf') : (houses.length===1 ? prod_phName(houses[0])+pt('share_excl') : '—');
           h += '<tr><td>'+prod_esc(k)+'</td>';
-          mm.houseOrder.forEach(function(ph){ h += '<td>'+prod_fmtNum(sp.houses[ph]||0)+'</td>'; });
-          h += '<td><b>'+prod_fmtNum(sp.total)+'</b></td><td>'+shared+'</td></tr>';
+          mm.houseOrder.forEach(function(ph){ h += '<td>'+prod_fmtNumRed(sp.houses[ph]||0)+'</td>'; });
+          h += '<td><b>'+prod_fmtNumRed(sp.total)+'</b></td><td>'+shared+'</td></tr>';
         });
         h += '</tbody></table>';
         /* 材料/骨料明细表：按规格×栋舍、按栋舍×规格 两张互补透视表（含底部总计） */
@@ -3800,6 +3870,7 @@ function _ovLoadChartLib(cb){
       var _prepStartDisp = f.prepStart || dmyAddDays(_prepEnd, -45);
       h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_gantt')+'</div>';
       h += '<div class="prod-form">'
+        + '<div class="prod-field"><label>'+pt('lbl_contract_signing_date')+'</label><input id="pg_contract_date" class="prod-contract-disp" value="'+prod_esc(prod_contractDateDisp())+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
         + prod_dateFld(pt('lbl_prep_start'),'pg_prep_start',_prepStartDisp,'prod_savePrep()')
         + prod_dateFld(pt('lbl_prep_end'),'pg_prep_end',_prepEnd,'prod_savePrep()')
         + '<div class="prod-field"><label>'+pt('lbl_start_ro')+'</label><input id="pg_start_ro" value="'+prod_esc(ymdToDmy(_prepEnd))+'" readonly style="background:#f2f2f2;cursor:default"></div>'
@@ -3816,7 +3887,7 @@ function _ovLoadChartLib(cb){
       var _holSet = prod_vnHolidaySet();
       /* 越南假期信息（名称/配色），供甘特图半透明竖条显示 */
       var _holInfo = {};
-      (BOARD_HOLIDAYS||[]).forEach(function(h){ if(!h.vn) return; var isTet=(h.zh==='春节')||((h.vi||'').indexOf('Tết')>=0)||((h.en||'').indexOf('Lunar')>=0)||((h.en||'').indexOf('Spring')>=0); var lo=isTet?-7:0, hi=isTet?10:((h.days||1)-1); for(var i=lo;i<=hi;i++){ var y=bdYmd(bdDateAdd(h.from,i)); _holInfo[y]={name:(h.vi||h.zh||h.en||''),color:h.color||'#ff5d73',isTet:isTet}; } });
+      (BOARD_HOLIDAYS||[]).forEach(function(h){ if(!h.vn) return; var isTet=(h.zh==='春节'); var lo=isTet?-7:0, hi=isTet?10:((h.days||1)-1); for(var i=lo;i<=hi;i++){ var y=bdYmd(bdDateAdd(h.from,i)); _holInfo[y]={name:(h.vi||h.zh||h.en||''),color:h.color||'#ff5d73',isTet:isTet}; } });
       function _isHol(dstr){ return !!_holSet[dstr]; }
       function _firstWork(d){ d = new Date(d.getTime()); while(_isHol(bdYmd(d))) d.setDate(d.getDate()+1); return d; }
       function _addWork(base, n){ var d = new Date(base.getTime()); if(n<=0) return d; var c=0; while(c<n){ d.setDate(d.getDate()+1); if(!_isHol(bdYmd(d))) c++; } return d; }
@@ -3835,6 +3906,10 @@ function _ovLoadChartLib(cb){
         var effStart = _firstWork(_raw);
         var _prepStartDate = new Date(dmyToYmd(_prepStartDisp||''));
         if(isNaN(_prepStartDate.getTime())) _prepStartDate = new Date(effStart.getTime());
+        var _cDateStr = prod_contractDateDisp();
+        var _cDateYmd = _cDateStr ? dmyToYmd(_cDateStr) : '';
+        var _cDateObj = _cDateYmd ? new Date(_cDateYmd) : null;
+        if(_cDateObj && isNaN(_cDateObj.getTime())) _cDateObj = null;
         _flat.forEach(function(s){ s.sDate=_addWork(effStart, s.startDay); s.eDate=_addWork(effStart, s.startDay+s.days); });
         var lastEnd = _flat.length ? _flat[_flat.length-1].eDate : effStart;
         /* 越南假期区间（相邻假期合并为一段，用于半透明竖条） */
@@ -3842,8 +3917,10 @@ function _ovLoadChartLib(cb){
         while(_bc<=lastEnd){ var yk=bdYmd(_bc), inf=_holInfo[yk]; if(inf){ if(!_bs){ _bs=new Date(_bc.getTime()); _bcol=inf.color; _bname=inf.name; _btet=inf.isTet; } } else if(_bs){ _bands.push({s:_bs,e:new Date(_bc.getTime()),color:_bcol,name:_bname,isTet:_btet}); _bs=null; } _bc.setDate(_bc.getDate()+1); }
         if(_bs){ _bands.push({s:_bs,e:new Date(_bc.getTime()),color:_bcol,name:_bname,isTet:_btet}); }
         var fmtFull = function(d){ return prod_pad(d.getDate())+'-'+prod_pad(d.getMonth()+1)+'-'+d.getFullYear(); };
-        /* 自然月等宽坐标：时间轴起点提前到「筹备开始日」，使筹备条完整可见，其右端接红色开工日 */
-        var startY=_prepStartDate.getFullYear(), startM=_prepStartDate.getMonth();
+        /* 自然月等宽坐标：时间轴起点取「筹备开始日」与「合同签约日」中较早者，确保合同签约日也出现在X轴上 */
+        var _ganttStartDate = new Date(_prepStartDate.getTime());
+        if(_cDateObj && _cDateObj < _ganttStartDate) _ganttStartDate = new Date(_cDateObj.getTime());
+        var startY=_ganttStartDate.getFullYear(), startM=_ganttStartDate.getMonth();
         function _dim(y,m){ return new Date(y,m+1,0).getDate(); }
         function _mu(d){ return (d.getFullYear()*12+d.getMonth())-(startY*12+startM)+(d.getDate()-1)/_dim(d.getFullYear(),d.getMonth()); }
         var endY=lastEnd.getFullYear(), endM=lastEnd.getMonth();
@@ -3859,12 +3936,28 @@ function _ovLoadChartLib(cb){
         h += '<div style="position:absolute;left:152px;right:310px;top:20px;bottom:0;pointer-events:none;z-index:4">';
         _marks.forEach(function(m){ h += '<div style="position:absolute;left:'+m.pos+'%;top:0;bottom:0;border-left:1px dashed #cfcfcf"></div>'; });
         h += '</div>';
+        /* 最顶部：合同签约日标记（菱形小点；早于时间轴起点时钳到最左，仍只显示一个小点） */
+        (function(){
+          var _cTxt = _cDateObj ? fmtFull(_cDateObj) : '—';
+          var _cLeft = _cDateObj ? _xpos(_cDateObj) : 0;
+          var _cLeftCss = Math.max(0, Math.min(95, _cLeft));
+          var _cDx = (_cLeft < 0) ? 0 : -50;
+          var _cTip = pt('lbl_contract_date')+': '+prod_esc(_cTxt);
+          h += '<div style="display:flex;align-items:center;margin:6px 0">'
+            + '<div style="width:152px;font-size:12px;flex-shrink:0">'+pt('lbl_contract_date')+'</div>'
+            + '<div style="flex:1;background:#f0f0f0;height:26px;border-radius:4px;position:relative;overflow:hidden">'
+            + '<div title="'+_cTip+'" style="position:absolute;left:'+_cLeftCss+'%;top:50%;width:12px;height:12px;background:#E53935;border:1px solid #fff;box-shadow:0 0 0 1px #E53935;transform:translate('+_cDx+'%,-50%) rotate(45deg);z-index:6"></div>'
+            + '</div>'
+            + '<div style="width:300px;margin-left:10px;font-size:11px;color:#000;line-height:1.5">'
+            + '<div style="color:#E53935;font-weight:600">'+_cTip+'</div>'
+            + '</div></div>';
+        })();
         /* 顶部：建厂筹备和试运营阶段条（绿色；时间轴起点已提前到筹备开始日，其右端接红色开工日） */
         var _prepBarW = Math.max(0, _xpos(effStart) - _xpos(_prepStartDate));
         h += '<div style="display:flex;align-items:center;margin:6px 0">'
           + '<div style="width:152px;font-size:12px;flex-shrink:0">'+pt('gantt_prep_label')+'</div>'
           + '<div style="flex:1;background:#f0f0f0;height:26px;border-radius:4px;position:relative;overflow:hidden">'
-          + '<div title="'+pt('gantt_prep_title')+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'" style="position:absolute;left:0%;width:'+_prepBarW+'%;background:#43A047;height:100%;border-radius:2px"></div>'
+          + '<div title="'+pt('gantt_prep_title')+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'" style="position:absolute;left:'+_xpos(_prepStartDate)+'%;width:'+_prepBarW+'%;background:#43A047;height:100%;border-radius:2px"></div>'
           + '</div>'
           + '<div style="width:300px;margin-left:10px;font-size:11px;color:#000;line-height:1.5">'
           + '<div style="color:#2e7d32">'+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'</div>'
@@ -3951,27 +4044,443 @@ function _ovLoadChartLib(cb){
     function prod_saveGanttStart(){ var f = prod_get(PROD_CUR); f.planStart = prod_val('pg_start'); prod_save(f); prod_renderTab('B'); prod_toast(pt('toast_sched')); }
     function prod_savePriorityHouse(){ var f = prod_get(PROD_CUR); f.priorityHouse = prod_val('pg_priority'); prod_save(f); prod_renderTab('B'); prod_toast(pt('toast_priority')); }
     function prod_savePrep(){ var f = prod_get(PROD_CUR); f.prepStart = prod_val('pg_prep_start'); f.prepEnd = prod_val('pg_prep_end'); if(!f.prepEnd) f.prepEnd = (f.planStart||prod_today()); prod_save(f); prod_renderTab('B'); }
-    /* C 人员（按日快照，只记数） */
+    /* C 日记录：人工 / 天气（按日快照，只记数；天气自动抓取） */
+    function prod_wxCard(slot, id, wx){
+      var label = pt(slot==='am'?'wx_am':'wx_pm');
+      if(!wx){
+        return '<div class="prod-wx-card" id="'+id+'" style="border:1px solid #e3e3e3;border-radius:8px;padding:10px 12px;min-width:200px;background:#fafcff;">'
+          + '<div class="prod-wx-h" style="font-weight:600;margin-bottom:6px;color:#2c3e50;">'+label+'</div>'
+          + '<div class="prod-wx-empty" style="color:#aaa;font-size:13px;">'+pt('wx_notyet')+'</div></div>';
+      }
+      var cond = (wx.code!=null) ? i18nVal(bdWxKey(wx.code),'—') : '';
+      return '<div class="prod-wx-card" id="'+id+'" style="border:1px solid #e3e3e3;border-radius:8px;padding:10px 12px;min-width:200px;background:#fafcff;">'
+        + '<div class="prod-wx-h" style="font-weight:600;margin-bottom:6px;color:#2c3e50;">'+label+'</div>'
+        + '<div class="prod-wx-row" style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0;"><span class="prod-wx-k" style="color:#888;">'+pt('wx_temp')+'</span><span class="prod-wx-v" style="font-weight:500;">'+prod_esc(wx.temp)+'</span></div>'
+        + '<div class="prod-wx-row" style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0;"><span class="prod-wx-k" style="color:#888;">'+pt('wx_cond')+'</span><span class="prod-wx-v" style="font-weight:500;">'+prod_esc(cond)+'</span></div>'
+        + '<div class="prod-wx-row" style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0;"><span class="prod-wx-k" style="color:#888;">'+pt('wx_hum')+'</span><span class="prod-wx-v" style="font-weight:500;">'+prod_esc(wx.hum)+'</span></div>'
+        + '<div class="prod-wx-row" style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0;"><span class="prod-wx-k" style="color:#888;">'+pt('wx_wind')+'</span><span class="prod-wx-v" style="font-weight:500;">'+prod_wxWind(wx)+'</span></div>'
+        + '</div>';
+    }
+    function prod_wxWind(wx){
+      if(!wx || wx.wind==null || wx.wind==='—') return '—';
+      var m = String(wx.wind).match(/\d+/);
+      return m ? m[0] + i18nVal('bd_wx_wind_unit','级') : prod_esc(wx.wind);
+    }
+    function prod_wxCompact(wx){
+      if(!wx) return '—';
+      var cond = (wx.code!=null) ? i18nVal(bdWxKey(wx.code),'—') : '';
+      return prod_esc(wx.temp)+' '+prod_esc(cond)+' · '+pt('wx_hum')+' '+prod_esc(wx.hum)+' · '+pt('wx_wind')+' '+prod_wxWind(wx);
+    }
     function prod_tabC(f){
-      var h = '<div class="prod-sec-title">'+pt('sec_workers')+'</div>'
-        + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pc_date',prod_today())
-        + '<div style="display:flex;gap:10px;flex-wrap:wrap">';
-      PROD_WORKERS.forEach(function(w){ h += prod_fld(pt('prod_role_'+w[0]),'pc_'+w[0],0); });
+      var d = prod_val('pc_date')||PROD_TABC_SELDATE||ymdToDmy(prod_today());
+      var w = (f.workers && f.workers[d])||{};
+      var rec = (w.recorder && w.recorder!=='') ? w.recorder : prod_loginUser();
+      var h = '<div class="prod-sec-title">'+pt('sec_labor')+'</div>'
+        + '<div class="prod-form">'
+        + '<div class="prod-form-row">'+prod_dateFld(pt('lbl_date'),'pc_date',dmyToYmd(d),'prod_updateWeatherCards()',prod_today())
+        + '<div class="prod-field"><label>'+pt('lbl_holiday')+'</label><select id="pc_holiday">'
++   '<option value="no"'+((w.holiday!=='yes')?' selected':'')+'>'+pt('opt_no')+'</option>'
++   '<option value="yes"'+((w.holiday==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option>'
++ '</select></div>'
++ '<div class="prod-field"><label>'+pt('lbl_recorder')+'</label><input id="pc_recorder" value="'+prod_esc(rec)+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
+        + prod_fld(pt('prod_role_manager'),'pc_manager',0)+'</div>'
+        + '<div class="prod-role-grid">';
+      PROD_WORKERS.slice(1).forEach(function(wk){ h += prod_fld(pt('prod_role_'+wk[0]),'pc_'+wk[0],0); });
       h += '</div><button class="prod-btn" onclick="prod_saveWorkers()">'+pt('btn_save_snap')+'</button></div>';
-      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th>';
-      PROD_WORKERS.forEach(function(w){ h += '<th>'+pt('prod_role_'+w[0])+'</th>'; });
-      h += '<th>'+pt('thr_total2')+'</th><th></th></tr></thead><tbody>';
-      var dates = Object.keys(f.workers||{}).sort().reverse();
-      dates.forEach(function(d){ var w = f.workers[d]; var sum = 0;
-        PROD_WORKERS.forEach(function(k){ sum += (+w[k[0]]||0); });
-        h += '<tr><td>'+ymdToDmy(d)+'</td>'; PROD_WORKERS.forEach(function(k){ h += '<td>'+(w[k[0]]||0)+'</td>'; });
-        h += '<td><b>'+sum+'</b></td><td><button class="prod-btn sec" onclick="prod_delWorkers(\''+d+'\')">'+pt('btn_del')+'</button></td></tr>';
+      h += '<div class="prod-sec-title">'+pt('sec_weather')+'</div>'
+        + '<div style="display:flex;gap:14px;flex-wrap:wrap">'
+        + prod_wxCard('am','pc_wx_am',w.weatherAm)
+        + prod_wxCard('pm','pc_wx_pm',w.weatherPm)
+        + '</div>'
+        + '<div id="pcBackfillWrap" style="margin-top:8px'+( (function(){ var dd=prod_val('pc_date')||ymdToDmy(prod_today()); var ymd=dmyToYmd(dd); return (ymd&&ymd<prod_today())?'':';display:none'; })() )+'">'
+        + '<div style="font-size:12px;color:#888;margin-bottom:6px">'+pt('wx_backfill_hint')+'</div>'
+        + '<button class="prod-btn sec" onclick="prodBackfillWeather()">'+pt('btn_backfill_wx')+'</button></div>';
+      h += '<div class="prod-table-scroll"><table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('lbl_holiday')+'</th><th>'+pt('thr_recorder')+'</th>';
+      PROD_WORKERS.forEach(function(wk){ h += '<th>'+pt('prod_role_'+wk[0])+'</th>'; });
+      h += '<th>'+pt('thr_total2')+'</th><th>'+pt('wx_am')+'</th><th>'+pt('wx_pm')+'</th><th>'+pt('op_actions')+'</th></tr></thead><tbody>';
+      var dates = prod_sortDateKeys(Object.keys(f.workers||{}), true);
+      dates.forEach(function(dd){ var ww = f.workers[dd]; var sum = 0;
+        PROD_WORKERS.forEach(function(k){ sum += (+ww[k[0]]||0); });
+        h += '<tr><td>'+ymdToDmy(dd)+'</td><td>'+((ww.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'</td><td>'+prod_esc(ww.recorder||'')+'</td>'; PROD_WORKERS.forEach(function(k){ h += '<td>'+(ww[k[0]]||0)+'</td>'; });
+        h += '<td><b>'+sum+'</b></td>'
+          + '<td>'+prod_wxCompact(ww.weatherAm)+'</td>'
+          + '<td>'+prod_wxCompact(ww.weatherPm)+'</td>'
+          + '<td style="white-space:nowrap"><button class="prod-op" aria-label="'+pt('op_edit')+'" onclick="prod_editRow(\''+dd+'\')">✏️</button>'
+          + '<button class="prod-op" onclick="prod_copyRow(\''+dd+'\')">📋</button>' + '<button class="prod-op" aria-label="'+pt('op_del')+'" onclick="prod_delWorkers(\''+dd+'\')">🗑️</button></td></tr>';
       });
-      h += '</tbody></table>';
+      h += '</tbody></table></div>';
+      h += prod_renderTrends(f);
       return h;
     }
-    function prod_saveWorkers(){ var f = prod_get(PROD_CUR); var d = prod_val('pc_date')||ymdToDmy(prod_today()); f.workers = f.workers||{}; var w = {}; PROD_WORKERS.forEach(function(k){ w[k[0]] = +prod_val('pc_'+k[0])||0; }); f.workers[d] = w; prod_save(f); prod_renderTab('C'); }
+    function prod_renderTrends(f){
+      var keys = Object.keys(f.workers||{});
+      var h = '<div class="prod-trend-sec">';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('trend_title')+'</div>';
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+        + '<button class="prod-btn mini'+(PROD_TREND_RANGE==='all'?' on':'')+'" onclick="prod_setTrendRange(\'all\')">'+pt('trend_all')+'</button>'
+        + '<button class="prod-btn mini'+(PROD_TREND_RANGE==='30'?' on':'')+'" onclick="prod_setTrendRange(\'30\')">'+pt('trend_30')+'</button>'
+        + '<button class="prod-btn mini'+(PROD_TREND_RANGE==='7'?' on':'')+'" onclick="prod_setTrendRange(\'7\')">'+pt('trend_7')+'</button></div>';
+      if(!keys.length){
+        h += '<div class="prod-trend-nodata">'+pt('trend_nodata')+'</div></div>';
+        return h;
+      }
+      /* 人工数量曲线 */
+      h += '<div class="prod-canvas-card"><div class="prod-sec-title" style="margin:0 0 6px;border-color:#E53935">'+pt('trend_labor')+'</div>';
+      h += '<div class="prod-role-toggles">';
+      h += '<label style="font-weight:600;color:#E53935"><input type="checkbox" checked disabled>'+pt('trend_total')+'</label>';
+      PROD_WORKERS.forEach(function(wk){ var on = PROD_TREND_ROLES[wk[0]]?' checked':''; h += '<label><input type="checkbox"'+on+' onchange="prod_toggleTrendRole(\''+wk[0]+'\',this.checked)">'+pt('prod_role_'+wk[0])+'</label>'; });
+      h += '</div>';
+      h += '<canvas id="pcLaborChart" style="width:100%;height:240px;display:block"></canvas><div class="prod-canvas-tip" id="pcLaborHover"></div></div>';
+      /* 温度 & 湿度曲线（晴雨带） */
+      h += '<div class="prod-canvas-card"><div class="prod-sec-title" style="margin:0 0 6px;border-color:#6c757d">'+pt('trend_weather')+'</div>';
+      h += '<canvas id="pcWeatherChart" style="width:100%;height:260px;display:block"></canvas>';
+      h += '<div class="prod-trend-tip" id="pcWeatherTip"></div><div class="prod-canvas-tip" id="pcWeatherHover"></div></div>';
+      h += '</div>';
+      return h;
+    }
+    function prod_setTrendRange(r){ PROD_TREND_RANGE = r; prod_renderTab('C'); }
+    function prod_toggleTrendRole(k,on){ PROD_TREND_ROLES[k] = !!on; prod_drawTrends(); }
+    function prod_wxNum(a,b){
+      var va = (a==null)?null:parseFloat(String(a).replace(/[^\d.\-]/g,''));
+      var vb = (b==null)?null:parseFloat(String(b).replace(/[^\d.\-]/g,''));
+      if(va==null && vb==null) return null;
+      if(va==null) return vb; if(vb==null) return va;
+      return (va+vb)/2;
+    }
+    function prod_wxCond(code){
+      if(code==null) return 'na';
+      if(code===0) return 'sun';
+      if(code>=51) return 'rain';
+      return 'cloud';
+    }
+    function prod_trendData(f){
+      var dates = prod_sortDateKeys(Object.keys(f.workers||{}), false);
+      if(PROD_TREND_RANGE!=='all'){ var n = PROD_TREND_RANGE==='7'?7:30; dates = dates.slice(-n); }
+      var laborTotal=[], laborByRole={}, temps=[], hums=[], cond=[];
+      PROD_WORKERS.forEach(function(k){ laborByRole[k[0]]=[]; });
+      dates.forEach(function(dd){
+        var w = f.workers[dd]||{}, sum=0;
+        PROD_WORKERS.forEach(function(k){ var v=+w[k[0]]||0; laborByRole[k[0]].push(v); sum+=v; });
+        laborTotal.push(sum>0?sum:null);
+        var ta = w.weatherAm, tp = w.weatherPm;
+        temps.push(prod_wxNum(ta&&ta.temp, tp&&tp.temp));
+        hums.push(prod_wxNum(ta&&ta.hum, tp&&tp.hum));
+        var ca = prod_wxCond(ta&&ta.code), cp = prod_wxCond(tp&&tp.code);
+        cond.push((ca==='rain'||cp==='rain')?'rain':((ca==='na'&&cp==='na')?'na':(ca==='sun'||cp==='sun')?'sun':'cloud'));
+      });
+      return {dates:dates, laborTotal:laborTotal, laborByRole:laborByRole, temps:temps, hums:hums, cond:cond};
+    }
+    function prod_canvasCtx(id,W,H){
+      var cv = prod_el(id); if(!cv) return null;
+      var dpr = window.devicePixelRatio||1;
+      cv.style.height = H+'px';
+      cv.width = Math.max(1,Math.round(W*dpr)); cv.height = Math.max(1,Math.round(H*dpr));
+      cv.style.width = W+'px';
+      var ctx = cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+      return {cv:cv, ctx:ctx, W:W, H:H};
+    }
+    function prod_drawTrends(){
+      if(PROD_ACTIVE_TAB!=='C') return;
+      var f = prod_get(PROD_CUR); if(!f) return;
+      if(!PROD_TREND_RESIZE){ PROD_TREND_RESIZE = true; window.addEventListener('resize', prod_drawTrends); }
+      var d = prod_trendData(f);
+      PROD_TREND_DATA = d;
+      prod_drawLaborChart(d);
+      prod_drawWeatherChart(d);
+      prod_bindCanvasHover('pcLaborChart', 'pcLaborHover', 'labor');
+      prod_bindCanvasHover('pcWeatherChart', 'pcWeatherHover', 'weather');
+    }
+    function prod_bindCanvasHover(canvasId, tipId, type){
+      var cv = prod_el(canvasId); if(!cv || cv._bound) return;
+      cv._bound = true;
+      cv.addEventListener('mousemove', function(e){ prod_canvasHover(e, cv, tipId, type); });
+      cv.addEventListener('mouseleave', function(){ var t = prod_el(tipId); if(t) t.style.display='none'; });
+    }
+    function prod_canvasHover(e, cv, tipId, type){
+      var g = cv._geom; if(!g) return;
+      var d = PROD_TREND_DATA; if(!d) return;
+      var rect = cv.getBoundingClientRect();
+      var mx = e.clientX - rect.left;
+      var i = g.n<=1 ? 0 : Math.round((mx - g.pl)/(g.plotW) * (g.n-1));
+      if(i<0) i=0; if(i>=g.n) i=g.n-1;
+      var tip = prod_el(tipId); if(!tip) return;
+      var html = '<b>'+d.dates[i]+'</b>';
+      if(type==='labor'){
+        var t = d.laborTotal[i];
+        html += '<br>'+pt('trend_total')+': '+(t!=null?t:'—');
+        PROD_WORKERS.forEach(function(k){ if(PROD_TREND_ROLES[k[0]]){ var v=d.laborByRole[k[0]][i]; html += '<br><span style="color:'+prod_roleColor(k[0])+'">'+pt('prod_role_'+k[0])+'</span>: '+(v!=null?v:'—'); } });
+      } else {
+        var tp = d.temps[i], hp = d.hums[i], c = d.cond[i];
+        html += '<br>'+pt('wx_temp')+': '+(tp!=null?tp+'°C':'—');
+        html += '<br>'+pt('wx_hum')+': '+(hp!=null?hp+'%':'—');
+        var cl = c==='sun'?pt('trend_sun'):c==='rain'?pt('trend_rain'):c==='cloud'?pt('trend_cloud'):'—';
+        html += '<br>'+pt('wx_cond')+': '+cl;
+      }
+      tip.innerHTML = html;
+      tip.style.display = 'block';
+      var baseL = cv.offsetLeft, baseT = cv.offsetTop;
+      var left = baseL + mx + 14;
+      if(left + tip.offsetWidth > rect.width + baseL) left = baseL + mx - tip.offsetWidth - 14;
+      tip.style.left = left + 'px';
+      tip.style.top = (baseT + (e.clientY - rect.top) + 12) + 'px';
+    }
+    function prod_drawLaborChart(d){
+      var card = prod_el('pcLaborChart'); if(!card) return;
+      var wrap = card.parentNode; var W = wrap.clientWidth - 24; if(W<200) W = 220;
+      var g = prod_canvasCtx('pcLaborChart', W, 240); if(!g) return;
+      var ctx = g.ctx; var n = d.dates.length; if(!n){ return; }
+      var pl=40, pr=12, ptp=12, pb=28; if(n===1){ pr=12; }
+      var plotW = W-pl-pr, plotH = 240-ptp-pb;
+      card._geom = {pl:pl, plotW:plotW, n:n}; card._type='labor';
+      var all = []; for(var i=0;i<n;i++){ if(d.laborTotal[i]!=null) all.push(d.laborTotal[i]); PROD_WORKERS.forEach(function(k){ var v=d.laborByRole[k[0]][i]; if(PROD_TREND_ROLES[k[0]] && v!=null) all.push(v); }); }
+      var maxV = Math.max(1, Math.max.apply(null, all)||1);
+      var yMax = Math.ceil(maxV*1.1);
+      var X = function(i){ return pl + (n<=1? plotW/2 : plotW*i/(n-1)); };
+      var Y = function(v){ return ptp + plotH*(1 - v/yMax); };
+      ctx.strokeStyle='#eee'; ctx.lineWidth=1; ctx.fillStyle='#999'; ctx.font='10px sans-serif';
+      var gridN = 4;
+      for(var gi=0; gi<=gridN; gi++){ var vy = yMax*gi/gridN; var yy = Y(vy); ctx.beginPath(); ctx.moveTo(pl,yy); ctx.lineTo(pl+plotW,yy); ctx.stroke(); ctx.fillText(Math.round(vy), 4, yy+3); }
+      prod_drawXLabels(ctx, d.dates, X, n, pl, plotH, ptp, 14);
+      var drawLine = function(arr, color, width, dashed){
+        ctx.strokeStyle=color; ctx.lineWidth=width; ctx.setLineDash(dashed?[4,3]:[]); ctx.beginPath(); var started=false;
+        for(var i=0;i<n;i++){ var v=arr[i]; if(v==null){ started=false; continue; } var x=X(i), y=Y(v); if(!started){ ctx.moveTo(x,y); started=true; } else ctx.lineTo(x,y); }
+        ctx.stroke(); ctx.setLineDash([]);
+      };
+      drawLine(d.laborTotal, '#E53935', 2.4, false);
+      PROD_WORKERS.forEach(function(k){ if(PROD_TREND_ROLES[k[0]]){ drawLine(d.laborByRole[k[0]], prod_roleColor(k[0]), 1.4, true); } });
+    }
+    function prod_drawWeatherChart(d){
+      var card = prod_el('pcWeatherChart'); if(!card) return;
+      var wrap = card.parentNode; var W = wrap.clientWidth - 24; if(W<200) W = 220;
+      var H = 260; var g = prod_canvasCtx('pcWeatherChart', W, H); if(!g) return;
+      var ctx = g.ctx; var n = d.dates.length; if(!n) return;
+      var pl=40, pr=42, ptp=12, pb=40; var plotW = W-pl-pr, plotH = H-ptp-pb;
+      var temps = d.temps, hums = d.hums;
+      var tmin=999, tmax=-999, hmin=999, hmax=-999;
+      for(var i=0;i<n;i++){ if(temps[i]!=null){ if(temps[i]<tmin)tmin=temps[i]; if(temps[i]>tmax)tmax=temps[i]; } if(hums[i]!=null){ if(hums[i]<hmin)hmin=hums[i]; if(hums[i]>hmax)hmax=hums[i]; } }
+      if(tmin>999){ tmin=0; tmax=10; } if(hmin>999){ hmin=0; hmax=100; }
+      tmin = Math.floor(tmin)-1; tmax = Math.ceil(tmax)+1; hmin = Math.min(0,hmin); hmax = Math.max(100,hmax);
+      var X = function(i){ return pl + (n<=1? plotW/2 : plotW*i/(n-1)); };
+      var YT = function(v){ return ptp + plotH*(1 - (v-tmin)/(tmax-tmin)); };
+      var YH = function(v){ return ptp + plotH*(1 - (v-hmin)/(hmax-hmin)); };
+      card._geom = {pl:pl, plotW:plotW, n:n}; card._type='weather';
+      /* 晴雨整幅绘图区背景：彩色带 + 大号半透明 emoji 水印（铺在每日色带中央） */
+      var sun=0, rain=0, cloud=0;
+      var colW = n>0 ? plotW/n : plotW;
+      var bandCol = function(c){ return (c==='rain')?'rgba(33,113,194,0.18)':(c==='sun')?'rgba(255,193,7,0.18)':(c==='cloud')?'rgba(158,158,158,0.20)':'rgba(255,255,255,0)'; };
+      var bandIcon = function(c){ return (c==='rain')?'🌧️':(c==='sun')?'☀️':(c==='cloud')?'☁️':''; };
+      for(var i=0;i<n;i++){
+        var c = d.cond[i]; var xc = X(i); var x0 = xc - colW/2, x1 = xc + colW/2;
+        if(x0<pl) x0=pl; if(x1>pl+plotW) x1=pl+plotW;
+        ctx.fillStyle = bandCol(c); ctx.fillRect(x0, ptp, x1-x0, plotH);
+        if(c==='rain') rain++; else if(c==='sun') sun++; else if(c==='cloud') cloud++;
+        var ic = bandIcon(c);
+        if(ic){
+          var fs = Math.min(colW*0.5, 30);
+          ctx.save(); ctx.globalAlpha = 0.8;
+          ctx.font = fs+'px "Segoe UI Emoji","Apple Color Emoji",serif';
+          ctx.textAlign='center'; ctx.textBaseline='bottom';
+          ctx.fillText(ic, xc, ptp + plotH - 4);
+          ctx.restore();
+        }
+      }
+      /* 网格 + 双轴 */
+      ctx.strokeStyle='#eee'; ctx.lineWidth=1; ctx.font='10px sans-serif';
+      for(var gi=0; gi<=4; gi++){ var vy = tmin + (tmax-tmin)*gi/4; var yy = YT(vy); ctx.beginPath(); ctx.moveTo(pl,yy); ctx.lineTo(pl+plotW,yy); ctx.stroke(); ctx.fillStyle='#E53935'; ctx.fillText(Math.round(vy)+'°', 4, yy+3); }
+      for(var gi2=0; gi2<=4; gi2++){ var hv = hmin + (hmax-hmin)*gi2/4; var yy2 = YH(hv); ctx.fillStyle='#000000'; ctx.fillText(Math.round(hv)+'%', pl+plotW+4, yy2+3); }
+      prod_drawXLabels(ctx, d.dates, X, n, pl, plotH, ptp, 24);
+      /* 温度用左轴 YT，湿度用右轴 YH（修正原湿度错画在温度轴上的 bug） */
+      var drawT = function(arr, color, width, dashed, yfn){ ctx.strokeStyle=color; ctx.lineWidth=width; ctx.setLineDash(dashed?[4,3]:[]); ctx.beginPath(); var st=false; for(var i=0;i<n;i++){ var v=arr[i]; if(v==null){ st=false; continue; } var x=X(i), y=yfn(v); if(!st){ ctx.moveTo(x,y); st=true; } else ctx.lineTo(x,y); } ctx.stroke(); ctx.setLineDash([]); };
+      drawT(temps, '#E53935', 2.4, false, YT);
+      drawT(hums, '#000000', 2, true, YH);
+      /* 每个折点标注温度（上方·红）/湿度（下方·黄），小字体，挤也照标 */
+      ctx.textAlign='center'; ctx.font = (n>22?'8px':'9px') + ' sans-serif';
+      for(var i=0;i<n;i++){
+        if(temps[i]!=null){ ctx.fillStyle='#E53935'; ctx.textBaseline='bottom'; ctx.fillText(temps[i]+'°', X(i), YT(temps[i])-3); }
+        if(hums[i]!=null){ ctx.fillStyle='#000000'; ctx.textBaseline='top'; ctx.fillText(hums[i]+'%', X(i), YH(hums[i])+3); }
+      }
+      var tip = prod_el('pcWeatherTip'); if(tip){ var s = pt('trend_sun')+': '+sun+pt('trend_sun_days'); s += ' · '+pt('trend_rain')+': '+rain+pt('trend_rain_days'); if(cloud>0) s += ' · '+pt('trend_cloud')+': '+cloud+pt('trend_cloud_days'); tip.innerHTML = s; }
+    }
+    function prod_roleColor(k){
+      var map = {manager:'#8e24aa',machinist:'#00897b',welder:'#fb8c00',forklift:'#6d4c41',loader:'#5e35b1',mixer:'#3949ab',press:'#d81b60',repair:'#43a047',cook:'#f4511e',temp:'#757575',keeper:'#00acc1'};
+      return map[k]||'#777';
+    }
+    function prod_drawXLabels(ctx, dates, X, n, pl, plotH, ptp, labelDY){
+      ctx.fillStyle='#666'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+      var step = Math.ceil(n/10); if(labelDY==null) labelDY=14;
+      for(var i=0;i<n;i++){ if(i%step!==0 && i!==n-1) continue; var x=X(i); var lab = dates[i]; lab = lab.length>5? lab.slice(0,5):lab; ctx.fillText(lab, x, ptp+plotH+labelDY); }
+      ctx.textAlign='left';
+    }
+    function prod_updateWeatherCards(){
+      if(PROD_ACTIVE_TAB!=='C') return;
+      var f = prod_get(PROD_CUR);
+      var d = prod_val('pc_date')||ymdToDmy(prod_today());
+      PROD_TABC_SELDATE = d;
+      var w = (f.workers && f.workers[d])||{};
+      var am = document.getElementById('pc_wx_am'); if(am) am.outerHTML = prod_wxCard('am','pc_wx_am',w.weatherAm);
+      var pm = document.getElementById('pc_wx_pm'); if(pm) pm.outerHTML = prod_wxCard('pm','pc_wx_pm',w.weatherPm);
+      prodRefreshBackfill();
+    }
+    function prod_saveWorkers(){
+      var f = prod_get(PROD_CUR);
+      var d = prod_val('pc_date')||ymdToDmy(prod_today());
+      f.workers = f.workers||{};
+      var w = (f.workers[d] && typeof f.workers[d]==='object') ? f.workers[d] : {};
+      PROD_WORKERS.forEach(function(k){ w[k[0]] = +prod_val('pc_'+k[0])||0; });
+      w.recorder = w.recorder || prod_loginUser();
+      w.holiday = prod_val('pc_holiday') || 'no';
+      f.workers[d] = w; prod_save(f); prod_renderTab('C');
+      prodTryCaptureWeather(); // 保存后立刻尝试抓取当天天气
+    }
     function prod_delWorkers(d){ var f = prod_get(PROD_CUR); delete f.workers[d]; prod_save(f); prod_renderTab('C'); }
+    /* DD-MM-YYYY → 前一天（DD-MM-YYYY），正确处理月份/年份进位 */
+    function prod_prevDateDmy(dmy){
+      var p = String(dmyToYmd(dmy)).split('-').map(Number);
+      var d = new Date(p[0], p[1]-1, p[2]);
+      d.setDate(d.getDate()-1);
+      return ymdToDmy(d.getFullYear()+'-'+prod_pad(d.getMonth()+1)+'-'+prod_pad(d.getDate()));
+    }
+    /* 按真实日期排序 key 数组（支持 DD-MM-YYYY / YYYY-MM-DD 混用），desc=true 表示从近到远 */
+    function prod_sortDateKeys(arr, desc){
+      return arr.slice().sort(function(a,b){
+        var ay = dmyToYmd(a), by = dmyToYmd(b);
+        if(ay < by) return desc ? 1 : -1;
+        if(ay > by) return desc ? -1 : 1;
+        return 0;
+      });
+    }
+    /* 复制一行人工数据：把源行数值复制成新行，目标=表单选中日期；若等于源日期则取前一天，确保生成新行 */
+    function prod_copyRow(dd){
+      var f = prod_get(PROD_CUR); var ww = (f.workers && f.workers[dd]) || {};
+      if(!f.workers || !f.workers[dd]) return;
+      var tk = prod_val('pc_date') || ymdToDmy(prod_today());
+      if(tk === dd) tk = prod_prevDateDmy(dd); // 没改日期 → 前一天，避免覆盖同一行
+      var guard = 0;
+      while(f.workers[tk] && guard < 3650){ tk = prod_prevDateDmy(tk); guard++; }
+      var clone = {};
+      PROD_WORKERS.forEach(function(k){ clone[k[0]] = (+ww[k[0]]||0); });
+      clone.recorder = ww.recorder || prod_loginUser();
+      f.workers[tk] = clone; prod_save(f); prod_renderTab('C');
+      prod_toast(pt('toast_copied') + ' → ' + tk);
+    }
+    function prod_editRow(d){
+      if(!PROD_CUR || !d) return;
+      var f = prod_get(PROD_CUR);
+      var w = (f.workers && f.workers[d])||{};
+      var el = prod_el('pc_date'); if(el){ el.value = d; PROD_TABC_SELDATE = d; }
+      PROD_WORKERS.forEach(function(k){ var e = prod_el('pc_'+k[0]); if(e) e.value = (w[k[0]]||0); });
+      var recEl = prod_el('pc_recorder'); if(recEl) recEl.value = (w.recorder && w.recorder!=='') ? w.recorder : prod_loginUser();
+      var he = prod_el('pc_holiday'); if(he) he.value = (w.holiday==='yes' ? 'yes' : 'no');
+      prod_updateWeatherCards();
+    }
+    function prodRefreshBackfill(){
+      var wrap = prod_el('pcBackfillWrap'); if(!wrap) return;
+      var d = prod_val('pc_date')||ymdToDmy(prod_today());
+      var ymd = dmyToYmd(d);
+      wrap.style.display = (ymd && ymd < prod_today()) ? '' : 'none';
+    }
+    /* ===== 天气自动抓取（setInterval 轮询，匹配工厂省份，解析四字段） ===== */
+    var PROD_WX_TIMER = null;
+    function prodFactoryProvKey(){
+      var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==PROD_CUR; }) : null;
+      return p ? (p.province||p.region||'') : '';
+    }
+    function prodLoadWeather(prov){
+      if(!prov || typeof vnProvinceByKey!=='function') return;
+      var pr = vnProvinceByKey(prov); if(!pr) return;
+      if(__bdWxCache && __bdWxCache[pr.vi] && (Date.now()-__bdWxAt<600000)) return; // 10 分钟内已取，复用
+      var lat = pr.lat, lng = pr.lng;
+      var url = 'https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lng
+        + '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code&timezone=Asia%2FHo_Chi_Minh';
+      try {
+        fetch(url).then(function(r){ return r.json(); }).then(function(d){
+          var one = d && d.current ? d.current : null;
+          __bdWxCache = __bdWxCache || {}; __bdWxCache[pr.vi] = one; __bdWxAt = Date.now();
+          prodTryCaptureWeather(); // 天气加载完成后立刻写入当天记录
+        }).catch(function(){});
+      } catch(e){}
+    }
+    function prodCaptureWeatherInto(w, slot){
+      var prov = prodFactoryProvKey(); if(!prov) return false;
+      var pr = (typeof vnProvinceByKey==='function') ? vnProvinceByKey(prov) : null; if(!pr) return false;
+      var cur = (__bdWxCache && __bdWxCache[pr.vi]) || null;
+      if(!cur || cur.temperature_2m==null) return false; // 未就绪，下一分钟重试
+      var temp = Math.round(cur.temperature_2m)+'°C';
+      var code = cur.weather_code;
+      var hum = (cur.relative_humidity_2m!=null) ? Math.round(cur.relative_humidity_2m)+'%' : '—';
+      var lv = (cur.wind_speed_10m!=null) ? bdBeaufort(cur.wind_speed_10m) : null;
+      var wind = (lv!=null) ? lv + i18nVal('bd_wx_wind_unit','级') : '—';
+      w[slot] = { temp:temp, code:code, hum:hum, wind:wind };
+      return true;
+    }
+    function prodTryCaptureWeather(){
+      if(!PROD_CUR) return;
+      var d = ymdToDmy(prod_today());
+      var f = prod_get(PROD_CUR); f.workers = f.workers||{};
+      var w = (f.workers[d] && typeof f.workers[d]==='object') ? f.workers[d] : {};
+      var hh = new Date().getHours();
+      var prov = prodFactoryProvKey();
+      if(prov) prodLoadWeather(prov); // 触发/复用天气加载（不依赖仪表盘 DOM）
+      var ch = false;
+      if(hh>=9 && !w.weatherAm){ if(prodCaptureWeatherInto(w,'weatherAm')) ch=true; }
+      if(hh>=14 && !w.weatherPm){ if(prodCaptureWeatherInto(w,'weatherPm')) ch=true; }
+      if(ch){ f.workers[d]=w; prod_save(f); if(PROD_ACTIVE_TAB==='C') prod_renderTab('C'); }
+    }
+    function prodStartWeatherTimer(){
+      if(PROD_WX_TIMER) return;
+      PROD_WX_TIMER = setInterval(prodTryCaptureWeather, 60000);
+      prodTryCaptureWeather();
+    }
+    /* ===== 历史天气补抓（Open-Meteo 归档接口，2026-01-01 起） ===== */
+    function prodWxFromHourly(hr, i){
+      if(!hr || i<0 || i>=hr.time.length) return null;
+      var temp = (hr.temperature_2m[i]!=null) ? Math.round(hr.temperature_2m[i])+'°C' : null;
+      if(temp==null) return null;
+      var code = hr.weather_code[i];
+      var hum = (hr.relative_humidity_2m[i]!=null) ? Math.round(hr.relative_humidity_2m[i])+'%' : '—';
+      var lv = (hr.wind_speed_10m[i]!=null) ? bdBeaufort(hr.wind_speed_10m[i]) : null;
+      var wind = (lv!=null) ? lv + i18nVal('bd_wx_wind_unit','级') : '—';
+      return { temp:temp, code:code, hum:hum, wind:wind };
+    }
+    function prodHourIdx(hr, ymd, hh){
+      if(!hr) return -1;
+      var exact = ymd+'T'+hh+':00';
+      var ex = hr.time.indexOf(exact); if(ex>=0) return ex;
+      var pre = ymd+'T'+hh;
+      for(var i=0;i<hr.time.length;i++){ if(hr.time[i].indexOf(pre)===0) return i; }
+      return -1;
+    }
+    function prodLoadWeatherArchive(prov, ymdStart, ymdEnd, cb){
+      var pr = (typeof vnProvinceByKey==='function') ? vnProvinceByKey(prov) : null; if(!pr){ cb(null); return; }
+      var url = 'https://archive-api.open-meteo.com/v1/archive?latitude='+pr.lat+'&longitude='+pr.lng
+        + '&start_date='+ymdStart+'&end_date='+ymdEnd
+        + '&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=Asia%2FHo_Chi_Minh';
+      try {
+        fetch(url).then(function(r){ return r.json(); }).then(function(d){
+          if(d && d.hourly && d.hourly.time && d.hourly.time.length) cb(d.hourly); else cb(null);
+        }).catch(function(){ cb(null); });
+      } catch(e){ cb(null); }
+    }
+    function prodBackfillWeather(){
+      if(!PROD_CUR) return;
+      var prov = prodFactoryProvKey();
+      if(!prov){ prod_toast(pt('toast_wx_noprov')); return; }
+      var sel = prod_val('pc_date')||ymdToDmy(prod_today());
+      var sy = dmyToYmd(sel);
+      if(!sy || sy >= prod_today()){ return; } // 仅针对过去日期，不受起止限制
+      prod_toast(pt('toast_wx_loading'));
+      prodLoadWeatherArchive(prov, sy, sy, function(hr){
+        if(!hr){ prod_toast(pt('toast_wx_fail')); return; }
+        var f = prod_get(PROD_CUR); f.workers = f.workers||{};
+        var w = (f.workers[sel] && typeof f.workers[sel]==='object') ? f.workers[sel] : {};
+        var am = prodWxFromHourly(hr, prodHourIdx(hr, sy, '09'));
+        var pm = prodWxFromHourly(hr, prodHourIdx(hr, sy, '14'));
+        if(am) w.weatherAm = am;
+        if(pm) w.weatherPm = pm;
+        f.workers[sel] = w; prod_save(f); prod_renderTab('C');
+        prod_toast((pt('toast_wx_backfilled')||'已补抓历史天气')+'：'+sel);
+      });
+    }
     /* D 原料与库存（自采，无流程） */
     function prod_tabD(f){
       var m = f.materials||{items:[],inbound:[],outbound:[]};
@@ -3983,9 +4492,9 @@ function _ovLoadChartLib(cb){
       (m.items||[]).forEach(function(it){ var st = stock(it.name); var warn = (it.warnAt!==''&&it.warnAt!=null&&+st<=+it.warnAt) ? ' style="color:#a31515;font-weight:700"' : ''; h += '<tr><td>'+prod_esc(it.name)+'</td><td>'+prod_esc(it.unit)+'</td><td'+warn+'>'+st+'</td><td>'+(it.warnAt||'')+'</td></tr>'; });
       h += '</tbody></table>';
       h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_inbound')+'</div>';
-      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pd_in_date',prod_today())+prod_fld(pt('lbl_name'),'pd_in_name')+prod_fld(pt('thr_qty2'),'pd_in_qty')+prod_fld(pt('lbl_note'),'pd_in_note')+'<button class="prod-btn" onclick="prod_matIn()">'+pt('btn_inbound')+'</button></div>';
+      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pd_in_date',prod_today(),'',prod_today())+prod_fld(pt('lbl_name'),'pd_in_name')+prod_fld(pt('thr_qty2'),'pd_in_qty')+prod_fld(pt('lbl_note'),'pd_in_note')+'<button class="prod-btn" onclick="prod_matIn()">'+pt('btn_inbound')+'</button></div>';
       h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_outbound')+'</div>';
-      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pd_out_date',prod_today())+prod_fld(pt('lbl_name'),'pd_out_name')+prod_fld(pt('thr_qty2'),'pd_out_qty')+prod_fld(pt('lbl_note'),'pd_out_note')+'<button class="prod-btn sec" onclick="prod_matOut()">'+pt('btn_outbound')+'</button></div>';
+      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pd_out_date',prod_today(),'',prod_today())+prod_fld(pt('lbl_name'),'pd_out_name')+prod_fld(pt('thr_qty2'),'pd_out_qty')+prod_fld(pt('lbl_note'),'pd_out_note')+'<button class="prod-btn sec" onclick="prod_matOut()">'+pt('btn_outbound')+'</button></div>';
       h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('thr_type')+'</th><th>'+pt('thr_name')+'</th><th>'+pt('thr_qty2')+'</th><th>'+pt('lbl_note')+'</th></tr></thead><tbody>';
       var rows = m.inbound.map(function(r){ return {d:r.date,t:pt('type_in'),n:r.name,q:r.qty,nt:r.note}; }).concat(m.outbound.map(function(r){ return {d:r.date,t:pt('type_out'),n:r.name,q:r.qty,nt:r.note}; }));
       rows.sort(function(a,b){ return (b.d||'').localeCompare(a.d||''); });
@@ -4016,13 +4525,14 @@ function _ovLoadChartLib(cb){
     /* E 每日生产 / 盘点 */
     function prod_tabE(f){
       var h = '<div class="prod-sec-title">'+pt('sec_daily')+'</div>'
-        + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pe_date',prod_today())
+        + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pe_date',prod_today(),'',prod_today())
         + '<button class="prod-btn" type="button" onclick="prod_addSpecRow()">'+pt('btn_add_spec')+'</button>'
         + '<button class="prod-btn sec" type="button" onclick="prod_addMatRow()">'+pt('btn_add_mat')+'</button>'
-        + '<button class="prod-btn" type="button" onclick="prod_saveProduction()">'+pt('btn_save_prod')+'</button></div>'
+        + '<button class="prod-btn" type="button" onclick="prod_saveProduction()">'+pt('btn_save_prod')+'</button>'
+        + '<button class="prod-btn sec" type="button" onclick="prod_autoFillHistory()">'+pt('btn_auto_hist')+'</button></div>'
         + '<div id="pe_specs"></div><div id="pe_mats"></div>';
       h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_history')+'</div><table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_good')+'</th><th>'+pt('thr_bad')+'</th><th>'+pt('thr_mat_used')+'</th></tr></thead><tbody>';
-      var dates = Object.keys(f.production||{}).sort().reverse();
+      var dates = prod_sortDateKeys(Object.keys(f.production||{}), true);
       dates.forEach(function(d){ var rec = f.production[d]; var specs = rec.specs||{}; var keys = Object.keys(specs);
         var mu = (rec.materialUsed||[]).map(function(x){ return x.name+':'+x.qty; }).join(', ');
         if(keys.length){ keys.forEach(function(s,i){ h += '<tr><td>'+(i===0?ymdToDmy(d):'')+'</td><td>'+prod_esc(s)+'</td><td>'+(specs[s].good||0)+'</td><td>'+(specs[s].bad||0)+'</td><td>'+(i===0?prod_esc(mu):'')+'</td></tr>'; }); }
@@ -4044,6 +4554,54 @@ function _ovLoadChartLib(cb){
       // 确保耗用物资出现在物资清单
       var names = {}; f.materials.outbound.forEach(function(x){ names[x.name]=1; }); for(var n in names){ if(!f.materials.items.some(function(it){ return it.name===n; })) f.materials.items.push({name:n,unit:'',warnAt:''}); }
       prod_save(f); prod_renderTab('E'); prod_toast(pt('toast_prod_saved'));
+    }
+    /* 自动补录历史产出：31-08-2026 至今，每规格每天随机良品/不良，并按规格体积算法自动算耗料过账 */
+    function prod_autoFillHistory(){
+      var f = prod_get(PROD_CUR);
+      if(!f) return;
+      var mm = prod_slatsMaterial();
+      if(!mm.length){ prod_toast(pt('empty_no_spec')); return; }
+      apprShowConfirm(pt('auto_hist_confirm'), function(){
+      /* 各规格「每吨/片」系数：取自规格表总用量 ÷ 总需求量（与智能报告同源） */
+      var coeff = {};
+      mm.forEach(function(d){ var q = +d.qty||0; coeff[d.spec] = { cement: q? (+d.cement||0)/q : 0, sand: q? (+d.sand||0)/q : 0, gravel: q? (+d.gravel||0)/q : 0, rebar: q? (+d.rebarTons||0)/q : 0 }; });
+      /* 先清空 31-08 至今的产出 + 生产耗用出库，并重置成品库存累计 */
+      f.production = {};
+      f.materials = f.materials || {items:[],inbound:[],outbound:[]};
+      f.materials.outbound = (f.materials.outbound||[]).filter(function(x){ return x.note !== '生产耗用'; });
+      f.finished = {};
+      var startYmd = '2026-08-31', endYmd = prod_today();
+      var cur = new Date(startYmd + 'T00:00:00');
+      var end = new Date(endYmd + 'T00:00:00');
+      var _rnd = function(a,b){ return Math.floor(Math.random()*(b-a+1))+a; };
+      while(cur <= end){
+        var d = bdYmd(cur);
+        var rec = { specs:{}, materialUsed:[] };
+        mm.forEach(function(sp){
+          var good = _rnd(50,350);
+          var bad = Math.round(good * (_rnd(0,3)/100));
+          rec.specs[sp.spec] = { good: good, bad: bad };
+          var c = coeff[sp.spec];
+          if(c){
+            var used = [
+              {name:'水泥', qty:+(c.cement*good).toFixed(2)},
+              {name:'黄砂', qty:+(c.sand*good).toFixed(2)},
+              {name:'石子', qty:+(c.gravel*good).toFixed(2)},
+              {name:'钢筋', qty:+(c.rebar*good).toFixed(2)}
+            ];
+            used.forEach(function(u){ if(u.qty>0){ rec.materialUsed.push(u); f.materials.outbound.push({date:d, name:u.name, qty:u.qty, note:'生产耗用'}); } });
+          }
+        });
+        f.production[d] = rec;
+        cur.setDate(cur.getDate()+1);
+      }
+      /* 重算成品库存累计（仅 produced，delivered 不变，故清零后只加 good） */
+      for(var dt in f.production){ var r = f.production[dt]; for(var s in r.specs){ f.finished[s] = f.finished[s]||{produced:0,delivered:0}; f.finished[s].produced = (+f.finished[s].produced||0) + (+r.specs[s].good||0); } }
+      /* 确保耗用物资出现在物资清单 */
+      var names = {}; f.materials.outbound.forEach(function(x){ if(x.note==='生产耗用') names[x.name]=1; });
+      for(var n in names){ if(!f.materials.items.some(function(it){ return it.name===n; })) f.materials.items.push({name:n, unit:'吨', warnAt:''}); }
+      prod_save(f); prod_renderTab('E'); prod_toast(pt('toast_auto_hist'));
+      });
     }
     /* H 成品库存（水泥漏缝地板，按规格） */
     function prod_idx(s){ return encodeURIComponent(s).replace(/[^a-zA-Z0-9]/g,'_'); }
@@ -4067,7 +4625,7 @@ function _ovLoadChartLib(cb){
       (f.equipment.list||[]).forEach(function(e){ h += '<tr><td>'+prod_esc(e.name)+'</td><td>'+prod_esc(e.grade)+'</td><td>'+prod_esc(e.maint)+'</td></tr>'; });
       h += '</tbody></table>';
       h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_fault')+'</div>';
-      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pf_fdate',prod_today())+prod_fld(pt('lbl_equip'),'pf_fequip')+prod_fld(pt('lbl_down'),'pf_fdown')+prod_fld(pt('lbl_reason'),'pf_freason')+prod_fld(pt('lbl_repair'),'pf_frepair')+'<button class="prod-btn sec" onclick="prod_addFault()">'+pt('btn_add_fault')+'</button></div>';
+      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pf_fdate',prod_today(),'',prod_today())+prod_fld(pt('lbl_equip'),'pf_fequip')+prod_fld(pt('lbl_down'),'pf_fdown')+prod_fld(pt('lbl_reason'),'pf_freason')+prod_fld(pt('lbl_repair'),'pf_frepair')+'<button class="prod-btn sec" onclick="prod_addFault()">'+pt('btn_add_fault')+'</button></div>';
       h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('lbl_equip')+'</th><th>'+pt('thr_down2')+'</th><th>'+pt('thr_reason2')+'</th><th>'+pt('thr_repair2')+'</th></tr></thead><tbody>';
       (f.equipment.faults||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).forEach(function(r){ h += '<tr><td>'+prod_esc(ymdToDmy(r.date))+'</td><td>'+prod_esc(r.equip)+'</td><td>'+prod_esc(r.down)+'</td><td>'+prod_esc(r.reason)+'</td><td>'+prod_esc(r.repair)+'</td></tr>'; });
       h += '</tbody></table>';
@@ -4080,7 +4638,7 @@ function _ovLoadChartLib(cb){
       var fn = f.finished||{}; var specs = Object.keys(fn);
       var opts = ''; specs.forEach(function(s){ opts += '<option value="'+prod_esc(s)+'">'+prod_esc(s)+'</option>'; });
       var h = '<div class="prod-sec-title">'+pt('sec_delivery')+'</div>'
-        + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pg_date',prod_today())
+        + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pg_date',prod_today(),'',prod_today())
         + '<div class="prod-field"><label>'+pt('lbl_spec2')+'</label><select id="pg_spec">'+opts+'</select></div>'
         + prod_fld(pt('thr_qty3'),'pg_qty')+prod_fld(pt('lbl_client'),'pg_client')+prod_fld(pt('lbl_note'),'pg_note')
         + '<button class="prod-btn" onclick="prod_addDelivery()">'+pt('btn_deliver')+'</button></div>';
@@ -6155,6 +6713,7 @@ function _ovLoadChartLib(cb){
 var I18N = {
   zh: { 
     // ---- 登录页 / 重置密码 / 忘记密码（顶层键，供 setLangDebug 的 data-i18n 扫描直接读取）----
+    bd_prod_title:"生产人数", bd_worker_title:"安装人数", bd_t10_prog:"生产进度", bd_prodprog_title:"安装进度",
     login_title:"CHOICE SLATS VIET NAM", login_sub:"登录您的账号", login_lbl_user:"账号", login_lbl_pwd:"密码",
     login_ph_user:"请输入账号", login_ph_pwd:"请输入密码",
     login_remember:"记住密码", login_btn:"登录",
@@ -6920,6 +7479,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
   },
   en: { 
     // ---- Login page / Reset Password / Forget Password (top-level keys for data-i18n scan) ----
+    bd_prod_title:"Production Workers", bd_worker_title:"Installation Workers", bd_t10_prog:"Production Progress", bd_prodprog_title:"Installation Progress",
     login_title:"CHOICE SLATS VIET NAM", login_sub:"Sign in to your account", login_lbl_user:"Username", login_lbl_pwd:"Password",
     login_ph_user:"Enter username", login_ph_pwd:"Enter password",
     login_remember:"Remember me", login_btn:"Sign In",
@@ -7688,6 +8248,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
   },
   vi: { 
     // ---- Trang đăng nhập / Đặt lại mật khẩu / Quên mật khẩu (key cấp cao nhất) ----
+    bd_prod_title:"Số người sản xuất", bd_worker_title:"Số người lắp đặt", bd_t10_prog:"Tiến độ sản xuất", bd_prodprog_title:"Tiến độ lắp đặt",
     login_title:"CHOICE SLATS VIET NAM", login_sub:"Đăng nhập tài khoản của bạn", login_lbl_user:"Tài khoản", login_lbl_pwd:"Mật khẩu",
     login_ph_user:"Nhập tài khoản", login_ph_pwd:"Nhập mật khẩu",
     login_remember:"Ghi nhớ", login_btn:"Đăng nhập",
@@ -17782,8 +18343,8 @@ function openDetailView(id, field, labelKey) {
   if (wr>0) warrantyHtml += '<span><b>RMB:</b> ' + Math.round(wr).toLocaleString('en-US') + '</span>';
   if (wu>0) warrantyHtml += '<span><b>USD:</b> ' + Math.round(wu).toLocaleString('en-US') + '</span>';
   if (wv>0) warrantyHtml += '<span><b>VND:</b> ' + Math.round(wv).toLocaleString('en-US') + '</span>';
-  if (ws) warrantyHtml += '<span><b>' + (t.lbl_warranty_start || '开始日期') + ':</b> ' + ws + '</span>';
-  if (we) warrantyHtml += '<span><b>' + (t.lbl_warranty_end || '结束日期') + ':</b> ' + we + '</span>';
+  if (ws) warrantyHtml += '<span><b>' + (t.lbl_warranty_start || '开始日期') + ':</b> ' + cpDisplayDate(ws) + '</span>';
+  if (we) warrantyHtml += '<span><b>' + (t.lbl_warranty_end || '结束日期') + ':</b> ' + cpDisplayDate(we) + '</span>';
   warrantyHtml += '</div></div>';
 
   el('dvBody').innerHTML = displayValue + warrantyHtml;
@@ -18030,7 +18591,7 @@ function openWonModal(id) {
   var ids=['w_contract_no','w_province','w_customer','w_contract_date','w_rate_rmb_vnd','w_rate_usd_vnd','w_include_install','w_payment_terms','w_salesperson','w_equip_rmb','w_equip_usd','w_equip_vnd','w_superv_rmb','w_superv_usd','w_superv_vnd','w_total_equip_rmb','w_total_equip_usd','w_total_equip_vnd','w_inst_budget_rmb','w_inst_budget_usd','w_inst_budget_vnd','w_inst_actual_rmb','w_inst_actual_usd','w_inst_actual_vnd','w_total_ei_rmb','w_total_ei_usd','w_total_ei_vnd','w_vat_rmb','w_vat_usd','w_vat_vnd','w_warranty_rmb','w_warranty_usd','w_warranty_vnd','w_warranty_start','w_warranty_end','w_cust_pay_count','w_cust_paid_rmb','w_cust_paid_usd','w_cust_paid_vnd','w_cust_unpaid_rmb','w_cust_unpaid_usd','w_cust_unpaid_vnd','w_cust_remark','w_doc_addendum_cnt','w_doc_view_addendum','w_doc_equip','w_doc_install'];
   if(id){ 
     var p=globalWonData.find(function(x){ return x.id==id; }); 
-    if(p) ids.forEach(function(i){ var e=el(i); if(e){ var key=i.replace('w_',''); if(key==='contract_date'){ var cd=p[key]||''; if(/^\d{2}-\d{2}-\d{4}$/.test(cd)){ var parts=cd.split('-'); e.value=parts[2]+'-'+parts[1]+'-'+parts[0]; } else e.value=cd; } else { var rawVal=p[key]||''; e.value=rawVal; } }}); 
+    if(p) ids.forEach(function(i){ var e=el(i); if(e){ var key=i.replace('w_',''); if(key==='contract_date' || key==='warranty_start' || key==='warranty_end'){ e.value=cpDisplayDate(p[key]||''); } else { var rawVal=p[key]||''; e.value=rawVal; } }}); 
     // 历史数据回显：已保存的销售人员若已离职/改职位而不在当前下拉中，动态补选项以正确显示。
     // 注意 AGI-GS Internal 由 applySigningLock() 按签约双方统一管理，此处不补，避免泄漏到 AGI-Customer/GS-Customer。
     var spEd = el('w_salesperson');
@@ -21688,8 +22249,8 @@ function addCpPayRow(savedRow) {
   html += '<option value="yes" ' + bgHasYes + '>' + yesText + '</option>';
   html += '</select></td>';
   html += '<td><select class="cp-bg-party" style="width:auto;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;">' + partyOptions + '</select></td>';
-  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="cp-bg-start" value="' + (bg.start || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
-  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="cp-bg-end" value="' + (bg.end || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
+  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="cp-bg-start" value="' + cpDisplayDate(bg.start || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
+  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="cp-bg-end" value="' + cpDisplayDate(bg.end || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
   html += '<td><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;">';
   html += '<input type="text" class="cp-bg-rmb" value="' + (bgAmt.rmb ? Math.round(bgAmt.rmb).toLocaleString() : '') + '" placeholder="RMB" inputmode="numeric" oninput="window.cpOnBgAmtInput(\'rmb\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #f8c9db;border-radius:3px;background:#fde7ef;">';
   html += '<input type="text" class="cp-bg-usd" value="' + (bgAmt.usd ? Math.round(bgAmt.usd).toLocaleString() : '') + '" placeholder="USD" inputmode="numeric" oninput="window.cpOnBgAmtInput(\'usd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #c2d3f3;border-radius:3px;background:#e7eefb;">';
@@ -21700,14 +22261,14 @@ function addCpPayRow(savedRow) {
   html += '<input type="text" class="cp-plan-usd" value="' + (r.plan && r.plan.usd ? Math.round(r.plan.usd).toLocaleString() : '') + '" placeholder="USD" inputmode="numeric" oninput="window.cpOnRowAmtInput(\'plan\',\'usd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #c2d3f3;border-radius:3px;background:#e7eefb;">';
   html += '<input type="text" class="cp-plan-vnd" value="' + (r.plan && r.plan.vnd ? Math.round(r.plan.vnd).toLocaleString() : '') + '" placeholder="VND" inputmode="numeric" oninput="window.cpOnRowAmtInput(\'plan\',\'vnd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #ecdc9f;border-radius:3px;background:#fbf3d8;">';
   html += '</div></td>';
-  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="cp-plan-date" value="' + (r.planDate || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
+  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="cp-plan-date" value="' + cpDisplayDate(r.planDate || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
   html += '<td><select class="cp-method">' + methodOptions + '</select></td>';
   html += '<td><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;">';
   html += '<input type="text" class="cp-actual-rmb" value="' + (r.actual && r.actual.rmb ? Math.round(r.actual.rmb).toLocaleString() : '') + '" placeholder="RMB" inputmode="numeric" oninput="window.cpOnRowAmtInput(\'actual\',\'rmb\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #f8c9db;border-radius:3px;background:#fde7ef;">';
   html += '<input type="text" class="cp-actual-usd" value="' + (r.actual && r.actual.usd ? Math.round(r.actual.usd).toLocaleString() : '') + '" placeholder="USD" inputmode="numeric" oninput="window.cpOnRowAmtInput(\'actual\',\'usd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #c2d3f3;border-radius:3px;background:#e7eefb;">';
   html += '<input type="text" class="cp-actual-vnd" value="' + (r.actual && r.actual.vnd ? Math.round(r.actual.vnd).toLocaleString() : '') + '" placeholder="VND" inputmode="numeric" oninput="window.cpOnRowAmtInput(\'actual\',\'vnd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #ecdc9f;border-radius:3px;background:#fbf3d8;">';
   html += '</div></td>';
-  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="cp-actual-date" value="' + (r.actualDate || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
+  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="cp-actual-date" value="' + cpDisplayDate(r.actualDate || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
   html += '<td style="text-align:center;"><button onclick="window.cpDelRow(this)" style="border:none;background:#fde8e8;color:#e74c3c;font-size:14px;cursor:pointer;padding:2px 6px;border-radius:4px;">🗑</button></td>';
 
   tr.innerHTML = html;
@@ -21902,6 +22463,11 @@ function cpParseDDMMYYYY(s) {
   var m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
   return m ? { y: +m[3], m: +m[2] - 1, d: +m[1] } : null;
 }
+function cpDisplayDate(v) {
+  if (!v) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) { var p = v.split('-'); return p[2] + '-' + p[1] + '-' + p[0]; }
+  return v;
+}
 
 function cpGetWeekDays() {
   var lang = CUR_LANG || 'zh';
@@ -21995,14 +22561,26 @@ function cpRenderCal(selected) {
   var firstDow = new Date(cpCalViewYear, cpCalViewMonth, 1).getDay();
   var daysInMonth = new Date(cpCalViewYear, cpCalViewMonth + 1, 0).getDate();
   var today = new Date();
+  var maxDate = null;
+  if (cpCalTarget && cpCalTarget.getAttribute('data-max')) {
+    var maxP = cpParseDDMMYYYY(cpCalTarget.getAttribute('data-max'));
+    if (maxP) maxDate = new Date(maxP.y, maxP.m, maxP.d, 0, 0, 0, 0);
+  }
   var html = '';
   for (var i = 0; i < firstDow; i++) html += '<button type="button" class="empty" disabled></button>';
   for (var d = 1; d <= daysInMonth; d++) {
     var cls = [];
+    var thisDate = new Date(cpCalViewYear, cpCalViewMonth, d);
+    var isDisabled = maxDate && thisDate.getTime() > maxDate.getTime();
     if (selected && selected.y === cpCalViewYear && selected.m === cpCalViewMonth && selected.d === d) cls.push('selected');
     if (today.getFullYear() === cpCalViewYear && today.getMonth() === cpCalViewMonth && today.getDate() === d) cls.push('today');
+    if (isDisabled) cls.push('disabled');
     // inline onclick：彻底杜绝事件委托失效/被拦截导致点不动
-    html += '<button type="button" class="' + cls.join(' ') + '" onclick="cpCalPick(' + d + ')">' + d + '</button>';
+    if (isDisabled) {
+      html += '<button type="button" class="' + cls.join(' ') + '" disabled>' + d + '</button>';
+    } else {
+      html += '<button type="button" class="' + cls.join(' ') + '" onclick="cpCalPick(' + d + ')">' + d + '</button>';
+    }
   }
   var grid = document.getElementById('cpCalGrid');
   if (grid) grid.innerHTML = html;
@@ -22439,8 +23017,8 @@ function applyCpRowToAgiRow(cpRow, agiTr) {
   setVal('.agi-usage', cpRow.usage || '');
   setVal('.agi-bg-has', (cpRow.bg && cpRow.bg.has) ? cpRow.bg.has : 'no');
   setVal('.agi-bg-party', (cpRow.bg && cpRow.bg.party) ? cpRow.bg.party : '');
-  setVal('.agi-bg-start', (cpRow.bg && cpRow.bg.start) ? cpRow.bg.start : '');
-  setVal('.agi-bg-end', (cpRow.bg && cpRow.bg.end) ? cpRow.bg.end : '');
+  setVal('.agi-bg-start', (cpRow.bg && cpRow.bg.start) ? cpDisplayDate(cpRow.bg.start) : '');
+  setVal('.agi-bg-end', (cpRow.bg && cpRow.bg.end) ? cpDisplayDate(cpRow.bg.end) : '');
   setVal('.agi-method', cpRow.method || '');
   // 触发 BG 启用/禁用联动
   var bgSel = agiTr.querySelector('.agi-bg-has');
@@ -22458,7 +23036,7 @@ function applyCpRowToAgiRow(cpRow, agiTr) {
   // 3) 预计付款 = cp.plan * (1-佣金比率)
   fill3('.agi-plan-rmb', '.agi-plan-usd', '.agi-plan-vnd', cpRow.plan || null);
   // 4) 预计日期 = cp.planDate + 7 天
-  setVal('.agi-plan-date', dmyAddDays(cpRow.planDate, 7));
+  setVal('.agi-plan-date', dmyAddDays(cpDisplayDate(cpRow.planDate), 7));
 }
 // 从 _custPayStore 按行号同步所有 agi 行（行数不足时补建空行）
 function syncAllAgiRowsFromCp() {
@@ -22576,8 +23154,8 @@ function addAgiPayRow(savedRow) {
   html += '<option value="yes" ' + bgHasYes + '>' + yesText + '</option>';
   html += '</select></td>';
   html += '<td><select class="agi-bg-party" style="' + selStyle + '">' + partyOptions + '</select></td>';
-  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="agi-bg-start" value="' + (bg.start || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="' + inpStyle + '"></div></td>';
-  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="agi-bg-end" value="' + (bg.end || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="' + inpStyle + '"></div></td>';
+  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="agi-bg-start" value="' + cpDisplayDate(bg.start || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="' + inpStyle + '"></div></td>';
+  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="agi-bg-end" value="' + cpDisplayDate(bg.end || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="' + inpStyle + '"></div></td>';
   html += '<td><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;">';
   html += '<input type="text" class="agi-bg-rmb" value="' + (bgAmt.rmb ? formatCurrencyWithSymbol(Math.round(bgAmt.rmb),'RMB') : '') + '" placeholder="RMB" inputmode="numeric" oninput="window.agiOnBgAmtInput(\'rmb\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #f8c9db;border-radius:3px;background:#fde7ef;">';
   html += '<input type="text" class="agi-bg-usd" value="' + (bgAmt.usd ? formatCurrencyWithSymbol(Math.round(bgAmt.usd),'USD') : '') + '" placeholder="USD" inputmode="numeric" oninput="window.agiOnBgAmtInput(\'usd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #c2d3f3;border-radius:3px;background:#e7eefb;">';
@@ -22588,14 +23166,14 @@ function addAgiPayRow(savedRow) {
   html += '<input type="text" class="agi-plan-usd" value="' + (r.plan && r.plan.usd ? formatCurrencyWithSymbol(Math.round(r.plan.usd),'USD') : '') + '" placeholder="USD" inputmode="numeric" oninput="window.agiOnRowAmtInput(\'plan\',\'usd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #c2d3f3;border-radius:3px;background:#e7eefb;">';
   html += '<input type="text" class="agi-plan-vnd" value="' + (r.plan && r.plan.vnd ? formatCurrencyWithSymbol(Math.round(r.plan.vnd),'VND') : '') + '" placeholder="VND" inputmode="numeric" oninput="window.agiOnRowAmtInput(\'plan\',\'vnd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #ecdc9f;border-radius:3px;background:#fbf3d8;">';
   html += '</div></td>';
-  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="agi-plan-date" value="' + (r.planDate || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="' + inpStyle + '"></div></td>';
+  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="agi-plan-date" value="' + cpDisplayDate(r.planDate || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="' + inpStyle + '"></div></td>';
   html += '<td><select class="agi-method" style="' + selStyle + '">' + methodOptions + '</select></td>';
   html += '<td><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;">';
   html += '<input type="text" class="agi-actual-rmb" value="' + (r.actual && r.actual.rmb ? formatCurrencyWithSymbol(Math.round(r.actual.rmb),'RMB') : '') + '" placeholder="RMB" inputmode="numeric" oninput="window.agiOnRowAmtInput(\'actual\',\'rmb\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #f8c9db;border-radius:3px;background:#fde7ef;">';
   html += '<input type="text" class="agi-actual-usd" value="' + (r.actual && r.actual.usd ? formatCurrencyWithSymbol(Math.round(r.actual.usd),'USD') : '') + '" placeholder="USD" inputmode="numeric" oninput="window.agiOnRowAmtInput(\'actual\',\'usd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #c2d3f3;border-radius:3px;background:#e7eefb;">';
   html += '<input type="text" class="agi-actual-vnd" value="' + (r.actual && r.actual.vnd ? formatCurrencyWithSymbol(Math.round(r.actual.vnd),'VND') : '') + '" placeholder="VND" inputmode="numeric" oninput="window.agiOnRowAmtInput(\'actual\',\'vnd\',this)" style="width:100%;font-size:11px;padding:2px;border:1px solid #ecdc9f;border-radius:3px;background:#fbf3d8;">';
   html += '</div></td>';
-  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="agi-actual-date" value="' + (r.actualDate || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
+  html += '<td><div class="cp-date-input-wrapper"><input type="text" class="agi-actual-date" value="' + cpDisplayDate(r.actualDate || '') + '" placeholder="DD-MM-YYYY" readonly onfocus="window.cpOpenCalendar(this)" style="width:100%;font-size:11px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;"></div></td>';
   html += '<td style="text-align:center;"><button onclick="window.agiDelRow(this)" style="border:none;background:#fde8e8;color:#e74c3c;font-size:14px;cursor:pointer;padding:2px 6px;border-radius:4px;">🗑</button></td>';
 
   tr.innerHTML = html;
@@ -24222,14 +24800,14 @@ function renderBoardShell() {
   + '<div class="bd-grid">'
   +   '<div class="bd-card bd-total" id="bdTotal"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_total_title','项目总数 / 建成 · 在建')+'</span></div><div class="bd-kpi-body" id="bdTotalBody"><span class="bd-loading">…</span></div></div>'
   +   '<div class="bd-card bd-top10" id="bdTop10"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_top10_title','TOP10 项目进度')+'</span></div><div class="bd-top10-body" id="bdTop10Body"><span class="bd-loading">…</span></div></div>'
-  +   '<div class="bd-card bd-prodprog" id="bdProdProg"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_prodprog_title','生产进度')+'</span></div><div class="bd-ph-body">'+i18nVal('bd_pending','（待接入：数据模块未就绪）')+'</div></div>'
+  +   '<div class="bd-card bd-prodprog" id="bdProdProg"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_prodprog_title','安装进度')+'</span></div><div class="bd-ph-body">'+i18nVal('bd_pending','（待接入：数据模块未就绪）')+'</div></div>'
   +   '<div class="bd-card bd-clock" id="bdClock"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_clock_title','日期 · 时间 · 天气')+'</span></div><div class="bd-clock-time" id="bdClockTime">--:--:--</div><div class="bd-clock-date" id="bdClockDate"></div><div class="bd-wx-list" id="bdWxBody"><span class="bd-loading">…</span></div></div>'
   +   '<div class="bd-card bd-map" id="bdMap"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_map_title','项目分布地图（越南）')+'</span></div><div class="bd-map-body" id="bdMapBody"><span class="bd-loading">…</span></div></div>'
   +   '<div class="bd-card bd-ph" id="bdPhotos"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_photo_title','现场图片')+'</span></div><div class="bd-ph-body">'+i18nVal('bd_pending','（待接入：数据模块未就绪）')+'</div></div>'
   +   '<div class="bd-card bd-cal" id="bdCal"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_cal_title','日历（中越法定假日）')+'</span></div><div class="bd-cal-body" id="bdCalBody"><span class="bd-loading">…</span></div></div>'
   +   '<div class="bd-row5">'
-  +     '<div class="bd-card bd-sq" id="bdWorkers"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_worker_title','施工人数')+'</span></div><div class="bd-ph-body bd-sq-body">'+i18nVal('bd_pending','（待接入：数据模块未就绪）')+'</div></div>'
-  +     '<div class="bd-card bd-sq" id="bdProd"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_prod_title','生产数据')+'</span></div><div class="bd-ph-body bd-sq-body">'+i18nVal('bd_pending','（待接入：数据模块未就绪）')+'</div></div>'
+  +     '<div class="bd-card bd-sq" id="bdWorkers"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_worker_title','安装人数')+'</span></div><div class="bd-ph-body bd-sq-body">'+i18nVal('bd_pending','（待接入：数据模块未就绪）')+'</div></div>'
+  +     '<div class="bd-card bd-sq" id="bdProd"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_prod_title','生产人数')+'</span></div><div class="bd-ph-body bd-sq-body">'+i18nVal('bd_pending','（待接入：数据模块未就绪）')+'</div></div>'
   +     '<div class="bd-card bd-sq bd-fx-tile"><div class="bd-card-h"><span class="bd-dot"></span><span>RMB-VND</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdFx1C"></canvas></div><div class="bd-fx-cur" id="bdFx1V">…</div></div>'
   +     '<div class="bd-card bd-sq bd-fx-tile"><div class="bd-card-h"><span class="bd-dot"></span><span>USD-VND</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdFx2C"></canvas></div><div class="bd-fx-cur" id="bdFx2V">…</div></div>'
   +     '<div class="bd-card bd-sq bd-fx-tile"><div class="bd-card-h"><span class="bd-dot"></span><span>USD-RMB</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdFx3C"></canvas></div><div class="bd-fx-cur" id="bdFx3V">…</div></div>'
@@ -24287,7 +24865,7 @@ function boardRenderTop10(list) {
   }).sort(function(a,b){ return b.amt - a.amt; }).slice(0,10);
   if (!rows.length) { body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
   // ★ 合同金额属敏感数据，看板一律不展示；金额仅用于内部排序
-  var html = '<div class="bd-t10-head"><span>#</span><span>'+i18nVal('bd_t10_name','项目')+'</span><span>'+i18nVal('bd_t10_prog','进度')+'</span></div>';
+  var html = '<div class="bd-t10-head"><span>#</span><span>'+i18nVal('bd_t10_name','项目')+'</span><span>'+i18nVal('bd_t10_prog','生产进度')+'</span></div>';
   rows.forEach(function(r, i){
     var name = r.p.customer || r.p.contract_no || ('#'+r.p.id);
     html += '<div class="bd-t10-row"><span class="bd-t10-rank">'+(i+1)+'</span><span class="bd-t10-name">'+escBd(name)+'</span><span class="bd-t10-prog">'+i18nVal('bd_pending_short','待接入')+'</span></div>';
@@ -28910,7 +29488,7 @@ window.CommissionModal={open:open,close:close,applyLang:applyLang,addPayRow:addP
         // 第7列（附件）由 addmDocCell 统一渲染（上传按钮 + 查看/下载 三语，与 w_doc_equip 一致）
         html+='<tr data-i="'+i+'">'
           +'<td style="padding:4px 6px;border:1px solid #e5e5e5;text-align:center;font-weight:700;color:#E53935;">'+(i+1)+'</td>'
-          +'<td style="padding:4px 6px;border:1px solid #e5e5e5;text-align:center;"><input type="text" class="ad-date" placeholder="DD-MM-YYYY" value="'+(r.date||'')+'" onfocus="window.cpOpenCalendar(this)" onclick="window.cpOpenCalendar(this)" oninput="addmOnDate('+i+',this.value)" onchange="addmOnDate('+i+',this.value)" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:11.5px;cursor:pointer;background:#fff;"></td>'
+          +'<td style="padding:4px 6px;border:1px solid #e5e5e5;text-align:center;"><input type="text" class="ad-date" placeholder="DD-MM-YYYY" value="'+cpDisplayDate(r.date||'')+'" onfocus="window.cpOpenCalendar(this)" onclick="window.cpOpenCalendar(this)" oninput="addmOnDate('+i+',this.value)" onchange="addmOnDate('+i+',this.value)" style="width:100%;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:11.5px;cursor:pointer;background:#fff;"></td>'
           +'<td style="padding:4px 6px;border:1px solid #e5e5e5;text-align:right;"><input type="text" class="ad-amt ad-amt-rmb" value="'+addmFmt(r.amt_rmb||0,'RMB')+'" data-cur="rmb" data-idx="'+i+'" onfocus="addmAmtFocus(this)" onblur="addmAmtBlur(this)" oninput="addmAmtInput(this)" style="width:100%;padding:4px 6px;border:1px solid #f8c9db;border-radius:4px;font-size:11.5px;text-align:right;background:#fde7ef;"></td>'
           +'<td style="padding:4px 6px;border:1px solid #e5e5e5;text-align:right;"><input type="text" class="ad-amt ad-amt-usd" value="'+addmFmt(r.amt_usd||0,'USD')+'" data-cur="usd" data-idx="'+i+'" onfocus="addmAmtFocus(this)" onblur="addmAmtBlur(this)" oninput="addmAmtInput(this)" style="width:100%;padding:4px 6px;border:1px solid #c2d3f3;border-radius:4px;font-size:11.5px;text-align:right;background:#e7eefb;"></td>'
           +'<td style="padding:4px 6px;border:1px solid #e5e5e5;text-align:right;"><input type="text" class="ad-amt ad-amt-vnd" value="'+addmFmt(r.amt_vnd||0,'VND')+'" data-cur="vnd" data-idx="'+i+'" onfocus="addmAmtFocus(this)" onblur="addmAmtBlur(this)" oninput="addmAmtInput(this)" style="width:100%;padding:4px 6px;border:1px solid #ecdc9f;border-radius:4px;font-size:11.5px;text-align:right;background:#fbf3d8;"></td>'
