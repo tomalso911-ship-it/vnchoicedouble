@@ -4113,7 +4113,11 @@ function _ovLoadChartLib(cb){
         if (typeof PROD_CUR === 'undefined') return;
         var listEl = prod_el('prod-list');
         if (listEl && listEl.style.display !== 'none') { prod_renderProduction(); return; }
-        if (PROD_CUR) { prod_renderTabs(PROD_ACTIVE_TAB || 'A'); }
+        if (PROD_CUR) {
+          var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==PROD_CUR; }) : null;
+          prod_el('prod-detail-title').textContent = (p ? (p.client||p.customer||p.name||'—') : pt('factory_label')) + pt('factory_suffix');
+          prod_renderTabs(PROD_ACTIVE_TAB || 'A');
+        }
       } catch(e){ console.warn('[lang] production:', e); }
     }
     </script>
