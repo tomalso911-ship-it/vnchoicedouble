@@ -3062,7 +3062,7 @@ function _ovLoadChartLib(cb){
     <button class="tb-item" data-view="dashboard" onclick="switchView('dashboard')">Dashboard</button>
     <button class="tb-item" data-view="won" onclick="switchView('won')">Won Projects</button>
     <button class="tb-item" data-view="worklog" onclick="switchView('worklog')"><span class="tb-label">工作日志</span></button>
-    <button class="tb-item" data-view="production" onclick="switchView('production')"><span class="tb-label">生产管理</span></button>
+    <button class="tb-item" data-view="production" onclick="switchView('production')"><span class="tb-label" data-i18n="nav_production">生产管理</span></button>
     <button class="tb-item" data-view="install" onclick="switchView('install')"><span class="tb-label">安装管理</span></button>
     <button class="tb-item" data-view="finance" onclick="switchView('finance')"><span class="tb-label">财务管理</span></button>
     <button class="tb-item" data-view="library" onclick="switchView('library')"><span class="tb-label">资料库</span></button>
@@ -3276,14 +3276,14 @@ function _ovLoadChartLib(cb){
     <div class="prod-wrap">
       <div id="prod-list">
         <div class="page-header">
-          <h2>生产管理 · 现场工厂</h2>
-          <span class="prod-sub">每个签约项目 = 一个独立现场工厂（人员/产能/设备/库存互不串）</span>
+          <h2 data-i18n="prod_title">生产管理 · 现场工厂</h2>
+          <span class="prod-sub" data-i18n="prod_sub">每个签约项目 = 一个独立现场工厂（人员/产能/设备/库存互不串）</span>
         </div>
         <div id="prod-cards" class="prod-cards"></div>
       </div>
       <div id="prod-detail" style="display:none">
         <div class="prod-detail-head">
-          <button class="prod-back" onclick="prod_back()">← 返回列表</button>
+          <button class="prod-back" onclick="prod_back()" data-i18n="prod_back">← 返回列表</button>
           <div class="prod-detail-title" id="prod-detail-title"></div>
         </div>
         <div class="prod-tabs" id="prod-tabs"></div>
@@ -3333,6 +3333,105 @@ function _ovLoadChartLib(cb){
     var PROD_WORKERS = [['welder','焊工'],['forklift','叉车工'],['loader','铲车工'],['mixer','搅拌机工'],['press','打板机操作工'],['repair','修水泥板工'],['cook','厨师'],['temp','其他临时工']];
     var PROD_TABS = [['A','工厂概况'],['B','生产计划'],['C','人员(日)'],['D','原料库存'],['E','每日生产'],['H','成品库存'],['F','设备与故障'],['G','交付']];
     var PROD_CUR = null;
+    var PROD_ACTIVE_TAB = 'A';
+    /* ===== 生产管理三语包（zh/en/vi），随系统 CUR_LANG 切换 ===== */
+    var PROD_I18N = {
+      zh: {
+        prod_tab_A:'工厂概况', prod_tab_B:'生产计划', prod_tab_C:'人员(日)', prod_tab_D:'原料库存', prod_tab_E:'每日生产', prod_tab_H:'成品库存', prod_tab_F:'设备与故障', prod_tab_G:'交付',
+        prod_overview:'工厂概况', lbl_addr:'现场地址', lbl_line:'生产线', opt_line_1:'1条', opt_line_2:'2条', opt_line_3:'3条', opt_line_4:'4条', lbl_shift:'班次', opt_shift_1:'1班/天', opt_shift_2:'2班/天', btn_save:'保存',
+        sec_usage:'项目用量分解（规格 × 栋舍，源自签约项目规格表）', empty_no_spec:'本项目尚未录入水泥漏缝地板规格。请回到「签约项目」打开该项目，点“编辑”填写“水泥漏缝地板规格”。',
+        th_spec:'规格(长×宽×高 mm)', thr_house:'栋舍', th_total:'总需求量', th_shared:'共用情况', share_excl:'专属', share_cross_pre:'跨', share_cross_suf:'共用',
+        sec_mat_spec:'按规格 × 栋舍 的材料用量', sec_mat_house:'按栋舍 × 规格 的材料用量', th_qty_whole:'数量/整场', th_rebar:'钢筋', th_cement:'水泥/吨', th_sand:'黄砂/吨', th_gravel:'石子/吨', thr_total:'总计',
+        sec_inv:'生产骨料库存计划表', lbl_rebar_days:'钢筋存储天数(天)', lbl_cement_days:'水泥存储天数(天)', lbl_sand_days:'黄砂存储天数(天)', lbl_gravel_days:'石子存储天数(天)', btn_save_inv:'保存库存计划',
+        thr_rate:'生产片数/天', thr_days:'生产天数', thr_rebar_buy:'钢筋采购量(Tons)', thr_cement_buy:'水泥采购量(Tons)', thr_sand_buy:'黄砂采购量(Tons)', thr_gravel_buy:'石子采购量(Tons)',
+        note_inv:'生产天数 = ⌈数量/整场 ÷ 生产片数/天⌉；未填写时默认 300 片/天；各骨料采购量 = 该规格该骨料吨数 ÷ 生产天数 × 存储天数。', empty_no_inv:'暂无规格数据可供排产。',
+        sec_gantt:'生产甘特图（概念排程，非实际生产）', lbl_prep_start:'建厂筹备和试运营·开始', lbl_prep_end:'建厂筹备和试运营·结束(=开工日)', lbl_start_ro:'开工日期（只读）', lbl_priority:'优先生产猪舍', opt_please:'（请选择）',
+        gantt_prep_label:'建厂筹备和试运营', gantt_prep_title:'建厂筹备和试运营：',
+        gantt_n1:'总生产周期约 ', gantt_n2:' 个有效工作日（已跳过越南公共假期，含春节前后各扩展；按各规格「生产片数/天」排产，默认 300 片/天；优先猪舍：', gantt_unset:'未设置',
+        gantt_n3:'；条内', gantt_gold:'金色=优先猪舍', gantt_n4:'，其余按需求量从大到小；右侧列为各猪舍明细；斜纹段为越南公共假期（悬停看名称）；虚线为每月首日；顶部', gantt_green:'绿色条=建厂筹备和试运营', gantt_n5:'（不计入生产周期，其右端接红色开工日）；筹备日期绿色、生产起止红色）。',
+        right_p1:'共 ', right_p2:' 片 · ', right_p3:' 天', unit_pcs:'片', unit_day:' 天', unit_ton:' 吨', tet_ext:'（含前后扩展）',
+        sec_house_sum:'按栋舍汇总生产计划', thr_house2:'栋舍', thr_qty_pcs:'数量/片', thr_start:'开工', thr_end:'结束', thr_prep:'建厂筹备和试运营', subtotal:'小计', empty_gantt:'请先在「生产骨料库存计划表」为各规格填写“生产片数/天”（默认按 300 片/天），并设置「建厂筹备和试运营」起止日期。',
+        sec_workers:'人员（按日快照，只记数不记名）', lbl_date:'日期', btn_save_snap:'保存当日快照', thr_date:'日期', thr_total2:'合计', btn_del:'删',
+        sec_raw:'原料与库存（工厂自采，无审批流）', sec_stock:'物资清单与库存', lbl_name:'名称', lbl_unit:'单位', lbl_warn:'预警阈值', btn_add_mat:'添加物资', thr_name:'名称', thr_unit2:'单位', thr_cur_stock:'当前库存', thr_warn2:'预警',
+        sec_inbound:'入库（采购直录）', thr_qty2:'数量', lbl_note:'备注', btn_inbound:'入库', sec_outbound:'出库', btn_outbound:'出库', thr_type:'类型', type_in:'入库', type_out:'出库',
+        sec_mat_req:'材料需求（按规格自动计算，指导采购）', kpi_cement:'水泥', kpi_sand:'黄砂', kpi_gravel:'石子', thr_material:'材料', thr_demand:'需求(吨)', thr_gap:'缺口', not_created:'未建物资',
+        note_d:'注：需求按规格体积折算标准板(1500×600×70)后，套用水泥24.4/黄砂22.6/石子68 kg·每标准板计算，与系统“智能报告”完全一致。',
+        sec_daily:'每日生产 / 盘点', btn_add_spec:'+ 产出规格', btn_add_mat:'+ 耗料', btn_save_prod:'保存当日生产', sec_history:'历史产出', thr_good:'良品', thr_bad:'不良', thr_mat_used:'耗料', lbl_spec:'规格', lbl_good2:'良品', lbl_bad2:'不良', btn_x:'×', lbl_mat_name:'耗料名称',
+        sec_finished:'成品库存（水泥漏缝地板，按规格）', kpi_prod_in:'累计生产入库', kpi_out2:'累计出库', kpi_balance:'结余', thr_produced:'生产入库', thr_out3:'出库', thr_balance2:'结余', empty_finished:'暂无成品。请在「每日生产」录入产出后自动累计。',
+        sec_equip:'设备台账与高价值工具等级表', lbl_grade:'等级', lbl_maint:'保养说明', btn_add_equip:'添加设备/工具', thr_grade2:'等级', thr_maint2:'保养', sec_fault:'设备故障记录', lbl_equip:'设备', lbl_down:'停机(h)', lbl_reason:'原因', lbl_repair:'维修', btn_add_fault:'记录故障', thr_down2:'停机(h)', thr_reason2:'原因', thr_repair2:'维修',
+        sec_delivery:'交付（出库，自动过账成品库存）', lbl_spec2:'规格', thr_qty3:'出库数量', lbl_client:'客户', btn_deliver:'出库交付', thr_client2:'客户', empty_delivery:'暂无成品规格，请先在每日生产录入产出。',
+        toast_inv_saved:'库存计划已保存', toast_saved:'已保存', toast_sched:'排程已更新', toast_priority:'优先猪舍已设置', toast_name_req:'请填名称', toast_prod_saved:'已保存，并自动过账成品入库 + 生产耗料出库', toast_deliver_req:'请选规格并填数量', toast_delivered:'已出库，成品库存结余已更新',
+        card_contract:'合同', card_spec:'规格', card_status:'状态：', card_due:'交期：', card_output:'累计产出', card_delivered:'已交付', empty_card:'暂无签约项目。请先在「签约项目」中录入数据，刷新后即可在此看到对应的现场工厂。',
+        factory_label:'工厂', factory_suffix:' · 现场工厂',
+        prod_role_welder:'焊工', prod_role_forklift:'叉车工', prod_role_loader:'铲车工', prod_role_mixer:'搅拌机工', prod_role_press:'打板机操作工', prod_role_repair:'修水泥板工', prod_role_cook:'厨师', prod_role_temp:'其他临时工'
+      },
+      en: {
+        prod_tab_A:'Factory Overview', prod_tab_B:'Production Plan', prod_tab_C:'Staff (daily)', prod_tab_D:'Raw Material Stock', prod_tab_E:'Daily Production', prod_tab_H:'Finished Goods Stock', prod_tab_F:'Equipment & Failures', prod_tab_G:'Delivery',
+        prod_overview:'Factory Overview', lbl_addr:'Site Address', lbl_line:'Production Line', opt_line_1:'1 line', opt_line_2:'2 lines', opt_line_3:'3 lines', opt_line_4:'4 lines', lbl_shift:'Shift', opt_shift_1:'1 shift/day', opt_shift_2:'2 shifts/day', btn_save:'Save',
+        sec_usage:'Project Usage Breakdown (Spec × House, from signed project spec sheet)', empty_no_spec:'This project has not entered concrete slatted floor specs. Please go back to "Signed Projects", open the project, click "Edit" and fill in "Concrete Slatted Floor Specs".',
+        th_spec:'Spec (L×W×H mm)', thr_house:'House', th_total:'Total Demand', th_shared:'Sharing', share_excl:' exclusive', share_cross_pre:'shared by ', share_cross_suf:'',
+        sec_mat_spec:'Material Usage by Spec × House', sec_mat_house:'Material Usage by House × Spec', th_qty_whole:'Qty / Whole Site', th_rebar:'Rebar', th_cement:'Cement/Tons', th_sand:'Sand/Tons', th_gravel:'Gravel/Tons', thr_total:'Grand Total',
+        sec_inv:'Production Aggregate Inventory Plan', lbl_rebar_days:'Rebar storage days', lbl_cement_days:'Cement storage days', lbl_sand_days:'Sand storage days', lbl_gravel_days:'Gravel storage days', btn_save_inv:'Save Inventory Plan',
+        thr_rate:'Slabs/day', thr_days:'Production days', thr_rebar_buy:'Rebar purchase (Tons)', thr_cement_buy:'Cement purchase (Tons)', thr_sand_buy:'Sand purchase (Tons)', thr_gravel_buy:'Gravel purchase (Tons)',
+        note_inv:'Production days = ⌈Qty/whole ÷ Slabs/day⌉; default 300 slabs/day if blank; aggregate purchase = spec aggregate tons ÷ production days × storage days.', empty_no_inv:'No spec data available for scheduling.',
+        sec_gantt:'Production Gantt (conceptual schedule, not actual)', lbl_prep_start:'Factory prep & trial run · start', lbl_prep_end:'Factory prep & trial run · end (=start day)', lbl_start_ro:'Start date (read-only)', lbl_priority:'Priority production house', opt_please:'(please select)',
+        gantt_prep_label:'Factory prep & trial run', gantt_prep_title:'Factory prep & trial run: ',
+        gantt_n1:'Total production cycle ≈ ', gantt_n2:' effective working days (Vietnam public holidays skipped, incl. pre/post-Tet extension; scheduled by spec "slabs/day", default 300 slabs/day; priority house: ', gantt_unset:'not set',
+        gantt_n3:'; bar', gantt_gold:'gold = priority house', gantt_n4:', rest sorted by demand desc; right column = per-house details; diagonal stripes = Vietnam public holidays (hover for name); dashed line = 1st of each month; top', gantt_green:'green bar = factory prep & trial run', gantt_n5:'(not counted in production cycle, its right end meets red start day); prep dates green, production start/end red).',
+        right_p1:'Total ', right_p2:' slabs · ', right_p3:' days', unit_pcs:' pcs', unit_day:' days', unit_ton:' tons', tet_ext:' (incl. extension)',
+        sec_house_sum:'Production Plan Summary by House', thr_house2:'House', thr_qty_pcs:'Qty / slab', thr_start:'Start', thr_end:'End', thr_prep:'Factory prep & trial run', subtotal:'Subtotal', empty_gantt:'Please first fill "slabs/day" for each spec in the Production Aggregate Inventory Plan (default 300 slabs/day), and set the factory prep & trial run start/end dates.',
+        sec_workers:'Staff (daily snapshot, count only, no names)', lbl_date:'Date', btn_save_snap:'Save daily snapshot', thr_date:'Date', thr_total2:'Total', btn_del:'Del',
+        sec_raw:'Raw Materials & Stock (factory self-purchase, no approval)', sec_stock:'Material list & stock', lbl_name:'Name', lbl_unit:'Unit', lbl_warn:'Warning threshold', btn_add_mat:'Add material', thr_name:'Name', thr_unit2:'Unit', thr_cur_stock:'Current stock', thr_warn2:'Warning',
+        sec_inbound:'Inbound (direct purchase log)', thr_qty2:'Qty', lbl_note:'Remark', btn_inbound:'Receive', sec_outbound:'Outbound', btn_outbound:'Issue', thr_type:'Type', type_in:'Inbound', type_out:'Outbound',
+        sec_mat_req:'Material demand (auto by spec, guides purchasing)', kpi_cement:'Cement', kpi_sand:'Sand', kpi_gravel:'Gravel', thr_material:'Material', thr_demand:'Demand (tons)', thr_gap:'Gap', not_created:'not created',
+        note_d:'Note: demand = spec volume converted to standard slab (1500×600×70), using cement 24.4 / sand 22.6 / gravel 68 kg per standard slab; identical to system "Smart Report".',
+        sec_daily:'Daily Production / Inventory', btn_add_spec:'+ Output spec', btn_add_mat:'+ Material used', btn_save_prod:'Save daily production', sec_history:'Historical output', thr_good:'Good', thr_bad:'Defect', thr_mat_used:'Material used', lbl_spec:'Spec', lbl_good2:'Good', lbl_bad2:'Defect', btn_x:'×', lbl_mat_name:'Material name',
+        sec_finished:'Finished Goods Stock (concrete slatted floor, by spec)', kpi_prod_in:'Cumulative produced inbound', kpi_out2:'Cumulative outbound', kpi_balance:'Balance', thr_produced:'Produced inbound', thr_out3:'Outbound', thr_balance2:'Balance', empty_finished:'No finished goods yet. They accumulate automatically after you enter output in "Daily Production".',
+        sec_equip:'Equipment ledger & high-value tool grade table', lbl_grade:'Grade', lbl_maint:'Maintenance note', btn_add_equip:'Add equipment/tool', thr_grade2:'Grade', thr_maint2:'Maintenance', sec_fault:'Equipment failure log', lbl_equip:'Equipment', lbl_down:'Downtime(h)', lbl_reason:'Reason', lbl_repair:'Repair', btn_add_fault:'Log failure', thr_down2:'Downtime(h)', thr_reason2:'Reason', thr_repair2:'Repair',
+        sec_delivery:'Delivery (outbound, auto-posts finished stock)', lbl_spec2:'Spec', thr_qty3:'Outbound qty', lbl_client:'Client', btn_deliver:'Deliver outbound', thr_client2:'Client', empty_delivery:'No finished spec yet; please enter output in Daily Production first.',
+        toast_inv_saved:'Inventory plan saved', toast_saved:'Saved', toast_sched:'Schedule updated', toast_priority:'Priority house set', toast_name_req:'Please enter name', toast_prod_saved:'Saved, and auto-posted finished inbound + production material outbound', toast_deliver_req:'Please select spec and enter qty', toast_delivered:'Outbound done, finished stock balance updated',
+        card_contract:'Contract', card_spec:'Spec', card_status:'Status: ', card_due:'Due: ', card_output:'Cumulative output', card_delivered:'Delivered', empty_card:'No signed projects yet. Please enter data in "Signed Projects" first; refresh to see the corresponding on-site factory here.',
+        factory_label:'Factory', factory_suffix:' · On-site Factory',
+        prod_role_welder:'Welder', prod_role_forklift:'Forklift Operator', prod_role_loader:'Loader Operator', prod_role_mixer:'Mixer Operator', prod_role_press:'Slab Press Operator', prod_role_repair:'Slab Repairer', prod_role_cook:'Cook', prod_role_temp:'Other Temporary Workers'
+      },
+      vi: {
+        prod_tab_A:'Tổng quan nhà máy', prod_tab_B:'Kế hoạch sản xuất', prod_tab_C:'Nhân sự (theo ngày)', prod_tab_D:'Kho nguyên liệu', prod_tab_E:'Sản xuất hàng ngày', prod_tab_H:'Kho thành phẩm', prod_tab_F:'Thiết bị & Sự cố', prod_tab_G:'Giao hàng',
+        prod_overview:'Tổng quan nhà máy', lbl_addr:'Địa chỉ công trường', lbl_line:'Dây chuyền sản xuất', opt_line_1:'1 dây chuyền', opt_line_2:'2 dây chuyền', opt_line_3:'3 dây chuyền', opt_line_4:'4 dây chuyền', lbl_shift:'Ca làm việc', opt_shift_1:'1 ca/ngày', opt_shift_2:'2 ca/ngày', btn_save:'Lưu',
+        sec_usage:'Phân tích lượng dùng dự án (Quy cách × Chuồng, từ bảng quy cách dự án ký)', empty_no_spec:'Dự án này chưa nhập quy cách sàn khe hở bê tông. Vui lòng quay lại "Dự án ký", mở dự án, nhấn "Sửa" và điền "Quy cách sàn khe hở bê tông".',
+        th_spec:'Quy cách (D×R×C mm)', thr_house:'Chuồng', th_total:'Tổng nhu cầu', th_shared:'Dùng chung', share_excl:' riêng', share_cross_pre:'dùng chung ', share_cross_suf:'',
+        sec_mat_spec:'Lượng vật liệu theo Quy cách × Chuồng', sec_mat_house:'Lượng vật liệu theo Chuồng × Quy cách', th_qty_whole:'SL / Toàn công trường', th_rebar:'Thép', th_cement:'Xi măng/Tấn', th_sand:'Cát/Tấn', th_gravel:'Sỏi/Tấn', thr_total:'Tổng cộng',
+        sec_inv:'Kế hoạch tồn kho cốt liệu sản xuất', lbl_rebar_days:'Số ngày lưu kho thép', lbl_cement_days:'Số ngày lưu kho xi măng', lbl_sand_days:'Số ngày lưu kho cát', lbl_gravel_days:'Số ngày lưu kho sỏi', btn_save_inv:'Lưu kế hoạch tồn kho',
+        thr_rate:'Tấm/ngày', thr_days:'Số ngày SX', thr_rebar_buy:'Mua thép (Tấn)', thr_cement_buy:'Mua xi măng (Tấn)', thr_sand_buy:'Mua cát (Tấn)', thr_gravel_buy:'Mua sỏi (Tấn)',
+        note_inv:'Số ngày SX = ⌈SL/toàn ÷ Tấm/ngày⌉; mặc định 300 tấm/ngày nếu trống; mua cốt liệu = tấn cốt liệu quy cách ÷ ngày SX × ngày lưu kho.', empty_no_inv:'Chưa có dữ liệu quy cách để lập lịch.',
+        sec_gantt:'Biểu đồ Gantt sản xuất (lịch trình khái niệm, không phải thực tế)', lbl_prep_start:'Chuẩn bị & chạy thử · bắt đầu', lbl_prep_end:'Chuẩn bị & chạy thử · kết thúc (=ngày khởi công)', lbl_start_ro:'Ngày khởi công (chỉ đọc)', lbl_priority:'Chuồng SX ưu tiên', opt_please:'(vui lòng chọn)',
+        gantt_prep_label:'Chuẩn bị & chạy thử', gantt_prep_title:'Chuẩn bị & chạy thử: ',
+        gantt_n1:'Tổng chu kỳ SX ≈ ', gantt_n2:' ngày làm việc hiệu lực (bỏ qua ngày lễ VN, gồm mở rộng trước/sau Tết; theo "tấm/ngày" từng quy cách, mặc định 300 tấm/ngày; chuồng ưu tiên: ', gantt_unset:'chưa thiết lập',
+        gantt_n3:'; trong thanh', gantt_gold:'vàng = chuồng ưu tiên', gantt_n4:', còn lại theo nhu cầu giảm dần; cột phải = chi tiết từng chuồng; vạch sọc = ngày lễ VN (di chuột xem tên); đường đứt = ngày đầu tháng; trên cùng', gantt_green:'thanh xanh = chuẩn bị & chạy thử', gantt_n5:'(không tính vào chu kỳ SX, đầu phải nối ngày khởi công đỏ); ngày chuẩn bị xanh, đầu/cuối SX đỏ).',
+        right_p1:'Tổng ', right_p2:' tấm · ', right_p3:' ngày', unit_pcs:' tấm', unit_day:' ngày', unit_ton:' tấn', tet_ext:' (gồm mở rộng)',
+        sec_house_sum:'Tóm tắt kế hoạch SX theo chuồng', thr_house2:'Chuồng', thr_qty_pcs:'SL / tấm', thr_start:'Bắt đầu', thr_end:'Kết thúc', thr_prep:'Chuẩn bị & chạy thử', subtotal:'Tổng cộng', empty_gantt:'Vui lòng điền "tấm/ngày" cho mỗi quy cách trong Kế hoạch tồn kho cốt liệu (mặc định 300 tấm/ngày), và đặt ngày bắt đầu/kết thúc chuẩn bị & chạy thử.',
+        sec_workers:'Nhân sự (ảnh chụp theo ngày, chỉ đếm, không tên)', lbl_date:'Ngày', btn_save_snap:'Lưu ảnh chụp ngày', thr_date:'Ngày', thr_total2:'Tổng', btn_del:'Xóa',
+        sec_raw:'Nguyên liệu & Kho (tự mua, không duyệt)', sec_stock:'Danh sách vật tư & tồn kho', lbl_name:'Tên', lbl_unit:'Đơn vị', lbl_warn:'Ngưỡng cảnh báo', btn_add_mat:'Thêm vật tư', thr_name:'Tên', thr_unit2:'Đơn vị', thr_cur_stock:'Tồn kho hiện tại', thr_warn2:'Cảnh báo',
+        sec_inbound:'Nhập kho (ghi mua trực tiếp)', thr_qty2:'SL', lbl_note:'Ghi chú', btn_inbound:'Nhập', sec_outbound:'Xuất kho', btn_outbound:'Xuất', thr_type:'Loại', type_in:'Nhập', type_out:'Xuất',
+        sec_mat_req:'Nhu cầu vật liệu (tự động theo quy cách, hướng dẫn mua)', kpi_cement:'Xi măng', kpi_sand:'Cát', kpi_gravel:'Sỏi', thr_material:'Vật liệu', thr_demand:'Nhu cầu (tấn)', thr_gap:'Thiếu hụt', not_created:'chưa tạo',
+        note_d:'Lưu ý: nhu cầu = thể tích quy cách quy đổi tấm chuẩn (1500×600×70), dùng xi măng 24.4 / cát 22.6 / sỏi 68 kg mỗi tấm chuẩn; hoàn toàn khớp "Báo cáo thông minh" hệ thống.',
+        sec_daily:'Sản xuất hàng ngày / Kiểm kê', btn_add_spec:'+ Quy cách đầu ra', btn_add_mat:'+ Vật liệu dùng', btn_save_prod:'Lưu SX ngày', sec_history:'Sản lượng lịch sử', thr_good:'Tốt', thr_bad:'Lỗi', thr_mat_used:'Vật liệu dùng', lbl_spec:'Quy cách', lbl_good2:'Tốt', lbl_bad2:'Lỗi', btn_x:'×', lbl_mat_name:'Tên vật liệu',
+        sec_finished:'Kho thành phẩm (sàn khe hở bê tông, theo quy cách)', kpi_prod_in:'Tổng SX nhập kho', kpi_out2:'Tổng xuất kho', kpi_balance:'Tồn', thr_produced:'Nhập kho SX', thr_out3:'Xuất kho', thr_balance2:'Tồn', empty_finished:'Chưa có thành phẩm. Tự động cộng dồn sau khi nhập đầu ra tại "Sản xuất hàng ngày".',
+        sec_equip:'Sổ thiết bị & bảng cấp công cụ giá trị cao', lbl_grade:'Cấp', lbl_maint:'Ghi chú bảo trì', btn_add_equip:'Thêm thiết bị/công cụ', thr_grade2:'Cấp', thr_maint2:'Bảo trì', sec_fault:'Nhật ký sự cố thiết bị', lbl_equip:'Thiết bị', lbl_down:'Dừng (h)', lbl_reason:'Nguyên nhân', lbl_repair:'Sửa chữa', btn_add_fault:'Ghi sự cố', thr_down2:'Dừng (h)', thr_reason2:'Nguyên nhân', thr_repair2:'Sửa chữa',
+        sec_delivery:'Giao hàng (xuất kho, tự động ghi nhận tồn kho thành phẩm)', lbl_spec2:'Quy cách', thr_qty3:'SL xuất kho', lbl_client:'Khách hàng', btn_deliver:'Xuất giao hàng', thr_client2:'Khách hàng', empty_delivery:'Chưa có quy cách thành phẩm, vui lòng nhập đầu ra tại Sản xuất hàng ngày trước.',
+        toast_inv_saved:'Đã lưu kế hoạch tồn kho', toast_saved:'Đã lưu', toast_sched:'Lịch trình đã cập nhật', toast_priority:'Đã đặt chuồng ưu tiên', toast_name_req:'Vui lòng nhập tên', toast_prod_saved:'Đã lưu, tự động ghi nhận nhập kho thành phẩm + xuất vật liệu SX', toast_deliver_req:'Vui lòng chọn quy cách và nhập số lượng', toast_delivered:'Đã xuất kho, tồn kho thành phẩm đã cập nhật',
+        card_contract:'Hợp đồng', card_spec:'Quy cách', card_status:'Trạng thái: ', card_due:'Hạn giao: ', card_output:'Tổng đầu ra', card_delivered:'Đã giao', empty_card:'Chưa có dự án ký. Vui lòng nhập dữ liệu tại "Dự án ký" trước; làm mới để xem nhà máy tương ứng tại đây.',
+        factory_label:'Nhà máy', factory_suffix:' · Nhà máy tại công trường',
+        prod_role_welder:'Thợ hàn', prod_role_forklift:'Lái xe nâng', prod_role_loader:'Lái xe xúc', prod_role_mixer:'Vận hành máy trộn', prod_role_press:'Vận hành máy ép tấm', prod_role_repair:'Thợ sửa tấm xi măng', prod_role_cook:'Đầu bếp', prod_role_temp:'Công nhân tạm thời khác'
+      }
+    };
+    function pt(k){
+      var lang = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
+      var d = PROD_I18N[lang]; if (d && d[k]!==undefined) return d[k];
+      var z = PROD_I18N.zh[k]; if (z!==undefined) return z;
+      var g = (typeof T==='function') ? T() : null; if (g && g[k]!==undefined) return g[k];
+      var zg = (typeof I18N!=='undefined' && I18N.zh) ? I18N.zh[k] : undefined; if (zg!==undefined) return zg;
+      return k;
+    }
     function prod_el(id){ return document.getElementById(id); }
     function prod_val(id){ var e = prod_el(id); return e ? e.value : ''; }
     function prod_esc(s){ s = String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -3451,10 +3550,10 @@ function _ovLoadChartLib(cb){
       });
       var h='<div class="prod-sec-title" style="border-color:#6c757d">'+title+'</div>';
       h+='<table class="prod-table"><thead><tr>';
-      h+= groupBy==='spec' ? '<th>规格(长×宽×高 mm)</th><th>栋舍</th>' : '<th>栋舍</th><th>规格(长×宽×高 mm)</th>';
-      h+='<th>数量/整场</th>';
-      usedSizes.forEach(function(s){ h+='<th>钢筋φ'+s+' (Tons)</th>'; });
-      h+='<th>水泥/吨</th><th>黄砂/吨</th><th>石子/吨</th></tr></thead><tbody>';
+      h+= groupBy==='spec' ? '<th>'+pt('th_spec')+'</th><th>'+pt('thr_house')+'</th>' : '<th>'+pt('thr_house')+'</th><th>'+pt('th_spec')+'</th>';
+      h+='<th>'+pt('th_qty_whole')+'</th>';
+      usedSizes.forEach(function(s){ h+='<th>'+pt('th_rebar')+'φ'+s+' (Tons)</th>'; });
+      h+='<th>'+pt('th_cement')+'</th><th>'+pt('th_sand')+'</th><th>'+pt('th_gravel')+'</th></tr></thead><tbody>';
       var fmt1=function(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}); };
       sorted.forEach(function(o){
         var rt={}; usedSizes.forEach(function(s){ rt[s]=o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
@@ -3466,7 +3565,7 @@ function _ovLoadChartLib(cb){
         h+='<td>'+fmt1(o.cement)+'</td><td>'+fmt1(o.sand)+'</td><td>'+fmt1(o.gravel)+'</td></tr>';
       });
       var totRt={}; usedSizes.forEach(function(s){ totRt[s]=totals.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
-      h+='<tr style="font-weight:700;background:#eef2f7"><td colspan="2">总计</td>';
+      h+='<tr style="font-weight:700;background:#eef2f7"><td colspan="2">'+pt('thr_total')+'</td>';
       h+='<td>'+prod_fmtNum(totals.qty)+'</td>';
       usedSizes.forEach(function(s){ h+='<td>'+fmt1(totRt[s])+'</td>'; });
       h+='<td>'+fmt1(totals.cement)+'</td><td>'+fmt1(totals.sand)+'</td><td>'+fmt1(totals.gravel)+'</td></tr>';
@@ -3505,7 +3604,7 @@ function _ovLoadChartLib(cb){
       rows.forEach(function(r,i){ var v = parseFloat(prod_val('pg_rate_'+i)); if(v>0) inv.specRates[r.spec]=v; else delete inv.specRates[r.spec]; });
       f.inventoryPlan = inv;
       prod_save(f);
-      prod_toast('库存计划已保存');
+      prod_toast(pt('toast_inv_saved'));
       prod_renderTab('B');
     }
     /* 越南无效工作日集合：读取日历 BOARD_HOLIDAYS 中 vn 标记的假期；越南春节额外扩展「前7天 + 后10天」为无效 */
@@ -3532,7 +3631,7 @@ function _ovLoadChartLib(cb){
     function prod_renderProduction(){
       var box = prod_el('prod-cards'); if(!box) return;
       var data = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData : [];
-      if(!data.length){ box.innerHTML = '<div class="prod-empty">暂无签约项目。请先在「签约项目」中录入数据，刷新后即可在此看到对应的现场工厂。</div>'; return; }
+      if(!data.length){ box.innerHTML = '<div class="prod-empty">'+pt('empty_card')+'</div>'; return; }
       var h = '';
       data.forEach(function(p){
         var id = p.id; var f = prod_get(id);
@@ -3546,11 +3645,11 @@ function _ovLoadChartLib(cb){
         for(var s in (f.finished||{})){ produced += (+f.finished[s].produced||0); delivered += (+f.finished[s].delivered||0); }
         h += '<div class="prod-card" onclick="prod_open(\''+id+'\')">'
           + '<div class="pc-title">'+prod_esc(client)+(prov?' · '+prod_esc(prov):'')+'</div>'
-          + '<span class="pc-chip">合同 '+prod_esc(String(code))+'</span>'
-          + '<span class="pc-chip">规格 '+prod_esc(spec)+'</span>'
-          + '<div class="pc-row">状态：<span class="prod-status '+prod_stcls(status)+'">'+prod_esc(status)+'</span></div>'
-          + '<div class="pc-row">交期：'+prod_esc(due)+'</div>'
-          + '<div class="pc-row">累计产出 '+produced+' / 已交付 '+delivered+'</div>'
+          + '<span class="pc-chip">'+pt('card_contract')+' '+prod_esc(String(code))+'</span>'
+          + '<span class="pc-chip">'+pt('card_spec')+' '+prod_esc(spec)+'</span>'
+          + '<div class="pc-row">'+pt('card_status')+'<span class="prod-status '+prod_stcls(status)+'">'+prod_esc(status)+'</span></div>'
+          + '<div class="pc-row">'+pt('card_due')+prod_esc(due)+'</div>'
+          + '<div class="pc-row">'+pt('card_output')+' '+produced+' / '+pt('card_delivered')+' '+delivered+'</div>'
           + '</div>';
       });
       box.innerHTML = h;
@@ -3560,7 +3659,7 @@ function _ovLoadChartLib(cb){
       prod_el('prod-list').style.display = 'none';
       prod_el('prod-detail').style.display = 'block';
       var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==id; }) : null;
-      prod_el('prod-detail-title').textContent = (p ? (p.client||p.customer||p.name||'—') : '工厂') + ' · 现场工厂';
+      prod_el('prod-detail-title').textContent = (p ? (p.client||p.customer||p.name||'—') : pt('factory_label')) + pt('factory_suffix');
       prod_renderTabs('A');
     }
     function prod_back(){
@@ -3569,12 +3668,14 @@ function _ovLoadChartLib(cb){
       prod_renderProduction();
     }
     function prod_renderTabs(active){
+      PROD_ACTIVE_TAB = active;
       var box = prod_el('prod-tabs'); var h = '';
-      PROD_TABS.forEach(function(t){ h += '<div class="prod-tab'+(t[0]===active?' active':'')+'" onclick="prod_renderTab(\''+t[0]+'\')">'+t[1]+'</div>'; });
+      PROD_TABS.forEach(function(t){ h += '<div class="prod-tab'+(t[0]===active?' active':'')+'" onclick="prod_renderTab(\''+t[0]+'\')">'+pt('prod_tab_'+t[0])+'</div>'; });
       box.innerHTML = h;
       prod_renderTab(active);
     }
     function prod_renderTab(key){
+      PROD_ACTIVE_TAB = key;
       var lab = ''; for(var i=0;i<PROD_TABS.length;i++){ if(PROD_TABS[i][0]===key){ lab=PROD_TABS[i][1]; break; } }
       var tabs = prod_el('prod-tabs').children;
       for(var j=0;j<tabs.length;j++){ tabs[j].classList.toggle('active', tabs[j].textContent===lab); }
@@ -3598,33 +3699,33 @@ function _ovLoadChartLib(cb){
     }
     function prod_tabA(f){
       var p = f.profile||{};
-      return '<div class="prod-sec-title">工厂概况</div>'
+      return '<div class="prod-sec-title">'+pt('prod_overview')+'</div>'
         + '<div class="prod-form">'
-        + prod_fld('现场地址','pa_addr',p.address||'')
-        + prod_sel('生产线','pa_cap',['1条','2条','3条','4条'],p.capacityNote||'')
-        + prod_sel('班次','pa_shift',['1班/天','2班/天'],p.shifts||'')
-        + '<button class="prod-btn" onclick="prod_saveProfile()">保存</button>'
+        + prod_fld(pt('lbl_addr'),'pa_addr',p.address||'')
+        + prod_sel(pt('lbl_line'),'pa_cap',[pt('opt_line_1'),pt('opt_line_2'),pt('opt_line_3'),pt('opt_line_4')],p.capacityNote||'')
+        + prod_sel(pt('lbl_shift'),'pa_shift',[pt('opt_shift_1'),pt('opt_shift_2')],p.shifts||'')
+        + '<button class="prod-btn" onclick="prod_saveProfile()">'+pt('btn_save')+'</button>'
         + '</div>';
     }
     function prod_saveProfile(){
       var f = prod_get(PROD_CUR);
       f.profile = { address:prod_val('pa_addr'), capacityNote:prod_val('pa_cap'), shifts:prod_val('pa_shift'), dailyCapacity:(f.profile && f.profile.dailyCapacity) || '' };
-      prod_save(f); prod_toast('已保存');
+      prod_save(f); prod_toast(pt('toast_saved'));
     }
     /* B 生产计划 */
     /* B 生产计划（用量分解 + 概念甘特图） */
     function prod_tabB(f){
       var mm = prod_slatsMatrix(); var keys = Object.keys(mm.specs);
-      var h = '<div class="prod-sec-title">项目用量分解（规格 × 栋舍，源自签约项目规格表）</div>';
+      var h = '<div class="prod-sec-title">'+pt('sec_usage')+'</div>';
       if(!keys.length){
-        h += '<div class="prod-empty">本项目尚未录入水泥漏缝地板规格。请回到「签约项目」打开该项目，点“编辑”填写“水泥漏缝地板规格”。</div>';
+        h += '<div class="prod-empty">'+pt('empty_no_spec')+'</div>';
       } else {
-        h += '<table class="prod-table"><thead><tr><th>规格(长×宽×高 mm)</th>';
+        h += '<table class="prod-table"><thead><tr><th>'+pt('th_spec')+'</th>';
         mm.houseOrder.forEach(function(ph){ h += '<th>'+prod_esc(prod_phName(ph))+'</th>'; });
-        h += '<th>总需求量</th><th>共用情况</th></tr></thead><tbody>';
+        h += '<th>'+pt('th_total')+'</th><th>'+pt('th_shared')+'</th></tr></thead><tbody>';
         keys.forEach(function(k){
           var sp = mm.specs[k]; var houses = mm.houseOrder.filter(function(h){ return sp.houses[h] != null; });
-          var shared = houses.length>1 ? '跨'+houses.map(prod_phName).join('+')+'共用' : (houses.length===1 ? prod_phName(houses[0])+'专属' : '—');
+          var shared = houses.length>1 ? pt('share_cross_pre')+houses.map(prod_phName).join('+')+pt('share_cross_suf') : (houses.length===1 ? prod_phName(houses[0])+pt('share_excl') : '—');
           h += '<tr><td>'+prod_esc(k)+'</td>';
           mm.houseOrder.forEach(function(ph){ h += '<td>'+prod_fmtNum(sp.houses[ph]||0)+'</td>'; });
           h += '<td><b>'+prod_fmtNum(sp.total)+'</b></td><td>'+shared+'</td></tr>';
@@ -3633,30 +3734,30 @@ function _ovLoadChartLib(cb){
         /* 材料/骨料明细表：按规格×栋舍、按栋舍×规格 两张互补透视表（含底部总计） */
         var mm2 = prod_slatsMaterial();
         if(mm2.pairs.length){
-          h += prod_renderMatTable('按规格 × 栋舍 的材料用量', mm2.pairs, mm2.usedSizes, mm2.totals, 'spec');
-          h += prod_renderMatTable('按栋舍 × 规格 的材料用量', mm2.pairs, mm2.usedSizes, mm2.totals, 'ph');
+          h += prod_renderMatTable(pt('sec_mat_spec'), mm2.pairs, mm2.usedSizes, mm2.totals, 'spec');
+          h += prod_renderMatTable(pt('sec_mat_house'), mm2.pairs, mm2.usedSizes, mm2.totals, 'ph');
         }
       }
       /* 生产骨料库存计划表：结合规格用量矩阵，按 生产片数/天 + 骨料存储天数 自动推算 生产天数 与 采购量(Tons) */
       var inv = f.inventoryPlan || { specRates:{}, storageDays:{} };
       var sd = inv.storageDays || {};
       var ispecs = prod_inventorySpecs();
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">生产骨料库存计划表</div>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_inv')+'</div>';
       h += '<div class="prod-form">'
-        + prod_fld('钢筋存储天数(天)','pg_sd_rebar', sd.rebar||'')
-        + prod_fld('水泥存储天数(天)','pg_sd_cement', sd.cement||'')
-        + prod_fld('黄砂存储天数(天)','pg_sd_sand', sd.sand||'')
-        + prod_fld('石子存储天数(天)','pg_sd_gravel', sd.gravel||'')
-        + '<button class="prod-btn" onclick="prod_saveInventory()">保存库存计划</button></div>';
+        + prod_fld(pt('lbl_rebar_days'),'pg_sd_rebar', sd.rebar||'')
+        + prod_fld(pt('lbl_cement_days'),'pg_sd_cement', sd.cement||'')
+        + prod_fld(pt('lbl_sand_days'),'pg_sd_sand', sd.sand||'')
+        + prod_fld(pt('lbl_gravel_days'),'pg_sd_gravel', sd.gravel||'')
+        + '<button class="prod-btn" onclick="prod_saveInventory()">'+pt('btn_save_inv')+'</button></div>';
       if(ispecs.length){
         var fmtInv=function(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}); };
         var totQty=0, totDays=0, totRebar=0, totPRebar=0, totCement=0, totPCement=0, totSand=0, totPSand=0, totGravel=0, totPGravel=0;
         h += '<div style="overflow-x:auto"><table class="prod-table" style="text-align:center"><thead><tr>'
-          + '<th>规格(长×宽×高 mm)</th><th>数量/整场</th><th>生产片数/天</th><th>生产天数</th>'
-          + '<th>钢筋(Tons)</th><th>钢筋采购量(Tons)</th>'
-          + '<th>水泥(Tons)</th><th>水泥采购量(Tons)</th>'
-          + '<th>黄砂(Tons)</th><th>黄砂采购量(Tons)</th>'
-          + '<th>石子(Tons)</th><th>石子采购量(Tons)</th></tr></thead><tbody>';
+          + '<th>'+pt('th_spec')+'</th><th>'+pt('th_qty_whole')+'</th><th>'+pt('thr_rate')+'</th><th>'+pt('thr_days')+'</th>'
+          + '<th>'+pt('th_rebar')+'(Tons)</th><th>'+pt('thr_rebar_buy')+'</th>'
+          + '<th>'+pt('th_cement')+'</th><th>'+pt('thr_cement_buy')+'</th>'
+          + '<th>'+pt('th_sand')+'</th><th>'+pt('thr_sand_buy')+'</th>'
+          + '<th>'+pt('th_gravel')+'</th><th>'+pt('thr_gravel_buy')+'</th></tr></thead><tbody>';
         ispecs.forEach(function(r,i){
           var savedRate = +inv.specRates[r.spec] || 0;
           var rate = savedRate || 300;
@@ -3674,34 +3775,34 @@ function _ovLoadChartLib(cb){
           h += '<tr><td>'+prod_esc(r.spec)+'</td>'
             + '<td>'+prod_fmtNum(r.qty)+'</td>'
             + '<td><input id="pg_rate_'+i+'" value="'+(savedRate||300)+'" style="width:72px;text-align:center"></td>'
-            + '<td>'+(days?days+' 天':'—')+'</td>'
+            + '<td>'+(days?days+pt('unit_day'):'—')+'</td>'
             + '<td>'+fmtInv(r.rebarTons)+'</td><td>'+(pRebar?fmtInv(pRebar):'—')+'</td>'
             + '<td>'+fmtInv(r.cement)+'</td><td>'+(pCement?fmtInv(pCement):'—')+'</td>'
             + '<td>'+fmtInv(r.sand)+'</td><td>'+(pSand?fmtInv(pSand):'—')+'</td>'
             + '<td>'+fmtInv(r.gravel)+'</td><td>'+(pGravel?fmtInv(pGravel):'—')+'</td></tr>';
         });
-        h += '<tr style="font-weight:700;background:#eef2f7"><td>总计</td>'
-          + '<td>'+prod_fmtNum(totQty)+'</td><td>—</td><td>'+totDays+' 天</td>'
+        h += '<tr style="font-weight:700;background:#eef2f7"><td>'+pt('thr_total')+'</td>'
+          + '<td>'+prod_fmtNum(totQty)+'</td><td>—</td><td>'+totDays+pt('unit_day')+'</td>'
           + '<td>'+fmtInv(totRebar)+'</td><td>'+fmtInv(totPRebar)+'</td>'
           + '<td>'+fmtInv(totCement)+'</td><td>'+fmtInv(totPCement)+'</td>'
           + '<td>'+fmtInv(totSand)+'</td><td>'+fmtInv(totPSand)+'</td>'
           + '<td>'+fmtInv(totGravel)+'</td><td>'+fmtInv(totPGravel)+'</td></tr>';
         h += '</tbody></table></div>';
-        h += '<div style="font-size:12px;color:#666;margin-top:6px">生产天数 = ⌈数量/整场 ÷ 生产片数/天⌉；未填写时默认 300 片/天；各骨料采购量 = 该规格该骨料吨数 ÷ 生产天数 × 存储天数。</div>';
+        h += '<div style="font-size:12px;color:#666;margin-top:6px">'+pt('note_inv')+'</div>';
       } else {
-        h += '<div class="prod-empty">暂无规格数据可供排产。</div>';
+        h += '<div class="prod-empty">'+pt('empty_no_inv')+'</div>';
       }
       /* 概念甘特图：读取「生产骨料库存计划表」每规格速率（默认300），按「优先猪舍全局优先」分段，并跳过越南公共假期（含春节前后扩展） */
       var priorityHouse = f.priorityHouse || '';
       var _prepEnd = f.prepEnd || f.planStart || prod_today();
       var _prepStartDisp = f.prepStart || dmyAddDays(_prepEnd, -45);
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">生产甘特图（概念排程，非实际生产）</div>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_gantt')+'</div>';
       h += '<div class="prod-form">'
-        + prod_dateFld('建厂筹备和试运营·开始','pg_prep_start',_prepStartDisp,'prod_savePrep()')
-        + prod_dateFld('建厂筹备和试运营·结束(=开工日)','pg_prep_end',_prepEnd,'prod_savePrep()')
-        + '<div class="prod-field"><label>开工日期（只读）</label><input id="pg_start_ro" value="'+prod_esc(ymdToDmy(_prepEnd))+'" readonly style="background:#f2f2f2;cursor:default"></div>'
-        + '<label style="font-size:12px;color:#555">优先生产猪舍</label><select id="pg_priority" onchange="prod_savePriorityHouse()">'
-        + '<option value="">（请选择）</option>'
+        + prod_dateFld(pt('lbl_prep_start'),'pg_prep_start',_prepStartDisp,'prod_savePrep()')
+        + prod_dateFld(pt('lbl_prep_end'),'pg_prep_end',_prepEnd,'prod_savePrep()')
+        + '<div class="prod-field"><label>'+pt('lbl_start_ro')+'</label><input id="pg_start_ro" value="'+prod_esc(ymdToDmy(_prepEnd))+'" readonly style="background:#f2f2f2;cursor:default"></div>'
+        + '<label style="font-size:12px;color:#555">'+pt('lbl_priority')+'</label><select id="pg_priority" onchange="prod_savePriorityHouse()">'
+        + '<option value="">'+pt('opt_please')+'</option>'
         + mm.houseOrder.map(function(h){ return '<option value="'+h+'"'+(priorityHouse===h?' selected':'')+'>'+prod_esc(prod_phName(h))+'</option>'; }).join('')
         + '</select>'
         + '</div>';
@@ -3759,9 +3860,9 @@ function _ovLoadChartLib(cb){
         /* 顶部：建厂筹备和试运营阶段条（绿色；时间轴起点已提前到筹备开始日，其右端接红色开工日） */
         var _prepBarW = Math.max(0, _xpos(effStart) - _xpos(_prepStartDate));
         h += '<div style="display:flex;align-items:center;margin:6px 0">'
-          + '<div style="width:152px;font-size:12px;flex-shrink:0">建厂筹备和试运营</div>'
+          + '<div style="width:152px;font-size:12px;flex-shrink:0">'+pt('gantt_prep_label')+'</div>'
           + '<div style="flex:1;background:#f0f0f0;height:26px;border-radius:4px;position:relative;overflow:hidden">'
-          + '<div title="建厂筹备和试运营：'+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'" style="position:absolute;left:0%;width:'+_prepBarW+'%;background:#43A047;height:100%;border-radius:2px"></div>'
+          + '<div title="'+pt('gantt_prep_title')+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'" style="position:absolute;left:0%;width:'+_prepBarW+'%;background:#43A047;height:100%;border-radius:2px"></div>'
           + '</div>'
           + '<div style="width:300px;margin-left:10px;font-size:11px;color:#000;line-height:1.5">'
           + '<div style="color:#2e7d32">'+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'</div>'
@@ -3774,20 +3875,20 @@ function _ovLoadChartLib(cb){
           g.segs.forEach(function(s){
             var left=_xpos(s.sDate), width=_xpos(s.eDate)-_xpos(s.sDate);
             var border = s.house===priorityHouse ? ';border:2px solid #333' : '';
-            h += '<div title="'+prod_esc(prod_phName(s.house))+'：'+prod_fmtNum(s.qty)+'片｜开工 '+fmtFull(s.sDate)+' ~ 结束 '+fmtFull(s.eDate)+'" style="position:absolute;left:'+left+'%;width:'+width+'%;background:'+s.color+';height:100%;border-radius:2px'+border+'"></div>';
+            h += '<div title="'+prod_esc(prod_phName(s.house))+': '+prod_fmtNum(s.qty)+pt('unit_pcs')+'｜'+pt('thr_start')+' '+fmtFull(s.sDate)+' ~ '+pt('thr_end')+' '+fmtFull(s.eDate)+'" style="position:absolute;left:'+left+'%;width:'+width+'%;background:'+s.color+';height:100%;border-radius:2px'+border+'"></div>';
           });
           /* 假期斜纹段：仅覆盖本行生产条实际日期区间（中性灰斜纹，悬停显示名称） */
           if(_rMin!==null){
             var _h2=null,_he2=null,_hn2=null,_ht2=false,_hd2=new Date(_rMin);
             var _inSeg=function(yk){ return g.segs.some(function(s){ return bdYmd(s.sDate)<=yk && yk<=bdYmd(s.eDate); }); };
-            while(_hd2<=_rMax){ var yk=bdYmd(_hd2), inf=_holInfo[yk], inside=(inf&&_inSeg(yk)); if(inside){ if(!_h2){ _h2=new Date(_hd2.getTime()); _hn2=inf.name; _ht2=inf.isTet; } _he2=new Date(_hd2.getTime()); } else if(_h2){ var _be=new Date(_he2.getTime()+86400000); h+='<div title="'+prod_esc(_hn2+(_ht2?'（含前后扩展）':''))+'：'+fmtFull(_h2)+' ~ '+fmtFull(_he2)+'" style="position:absolute;left:'+_xpos(_h2)+'%;width:'+(_xpos(_be)-_xpos(_h2))+'%;top:0;bottom:0;z-index:2;pointer-events:auto;background:repeating-linear-gradient(135deg,#9e9e9e 0 4px,#f2f2f2 4px 8px)"></div>'; _h2=null; } _hd2.setDate(_hd2.getDate()+1); }
-            if(_h2){ var _be=new Date(_he2.getTime()+86400000); h+='<div title="'+prod_esc(_hn2+(_ht2?'（含前后扩展）':''))+'：'+fmtFull(_h2)+' ~ '+fmtFull(_he2)+'" style="position:absolute;left:'+_xpos(_h2)+'%;width:'+(_xpos(_be)-_xpos(_h2))+'%;top:0;bottom:0;z-index:2;pointer-events:auto;background:repeating-linear-gradient(135deg,#9e9e9e 0 4px,#f2f2f2 4px 8px)"></div>'; }
+            while(_hd2<=_rMax){ var yk=bdYmd(_hd2), inf=_holInfo[yk], inside=(inf&&_inSeg(yk)); if(inside){ if(!_h2){ _h2=new Date(_hd2.getTime()); _hn2=inf.name; _ht2=inf.isTet; } _he2=new Date(_hd2.getTime()); } else if(_h2){ var _be=new Date(_he2.getTime()+86400000); h+='<div title="'+prod_esc(_hn2+(_ht2?pt('tet_ext'):''))+'：'+fmtFull(_h2)+' ~ '+fmtFull(_he2)+'" style="position:absolute;left:'+_xpos(_h2)+'%;width:'+(_xpos(_be)-_xpos(_h2))+'%;top:0;bottom:0;z-index:2;pointer-events:auto;background:repeating-linear-gradient(135deg,#9e9e9e 0 4px,#f2f2f2 4px 8px)"></div>'; _h2=null; } _hd2.setDate(_hd2.getDate()+1); }
+            if(_h2){ var _be=new Date(_he2.getTime()+86400000); h+='<div title="'+prod_esc(_hn2+(_ht2?pt('tet_ext'):''))+'：'+fmtFull(_h2)+' ~ '+fmtFull(_he2)+'" style="position:absolute;left:'+_xpos(_h2)+'%;width:'+(_xpos(_be)-_xpos(_h2))+'%;top:0;bottom:0;z-index:2;pointer-events:auto;background:repeating-linear-gradient(135deg,#9e9e9e 0 4px,#f2f2f2 4px 8px)"></div>'; }
           }
           h += '</div>';
           /* 右侧明细列：该规格各猪舍名、数量、开工~结束日期 */
           h += '<div style="width:300px;margin-left:10px;font-size:11px;color:#000;line-height:1.5">';
-          h += '<div style="color:#444">共 '+prod_fmtNum(g.total)+' 片 · '+g.workDays+' 天</div>';
-          g.segs.forEach(function(s){ var pfx = s.house===priorityHouse ? '★' : ''; h += '<div>'+pfx+prod_esc(prod_phName(s.house))+'：'+prod_fmtNum(s.qty)+'片｜'+fmtFull(s.sDate)+'~'+fmtFull(s.eDate)+'</div>'; });
+          h += '<div style="color:#444">'+pt('right_p1')+prod_fmtNum(g.total)+pt('right_p2')+g.workDays+pt('right_p3')+'</div>';
+          g.segs.forEach(function(s){ var pfx = s.house===priorityHouse ? '★' : ''; h += '<div>'+pfx+prod_esc(prod_phName(s.house))+'：'+prod_fmtNum(s.qty)+pt('unit_pcs')+'｜'+fmtFull(s.sDate)+'~'+fmtFull(s.eDate)+'</div>'; });
           /* 右侧红字假期说明：本规格生产区间内重叠的假期名称和起止日期 */
           var _rMin2=null,_rMax2=null; g.segs.forEach(function(s){ var a=+s.sDate, b=+s.eDate; if(_rMin2===null||a<_rMin2)_rMin2=a; if(_rMax2===null||b>_rMax2)_rMax2=b; });
           if(_rMin2!==null){
@@ -3801,7 +3902,7 @@ function _ovLoadChartLib(cb){
           h += '</div>';
           h += '</div>';
         });
-        h += '<div style="font-size:12px;color:#666;margin-top:8px">总生产周期约 <b>'+totalDays+'</b> 个有效工作日（已跳过越南公共假期，含春节前后各扩展；按各规格「生产片数/天」排产，默认 300 片/天；优先猪舍：'+(priorityHouse?prod_esc(prod_phName(priorityHouse)):'未设置')+'；条内<strong style="color:#F9A825">金色=优先猪舍</strong>，其余按需求量从大到小；右侧列为各猪舍明细；斜纹段为越南公共假期（悬停看名称）；虚线为每月首日；顶部<strong style="color:#2e7d32">绿色条=建厂筹备和试运营</strong>（不计入生产周期，其右端接红色开工日）；筹备日期绿色、生产起止红色）。</div>';
+        h += '<div style="font-size:12px;color:#666;margin-top:8px">'+pt('gantt_n1')+'<b>'+totalDays+'</b>'+pt('gantt_n2')+(priorityHouse?prod_esc(prod_phName(priorityHouse)):pt('gantt_unset'))+pt('gantt_n3')+'<strong style="color:#F9A825">'+pt('gantt_gold')+'</strong>'+pt('gantt_n4')+'<strong style="color:#2e7d32">'+pt('gantt_green')+'</strong>'+pt('gantt_n5')+'</div>';
         h += '</div></div>';
         /* 按栋舍汇总生产计划表：分组猪舍，组内按开工日期升序，含每栋舍小计 */
         var _byHouse = {};
@@ -3810,9 +3911,9 @@ function _ovLoadChartLib(cb){
         /* 全局最早开工日 & 全局最晚结束日，仅这两个日期标红 */
         var globalFirst = _flat.reduce(function(m, s){ return (!m || +s.sDate < +m) ? s.sDate : m; }, null);
         var globalLast = _flat.reduce(function(m, s){ return (!m || +s.eDate > +m) ? s.eDate : m; }, null);
-        h += '<div class="prod-sec-title" style="border-color:#6c757d;margin-top:18px">按栋舍汇总生产计划</div>';
+        h += '<div class="prod-sec-title" style="border-color:#6c757d;margin-top:18px">'+pt('sec_house_sum')+'</div>';
         h += '<div style="overflow-x:auto"><table class="prod-table" style="text-align:center"><thead><tr>'
-          + '<th>栋舍</th><th>规格(长×宽×高 mm)</th><th>数量/片</th><th>开工</th><th>结束</th><th>建厂筹备和试运营</th></tr></thead><tbody>';
+          + '<th>'+pt('thr_house2')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_qty_pcs')+'</th><th>'+pt('thr_start')+'</th><th>'+pt('thr_end')+'</th><th>'+pt('thr_prep')+'</th></tr></thead><tbody>';
         _houseSorted.forEach(function(ph){
           var segs = _byHouse[ph].slice().sort(function(a,b){ return +a.sDate - +b.sDate; });
           var sub = 0;
@@ -3823,33 +3924,33 @@ function _ovLoadChartLib(cb){
             var redEnd = (+s.eDate === +globalLast) ? ' style="color:#d32f2f;font-weight:700"' : '';
             h += '<tr><td>'+pfx+prod_esc(prod_phName(s.house))+'</td><td>'+prod_esc(s.spec)+'</td><td>'+prod_fmtNum(s.qty)+'</td><td'+redStart+'>'+fmtFull(s.sDate)+'</td><td'+redEnd+'>'+fmtFull(s.eDate)+'</td><td style="color:#2e7d32;font-weight:600">'+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'</td></tr>';
           });
-          h += '<tr style="font-weight:700;background:#eef2f7"><td colspan="2">'+prod_esc(prod_phName(ph))+' 小计</td><td colspan="4" style="text-align:left">'+prod_fmtNum(sub)+' 片</td></tr>';
+          h += '<tr style="font-weight:700;background:#eef2f7"><td colspan="2">'+prod_esc(prod_phName(ph))+' '+pt('subtotal')+'</td><td colspan="4" style="text-align:left">'+prod_fmtNum(sub)+' '+pt('unit_pcs')+'</td></tr>';
         });
         h += '</tbody></table></div>';
       } else {
-        h += '<div class="prod-empty">请先在「生产骨料库存计划表」为各规格填写“生产片数/天”（默认按 300 片/天），并设置「建厂筹备和试运营」起止日期。</div>';
+        h += '<div class="prod-empty">'+pt('empty_gantt')+'</div>';
       }
 
       return h;
     }
-    function prod_saveGanttStart(){ var f = prod_get(PROD_CUR); f.planStart = prod_val('pg_start'); prod_save(f); prod_renderTab('B'); prod_toast('排程已更新'); }
-    function prod_savePriorityHouse(){ var f = prod_get(PROD_CUR); f.priorityHouse = prod_val('pg_priority'); prod_save(f); prod_renderTab('B'); prod_toast('优先猪舍已设置'); }
+    function prod_saveGanttStart(){ var f = prod_get(PROD_CUR); f.planStart = prod_val('pg_start'); prod_save(f); prod_renderTab('B'); prod_toast(pt('toast_sched')); }
+    function prod_savePriorityHouse(){ var f = prod_get(PROD_CUR); f.priorityHouse = prod_val('pg_priority'); prod_save(f); prod_renderTab('B'); prod_toast(pt('toast_priority')); }
     function prod_savePrep(){ var f = prod_get(PROD_CUR); f.prepStart = prod_val('pg_prep_start'); f.prepEnd = prod_val('pg_prep_end'); if(!f.prepEnd) f.prepEnd = (f.planStart||prod_today()); prod_save(f); prod_renderTab('B'); }
     /* C 人员（按日快照，只记数） */
     function prod_tabC(f){
-      var h = '<div class="prod-sec-title">人员（按日快照，只记数不记名）</div>'
-        + '<div class="prod-form">'+prod_dateFld('日期','pc_date',prod_today())
+      var h = '<div class="prod-sec-title">'+pt('sec_workers')+'</div>'
+        + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pc_date',prod_today())
         + '<div style="display:flex;gap:10px;flex-wrap:wrap">';
-      PROD_WORKERS.forEach(function(w){ h += prod_fld(w[1],'pc_'+w[0],0); });
-      h += '</div><button class="prod-btn" onclick="prod_saveWorkers()">保存当日快照</button></div>';
-      h += '<table class="prod-table"><thead><tr><th>日期</th>';
-      PROD_WORKERS.forEach(function(w){ h += '<th>'+w[1]+'</th>'; });
-      h += '<th>合计</th><th></th></tr></thead><tbody>';
+      PROD_WORKERS.forEach(function(w){ h += prod_fld(pt('prod_role_'+w[0]),'pc_'+w[0],0); });
+      h += '</div><button class="prod-btn" onclick="prod_saveWorkers()">'+pt('btn_save_snap')+'</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th>';
+      PROD_WORKERS.forEach(function(w){ h += '<th>'+pt('prod_role_'+w[0])+'</th>'; });
+      h += '<th>'+pt('thr_total2')+'</th><th></th></tr></thead><tbody>';
       var dates = Object.keys(f.workers||{}).sort().reverse();
       dates.forEach(function(d){ var w = f.workers[d]; var sum = 0;
         PROD_WORKERS.forEach(function(k){ sum += (+w[k[0]]||0); });
         h += '<tr><td>'+ymdToDmy(d)+'</td>'; PROD_WORKERS.forEach(function(k){ h += '<td>'+(w[k[0]]||0)+'</td>'; });
-        h += '<td><b>'+sum+'</b></td><td><button class="prod-btn sec" onclick="prod_delWorkers(\''+d+'\')">删</button></td></tr>';
+        h += '<td><b>'+sum+'</b></td><td><button class="prod-btn sec" onclick="prod_delWorkers(\''+d+'\')">'+pt('btn_del')+'</button></td></tr>';
       });
       h += '</tbody></table>';
       return h;
@@ -3860,52 +3961,52 @@ function _ovLoadChartLib(cb){
     function prod_tabD(f){
       var m = f.materials||{items:[],inbound:[],outbound:[]};
       function stock(name){ var s=0; m.inbound.forEach(function(r){ if(r.name===name) s+=(+r.qty||0); }); m.outbound.forEach(function(r){ if(r.name===name) s-=(+r.qty||0); }); return s; }
-      var h = '<div class="prod-sec-title">原料与库存（工厂自采，无审批流）</div>';
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">物资清单与库存</div>';
-      h += '<div class="prod-form">'+prod_fld('名称','pd_name')+prod_fld('单位','pd_unit')+prod_fld('预警阈值','pd_warn')+'<button class="prod-btn" onclick="prod_addMat()">添加物资</button></div>';
-      h += '<table class="prod-table"><thead><tr><th>名称</th><th>单位</th><th>当前库存</th><th>预警</th></tr></thead><tbody>';
+      var h = '<div class="prod-sec-title">'+pt('sec_raw')+'</div>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_stock')+'</div>';
+      h += '<div class="prod-form">'+prod_fld(pt('lbl_name'),'pd_name')+prod_fld(pt('lbl_unit'),'pd_unit')+prod_fld(pt('lbl_warn'),'pd_warn')+'<button class="prod-btn" onclick="prod_addMat()">'+pt('btn_add_mat')+'</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_name')+'</th><th>'+pt('thr_unit2')+'</th><th>'+pt('thr_cur_stock')+'</th><th>'+pt('thr_warn2')+'</th></tr></thead><tbody>';
       (m.items||[]).forEach(function(it){ var st = stock(it.name); var warn = (it.warnAt!==''&&it.warnAt!=null&&+st<=+it.warnAt) ? ' style="color:#a31515;font-weight:700"' : ''; h += '<tr><td>'+prod_esc(it.name)+'</td><td>'+prod_esc(it.unit)+'</td><td'+warn+'>'+st+'</td><td>'+(it.warnAt||'')+'</td></tr>'; });
       h += '</tbody></table>';
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">入库（采购直录）</div>';
-      h += '<div class="prod-form">'+prod_dateFld('日期','pd_in_date',prod_today())+prod_fld('名称','pd_in_name')+prod_fld('数量','pd_in_qty')+prod_fld('备注','pd_in_note')+'<button class="prod-btn" onclick="prod_matIn()">入库</button></div>';
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">出库</div>';
-      h += '<div class="prod-form">'+prod_dateFld('日期','pd_out_date',prod_today())+prod_fld('名称','pd_out_name')+prod_fld('数量','pd_out_qty')+prod_fld('备注','pd_out_note')+'<button class="prod-btn sec" onclick="prod_matOut()">出库</button></div>';
-      h += '<table class="prod-table"><thead><tr><th>日期</th><th>类型</th><th>名称</th><th>数量</th><th>备注</th></tr></thead><tbody>';
-      var rows = m.inbound.map(function(r){ return {d:r.date,t:'入库',n:r.name,q:r.qty,nt:r.note}; }).concat(m.outbound.map(function(r){ return {d:r.date,t:'出库',n:r.name,q:r.qty,nt:r.note}; }));
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_inbound')+'</div>';
+      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pd_in_date',prod_today())+prod_fld(pt('lbl_name'),'pd_in_name')+prod_fld(pt('thr_qty2'),'pd_in_qty')+prod_fld(pt('lbl_note'),'pd_in_note')+'<button class="prod-btn" onclick="prod_matIn()">'+pt('btn_inbound')+'</button></div>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_outbound')+'</div>';
+      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pd_out_date',prod_today())+prod_fld(pt('lbl_name'),'pd_out_name')+prod_fld(pt('thr_qty2'),'pd_out_qty')+prod_fld(pt('lbl_note'),'pd_out_note')+'<button class="prod-btn sec" onclick="prod_matOut()">'+pt('btn_outbound')+'</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('thr_type')+'</th><th>'+pt('thr_name')+'</th><th>'+pt('thr_qty2')+'</th><th>'+pt('lbl_note')+'</th></tr></thead><tbody>';
+      var rows = m.inbound.map(function(r){ return {d:r.date,t:pt('type_in'),n:r.name,q:r.qty,nt:r.note}; }).concat(m.outbound.map(function(r){ return {d:r.date,t:pt('type_out'),n:r.name,q:r.qty,nt:r.note}; }));
       rows.sort(function(a,b){ return (b.d||'').localeCompare(a.d||''); });
       rows.forEach(function(r){ h += '<tr><td>'+prod_esc(ymdToDmy(r.d))+'</td><td>'+r.t+'</td><td>'+prod_esc(r.n)+'</td><td>'+prod_esc(r.q)+'</td><td>'+prod_esc(r.nt)+'</td></tr>'; });
       h += '</tbody></table>';
       /* 材料需求（按规格自动计算，与系统智能报告算法一致，指导采购） */
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">材料需求（按规格自动计算，指导采购）</div>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_mat_req')+'</div>';
       var mm2 = prod_slatsMatrix(); var mat = {cement:0,sand:0,gravel:0};
       Object.keys(mm2.specs).forEach(function(k){ var sp = mm2.specs[k]; var L=+sp.L||0,W=+sp.W||0,H=+sp.H||0; if(L&&W&&H){ var vol=L*W*H/1e9; var std=vol/0.063; mat.cement+=std*24.4*sp.total/1000; mat.sand+=std*22.6*sp.total/1000; mat.gravel+=std*68*sp.total/1000; } });
       h += '<div class="prod-kpi">'
-        + '<div class="k">水泥<b>'+mat.cement.toFixed(1)+' 吨</b></div>'
-        + '<div class="k">黄砂<b>'+mat.sand.toFixed(1)+' 吨</b></div>'
-        + '<div class="k">石子<b>'+mat.gravel.toFixed(1)+' 吨</b></div></div>';
+        + '<div class="k">'+pt('kpi_cement')+'<b>'+mat.cement.toFixed(1)+pt('unit_ton')+'</b></div>'
+        + '<div class="k">'+pt('kpi_sand')+'<b>'+mat.sand.toFixed(1)+pt('unit_ton')+'</b></div>'
+        + '<div class="k">'+pt('kpi_gravel')+'<b>'+mat.gravel.toFixed(1)+pt('unit_ton')+'</b></div></div>';
       function _stock(name){ var s=0; m.inbound.forEach(function(r){ if(r.name===name) s+=(+r.qty||0); }); m.outbound.forEach(function(r){ if(r.name===name) s-=(+r.qty||0); }); return s; }
       function _match(name){ var hit=null; m.items.forEach(function(it){ if(it.name && it.name.indexOf(name)>=0) hit=it.name; }); return hit; }
-      h += '<table class="prod-table"><thead><tr><th>材料</th><th>需求(吨)</th><th>当前库存</th><th>缺口</th></tr></thead><tbody>';
-      [['水泥','cement'],['黄砂','sand'],['石子','gravel']].forEach(function(pair){
-        var nm=_match(pair[0]); var have = nm?_stock(nm):0; var need=mat[pair[1]];
-        h += '<tr><td>'+pair[0]+'</td><td>'+need.toFixed(1)+'</td><td>'+(nm?have:'未建物资')+'</td><td><b>'+Math.max(0,need-have).toFixed(1)+'</b></td></tr>';
+      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_material')+'</th><th>'+pt('thr_demand')+'</th><th>'+pt('thr_cur_stock')+'</th><th>'+pt('thr_gap')+'</th></tr></thead><tbody>';
+      [['kpi_cement','cement'],['kpi_sand','sand'],['kpi_gravel','gravel']].forEach(function(pair){
+        var nm=_match(pt(pair[0])); var have = nm?_stock(nm):0; var need=mat[pair[1]];
+        h += '<tr><td>'+pt(pair[0])+'</td><td>'+need.toFixed(1)+'</td><td>'+(nm?have:pt('not_created'))+'</td><td><b>'+Math.max(0,need-have).toFixed(1)+'</b></td></tr>';
       });
       h += '</tbody></table>';
-      h += '<div style="font-size:12px;color:#666">注：需求按规格体积折算标准板(1500×600×70)后，套用水泥24.4/黄砂22.6/石子68 kg·每标准板计算，与系统“智能报告”完全一致。</div>';
+      h += '<div style="font-size:12px;color:#666">'+pt('note_d')+'</div>';
       return h;
     }
     function prod_addMat(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; f.materials.items.push({name:prod_val('pd_name'),unit:prod_val('pd_unit'),warnAt:prod_val('pd_warn')}); prod_save(f); prod_renderTab('D'); }
-    function prod_matIn(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; if(!prod_val('pd_in_name')){ prod_toast('请填名称'); return; } f.materials.inbound.push({date:prod_val('pd_in_date'),name:prod_val('pd_in_name'),qty:prod_val('pd_in_qty'),note:prod_val('pd_in_note')}); prod_save(f); prod_renderTab('D'); }
-    function prod_matOut(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; if(!prod_val('pd_out_name')){ prod_toast('请填名称'); return; } f.materials.outbound.push({date:prod_val('pd_out_date'),name:prod_val('pd_out_name'),qty:prod_val('pd_out_qty'),note:prod_val('pd_out_note')||'人工出库'}); prod_save(f); prod_renderTab('D'); }
+    function prod_matIn(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; if(!prod_val('pd_in_name')){ prod_toast(pt('toast_name_req')); return; } f.materials.inbound.push({date:prod_val('pd_in_date'),name:prod_val('pd_in_name'),qty:prod_val('pd_in_qty'),note:prod_val('pd_in_note')}); prod_save(f); prod_renderTab('D'); }
+    function prod_matOut(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; if(!prod_val('pd_out_name')){ prod_toast(pt('toast_name_req')); return; } f.materials.outbound.push({date:prod_val('pd_out_date'),name:prod_val('pd_out_name'),qty:prod_val('pd_out_qty'),note:prod_val('pd_out_note')||'人工出库'}); prod_save(f); prod_renderTab('D'); }
     /* E 每日生产 / 盘点 */
     function prod_tabE(f){
-      var h = '<div class="prod-sec-title">每日生产 / 盘点</div>'
-        + '<div class="prod-form">'+prod_dateFld('日期','pe_date',prod_today())
-        + '<button class="prod-btn" type="button" onclick="prod_addSpecRow()">+ 产出规格</button>'
-        + '<button class="prod-btn sec" type="button" onclick="prod_addMatRow()">+ 耗料</button>'
-        + '<button class="prod-btn" type="button" onclick="prod_saveProduction()">保存当日生产</button></div>'
+      var h = '<div class="prod-sec-title">'+pt('sec_daily')+'</div>'
+        + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pe_date',prod_today())
+        + '<button class="prod-btn" type="button" onclick="prod_addSpecRow()">'+pt('btn_add_spec')+'</button>'
+        + '<button class="prod-btn sec" type="button" onclick="prod_addMatRow()">'+pt('btn_add_mat')+'</button>'
+        + '<button class="prod-btn" type="button" onclick="prod_saveProduction()">'+pt('btn_save_prod')+'</button></div>'
         + '<div id="pe_specs"></div><div id="pe_mats"></div>';
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">历史产出</div><table class="prod-table"><thead><tr><th>日期</th><th>规格</th><th>良品</th><th>不良</th><th>耗料</th></tr></thead><tbody>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_history')+'</div><table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_good')+'</th><th>'+pt('thr_bad')+'</th><th>'+pt('thr_mat_used')+'</th></tr></thead><tbody>';
       var dates = Object.keys(f.production||{}).sort().reverse();
       dates.forEach(function(d){ var rec = f.production[d]; var specs = rec.specs||{}; var keys = Object.keys(specs);
         var mu = (rec.materialUsed||[]).map(function(x){ return x.name+':'+x.qty; }).join(', ');
@@ -3915,8 +4016,8 @@ function _ovLoadChartLib(cb){
       h += '</tbody></table>';
       return h;
     }
-    function prod_addSpecRow(){ var c = prod_el('pe_specs'); if(!c) return; var i = Date.now(); var d = document.createElement('div'); d.className = 'prod-form'; d.innerHTML = prod_fld('规格','pes_'+i)+prod_fld('良品','peg_'+i)+prod_fld('不良','peb_'+i)+'<button class="prod-btn sec" onclick="this.parentNode.remove()">×</button>'; c.appendChild(d); }
-    function prod_addMatRow(){ var c = prod_el('pe_mats'); if(!c) return; var i = Date.now(); var d = document.createElement('div'); d.className = 'prod-form'; d.innerHTML = prod_fld('耗料名称','pem_'+i)+prod_fld('数量','peq_'+i)+'<button class="prod-btn sec" onclick="this.parentNode.remove()">×</button>'; c.appendChild(d); }
+    function prod_addSpecRow(){ var c = prod_el('pe_specs'); if(!c) return; var i = Date.now(); var d = document.createElement('div'); d.className = 'prod-form'; d.innerHTML = prod_fld(pt('lbl_spec'),'pes_'+i)+prod_fld(pt('lbl_good2'),'peg_'+i)+prod_fld(pt('lbl_bad2'),'peb_'+i)+'<button class="prod-btn sec" onclick="this.parentNode.remove()">'+pt('btn_x')+'</button>'; c.appendChild(d); }
+    function prod_addMatRow(){ var c = prod_el('pe_mats'); if(!c) return; var i = Date.now(); var d = document.createElement('div'); d.className = 'prod-form'; d.innerHTML = prod_fld(pt('lbl_mat_name'),'pem_'+i)+prod_fld(pt('thr_qty2'),'peq_'+i)+'<button class="prod-btn sec" onclick="this.parentNode.remove()">'+pt('btn_x')+'</button>'; c.appendChild(d); }
     function prod_saveProduction(){
       var f = prod_get(PROD_CUR); var d = prod_val('pe_date')||ymdToDmy(prod_today());
       f.production = f.production||{}; var rec = f.production[d]||{specs:{},materialUsed:[]};
@@ -3927,32 +4028,32 @@ function _ovLoadChartLib(cb){
       for(var s in rec.specs){ f.finished[s] = f.finished[s]||{produced:0,delivered:0}; f.finished[s].produced = (+f.finished[s].produced||0) + (+rec.specs[s].good||0); }
       // 确保耗用物资出现在物资清单
       var names = {}; f.materials.outbound.forEach(function(x){ names[x.name]=1; }); for(var n in names){ if(!f.materials.items.some(function(it){ return it.name===n; })) f.materials.items.push({name:n,unit:'',warnAt:''}); }
-      prod_save(f); prod_renderTab('E'); prod_toast('已保存，并自动过账成品入库 + 生产耗料出库');
+      prod_save(f); prod_renderTab('E'); prod_toast(pt('toast_prod_saved'));
     }
     /* H 成品库存（水泥漏缝地板，按规格） */
     function prod_idx(s){ return encodeURIComponent(s).replace(/[^a-zA-Z0-9]/g,'_'); }
     function prod_tabH(f){
       var fn = f.finished||{}; var specs = Object.keys(fn);
       var totP = 0, totD = 0; specs.forEach(function(s){ totP += (+fn[s].produced||0); totD += (+fn[s].delivered||0); });
-      var h = '<div class="prod-sec-title">成品库存（水泥漏缝地板，按规格）</div>'
-        + '<div class="prod-kpi"><div class="k">累计生产入库<b>'+totP+'</b></div><div class="k">累计出库<b>'+totD+'</b></div><div class="k">结余<b>'+(totP-totD)+'</b></div></div>';
-      h += '<table class="prod-table"><thead><tr><th>规格</th><th>生产入库</th><th>出库</th><th>结余</th></tr></thead><tbody>';
+      var h = '<div class="prod-sec-title">'+pt('sec_finished')+'</div>'
+        + '<div class="prod-kpi"><div class="k">'+pt('kpi_prod_in')+'<b>'+totP+'</b></div><div class="k">'+pt('kpi_out2')+'<b>'+totD+'</b></div><div class="k">'+pt('kpi_balance')+'<b>'+(totP-totD)+'</b></div></div>';
+      h += '<table class="prod-table"><thead><tr><th>'+pt('th_spec')+'</th><th>'+pt('thr_produced')+'</th><th>'+pt('thr_out3')+'</th><th>'+pt('thr_balance2')+'</th></tr></thead><tbody>';
       specs.forEach(function(s){ var r = fn[s]; var bal = (+r.produced||0)-(+r.delivered||0);
         h += '<tr><td>'+prod_esc(s)+'</td><td>'+(+r.produced||0)+'</td><td>'+(+r.delivered||0)+'</td><td><b>'+bal+'</b></td></tr>'; });
       h += '</tbody></table>';
-      if(!specs.length) h += '<div class="prod-empty">暂无成品。请在「每日生产」录入产出后自动累计。</div>';
+      if(!specs.length) h += '<div class="prod-empty">'+pt('empty_finished')+'</div>';
       return h;
     }
     /* F 设备与故障 */
     function prod_tabF(f){
-      var h = '<div class="prod-sec-title">设备台账与高价值工具等级表</div>'
-        + '<div class="prod-form">'+prod_fld('名称','pf_name')+prod_fld('等级','pf_grade')+prod_fld('保养说明','pf_maint')+'<button class="prod-btn" onclick="prod_addEquip()">添加设备/工具</button></div>';
-      h += '<table class="prod-table"><thead><tr><th>名称</th><th>等级</th><th>保养</th></tr></thead><tbody>';
+      var h = '<div class="prod-sec-title">'+pt('sec_equip')+'</div>'
+        + '<div class="prod-form">'+prod_fld(pt('lbl_name'),'pf_name')+prod_fld(pt('lbl_grade'),'pf_grade')+prod_fld(pt('lbl_maint'),'pf_maint')+'<button class="prod-btn" onclick="prod_addEquip()">'+pt('btn_add_equip')+'</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_name')+'</th><th>'+pt('thr_grade2')+'</th><th>'+pt('thr_maint2')+'</th></tr></thead><tbody>';
       (f.equipment.list||[]).forEach(function(e){ h += '<tr><td>'+prod_esc(e.name)+'</td><td>'+prod_esc(e.grade)+'</td><td>'+prod_esc(e.maint)+'</td></tr>'; });
       h += '</tbody></table>';
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">设备故障记录</div>';
-      h += '<div class="prod-form">'+prod_dateFld('日期','pf_fdate',prod_today())+prod_fld('设备','pf_fequip')+prod_fld('停机(h)','pf_fdown')+prod_fld('原因','pf_freason')+prod_fld('维修','pf_frepair')+'<button class="prod-btn sec" onclick="prod_addFault()">记录故障</button></div>';
-      h += '<table class="prod-table"><thead><tr><th>日期</th><th>设备</th><th>停机(h)</th><th>原因</th><th>维修</th></tr></thead><tbody>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_fault')+'</div>';
+      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pf_fdate',prod_today())+prod_fld(pt('lbl_equip'),'pf_fequip')+prod_fld(pt('lbl_down'),'pf_fdown')+prod_fld(pt('lbl_reason'),'pf_freason')+prod_fld(pt('lbl_repair'),'pf_frepair')+'<button class="prod-btn sec" onclick="prod_addFault()">'+pt('btn_add_fault')+'</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('lbl_equip')+'</th><th>'+pt('thr_down2')+'</th><th>'+pt('thr_reason2')+'</th><th>'+pt('thr_repair2')+'</th></tr></thead><tbody>';
       (f.equipment.faults||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).forEach(function(r){ h += '<tr><td>'+prod_esc(ymdToDmy(r.date))+'</td><td>'+prod_esc(r.equip)+'</td><td>'+prod_esc(r.down)+'</td><td>'+prod_esc(r.reason)+'</td><td>'+prod_esc(r.repair)+'</td></tr>'; });
       h += '</tbody></table>';
       return h;
@@ -3963,24 +4064,24 @@ function _ovLoadChartLib(cb){
     function prod_tabG(f){
       var fn = f.finished||{}; var specs = Object.keys(fn);
       var opts = ''; specs.forEach(function(s){ opts += '<option value="'+prod_esc(s)+'">'+prod_esc(s)+'</option>'; });
-      var h = '<div class="prod-sec-title">交付（出库，自动过账成品库存）</div>'
-        + '<div class="prod-form">'+prod_dateFld('日期','pg_date',prod_today())
-        + '<div class="prod-field"><label>规格</label><select id="pg_spec">'+opts+'</select></div>'
-        + prod_fld('出库数量','pg_qty')+prod_fld('客户','pg_client')+prod_fld('备注','pg_note')
-        + '<button class="prod-btn" onclick="prod_addDelivery()">出库交付</button></div>';
-      h += '<table class="prod-table"><thead><tr><th>日期</th><th>规格</th><th>数量</th><th>客户</th></tr></thead><tbody>';
+      var h = '<div class="prod-sec-title">'+pt('sec_delivery')+'</div>'
+        + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pg_date',prod_today())
+        + '<div class="prod-field"><label>'+pt('lbl_spec2')+'</label><select id="pg_spec">'+opts+'</select></div>'
+        + prod_fld(pt('thr_qty3'),'pg_qty')+prod_fld(pt('lbl_client'),'pg_client')+prod_fld(pt('lbl_note'),'pg_note')
+        + '<button class="prod-btn" onclick="prod_addDelivery()">'+pt('btn_deliver')+'</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_qty2')+'</th><th>'+pt('thr_client2')+'</th></tr></thead><tbody>';
       (f.delivery||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).forEach(function(r){ h += '<tr><td>'+prod_esc(ymdToDmy(r.date))+'</td><td>'+prod_esc(r.spec)+'</td><td>'+prod_esc(r.qty)+'</td><td>'+prod_esc(r.client)+'</td></tr>'; });
       h += '</tbody></table>';
-      if(!specs.length) h += '<div class="prod-empty">暂无成品规格，请先在每日生产录入产出。</div>';
+      if(!specs.length) h += '<div class="prod-empty">'+pt('empty_delivery')+'</div>';
       return h;
     }
     function prod_addDelivery(){
       var f = prod_get(PROD_CUR); var spec = prod_val('pg_spec'); var q = +prod_val('pg_qty')||0;
-      if(!spec || !q){ prod_toast('请选规格并填数量'); return; }
+      if(!spec || !q){ prod_toast(pt('toast_deliver_req')); return; }
       f.finished = f.finished||{}; f.finished[spec] = f.finished[spec]||{produced:0,delivered:0};
       f.finished[spec].delivered = (+f.finished[spec].delivered||0) + q;
       f.delivery = f.delivery||[]; f.delivery.push({date:prod_val('pg_date'),spec:spec,qty:q,client:prod_val('pg_client'),note:prod_val('pg_note')});
-      prod_save(f); prod_renderTab('G'); prod_toast('已出库，成品库存结余已更新');
+      prod_save(f); prod_renderTab('G'); prod_toast(pt('toast_delivered'));
     }
     /* 工作日志索引钩子：将来工作日志只调用此函数取核心指标，不重复存 */
     function prod_generateWorklogSummary(id, date){
@@ -3990,6 +4091,15 @@ function _ovLoadChartLib(cb){
       if(rec){ for(var s in rec.specs){ produced[s] = rec.specs[s].good||0; } used = rec.materialUsed||[]; }
       var faults = (f.equipment.faults||[]).filter(function(x){ return x.date===date; });
       return { factoryId:id, date:date, workers:sum, workerDetail:w, produced:produced, materialUsed:used, faults:faults.length };
+    }
+    /* 语言切换时即时重渲染生产管理当前视图（随系统 CUR_LANG 变化） */
+    function applyProductionLang(){
+      try {
+        if (typeof PROD_CUR === 'undefined') return;
+        var listEl = prod_el('prod-list');
+        if (listEl && listEl.style.display !== 'none') { prod_renderProduction(); return; }
+        if (PROD_CUR) { prod_renderTabs(PROD_ACTIVE_TAB || 'A'); }
+      } catch(e){ console.warn('[lang] production:', e); }
     }
     </script>
   </section>
@@ -6021,7 +6131,8 @@ var I18N = {
     slats_table_bar_len:"条/\n长度方向", slats_table_rebar_size_len:"钢筋尺寸/\n长度方向", slats_table_bar_wid:"条/\n宽度方向", slats_table_rebar_size_wid:"钢筋尺寸/\n宽度方向",
     slats_table_remark:"备注", slats_table_op:"操作", slats_table_add:"+ 新增行", slats_table_total:"总计", slats_fill_required:"请完成全部必填框！",
     slats_default_bar_len_tip:"默认值是6，请根据实际修改！", slats_default_bar_wid_tip:"默认值是3，请根据实际修改！",
-    slats_pig_house_1:"公猪站", slats_pig_house_2:"配种舍", slats_pig_house_3:"怀孕舍", slats_pig_house_4:"分娩舍", slats_pig_house_5:"保育舍", slats_pig_house_6:"育肥舍", slats_pig_house_7:"隔离舍", slats_pig_house_8:"后备舍", slats_pig_house_9:"转猪舍", slats_pig_house_10:"断奶培育舍", slats_pig_house_11:"代售舍", slats_pig_house_12:"过道", slats_pig_house_13:"自留备用", slats_pig_house_14:"其他房舍", slats_pig_house_15:"其他用途",
+    slats_pig_house_1:"公猪站", slats_pig_house_2:"配种舍", slats_pig_house_3:"怀孕舍", slats_pig_house_4:"分娩舍", slats_pig_house_5:"保育舍", slats_pig_house_6:"育肥舍", slats_pig_house_7:"隔离舍", slats_pig_house_8:"后备舍", slats_pig_house_9:"转猪舍", slats_pig_house_10:"断奶培育舍", slats_pig_house_11:"代售舍", slats_pig_house_12:"过道", slats_pig_house_13:"自留备用", slats_pig_house_14:"其他房舍",     slats_pig_house_15:"其他用途",
+    nav_production:"生产管理", prod_title:"生产管理 · 现场工厂", prod_sub:"每个签约项目 = 一个独立现场工厂（人员/产能/设备/库存互不串）", prod_back:"← 返回列表",
     slats_mesh_1:"1", slats_mesh_2:"2",
     slats_rebar_φ6:"φ6", slats_rebar_φ8:"φ8", slats_rebar_φ10:"φ10", slats_rebar_φ12:"φ12",
     slats_table_btn_delete:"删除", slats_table_btn_copy:"复制", slats_table_btn_merge:"合并", btnAddWon:"+ 新建签约", btnExportExcel:"📊 导出 Excel", btnSave:"保存", btnCancel:"取消", btnEdit:"编辑", btnDelete:"删除", btnMove:"上移或下移该行", btnMoveUp:"上移", btnMoveDown:"下移", confirmDelTitle:"确认删除", confirmDel:"确定删除该项目？", btnConfirm:"确定", btnCancel:"取消", saveOk:"保存成功", pending:"已提交审批", fillAll:"请填写所有必填项", noData:"暂无数据", hiddenColumns:"已隐藏列:", cur_col_toggle:"点击显示/隐藏该货币列（至少保留一项）",
@@ -6785,7 +6896,8 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     slats_table_bar_len:"Bars/\nL", slats_table_rebar_size_len:"Rebar\nSize/L", slats_table_bar_wid:"Bars/\nW", slats_table_rebar_size_wid:"Rebar\nSize/W",
     slats_table_remark:"Remarks", slats_table_op:"Operation", slats_table_add:"+ Add Row", slats_table_total:"Total", slats_fill_required:"Please complete all required fields!",
     slats_default_bar_len_tip:"Default is 6, please adjust as actual!", slats_default_bar_wid_tip:"Default is 3, please adjust as actual!",
-    slats_pig_house_1:"Boar stud", slats_pig_house_2:"Mating barn", slats_pig_house_3:"Gestation barn", slats_pig_house_4:"Farrowing barn", slats_pig_house_5:"Nursery barn", slats_pig_house_6:"Finishing barn", slats_pig_house_7:"Isolation barn", slats_pig_house_8:"Gilt barn", slats_pig_house_9:"Transfer barn", slats_pig_house_10:"Weaner barn", slats_pig_house_11:"Sales barn", slats_pig_house_12:"Passage", slats_pig_house_13:"Reserved", slats_pig_house_14:"Other house", slats_pig_house_15:"Other purposes",
+    slats_pig_house_1:"Boar stud", slats_pig_house_2:"Mating barn", slats_pig_house_3:"Gestation barn", slats_pig_house_4:"Farrowing barn", slats_pig_house_5:"Nursery barn", slats_pig_house_6:"Finishing barn", slats_pig_house_7:"Isolation barn", slats_pig_house_8:"Gilt barn", slats_pig_house_9:"Transfer barn", slats_pig_house_10:"Weaner barn", slats_pig_house_11:"Sales barn", slats_pig_house_12:"Passage", slats_pig_house_13:"Reserved", slats_pig_house_14:"Other house",     slats_pig_house_15:"Other purposes",
+    nav_production:"Production Management", prod_title:"Production Management · On-site Factory", prod_sub:"Each signed project = one independent on-site factory (staff / capacity / equipment / inventory are isolated)", prod_back:"← Back to list",
     slats_mesh_1:"1", slats_mesh_2:"2",
     slats_rebar_φ6:"φ6", slats_rebar_φ8:"φ8", slats_rebar_φ10:"φ10", slats_rebar_φ12:"φ12",
     slats_table_btn_delete:"Delete", slats_table_btn_copy:"Copy", slats_table_btn_merge:"Merge", btnAddWon:"+ New Won", btnExportExcel:"📊 Export Excel", btnSave:"Save", btnCancel:"Cancel", btnEdit:"Edit", btnDelete:"Delete", btnMoveUp:"Move up", btnMoveDown:"Move down", confirmDelTitle:"Confirm Delete", confirmDel:"Delete this project?", btnConfirm:"Confirm", btnCancel:"Cancel", saveOk:"Saved", pending:"Pending approval", fillAll:"Please fill all required fields", noData:"No data", hiddenColumns:"Hidden Columns:", cur_col_toggle:"Click to show/hide this currency column (keep at least one)",
@@ -7552,7 +7664,8 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     slats_table_bar_len:"Thanh/\nChiều dài", slats_table_rebar_size_len:"Cỡ thép/\nChiều dài", slats_table_bar_wid:"Thanh/\nChiều rộng", slats_table_rebar_size_wid:"Cỡ thép/\nChiều rộng",
     slats_table_remark:"Ghi chú", slats_table_op:"Thao tác", slats_table_add:"+ Thêm dòng", slats_table_total:"Tổng cộng", slats_fill_required:"Vui lòng điền đầy đủ các trường bắt buộc!",
     slats_default_bar_len_tip:"Mặc định là 6, vui lòng điều chỉnh theo thực tế!", slats_default_bar_wid_tip:"Mặc định là 3, vui lòng điều chỉnh theo thực tế!",
-    slats_pig_house_1:"Trạm đực giống", slats_pig_house_2:"Chuồng phối giống", slats_pig_house_3:"Chuồng mang thai", slats_pig_house_4:"Chuồng đẻ", slats_pig_house_5:"Chuồng úm", slats_pig_house_6:"Chuồng vỗ béo", slats_pig_house_7:"Chuồng cách ly", slats_pig_house_8:"Chuồng heo dự bị", slats_pig_house_9:"Chuồng chuyển heo", slats_pig_house_10:"Chuồng cai sữa", slats_pig_house_11:"Chuồng chờ bán", slats_pig_house_12:"Hành lang", slats_pig_house_13:"Dành riêng", slats_pig_house_14:"Chuồng khác", slats_pig_house_15:"Mục đích khác",
+    slats_pig_house_1:"Trạm đực giống", slats_pig_house_2:"Chuồng phối giống", slats_pig_house_3:"Chuồng mang thai", slats_pig_house_4:"Chuồng đẻ", slats_pig_house_5:"Chuồng úm", slats_pig_house_6:"Chuồng vỗ béo", slats_pig_house_7:"Chuồng cách ly", slats_pig_house_8:"Chuồng heo dự bị", slats_pig_house_9:"Chuồng chuyển heo", slats_pig_house_10:"Chuồng cai sữa", slats_pig_house_11:"Chuồng chờ bán", slats_pig_house_12:"Hành lang", slats_pig_house_13:"Dành riêng", slats_pig_house_14:"Chuồng khác",     slats_pig_house_15:"Mục đích khác",
+    nav_production:"Quản lý Sản xuất", prod_title:"Quản lý Sản xuất · Nhà máy tại công trường", prod_sub:"Mỗi dự án đã ký = một nhà máy độc lập tại công trường (nhân sự / công suất / thiết bị / tồn kho độc lập)", prod_back:"← Quay lại danh sách",
     slats_mesh_1:"1", slats_mesh_2:"2",
     slats_rebar_φ6:"φ6", slats_rebar_φ8:"φ8", slats_rebar_φ10:"φ10", slats_rebar_φ12:"φ12",
     slats_table_btn_delete:"Xóa", slats_table_btn_copy:"Sao chép", slats_table_btn_merge:"Gộp", btnAddWon:"+ Thắng Mới", btnExportExcel:"📊 Xuất Excel", btnSave:"Lưu", btnCancel:"Hủy", btnEdit:"Sửa", btnDelete:"Xóa", btnMove:"Di chuyển dòng này lên hoặc xuống", btnMoveUp:"Lên", btnMoveDown:"Xuống", confirmDelTitle:"Xác nhận xóa", confirmDel:"Xóa dự án này?", btnConfirm:"Xác nhận", btnCancel:"Hủy", saveOk:"Đã lưu", pending:"Chờ phê duyệt", fillAll:"Vui lòng điền đủ thông tin", noData:"Không có dữ liệu", hiddenColumns:"Cột đã ẩn:", cur_col_toggle:"Bấm để hiện/ẩn cột tiền tệ này (giữ ít nhất một)",
@@ -10151,7 +10264,7 @@ function setLangDebug(lang) {
   // 性能优化：表头/按钮/导航/弹窗等"轻量"步骤同步执行（UI 立即反馈）；CRM/LOST/WON
   // 表格行重渲染（涉及 colgroup/thead/tbody 字符串拼接+innerHTML，行数大时单帧 30~80ms）
   // 全部推到下一帧批量执行，避免连续同步重渲染阻塞首屏反馈。
-  var lightSteps = ['applyTopbarLang', 'applyEmptyLang', 'applyUsersLang', 'applyApprovalsLang', 'applyCommissionLang', 'applyDashUpdateLang', 'applyDashboardChartTitles', 'applyLangRefreshers', 'applyCleanD1Lang'];
+  var lightSteps = ['applyTopbarLang', 'applyEmptyLang', 'applyUsersLang', 'applyApprovalsLang', 'applyCommissionLang', 'applyDashUpdateLang', 'applyDashboardChartTitles', 'applyLangRefreshers', 'applyCleanD1Lang', 'applyProductionLang'];
   var heavySteps = ['applyWonLang', 'applyCrmLang', 'applyLostLang'];
   console.warn('[lang] setLangDebug(' + lang + ') lightSteps start');
   for (var i = 0; i < lightSteps.length; i++) {
