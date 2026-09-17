@@ -978,6 +978,7 @@ function _ovLoadChartLib(cb){
       display: flex !important;
     }
     .cust-pay-modal {
+      position: relative;
       background: white;
       border-radius: 14px;
       width: 100%;
@@ -1106,12 +1107,14 @@ function _ovLoadChartLib(cb){
   /* ===== 智能报告模态框 ===== */
   .cpr-overlay{position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(30,30,50,.45);display:none;align-items:flex-start;justify-content:center;z-index:1100;padding:10px 12px 30px 12px;overflow-y:auto;}
   .cpr-overlay.show{display:flex;}
-  .cpr-box{background:#fff;width:100%;max-width:1000px;border-radius:14px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:pop .25s ease;}
+  .cpr-box{background:#fff;width:100%;max-width:1000px;border-radius:14px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:pop .25s ease;position:relative;}
   .cpr-head{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;background:linear-gradient(135deg,#D32F2F,#E53935);color:#fff;}
   .cpr-head h3{margin:0;font-size:13.2px;font-weight:700;}
   .cpr-head .cpr-meta{font-size:9px;opacity:.9;margin-top:3px;}
-  .cpr-close{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;transition:transform .15s;}
+  .cpr-close{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;transition:transform .15s;padding:0 2px;}
   .cpr-close:hover{transform:scale(1.2);}
+  .cpr-head .mmax-btn{color:#fff;border:1px solid rgba(255,255,255,.7);}
+  .cpr-head .mmax-btn:hover{color:#ffe3c8;border-color:#ffe3c8;background:rgba(255,255,255,.15);}
   .cpr-body{padding:20px 24px;max-height:68vh;overflow-y:auto;}
   .cpr-sec{margin-bottom:16px;padding:14px 16px;border:1px solid #f3e0c8;border-radius:10px;background:#fdf8f1;}
   .cpr-sec-title{font-size:13px;font-weight:700;color:#D32F2F;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #FBE9E7;display:flex;align-items:center;gap:6px;}
@@ -1138,6 +1141,8 @@ function _ovLoadChartLib(cb){
   .cpr-btn-outline:hover{background:#FBE9E7;color:#B71C1C;border-color:#D32F2F;}
   .cpr-btn-print{background:linear-gradient(135deg,#D32F2F,#E53935);color:#fff;box-shadow:0 3px 10px rgba(211,47,47,.3);}
   .cpr-btn-print:hover{filter:brightness(1.06);transform:translateY(-1px);}
+  .cpr-btn-newwin{background:#fff;color:#D32F2F;border:1px solid #F0C4C4;}
+  .cpr-btn-newwin:hover{background:#FBE9E7;color:#B71C1C;border-color:#D32F2F;}
 
   /* ===== 报告内新增样式：甘特图 & 现金流预测 ===== */
   .gantt-container { margin-top:10px; overflow-x:auto; }
@@ -1333,7 +1338,7 @@ function _ovLoadChartLib(cb){
     /* ===== GS→AGI 佣金报告 样式 ===== */
     .gsr-overlay{display:none;position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:1100;justify-content:center;align-items:flex-start;padding:10px 12px 30px 12px;overflow-y:auto;}
     .gsr-overlay.show{display:flex;}
-    .gsr-modal{background:white;border-radius:14px;width:900px;max-width:100%;box-shadow:0 10px 40px rgba(0,0,0,.28);overflow:hidden;}
+    .gsr-modal{position:relative;background:white;border-radius:14px;width:900px;max-width:100%;box-shadow:0 10px 40px rgba(0,0,0,.28);overflow:hidden;}
     .gsr-head{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;background:linear-gradient(135deg,#E53935,#C62828);color:white;}
     .gsr-head h2{font-size:13.2px;font-weight:700;}
     .gsr-head .gsr-meta{font-size:9px;opacity:.92;}
@@ -3266,12 +3271,440 @@ function _ovLoadChartLib(cb){
     </div>
   </section>
 
-  <!-- 生产管理（占位） -->
+  <!-- 生产管理（现场工厂子系统） -->
   <section class="view" id="view-production">
-    <div class="approvals-page">
-      <div class="page-header"><h2>生产管理</h2></div>
-      <p>生产管理模块开发中，敬请期待。</p>
+    <div class="prod-wrap">
+      <div id="prod-list">
+        <div class="page-header">
+          <h2>生产管理 · 现场工厂</h2>
+          <span class="prod-sub">每个签约项目 = 一个独立现场工厂（人员/产能/设备/库存互不串）</span>
+        </div>
+        <div id="prod-cards" class="prod-cards"></div>
+      </div>
+      <div id="prod-detail" style="display:none">
+        <div class="prod-detail-head">
+          <button class="prod-back" onclick="prod_back()">← 返回列表</button>
+          <div class="prod-detail-title" id="prod-detail-title"></div>
+        </div>
+        <div class="prod-tabs" id="prod-tabs"></div>
+        <div class="prod-tab-body" id="prod-tab-body"></div>
+      </div>
     </div>
+    <style id="prodStyle">
+      .prod-wrap{max-width:1120px;margin:0 auto;padding:8px 12px 40px;}
+      .prod-sub{font-size:12px;color:#666;margin-left:8px;}
+      .prod-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:14px;}
+      .prod-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:.15s;}
+      .prod-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.12);transform:translateY(-2px);}
+      .prod-card .pc-title{font-weight:700;font-size:15px;margin-bottom:6px;}
+      .prod-card .pc-chip{display:inline-block;background:#E7F2D4;color:#3a6b1e;border-radius:20px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0;}
+      .prod-card .pc-row{font-size:13px;color:#444;margin:3px 0;}
+      .prod-status{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+      .st-wait{background:#FFF3CD;color:#8a6d00;}
+      .st-doing{background:#D4EDDA;color:#1e6b3a;}
+      .st-done{background:#E9ECEF;color:#555;}
+      .st-over{background:#F8D7DA;color:#a31515;}
+      .prod-detail-head{display:flex;align-items:center;gap:12px;margin:4px 0 10px;}
+      .prod-back{border:1px solid #ccc;background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;}
+      .prod-detail-title{font-weight:700;font-size:16px;}
+      .prod-tabs{display:flex;flex-wrap:wrap;gap:6px;border-bottom:2px solid #E7F2D4;padding-bottom:6px;margin-bottom:12px;}
+      .prod-tab{padding:6px 12px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;background:#f4f6f2;color:#444;}
+      .prod-tab.active{background:#E53935;color:#fff;font-weight:600;}
+      .prod-tab-body{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;}
+      .prod-form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;}
+      .prod-field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
+      .prod-field input,.prod-field select,.prod-field textarea{padding:6px 8px;border:1px solid #ccc;border-radius:8px;font-size:13px;}
+      .prod-btn{background:#E53935;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;}
+      .prod-btn.sec{background:#6c757d;}
+      .prod-table{width:100%;border-collapse:collapse;font-size:13px;}
+      .prod-table th,.prod-table td{border:1px solid #eee;padding:6px 8px;text-align:left;}
+      .prod-table th{background:#f7f9f4;}
+      .prod-table tbody tr:nth-child(even){background:#fafafa;}
+      .prod-table tbody tr:hover{background:#f0f4ff;}
+      .prod-empty{color:#888;padding:24px;text-align:center;}
+      .prod-sec-title{font-weight:700;margin:14px 0 8px;font-size:14px;border-left:4px solid #E53935;padding-left:8px;}
+      .prod-kpi{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+      .prod-kpi .k{background:#f7f9f4;border-radius:10px;padding:8px 14px;font-size:13px;}
+      .prod-kpi .k b{display:block;font-size:18px;color:#E53935;}
+    </style>
+    <script>
+    /* ===================== 生产管理子系统（现场工厂） ===================== */
+    var PROD_LS = 'prod_factory_';
+    var PROD_WORKERS = [['welder','焊工'],['forklift','叉车工'],['loader','铲车工'],['mixer','搅拌机工'],['press','打板机操作工'],['repair','修水泥板工'],['cook','厨师'],['temp','其他临时工']];
+    var PROD_TABS = [['A','工厂概况'],['B','生产计划'],['C','人员(日)'],['D','原料库存'],['E','每日生产'],['H','成品库存'],['F','设备与故障'],['G','交付']];
+    var PROD_CUR = null;
+    function prod_el(id){ return document.getElementById(id); }
+    function prod_val(id){ var e = prod_el(id); return e ? e.value : ''; }
+    function prod_esc(s){ s = String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function prod_fmtNum(n){ return Math.round(Number(n)||0).toLocaleString('en-US'); }
+    function prod_pad(n){ return n<10?'0'+n:''+n; }
+    function prod_today(){ var t=new Date(); return t.getFullYear()+'-'+prod_pad(t.getMonth()+1)+'-'+prod_pad(t.getDate()); }
+    function prod_toast(m){ if(typeof showToast==='function') showToast(m); else alert(m); }
+    function prod_get(id){
+      try { var s = localStorage.getItem(PROD_LS+id); if(s) return JSON.parse(s); } catch(e){}
+      return { id:id, profile:{}, plan:[], workers:{}, materials:{items:[],inbound:[],outbound:[]}, production:{}, finished:{}, equipment:{list:[],faults:[]}, delivery:[] };
+    }
+    function prod_save(f){ try { localStorage.setItem(PROD_LS+f.id, JSON.stringify(f)); } catch(e){} }
+    function prod_fld(label,id,val){ return '<div class="prod-field"><label>'+label+'</label><input id="'+id+'" value="'+prod_esc(val)+'"></div>'; }
+    /* 读取签约项目里的水泥漏缝地板规格（concrete_floor_spec，与系统智能报告同源） */
+    function prod_slatsRows(){
+      var pid = PROD_CUR;
+      var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==pid; }) : null;
+      var raw = p && p.concrete_floor_spec ? p.concrete_floor_spec : '';
+      if(raw && typeof raw !== 'string'){ try { raw = JSON.stringify(raw); } catch(e){ raw=''; } }
+      try { var a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch(e){ return []; }
+    }
+    /* 猪舍编号 → 三语名称（例如 1→公猪站/Boar stud/Trạm đực giống），无对应则原样返回 */
+    function prod_phName(v){
+      var key = 'slats_pig_house_' + String(v == null ? '' : v).trim();
+      var d = (typeof T === 'function') ? T() : null;
+      if(d && d[key] !== undefined) return d[key];
+      return (v == null || String(v).trim() === '') ? '' : String(v);
+    }
+    /* 聚合成 规格×栋舍 矩阵：key=长×宽×高，汇总各猪舍数量与总需求 */
+    function prod_slatsMatrix(){
+      var rows = prod_slatsRows(); var specs = {}; var houseOrder = [];
+      var _lastPh = '—'; // 合并行兜底：JSON 按猪舍连续分组，空猪舍行继承上一非空猪舍
+      rows.forEach(function(r){
+        var L = r.floor_len!=null?r.floor_len:r.L, W = r.floor_wid!=null?r.floor_wid:r.W, H = r.floor_hgt!=null?r.floor_hgt:r.H;
+        // 数量/整场 不再信任存值，改为按 数量/单元 × 单元/栋 × 栋数/整场 重算（与智能报告 openSlatsReportModal 算法一致），
+        // 避免合并行/编辑后 qty_whole 缺失或不同步导致矩阵错位、总需求量显示 0
+        var _qu = parseFloat(String(r.qty_unit||'').replace(/[^0-9.\-]/g,''))||0;
+        var _ub = parseFloat(String(r.unit_per_building||'').replace(/[^0-9.\-]/g,''))||0;
+        var _bc = parseFloat(String(r.building_count||'').replace(/[^0-9.\-]/g,''))||0;
+        var qty = Math.round(_qu * _ub * _bc);
+        // 兜底：三要素缺失但存值非空时退回存值，保证任何数据状态都能显示
+        if(!qty && r.qty_whole!=null){ var _qw = parseFloat(String(r.qty_whole).replace(/[^0-9.\-]/g,''))||0; if(_qw) qty=_qw; }
+        var ph = String(r.pig_house || '').trim();
+        // 合并行兜底：当前行猪舍为空时，继承上一条非空猪舍（JSON 中同类猪舍连续排列）
+        if(ph === ''){ ph = (_lastPh === '—' ? '' : _lastPh); }
+        else { _lastPh = ph; }
+        if(ph === '') ph = '—';
+        // 支持一栋或多栋猪舍：1,2 / 1+2 / 1/2 / 1 2 等；这些会被识别为“共用”
+        var houses = ph === '—' ? [] : ph.split(/[,，+\/、&\s]+/).filter(function(x){ return x.trim() !== ''; }).map(function(x){ return x.trim(); });
+        if(!houses.length) houses = ['—'];
+        var key = (L||'?')+'×'+(W||'?')+'×'+(H||'?');
+        if(!specs[key]) specs[key] = { key:key, L:L, W:W, H:H, houses:{}, total:0 };
+        houses.forEach(function(h){
+          specs[key].houses[h] = (+specs[key].houses[h]||0) + qty;
+          if(houseOrder.indexOf(h) < 0) houseOrder.push(h);
+        });
+        // 数量按“每栋录入猪舍”计算；例如猪舍填 1,2、数量 576，则 1 和 2 各 576，合计 1152
+        specs[key].total += qty * houses.length;
+      });
+      // 猪舍列按数字大小排序，纯数字在前，非数字按字典序
+      houseOrder.sort(function(a,b){
+        var na = parseFloat(a), nb = parseFloat(b);
+        if(!isNaN(na) && !isNaN(nb)) return na - nb;
+        if(!isNaN(na)) return -1;
+        if(!isNaN(nb)) return 1;
+        return String(a).localeCompare(String(b));
+      });
+      return { specs:specs, houseOrder:houseOrder };
+    }
+    function prod_stcls(status){
+      if(!status) return 'st-wait';
+      if(status.indexOf('逾期')>=0) return 'st-over';
+      if(status.indexOf('交付')>=0) return 'st-done';
+      if(status.indexOf('产')>=0 && status.indexOf('待')<0) return 'st-doing';
+      return 'st-wait';
+    }
+    function prod_renderProduction(){
+      var box = prod_el('prod-cards'); if(!box) return;
+      var data = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData : [];
+      if(!data.length){ box.innerHTML = '<div class="prod-empty">暂无签约项目。请先在「签约项目」中录入数据，刷新后即可在此看到对应的现场工厂。</div>'; return; }
+      var h = '';
+      data.forEach(function(p){
+        var id = p.id; var f = prod_get(id);
+        var client = p.client || p.customer || p.name || '—';
+        var prov = p.province || p.region || '';
+        var code = p.contract_no || p.code || ('#'+id);
+        var spec = p.spec || p.model || '—';
+        var status = p.status || '待排产';
+        var due = p.due_date || p.delivery_date || '—';
+        var produced = 0, delivered = 0;
+        for(var s in (f.finished||{})){ produced += (+f.finished[s].produced||0); delivered += (+f.finished[s].delivered||0); }
+        h += '<div class="prod-card" onclick="prod_open(\''+id+'\')">'
+          + '<div class="pc-title">'+prod_esc(client)+(prov?' · '+prod_esc(prov):'')+'</div>'
+          + '<span class="pc-chip">合同 '+prod_esc(String(code))+'</span>'
+          + '<span class="pc-chip">规格 '+prod_esc(spec)+'</span>'
+          + '<div class="pc-row">状态：<span class="prod-status '+prod_stcls(status)+'">'+prod_esc(status)+'</span></div>'
+          + '<div class="pc-row">交期：'+prod_esc(due)+'</div>'
+          + '<div class="pc-row">累计产出 '+produced+' / 已交付 '+delivered+'</div>'
+          + '</div>';
+      });
+      box.innerHTML = h;
+    }
+    function prod_open(id){
+      PROD_CUR = id;
+      prod_el('prod-list').style.display = 'none';
+      prod_el('prod-detail').style.display = 'block';
+      var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==id; }) : null;
+      prod_el('prod-detail-title').textContent = (p ? (p.client||p.customer||p.name||'—') : '工厂') + ' · 现场工厂';
+      prod_renderTabs('A');
+    }
+    function prod_back(){
+      prod_el('prod-detail').style.display = 'none';
+      prod_el('prod-list').style.display = 'block';
+      prod_renderProduction();
+    }
+    function prod_renderTabs(active){
+      var box = prod_el('prod-tabs'); var h = '';
+      PROD_TABS.forEach(function(t){ h += '<div class="prod-tab'+(t[0]===active?' active':'')+'" onclick="prod_renderTab(\''+t[0]+'\')">'+t[1]+'</div>'; });
+      box.innerHTML = h;
+      prod_renderTab(active);
+    }
+    function prod_renderTab(key){
+      var lab = ''; for(var i=0;i<PROD_TABS.length;i++){ if(PROD_TABS[i][0]===key){ lab=PROD_TABS[i][1]; break; } }
+      var tabs = prod_el('prod-tabs').children;
+      for(var j=0;j<tabs.length;j++){ tabs[j].classList.toggle('active', tabs[j].textContent===lab); }
+      var body = prod_el('prod-tab-body'); var f = prod_get(PROD_CUR);
+      if(key==='A') body.innerHTML = prod_tabA(f);
+      else if(key==='B') body.innerHTML = prod_tabB(f);
+      else if(key==='C') body.innerHTML = prod_tabC(f);
+      else if(key==='D') body.innerHTML = prod_tabD(f);
+      else if(key==='E') body.innerHTML = prod_tabE(f);
+      else if(key==='H') body.innerHTML = prod_tabH(f);
+      else if(key==='F') body.innerHTML = prod_tabF(f);
+      else if(key==='G') body.innerHTML = prod_tabG(f);
+    }
+    /* A 工厂概况 */
+    function prod_sel(label,id,opts,val){
+      var h = '<div class="prod-field"><label>'+label+'</label><select id="'+id+'">';
+      h += '<option value=""></option>';
+      opts.forEach(function(o){ h += '<option value="'+prod_esc(o)+'"'+(o===val?' selected':'')+'>'+prod_esc(o)+'</option>'; });
+      h += '</select></div>';
+      return h;
+    }
+    function prod_tabA(f){
+      var p = f.profile||{};
+      return '<div class="prod-sec-title">工厂概况</div>'
+        + '<div class="prod-form">'
+        + prod_fld('现场地址','pa_addr',p.address||'')
+        + prod_sel('生产线','pa_cap',['1条','2条','3条','4条'],p.capacityNote||'')
+        + prod_sel('班次','pa_shift',['1班/天','2班/天'],p.shifts||'')
+        + prod_fld('计划日产能：片/天','pa_daily',p.dailyCapacity||'')
+        + '<button class="prod-btn" onclick="prod_saveProfile()">保存</button>'
+        + '</div>';
+    }
+    function prod_saveProfile(){
+      var f = prod_get(PROD_CUR);
+      f.profile = { address:prod_val('pa_addr'), capacityNote:prod_val('pa_cap'), shifts:prod_val('pa_shift'), dailyCapacity:prod_val('pa_daily') };
+      prod_save(f); prod_toast('已保存');
+    }
+    /* B 生产计划 */
+    /* B 生产计划（用量分解 + 概念甘特图） */
+    function prod_tabB(f){
+      var mm = prod_slatsMatrix(); var keys = Object.keys(mm.specs);
+      var h = '<div class="prod-sec-title">项目用量分解（规格 × 栋舍，源自签约项目规格表）</div>';
+      if(!keys.length){
+        h += '<div class="prod-empty">本项目尚未录入水泥漏缝地板规格。请回到「签约项目」打开该项目，点“编辑”填写“水泥漏缝地板规格”。</div>';
+      } else {
+        h += '<table class="prod-table"><thead><tr><th>规格(长×宽×高 mm)</th>';
+        mm.houseOrder.forEach(function(ph){ h += '<th>'+prod_esc(prod_phName(ph))+'</th>'; });
+        h += '<th>总需求量</th><th>共用情况</th></tr></thead><tbody>';
+        keys.forEach(function(k){
+          var sp = mm.specs[k]; var houses = mm.houseOrder.filter(function(h){ return sp.houses[h] != null; });
+          var shared = houses.length>1 ? '跨'+houses.map(prod_phName).join('+')+'共用' : (houses.length===1 ? prod_phName(houses[0])+'专属' : '—');
+          h += '<tr><td>'+prod_esc(k)+'</td>';
+          mm.houseOrder.forEach(function(ph){ h += '<td>'+prod_fmtNum(sp.houses[ph]||0)+'</td>'; });
+          h += '<td><b>'+prod_fmtNum(sp.total)+'</b></td><td>'+shared+'</td></tr>';
+        });
+        h += '</tbody></table>';
+      }
+      /* 概念甘特图 */
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">生产甘特图（概念排程，非实际生产）</div>';
+      h += '<div class="prod-form">'+prod_fld('开工日期','pg_start',f.planStart||prod_today())
+        + '<button class="prod-btn" onclick="prod_saveGanttStart()">更新排程</button></div>';
+      var cap = +f.profile.dailyCapacity || 0;
+      if(cap>0 && keys.length){
+        var dayCursor = 0; var gantt = [];
+        keys.forEach(function(k){ var sp = mm.specs[k]; var days = Math.ceil(sp.total/cap); gantt.push({key:k,total:sp.total,days:days,startDay:dayCursor}); dayCursor += days; });
+        var totalDays = dayCursor;
+        h += '<div style="overflow-x:auto"><div style="position:relative;min-width:640px;margin-top:6px">';
+        gantt.forEach(function(g){
+          var left = totalDays ? (g.startDay/totalDays*100) : 0;
+          var width = totalDays ? (g.days/totalDays*100) : 0;
+          h += '<div style="display:flex;align-items:center;margin:5px 0">'
+            + '<div style="width:140px;font-size:12px;flex-shrink:0">'+prod_esc(g.key)+'</div>'
+            + '<div style="flex:1;background:#f0f0f0;height:24px;border-radius:4px;position:relative;overflow:hidden">'
+            + '<div style="position:absolute;left:'+left+'%;width:'+width+'%;background:#E53935;height:100%;border-radius:4px"></div>'
+            + '<span style="position:absolute;left:'+(left+0.6)+'%;top:3px;font-size:11px;color:#fff;white-space:nowrap">'+g.total+'片 · '+g.days+'天</span>'
+            + '</div></div>';
+        });
+        h += '<div style="font-size:12px;color:#666;margin-top:8px">总生产周期约 <b>'+totalDays+'</b> 天（按计划日产能 '+cap+' 片/天，按规格顺序排产，仅为直观概念，非实际）。</div>';
+        h += '</div></div>';
+      } else {
+        h += '<div class="prod-empty">请先在「工厂概况」填写“计划日产能：片/天”，并已在签约项目录入规格数据。</div>';
+      }
+      /* 其他计划备注（手动） */
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">其他计划备注</div>';
+      h += '<div class="prod-form">'+prod_fld('计划项','pb_item')+prod_fld('开始','pb_start')+prod_fld('结束','pb_end')+prod_fld('数量','pb_qty')+prod_fld('备注','pb_note')+'<button class="prod-btn sec" onclick="prod_addPlan()">添加备注</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>计划项</th><th>开始</th><th>结束</th><th>数量</th><th>备注</th><th></th></tr></thead><tbody>';
+      (f.plan||[]).forEach(function(r,i){ h += '<tr><td>'+prod_esc(r.item)+'</td><td>'+prod_esc(r.start)+'</td><td>'+prod_esc(r.end)+'</td><td>'+prod_esc(r.qty)+'</td><td>'+prod_esc(r.note)+'</td><td><button class="prod-btn sec" onclick="prod_delPlan('+i+')">删</button></td></tr>'; });
+      h += '</tbody></table>';
+      return h;
+    }
+    function prod_saveGanttStart(){ var f = prod_get(PROD_CUR); f.planStart = prod_val('pg_start'); prod_save(f); prod_renderTab('B'); prod_toast('排程已更新'); }
+    function prod_addPlan(){ var f = prod_get(PROD_CUR); f.plan = f.plan||[]; f.plan.push({item:prod_val('pb_item'),start:prod_val('pb_start'),end:prod_val('pb_end'),qty:prod_val('pb_qty'),note:prod_val('pb_note')}); prod_save(f); prod_renderTab('B'); }
+    function prod_delPlan(i){ var f = prod_get(PROD_CUR); f.plan.splice(i,1); prod_save(f); prod_renderTab('B'); }
+    /* C 人员（按日快照，只记数） */
+    function prod_tabC(f){
+      var h = '<div class="prod-sec-title">人员（按日快照，只记数不记名）</div>'
+        + '<div class="prod-form">'+prod_fld('日期(YYYY-MM-DD)','pc_date',prod_today())
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+      PROD_WORKERS.forEach(function(w){ h += prod_fld(w[1],'pc_'+w[0],0); });
+      h += '</div><button class="prod-btn" onclick="prod_saveWorkers()">保存当日快照</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>日期</th>';
+      PROD_WORKERS.forEach(function(w){ h += '<th>'+w[1]+'</th>'; });
+      h += '<th>合计</th><th></th></tr></thead><tbody>';
+      var dates = Object.keys(f.workers||{}).sort().reverse();
+      dates.forEach(function(d){ var w = f.workers[d]; var sum = 0;
+        PROD_WORKERS.forEach(function(k){ sum += (+w[k[0]]||0); });
+        h += '<tr><td>'+d+'</td>'; PROD_WORKERS.forEach(function(k){ h += '<td>'+(w[k[0]]||0)+'</td>'; });
+        h += '<td><b>'+sum+'</b></td><td><button class="prod-btn sec" onclick="prod_delWorkers(\''+d+'\')">删</button></td></tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+    function prod_saveWorkers(){ var f = prod_get(PROD_CUR); var d = prod_val('pc_date')||prod_today(); f.workers = f.workers||{}; var w = {}; PROD_WORKERS.forEach(function(k){ w[k[0]] = +prod_val('pc_'+k[0])||0; }); f.workers[d] = w; prod_save(f); prod_renderTab('C'); }
+    function prod_delWorkers(d){ var f = prod_get(PROD_CUR); delete f.workers[d]; prod_save(f); prod_renderTab('C'); }
+    /* D 原料与库存（自采，无流程） */
+    function prod_tabD(f){
+      var m = f.materials||{items:[],inbound:[],outbound:[]};
+      function stock(name){ var s=0; m.inbound.forEach(function(r){ if(r.name===name) s+=(+r.qty||0); }); m.outbound.forEach(function(r){ if(r.name===name) s-=(+r.qty||0); }); return s; }
+      var h = '<div class="prod-sec-title">原料与库存（工厂自采，无审批流）</div>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">物资清单与库存</div>';
+      h += '<div class="prod-form">'+prod_fld('名称','pd_name')+prod_fld('单位','pd_unit')+prod_fld('预警阈值','pd_warn')+'<button class="prod-btn" onclick="prod_addMat()">添加物资</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>名称</th><th>单位</th><th>当前库存</th><th>预警</th></tr></thead><tbody>';
+      (m.items||[]).forEach(function(it){ var st = stock(it.name); var warn = (it.warnAt!==''&&it.warnAt!=null&&+st<=+it.warnAt) ? ' style="color:#a31515;font-weight:700"' : ''; h += '<tr><td>'+prod_esc(it.name)+'</td><td>'+prod_esc(it.unit)+'</td><td'+warn+'>'+st+'</td><td>'+(it.warnAt||'')+'</td></tr>'; });
+      h += '</tbody></table>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">入库（采购直录）</div>';
+      h += '<div class="prod-form">'+prod_fld('日期','pd_in_date',prod_today())+prod_fld('名称','pd_in_name')+prod_fld('数量','pd_in_qty')+prod_fld('备注','pd_in_note')+'<button class="prod-btn" onclick="prod_matIn()">入库</button></div>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">出库</div>';
+      h += '<div class="prod-form">'+prod_fld('日期','pd_out_date',prod_today())+prod_fld('名称','pd_out_name')+prod_fld('数量','pd_out_qty')+prod_fld('备注','pd_out_note')+'<button class="prod-btn sec" onclick="prod_matOut()">出库</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>日期</th><th>类型</th><th>名称</th><th>数量</th><th>备注</th></tr></thead><tbody>';
+      var rows = m.inbound.map(function(r){ return {d:r.date,t:'入库',n:r.name,q:r.qty,nt:r.note}; }).concat(m.outbound.map(function(r){ return {d:r.date,t:'出库',n:r.name,q:r.qty,nt:r.note}; }));
+      rows.sort(function(a,b){ return (b.d||'').localeCompare(a.d||''); });
+      rows.forEach(function(r){ h += '<tr><td>'+prod_esc(r.d)+'</td><td>'+r.t+'</td><td>'+prod_esc(r.n)+'</td><td>'+prod_esc(r.q)+'</td><td>'+prod_esc(r.nt)+'</td></tr>'; });
+      h += '</tbody></table>';
+      /* 材料需求（按规格自动计算，与系统智能报告算法一致，指导采购） */
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">材料需求（按规格自动计算，指导采购）</div>';
+      var mm2 = prod_slatsMatrix(); var mat = {cement:0,sand:0,gravel:0};
+      Object.keys(mm2.specs).forEach(function(k){ var sp = mm2.specs[k]; var L=+sp.L||0,W=+sp.W||0,H=+sp.H||0; if(L&&W&&H){ var vol=L*W*H/1e9; var std=vol/0.063; mat.cement+=std*24.4*sp.total/1000; mat.sand+=std*22.6*sp.total/1000; mat.gravel+=std*68*sp.total/1000; } });
+      h += '<div class="prod-kpi">'
+        + '<div class="k">水泥<b>'+mat.cement.toFixed(1)+' 吨</b></div>'
+        + '<div class="k">黄砂<b>'+mat.sand.toFixed(1)+' 吨</b></div>'
+        + '<div class="k">石子<b>'+mat.gravel.toFixed(1)+' 吨</b></div></div>';
+      function _stock(name){ var s=0; m.inbound.forEach(function(r){ if(r.name===name) s+=(+r.qty||0); }); m.outbound.forEach(function(r){ if(r.name===name) s-=(+r.qty||0); }); return s; }
+      function _match(name){ var hit=null; m.items.forEach(function(it){ if(it.name && it.name.indexOf(name)>=0) hit=it.name; }); return hit; }
+      h += '<table class="prod-table"><thead><tr><th>材料</th><th>需求(吨)</th><th>当前库存</th><th>缺口</th></tr></thead><tbody>';
+      [['水泥','cement'],['黄砂','sand'],['石子','gravel']].forEach(function(pair){
+        var nm=_match(pair[0]); var have = nm?_stock(nm):0; var need=mat[pair[1]];
+        h += '<tr><td>'+pair[0]+'</td><td>'+need.toFixed(1)+'</td><td>'+(nm?have:'未建物资')+'</td><td><b>'+Math.max(0,need-have).toFixed(1)+'</b></td></tr>';
+      });
+      h += '</tbody></table>';
+      h += '<div style="font-size:12px;color:#666">注：需求按规格体积折算标准板(1500×600×70)后，套用水泥24.4/黄砂22.6/石子68 kg·每标准板计算，与系统“智能报告”完全一致。</div>';
+      return h;
+    }
+    function prod_addMat(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; f.materials.items.push({name:prod_val('pd_name'),unit:prod_val('pd_unit'),warnAt:prod_val('pd_warn')}); prod_save(f); prod_renderTab('D'); }
+    function prod_matIn(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; if(!prod_val('pd_in_name')){ prod_toast('请填名称'); return; } f.materials.inbound.push({date:prod_val('pd_in_date'),name:prod_val('pd_in_name'),qty:prod_val('pd_in_qty'),note:prod_val('pd_in_note')}); prod_save(f); prod_renderTab('D'); }
+    function prod_matOut(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; if(!prod_val('pd_out_name')){ prod_toast('请填名称'); return; } f.materials.outbound.push({date:prod_val('pd_out_date'),name:prod_val('pd_out_name'),qty:prod_val('pd_out_qty'),note:prod_val('pd_out_note')||'人工出库'}); prod_save(f); prod_renderTab('D'); }
+    /* E 每日生产 / 盘点 */
+    function prod_tabE(f){
+      var h = '<div class="prod-sec-title">每日生产 / 盘点</div>'
+        + '<div class="prod-form">'+prod_fld('日期','pe_date',prod_today())
+        + '<button class="prod-btn" type="button" onclick="prod_addSpecRow()">+ 产出规格</button>'
+        + '<button class="prod-btn sec" type="button" onclick="prod_addMatRow()">+ 耗料</button>'
+        + '<button class="prod-btn" type="button" onclick="prod_saveProduction()">保存当日生产</button></div>'
+        + '<div id="pe_specs"></div><div id="pe_mats"></div>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">历史产出</div><table class="prod-table"><thead><tr><th>日期</th><th>规格</th><th>良品</th><th>不良</th><th>耗料</th></tr></thead><tbody>';
+      var dates = Object.keys(f.production||{}).sort().reverse();
+      dates.forEach(function(d){ var rec = f.production[d]; var specs = rec.specs||{}; var keys = Object.keys(specs);
+        var mu = (rec.materialUsed||[]).map(function(x){ return x.name+':'+x.qty; }).join(', ');
+        if(keys.length){ keys.forEach(function(s,i){ h += '<tr><td>'+(i===0?d:'')+'</td><td>'+prod_esc(s)+'</td><td>'+(specs[s].good||0)+'</td><td>'+(specs[s].bad||0)+'</td><td>'+(i===0?prod_esc(mu):'')+'</td></tr>'; }); }
+        else { h += '<tr><td>'+d+'</td><td colspan="4">—</td></tr>'; }
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+    function prod_addSpecRow(){ var c = prod_el('pe_specs'); if(!c) return; var i = Date.now(); var d = document.createElement('div'); d.className = 'prod-form'; d.innerHTML = prod_fld('规格','pes_'+i)+prod_fld('良品','peg_'+i)+prod_fld('不良','peb_'+i)+'<button class="prod-btn sec" onclick="this.parentNode.remove()">×</button>'; c.appendChild(d); }
+    function prod_addMatRow(){ var c = prod_el('pe_mats'); if(!c) return; var i = Date.now(); var d = document.createElement('div'); d.className = 'prod-form'; d.innerHTML = prod_fld('耗料名称','pem_'+i)+prod_fld('数量','peq_'+i)+'<button class="prod-btn sec" onclick="this.parentNode.remove()">×</button>'; c.appendChild(d); }
+    function prod_saveProduction(){
+      var f = prod_get(PROD_CUR); var d = prod_val('pe_date')||prod_today();
+      f.production = f.production||{}; var rec = f.production[d]||{specs:{},materialUsed:[]};
+      var cs = prod_el('pe_specs'); if(cs){ var rows = cs.querySelectorAll('.prod-form'); rows.forEach(function(r){ var inp = r.querySelectorAll('input'); var spec = inp[0].value; if(!spec) return; rec.specs[spec] = rec.specs[spec]||{}; rec.specs[spec].good = (+inp[1].value||0); rec.specs[spec].bad = (+inp[2].value||0); }); }
+      var cm = prod_el('pe_mats'); if(cm){ var mrows = cm.querySelectorAll('.prod-form'); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; mrows.forEach(function(r){ var inp = r.querySelectorAll('input'); var name = inp[0].value; var q = +inp[1].value||0; if(!name) return; rec.materialUsed.push({name:name,qty:q}); f.materials.outbound.push({date:d,name:name,qty:q,note:'生产耗用'}); }); }
+      f.production[d] = rec;
+      f.finished = f.finished||{};
+      for(var s in rec.specs){ f.finished[s] = f.finished[s]||{produced:0,delivered:0}; f.finished[s].produced = (+f.finished[s].produced||0) + (+rec.specs[s].good||0); }
+      // 确保耗用物资出现在物资清单
+      var names = {}; f.materials.outbound.forEach(function(x){ names[x.name]=1; }); for(var n in names){ if(!f.materials.items.some(function(it){ return it.name===n; })) f.materials.items.push({name:n,unit:'',warnAt:''}); }
+      prod_save(f); prod_renderTab('E'); prod_toast('已保存，并自动过账成品入库 + 生产耗料出库');
+    }
+    /* H 成品库存（水泥漏缝地板，按规格） */
+    function prod_idx(s){ return encodeURIComponent(s).replace(/[^a-zA-Z0-9]/g,'_'); }
+    function prod_tabH(f){
+      var fn = f.finished||{}; var specs = Object.keys(fn);
+      var totP = 0, totD = 0; specs.forEach(function(s){ totP += (+fn[s].produced||0); totD += (+fn[s].delivered||0); });
+      var h = '<div class="prod-sec-title">成品库存（水泥漏缝地板，按规格）</div>'
+        + '<div class="prod-kpi"><div class="k">累计生产入库<b>'+totP+'</b></div><div class="k">累计出库<b>'+totD+'</b></div><div class="k">结余<b>'+(totP-totD)+'</b></div></div>';
+      h += '<table class="prod-table"><thead><tr><th>规格</th><th>生产入库</th><th>出库</th><th>结余</th></tr></thead><tbody>';
+      specs.forEach(function(s){ var r = fn[s]; var bal = (+r.produced||0)-(+r.delivered||0);
+        h += '<tr><td>'+prod_esc(s)+'</td><td>'+(+r.produced||0)+'</td><td>'+(+r.delivered||0)+'</td><td><b>'+bal+'</b></td></tr>'; });
+      h += '</tbody></table>';
+      if(!specs.length) h += '<div class="prod-empty">暂无成品。请在「每日生产」录入产出后自动累计。</div>';
+      return h;
+    }
+    /* F 设备与故障 */
+    function prod_tabF(f){
+      var h = '<div class="prod-sec-title">设备台账与高价值工具等级表</div>'
+        + '<div class="prod-form">'+prod_fld('名称','pf_name')+prod_fld('等级','pf_grade')+prod_fld('保养说明','pf_maint')+'<button class="prod-btn" onclick="prod_addEquip()">添加设备/工具</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>名称</th><th>等级</th><th>保养</th></tr></thead><tbody>';
+      (f.equipment.list||[]).forEach(function(e){ h += '<tr><td>'+prod_esc(e.name)+'</td><td>'+prod_esc(e.grade)+'</td><td>'+prod_esc(e.maint)+'</td></tr>'; });
+      h += '</tbody></table>';
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">设备故障记录</div>';
+      h += '<div class="prod-form">'+prod_fld('日期','pf_fdate',prod_today())+prod_fld('设备','pf_fequip')+prod_fld('停机(h)','pf_fdown')+prod_fld('原因','pf_freason')+prod_fld('维修','pf_frepair')+'<button class="prod-btn sec" onclick="prod_addFault()">记录故障</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>日期</th><th>设备</th><th>停机(h)</th><th>原因</th><th>维修</th></tr></thead><tbody>';
+      (f.equipment.faults||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).forEach(function(r){ h += '<tr><td>'+prod_esc(r.date)+'</td><td>'+prod_esc(r.equip)+'</td><td>'+prod_esc(r.down)+'</td><td>'+prod_esc(r.reason)+'</td><td>'+prod_esc(r.repair)+'</td></tr>'; });
+      h += '</tbody></table>';
+      return h;
+    }
+    function prod_addEquip(){ var f = prod_get(PROD_CUR); f.equipment = f.equipment||{list:[],faults:[]}; f.equipment.list.push({name:prod_val('pf_name'),grade:prod_val('pf_grade'),maint:prod_val('pf_maint')}); prod_save(f); prod_renderTab('F'); }
+    function prod_addFault(){ var f = prod_get(PROD_CUR); f.equipment = f.equipment||{list:[],faults:[]}; f.equipment.faults.push({date:prod_val('pf_fdate'),equip:prod_val('pf_fequip'),down:prod_val('pf_fdown'),reason:prod_val('pf_freason'),repair:prod_val('pf_frepair')}); prod_save(f); prod_renderTab('F'); }
+    /* G 交付（出库，过账成品库存+成本） */
+    function prod_tabG(f){
+      var fn = f.finished||{}; var specs = Object.keys(fn);
+      var opts = ''; specs.forEach(function(s){ opts += '<option value="'+prod_esc(s)+'">'+prod_esc(s)+'</option>'; });
+      var h = '<div class="prod-sec-title">交付（出库，自动过账成品库存）</div>'
+        + '<div class="prod-form">'+prod_fld('日期','pg_date',prod_today())
+        + '<div class="prod-field"><label>规格</label><select id="pg_spec">'+opts+'</select></div>'
+        + prod_fld('出库数量','pg_qty')+prod_fld('客户','pg_client')+prod_fld('备注','pg_note')
+        + '<button class="prod-btn" onclick="prod_addDelivery()">出库交付</button></div>';
+      h += '<table class="prod-table"><thead><tr><th>日期</th><th>规格</th><th>数量</th><th>客户</th></tr></thead><tbody>';
+      (f.delivery||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).forEach(function(r){ h += '<tr><td>'+prod_esc(r.date)+'</td><td>'+prod_esc(r.spec)+'</td><td>'+prod_esc(r.qty)+'</td><td>'+prod_esc(r.client)+'</td></tr>'; });
+      h += '</tbody></table>';
+      if(!specs.length) h += '<div class="prod-empty">暂无成品规格，请先在每日生产录入产出。</div>';
+      return h;
+    }
+    function prod_addDelivery(){
+      var f = prod_get(PROD_CUR); var spec = prod_val('pg_spec'); var q = +prod_val('pg_qty')||0;
+      if(!spec || !q){ prod_toast('请选规格并填数量'); return; }
+      f.finished = f.finished||{}; f.finished[spec] = f.finished[spec]||{produced:0,delivered:0};
+      f.finished[spec].delivered = (+f.finished[spec].delivered||0) + q;
+      f.delivery = f.delivery||[]; f.delivery.push({date:prod_val('pg_date'),spec:spec,qty:q,client:prod_val('pg_client'),note:prod_val('pg_note')});
+      prod_save(f); prod_renderTab('G'); prod_toast('已出库，成品库存结余已更新');
+    }
+    /* 工作日志索引钩子：将来工作日志只调用此函数取核心指标，不重复存 */
+    function prod_generateWorklogSummary(id, date){
+      var f = prod_get(id); var w = (f.workers && f.workers[date]) ? f.workers[date] : {};
+      var sum = 0; PROD_WORKERS.forEach(function(k){ sum += (+w[k[0]]||0); });
+      var rec = f.production && f.production[date]; var produced = {}; var used = [];
+      if(rec){ for(var s in rec.specs){ produced[s] = rec.specs[s].good||0; } used = rec.materialUsed||[]; }
+      var faults = (f.equipment.faults||[]).filter(function(x){ return x.date===date; });
+      return { factoryId:id, date:date, workers:sum, workerDetail:w, produced:produced, materialUsed:used, faults:faults.length };
+    }
+    </script>
   </section>
 
   <!-- 安装管理（占位） -->
@@ -4353,10 +4786,11 @@ function _ovLoadChartLib(cb){
 .slats-spec-table th:last-child,
 .slats-spec-table td:last-child { border-right: none; }
 .slats-spec-table thead th { background: linear-gradient(135deg,#E53935,#C62828); color: #fff; font-weight: 600; white-space: pre-line; position: sticky; z-index: 2; padding: 6px 4px; box-sizing: border-box; }
-/* 一级表头固定；rowspan 单元格会自然跨到二级表头高度 */
-.slats-spec-table thead tr:first-child th { top: 0; z-index: 3; height: 46px; }
-/* 二级表头固定在一级表头下方 */
-.slats-spec-header-sub th { background: #ff8a80; color: #fff; font-weight: 500; top: 46px; height: 30px; }
+/* 一级表头固定：分组头只占第一行 46px；跨两行单元格必须占满 76px（含二级行），否则它们的高度错误会把二级表头挤出 sticky 区域 */
+.slats-spec-table thead tr:first-child th[colspan] { top: 0; z-index: 3; height: 46px; }
+.slats-spec-table thead th[rowspan] { top: 0; z-index: 3; height: 76px; }
+/* 二级表头固定在一级表头下方；z-index 必须比一级高，避免被 rowspan 单元格压住 */
+.slats-spec-header-sub th { background: #ff8a80; color: #fff; font-weight: 500; top: 46px; height: 30px; z-index: 4; }
 .slats-spec-table thead tr:first-child th:first-child { border-radius: 10px 0 0 0; }
 .slats-spec-table thead tr:first-child th:last-child { border-radius: 0 10px 0 0; }
 .slats-spec-table tbody tr:nth-child(even) { background: #fafafa; }
@@ -4990,10 +5424,11 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 客户付款明细 · 二级模态框 ==================== -->
 <div id="custPayModal" class="cust-pay-overlay">
-  <div class="cust-pay-modal">
+  <div class="cust-pay-modal" data-mmax-btn="1">
     <div class="cp-head">
       <h2>📄 <span id="cpTitleText">客户付款明细</span> <span style="font-size:12px;opacity:.85;font-weight:400;" id="cpSubTitle">Customer Payment Details</span></h2>
-      <button class="cp-close" onclick="window.closeCustPayModal()">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.cust-pay-modal'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button class="cp-close" onclick="window.closeCustPayModal()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;z-index:5;">×</button>
     </div>
 
     <div class="cp-body">
@@ -5099,18 +5534,20 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 客户付款智能报告模态框 ==================== -->
 <div id="custPayReportModal" class="cpr-overlay">
-  <div class="cpr-box">
+  <div class="cpr-box" data-mmax-btn="1">
     <div class="cpr-head">
       <div>
         <h3 id="cprTitleText">📋 Báo cáo TT KH thông minh</h3>
         <div class="cpr-meta" id="cprMeta"></div>
       </div>
-      <button class="cpr-close" onclick="closeCustPayReport()">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.cpr-box'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button class="cpr-close" type="button" onclick="closeCustPayReport()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;line-height:1;cursor:pointer;z-index:5;">×</button>
     </div>
     <div class="cpr-body" id="cprBody"></div>
     <div class="cpr-foot">
       <span style="font-size:11px;color:#bbb;" id="cprFootHint"></span>
       <div class="cpr-foot-right">
+        <button class="cpr-btn cpr-btn-newwin" onclick="openReportInNewWindow('custPayReportModal')">🗖 新窗口</button>
         <button class="cpr-btn cpr-btn-print" onclick="printModalById('custPayReportModal')"><span id="cprPrintIcon">🖨</span> <span id="cprPrintText">打印</span></button>
         <button class="cpr-btn cpr-btn-outline" onclick="closeCustPayReport()"><span id="cprCloseText">关闭</span></button>
       </div>
@@ -5120,10 +5557,11 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== AGI付款明细 · 二级模态框 ==================== -->
 <div id="agiPayModal" class="cust-pay-overlay">
-  <div class="cust-pay-modal">
+  <div class="cust-pay-modal" data-mmax-btn="1">
     <div class="cp-head">
       <h2>📄 <span id="agiTitleText">AGI→GS 付款明细</span> <span style="font-size:12px;opacity:.85;font-weight:400;" id="agiSubTitle">AGI to GS Payment Details</span></h2>
-      <button class="cp-close" onclick="window.closeAgiPayModal()">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.cust-pay-modal'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button class="cp-close" onclick="window.closeAgiPayModal()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;z-index:5;">×</button>
     </div>
 
     <div class="cp-body">
@@ -5226,18 +5664,20 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== AGI付款智能报告模态框 ==================== -->
 <div id="agiPayReportModal" class="cpr-overlay">
-  <div class="cpr-box">
+  <div class="cpr-box" data-mmax-btn="1">
     <div class="cpr-head">
       <div>
         <h3 id="agiRptTitleText">📋 Báo cáo TT KH thông minh</h3>
         <div class="cpr-meta" id="agiRptMeta"></div>
       </div>
-      <button class="cpr-close" onclick="closeAgiPayReport()">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.cpr-box'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button class="cpr-close" type="button" onclick="closeAgiPayReport()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;line-height:1;cursor:pointer;z-index:5;">×</button>
     </div>
     <div class="cpr-body" id="agiRptBody"></div>
     <div class="cpr-foot">
       <span style="font-size:11px;color:#bbb;" id="agiRptFootHint"></span>
       <div class="cpr-foot-right">
+        <button class="cpr-btn cpr-btn-newwin" onclick="openReportInNewWindow('agiPayReportModal')">🗖 新窗口</button>
         <button class="cpr-btn cpr-btn-print" onclick="printModalById('agiPayReportModal')"><span id="agiRptPrintIcon">🖨</span> <span id="agiRptPrintText">打印</span></button>
         <button class="cpr-btn cpr-btn-outline" onclick="closeAgiPayReport()"><span id="agiRptCloseText">关闭</span></button>
       </div>
@@ -23008,6 +23448,15 @@ function switchView(name) {
       } else if (needReloadView('won')) { loadWon(); markViewLoaded('won'); }
     }
   }
+  // 进入生产管理视图时渲染现场工厂列表
+  if (name === 'production' && typeof prod_renderProduction === 'function') {
+    if ((typeof globalWonData === 'undefined' || !globalWonData.length) && typeof loadWon === 'function') {
+      loadWon();
+      setTimeout(prod_renderProduction, 400);
+    } else {
+      prod_renderProduction();
+    }
+  }
   // 进入 CRM 潜在项目视图时确保数据已渲染（100% 复刻 WON 分支结构）
   if (name === 'crm') {
     if (typeof applyCrmLang === 'function' && typeof loadCrm === 'function') {
@@ -27492,13 +27941,14 @@ window.CommissionModal={open:open,close:close,applyLang:applyLang,addPayRow:addP
 
 <!-- ============ GS→AGI 佣金报告 模态框 ============ -->
 <div class="gsr-overlay" id="gsCommissionReportOverlay" role="dialog" aria-modal="true">
-  <div class="gsr-modal">
+  <div class="gsr-modal" data-mmax-btn="1">
     <div class="gsr-head">
       <div>
         <h2 id="gsRptTitle">📋 GS→AGI 佣金报告</h2>
         <div class="gsr-meta" id="gsRptMeta"></div>
       </div>
-      <button type="button" class="gsr-close" onclick="closeGsCommissionReport()" aria-label="关闭">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.gsr-modal'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button type="button" class="gsr-close" onclick="closeGsCommissionReport()" aria-label="关闭" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;z-index:5;">×</button>
     </div>
     <div class="gsr-body" id="gsRptBody"></div>
     <div class="gsr-foot">
@@ -28717,13 +29167,14 @@ window.CommissionModal={open:open,close:close,applyLang:applyLang,addPayRow:addP
 
 <!-- ===== 项目综合报告模态框（三语） ===== -->
 <div class="rpt-overlay" id="rptOverlay" style="display:none;position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(30,30,50,.5);z-index:1100;justify-content:center;align-items:flex-start;padding:10px 10px 24px 10px;overflow-y:auto;">
-  <div class="rpt-modal" style="background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:rptPop .25s ease;">
+  <div class="rpt-modal" data-mmax-btn="1" style="background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:rptPop .25s ease;">
     <div class="rpt-head" style="display:flex;align-items:center;justify-content:space-between;padding:12px 22px;background:linear-gradient(135deg,#D32F2F,#E53935);color:#fff;">
       <div>
         <h3 id="rptTitle" style="margin:0;font-size:11px;font-weight:700;">📊 项目综合报告</h3>
         <div id="rptMeta" class="rpt-meta" style="font-size:9px;opacity:.92;margin-top:3px;"></div>
       </div>
-      <button type="button" class="rpt-close" onclick="closeProjectReport()" style="background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.rpt-modal'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button type="button" class="rpt-close" onclick="closeProjectReport()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;z-index:5;">×</button>
     </div>
     <div class="rpt-body" id="rptBody" style="padding:20px 24px;max-height:70vh;overflow-y:auto;"></div>
     <div class="rpt-foot" style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px;border-top:2px solid #FBE9E7;background:#fdfaf5;">
@@ -28739,7 +29190,7 @@ window.CommissionModal={open:open,close:close,applyLang:applyLang,addPayRow:addP
 <style>
 .rpt-overlay.show{display:flex;}
 .rpt-overlay{display:none;position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(30,30,50,.5);z-index:1100;justify-content:center;align-items:flex-start;padding:10px 10px 24px 10px;overflow-y:auto;}
-.rpt-modal{background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:rptPop .25s ease;}
+.rpt-modal{position:relative;background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:rptPop .25s ease;}
 @keyframes rptPop{from{transform:translateY(20px);opacity:0;}to{transform:none;opacity:1;}}
 .rpt-head{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;background:linear-gradient(135deg,#D32F2F,#E53935);color:#fff;}
 .rpt-head h3{margin:0;font-size:13.2px;font-weight:700;}
@@ -30842,6 +31293,57 @@ function printModalById(modalId){
   m.classList.add('print-target');
   window.print();
   setTimeout(function(){ m.classList.remove('print-target'); }, 300);
+}
+
+// ===== 在新窗口打开报告（带独立最大化/关闭按钮）=====
+function openReportInNewWindow(modalId){
+  var m = document.getElementById(modalId);
+  if(!m){ showAlert('未找到报告弹窗'); return; }
+  var bodyEl = m.querySelector('.cpr-body');
+  var titleEl = m.querySelector('#cprTitleText, #agiRptTitleText');
+  var metaEl = m.querySelector('#cprMeta, #agiRptMeta');
+  var title = titleEl ? titleEl.textContent : '报告';
+  var meta = metaEl ? metaEl.textContent : '';
+
+  var styles = '';
+  document.querySelectorAll('style, link[rel="stylesheet"]').forEach(function(el){
+    styles += el.outerHTML;
+  });
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>' + escapeHtml(title) + '</title>';
+  html += styles;
+  html += '</head><body style="margin:0;padding:0;background:#f5f5f5;font-family:\'Microsoft YaHei\',Arial,sans-serif;">';
+
+  html += '<div style="position:sticky;top:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:linear-gradient(135deg,#D32F2F,#E53935);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);">';
+  html += '<div><div style="font-size:17px;font-weight:700;">' + escapeHtml(title) + '</div><div style="font-size:11px;opacity:.9;margin-top:3px;">' + escapeHtml(meta) + '</div></div>';
+  html += '<div style="display:flex;gap:8px;align-items:center;">';
+  html += '<button type="button" onclick="window.__toggleWinMax()" title="最大化/还原" style="width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;border-radius:6px;">&#9633;</button>';
+  html += '<button type="button" onclick="window.close()" title="关闭" style="width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.7);color:#fff;font-size:22px;line-height:1;cursor:pointer;border-radius:6px;">×</button>';
+  html += '</div></div>';
+
+  html += '<div class="cpr-body" style="padding:20px 24px;background:#f5f5f5;max-height:none;overflow:visible;">' + (bodyEl ? bodyEl.innerHTML : '') + '</div>';
+
+  html += '<script>(function(){';
+  html += 'var baseW=1100, baseH=800, isMax=false;';
+  html += 'window.__toggleWinMax=function(){';
+  html += '  try{';
+  html += '    if(isMax){';
+  html += '      var x=Math.max(0, Math.floor((screen.availWidth-baseW)/2));';
+  html += '      var y=Math.max(0, Math.floor((screen.availHeight-baseH)/2));';
+  html += '      window.moveTo(x,y); window.resizeTo(baseW,baseH); isMax=false;';
+  html += '    }else{';
+  html += '      window.moveTo(0,0); window.resizeTo(screen.availWidth, screen.availHeight); isMax=true;';
+  html += '    }';
+  html += '  }catch(e){}';
+  html += '};';
+  html += '})();<\/script>';
+  html += '</body></html>';
+
+  var w = window.open('', '_blank', 'width=1100,height=800,resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,location=no');
+  if(!w){ showAlert('新窗口被浏览器拦截，请允许弹窗后重试'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }
 function printDashboard(){
   document.body.classList.add('printing-dashboard');

@@ -978,6 +978,7 @@ function _ovLoadChartLib(cb){
       display: flex !important;
     }
     .cust-pay-modal {
+      position: relative;
       background: white;
       border-radius: 14px;
       width: 100%;
@@ -1106,12 +1107,14 @@ function _ovLoadChartLib(cb){
   /* ===== 智能报告模态框 ===== */
   .cpr-overlay{position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(30,30,50,.45);display:none;align-items:flex-start;justify-content:center;z-index:1100;padding:10px 12px 30px 12px;overflow-y:auto;}
   .cpr-overlay.show{display:flex;}
-  .cpr-box{background:#fff;width:100%;max-width:1000px;border-radius:14px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:pop .25s ease;}
+  .cpr-box{background:#fff;width:100%;max-width:1000px;border-radius:14px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:pop .25s ease;position:relative;}
   .cpr-head{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#D32F2F,#E53935);color:#fff;}
   .cpr-head h3{margin:0;font-size:17px;font-weight:700;}
   .cpr-head .cpr-meta{font-size:11px;opacity:.9;margin-top:3px;}
   .cpr-close{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;transition:transform .15s;}
   .cpr-close:hover{transform:scale(1.2);}
+  .cpr-head .mmax-btn{color:#fff;border:1px solid rgba(255,255,255,.7);}
+  .cpr-head .mmax-btn:hover{color:#ffe3c8;border-color:#ffe3c8;background:rgba(255,255,255,.15);}
   .cpr-body{padding:20px 24px;max-height:68vh;overflow-y:auto;}
   .cpr-sec{margin-bottom:16px;padding:14px 16px;border:1px solid #f3e0c8;border-radius:10px;background:#fdf8f1;}
   .cpr-sec-title{font-size:13px;font-weight:700;color:#D32F2F;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #FBE9E7;display:flex;align-items:center;gap:6px;}
@@ -1333,7 +1336,7 @@ function _ovLoadChartLib(cb){
     /* ===== GS→AGI 佣金报告 样式 ===== */
     .gsr-overlay{display:none;position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:1100;justify-content:center;align-items:flex-start;padding:10px 12px 30px 12px;overflow-y:auto;}
     .gsr-overlay.show{display:flex;}
-    .gsr-modal{background:white;border-radius:14px;width:900px;max-width:100%;box-shadow:0 10px 40px rgba(0,0,0,.28);overflow:hidden;}
+    .gsr-modal{position:relative;background:white;border-radius:14px;width:900px;max-width:100%;box-shadow:0 10px 40px rgba(0,0,0,.28);overflow:hidden;}
     .gsr-head{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:linear-gradient(135deg,#E53935,#C62828);color:white;}
     .gsr-head h2{font-size:16px;font-weight:700;}
     .gsr-head .gsr-meta{font-size:11px;opacity:.92;}
@@ -5194,10 +5197,11 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 客户付款明细 · 二级模态框 ==================== -->
 <div id="custPayModal" class="cust-pay-overlay">
-  <div class="cust-pay-modal">
+  <div class="cust-pay-modal" data-mmax-btn="1">
     <div class="cp-head">
       <h2>📄 <span id="cpTitleText">客户付款明细</span> <span style="font-size:12px;opacity:.85;font-weight:400;" id="cpSubTitle">Customer Payment Details</span></h2>
-      <button class="cp-close" onclick="window.closeCustPayModal()">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.cust-pay-modal'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button class="cp-close" onclick="window.closeCustPayModal()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;z-index:5;">×</button>
     </div>
 
     <div class="cp-body">
@@ -5303,13 +5307,14 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== 客户付款智能报告模态框 ==================== -->
 <div id="custPayReportModal" class="cpr-overlay">
-  <div class="cpr-box">
+  <div class="cpr-box" data-mmax-btn="1">
     <div class="cpr-head">
       <div>
         <h3 id="cprTitleText">📋 Báo cáo TT KH thông minh</h3>
         <div class="cpr-meta" id="cprMeta"></div>
       </div>
-      <button class="cpr-close" onclick="closeCustPayReport()">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.cpr-box'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button class="cpr-close" type="button" onclick="closeCustPayReport()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;line-height:1;cursor:pointer;z-index:5;">×</button>
     </div>
     <div class="cpr-body" id="cprBody"></div>
     <div class="cpr-foot">
@@ -5324,10 +5329,11 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== AGI付款明细 · 二级模态框 ==================== -->
 <div id="agiPayModal" class="cust-pay-overlay">
-  <div class="cust-pay-modal">
+  <div class="cust-pay-modal" data-mmax-btn="1">
     <div class="cp-head">
       <h2>📄 <span id="agiTitleText">AGI→GS 付款明细</span> <span style="font-size:12px;opacity:.85;font-weight:400;" id="agiSubTitle">AGI to GS Payment Details</span></h2>
-      <button class="cp-close" onclick="window.closeAgiPayModal()">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.cust-pay-modal'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button class="cp-close" onclick="window.closeAgiPayModal()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;z-index:5;">×</button>
     </div>
 
     <div class="cp-body">
@@ -5430,13 +5436,14 @@ function _ovLoadChartLib(cb){
 
 <!-- ==================== AGI付款智能报告模态框 ==================== -->
 <div id="agiPayReportModal" class="cpr-overlay">
-  <div class="cpr-box">
+  <div class="cpr-box" data-mmax-btn="1">
     <div class="cpr-head">
       <div>
         <h3 id="agiRptTitleText">📋 Báo cáo TT KH thông minh</h3>
         <div class="cpr-meta" id="agiRptMeta"></div>
       </div>
-      <button class="cpr-close" onclick="closeAgiPayReport()">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.cpr-box'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button class="cpr-close" type="button" onclick="closeAgiPayReport()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;line-height:1;cursor:pointer;z-index:5;">×</button>
     </div>
     <div class="cpr-body" id="agiRptBody"></div>
     <div class="cpr-foot">
@@ -26946,13 +26953,14 @@ window.CommissionModal={open:open,close:close,applyLang:applyLang,addPayRow:addP
 
 <!-- ============ GS→AGI 佣金报告 模态框 ============ -->
 <div class="gsr-overlay" id="gsCommissionReportOverlay" role="dialog" aria-modal="true">
-  <div class="gsr-modal">
+  <div class="gsr-modal" data-mmax-btn="1">
     <div class="gsr-head">
       <div>
         <h2 id="gsRptTitle">📋 GS→AGI 佣金报告</h2>
         <div class="gsr-meta" id="gsRptMeta"></div>
       </div>
-      <button type="button" class="gsr-close" onclick="closeGsCommissionReport()" aria-label="关闭">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.gsr-modal'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button type="button" class="gsr-close" onclick="closeGsCommissionReport()" aria-label="关闭" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;z-index:5;">×</button>
     </div>
     <div class="gsr-body" id="gsRptBody"></div>
     <div class="gsr-foot">
@@ -28171,13 +28179,14 @@ window.CommissionModal={open:open,close:close,applyLang:applyLang,addPayRow:addP
 
 <!-- ===== 项目综合报告模态框（三语） ===== -->
 <div class="rpt-overlay" id="rptOverlay" style="display:none;position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(30,30,50,.5);z-index:1100;justify-content:center;align-items:flex-start;padding:10px 10px 24px 10px;overflow-y:auto;">
-  <div class="rpt-modal" style="background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:rptPop .25s ease;">
+  <div class="rpt-modal" data-mmax-btn="1" style="background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:rptPop .25s ease;">
     <div class="rpt-head" style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#D32F2F,#E53935);color:#fff;">
       <div>
         <h3 id="rptTitle" style="margin:0;font-size:17px;font-weight:700;">📊 项目综合报告</h3>
         <div id="rptMeta" class="rpt-meta" style="font-size:11px;opacity:.92;margin-top:3px;"></div>
       </div>
-      <button type="button" class="rpt-close" onclick="closeProjectReport()" style="background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;">×</button>
+      <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.rpt-modal'))" title="最大化" style="position:absolute;top:11px;right:48px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid rgba(255,255,255,.7);color:#fff;font-size:16px;cursor:pointer;z-index:6;">&#9633;</button>
+      <button type="button" class="rpt-close" onclick="closeProjectReport()" title="关闭" style="position:absolute;top:11px;right:16px;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;background:none;border:none;color:#fff;font-size:24px;cursor:pointer;line-height:1;z-index:5;">×</button>
     </div>
     <div class="rpt-body" id="rptBody" style="padding:20px 24px;max-height:70vh;overflow-y:auto;"></div>
     <div class="rpt-foot" style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px;border-top:2px solid #FBE9E7;background:#fdfaf5;">
@@ -28193,7 +28202,7 @@ window.CommissionModal={open:open,close:close,applyLang:applyLang,addPayRow:addP
 <style>
 .rpt-overlay.show{display:flex;}
 .rpt-overlay{display:none;position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(30,30,50,.5);z-index:1100;justify-content:center;align-items:flex-start;padding:10px 10px 24px 10px;overflow-y:auto;}
-.rpt-modal{background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:rptPop .25s ease;}
+.rpt-modal{position:relative;background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:rptPop .25s ease;}
 @keyframes rptPop{from{transform:translateY(20px);opacity:0;}to{transform:none;opacity:1;}}
 .rpt-head{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:linear-gradient(135deg,#D32F2F,#E53935);color:#fff;}
 .rpt-head h3{margin:0;font-size:17px;font-weight:700;}
@@ -30300,6 +30309,7 @@ function printModalById(modalId){
   window.print();
   setTimeout(function(){ m.classList.remove('print-target'); }, 300);
 }
+
 function printDashboard(){
   document.body.classList.add('printing-dashboard');
   window.print();
