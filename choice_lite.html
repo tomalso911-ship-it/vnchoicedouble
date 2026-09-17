@@ -5198,6 +5198,13 @@ function _ovLoadChartLib(cb){
 .slats-spec-input:focus { border-color: #E53935; outline: none; box-shadow: inset 0 0 0 1px rgba(229,57,53,.35); }
 .slats-spec-input.slats-spec-computed { background: #f0f0f0; color: #333; cursor: default; }
 .slats-spec-input.slats-default-value { color: #D32F2F; font-weight: 600; }
+/* 四类特殊房舍（过道/自留备用/其他房舍/其他用途）下 5 个字段强制=1 且透明显示（看起来空白，实际值=1，只读） */
+.slats-spec-input.slats-special-locked { color: transparent !important; background: #fff; }
+/* 序号分组黑色外框（3px solid #000，每个序号分组整框，含单行） */
+.slats-spec-table tr.slats-group-first > td { border-top: 3px solid #000; }
+.slats-spec-table tr.slats-group-last > td { border-bottom: 3px solid #000; }
+.slats-spec-table tr.slats-group > td.slats-spec-idx { border-left: 3px solid #000; }
+.slats-spec-table tr.slats-group > td:last-child { border-right: 3px solid #000; }
 .slats-spec-idx { font-weight: 700; color: #E53935; padding: 6px 4px; }
 .slats-spec-actions { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .slats-spec-iconbtn { width: 24px; height: 24px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: all .15s; padding: 0; }
@@ -18322,6 +18329,7 @@ function openSlatsReportModal(){
   var matMap={}; // 水泥板规格 -> {长,宽,高,数量/整场}（智能统计实际出现的规格）
   var totalBuildings=0, totalQty=0, totalSqm=0;
   rows.forEach(function(r){
+    if(slatsIsSpecialHouse(r.pig_house)) return; // 四类特殊房舍不计入报告任何总数/分布
     var phKey=String(r.pig_house||'');
     var hc=String(r.house_code||'');
     var houseLabel=_phLabel(phKey)+' #'+hc;
@@ -18353,6 +18361,7 @@ function openSlatsReportModal(){
   // 栋数/单元数按组去重统计（每组只算一次，避免组内多规格行重复累加）
   var totalBldgGroups=0, totalUnits=0;
   groups.forEach(function(g){
+    if(slatsIsSpecialHouse(g.pig_house)) return; // 四类特殊房舍不参与整场栋数/单元数统计
     totalBldgGroups+=slatsParseNum(g.building_count);
     totalUnits+=slatsParseNum(g.unit_per_building)*slatsParseNum(g.building_count);
   });
@@ -18391,17 +18400,18 @@ function openSlatsReportModal(){
     var rs=g.rows.length;
     var phKey='slats_pig_house_'+String(g.pig_house).trim();
     var phTranslated=_phLabel(g.pig_house);
+    var gSpecial=slatsIsSpecialHouse(g.pig_house); // 四类特殊房舍：5 个字段透明(显示空白)，实际值=1
     g.rows.forEach(function(r, rIdx){
       ovHtml+='<tr>';
       if(rIdx===0){
         ovHtml+='<td rowspan="'+rs+'">'+(gIdx+1)+'</td>'+
           '<td rowspan="'+rs+'" data-i18n="'+phKey+'">'+_e(phTranslated)+'</td>'+
           '<td rowspan="'+rs+'">'+_e(g.house_code)+'</td>'+
-          '<td rowspan="'+rs+'">'+slatsFmtNum(slatsParseNum(g.unit_per_building),0)+'</td>'+
-          '<td rowspan="'+rs+'">'+slatsFmtNum(slatsParseNum(g.len_per_unit),2)+'</td>'+
-          '<td rowspan="'+rs+'">'+slatsFmtNum(slatsParseNum(g.wid_per_unit),2)+'</td>'+
-          '<td rowspan="'+rs+'">'+slatsFmtNum(slatsParseNum(g.hgt_per_unit),2)+'</td>'+
-          '<td rowspan="'+rs+'">'+slatsFmtNum(slatsParseNum(g.building_count),0)+'</td>';
+          '<td rowspan="'+rs+'">'+(gSpecial?'':slatsFmtNum(slatsParseNum(g.unit_per_building),0))+'</td>'+
+          '<td rowspan="'+rs+'">'+(gSpecial?'':slatsFmtNum(slatsParseNum(g.len_per_unit),2))+'</td>'+
+          '<td rowspan="'+rs+'">'+(gSpecial?'':slatsFmtNum(slatsParseNum(g.wid_per_unit),2))+'</td>'+
+          '<td rowspan="'+rs+'">'+(gSpecial?'':slatsFmtNum(slatsParseNum(g.hgt_per_unit),2))+'</td>'+
+          '<td rowspan="'+rs+'">'+(gSpecial?'':slatsFmtNum(slatsParseNum(g.building_count),0))+'</td>';
       }
       var rebKeyLen='slats_rebar_'+String(r.rebar_size_len||'').trim();
       var rebKeyWid='slats_rebar_'+String(r.rebar_size_wid||'').trim();
@@ -18463,6 +18473,7 @@ function openSlatsReportModal(){
   var houseTypeSet={};
   var totalVol=0, matCem=0, matSand=0, matGrav=0;
   rows.forEach(function(r){
+    if(slatsIsSpecialHouse(r.pig_house)) return; // 四类特殊房舍不计入房舍类型数
     houseTypeSet[String(r.pig_house||'')]=true;
   });
   matRows.forEach(function(o){
@@ -18682,6 +18693,9 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
 var SLATS_PIG_HOUSE=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
 var SLATS_MESH=[1,2];
 var SLATS_REBAR=['φ6','φ8','φ10','φ12'];
+// 四类特殊房舍：12=过道、13=自留备用、14=其他房舍、15=其他用途（这四类不参与整场栋数统计，且 5 个字段强制=1）
+var SLATS_SPECIAL_HOUSES=['12','13','14','15'];
+function slatsIsSpecialHouse(v){ return SLATS_SPECIAL_HOUSES.indexOf(String(v==null?'':v).trim())>=0; }
 function slatsArrForPrefix(p){
   if(p==='slats_pig_house_') return SLATS_PIG_HOUSE;
   if(p==='slats_mesh_') return SLATS_MESH;
@@ -18800,6 +18814,32 @@ function slatsApplyDefaultState(tr){
     } else {
       inp.classList.remove('slats-default-value');
       inp.title='';
+    }
+  }
+}
+// 四类特殊房舍：对分组首行的 5 个字段（单元/栋/长/单元/宽/单元/高/单元/栋数/整场，列 3~7）强制=1 并透明只读；
+// 非特殊房舍则解除锁定并清掉被强制写入的 1（恢复可编辑空白）。合并列的输入只存在于分组首行。
+function slatsApplySpecialState(group){
+  if(!group || !group.rows || !group.rows.length) return;
+  var header=group.rows[0];
+  var phCell=slatsGetCellByCol(header, 1);
+  var phSel=phCell?phCell.querySelector('select.slats-spec-select'):null;
+  var isSpecial = !!(phSel && slatsIsSpecialHouse(phSel.value));
+  var cols=[3,4,5,6,7];
+  for(var i=0;i<cols.length;i++){
+    var cell=slatsGetCellByCol(header, cols[i]);
+    var inp=cell?cell.querySelector('input.slats-spec-input'):null;
+    if(!inp) continue;
+    if(isSpecial){
+      inp.value='1';
+      inp.classList.add('slats-special-locked');
+      inp.readOnly=true;
+    } else {
+      if(inp.classList.contains('slats-special-locked')){
+        inp.classList.remove('slats-special-locked');
+        inp.readOnly=false;
+        if(inp.value==='1') inp.value='';
+      }
     }
   }
 }
@@ -18956,6 +18996,31 @@ function rebuildSlatsGroups(){
     if(gid!==lastGid){ displayNo++; lastGid=gid; }
     var idxTd=row.querySelector('td.slats-spec-idx');
     if(idxTd){ idxTd.textContent=displayNo; }
+  }
+  // 序号分组黑色外框（3px solid #000，每个序号分组整框，含单行）+ 特殊房舍字段强制=1 透明锁定
+  for(var g2=0;g2<groups.length;g2++){
+    var grp2=groups[g2];
+    // 先清旧状态，避免分组规模变化后残留
+    for(var r0=0;r0<grp2.rows.length;r0++){
+      var row0=grp2.rows[r0];
+      row0.classList.remove('slats-group','slats-group-first','slats-group-last');
+      var cells0=row0.querySelectorAll('td');
+      for(var c0=0;c0<cells0.length;c0++){ cells0[c0].classList.remove('slats-group-last'); }
+    }
+    for(var r2=0;r2<grp2.rows.length;r2++){
+      var row2=grp2.rows[r2];
+      row2.classList.add('slats-group');
+      if(r2===0) row2.classList.add('slats-group-first');
+      if(r2===grp2.rows.length-1) row2.classList.add('slats-group-last');
+    }
+    // 多行合并时，合并列（序号/猪舍/房舍编号/单元/栋/长/单元/宽/单元/高/单元/栋数/整场）的首行单元格要补下边框，封闭整框底部
+    if(grp2.rows.length>1){
+      for(var m2=0;m2<SLATS_MERGED_COLS.length;m2++){
+        var mc=slatsGetCellByCol(grp2.rows[0], SLATS_MERGED_COLS[m2]);
+        if(mc) mc.classList.add('slats-group-last');
+      }
+    }
+    slatsApplySpecialState(grp2);
   }
   refreshSlatsSelectOptions();
   fitSlatsSpecTable();
@@ -19283,7 +19348,15 @@ function slatsUpdateTotals(){
   var totalBuildings=0, totalQty=0, totalSqm=0;
   for(var i=0;i<tbody.children.length;i++){
     var row=tbody.children[i];
-    totalBuildings+=slatsParseNum(slatsGetInputValue(row, 7));
+    // 四类特殊房舍（过道/自留备用/其他房舍/其他用途）不计入整场栋数总计，但其数量/整场、平米/整场仍照常计入
+    var g=slatsFindGroupForRow(row);
+    var isSpecial=false;
+    if(g && g.rows[0]){
+      var phC=slatsGetCellByCol(g.rows[0], 1);
+      var phS=phC?phC.querySelector('select.slats-spec-select'):null;
+      isSpecial = !!(phS && slatsIsSpecialHouse(phS.value));
+    }
+    if(!isSpecial) totalBuildings+=slatsParseNum(slatsGetInputValue(row, 7));
     totalQty+=slatsParseNum(slatsGetInputValue(row, 12));
     totalSqm+=slatsParseNum(slatsGetInputValue(row, 14));
   }
@@ -19340,6 +19413,8 @@ function fitSlatsSpecTable(){
     var tr=target.closest('tr');
     if(!tr) return;
     var group=slatsFindGroupForRow(tr);
+    // 切换猪舍（含特殊房舍）时先同步 5 字段的强制=1/透明锁定状态，再做重算
+    slatsApplySpecialState(group);
     slatsRecalcGroup(group);
     slatsUpdateTotals();
   });
