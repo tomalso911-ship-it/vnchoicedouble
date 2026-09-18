@@ -3259,6 +3259,30 @@ def upload_attachment(pid):
     conn.close()
     return jsonify(row_to_dict(new_row))
 
+
+# ===================== 生产模块：收货单照片上传 =====================
+# 与合同附件机制一致：文件存 uploads/，返回 文件名 + URL；不污染 won_projects.attachments 列。
+@app.route("/api/won-projects/<int:pid>/prod-receipt-photos", methods=["POST"])
+def upload_prod_receipt_photo(pid):
+    if "file" not in request.files:
+        return jsonify({"error": "no file"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"error": "empty filename"}), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in ALLOWED_EXT:
+        return jsonify({"error": "ext not allowed"}), 400
+    conn = get_db()
+    row = conn.execute("SELECT id FROM won_projects WHERE id=?", (pid,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    stamp = time.strftime("%Y%m%d%H%M%S")
+    rand = os.urandom(3).hex()
+    fname = "prec_%d_%s_%s%s" % (pid, stamp, rand, ext)
+    f.save(os.path.join(UPLOAD_DIR, fname))
+    return jsonify({"ok": True, "filename": fname, "url": "/uploads/" + fname})
+
 @app.route("/api/won-projects/<int:pid>/attachments/<path:filename>", methods=["DELETE"])
 def delete_attachment(pid, filename):
     filename = os.path.basename(filename)
