@@ -666,24 +666,6 @@ def init_db():
         resolver_name TEXT DEFAULT ''
     );
     """)
-    # ===== 生产现场工厂共享数据表（全员可见，服务端存储，取代仅浏览器 localStorage） =====
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS prod_factory (
-        project_id TEXT PRIMARY KEY,
-        data TEXT,
-        updated_by TEXT DEFAULT '',
-        updated_at TEXT DEFAULT ''
-    );
-    """)
-    # ===== 生产模块通用键值表（材料规格等全局配置，服务端共享） =====
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS prod_kv (
-        k TEXT PRIMARY KEY,
-        data TEXT,
-        updated_by TEXT DEFAULT '',
-        updated_at TEXT DEFAULT ''
-    );
-    """)
     # 审批模块扩展字段：标题 / 审批内容说明 / 审批结果意见
     for col in ["title", "content", "result_note"]:
         try:
@@ -1523,13 +1505,8 @@ def _is_manager(conn, username):
 
 
 def _manager_usernames(conn):
-    """返回当前所有管理员账号列表（只保留 users 表里真实存在的账号，自动清理残留）。"""
-    rows = conn.execute(
-        "SELECT m.username FROM managers m "
-        "INNER JOIN users u ON lower(u.username) = lower(m.username) "
-        "ORDER BY m.username"
-    ).fetchall()
-    return [r["username"] for r in rows]
+    """返回当前所有管理员账号列表。"""
+    return [r["username"] for r in conn.execute("SELECT username FROM managers ORDER BY username").fetchall()]
 
 
 @app.route("/api/me", methods=["GET"])
@@ -1581,12 +1558,7 @@ def api_me():
 # ============================================================
 def _dash_sum_with_fallback(primary, fallback, suffix):
     p = primary + "_" + suffix
-    # fallback 传 '0' 表示「没有备用列，按 0 计」；直接拼成 0_rmb 会被 SQLite
-    # 解析成非法 token（unrecognized token: "0_rmb"）导致 /api/dashboard-stats 500。
-    if not fallback or fallback == "0":
-        f = "0"
-    else:
-        f = fallback + "_" + suffix
+    f = fallback + "_" + suffix
     return (f"SUM(CASE WHEN {p} IS NULL THEN COALESCE(CAST({f} AS REAL),0) "
             f"ELSE CAST({p} AS REAL) END)")
 
@@ -1634,12 +1606,6 @@ def api_dashboard_stats():
         return jsonify({"ok": True, "crm": crm, "won": won, "lost": lost})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
-
-
-# ==================== 汇率看板 ====================
-# 汇率数据统一由系统既有的 /api/fx-rates（见下方 api_fx_rates）提供：
-#   读库缓存 + 当月缺失后台补抓，返回 {ok, labels:[YYYY-MM], series:{usd_cny,usd_vnd,cny_vnd}}。
-# 此处不再重复定义路由，避免 Flask 端点名冲突导致应用无法启动。
 
 
 # ==================== 个人佣金 · 修改金额审批 ====================
@@ -3282,30 +3248,6 @@ def upload_attachment(pid):
     conn.close()
     return jsonify(row_to_dict(new_row))
 
-
-# ===================== 生产模块：收货单照片上传 =====================
-# 与合同附件机制一致：文件存 uploads/，返回 文件名 + URL；不污染 won_projects.attachments 列。
-@app.route("/api/won-projects/<int:pid>/prod-receipt-photos", methods=["POST"])
-def upload_prod_receipt_photo(pid):
-    if "file" not in request.files:
-        return jsonify({"error": "no file"}), 400
-    f = request.files["file"]
-    if not f.filename:
-        return jsonify({"error": "empty filename"}), 400
-    ext = os.path.splitext(f.filename)[1].lower()
-    if ext not in ALLOWED_EXT:
-        return jsonify({"error": "ext not allowed"}), 400
-    conn = get_db()
-    row = conn.execute("SELECT id FROM won_projects WHERE id=?", (pid,)).fetchone()
-    conn.close()
-    if not row:
-        return jsonify({"error": "not found"}), 404
-    stamp = time.strftime("%Y%m%d%H%M%S")
-    rand = os.urandom(3).hex()
-    fname = "prec_%d_%s_%s%s" % (pid, stamp, rand, ext)
-    f.save(os.path.join(UPLOAD_DIR, fname))
-    return jsonify({"ok": True, "filename": fname, "url": "/uploads/" + fname})
-
 @app.route("/api/won-projects/<int:pid>/attachments/<path:filename>", methods=["DELETE"])
 def delete_attachment(pid, filename):
     filename = os.path.basename(filename)
@@ -3640,10 +3582,6 @@ def serve_vault():
 @app.route("/lost_table.js")
 def serve_lost_table():
     return send_from_directory(BASE_DIR, "lost_table.js", mimetype="application/javascript")
-
-@app.route("/vn_provinces.js")
-def serve_vn_provinces():
-    return send_from_directory(BASE_DIR, "vn_provinces.js", mimetype="application/javascript")
 
 # ===== PWA / 手机 APP 静态资源 =====
 @app.route("/manifest.json")
@@ -4288,98 +4226,6 @@ def api_approval_list():
     return jsonify({"ok": True, "items": items})
 
 
-@app.route("/api/prod-factory/<pid>", methods=["GET"])
-def api_prod_factory_get(pid):
-    me = (request.args.get("me") or "").strip()
-    if not me:
-        return jsonify({"ok": False, "msg": "未登录"}), 401
-    conn = get_db()
-    row = conn.execute("SELECT data FROM prod_factory WHERE project_id=?", (str(pid),)).fetchone()
-    conn.close()
-    if row and row["data"]:
-        try:
-            return jsonify({"ok": True, "data": json.loads(row["data"])})
-        except Exception:
-            return jsonify({"ok": True, "data": None})
-    return jsonify({"ok": True, "data": None})
-
-
-@app.route("/api/prod-factory/<pid>", methods=["PUT"])
-def api_prod_factory_put(pid):
-    data = request.get_json(force=True, silent=True) or {}
-    me = (data.get("requester") or "").strip()
-    if not me:
-        return jsonify({"ok": False, "msg": "未登录"}), 401
-    payload = data.get("data")
-    if payload is None:
-        return jsonify({"ok": False, "msg": "empty data"}), 400
-    try:
-        blob = json.dumps(payload, ensure_ascii=False)
-    except Exception:
-        return jsonify({"ok": False, "msg": "bad data"}), 400
-    conn = get_db()
-    try:
-        conn.execute("DELETE FROM prod_factory WHERE project_id=?", (str(pid),))
-        conn.execute("INSERT INTO prod_factory (project_id, data, updated_by, updated_at) VALUES (?,?,?,?)",
-                     (str(pid), blob, me, time.strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-    except Exception as e:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        conn.close()
-        return jsonify({"ok": False, "msg": str(e)}), 500
-    conn.close()
-    return jsonify({"ok": True})
-
-
-@app.route("/api/prod-kv/<path:key>", methods=["GET"])
-def api_prod_kv_get(key):
-    me = (request.args.get("me") or "").strip()
-    if not me:
-        return jsonify({"ok": False, "msg": "未登录"}), 401
-    conn = get_db()
-    row = conn.execute("SELECT data FROM prod_kv WHERE k=?", (str(key),)).fetchone()
-    conn.close()
-    if row and row["data"]:
-        try:
-            return jsonify({"ok": True, "data": json.loads(row["data"])})
-        except Exception:
-            return jsonify({"ok": True, "data": None})
-    return jsonify({"ok": True, "data": None})
-
-
-@app.route("/api/prod-kv/<path:key>", methods=["PUT"])
-def api_prod_kv_put(key):
-    data = request.get_json(force=True, silent=True) or {}
-    me = (data.get("requester") or "").strip()
-    if not me:
-        return jsonify({"ok": False, "msg": "未登录"}), 401
-    payload = data.get("data")
-    if payload is None:
-        return jsonify({"ok": False, "msg": "empty data"}), 400
-    try:
-        blob = json.dumps(payload, ensure_ascii=False)
-    except Exception:
-        return jsonify({"ok": False, "msg": "bad data"}), 400
-    conn = get_db()
-    try:
-        conn.execute("DELETE FROM prod_kv WHERE k=?", (str(key),))
-        conn.execute("INSERT INTO prod_kv (k, data, updated_by, updated_at) VALUES (?,?,?,?)",
-                     (str(key), blob, me, time.strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit()
-    except Exception as e:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        conn.close()
-        return jsonify({"ok": False, "msg": str(e)}), 500
-    conn.close()
-    return jsonify({"ok": True})
-
-
 @app.route("/api/approval-requests/<int:rid>/resolve", methods=["POST"])
 def api_approval_resolve(rid):
     data = request.get_json(force=True, silent=True) or {}
@@ -4777,16 +4623,13 @@ def api_managers_update():
     if len(managers) < 2 or len(managers) > 4:
         return jsonify({"ok": False, "message": "管理人员数量必须在 2-4 人之间"}), 400
     conn = get_db()
-    # 校验并自动过滤不存在的账号（历史残留/幽灵账号不阻断保存）
-    placeholders = ",".join("?" * len(managers)) if managers else "''"
-    existing = {r["username"] for r in conn.execute(f"SELECT username FROM users WHERE username IN ({placeholders})", managers).fetchall()} if managers else set()
-    managers = sorted(set(managers) & existing)
-    if "tom" not in managers:
+    # 校验所有账号真实存在
+    placeholders = ",".join("?" * len(managers))
+    existing = {r["username"] for r in conn.execute(f"SELECT username FROM users WHERE username IN ({placeholders})", managers).fetchall()}
+    missing = set(managers) - existing
+    if missing:
         conn.close()
-        return jsonify({"ok": False, "message": "tom 必须是管理员之一"}), 400
-    if len(managers) < 2 or len(managers) > 4:
-        conn.close()
-        return jsonify({"ok": False, "message": "管理人员数量必须在 2-4 人之间"}), 400
+        return jsonify({"ok": False, "message": f"以下账号不存在: {', '.join(sorted(missing))}"}), 400
     # 原子替换
     conn.execute("DELETE FROM managers")
     for username in managers:
