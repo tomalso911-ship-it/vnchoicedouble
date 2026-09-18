@@ -4635,15 +4635,7 @@ function _ovLoadChartLib(cb){
       h += '<table class="prod-table"><thead><tr><th>'+pt('thr_name')+'</th><th>'+pt('thr_unit2')+'</th><th>'+pt('thr_cur_stock')+'</th><th>'+pt('thr_warn2')+'</th></tr></thead><tbody>';
       (m.items||[]).forEach(function(it){ var st = stock(it.name); var warn = (it.warnAt!==''&&it.warnAt!=null&&+st<=+it.warnAt) ? ' style="color:#a31515;font-weight:700"' : ''; h += '<tr><td>'+prod_esc(it.name)+'</td><td>'+prod_esc(it.unit)+'</td><td'+warn+'>'+st+'</td><td>'+(it.warnAt||'')+'</td></tr>'; });
       h += '</tbody></table>';
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_inbound')+'</div>';
-      h += '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pd_in_date',prod_today(),'',prod_today())+prod_fld(pt('lbl_name'),'pd_in_name')+prod_fld(pt('thr_qty2'),'pd_in_qty')+prod_fld(pt('lbl_note'),'pd_in_note')+'<button class="prod-btn" onclick="prod_matIn()">'+pt('btn_inbound')+'</button></div>';
-      /* 入库记录（仅展示入库，不含出库） */
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_inbound_hist')+'</div>';
-      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('thr_name')+'</th><th>'+pt('thr_qty2')+'</th><th>'+pt('lbl_note')+'</th></tr></thead><tbody>';
-      var rows = (m.inbound||[]).map(function(r){ return {d:r.date,n:r.name,q:r.qty,nt:r.note}; });
-      rows.sort(function(a,b){ return (b.d||'').localeCompare(a.d||''); });
-      rows.forEach(function(r){ h += '<tr><td>'+prod_esc(ymdToDmy(r.d))+'</td><td>'+prod_esc(r.n)+'</td><td>'+prod_esc(r.q)+'</td><td>'+prod_esc(r.nt)+'</td></tr>'; });
-      h += '</tbody></table>';
+
       /* 收货确认（厂长现场收货后填写，采购二次确认） */
       h += '<div class="prod-sec-title" style="border-color:#2b7a3e">'+pt('sec_receipt')+'</div>';
       var _mmR = prod_slatsMatrix();
@@ -4691,8 +4683,7 @@ function _ovLoadChartLib(cb){
       return h;
     }
     function prod_addMat(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; f.materials.items.push({name:prod_val('pd_name'),unit:prod_val('pd_unit'),warnAt:prod_val('pd_warn')}); prod_save(f); prod_renderTab('D'); }
-    function prod_matIn(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; if(!prod_val('pd_in_name')){ prod_toast(pt('toast_name_req')); return; } f.materials.inbound.push({date:prod_val('pd_in_date'),name:prod_val('pd_in_name'),qty:prod_val('pd_in_qty'),note:prod_val('pd_in_note')}); prod_save(f); prod_renderTab('D'); }
-    function prod_matOut(){ var f = prod_get(PROD_CUR); f.materials = f.materials||{items:[],inbound:[],outbound:[]}; if(!prod_val('pd_out_name')){ prod_toast(pt('toast_name_req')); return; } f.materials.outbound.push({date:prod_val('pd_out_date'),name:prod_val('pd_out_name'),qty:prod_val('pd_out_qty'),note:prod_val('pd_out_note')||'人工出库'}); prod_save(f); prod_renderTab('D'); }
+
     /* 收货确认：照片上传（服务器，与合同附件机制一致） */
     function prodReceiptPhotoOnFile(input){
       var f = input.files && input.files[0]; if(!f) return;
