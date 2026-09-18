@@ -3345,6 +3345,20 @@ function _ovLoadChartLib(cb){
       .prod-sec-title{font-weight:700;margin:14px 0 8px;font-size:14px;border-left:4px solid #E53935;padding-left:8px;}
       .prod-kpi{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
       .prod-kpi .k{background:#f7f9f4;border-radius:10px;padding:8px 14px;font-size:13px;}
+      .prod-house-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin:8px 0 4px;}
+      .prod-house-card{background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;box-shadow:0 1px 5px rgba(20,40,80,.06);}
+      .prod-house-h{font-weight:700;font-size:14px;padding:9px 12px;background:#f7f9f4;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;}
+      .prod-house-days{font-size:11px;font-weight:600;color:#666;}
+      .prod-house-body{padding:10px 12px;display:flex;flex-direction:column;gap:10px;}
+      .prod-mat{background:#fafbfc;border:1px solid #f0f0f0;border-radius:8px;padding:7px 9px;}
+      .prod-mat-h{font-size:12px;font-weight:700;color:#333;margin-bottom:5px;}
+      .prod-mat-sd{font-size:11px;font-weight:500;color:#888;}
+      .prod-mat-rows{display:flex;flex-direction:column;gap:3px;}
+      .prod-mat-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#555;gap:6px;}
+      .prod-mat-row .sz{font-weight:600;color:#333;min-width:34px;}
+      .prod-mat-row .tv{color:#222;flex:1;text-align:right;}
+      .prod-mat-row .bv{color:#E53935;font-weight:700;min-width:92px;text-align:right;}
+      .prod-mat-sub{margin-top:3px;padding-top:4px;border-top:1px dashed #e3e3e3;font-weight:600;}
       .prod-kpi .k b{display:block;font-size:18px;color:#E53935;}
     </style>
     <script>
@@ -3369,14 +3383,14 @@ function _ovLoadChartLib(cb){
         sec_mat_spec:'按规格 × 栋舍 的材料用量', sec_mat_house:'按栋舍 × 规格 的材料用量', th_qty_whole:'数量/整场', th_rebar:'钢筋', th_cement:'水泥/吨', th_sand:'黄砂/吨', th_gravel:'石子/吨', thr_total:'总计',
         sec_inv:'生产骨料库存计划表', lbl_rebar_days:'钢筋存储天数(天)', lbl_cement_days:'水泥存储天数(天)', lbl_sand_days:'黄砂存储天数(天)', lbl_gravel_days:'石子存储天数(天)', btn_save_inv:'保存库存计划', prod_print_pdf:'打印PDF',
         thr_rate:'生产片数/天', thr_days:'生产天数', thr_rebar_buy:'钢筋采购量(Tons)', thr_cement_buy:'水泥采购量(Tons)', thr_sand_buy:'黄砂采购量(Tons)', thr_gravel_buy:'石子采购量(Tons)',
-        note_inv:'生产天数 = ⌈数量/整场 ÷ 生产片数/天⌉；未填写时默认 300 片/天；各骨料采购量 = 该规格该骨料吨数 ÷ 生产天数 × 存储天数。', empty_no_inv:'暂无规格数据可供排产。',
+        note_inv:'生产天数 = ⌈数量/整场 ÷ 生产片数/天⌉；未填写时默认 300 片/天；各骨料采购量 = 该规格该骨料吨数 ÷ 生产天数 × 存储天数。',
+        sec_house_card:'按栋舍 × 物料 采购准备量', lbl_card_total:'总需求(吨)', lbl_card_store:'存储天数(天)', lbl_card_days:'生产天数(天)', lbl_card_buy:'采购量(吨)', note_card:'采购量 = 总需求 ÷ 生产天数 × 存储天数；生产天数按各规格「生产片数/天」(默认300)累加；存储天数未填时默认 钢筋4/水泥5/黄砂5/石子5 天。', empty_no_inv:'暂无规格数据可供排产。',
         sec_gantt:'生产甘特图（概念排程，非实际生产）', lbl_prep_start:'建厂筹备和试运营·开始', lbl_prep_end:'建厂筹备和试运营·结束(=开工日)', lbl_start_ro:'开工日期（只读）', lbl_priority:'优先生产猪舍', opt_please:'（请选择）',
         gantt_prep_label:'建厂筹备和试运营', gantt_prep_title:'建厂筹备和试运营：',
         gantt_n1:'总生产周期约 ', gantt_n2:' 个有效工作日（已跳过越南公共假期，含春节前后各扩展；按各规格「生产片数/天」排产，默认 300 片/天；优先猪舍：', gantt_unset:'未设置',
         gantt_n3:'；条内', gantt_gold:'金色=优先猪舍', gantt_n4:'，其余按需求量从大到小；右侧列为各猪舍明细；斜纹段为越南公共假期（悬停看名称）；虚线为每月首日；顶部', gantt_green:'绿色条=建厂筹备和试运营', gantt_n5:'（不计入生产周期，其右端接红色开工日）；筹备日期绿色、生产起止红色）。',
         right_p1:'共 ', right_p2:' 片 · ', right_p3:' 天', unit_pcs:'片', unit_day:' 天', unit_ton:' 吨', tet_ext:'（含前后扩展）',
-        sec_house_sum:'按栋舍汇总生产计划', thr_house2:'栋舍', thr_qty_pcs:'数量/片', thr_start:'开工', thr_end:'结束', thr_prep:'建厂筹备和试运营', subtotal:'小计', empty_gantt:'请先在「生产骨料库存计划表」为各规格填写“生产片数/天”（默认按 300 片/天），并设置「建厂筹备和试运营」起止日期。',
-        sec_workers:'人员（按日快照，只记数不记名）', lbl_date:'日期', btn_save_snap:'保存当日快照', thr_date:'日期', thr_total2:'合计', btn_del:'删',
+        sec_house_sum:'按栋舍汇总生产计划', thr_house2:'栋舍', thr_qty_pcs:'数量/片', thr_start:'开工', thr_end:'结束', thr_prep:'建厂筹备和试运营', subtotal:'小计', empty_gantt:'请先在「生产骨料库存计划表」为各规格填写“生产片数/天”（默认按 300 片/天），并设置「建厂筹备和试运营」起止日期。', th_prod_order:'生产次序', sec_workers:'人员（按日快照，只记数不记名）', lbl_date:'日期', btn_save_snap:'保存当日快照', thr_date:'日期', thr_total2:'合计', btn_del:'删',
         sec_raw:'原料与库存（工厂自采，无审批流）', sec_stock:'物资清单与库存', lbl_name:'名称', lbl_unit:'单位', lbl_warn:'预警阈值', btn_add_mat:'添加物资', thr_name:'名称', thr_unit2:'单位', thr_cur_stock:'当前库存', thr_warn2:'预警',
         sec_inbound:'入库（采购直录）', thr_qty2:'数量', lbl_note:'备注', btn_inbound:'入库', sec_outbound:'出库', btn_outbound:'出库', thr_type:'类型', type_in:'入库', type_out:'出库',
         sec_mat_req:'材料需求（按规格自动计算，指导采购）', kpi_cement:'水泥', kpi_sand:'黄砂', kpi_gravel:'石子', thr_material:'材料', thr_demand:'需求(吨)', thr_gap:'缺口', not_created:'未建物资',
@@ -3398,14 +3412,13 @@ function _ovLoadChartLib(cb){
         sec_mat_spec:'Material Usage by Spec × House', sec_mat_house:'Material Usage by House × Spec', th_qty_whole:'Qty / Whole Site', th_rebar:'Rebar', th_cement:'Cement/Tons', th_sand:'Sand/Tons', th_gravel:'Gravel/Tons', thr_total:'Grand Total',
         sec_inv:'Production Aggregate Inventory Plan', lbl_rebar_days:'Rebar storage days', lbl_cement_days:'Cement storage days', lbl_sand_days:'Sand storage days', lbl_gravel_days:'Gravel storage days', btn_save_inv:'Save Inventory Plan', prod_print_pdf:'Print PDF',
         thr_rate:'Slabs/day', thr_days:'Production days', thr_rebar_buy:'Rebar purchase (Tons)', thr_cement_buy:'Cement purchase (Tons)', thr_sand_buy:'Sand purchase (Tons)', thr_gravel_buy:'Gravel purchase (Tons)',
-        note_inv:'Production days = ⌈Qty/whole ÷ Slabs/day⌉; default 300 slabs/day if blank; aggregate purchase = spec aggregate tons ÷ production days × storage days.', empty_no_inv:'No spec data available for scheduling.',
+        note_inv:'Production days = ⌈Qty/whole ÷ Slabs/day⌉; default 300 slabs/day if blank; aggregate purchase = spec aggregate tons ÷ production days × storage days.', sec_house_card:'Purchase preparation by House × Material', lbl_card_total:'Total demand (Tons)', lbl_card_store:'Storage days', lbl_card_days:'Production days', lbl_card_buy:'Purchase (Tons)', note_card:'Purchase = total demand ÷ production days × storage days; production days summed from each spec "slabs/day" (default 300); storage days default rebar4/cement5/sand5/gravel5 if blank.', empty_no_inv:'No spec data available for scheduling.',
         sec_gantt:'Production Gantt (conceptual schedule, not actual)', lbl_prep_start:'Factory prep & trial run · start', lbl_prep_end:'Factory prep & trial run · end (=start day)', lbl_start_ro:'Start date (read-only)', lbl_priority:'Priority production house', opt_please:'(please select)',
         gantt_prep_label:'Factory prep & trial run', gantt_prep_title:'Factory prep & trial run: ',
         gantt_n1:'Total production cycle ≈ ', gantt_n2:' effective working days (Vietnam public holidays skipped, incl. pre/post-Tet extension; scheduled by spec "slabs/day", default 300 slabs/day; priority house: ', gantt_unset:'not set',
         gantt_n3:'; bar', gantt_gold:'gold = priority house', gantt_n4:', rest sorted by demand desc; right column = per-house details; diagonal stripes = Vietnam public holidays (hover for name); dashed line = 1st of each month; top', gantt_green:'green bar = factory prep & trial run', gantt_n5:'(not counted in production cycle, its right end meets red start day); prep dates green, production start/end red).',
         right_p1:'Total ', right_p2:' slabs · ', right_p3:' days', unit_pcs:' pcs', unit_day:' days', unit_ton:' tons', tet_ext:' (incl. extension)',
-        sec_house_sum:'Production Plan Summary by House', thr_house2:'House', thr_qty_pcs:'Qty / slab', thr_start:'Start', thr_end:'End', thr_prep:'Factory prep & trial run', subtotal:'Subtotal', empty_gantt:'Please first fill "slabs/day" for each spec in the Production Aggregate Inventory Plan (default 300 slabs/day), and set the factory prep & trial run start/end dates.',
-        sec_workers:'Staff (daily snapshot, count only, no names)', lbl_date:'Date', btn_save_snap:'Save daily snapshot', thr_date:'Date', thr_total2:'Total', btn_del:'Del',
+        sec_house_sum:'Production Plan Summary by House', thr_house2:'House', thr_qty_pcs:'Qty / slab', thr_start:'Start', thr_end:'End', thr_prep:'Factory prep & trial run', subtotal:'Subtotal', empty_gantt:'Please first fill "slabs/day" for each spec in the Production Aggregate Inventory Plan (default 300 slabs/day), and set the factory prep & trial run start/end dates.', th_prod_order:'Production Order', sec_workers:'Staff (daily snapshot, count only, no names)', lbl_date:'Date', btn_save_snap:'Save daily snapshot', thr_date:'Date', thr_total2:'Total', btn_del:'Del',
         sec_raw:'Raw Materials & Stock (factory self-purchase, no approval)', sec_stock:'Material list & stock', lbl_name:'Name', lbl_unit:'Unit', lbl_warn:'Warning threshold', btn_add_mat:'Add material', thr_name:'Name', thr_unit2:'Unit', thr_cur_stock:'Current stock', thr_warn2:'Warning',
         sec_inbound:'Inbound (direct purchase log)', thr_qty2:'Qty', lbl_note:'Remark', btn_inbound:'Receive', sec_outbound:'Outbound', btn_outbound:'Issue', thr_type:'Type', type_in:'Inbound', type_out:'Outbound',
         sec_mat_req:'Material demand (auto by spec, guides purchasing)', kpi_cement:'Cement', kpi_sand:'Sand', kpi_gravel:'Gravel', thr_material:'Material', thr_demand:'Demand (tons)', thr_gap:'Gap', not_created:'not created',
@@ -3427,14 +3440,13 @@ function _ovLoadChartLib(cb){
         sec_mat_spec:'Lượng vật liệu theo Quy cách × Chuồng', sec_mat_house:'Lượng vật liệu theo Chuồng × Quy cách', th_qty_whole:'SL / Toàn công trường', th_rebar:'Thép', th_cement:'Xi măng/Tấn', th_sand:'Cát/Tấn', th_gravel:'Sỏi/Tấn', thr_total:'Tổng cộng',
         sec_inv:'Kế hoạch tồn kho cốt liệu sản xuất', lbl_rebar_days:'Số ngày lưu kho thép', lbl_cement_days:'Số ngày lưu kho xi măng', lbl_sand_days:'Số ngày lưu kho cát', lbl_gravel_days:'Số ngày lưu kho sỏi', btn_save_inv:'Lưu kế hoạch tồn kho', prod_print_pdf:'In PDF',
         thr_rate:'Tấm/ngày', thr_days:'Số ngày SX', thr_rebar_buy:'Mua thép (Tấn)', thr_cement_buy:'Mua xi măng (Tấn)', thr_sand_buy:'Mua cát (Tấn)', thr_gravel_buy:'Mua sỏi (Tấn)',
-        note_inv:'Số ngày SX = ⌈SL/toàn ÷ Tấm/ngày⌉; mặc định 300 tấm/ngày nếu trống; mua cốt liệu = tấn cốt liệu quy cách ÷ ngày SX × ngày lưu kho.', empty_no_inv:'Chưa có dữ liệu quy cách để lập lịch.',
+        note_inv:'Số ngày SX = ⌈SL/toàn ÷ Tấm/ngày⌉; mặc định 300 tấm/ngày nếu trống; mua cốt liệu = tấn cốt liệu quy cách ÷ ngày SX × ngày lưu kho.', sec_house_card:'Chuẩn bị mua hàng theo Chuồng × Vật liệu', lbl_card_total:'Tổng nhu cầu (Tấn)', lbl_card_store:'Ngày lưu kho', lbl_card_days:'Ngày SX', lbl_card_buy:'Mua (Tấn)', note_card:'Mua = tổng nhu cầu ÷ ngày SX × ngày lưu kho; ngày SX cộng dồn từ "tấm/ngày" từng quy cách (mặc định 300); ngày lưu kho mặc định thép4/xi măng5/cát5/sỏi5 nếu trống.', empty_no_inv:'Chưa có dữ liệu quy cách để lập lịch.',
         sec_gantt:'Biểu đồ Gantt sản xuất (lịch trình khái niệm, không phải thực tế)', lbl_prep_start:'Chuẩn bị & chạy thử · bắt đầu', lbl_prep_end:'Chuẩn bị & chạy thử · kết thúc (=ngày khởi công)', lbl_start_ro:'Ngày khởi công (chỉ đọc)', lbl_priority:'Chuồng SX ưu tiên', opt_please:'(vui lòng chọn)',
         gantt_prep_label:'Chuẩn bị & chạy thử', gantt_prep_title:'Chuẩn bị & chạy thử: ',
         gantt_n1:'Tổng chu kỳ SX ≈ ', gantt_n2:' ngày làm việc hiệu lực (bỏ qua ngày lễ VN, gồm mở rộng trước/sau Tết; theo "tấm/ngày" từng quy cách, mặc định 300 tấm/ngày; chuồng ưu tiên: ', gantt_unset:'chưa thiết lập',
         gantt_n3:'; trong thanh', gantt_gold:'vàng = chuồng ưu tiên', gantt_n4:', còn lại theo nhu cầu giảm dần; cột phải = chi tiết từng chuồng; vạch sọc = ngày lễ VN (di chuột xem tên); đường đứt = ngày đầu tháng; trên cùng', gantt_green:'thanh xanh = chuẩn bị & chạy thử', gantt_n5:'(không tính vào chu kỳ SX, đầu phải nối ngày khởi công đỏ); ngày chuẩn bị xanh, đầu/cuối SX đỏ).',
         right_p1:'Tổng ', right_p2:' tấm · ', right_p3:' ngày', unit_pcs:' tấm', unit_day:' ngày', unit_ton:' tấn', tet_ext:' (gồm mở rộng)',
-        sec_house_sum:'Tóm tắt kế hoạch SX theo chuồng', thr_house2:'Chuồng', thr_qty_pcs:'SL / tấm', thr_start:'Bắt đầu', thr_end:'Kết thúc', thr_prep:'Chuẩn bị & chạy thử', subtotal:'Tổng cộng', empty_gantt:'Vui lòng điền "tấm/ngày" cho mỗi quy cách trong Kế hoạch tồn kho cốt liệu (mặc định 300 tấm/ngày), và đặt ngày bắt đầu/kết thúc chuẩn bị & chạy thử.',
-        sec_workers:'Nhân sự (ảnh chụp theo ngày, chỉ đếm, không tên)', lbl_date:'Ngày', btn_save_snap:'Lưu ảnh chụp ngày', thr_date:'Ngày', thr_total2:'Tổng', btn_del:'Xóa',
+        sec_house_sum:'Tóm tắt kế hoạch SX theo chuồng', thr_house2:'Chuồng', thr_qty_pcs:'SL / tấm', thr_start:'Bắt đầu', thr_end:'Kết thúc', thr_prep:'Chuẩn bị & chạy thử', subtotal:'Tổng cộng', empty_gantt:'Vui lòng điền "tấm/ngày" cho mỗi quy cách trong Kế hoạch tồn kho cốt liệu (mặc định 300 tấm/ngày), và đặt ngày bắt đầu/kết thúc chuẩn bị & chạy thử.', th_prod_order:'Thứ tự SX', sec_workers:'Nhân sự (ảnh chụp theo ngày, chỉ đếm, không tên)', lbl_date:'Ngày', btn_save_snap:'Lưu ảnh chụp ngày', thr_date:'Ngày', thr_total2:'Tổng', btn_del:'Xóa',
         sec_raw:'Nguyên liệu & Kho (tự mua, không duyệt)', sec_stock:'Danh sách vật tư & tồn kho', lbl_name:'Tên', lbl_unit:'Đơn vị', lbl_warn:'Ngưỡng cảnh báo', btn_add_mat:'Thêm vật tư', thr_name:'Tên', thr_unit2:'Đơn vị', thr_cur_stock:'Tồn kho hiện tại', thr_warn2:'Cảnh báo',
         sec_inbound:'Nhập kho (ghi mua trực tiếp)', thr_qty2:'SL', lbl_note:'Ghi chú', btn_inbound:'Nhập', sec_outbound:'Xuất kho', btn_outbound:'Xuất', thr_type:'Loại', type_in:'Nhập', type_out:'Xuất',
         sec_mat_req:'Nhu cầu vật liệu (tự động theo quy cách, hướng dẫn mua)', kpi_cement:'Xi măng', kpi_sand:'Cát', kpi_gravel:'Sỏi', thr_material:'Vật liệu', thr_demand:'Nhu cầu (tấn)', thr_gap:'Thiếu hụt', not_created:'chưa tạo',
@@ -3575,26 +3587,43 @@ function _ovLoadChartLib(cb){
       return { pairs:pairs, usedSizes:usedSizes, totals:tot };
     }
     function prod_renderMatTable(title, pairs, usedSizes, totals, groupBy){
+      /* 按原始猪舍编号/规格排序，避免切换语言时因三语名称不同导致顺序变化 */
+      var _numCmp = function(a,b){ var na=parseFloat(a), nb=parseFloat(b); if(!isNaN(na) && !isNaN(nb) && na!==nb) return na-nb; return 0; };
       var sorted=pairs.slice().sort(function(a,b){
-        if(groupBy==='spec'){ var c=a.spec.localeCompare(b.spec,'zh'); return c?c:a.ph.localeCompare(b.ph,'zh'); }
-        return prod_phName(a.ph).localeCompare(prod_phName(b.ph),'zh')||a.spec.localeCompare(b.spec,'zh');
+        if(groupBy==='spec'){ var c=a.spec.localeCompare(b.spec,'zh'); if(c) return c; c=_numCmp(a.ph,b.ph); return c?c:String(a.ph).localeCompare(String(b.ph),'zh'); }
+        var c=_numCmp(a.ph,b.ph); if(c) return c; c=String(a.ph).localeCompare(String(b.ph),'zh'); return c?c:a.spec.localeCompare(b.spec,'zh');
       });
       var h='<div class="prod-sec-title" style="border-color:#6c757d">'+title+'</div>';
       h+='<table class="prod-table"><thead><tr>';
       h+= groupBy==='spec' ? '<th>'+pt('th_spec')+'</th><th>'+pt('thr_house')+'</th>' : '<th>'+pt('thr_house')+'</th><th>'+pt('th_spec')+'</th>';
       h+='<th>'+pt('th_qty_whole')+'</th>';
-      usedSizes.forEach(function(s){ h+='<th>'+pt('th_rebar')+'φ'+s+' (Tons)</th>'; });
-      h+='<th>'+pt('th_cement')+'</th><th>'+pt('th_sand')+'</th><th>'+pt('th_gravel')+'</th></tr></thead><tbody>';
+      usedSizes.forEach(function(s){ h+='<th>'+pt('th_rebar')+' φ'+s+' ('+pt('unit_ton')+')</th>'; });
+      h+='<th>'+pt('kpi_cement')+' ('+pt('unit_ton')+')</th><th>'+pt('kpi_sand')+' ('+pt('unit_ton')+')</th><th>'+pt('kpi_gravel')+' ('+pt('unit_ton')+')</th></tr></thead><tbody>';
       var fmt1=function(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}); };
       var fmt1Red=function(n){ var v=Number(n)||0; var s=fmt1(n); return v>0?'<span style="color:#E53935;font-weight:600">'+s+'</span>':s; };
-      sorted.forEach(function(o){
-        var rt={}; usedSizes.forEach(function(s){ rt[s]=o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
-        h+='<tr>';
-        if(groupBy==='spec') h+='<td>'+prod_esc(o.spec)+'</td><td>'+prod_esc(prod_phName(o.ph))+'</td>';
-        else h+='<td>'+prod_esc(prod_phName(o.ph))+'</td><td>'+prod_esc(o.spec)+'</td>';
-        h+='<td>'+prod_fmtNumRed(o.qty)+'</td>';
-        usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(rt[s])+'</td>'; });
-        h+='<td>'+fmt1Red(o.cement)+'</td><td>'+fmt1Red(o.sand)+'</td><td>'+fmt1Red(o.gravel)+'</td></tr>';
+      /* 按最左列(规格 或 栋舍)连续相同值合并单元格；每组末加小计行；组间黑色隔离 */
+      var _GRP = (groupBy==='spec') ? 'spec' : 'ph';
+      var _runs = []; var _cur = null;
+      sorted.forEach(function(o){ var _g = (_GRP==='spec') ? o.spec : o.ph; if(!_cur || _cur.key!==_g){ _cur={key:_g, rows:[]}; _runs.push(_cur); } _cur.rows.push(o); });
+      _runs.forEach(function(_run){
+        var _rs = _run.rows.length + 1; // +1 含小计行
+        var _sq=0, _srebar={}, _scement=0, _ssand=0, _sgravel=0; usedSizes.forEach(function(s){ _srebar[s]=0; });
+        _run.rows.forEach(function(o){ var _rt={}; usedSizes.forEach(function(s){ _rt[s]=o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; _srebar[s]+=_rt[s]; }); _sq+=o.qty; _scement+=o.cement; _ssand+=o.sand; _sgravel+=o.gravel; });
+        _run.rows.forEach(function(o, _idx){
+          var _rt={}; usedSizes.forEach(function(s){ _rt[s]=o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
+          h+='<tr>';
+          if(_idx===0) h+='<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #000;vertical-align:middle">'+prod_esc((_GRP==='spec')?_run.key:prod_phName(_run.key))+'</td>';
+          h+= (groupBy==='spec') ? '<td>'+prod_esc(prod_phName(o.ph))+'</td>' : '<td>'+prod_esc(o.spec)+'</td>';
+          h+='<td>'+prod_fmtNumRed(o.qty)+'</td>';
+          usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(_rt[s])+'</td>'; });
+          h+='<td>'+fmt1Red(o.cement)+'</td><td>'+fmt1Red(o.sand)+'</td><td>'+fmt1Red(o.gravel)+'</td></tr>';
+        });
+        /* 小计行：最左列被合并单元格覆盖；黑线隔离下一组 */
+        h+='<tr style="border-bottom:2px solid #000;font-weight:700;background:#eef2f7">';
+        h+= '<td>'+pt('subtotal')+'</td>';
+        h+='<td>'+prod_fmtNumRed(_sq)+'</td>';
+        usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(_srebar[s])+'</td>'; });
+        h+='<td>'+fmt1Red(_scement)+'</td><td>'+fmt1Red(_ssand)+'</td><td>'+fmt1Red(_sgravel)+'</td></tr>';
       });
       var totRt={}; usedSizes.forEach(function(s){ totRt[s]=totals.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
       h+='<tr style="font-weight:700;background:#eef2f7"><td colspan="2">'+pt('thr_total')+'</td>';
@@ -3620,6 +3649,80 @@ function _ovLoadChartLib(cb){
         SLATS_REBAR_SIZES.forEach(function(s){ rt += (d.rebar[s]||0)*SLATS_REBAR_WEIGHT[s]/1000; });
         return { spec:k, qty:d.qty, rebarTons:rt, cement:d.cement, sand:d.sand, gravel:d.gravel };
       });
+    }
+    /* 按栋舍 分组大卡片：一张大卡=一个猪舍，卡内列出 钢筋(按尺寸φ6/φ8/φ10/φ12) / 水泥 / 黄砂 / 石子 的「总需求」与「采购量」；采购量 = 总需求 ÷ 生产天数 × 存储天数 */
+    function prod_renderHouseCards(inv){
+      var mm = prod_slatsMaterial();
+      if(!mm.pairs.length){ return '<div class="prod-empty">'+pt('empty_no_inv')+'</div>'; }
+      var sd = inv.storageDays || {};
+      var defSd = { rebar:4, cement:5, sand:5, gravel:5 };
+      var sdR = (+sd.rebar>0)?+sd.rebar:defSd.rebar;
+      var sdC = (+sd.cement>0)?+sd.cement:defSd.cement;
+      var sdS = (+sd.sand>0)?+sd.sand:defSd.sand;
+      var sdG = (+sd.gravel>0)?+sd.gravel:defSd.gravel;
+      var rates = inv.specRates || {};
+      var byHouse = {};
+      mm.pairs.forEach(function(o){
+        var ph = o.ph;
+        if(!byHouse[ph]) byHouse[ph] = { ph:ph, qty:0, rebarBySize:{}, cement:0, sand:0, gravel:0, days:0, rebarTons:0 };
+        var d = byHouse[ph];
+        d.qty += o.qty;
+        SLATS_REBAR_SIZES.forEach(function(s){ d.rebarBySize[s] = (d.rebarBySize[s]||0) + (o.rebar[s]||0); });
+        d.cement += o.cement; d.sand += o.sand; d.gravel += o.gravel;
+        var rate = +rates[o.spec] || 300;
+        d.days += Math.ceil((o.qty||0)/rate);
+      });
+      Object.keys(byHouse).forEach(function(ph){
+        var d = byHouse[ph], rt = 0;
+        SLATS_REBAR_SIZES.forEach(function(s){ rt += (d.rebarBySize[s]||0)*SLATS_REBAR_WEIGHT[s]/1000; });
+        d.rebarTons = rt;
+      });
+      var fmt = function(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}); };
+      var houses = Object.keys(byHouse).sort(function(a,b){
+        var na=parseFloat(a), nb=parseFloat(b);
+        if(!isNaN(na) && !isNaN(nb) && na!==nb) return na-nb;
+        return String(a).localeCompare(String(b),'zh');
+      });
+      function kvRow(sz, tot, buy){
+        var szHtml = sz ? '<span class="sz">'+sz+'</span>' : '<span class="sz"></span>';
+        return '<div class="prod-mat-row">'+szHtml
+          + '<span class="tv">'+pt('lbl_card_total')+' '+fmt(tot)+' '+pt('unit_ton')+'</span>'
+          + '<span class="bv">'+pt('lbl_card_buy')+' '+fmt(buy)+' '+pt('unit_ton')+'</span></div>';
+      }
+      function matSec(name, color, storeDays, bodyHtml){
+        return '<div class="prod-mat" style="border-left:4px solid '+color+'">'
+          + '<div class="prod-mat-h">'+name+' <span class="prod-mat-sd">'+pt('lbl_card_store')+' '+storeDays+'</span></div>'
+          + bodyHtml + '</div>';
+      }
+      var cards = '';
+      houses.forEach(function(ph){
+        var d = byHouse[ph];
+        if(d.qty<=0) return;
+        var rebarRows = '', rebarBuy = 0;
+        SLATS_REBAR_SIZES.forEach(function(s){
+          var m = d.rebarBySize[s]||0; if(m<=0) return;
+          var tons = m*SLATS_REBAR_WEIGHT[s]/1000;
+          var buy = (d.days>0) ? tons/d.days*sdR : 0;
+          rebarBuy += buy;
+          rebarRows += kvRow('φ'+s, tons, buy);
+        });
+        var rebarSec = rebarRows
+          ? matSec(pt('th_rebar'), '#607D8B', sdR, rebarRows
+              + '<div class="prod-mat-row prod-mat-sub"><span class="sz">'+pt('subtotal')+'</span>'
+              + '<span class="tv">'+pt('lbl_card_total')+' '+fmt(d.rebarTons)+' '+pt('unit_ton')+'</span>'
+              + '<span class="bv">'+pt('lbl_card_buy')+' '+fmt(rebarBuy)+' '+pt('unit_ton')+'</span></div>')
+          : '';
+        var cementSec = matSec(pt('kpi_cement'), '#26A69A', sdC, kvRow('', d.cement, (d.days>0)?d.cement/d.days*sdC:0));
+        var sandSec   = matSec(pt('kpi_sand'),   '#FBC02D', sdS, kvRow('', d.sand,   (d.days>0)?d.sand/d.days*sdS:0));
+        var gravelSec = matSec(pt('kpi_gravel'), '#8D6E63', sdG, kvRow('', d.gravel, (d.days>0)?d.gravel/d.days*sdG:0));
+        cards += '<div class="prod-house-card">'
+          + '<div class="prod-house-h"><span>'+prod_esc(prod_phName(ph))+'</span>'
+          + '<span class="prod-house-days">'+pt('lbl_card_days')+' '+d.days+'</span></div>'
+          + '<div class="prod-house-body">'+rebarSec+cementSec+sandSec+gravelSec+'</div>'
+          + '</div>';
+      });
+      return '<div class="prod-house-cards">'+cards+'</div>'
+        + '<div style="font-size:12px;color:#666;margin-top:6px">'+pt('note_card')+'</div>';
     }
     /* 保存「生产骨料库存计划表」的 生产片数/天 与 各骨料存储天数；不关闭模态框 */
     function prod_saveInventory(){
@@ -3827,9 +3930,9 @@ function _ovLoadChartLib(cb){
         h += '<div style="overflow-x:auto"><table class="prod-table" style="text-align:center"><thead><tr>'
           + '<th>'+pt('th_spec')+'</th><th>'+pt('th_qty_whole')+'</th><th>'+pt('thr_rate')+'</th><th>'+pt('thr_days')+'</th>'
           + '<th>'+pt('th_rebar')+'(Tons)</th><th>'+pt('thr_rebar_buy')+'</th>'
-          + '<th>'+pt('th_cement')+'</th><th>'+pt('thr_cement_buy')+'</th>'
-          + '<th>'+pt('th_sand')+'</th><th>'+pt('thr_sand_buy')+'</th>'
-          + '<th>'+pt('th_gravel')+'</th><th>'+pt('thr_gravel_buy')+'</th></tr></thead><tbody>';
+          + '<th>'+pt('kpi_cement')+' ('+pt('unit_ton')+')</th><th>'+pt('thr_cement_buy')+'</th>'
+          + '<th>'+pt('kpi_sand')+' ('+pt('unit_ton')+')</th><th>'+pt('thr_sand_buy')+'</th>'
+          + '<th>'+pt('kpi_gravel')+' ('+pt('unit_ton')+')</th><th>'+pt('thr_gravel_buy')+'</th></tr></thead><tbody>';
         ispecs.forEach(function(r,i){
           var savedRate = +inv.specRates[r.spec] || 0;
           var rate = savedRate || 300;
@@ -3864,6 +3967,9 @@ function _ovLoadChartLib(cb){
       } else {
         h += '<div class="prod-empty">'+pt('empty_no_inv')+'</div>';
       }
+      /* 按栋舍 × 物料 采购准备量 卡片（结合存储天数），新增独立区块，原库存计划表保留 */
+      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_house_card')+'</div>';
+      h += prod_renderHouseCards(inv);
       /* 概念甘特图：读取「生产骨料库存计划表」每规格速率（默认300），按「优先猪舍全局优先」分段，并跳过越南公共假期（含春节前后扩展） */
       var priorityHouse = f.priorityHouse || '';
       var _prepEnd = f.prepEnd || f.planStart || prod_today();
@@ -4006,22 +4112,33 @@ function _ovLoadChartLib(cb){
         /* 全局最早开工日 & 全局最晚结束日，仅这两个日期标红 */
         var globalFirst = _flat.reduce(function(m, s){ return (!m || +s.sDate < +m) ? s.sDate : m; }, null);
         var globalLast = _flat.reduce(function(m, s){ return (!m || +s.eDate > +m) ? s.eDate : m; }, null);
+        /* 按最早开工日期计算每个猪舍的生产次序，显示在猪舍名右侧 */
+        var _houseMinStart = {};
+        _flat.forEach(function(s){ if(!_houseMinStart[s.house] || +s.sDate < +_houseMinStart[s.house]) _houseMinStart[s.house] = s.sDate; });
+        var _houseOrder = _houseSorted.slice().sort(function(a,b){ return (+_houseMinStart[a] - +_houseMinStart[b]) || a.localeCompare(b); });
+        var prodOrder = {}; _houseOrder.forEach(function(ph, idx){ prodOrder[ph] = idx+1; });
         h += '<div class="prod-sec-title" style="border-color:#6c757d;margin-top:18px">'+pt('sec_house_sum')+'</div>';
         h += '<div style="overflow-x:auto"><table class="prod-table" style="text-align:center"><thead><tr>'
           + '<th>'+pt('thr_house2')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_qty_pcs')+'</th><th>'+pt('thr_start')+'</th><th>'+pt('thr_end')+'</th><th>'+pt('thr_prep')+'</th></tr></thead><tbody>';
         _houseSorted.forEach(function(ph){
           var segs = _byHouse[ph].slice().sort(function(a,b){ return +a.sDate - +b.sDate; });
           var sub = 0;
-          segs.forEach(function(s){
+          var _rs = segs.length + 1; // +1 含小计行
+          segs.forEach(function(s, _idx){
             sub += s.qty;
             var pfx = (s.house === priorityHouse) ? '★ ' : '';
             var redStart = (+s.sDate === +globalFirst) ? ' style="color:#d32f2f;font-weight:700"' : '';
             var redEnd = (+s.eDate === +globalLast) ? ' style="color:#d32f2f;font-weight:700"' : '';
-            h += '<tr><td>'+pfx+prod_esc(prod_phName(s.house))+'</td><td>'+prod_esc(s.spec)+'</td><td>'+prod_fmtNum(s.qty)+'</td><td'+redStart+'>'+fmtFull(s.sDate)+'</td><td'+redEnd+'>'+fmtFull(s.eDate)+'</td><td style="color:#2e7d32;font-weight:600">'+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'</td></tr>';
+            h += '<tr>';
+            if(_idx===0) h += '<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #000;vertical-align:middle">'+pfx+prod_esc(prod_phName(s.house))+' <span style="font-size:10px;color:#666">('+pt('th_prod_order')+': '+prodOrder[s.house]+')</span></td>';
+            h += '<td>'+prod_esc(s.spec)+'</td><td>'+prod_fmtNum(s.qty)+'</td><td'+redStart+'>'+fmtFull(s.sDate)+'</td><td'+redEnd+'>'+fmtFull(s.eDate)+'</td><td style="color:#2e7d32;font-weight:600">'+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'</td></tr>';
           });
-          h += '<tr style="font-weight:700;background:#eef2f7"><td colspan="2">'+prod_esc(prod_phName(ph))+' '+pt('subtotal')+'</td><td colspan="4" style="text-align:left">'+prod_fmtNum(sub)+' '+pt('unit_pcs')+'</td></tr>';
+          /* 小计行：最左列被合并单元格覆盖；黑线隔离下一组 */
+          h += '<tr style="border-bottom:2px solid #000;font-weight:700;background:#eef2f7"><td>'+prod_esc(prod_phName(ph))+' '+pt('subtotal')+'</td><td colspan="4" style="text-align:left">'+prod_fmtNum(sub)+' '+pt('unit_pcs')+'</td></tr>';
         });
         h += '</tbody></table></div>';
+
+
       } else {
         h += '<div class="prod-empty">'+pt('empty_gantt')+'</div>';
       }
