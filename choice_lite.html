@@ -4641,8 +4641,6 @@ function _ovLoadChartLib(cb){
           + '<option value="钢筋">'+pt('th_rebar')+'</option></select></div>'
         + '<div class="prod-field"><label>'+pt('lbl_unit')+' / '+pt('thr_qty2')+'</label><input id="pd_qty" oninput="prodReceiptPreview()"></div>'
         + '<div class="prod-field"><label>'+pt('lbl_unit_price')+'</label><input id="pd_price" oninput="prodReceiptPreview()"></div>'
-        + '<div class="prod-field" style="flex:1 1 100%"><label>'+pt('lbl_for_house')+'</label><div class="chk-grp">'
-          + _mmR.houseOrder.map(function(h){return '<label class="chk"><input type="checkbox" class="pd_house" value="'+prod_esc(h)+'">'+prod_esc(prod_phName(h))+'</label>';}).join('')+'</div></div>'
         + '<div class="prod-field" style="flex:1 1 100%"><label>'+pt('lbl_floor_spec')+'</label><div class="chk-grp">'
           + Object.keys(_mmR.specs).map(function(k){return '<label class="chk"><input type="checkbox" class="pd_floor" value="'+prod_esc(k)+'">'+prod_esc(k)+'</label>';}).join('')+'</div></div>'
         + '<div class="prod-field" style="flex:1 1 100%"><label>'+pt('lbl_photos')+'</label>'
@@ -4658,14 +4656,12 @@ function _ovLoadChartLib(cb){
       if(!_rc.length){ h += '<div class="prod-empty">'+pt('receipt_empty')+'</div>'; }
       _rc.forEach(function(r,idx){
         var _st = r.status==='confirmed' ? '<span class="badge ok">'+pt('status_confirmed')+'</span>' : '<span class="badge pend">'+pt('status_pending')+'</span>';
-        var _hs = (r.houses||[]).map(function(hh){return prod_phName(hh);}).join('、');
         var _ph = (r.photos||[]).map(function(p){return '<a href="/uploads/'+prod_esc(p)+'" target="_blank"><img src="/uploads/'+prod_esc(p)+'" class="thumb"></a>';}).join('');
         h += '<div class="receipt-card'+(r.status==='confirmed'?' confirmed':'')+'">'
           + '<div class="rc-top"><b>'+prod_esc(r.material)+'</b> · '+prod_esc((r.floors||[]).join('、')||r.floor||'')+' · '+prod_esc(ymdToDmy(r.date||''))+' '+_st+'</div>'
           + '<div class="rc-body">'
             + '<div>'+pt('thr_qty2')+': '+prod_esc(r.qty)+'　'+pt('lbl_unit_price')+': '+prod_esc(r.price)+' VND</div>'
             + '<div>'+pt('lbl_total_vnd')+': '+prod_esc(r.totalVnd)+' VND　'+pt('lbl_price_rmb')+': '+prod_esc(r.rmb)+'　'+pt('lbl_price_usd')+': '+prod_esc(r.usd)+'</div>'
-            + (_hs?'<div>'+pt('lbl_for_house')+': '+prod_esc(_hs)+'</div>':'')
             + (r.note?'<div>'+pt('lbl_note')+': '+prod_esc(r.note)+'</div>':'')
             + (_ph?'<div class="photo-list">'+_ph+'</div>':'')
           + '</div>'
@@ -4722,10 +4718,9 @@ function _ovLoadChartLib(cb){
       var pr=(typeof globalWonData!=='undefined'&&globalWonData)?(globalWonData.find(function(x){return x.id==PROD_CUR;})||{}):{};
       var rR=+pr.rate_rmb_vnd||0, rU=+pr.rate_usd_vnd||0;
       var rmb = rR? (totalVnd/rR).toFixed(2):'0', usd = rU? (totalVnd/rU).toFixed(2):'0';
-      var houses=[]; var _chs=document.querySelectorAll('.pd_house:checked'); for(var _i=0;_i<_chs.length;_i++){ houses.push(_chs[_i].value); }
       var photos=[]; try{ photos=JSON.parse(el('pd_photos').value||'[]'); }catch(e){}
       var note = el('pd_rnote')? el('pd_rnote').value:'';
-      f.materials.receipts.push({date:date, material:mat, floors:floors, qty:qty, price:price, totalVnd:totalVnd, rmb:rmb, usd:usd, houses:houses, photos:photos, note:note, status:'pending'});
+      f.materials.receipts.push({date:date, material:mat, floors:floors, qty:qty, price:price, totalVnd:totalVnd, rmb:rmb, usd:usd, photos:photos, note:note, status:'pending'});
       prod_save(f); prod_renderTab('D');
     }
     function prod_confirmReceipt(idx){
