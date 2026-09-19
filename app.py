@@ -3306,6 +3306,25 @@ def upload_prod_receipt_photo(pid):
     f.save(os.path.join(UPLOAD_DIR, fname))
     return jsonify({"ok": True, "filename": fname, "url": "/uploads/" + fname})
 
+
+# 删除收货单照片文件（仅 tom/cuong/james 可操作；删除收货单时前端逐张调用）
+@app.route("/api/prod-receipt-photos/<path:filename>", methods=["DELETE"])
+def delete_prod_receipt_photo(filename):
+    filename = os.path.basename(filename)
+    me = (request.args.get("me") or "").strip()
+    if me not in ("tom", "cuong", "james"):
+        return jsonify({"ok": False, "error": "no permission"}), 403
+    if not filename.startswith("prec_"):
+        return jsonify({"ok": False, "error": "not a receipt photo"}), 400
+    path = os.path.join(UPLOAD_DIR, filename)
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/api/won-projects/<int:pid>/attachments/<path:filename>", methods=["DELETE"])
 def delete_attachment(pid, filename):
     filename = os.path.basename(filename)
@@ -4201,10 +4220,12 @@ def api_approval_create():
     target_id = (data.get("target_id") or "").strip()
     dup_sql = (
         "SELECT 1 FROM approval_requests WHERE requester=? AND block_id=? AND status='pending' AND persist=?"
-        + (" AND target_id=?" if persist == "single-use" else "")
+        + (" AND target_id=?"
+           if (persist == "single-use" or block_id == "PROD-RECEIPT")
+           else "")
     )
     dup_params = (requester, block_id, persist)
-    if persist == "single-use":
+    if persist == "single-use" or block_id == "PROD-RECEIPT":
         dup_params += (target_id,)
     dup = conn.execute(dup_sql, dup_params).fetchone()
     if dup:
@@ -4226,6 +4247,14 @@ def api_approval_create():
     if not approvers:
         conn.close()
         return jsonify({"ok": False, "msg": "系统中没有可用的审批人（tom 不存在？）"}), 400
+    # 全局规则：tom/cuong/james 对任何审批请求都具备审批权（含收货单 PROD-RECEIPT 等全部区块）；
+    # 三人任一人点击通过/驳回即结束该申请（先到先得，效率同等）
+    try:
+        for _a in TRI_APPROVERS:
+            if _a in existing_users and _a not in approvers:
+                approvers.append(_a)
+    except Exception:
+        pass
     conn.execute("""INSERT INTO approval_requests
         (title, requester, requester_name, block_id, block_name, action_name, approvers, status, created_at, content, persist, target_id, payload)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
@@ -4380,12 +4409,21 @@ def api_prod_kv_put(key):
     return jsonify({"ok": True})
 
 
+# 版本号：用于确认运行中的服务进程加载的是哪一版 app.py
+# （Python 进程启动后不会自动加载文件修改；改完代码必须重启服务）
+APP_BUILD = "V2026.09.19-prod-receipt-3way"
+
+@app.route("/api/version", methods=["GET"])
+def api_version():
+    return jsonify({"ok": True, "build": APP_BUILD})
+
+
 @app.route("/api/approval-requests/<int:rid>/resolve", methods=["POST"])
 def api_approval_resolve(rid):
     data = request.get_json(force=True, silent=True) or {}
-    action = data.get("action")  # approve / reject
+    action = data.get("action")  # approve / reject / return（返回重新填写）
     resolver = (data.get("resolver") or "").strip()
-    if action not in ("approve", "reject"):
+    if action not in ("approve", "reject", "return"):
         return jsonify({"ok": False, "msg": "invalid action"}), 400
     conn = get_db()
     row = conn.execute("SELECT * FROM approval_requests WHERE id=?", (rid,)).fetchone()
@@ -4404,8 +4442,11 @@ def api_approval_resolve(rid):
     if not allowed:
         conn.close()
         return jsonify({"ok": False, "msg": "您不是该审批单的指定审批人"}), 403
-    new_status = "approved" if action == "approve" else "rejected"
+    # 三种结果：approve=同意 / reject=拒绝 / return=返回重新填写
+    new_status = "approved" if action == "approve" else ("returned" if action == "return" else "rejected")
     result_note = data.get("note") or data.get("result_note") or ""
+    if action == "return" and not result_note:
+        result_note = "RETURN_FOR_EDIT"
     # 顺带把审批人字段持久化为规范的用户名（修复旧数字 ID 数据）
     conn.execute("""UPDATE approval_requests SET status=?, resolved_at=?, resolver=?, resolver_name=?, result_note=?, approvers=?
                     WHERE id=?""", (

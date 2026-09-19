@@ -17559,10 +17559,31 @@ function openSlatsReportModal(){
     return;
   }
 
+  // 辅助：任意语言猪舍名 → 编号
+  function _phIdFromName(name){
+    var s=String(name||'').trim(); if(!s) return '';
+    var d=(typeof I18N!=='undefined' && I18N)?I18N:null;
+    if(!d) return '';
+    var langs=['zh','en','vi'];
+    for(var i=0;i<langs.length;i++){
+      var dict=d[langs[i]]; if(!dict) continue;
+      for(var k in dict){
+        if(k.indexOf('slats_pig_house_')===0 && dict[k]===s){
+          var id=k.replace('slats_pig_house_','');
+          if(id && !/[^0-9]/.test(id)) return id;
+        }
+      }
+    }
+    return '';
+  }
   // 辅助：翻译猪舍名称（三语）
   function _phLabel(v){
-    var key='slats_pig_house_'+String(v).trim();
-    return t[key]!==undefined?t[key]:String(v||'');
+    var s=String(v||'').trim();
+    var key='slats_pig_house_'+s;
+    if(t[key]!==undefined) return t[key];
+    var id=_phIdFromName(s);
+    if(id){ var key2='slats_pig_house_'+id; if(t[key2]!==undefined) return t[key2]; }
+    return s;
   }
   // 辅助：翻译钢筋/钢网选项（三语）
   function _rebarLabel(v){
