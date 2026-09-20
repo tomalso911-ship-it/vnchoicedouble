@@ -1093,10 +1093,11 @@ function _ovLoadChartLib(cb){
     .cp-cal-week span { text-align:center;font-size:10px;color:#999;font-weight:700;padding:2px 0; }
     .cp-cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:2px; }
     .cp-cal-grid button { width:100%;aspect-ratio:1/1;border:none;background:transparent;font-size:11px;color:#333;border-radius:5px;cursor:pointer;padding:0; }
-    .cp-cal-grid button:hover:not(.empty):not(.selected) { background:#FDECEA;color:#E53935; }
+    .cp-cal-grid button:hover:not(.empty):not(.selected):not(:disabled) { background:#FDECEA;color:#E53935; }
     .cp-cal-grid button.empty { visibility:hidden; }
     .cp-cal-grid button.today { box-shadow:inset 0 0 0 1.5px #E53935;color:#E53935;font-weight:700; }
     .cp-cal-grid button.selected { background:#E53935;color:#fff;font-weight:700; }
+    .cp-cal-grid button:disabled { color:#ccc;cursor:not-allowed; }
     .cp-cal-foot { display:flex;justify-content:space-between;align-items:center;gap:4px;margin-top:6px;padding-top:5px;border-top:1px dashed #eee; }
     .cp-cal-foot .cp-cal-fmt { font-size:9.5px;color:#bbb; }
     .cp-cal-foot .cp-cal-today { border:1px solid #E53935;background:#fff;color:#E53935;font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer; }
@@ -21097,6 +21098,9 @@ function cpParseDDMMYYYY(s) {
   var m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
   return m ? { y: +m[3], m: +m[2] - 1, d: +m[1] } : null;
 }
+function cpCalGetMax() {
+  return cpCalTarget ? cpParseDDMMYYYY(cpCalTarget.getAttribute('data-max') || '') : null;
+}
 
 function cpGetWeekDays() {
   var lang = CUR_LANG || 'zh';
@@ -21145,11 +21149,14 @@ function cpCloseCalendar() {
 function cpCalBuildYM() {
   var ys = document.getElementById('cpYearSel'), ms = document.getElementById('cpMonthSel');
   if (!ys || !ms) return;
+  var maxD = cpCalGetMax();
   var yNow = new Date().getFullYear(), o = '';
-  for (var yy = 2000; yy <= yNow + 10; yy++) o += '<option value="' + yy + '"' + (yy === cpCalViewYear ? ' selected' : '') + '>' + yy + '</option>';
+  var yMax = maxD ? maxD.y : yNow + 10;
+  for (var yy = 2000; yy <= yMax; yy++) o += '<option value="' + yy + '"' + (yy === cpCalViewYear ? ' selected' : '') + '>' + yy + '</option>';
   ys.innerHTML = o;
   var m = '', lang = CUR_LANG || 'zh';
-  for (var mm = 0; mm < 12; mm++) m += '<option value="' + mm + '"' + (mm === cpCalViewMonth ? ' selected' : '') + '>' + cpGetMonthName(mm) + '</option>';
+  var mMax = (maxD && cpCalViewYear === maxD.y) ? maxD.m : 11;
+  for (var mm = 0; mm <= mMax; mm++) m += '<option value="' + mm + '"' + (mm === cpCalViewMonth ? ' selected' : '') + '>' + cpGetMonthName(mm) + '</option>';
   ms.innerHTML = m;
 }
 function cpCalSetYM() {
@@ -21173,6 +21180,10 @@ function cpCalPick(d) {
 }
 function cpCalPickToday() {
   var n = new Date();
+  var maxD = cpCalGetMax();
+  if (maxD && (n.getFullYear() > maxD.y || (n.getFullYear() === maxD.y && n.getMonth() > maxD.m) || (n.getFullYear() === maxD.y && n.getMonth() === maxD.m && n.getDate() > maxD.d))) {
+    cpCalViewYear = maxD.y; cpCalViewMonth = maxD.m; cpCalPick(maxD.d); return;
+  }
   cpCalViewYear = n.getFullYear(); cpCalViewMonth = n.getMonth();
   cpCalPick(n.getDate());
 }
@@ -21190,14 +21201,20 @@ function cpRenderCal(selected) {
   var firstDow = new Date(cpCalViewYear, cpCalViewMonth, 1).getDay();
   var daysInMonth = new Date(cpCalViewYear, cpCalViewMonth + 1, 0).getDate();
   var today = new Date();
+  var maxD = cpCalGetMax();
+  var maxDateObj = maxD ? new Date(maxD.y, maxD.m, maxD.d) : null;
   var html = '';
   for (var i = 0; i < firstDow; i++) html += '<button type="button" class="empty" disabled></button>';
   for (var d = 1; d <= daysInMonth; d++) {
     var cls = [];
+    var curDate = new Date(cpCalViewYear, cpCalViewMonth, d);
+    var disabled = maxDateObj && curDate > maxDateObj;
     if (selected && selected.y === cpCalViewYear && selected.m === cpCalViewMonth && selected.d === d) cls.push('selected');
     if (today.getFullYear() === cpCalViewYear && today.getMonth() === cpCalViewMonth && today.getDate() === d) cls.push('today');
+    if (disabled) cls.push('disabled');
     // inline onclick：彻底杜绝事件委托失效/被拦截导致点不动
-    html += '<button type="button" class="' + cls.join(' ') + '" onclick="cpCalPick(' + d + ')">' + d + '</button>';
+    if (disabled) html += '<button type="button" class="' + cls.join(' ') + '" disabled>' + d + '</button>';
+    else html += '<button type="button" class="' + cls.join(' ') + '" onclick="cpCalPick(' + d + ')">' + d + '</button>';
   }
   var grid = document.getElementById('cpCalGrid');
   if (grid) grid.innerHTML = html;
@@ -21209,6 +21226,8 @@ window.cpCalGoPrev = function() {
   cpRenderCal(cpParseDDMMYYYY(cpCalTarget ? cpCalTarget.value : ''));
 };
 window.cpCalGoNext = function() {
+  var maxD = cpCalGetMax();
+  if (maxD && (cpCalViewYear > maxD.y || (cpCalViewYear === maxD.y && cpCalViewMonth >= maxD.m))) return;
   cpCalViewMonth++;
   if (cpCalViewMonth > 11) { cpCalViewMonth = 0; cpCalViewYear++; }
   cpRenderCal(cpParseDDMMYYYY(cpCalTarget ? cpCalTarget.value : ''));
