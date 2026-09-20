@@ -3323,14 +3323,19 @@ function _ovLoadChartLib(cb){
       .prod-form-row .prod-field{flex:1 1 140px;min-width:0;}
       .prod-form-row .prod-field:first-child{flex:0 0 160px;}
       .pc-lw{width:100%;}
-      .pc-lw-row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;width:100%;margin-top:4px;}
-      .pc-labor-form{flex:1 1 460px;min-width:0;}
-      .pc-weather-side{flex:1 1 300px;min-width:0;}
-      .pc-weather-cards{display:flex;gap:14px;flex-wrap:wrap;}
-      @media (max-width:760px){ .pc-lw-row{flex-direction:column;} .pc-weather-side,.pc-labor-form{flex:1 1 auto;width:100%;} }
+      .pc-lw-row{display:flex;gap:16px;flex-wrap:wrap;align-items:stretch;width:100%;margin-top:4px;}
+      .pc-labor-form{flex:2 1 520px;min-width:0;display:flex;flex-direction:column;}
+      .pc-weather-side{flex:1 1 300px;min-width:300px;display:flex;flex-direction:column;}
+      .pc-weather-cards{display:flex;gap:14px;flex-wrap:wrap;flex:1;}
+      .pc-common-grid{display:grid;grid-template-columns:130px repeat(3, minmax(0, 1fr));gap:10px;width:100%;}
+      .pc-common-grid .prod-field{min-width:0;}
+      @media (max-width:860px){ .pc-lw-row{flex-direction:column;} .pc-weather-side,.pc-labor-form{flex:1 1 auto;width:100%;min-width:0;} .pc-common-grid{grid-template-columns:repeat(2, minmax(0, 1fr));} }
       .prod-role-grid{display:grid;grid-template-columns:repeat(5, minmax(0, 1fr));gap:10px;width:100%;}
       @media (max-width:680px){ .prod-role-grid{grid-template-columns:repeat(3, minmax(0, 1fr));} }
       @media (max-width:420px){ .prod-role-grid{grid-template-columns:repeat(2, minmax(0, 1fr));} }
+      .pc-labor-form .prod-field{gap:2px;font-size:12px;}
+      .pc-labor-form .prod-field input,.pc-labor-form .prod-field select{padding:4px 8px;font-size:12px;}
+      .pc-labor-form .prod-form{margin-bottom:0;flex:1;display:flex;flex-direction:column;justify-content:flex-start;gap:8px;}
       .prod-field{display:flex;flex-direction:column;gap:4px;font-size:13px;}
       .prod-field input,.prod-field select,.prod-field textarea{padding:6px 8px;border:1px solid #ccc;border-radius:8px;font-size:13px;}
       .prod-field select.prod-holiday-yes{background:#ffe6e6;border-color:#ff4d4f;color:#a8071a;font-weight:600;}
@@ -3537,6 +3542,7 @@ function _ovLoadChartLib(cb){
       .prod-empty{color:#888;padding:24px;text-align:center;}
       .prod-sec-title{font-weight:700;margin:14px 0 8px;font-size:14px;border-left:4px solid #E53935;padding-left:8px;}
       .pe-card{background:#fff;border:1px solid #e6e9ee;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+      .pe-card.pe-line-2{background:#f0f7ff;}
       .pe-common{background:#fbfcfe;}
       .pe-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
       .pe-card-title{font-weight:700;font-size:14px;}
@@ -3551,7 +3557,6 @@ function _ovLoadChartLib(cb){
       .pe-col{display:flex;flex-direction:column;justify-content:flex-start;gap:2px;flex:1 1 180px;min-width:150px;}
       .pe-common-row .pe-col .prod-field{flex:0 0 auto;width:100%;min-width:0;margin:0;gap:2px;}
       .pe-common-row .pe-col .pe-date-fld{flex:0 0 auto;width:100%;}
-      .pe-common-row #peBackfillWrap{flex:0 0 auto;min-width:0;white-space:nowrap;display:flex;align-items:center;}
       .pe-common-row .pe-wx-mini{flex:0 0 140px;min-width:120px;align-self:stretch;height:auto;}
       .pe-card-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
       .pe-wx-mini{padding:6px 10px;gap:2px;}
@@ -3909,6 +3914,7 @@ function _ovLoadChartLib(cb){
       prod_toast((pt('sync_all_done')||'已上传 {n} 个现场工厂到服务器').replace('{n}', n));
     }
     function prod_fld(label,id,val){ return '<div class="prod-field"><label>'+label+'</label><input id="'+id+'" value="'+prod_esc(val)+'"></div>'; }
+    function prod_numFld(label,id,val){ return '<div class="prod-field"><label>'+label+'</label><input id="'+id+'" inputmode="numeric" pattern="[0-9]*" value="'+prod_esc(val)+'" onfocus="this.select(); if(this.value===\'0\'){this.value=\'\';this.dataset.wasZero=\'1\'}" onblur="var v=this.value.replace(/[^0-9]/g,\'\'); if(v===\'\'){if(this.dataset.wasZero){this.value=\'0\';delete this.dataset.wasZero}}else{this.value=String(parseInt(v,10)||0); delete this.dataset.wasZero}"></div>'; }
     /* 标准日期选择器（与 #w_contract_date 一致）：显示 DD-MM-YYYY，内部仍存 YYYY-MM-DD（由 dmyToYmd 在保存时转换） */
     function prod_dateFld(label,id,valYmd,onInput,maxDate,extraClass,i18nKey){
       var disp = (typeof ymdToDmy==='function') ? ymdToDmy(valYmd||'') : (valYmd||'');
@@ -4301,7 +4307,7 @@ function _ovLoadChartLib(cb){
       else if(key==='B'){ body.innerHTML = prod_tabB(f); prod_syncContractDate(); prod_applyHouseFilter(); }
       else if(key==='C'){ body.innerHTML = prod_tabC(f); prod_drawTrends(); PROD_LABOR_SORT = {col:null, dir:0}; }
       else if(key==='D'){ body.innerHTML = prod_tabD(f); prodReceiptRenderRows(); prod_receiptApplyHouse(); prod_updateHouseFilterTip(); prod_updateHousePreview(); }
-      else if(key==='E'){ body.innerHTML = prod_tabE(f); prod_dailyRefreshBackfill(); prod_drawEStats(f); }
+      else if(key==='E'){ body.innerHTML = prod_tabE(f); prod_drawEStats(f); }
       else if(key==='H') body.innerHTML = prod_tabH(f);
       else if(key==='F') body.innerHTML = prod_tabF(f);
       else if(key==='G') body.innerHTML = prod_tabG(f);
@@ -4792,12 +4798,12 @@ function _ovLoadChartLib(cb){
     function prod_wxCard(slot, id, wx){
       var label = pt(slot==='am'?'wx_am':'wx_pm');
       if(!wx){
-        return '<div class="prod-wx-card" id="'+id+'" style="border:1px solid #e3e3e3;border-radius:8px;padding:10px 12px;min-width:200px;background:#fafcff;">'
+        return '<div class="prod-wx-card" id="'+id+'" style="border:1px solid #e3e3e3;border-radius:8px;padding:10px 12px;min-width:140px;flex:1 1 0;background:#fafcff;">'
           + '<div class="prod-wx-h" style="display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:6px;color:#2c3e50;">'+label+'<span class="prod-wx-condico">'+prod_wxCondIco(wx)+'</span></div>'
           + '<div class="prod-wx-empty" style="color:#aaa;font-size:13px;">'+pt('wx_notyet')+'</div></div>';
       }
       var cond = (wx.code!=null) ? i18nVal(bdWxKey(wx.code),'—') : '';
-      return '<div class="prod-wx-card" id="'+id+'" style="border:1px solid #e3e3e3;border-radius:8px;padding:10px 12px;min-width:200px;background:#fafcff;">'
+      return '<div class="prod-wx-card" id="'+id+'" style="border:1px solid #e3e3e3;border-radius:8px;padding:10px 12px;min-width:140px;flex:1 1 0;background:#fafcff;">'
         + '<div class="prod-wx-h" style="display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:6px;color:#2c3e50;">'+label+'<span class="prod-wx-condico">'+prod_wxCondIco(wx)+'</span></div>'
         + '<div class="prod-wx-row" style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0;"><span class="prod-wx-k" style="color:#888;">'+pt('wx_temp')+'</span><span class="prod-wx-v" style="font-weight:500;">'+prod_esc(wx.temp)+'</span></div>'
         + '<div class="prod-wx-row" style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:2px 0;"><span class="prod-wx-k" style="color:#888;">'+pt('wx_cond')+'</span><span class="prod-wx-v" style="font-weight:500;">'+prod_esc(cond)+'</span></div>'
@@ -4926,20 +4932,20 @@ function _ovLoadChartLib(cb){
       var h = banner
         + '<div id="pcEditBanner" class="pc-edit-banner" style="display:none"></div>'
         + '<div class="pc-lw">'
-        +   '<div class="prod-sec-title">'+pt('sec_labor')+'</div>'
         +   '<div class="pc-lw-row">'
         +     '<div class="pc-labor-form">'
+        +       '<div class="prod-sec-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+pt('sec_labor')+'<button class="prod-btn mini" onclick="prod_saveWorkers()">'+pt('btn_save_snap')+'</button></div>'
         +       '<div class="prod-form">'
-        + '<div class="prod-form-row">'+prod_dateFld(pt('lbl_date'),'pc_date',dmyToYmd(d),'prod_updateWeatherCards()',prod_today())
-        + '<div class="prod-field"><label>'+pt('lbl_holiday')+'</label><select id="pc_holiday">'
+        +         '<div class="pc-common-grid">'+prod_dateFld(pt('lbl_date'),'pc_date',dmyToYmd(d),'prod_updateWeatherCards()',prod_today())
+        +           '<div class="prod-field"><label>'+pt('lbl_holiday')+'</label><select id="pc_holiday">'
 +   '<option value="no"'+((w.holiday!=='yes')?' selected':'')+'>'+pt('opt_no')+'</option>'
 +   '<option value="yes"'+((w.holiday==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option>'
 + '</select></div>'
 + '<div class="prod-field"><label>'+pt('lbl_recorder')+'</label><input id="pc_recorder" value="'+prod_esc(rec)+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
-        + prod_fld(pt('prod_role_manager'),'pc_manager',0)+'</div>'
-        + '<div class="prod-role-grid">';
-      PROD_WORKERS.slice(1).forEach(function(wk){ h += prod_fld(pt('prod_role_'+wk[0]),'pc_'+wk[0],0); });
-      h += '</div><button class="prod-btn" onclick="prod_saveWorkers()">'+pt('btn_save_snap')+'</button></div>';
+        +           prod_numFld(pt('prod_role_manager'),'pc_manager',0)+'</div>'
+        +         '<div class="prod-role-grid">';
+      PROD_WORKERS.slice(1).forEach(function(wk){ h += prod_numFld(pt('prod_role_'+wk[0]),'pc_'+wk[0],0); });
+      h += '</div></div>';
       h +=       '</div>'
         +     '<div class="pc-weather-side">'
         +       '<div class="prod-sec-title">'+pt('sec_weather')+'</div>'
@@ -4947,9 +4953,6 @@ function _ovLoadChartLib(cb){
         +         prod_wxCard('am','pc_wx_am',w.weatherAm)
         +         prod_wxCard('pm','pc_wx_pm',w.weatherPm)
         +       '</div>'
-        +       '<div id="pcBackfillWrap" style="margin-top:8px'+( (function(){ var dd=prod_val('pc_date')||ymdToDmy(prod_today()); var ymd=dmyToYmd(dd); return (ymd&&ymd<prod_today())?'':';display:none'; })() )+'">'
-        +         '<div style="font-size:12px;color:#888;margin-bottom:6px">'+pt('wx_backfill_hint')+'</div>'
-        +         '<button class="prod-btn sec" onclick="prodBackfillWeather()">'+pt('btn_backfill_wx')+'</button></div>'
         +     '</div>'
         +   '</div>'
         + '</div>';
@@ -4963,7 +4966,7 @@ function _ovLoadChartLib(cb){
         + '<th class="pc-col-wx pc-sortable" onclick="prod_sortLabor(this)">'+pt('wx_pm')+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>'
         + '<th class="pc-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
       var dates = prod_sortDateKeys(Object.keys(f.workers||{}), true);
-      if(cDue) dates = dates.filter(function(dd){ return dd<=cDue; });
+      if(cDue) dates = dates.filter(function(dd){ return dmyToYmd(dd)<=cDue; });
       dates.forEach(function(dd, idx){ var ww = f.workers[dd]; var sum = 0;
         PROD_WORKERS.forEach(function(k){ sum += (+ww[k[0]]||0); });
         h += '<tr data-orig-idx="'+idx+'"><td class="pc-col-date">'+ymdToDmy(dd)+'</td>'
@@ -4978,6 +4981,7 @@ function _ovLoadChartLib(cb){
       });
       h += '</tbody></table></div>';
       h += prod_renderTrends(f);
+      setTimeout(prodAutoBackfillWeather, 0);
       return h;
     }
     function prod_renderTrends(f){
@@ -5023,7 +5027,7 @@ function _ovLoadChartLib(cb){
     }
     function prod_trendData(f){
       var dates = prod_sortDateKeys(Object.keys(f.workers||{}), false);
-      var due = prod_cDueYmd(); if(due) dates = dates.filter(function(dd){ return dd<=due; });
+      var due = prod_cDueYmd(); if(due) dates = dates.filter(function(dd){ return dmyToYmd(dd)<=due; });
       if(PROD_TREND_RANGE!=='all'){ var n = PROD_TREND_RANGE==='7'?7:30; dates = dates.slice(-n); }
       var laborTotal=[], laborByRole={}, temps=[], hums=[], cond=[];
       PROD_WORKERS.forEach(function(k){ laborByRole[k[0]]=[]; });
@@ -5188,7 +5192,6 @@ function _ovLoadChartLib(cb){
       var w = (f.workers && f.workers[d])||{};
       var am = document.getElementById('pc_wx_am'); if(am) am.outerHTML = prod_wxCard('am','pc_wx_am',w.weatherAm);
       var pm = document.getElementById('pc_wx_pm'); if(pm) pm.outerHTML = prod_wxCard('pm','pc_wx_pm',w.weatherPm);
-      prodRefreshBackfill();
     }
     function prod_saveWorkers(){
       var f = prod_get(PROD_CUR);
@@ -5246,12 +5249,6 @@ function _ovLoadChartLib(cb){
       prod_updateWeatherCards();
       var eb = prod_el('pcEditBanner');
       if(eb){ eb.textContent = pt('editing_label') + '：' + d; eb.style.display = 'block'; eb.scrollIntoView({behavior:'smooth', block:'start'}); }
-    }
-    function prodRefreshBackfill(){
-      var wrap = prod_el('pcBackfillWrap'); if(!wrap) return;
-      var d = prod_val('pc_date')||ymdToDmy(prod_today());
-      var ymd = dmyToYmd(d);
-      wrap.style.display = (ymd && ymd < prod_today()) ? '' : 'none';
     }
     /* ===== 天气自动抓取（setInterval 轮询，匹配工厂省份，解析四字段） ===== */
     var PROD_WX_TIMER = null;
@@ -5340,24 +5337,36 @@ function _ovLoadChartLib(cb){
         }).catch(function(){ cb(null); });
       } catch(e){ cb(null); }
     }
-    function prodBackfillWeather(){
-      if(!PROD_CUR) return;
-      var prov = prodFactoryProvKey();
-      if(!prov){ prod_toast(pt('toast_wx_noprov')); return; }
-      var sel = prod_val('pc_date')||ymdToDmy(prod_today());
-      var sy = dmyToYmd(sel);
-      if(!sy || sy >= prod_today()){ return; } // 仅针对过去日期，不受起止限制
-      prod_toast(pt('toast_wx_loading'));
-      prodLoadWeatherArchive(prov, sy, sy, function(hr){
-        if(!hr){ prod_toast(pt('toast_wx_fail')); return; }
-        var f = prod_get(PROD_CUR); f.workers = f.workers||{};
-        var w = (f.workers[sel] && typeof f.workers[sel]==='object') ? f.workers[sel] : {};
-        var am = prodWxFromHourly(hr, prodHourIdx(hr, sy, '09'));
-        var pm = prodWxFromHourly(hr, prodHourIdx(hr, sy, '14'));
-        if(am) w.weatherAm = am;
-        if(pm) w.weatherPm = pm;
-        f.workers[sel] = w; prod_save(f); prod_renderTab('C');
-        prod_toast((pt('toast_wx_backfilled')||'已补抓历史天气')+'：'+sel);
+    /* 自动补抓所有早于今天且天气缺失的历史记录（无需点按钮） */
+    var PROD_WX_AUTO_BACKFILLING = false;
+    function prodAutoBackfillWeather(){
+      if(!PROD_CUR || PROD_WX_AUTO_BACKFILLING) return;
+      var prov = prodFactoryProvKey(); if(!prov) return;
+      var f = prod_get(PROD_CUR); f.workers = f.workers||{};
+      var today = prod_today();
+      var missing = [];
+      Object.keys(f.workers).forEach(function(dd){
+        var ymd = dmyToYmd(dd);
+        if(!ymd || ymd >= today) return;
+        var w = f.workers[dd]; if(!w) return;
+        if(!w.weatherAm || !w.weatherPm) missing.push({dd:dd, ymd:ymd});
+      });
+      if(!missing.length) return;
+      missing.sort(function(a,b){ return a.ymd.localeCompare(b.ymd); });
+      var start = missing[0].ymd, end = missing[missing.length-1].ymd;
+      PROD_WX_AUTO_BACKFILLING = true;
+      prodLoadWeatherArchive(prov, start, end, function(hr){
+        PROD_WX_AUTO_BACKFILLING = false;
+        if(!hr) return;
+        var ch = false;
+        missing.forEach(function(m){
+          var w = f.workers[m.dd];
+          var am = prodWxFromHourly(hr, prodHourIdx(hr, m.ymd, '09'));
+          var pm = prodWxFromHourly(hr, prodHourIdx(hr, m.ymd, '14'));
+          if(am && !w.weatherAm){ w.weatherAm = am; ch = true; }
+          if(pm && !w.weatherPm){ w.weatherPm = pm; ch = true; }
+        });
+        if(ch){ prod_save(f); if(PROD_ACTIVE_TAB==='C') prod_renderTab('C'); }
       });
     }
     /* D 原料与库存（自采；收货后提交采购经理审批） */
@@ -6971,30 +6980,40 @@ function _ovLoadChartLib(cb){
       var dd = prod_val('pe_date')||ymdToDmy(prod_today());
       PROD_PE_DRAFT = prod_dailyDraftFor(dmyToYmd(dd));
       prod_renderTab('E');
-      prod_dailyRefreshBackfill();
     }
-    function prod_dailyRefreshBackfill(){
-      var wrap = prod_el('peBackfillWrap'); if(!wrap) return;
-      var d = prod_val('pe_date')||ymdToDmy(prod_today());
-      var ymd = dmyToYmd(d);
-      wrap.style.display = (ymd && ymd < prod_today()) ? '' : 'none';
-    }
-    function prodBackfillWeatherE(){
-      if(!PROD_CUR) return;
-      var prov = prodFactoryProvKey();
-      if(!prov){ prod_toast(pt('toast_wx_noprov')); return; }
-      var sel = prod_val('pe_date')||ymdToDmy(prod_today());
-      var sy = dmyToYmd(sel);
-      if(!sy || sy >= prod_today()){ return; } // 仅针对过去日期
-      prod_toast(pt('toast_wx_loading'));
+    /* 自动补抓 E 页当前日期（过去日期）缺失的天气，无需点按钮 */
+    var PROD_WX_AUTO_BACKFILLING_E = false;
+    function prodAutoBackfillWeatherE(){
+      if(!PROD_CUR || PROD_ACTIVE_TAB!=='E' || PROD_WX_AUTO_BACKFILLING_E) return;
+      if(!PROD_PE_DRAFT) return;
+      var dmy = PROD_PE_DRAFT.date;
+      var sy = dmyToYmd(dmy);
+      if(!sy || sy >= prod_today()) return;            // 今天由 prodTryCaptureWeather 处理
+      if(PROD_PE_DRAFT.weatherAm && PROD_PE_DRAFT.weatherPm) return;
+      var prov = prodFactoryProvKey(); if(!prov) return;
+      PROD_WX_AUTO_BACKFILLING_E = true;
       prodLoadWeatherArchive(prov, sy, sy, function(hr){
-        if(!hr){ prod_toast(pt('toast_wx_fail')); return; }
+        PROD_WX_AUTO_BACKFILLING_E = false;
+        if(!hr) return;
         var am = prodWxFromHourly(hr, prodHourIdx(hr, sy, '09'));
         var pm = prodWxFromHourly(hr, prodHourIdx(hr, sy, '14'));
-        if(am) PROD_PE_DRAFT.weatherAm = am;
-        if(pm) PROD_PE_DRAFT.weatherPm = pm;
-        prod_renderTab('E');
-        prod_toast((pt('toast_wx_backfilled')||'已补抓历史天气')+'：'+sel);
+        var ch = false;
+        if(am && !PROD_PE_DRAFT.weatherAm){ PROD_PE_DRAFT.weatherAm = am; ch = true; }
+        if(pm && !PROD_PE_DRAFT.weatherPm){ PROD_PE_DRAFT.weatherPm = pm; ch = true; }
+        if(ch){
+          var f = prod_get(PROD_CUR); f.production = f.production||{};
+          var rec = (f.production[dmy] && typeof f.production[dmy]==='object') ? f.production[dmy] : {};
+          if(am) rec.weatherAm = am;
+          if(pm) rec.weatherPm = pm;
+          f.production[dmy] = rec;
+          f.workers = f.workers||{};
+          var w = (f.workers[dmy] && typeof f.workers[dmy]==='object') ? f.workers[dmy] : {};
+          if(am) w.weatherAm = am;
+          if(pm) w.weatherPm = pm;
+          f.workers[dmy] = w;
+          prod_save(f);
+          if(PROD_ACTIVE_TAB==='E') prod_renderTab('E');
+        }
       });
     }
     function prod_tabE(f){
@@ -7025,7 +7044,6 @@ function _ovLoadChartLib(cb){
         +         '<option value="no"'+((PROD_PE_DRAFT.holiday!=='yes')?' selected':'')+'>'+pt('opt_no')+'</option>'
         +         '<option value="yes"'+((PROD_PE_DRAFT.holiday==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option></select></div>'
         +     '</div>'
-        +     '<div id="peBackfillWrap" style="display:none;"><button class="prod-btn sec" type="button" onclick="prodBackfillWeatherE()">'+pt('btn_backfill_wx')+'</button></div>'
         +     prod_wxMiniCard('am','pe_wx_am',PROD_PE_DRAFT.weatherAm)
         +     prod_wxMiniCard('pm','pe_wx_pm',PROD_PE_DRAFT.weatherPm)
         +   '</div>'
@@ -7039,6 +7057,7 @@ function _ovLoadChartLib(cb){
         + '<span>'+pt('sec_history')+'</span>'
         + '<button class="prod-btn mini'+(PROD_HIST_HIDEZERO?' on':'')+'" type="button" onclick="prod_toggleHistZero()">'+(PROD_HIST_HIDEZERO?pt('hist_show_all'):pt('hist_hide_zero'))+'</button></div>';
       h += prod_dailyHistoryTable(f, specs);
+      setTimeout(prodAutoBackfillWeatherE, 0);
       return h;
     }
     /* ===== E 页「生产统计 & 曲线图」 ===== */
@@ -7262,7 +7281,7 @@ function _ovLoadChartLib(cb){
     }
     function prod_dailyLineCard(n, specs, houses){
       var line = PROD_PE_DRAFT.lines[n] || {houses:[],qty:{}};
-      var h = '<div class="pe-card pe-line">';
+      var h = '<div class="pe-card pe-line'+(n===2?' pe-line-2':'')+'">';
       h += '<div class="pe-card-head"><div class="pe-card-title pe-line-title">'+pt('prod_line_n').replace('{n}',n)+'</div>'
          + '<div class="pe-line-total" id="pe_linetotal_'+n+'">'+prod_dailyLineTotalHtml(line, specs)+'</div></div>';
       h += '<div class="pe-block"><div class="pe-block-title">'+pt('lbl_houses')+'</div><div class="pe-chips">';
@@ -7315,7 +7334,16 @@ function _ovLoadChartLib(cb){
       var line = PROD_PE_DRAFT.lines[n] || {houses:[],qty:{}};
       var avail = prod_lineAvailSpecs(line);
       if(!avail.length) return '<span class="pe-hint">'+pt('empty_sel_house')+'</span>';
-      return avail.map(function(s){ var on = line.qty && line.qty[s]!=null ? ' on':''; return '<span class="pe-chip pe-spec'+on+'" data-line="'+n+'" data-spec="'+prod_esc(s)+'" onclick="prod_dailySpecToggle(this,'+n+')">'+prod_esc(s)+'</span>'; }).join('');
+      var mm = prod_slatsMatrix();
+      return avail.map(function(s){
+        var on = line.qty && line.qty[s]!=null ? ' on':'';
+        var sp = mm.specs[s] || {total:0, houses:{}};
+        var total = sp.total || 0;
+        var houseQty = 0;
+        (line.houses||[]).forEach(function(h){ houseQty += (+sp.houses[h]||0); });
+        var title = total ? (prod_fmtNum(houseQty) + ' / ' + prod_fmtNum(total) + ' ' + (pt('unit_pcs')||'片')) : '';
+        return '<span class="pe-chip pe-spec'+on+'" data-line="'+n+'" data-spec="'+prod_esc(s)+'" title="'+prod_esc(title)+'" onclick="prod_dailySpecToggle(this,'+n+')">'+prod_esc(s)+'</span>';
+      }).join('');
     }
     function prod_dailySpecRowsHtml(n){
       var line = PROD_PE_DRAFT.lines[n] || {houses:[],qty:{}};
@@ -7460,7 +7488,6 @@ function _ovLoadChartLib(cb){
       PROD_PE_DRAFT = prod_dailyDraftFor(d);
       var el=prod_el('pe_date'); if(el) el.value = d;
       prod_renderTab('E');
-      prod_dailyRefreshBackfill();
     }
     function prod_delProductionRow(d){
       var f=prod_get(PROD_CUR); if(!f || !f.production || !f.production[d]) return;
@@ -7522,7 +7549,7 @@ function _ovLoadChartLib(cb){
       var h = '<div class="prod-sec-title">'+pt('sec_delivery')+'</div>'
         + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pg_date',prod_today(),'',prod_today())
         + '<div class="prod-field"><label>'+pt('lbl_spec2')+'</label><select id="pg_spec">'+opts+'</select></div>'
-        + prod_fld(pt('thr_qty3'),'pg_qty')+prod_fld(pt('lbl_client'),'pg_client')+prod_fld(pt('lbl_note'),'pg_note')
+        + prod_numFld(pt('thr_qty3'),'pg_qty')+prod_fld(pt('lbl_client'),'pg_client')+prod_fld(pt('lbl_note'),'pg_note')
         + '<button class="prod-btn" onclick="prod_addDelivery()">'+pt('btn_deliver')+'</button></div>';
       h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_qty2')+'</th><th>'+pt('thr_client2')+'</th></tr></thead><tbody>';
       (f.delivery||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).forEach(function(r){ h += '<tr><td>'+prod_esc(ymdToDmy(r.date))+'</td><td>'+prod_esc(r.spec)+'</td><td>'+prod_esc(r.qty)+'</td><td>'+prod_esc(r.client)+'</td></tr>'; });
