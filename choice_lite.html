@@ -437,6 +437,9 @@ function _ovLoadChartLib(cb){
   </script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI','Microsoft YaHei',sans-serif; }
+    /* 全站表格单元格内容统一上下左右居中 */
+    table td, table th { vertical-align:middle !important; text-align:center !important; }
+    table td input, table td select, table td textarea { text-align:center !important; vertical-align:middle !important; }
     body { background:#f0f2f5; color:#333; padding:20px; }
     .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
     .page-header h2 { font-size:18px; color:#2c3e50; }
@@ -3331,6 +3334,7 @@ function _ovLoadChartLib(cb){
       .pc-common-grid .prod-field{min-width:0;}
       @media (max-width:860px){ .pc-lw-row{flex-direction:column;} .pc-weather-side,.pc-labor-form{flex:1 1 auto;width:100%;min-width:0;} .pc-common-grid{grid-template-columns:repeat(2, minmax(0, 1fr));} }
       .prod-role-grid{display:grid;grid-template-columns:repeat(5, minmax(0, 1fr));gap:10px;width:100%;}
+      .prod-role-grid .prod-field > label{font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       @media (max-width:680px){ .prod-role-grid{grid-template-columns:repeat(3, minmax(0, 1fr));} }
       @media (max-width:420px){ .prod-role-grid{grid-template-columns:repeat(2, minmax(0, 1fr));} }
       .pc-labor-form .prod-field{gap:2px;font-size:12px;}
@@ -3351,18 +3355,23 @@ function _ovLoadChartLib(cb){
       .prod-table td{white-space:normal;word-break:break-word;}
       .prod-table tbody tr:nth-child(even){background:#fafafa;}
       .prod-table tbody tr:hover{background:#f0f4ff;}
-      .pc-labor-hist{table-layout:fixed;width:100%;font-size:11px;}
-      .pc-labor-hist th{font-size:10px;padding:3px 4px;line-height:1.1;white-space:normal;word-break:break-word;text-align:center;vertical-align:middle;}
-      .pc-labor-hist td{padding:3px 4px;font-size:11px;line-height:1.2;word-break:break-word;vertical-align:top;}
-      .pc-labor-hist th.pc-col-date{width:74px;}
-      .pc-labor-hist th.pc-col-holiday{width:46px;}
-      .pc-labor-hist th.pc-col-rec{width:80px;white-space:nowrap;}
-      .pc-labor-hist th.pc-col-total{width:46px;}
-      .pc-labor-hist th.pc-col-wx{width:92px;}
-      .pc-labor-hist th.pc-col-act{width:82px;white-space:nowrap;}
+      .pc-labor-hist{table-layout:fixed;width:100%;font-size:10px;}
+      .pc-labor-hist th{font-size:9px;padding:2px 3px;line-height:1.1;white-space:normal;word-break:break-word;text-align:center;vertical-align:middle;}
+      .pc-labor-hist td{padding:2px 3px;font-size:10px;line-height:1.2;word-break:break-word;vertical-align:top;}
+      .pc-labor-hist .pc-col-no{width:32px;text-align:center;}
+      .pc-labor-hist .pc-col-date{width:60px;white-space:nowrap;}
+      .pc-labor-hist .pc-col-holiday{width:42px;}
+      .pc-labor-hist .pc-col-rec{width:44px;}
+      .pc-labor-hist .pc-col-role{width:50px;}
+      .pc-labor-hist .pc-col-total{width:46px;}
+      .pc-labor-hist .pc-col-wx{width:64px;}
+      .pc-labor-hist .pc-col-act{width:100px;white-space:nowrap;}
+      .pc-labor-hist .pc-zero{color:#e53935;font-weight:600;}
       .pc-labor-hist td.pc-col-act{white-space:nowrap;}
       .pc-labor-hist td.pc-col-role,.pc-labor-hist td.pc-col-total{text-align:center;vertical-align:middle;}
       .pc-labor-hist .prod-op{font-size:12px;padding:1px 4px;margin-right:1px;}
+      .pc-labor-scroll{max-height:400px;overflow-y:auto;overflow-x:auto;}
+      .pc-labor-hist thead th{position:sticky;top:0;z-index:10;background:#f7f9f4;}
       .pc-labor-hist .pc-wx-cell{font-size:10px;line-height:1.15;}
       .pc-labor-hist th.pc-sortable{cursor:pointer;user-select:none;}
       .pc-labor-hist th.pc-sortable:hover{background:#eef3ee;}
@@ -3370,16 +3379,17 @@ function _ovLoadChartLib(cb){
       .pc-sort-ind .up,.pc-sort-ind .dn{font-size:9px;color:#c4ccd4;font-style:normal;line-height:0.78;}
       .pc-sort-ind .up.on{color:#E53935;}
       .pc-sort-ind .dn.on{color:#E53935;}
-      /* 历史生产表：等宽固定布局，保证 13+ 规格列也能一行放完（无横向滚动） */
-      .pe-hist{table-layout:fixed;width:100%;font-size:11px;}
-      .pe-hist th:nth-child(1){width:74px;}
-      .pe-hist th:nth-child(2){width:38px;}
-      .pe-hist th:nth-child(3){width:70px;}
-      .pe-hist th:nth-child(4){width:54px;text-align:center;}
-      .pe-hist th:last-child{width:68px;text-align:center;}
-      .pe-hist td:nth-child(4){text-align:center;}
-      .pe-hist td:last-child{text-align:center;white-space:nowrap;}
-      .pe-hist .pe-vth, .pe-stats .pe-vth{white-space:normal;height:auto;line-height:1.05;vertical-align:bottom;text-align:center;padding:3px 3px;font-size:8px;letter-spacing:0;max-width:66px;word-break:break-word;}
+      /* 历史生产表：极限压缩等宽固定布局，保证 13+ 规格列也能一行放完（无横向滚动） */
+      .pe-hist{table-layout:fixed;width:100%;font-size:10px;}
+      .pe-hist th,.pe-hist td{padding:1px 2px;vertical-align:middle;text-align:center;}
+      .pe-hist .pe-col-no{width:24px;}
+      .pe-hist .pe-col-date{width:56px;white-space:nowrap;}
+      .pe-hist .pe-col-holiday{width:28px;}
+      .pe-hist .pe-col-rec{max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .pe-hist .pe-col-wx-am,.pe-hist .pe-col-wx-pm{width:54px;font-size:8px;line-height:1.1;white-space:normal;word-break:break-word;}
+      .pe-hist .pe-col-total{width:34px;}
+      .pe-hist .pe-col-act{width:50px;white-space:nowrap;padding:1px 1px;}
+      .pe-hist .pe-vth, .pe-stats .pe-vth{white-space:normal;height:auto;line-height:1.05;vertical-align:bottom;text-align:center;padding:1px 0;font-size:6px;letter-spacing:0;max-width:40px;word-break:break-word;}
       .pe-hist .pe-vth .v1, .pe-stats .pe-vth .v1{display:block;font-weight:700;}
       .pe-hist .pe-vth .v2, .pe-stats .pe-vth .v2{display:block;color:#667;margin-top:1px;}
       .pe-stats .pe-vth{font-size:14px;padding:6px 6px;max-width:120px;line-height:1.25;}
@@ -3389,12 +3399,9 @@ function _ovLoadChartLib(cb){
       .pe-sort-arrow{display:inline-block;width:12px;text-align:center;font-size:10px;color:#E53935;margin-left:2px;}
       .pe-sort-arrow.idle{color:#bbb;}
       .pe-stats tbody tr.pe-highlight{background:#ffe6e6 !important;}
-      .pe-hist td{text-align:right;font-variant-numeric:tabular-nums;padding:3px 4px;}
-      .pe-hist td:first-child,.pe-hist td:nth-child(2),.pe-hist td:nth-child(3){text-align:left;}
-      .pe-hist td:nth-child(3){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .pe-hist td{font-variant-numeric:tabular-nums;}
       .pe-hist .pe-zero{color:#cfd6dd;}
-      .pe-hist .pe-wx-avg{font-size:12px;white-space:nowrap;}
-      .pe-hist .prod-op{font-size:13px;padding:1px 5px;}
+      .pe-hist .prod-op{font-size:10px;padding:0 1px;margin-right:0;}
       .prod-due-stop{margin:0 0 10px;padding:8px 12px;border:1px solid #f0c8a8;border-radius:8px;background:#FFF7EC;color:#c0622a;font-size:13px;font-weight:600;}
       .pc-edit-banner{margin:0 0 10px;padding:8px 12px;border:1px solid #E53935;border-radius:8px;background:#FFF0F0;color:#E53935;font-size:13px;font-weight:700;}
       .receipt-tbl .rc-num{width:78px;padding:3px 4px;border:1px solid #ccc;border-radius:4px;font-size:12px;}
@@ -3463,6 +3470,7 @@ function _ovLoadChartLib(cb){
       .receipt-extra-wrap.collapsed{display:none;}
       .receipt-collapse-btn{position:absolute;top:8px;right:12px;width:22px;height:22px;padding:0;border:1px solid #e53935;background:#fff5f5;border-radius:4px;cursor:pointer;font-size:14px;font-weight:700;line-height:20px;text-align:center;color:#e53935;}
       .receipt-collapse-btn:hover{background:#ffeaea;}
+      .rc-list-scroll{max-height:650px;overflow-y:auto;overflow-x:hidden;}
       /* 入库原料统计 & 需求对比 报告模态框 */
       #prod_report_modal .modal-header{position:relative;}
       #prod_report_modal .modal-header .prod-report-title{font-size:15px;font-weight:700;flex:1;padding-right:90px;line-height:1.4;}
@@ -3508,8 +3516,8 @@ function _ovLoadChartLib(cb){
       .badge.warn{background:#ffe0b2;color:#8a4b00;}
       .photo-upload-mock{display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;min-height:34px;}
       .photo-upload-mock:hover{border-color:#aaa;}
-      .photo-mock-btn{flex:none;padding:4px 10px;border:1px solid #bbb;border-radius:4px;background:#f5f5f5;font-size:12px;color:#333;cursor:pointer;}
-      .photo-mock-btn:hover{background:#ebebeb;}
+      .photo-mock-btn{flex:none;padding:4px 10px;border:1px solid #E53935;border-radius:4px;background:#E53935;font-size:12px;color:#fff;cursor:pointer;font-weight:600;}
+      .photo-mock-btn:hover{background:#c42f2f;border-color:#c42f2f;}
       .photo-mock-name{font-size:12px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       .photo-upload-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
       .vis-hide{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;white-space:nowrap;}
@@ -3585,8 +3593,12 @@ function _ovLoadChartLib(cb){
       .pe-block{margin-top:10px;}
       .pe-block-title{font-size:12px;color:#666;margin-bottom:6px;font-weight:600;}
       .pe-chips{display:flex;flex-wrap:wrap;gap:6px;}
-      .pe-chip{display:inline-block;padding:4px 10px;border:1px solid #cfd6e0;border-radius:16px;font-size:12px;background:#f5f7fa;cursor:pointer;user-select:none;}
+      .pe-chip{display:inline-block;position:relative;padding:4px 10px;border:1px solid #cfd6e0;border-radius:16px;font-size:12px;background:#f5f7fa;cursor:pointer;user-select:none;}
+      .pe-chip-badge{position:absolute;top:-7px;right:-5px;padding:1px 4px;border-radius:7px;font-size:9px;font-weight:600;line-height:1.2;background:#e65100;color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15);pointer-events:none;white-space:nowrap;}
+      .pe-chip-badge b{color:#000;font-weight:600;}
       .pe-chip.on{background:#1f6feb;color:#fff;border-color:#1f6feb;}
+      .pe-chip.on .pe-chip-badge{background:#fff;color:#1f6feb;}
+      .pe-chip.on .pe-chip-badge b{color:#000;}
       .pe-specchips .pe-chip{background:#fff7e6;border-color:#f0d9a8;color:#8a6d00;}
       .pe-specchips .pe-chip.on{background:#1f6feb;color:#fff;border-color:#1f6feb;}
       .pe-hint{display:block;color:#9aa3ad;font-size:12px;padding:4px 2px;}
@@ -3654,7 +3666,7 @@ function _ovLoadChartLib(cb){
         gantt_n1:'总生产周期约 ', gantt_n2:' 个有效工作日（已跳过越南公共假期，含春节前后各扩展；按各规格「生产片数/天」排产，默认 300 片/天；优先猪舍：', gantt_unset:'未设置',
         gantt_n3:'；条内', gantt_gold:'金色=优先猪舍', gantt_n4:'，其余按需求量从大到小；右侧列为各猪舍明细；斜纹段为越南公共假期（悬停看名称）；虚线为每月首日；顶部', gantt_green:'绿色条=建厂筹备和试运营', gantt_n5:'（不计入生产周期，其右端接红色开工日）；筹备日期绿色、生产起止红色）。',
         right_p1:'共 ', right_p2:' 片 · ', right_p3:' 天', unit_pcs:'片', unit_day:' 天', unit_ton:' 吨', unit_m3:' 方', tet_ext:'（含前后扩展）',
-        sec_house_sum:'按栋舍汇总生产计划', thr_house2:'栋舍', thr_qty_pcs:'数量/片', thr_start:'开工', thr_end:'结束', thr_prep:'建厂筹备和试运营', subtotal:'小计', empty_gantt:'请先在「生产骨料库存计划表」为各规格填写“生产片数/天”（默认按 300 片/天），并设置「建厂筹备和试运营」起止日期。', th_prod_order:'生产次序', sec_workers:'人员（按日快照，只记数不记名）', lbl_report_date:'填报日期', lbl_date:'日期', btn_save_snap:'保存当日快照', thr_date:'日期', thr_total2:'合计', btn_del:'删', common_close:'关闭',
+        sec_house_sum:'按栋舍汇总生产计划', thr_house2:'栋舍', thr_qty_pcs:'数量/片', thr_start:'开工', thr_end:'结束', thr_prep:'建厂筹备和试运营', subtotal:'小计', empty_gantt:'请先在「生产骨料库存计划表」为各规格填写“生产片数/天”（默认按 300 片/天），并设置「建厂筹备和试运营」起止日期。', th_prod_order:'生产次序', sec_workers:'人员（按日快照，只记数不记名）', lbl_report_date:'填报日期', lbl_date:'日期', btn_save_snap:'保存当日快照', thr_no:'序号', thr_date:'日期', thr_total2:'合计', btn_del:'删', common_close:'关闭',
         sec_raw:'原料与库存', sec_stock:'物资清单与库存', lbl_name:'名称', lbl_unit:'单位', lbl_warn:'预警阈值', btn_add_mat:'添加物资', thr_name:'名称', thr_unit2:'单位', thr_cur_stock:'当前库存', thr_warn2:'预警', lbl_floor_spec:'当前生产的地板规格',
         sec_inbound:'入库（采购直录）', sec_inbound_hist:'入库记录', thr_qty2:'数量', lbl_note:'备注', lbl_edit_note:'编辑备注', btn_inbound:'入库', sec_outbound:'出库', btn_outbound:'出库', thr_type:'类型', type_in:'入库', type_out:'出库',
         sec_mat_req:'材料需求（按规格自动计算，指导采购）', kpi_cement:'水泥', kpi_sand:'黄砂', kpi_gravel:'石子', thr_material:'材料', thr_demand:'需求(吨)', thr_gap:'缺口', not_created:'未建物资',
@@ -3667,7 +3679,7 @@ function _ovLoadChartLib(cb){
         toast_inv_saved:'库存计划已保存', toast_saved:'已保存', toast_sched:'排程已更新', toast_priority:'优先猪舍已设置', toast_name_req:'请填名称', toast_prod_saved:'已保存，并自动过账成品入库', toast_deliver_req:'请选规格并填数量', toast_delivered:'已出库，成品库存结余已更新',
         card_contract:'合同', card_spec:'规格', card_status:'状态：', card_due:'交期：', card_output:'累计产出', card_delivered:'已交付', empty_card:'暂无签约项目。请先在「签约项目」中录入数据，刷新后即可在此看到对应的现场工厂。',
         factory_label:'工厂', factory_suffix:' · 现场工厂',
-        prod_role_welder:'焊工', prod_role_forklift:'叉车工', prod_role_loader:'铲车工', prod_role_mixer:'搅拌机工', prod_role_press:'打板机操作工', prod_role_repair:'修水泥板工', prod_role_cook:'厨师', prod_role_temp:'其他临时工', prod_role_keeper:'材料看管员', sec_labor:'人工', sec_weather:'天气', wx_am:'上午天气', wx_pm:'下午天气', wx_temp:'温度', wx_cond:'天气', wx_hum:'湿度', wx_wind:'风力', wx_notyet:'未录入', btn_backfill_wx:'补抓历史天气', toast_wx_loading:'正在补抓历史天气…', toast_wx_backfilled:'已补抓历史天气', toast_wx_noprov:'未取到工厂省份，无法补抓天气', toast_wx_fail:'历史天气获取失败', op_actions:'操作', op_edit:'编辑', op_del:'删除', wx_backfill_hint:'该日期天气缺失，点击下方按钮补录', trend_title:'趋势图', trend_all:'全部', trend_7:'近7天', trend_30:'近30天', trend_labor:'人工数量曲线', trend_weather:'温度&湿度曲线（晴雨带）', trend_total:'总人工数', trend_sun:'晴', trend_rain:'雨', trend_cloud:'多云', trend_sun_days:'天晴朗', trend_rain_days:'天下雨', trend_cloud_days:'天多云', trend_nodata:'暂无历史数据',         prod_role_manager:'厂长', prod_role_machinist:'机器维修员', lbl_recorder:'填表人', thr_recorder:'填表人', lbl_holiday:'春节', opt_yes:'是', opt_no:'否', prod_status_wait:'待排产', toast_copied:'已复制该行', editing_label:'正在修改',
+        prod_role_welder:'焊工', prod_role_forklift:'叉车工', prod_role_loader:'铲车工', prod_role_mixer:'搅拌机工', prod_role_press:'打板机操作工', prod_role_repair:'修水泥板工', prod_role_cook:'厨师', prod_role_temp:'其他临时工', prod_role_keeper:'材料看管员', sec_labor:'人工', sec_weather:'天气', wx_am:'上午天气', wx_pm:'下午天气', wx_temp:'温度', wx_cond:'天气', wx_hum:'湿度', wx_wind:'风力', wx_notyet:'未录入', btn_backfill_wx:'补抓历史天气', toast_wx_loading:'正在补抓历史天气…', toast_wx_backfilled:'已补抓历史天气', toast_wx_noprov:'未取到工厂省份，无法补抓天气', toast_wx_fail:'历史天气获取失败', op_actions:'操作', op_edit:'编辑', op_del:'删除', wx_backfill_hint:'该日期天气缺失，点击下方按钮补录', trend_title:'趋势图', trend_all:'全部', trend_7:'近7天', trend_30:'近30天', trend_labor:'人工数量曲线', trend_weather:'温度&湿度曲线（晴雨带）', trend_total:'总人工数', trend_sun:'晴', trend_rain:'雨', trend_cloud:'多云', trend_sun_days:'天晴朗', trend_rain_days:'天下雨', trend_cloud_days:'天多云', trend_nodata:'暂无历史数据',         prod_role_manager:'厂长', prod_role_machinist:'机器维修员', lbl_recorder:'填表人', thr_recorder:'填表人', lbl_holiday:'春节', opt_yes:'是', opt_no:'否', sec_labor_wx_detail:'人工-天气明细表', prod_status_wait:'待排产', toast_copied:'已复制该行', editing_label:'正在修改',
       btn_change_due_date:'更改日期', msg_due_date_locked:'项目交期一经选定后不可更改，确定要选择 {date} 吗？', toast_due_date_saved:'项目交期已保存', toast_no_auth_due:'无权限更改项目交期', msg_due_stop:'已到项目交期（{date}），停止计算',
       sec_slats_info:'水泥漏缝地板配置基础信息', btn_view_slats:'查看水泥漏缝地板详细配置', btn_edit_slats:'编辑水泥漏缝地板详细配置',
       btn_report:'查看入库原料统计&生产物料总需求对比分析报告', rpt_title:'入库原料统计 & 生产物料总需求对比分析报告', rpt_section_summary:'一、按栋舍 × 物料 费用汇总（按设定单价）', rpt_section_gap:'二、已入库统计与缺口（含待审/退回/已确认/入库直录）', rpt_section_pie:'三、已花费金额占比（饼图）', rpt_section_bar:'四、需求总价 vs 已采购总价（柱状图）', thr_house:'猪舍', thr_total_cost:'费用合计', thr_material:'物料', thr_demand_ton:'需求(吨)', thr_bought_ton:'已采购(吨)', thr_gap_ton:'缺口(吨)', thr_spent:'已花费', thr_need:'还需花费', rpt_cat_rebar6:'钢筋φ6', rpt_cat_rebar8:'钢筋φ8', rpt_cat_rebar10:'钢筋φ10', rpt_cat_rebar12:'钢筋φ12', rpt_cat_cement:'水泥', rpt_cat_sand:'黄砂', rpt_cat_gravel:'石子', rpt_grand_total:'总计', btn_collapse_all:'收缩', btn_expand_all:'展开', lbl_receipt_no:'第{n}次', prod_line_n:'线{n}', thr_total_pcs:'总计', lbl_houses:'猪舍', lbl_specs:'规格', lbl_matrix_qty:'片数', lbl_line_total:'本线合计', lbl_house_spec:'猪舍 / 规格', empty_sel_house:'请先选择猪舍', empty_sel_spec:'请先选择规格', empty_no_lines:'未设置生产线（请在「工厂概况」设置生产线数量）', thr_pcs:'片', hist_hide_zero:'隐藏 0 值列', hist_show_all:'显示全部列'
@@ -3686,7 +3698,7 @@ function _ovLoadChartLib(cb){
         gantt_n1:'Total production cycle ≈ ', gantt_n2:' effective working days (Vietnam public holidays skipped, incl. pre/post-Tet extension; scheduled by spec "slabs/day", default 300 slabs/day; priority house: ', gantt_unset:'not set',
         gantt_n3:'; bar', gantt_gold:'gold = priority house', gantt_n4:', rest sorted by demand desc; right column = per-house details; diagonal stripes = Vietnam public holidays (hover for name); dashed line = 1st of each month; top', gantt_green:'green bar = factory prep & trial run', gantt_n5:'(not counted in production cycle, its right end meets red start day); prep dates green, production start/end red).',
         right_p1:'Total ', right_p2:' slabs · ', right_p3:' days', unit_pcs:' pcs', unit_day:' days', unit_ton:' tons', unit_m3:' m³', tet_ext:' (incl. extension)',
-        sec_house_sum:'Production Plan Summary by House', thr_house2:'House', thr_qty_pcs:'Qty / slab', thr_start:'Start', thr_end:'End', thr_prep:'Factory prep & trial run', subtotal:'Subtotal', empty_gantt:'Please first fill "slabs/day" for each spec in the Production Aggregate Inventory Plan (default 300 slabs/day), and set the factory prep & trial run start/end dates.', th_prod_order:'Production Order', sec_workers:'Staff (daily snapshot, count only, no names)', lbl_report_date:'Report Date', lbl_date:'Date', btn_save_snap:'Save daily snapshot', thr_date:'Date', thr_total2:'Total', btn_del:'Del', common_close:'Close',
+        sec_house_sum:'Production Plan Summary by House', thr_house2:'House', thr_qty_pcs:'Qty / slab', thr_start:'Start', thr_end:'End', thr_prep:'Factory prep & trial run', subtotal:'Subtotal', empty_gantt:'Please first fill "slabs/day" for each spec in the Production Aggregate Inventory Plan (default 300 slabs/day), and set the factory prep & trial run start/end dates.', th_prod_order:'Production Order', sec_workers:'Staff (daily snapshot, count only, no names)', lbl_report_date:'Report Date', lbl_date:'Date', btn_save_snap:'Save daily snapshot', thr_no:'No.', thr_date:'Date', thr_total2:'Total', btn_del:'Del', common_close:'Close',
         sec_raw:'Raw Materials & Stock', sec_stock:'Material list & stock', lbl_name:'Name', lbl_unit:'Unit', lbl_warn:'Warning threshold', btn_add_mat:'Add material', thr_name:'Name', thr_unit2:'Unit', thr_cur_stock:'Current stock', thr_warn2:'Warning', lbl_floor_spec:'Current floor specs',
         sec_inbound:'Inbound (direct purchase log)', sec_inbound_hist:'Inbound records', thr_qty2:'Qty', lbl_note:'Remark', lbl_edit_note:'Edit Remark', btn_inbound:'Receive', sec_outbound:'Outbound', btn_outbound:'Issue', thr_type:'Type', type_in:'Inbound',         type_out:'Outbound',
         sec_mat_req:'Material demand (auto by spec, guides purchasing)', kpi_cement:'Cement', kpi_sand:'Sand', kpi_gravel:'Gravel', thr_material:'Material', thr_demand:'Demand (tons)', thr_gap:'Gap', not_created:'not created',
@@ -3699,7 +3711,7 @@ function _ovLoadChartLib(cb){
         toast_inv_saved:'Inventory plan saved', toast_saved:'Saved', toast_sched:'Schedule updated', toast_priority:'Priority house set', toast_name_req:'Please enter name', toast_prod_saved:'Saved, and auto-posted finished inbound', toast_deliver_req:'Please select spec and enter qty', toast_delivered:'Outbound done, finished stock balance updated',
         card_contract:'Contract', card_spec:'Spec', card_status:'Status: ', card_due:'Due: ', card_output:'Cumulative output', card_delivered:'Delivered', empty_card:'No signed projects yet. Please enter data in "Signed Projects" first; refresh to see the corresponding on-site factory here.',
         factory_label:'Factory', factory_suffix:' · On-site Factory',
-        prod_role_welder:'Welder', prod_role_forklift:'Forklift Operator', prod_role_loader:'Loader Operator', prod_role_mixer:'Mixer Operator', prod_role_press:'Slab Press Operator', prod_role_repair:'Slab Repairer', prod_role_cook:'Cook', prod_role_temp:'Other Temporary Workers', prod_role_keeper:'Material Keeper', sec_labor:'Labor', sec_weather:'Weather', wx_am:'Morning', wx_pm:'Afternoon', wx_temp:'Temp', wx_cond:'Condition', wx_hum:'Humidity', wx_wind:'Wind', wx_notyet:'Not recorded', btn_backfill_wx:'Backfill Weather', toast_wx_loading:'Backfilling historical weather…', toast_wx_backfilled:'Historical weather backfilled', toast_wx_noprov:'Factory province not found', toast_wx_fail:'Failed to fetch historical weather', op_actions:'Actions', op_edit:'Edit', op_del:'Delete', wx_backfill_hint:'Weather for this date is missing. Click below to backfill.', trend_title:'Trends', trend_all:'All', trend_7:'Last 7d', trend_30:'Last 30d', trend_labor:'Labor Count', trend_weather:'Temp & Humidity (sun/rain band)', trend_total:'Total', trend_sun:'Sun', trend_rain:'Rain', trend_cloud:'Cloudy', trend_sun_days:' sunny days', trend_rain_days:' rainy days', trend_cloud_days:' cloudy days', trend_nodata:'No history',         prod_role_manager:'Factory Manager', prod_role_machinist:'Machine Repairman', lbl_recorder:'Recorder', thr_recorder:'Recorder', lbl_holiday:'TET', opt_yes:'Yes', opt_no:'No', prod_status_wait:'Pending Scheduling', toast_copied:'Row copied', editing_label:'Editing',
+        prod_role_welder:'Welder', prod_role_forklift:'Forklift Operator', prod_role_loader:'Loader Operator', prod_role_mixer:'Mixer Operator', prod_role_press:'Slab Press Operator', prod_role_repair:'Slab Repairer', prod_role_cook:'Cook', prod_role_temp:'Other Temporary Workers', prod_role_keeper:'Material Keeper', sec_labor:'Labor', sec_weather:'Weather', wx_am:'Morning', wx_pm:'Afternoon', wx_temp:'Temp', wx_cond:'Condition', wx_hum:'Humidity', wx_wind:'Wind', wx_notyet:'Not recorded', btn_backfill_wx:'Backfill Weather', toast_wx_loading:'Backfilling historical weather…', toast_wx_backfilled:'Historical weather backfilled', toast_wx_noprov:'Factory province not found', toast_wx_fail:'Failed to fetch historical weather', op_actions:'Actions', op_edit:'Edit', op_del:'Delete', wx_backfill_hint:'Weather for this date is missing. Click below to backfill.', trend_title:'Trends', trend_all:'All', trend_7:'Last 7d', trend_30:'Last 30d', trend_labor:'Labor Count', trend_weather:'Temp & Humidity (sun/rain band)', trend_total:'Total', trend_sun:'Sun', trend_rain:'Rain', trend_cloud:'Cloudy', trend_sun_days:' sunny days', trend_rain_days:' rainy days', trend_cloud_days:' cloudy days', trend_nodata:'No history',         prod_role_manager:'Factory Manager', prod_role_machinist:'Machine Repairman', lbl_recorder:'Recorder', thr_recorder:'Recorder', lbl_holiday:'TET', opt_yes:'Yes', opt_no:'No', sec_labor_wx_detail:'Labor & Weather Detail', prod_status_wait:'Pending Scheduling', toast_copied:'Row copied', editing_label:'Editing',
       btn_change_due_date:'Change Date', msg_due_date_locked:'Once selected, the project delivery date cannot be changed. Confirm {date}?', toast_due_date_saved:'Project delivery date saved', toast_no_auth_due:'No permission to change project delivery date', msg_due_stop:'Project delivery date reached ({date}). Calculation stopped.',
       btn_report:'View Inbound Material Stats & Production Demand Comparison Report', rpt_title:'Inbound Material Stats & Production Demand Comparison Report', rpt_section_summary:'1. Cost summary by House × Material (at set unit prices)', rpt_section_gap:'2. Received stats & gap (incl. pending/returned/confirmed/direct inbound)', rpt_section_pie:'3. Spent amount share (pie)', rpt_section_bar:'4. Total demand cost vs purchased cost (bar)', thr_house:'House', thr_total_cost:'Total Cost', thr_material:'Material', thr_demand_ton:'Demand (t)', thr_bought_ton:'Purchased (t)', thr_gap_ton:'Gap (t)', thr_spent:'Spent', thr_need:'Need', rpt_cat_rebar6:'Rebar φ6', rpt_cat_rebar8:'Rebar φ8', rpt_cat_rebar10:'Rebar φ10', rpt_cat_rebar12:'Rebar φ12', rpt_cat_cement:'Cement', rpt_cat_sand:'Sand', rpt_cat_gravel:'Gravel', rpt_grand_total:'Grand Total',
       sec_slats_info:'Concrete Slatted Floor Configuration Basic Info', btn_view_slats:'View Concrete Slatted Floor Detailed Config',         btn_edit_slats:'Edit Concrete Slatted Floor Detailed Config', btn_collapse_all:'Collapse', btn_expand_all:'Expand', lbl_receipt_no:'No.{n}', prod_line_n:'Line {n}', thr_total_pcs:'Total', lbl_houses:'Houses', lbl_specs:'Specs', lbl_matrix_qty:'Qty (slabs)', lbl_line_total:'Line total', lbl_house_spec:'House / Spec', empty_sel_house:'Select houses first', empty_sel_spec:'Select specs first', empty_no_lines:'No production lines set (set line count in Factory Overview)', thr_pcs:'slabs', hist_hide_zero:'Hide 0-value cols', hist_show_all:'Show all cols'
@@ -3718,7 +3730,7 @@ function _ovLoadChartLib(cb){
         gantt_n1:'Tổng chu kỳ SX ≈ ', gantt_n2:' ngày làm việc hiệu lực (bỏ qua ngày lễ VN, gồm mở rộng trước/sau Tết; theo "tấm/ngày" từng quy cách, mặc định 300 tấm/ngày; chuồng ưu tiên: ', gantt_unset:'chưa thiết lập',
         gantt_n3:'; trong thanh', gantt_gold:'vàng = chuồng ưu tiên', gantt_n4:', còn lại theo nhu cầu giảm dần; cột phải = chi tiết từng chuồng; vạch sọc = ngày lễ VN (di chuột xem tên); đường đứt = ngày đầu tháng; trên cùng', gantt_green:'thanh xanh = chuẩn bị & chạy thử', gantt_n5:'(không tính vào chu kỳ SX, đầu phải nối ngày khởi công đỏ); ngày chuẩn bị xanh, đầu/cuối SX đỏ).',
         right_p1:'Tổng ', right_p2:' tấm · ', right_p3:' ngày', unit_pcs:' tấm', unit_day:' ngày', unit_ton:' tấn', unit_m3:' m³', tet_ext:' (gồm mở rộng)',
-        sec_house_sum:'Tóm tắt kế hoạch SX theo chuồng', thr_house2:'Chuồng', thr_qty_pcs:'SL / tấm', thr_start:'Bắt đầu', thr_end:'Kết thúc', thr_prep:'Chuẩn bị & chạy thử', subtotal:'Tổng cộng', empty_gantt:'Vui lòng điền "tấm/ngày" cho mỗi quy cách trong Kế hoạch tồn kho cốt liệu (mặc định 300 tấm/ngày), và đặt ngày bắt đầu/kết thúc chuẩn bị & chạy thử.', th_prod_order:'Thứ tự SX', sec_workers:'Nhân sự (ảnh chụp theo ngày, chỉ đếm, không tên)', lbl_report_date:'Ngày báo cáo', lbl_date:'Ngày', btn_save_snap:'Lưu ảnh chụp ngày', thr_date:'Ngày', thr_total2:'Tổng', btn_del:'Xóa', common_close:'Đóng',
+        sec_house_sum:'Tóm tắt kế hoạch SX theo chuồng', thr_house2:'Chuồng', thr_qty_pcs:'SL / tấm', thr_start:'Bắt đầu', thr_end:'Kết thúc', thr_prep:'Chuẩn bị & chạy thử', subtotal:'Tổng cộng', empty_gantt:'Vui lòng điền "tấm/ngày" cho mỗi quy cách trong Kế hoạch tồn kho cốt liệu (mặc định 300 tấm/ngày), và đặt ngày bắt đầu/kết thúc chuẩn bị & chạy thử.', th_prod_order:'Thứ tự SX', sec_workers:'Nhân sự (ảnh chụp theo ngày, chỉ đếm, không tên)', lbl_report_date:'Ngày báo cáo', lbl_date:'Ngày', btn_save_snap:'Lưu ảnh chụp ngày', thr_no:'Số thứ tự', thr_date:'Ngày', thr_total2:'Tổng', btn_del:'Xóa', common_close:'Đóng',
         sec_raw:'Nguyên liệu & Kho', sec_stock:'Danh sách vật tư & tồn kho', lbl_name:'Tên', lbl_unit:'Đơn vị', lbl_warn:'Ngưỡng cảnh báo', btn_add_mat:'Thêm vật tư', thr_name:'Tên', thr_unit2:'Đơn vị', thr_cur_stock:'Tồn kho hiện tại', thr_warn2:'Cảnh báo', lbl_floor_spec:'Quy cách sàn đang SX',
         sec_inbound:'Nhập kho (ghi mua trực tiếp)', sec_inbound_hist:'Lịch sử nhập kho', thr_qty2:'SL', lbl_note:'Ghi chú', lbl_edit_note:'Chỉnh sửa ghi chú', btn_inbound:'Nhập', sec_outbound:'Xuất kho', btn_outbound:'Xuất', thr_type:'Loại', type_in:'Nhập', type_out:'Xuất',
         sec_mat_req:'Nhu cầu vật liệu (tự động theo quy cách, hướng dẫn mua)', kpi_cement:'Xi măng', kpi_sand:'Cát', kpi_gravel:'Sỏi', thr_material:'Vật liệu', thr_demand:'Nhu cầu (tấn)', thr_gap:'Thiếu hụt', not_created:'chưa tạo',
@@ -3731,7 +3743,7 @@ function _ovLoadChartLib(cb){
         toast_inv_saved:'Đã lưu kế hoạch tồn kho', toast_saved:'Đã lưu', toast_sched:'Lịch trình đã cập nhật', toast_priority:'Đã đặt chuồng ưu tiên', toast_name_req:'Vui lòng nhập tên', toast_prod_saved:'Đã lưu, tự động ghi nhận nhập kho thành phẩm', toast_deliver_req:'Vui lòng chọn quy cách và nhập số lượng', toast_delivered:'Đã xuất kho, tồn kho thành phẩm đã cập nhật',
         card_contract:'Hợp đồng', card_spec:'Quy cách', card_status:'Trạng thái: ', card_due:'Hạn giao: ', card_output:'Tổng đầu ra', card_delivered:'Đã giao', empty_card:'Chưa có dự án ký. Vui lòng nhập dữ liệu tại "Dự án ký" trước; làm mới để xem nhà máy tương ứng tại đây.',
         factory_label:'Nhà máy', factory_suffix:' · Nhà máy tại công trường',
-        prod_role_welder:'Thợ hàn', prod_role_forklift:'Lái xe nâng', prod_role_loader:'Lái xe xúc', prod_role_mixer:'Vận hành máy trộn', prod_role_press:'Vận hành máy ép tấm', prod_role_repair:'Thợ sửa tấm xi măng', prod_role_cook:'Đầu bếp', prod_role_temp:'Công nhân tạm thời khác', prod_role_keeper:'Người trông vật liệu', sec_labor:'Nhân công', sec_weather:'Thời tiết', wx_am:'Sáng', wx_pm:'Chiều', wx_temp:'Nhiệt độ', wx_cond:'Tình trạng', wx_hum:'Độ ẩm', wx_wind:'Gió', wx_notyet:'Chưa ghi', btn_backfill_wx:'Bù thời tiết lịch sử', toast_wx_loading:'Đang bù thời tiết lịch sử…', toast_wx_backfilled:'Đã bù thời tiết lịch sử', toast_wx_noprov:'Không tìm thấy tỉnh nhà máy', toast_wx_fail:'Lỗi lấy thời tiết lịch sử', op_actions:'Thao tác', op_edit:'Sửa', op_del:'Xóa', wx_backfill_hint:'Thời tiết ngày này bị thiếu, nhấn nút bên dưới để bổ sung.', trend_title:'Xu hướng', trend_all:'Tất cả', trend_7:'7 ngày', trend_30:'30 ngày', trend_labor:'Số nhân công', trend_weather:'Nhiệt độ & Độ ẩm (dải nắng/mưa)', trend_total:'Tổng', trend_sun:'Nắng', trend_rain:'Mưa', trend_cloud:'Nhiều mây', trend_sun_days:' ngày nắng', trend_rain_days:' ngày mưa', trend_cloud_days:' ngày nhiều mây', trend_nodata:'Chưa có dữ liệu', prod_role_manager:'Giám đốc nhà máy', prod_role_machinist:'Thợ sửa máy', lbl_recorder:'Người lập biểu', thr_recorder:'Người lập biểu', lbl_holiday:'TET', opt_yes:'Có', opt_no:'Không',         prod_status_wait:'Chờ lập lịch', toast_copied:'Đã sao chép dòng', editing_label:'Đang chỉnh sửa',
+        prod_role_welder:'Thợ hàn', prod_role_forklift:'Lái xe nâng', prod_role_loader:'Lái xe xúc', prod_role_mixer:'Vận hành máy trộn', prod_role_press:'Vận hành máy ép tấm', prod_role_repair:'Thợ sửa tấm xi măng', prod_role_cook:'Đầu bếp', prod_role_temp:'Công nhân tạm thời khác', prod_role_keeper:'Người trông vật liệu', sec_labor:'Nhân công', sec_weather:'Thời tiết', wx_am:'Sáng', wx_pm:'Chiều', wx_temp:'Nhiệt độ', wx_cond:'Tình trạng', wx_hum:'Độ ẩm', wx_wind:'Gió', wx_notyet:'Chưa ghi', btn_backfill_wx:'Bù thời tiết lịch sử', toast_wx_loading:'Đang bù thời tiết lịch sử…', toast_wx_backfilled:'Đã bù thời tiết lịch sử', toast_wx_noprov:'Không tìm thấy tỉnh nhà máy', toast_wx_fail:'Lỗi lấy thời tiết lịch sử', op_actions:'Thao tác', op_edit:'Sửa', op_del:'Xóa', wx_backfill_hint:'Thời tiết ngày này bị thiếu, nhấn nút bên dưới để bổ sung.', trend_title:'Xu hướng', trend_all:'Tất cả', trend_7:'7 ngày', trend_30:'30 ngày', trend_labor:'Số nhân công', trend_weather:'Nhiệt độ & Độ ẩm (dải nắng/mưa)', trend_total:'Tổng', trend_sun:'Nắng', trend_rain:'Mưa', trend_cloud:'Nhiều mây', trend_sun_days:' ngày nắng', trend_rain_days:' ngày mưa', trend_cloud_days:' ngày nhiều mây', trend_nodata:'Chưa có dữ liệu', prod_role_manager:'Giám đốc nhà máy', prod_role_machinist:'Thợ sửa máy', lbl_recorder:'Người lập biểu', thr_recorder:'Người lập biểu', lbl_holiday:'TET', opt_yes:'Có', opt_no:'Không', sec_labor_wx_detail:'Bảng chi tiết nhân công & thời tiết',         prod_status_wait:'Chờ lập lịch', toast_copied:'Đã sao chép dòng', editing_label:'Đang chỉnh sửa',
       btn_change_due_date:'Thay đổi ngày', msg_due_date_locked:'Ngày bàn giao dự án sau khi chọn không thể thay đổi. Xác nhận {date}?', toast_due_date_saved:'Đã lưu ngày bàn giao dự án', toast_no_auth_due:'Không có quyền thay đổi ngày bàn giao dự án', msg_due_stop:'Đã đến ngày bàn giao dự án ({date}). Dừng tính toán.',
       sec_slats_info:'Thông tin cơ bản cấu hình sàn khe hở bê tông', btn_view_slats:'Xem cấu hình chi tiết sàn khe hở bê tông', btn_edit_slats:'Sửa cấu hình chi tiết sàn khe hở bê tông',
       btn_report:'Xem thống kê nguyên liệu nhập kho & Báo cáo so sánh nhu cầu vật liệu SX', rpt_title:'Thống kê nguyên liệu nhập kho & Báo cáo so sánh nhu cầu vật liệu SX', rpt_section_summary:'1. Tổng hợp chi phí theo Chuồng × Vật liệu (theo đơn giá đặt)', rpt_section_gap:'2. Thống kê đã nhập & thiếu hụt (gồm chờ duyệt/bị trả/đã xác nhận/nhập trực tiếp)', rpt_section_pie:'3. Tỷ lệ số tiền đã chi (biểu đồ tròn)', rpt_section_bar:'4. Tổng chi phí nhu cầu vs đã mua (biểu đồ cột)', thr_house:'Chuồng', thr_total_cost:'Tổng chi phí', thr_material:'Vật liệu', thr_demand_ton:'Nhu cầu (t)', thr_bought_ton:'Đã mua (t)', thr_gap_ton:'Thiếu (t)', thr_spent:'Đã chi', thr_need:'Cần mua', rpt_cat_rebar6:'Thép φ6', rpt_cat_rebar8:'Thép φ8', rpt_cat_rebar10:'Thép φ10', rpt_cat_rebar12:'Thép φ12', rpt_cat_cement:'Xi măng', rpt_cat_sand:'Cát', rpt_cat_gravel:'Sỏi',         rpt_grand_total:'Tổng cộng', btn_collapse_all:'Thu gọn', btn_expand_all:'Mở rộng', lbl_receipt_no:'Lần {n}', prod_line_n:'Dây chuyền {n}', thr_total_pcs:'Tổng', lbl_houses:'Chuồng', lbl_specs:'Quy cách', lbl_matrix_qty:'SL (tấm)', lbl_line_total:'Tổng dây chuyền', lbl_house_spec:'Chuồng / Quy cách', empty_sel_house:'Chọn chuồng trước', empty_sel_spec:'Chọn quy cách trước', empty_no_lines:'Chưa cài đặt dây chuyền (thiết lập trong Tổng quan nhà máy)', thr_pcs:'tấm', hist_hide_zero:'Ẩn cột 0', hist_show_all:'Hiện tất cả cột'
@@ -4956,7 +4968,9 @@ function _ovLoadChartLib(cb){
         +     '</div>'
         +   '</div>'
         + '</div>';
-      h += '<div class="prod-table-scroll"><table class="prod-table pc-labor-hist"><thead><tr>'
+      h += '<div class="prod-sec-title" style="margin-top:24px;">'+pt('sec_labor_wx_detail')+'</div>';
+      h += '<div class="prod-table-scroll pc-labor-scroll"><table class="prod-table pc-labor-hist"><thead><tr>'
+        + '<th class="pc-col-no">'+pt('thr_no')+'</th>'
         + '<th class="pc-col-date pc-sortable" onclick="prod_sortLabor(this)">'+pt('thr_date')+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>'
         + '<th class="pc-col-holiday pc-sortable" onclick="prod_sortLabor(this)">'+pt('lbl_holiday')+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>'
         + '<th class="pc-col-rec pc-sortable" onclick="prod_sortLabor(this)">'+pt('thr_recorder')+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>';
@@ -4967,13 +4981,14 @@ function _ovLoadChartLib(cb){
         + '<th class="pc-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
       var dates = prod_sortDateKeys(Object.keys(f.workers||{}), true);
       if(cDue) dates = dates.filter(function(dd){ return dmyToYmd(dd)<=cDue; });
+      var pcTotalRows = dates.length;
       dates.forEach(function(dd, idx){ var ww = f.workers[dd]; var sum = 0;
         PROD_WORKERS.forEach(function(k){ sum += (+ww[k[0]]||0); });
-        h += '<tr data-orig-idx="'+idx+'"><td class="pc-col-date">'+ymdToDmy(dd)+'</td>'
+        h += '<tr data-orig-idx="'+idx+'"><td class="pc-col-no">'+(pcTotalRows-idx)+'</td><td class="pc-col-date">'+ymdToDmy(dd)+'</td>'
           + '<td class="pc-col-holiday">'+((ww.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'</td>'
           + '<td class="pc-col-rec">'+prod_esc(ww.recorder||'')+'</td>';
-        PROD_WORKERS.forEach(function(k){ h += '<td class="pc-col-role">'+(ww[k[0]]||0)+'</td>'; });
-        h += '<td class="pc-col-total"><b>'+sum+'</b></td>'
+        PROD_WORKERS.forEach(function(k){ var v = ww[k[0]]||0; h += '<td class="pc-col-role'+(v===0?' pc-zero':'')+'">'+v+'</td>'; });
+        h += '<td class="pc-col-total'+(sum===0?' pc-zero':'')+'"><b>'+sum+'</b></td>'
           + '<td class="pc-col-wx pc-wx-cell">'+prod_wxCompact(ww.weatherAm)+'</td>'
           + '<td class="pc-col-wx pc-wx-cell">'+prod_wxCompact(ww.weatherPm)+'</td>'
           + '<td class="pc-col-act"><button class="prod-op" aria-label="'+pt('op_edit')+'" onclick="prod_editRow(\''+dd+'\')">✏️</button>'
@@ -5424,7 +5439,7 @@ function _ovLoadChartLib(cb){
         + '<span data-i18n="sec_receipt_list">'+pt('sec_receipt_list')+'</span>'
         + '<button type="button" id="pd_receipt_collapse_all" class="prod-btn ghost" style="margin-left:auto;padding:4px 12px;font-size:12px;" onclick="prod_toggleAllReceipts(this)">'+pt('btn_collapse_all')+'</button>'
         + '</div>';
-      h += '<div class="receipt-list" id="pd_receipt_list">';
+      h += '<div class="receipt-list rc-list-scroll" id="pd_receipt_list">';
       if(!_rc.length){ h += '<div class="prod-empty" data-i18n="receipt_empty">'+pt('receipt_empty')+'</div>'; }
       else {
         var _rcVisible='';
@@ -7052,11 +7067,11 @@ function _ovLoadChartLib(cb){
       if(N<=0){ h += '<div class="prod-empty">'+pt('empty_no_lines')+'</div>'; }
       else { h += '<div class="pe-lines">'; for(var n=1;n<=N;n++){ h += prod_dailyLineCard(n, specs, houses); } h += '</div>'; }
       if(noSpec){ h += '<div class="prod-empty">'+pt('empty_no_spec')+'</div>'; }
-      h += prod_eStatsSection(f);
-      h += '<div class="prod-sec-title" style="border-color:#6c757d;margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">'
+      h += '<div class="prod-sec-title" style="border-color:#6c757d;display:flex;align-items:center;justify-content:space-between;gap:10px;">'
         + '<span>'+pt('sec_history')+'</span>'
         + '<button class="prod-btn mini'+(PROD_HIST_HIDEZERO?' on':'')+'" type="button" onclick="prod_toggleHistZero()">'+(PROD_HIST_HIDEZERO?pt('hist_show_all'):pt('hist_hide_zero'))+'</button></div>';
       h += prod_dailyHistoryTable(f, specs);
+      h += prod_eStatsSection(f);
       setTimeout(prodAutoBackfillWeatherE, 0);
       return h;
     }
@@ -7281,7 +7296,7 @@ function _ovLoadChartLib(cb){
     }
     function prod_dailyLineCard(n, specs, houses){
       var line = PROD_PE_DRAFT.lines[n] || {houses:[],qty:{}};
-      var h = '<div class="pe-card pe-line'+(n===2?' pe-line-2':'')+'">';
+      var h = '<div class="pe-card pe-line'+(n===2||n===3?' pe-line-2':'')+'">';
       h += '<div class="pe-card-head"><div class="pe-card-title pe-line-title">'+pt('prod_line_n').replace('{n}',n)+'</div>'
          + '<div class="pe-line-total" id="pe_linetotal_'+n+'">'+prod_dailyLineTotalHtml(line, specs)+'</div></div>';
       h += '<div class="pe-block"><div class="pe-block-title">'+pt('lbl_houses')+'</div><div class="pe-chips">';
@@ -7341,8 +7356,8 @@ function _ovLoadChartLib(cb){
         var total = sp.total || 0;
         var houseQty = 0;
         (line.houses||[]).forEach(function(h){ houseQty += (+sp.houses[h]||0); });
-        var title = total ? (prod_fmtNum(houseQty) + ' / ' + prod_fmtNum(total) + ' ' + (pt('unit_pcs')||'片')) : '';
-        return '<span class="pe-chip pe-spec'+on+'" data-line="'+n+'" data-spec="'+prod_esc(s)+'" title="'+prod_esc(title)+'" onclick="prod_dailySpecToggle(this,'+n+')">'+prod_esc(s)+'</span>';
+        var badge = total ? '<span class="pe-chip-badge"><b>'+houseQty+'</b>/'+total+'</span>' : '';
+        return '<span class="pe-chip pe-spec'+on+'" data-line="'+n+'" data-spec="'+prod_esc(s)+'" onclick="prod_dailySpecToggle(this,'+n+')">'+prod_esc(s)+badge+'</span>';
       }).join('');
     }
     function prod_dailySpecRowsHtml(n){
@@ -7436,30 +7451,31 @@ function _ovLoadChartLib(cb){
       var specHouseMap = prod_specHouseMap();
       var disp = PROD_HIST_HIDEZERO ? specs.filter(function(s){ return grand[s]>0; }) : specs;
       var h = '<div class="prod-table-scroll"><table class="prod-table pe-hist"><thead><tr>'
-        + '<th>'+pt('thr_date')+'</th><th>'+pt('lbl_holiday')+'</th><th>'+pt('thr_recorder')+'</th><th>'+pt('sec_weather')+'</th>';
+        + '<th class="pe-col-no">'+pt('thr_no')+'</th><th class="pe-col-date">'+pt('thr_date')+'</th><th class="pe-col-holiday">'+pt('lbl_holiday')+'</th><th class="pe-col-rec">'+pt('thr_recorder')+'</th><th class="pe-col-wx-am">'+pt('wx_am')+'</th><th class="pe-col-wx-pm">'+pt('wx_pm')+'</th>';
       disp.forEach(function(s){
         var houses = specHouseMap[s]||[];
         var tip = houses.length ? (pt('thr_house') + '：' + prod_esc(houses.join('、'))) : '';
         var sp = s.split('×');
-        var sh = '<span class="v1">'+prod_esc(sp[0])+'</span>' + (sp.length>1 ? '<span class="v2">×'+prod_esc(sp.slice(1).join('×'))+'</span>' : '');
+        var sh = '<span class="v1">'+prod_esc(sp[0])+'</span>' + (sp.length>1 ? '<span class="v2">×'+prod_esc(sp[1])+'<br>×'+prod_esc(sp[2]||'')+'</span>' : '');
         h += '<th class="pe-vth" title="'+tip+'">'+sh+'</th>';
       });
-      h += '<th>'+pt('thr_total_pcs')+'</th><th>'+pt('op_actions')+'</th></tr></thead><tbody>';
-      if(!rows.length){ h += '<tr><td colspan="'+(disp.length+6)+'">—</td></tr>'; }
-      rows.forEach(function(r){
+      h += '<th class="pe-col-total">'+pt('thr_total_pcs')+'</th><th class="pe-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
+      if(!rows.length){ h += '<tr><td colspan="'+(disp.length+8)+'">—</td></tr>'; }
+      rows.forEach(function(r, idx){
         var d=r.d, rec=r.rec, per=r.per;
-        h += '<tr><td>'+prod_dateShort(d)+'</td><td>'+((rec.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'</td><td title="'+prod_esc(rec.recorder||'')+'">'+prod_esc(rec.recorder||'')+'</td>'+prod_dailyWxCell(rec);
+        h += '<tr><td class="pe-col-no">'+(idx+1)+'</td><td class="pe-col-date">'+prod_dateShort(d)+'</td><td class="pe-col-holiday">'+((rec.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'</td><td class="pe-col-rec" title="'+prod_esc(rec.recorder||'')+'">'+prod_esc(rec.recorder||'')+'</td>'+prod_dailyWxCells(rec);
         disp.forEach(function(s){
           var v=per[s]||0;
           var houses = specHouseMap[s]||[];
           var tip = houses.length ? (pt('thr_house') + '：' + prod_esc(houses.join('、'))) : '';
           h += '<td'+(v===0?' class="pe-zero"':'')+' title="'+tip+'">'+v+'</td>';
         });
-        h += '<td><b>'+r.dayTotal+'</b></td>'
-          + '<td><button class="prod-op" aria-label="'+pt('op_edit')+'" onclick="prod_editProductionRow(\''+prod_esc(d)+'\')">✏️</button>'
+        h += '<td class="pe-col-total"><b>'+r.dayTotal+'</b></td>'
+          + '<td class="pe-col-act"><button class="prod-op" aria-label="'+pt('op_edit')+'" onclick="prod_editProductionRow(\''+prod_esc(d)+'\')">✏️</button>'
+          + '<button class="prod-op" onclick="prod_copyProductionRow(\''+prod_esc(d)+'\')">📋</button>'
           + '<button class="prod-op" aria-label="'+pt('op_del')+'" onclick="prod_delProductionRow(\''+prod_esc(d)+'\')">🗑️</button></td></tr>';
       });
-      h += '<tr class="pe-grand"><td colspan="4"><b>'+pt('thr_total_pcs')+'</b></td>';
+      h += '<tr class="pe-grand"><td colspan="6"><b>'+pt('thr_total_pcs')+'</b></td>';
       disp.forEach(function(s){ h += '<td><b>'+grand[s]+'</b></td>'; });
       h += '<td><b>'+grandTotal+'</b></td><td></td></tr>';
       h += '</tbody></table></div>';
@@ -7497,20 +7513,37 @@ function _ovLoadChartLib(cb){
       prod_save(f);
       prod_renderTab('E');
     }
+    /* 复制一行产出数据：目标=源日期前一天；若已被占用则继续往前找空缺；日期格式保持 DD-MM-YYYY */
+    function prod_copyProductionRow(d){
+      var f = prod_get(PROD_CUR);
+      if(!f.production || !f.production[d]) return;
+      var rec = f.production[d];
+      var tk = prod_prevDateDmy(d);            // 源日期前一天（DD-MM-YYYY）
+      var guard = 0;
+      while(f.production[tk] && guard < 3650){ tk = prod_prevDateDmy(tk); guard++; } // 往前找空缺
+      var clone = JSON.parse(JSON.stringify(rec));
+      clone.date = tk;
+      f.production[tk] = clone;
+      prod_recomputeFinished(f);
+      prod_save(f);
+      prod_renderTab('E');
+      prod_toast(pt('toast_copied') + ' → ' + tk);
+    }
     function prod_toggleHistZero(){
       PROD_HIST_HIDEZERO = !PROD_HIST_HIDEZERO;
       prod_renderTab('E');
     }
-    function prod_dailyWxCell(rec){
-      var am=rec.weatherAm, pm=rec.weatherPm;
-      if(!am && !pm) return '<td class="pe-wx-avg pe-zero">—</td>';
-      var t = prod_wxNum(am&&am.temp, pm&&pm.temp);
-      var tStr = (t!=null)? Math.round(t)+'°' : '—';
-      var code = (pm&&pm.code!=null)? pm.code : (am&&am.code!=null? am.code : null);
-      var cond = prod_wxCond(code);
-      var ico = cond==='rain'?'🌧️':(cond==='sun'?'☀️':'⛅');
-      var tip = (am?('AM '+am.temp):'')+(am&&pm?' / ':'')+(pm?('PM '+pm.temp):'');
-      return '<td class="pe-wx-avg" title="'+prod_esc(tip)+'">'+ico+' '+tStr+'</td>';
+    /* 天气对象 → 温度/天气/湿度/风力 多行文本 */
+    function prod_wxDetailCell(wx){
+      if(!wx || wx.temp==null) return '<span class="pe-zero">—</span>';
+      var txt = pt(bdWxKey(wx.code)) || pt('bd_wx_na');
+      var hum = wx.hum!=null ? wx.hum+'%' : '—';
+      var wind = wx.wind!=null ? wx.wind : '—';
+      return Math.round(wx.temp)+'°C '+txt+'<br>· '+pt('wx_hum')+' '+hum+'<br>· '+pt('wx_wind')+wind+pt('bd_wx_wind_unit');
+    }
+    function prod_dailyWxCells(rec){
+      return '<td class="pe-col-wx-am">'+prod_wxDetailCell(rec.weatherAm)+'</td>'
+           + '<td class="pe-col-wx-pm">'+prod_wxDetailCell(rec.weatherPm)+'</td>';
     }
     /* H 成品库存（水泥漏缝地板，按规格） */
     function prod_idx(s){ return encodeURIComponent(s).replace(/[^a-zA-Z0-9]/g,'_'); }
