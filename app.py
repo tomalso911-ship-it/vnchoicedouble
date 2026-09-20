@@ -6499,6 +6499,88 @@ def api_feed_test():
     }
     return jsonify(result)
 
+
+@app.route("/api/material-prices")
+def api_material_prices():
+    """建材（钢筋/水泥/黄砂/石子）市场价格指数 API。
+
+    优先拉取环境变量配置的真实数据源（VN_MAT_API_URL + 可选 VN_MAT_API_KEY），
+    返回与前端 vendor/material_prices.js 完全一致的 {labels, units, series} 结构；
+    未配置或拉取失败时回退到前端已内置的示例数据（use_bundled=true），前端零改动。
+
+    期望的真实数据源响应格式（两种均可）：
+      格式A（直接同构）:
+        {"labels":["2021-01",...], "units":{"rebar":"VND/kg",...},
+         "series":{"rebar":[...],"cement":[...],"sand":[...],"gravel":[...]}}
+      格式B（按材料列点）:
+        {"rebar":[{"ym":"2021-01","price":15677},...], "cement":[...], ...}
+    越南可选数据源示例：Vật Giá Top（vatgia.top）Construction Material Price API。
+    """
+    cache_key = "material_prices"
+    cached = _API_CACHE.get(cache_key)
+    if cached and (time.time() - cached[0] < 3600):
+        return jsonify(cached[1])
+
+    url = os.environ.get("VN_MAT_API_URL")
+    key = os.environ.get("VN_MAT_API_KEY")
+    if url:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            if key:
+                req.add_header("Authorization", "Bearer " + key)
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                js = json.loads(resp.read().decode("utf-8"))
+            data = _normalize_material_prices(js)
+            if data:
+                out = {"ok": True, "data_source": "live", "use_bundled": False,
+                       "labels": data["labels"], "units": data["units"], "series": data["series"]}
+                _API_CACHE[cache_key] = (time.time(), out)
+                return jsonify(out)
+        except Exception as e:
+            app.logger.warning("material-prices live fetch failed: %s", e)
+    # 回退：使用前端内置示例数据
+    out = {"ok": True, "data_source": "demo", "use_bundled": True,
+           "labels": [], "units": {}, "series": {}}
+    _API_CACHE[cache_key] = (time.time(), out)
+    return jsonify(out)
+
+
+def _normalize_material_prices(js):
+    """把外部响应规整成 {labels, units, series}，失败返回 None。"""
+    if not isinstance(js, dict):
+        return None
+    keys = ("rebar", "cement", "sand", "gravel")
+    # 格式A：直接同构
+    if js.get("labels") and isinstance(js.get("series"), dict):
+        series = {k: list(js["series"].get(k, []) or []) for k in keys}
+        if any(series.values()):
+            labels = list(js["labels"])
+            for k in keys:
+                if len(series[k]) > len(labels):
+                    series[k] = series[k][:len(labels)]
+            return {"labels": labels,
+                    "units": {k: (js.get("units") or {}).get(k, "VND") for k in keys},
+                    "series": series}
+    # 格式B：每个材料是 [{ym, price}] 列表
+    if all(isinstance(js.get(k), list) for k in keys):
+        merged = {}
+        for k in keys:
+            for it in (js.get(k) or []):
+                if not isinstance(it, dict):
+                    continue
+                ym = it.get("ym") or it.get("date")
+                price = it.get("price", it.get("value"))
+                if ym and price is not None:
+                    merged.setdefault(k, {})[ym] = price
+        if merged:
+            labels = sorted({ym for k in merged for ym in merged[k]})
+            series = {k: [merged.get(k, {}).get(ym) for ym in labels] for k in keys}
+            return {"labels": labels,
+                    "units": {k: "VND" for k in keys},
+                    "series": series}
+    return None
+
+
 @app.route("/api/fx-rates")
 def api_fx_rates():
     """返回三条真实历史汇率曲线：USD→CNY、USD→VND、CNY→VND，最近 5 年 + 当月。"""
