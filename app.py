@@ -19,7 +19,7 @@ import time
 import shutil
 from datetime import datetime, timedelta
 import re
-from flask import Flask, request, jsonify, send_from_directory, Response
+from flask import Flask, request, jsonify, send_from_directory, Response, redirect
 from flask_cors import CORS
 
 # Windows 控制台默认 cp1252 无法打印中文，统一改用 UTF-8，避免中文 print 崩溃
@@ -3631,14 +3631,25 @@ def index():
 @app.route("/lite")
 def index_lite():
     """精简版页面：页签只保留「看板 / 签约项目」，表格样式与主站一致。
-    与 index() 同机制：本机模式下把 CLOUD_ONLY 置空，所有接口走 localhost。"""
+    与 index() 同机制：本机模式下把 CLOUD_ONLY 置空，所有接口走 localhost。
+
+    缓存令牌：以 choice_lite.html 内容 MD5 作为版本号，URL 自动带 ?v=<hash>。
+    文件内容一变 → hash 变 → URL 变 → 浏览器必然重新拉取并执行最新脚本，
+    彻底避免「改了代码却看到旧版 / 旧 DOM」（含 bfcache 恢复旧页面的情况）。"""
+    src = os.path.join(BASE_DIR, "choice_lite.html")
     try:
-        src = os.path.join(BASE_DIR, "choice_lite.html")
+        with io.open(src, "rb") as fb:
+            raw = fb.read()
+        hv = hashlib.md5(raw).hexdigest()[:12]
+        if request.args.get("v") != hv:
+            r = redirect("/lite?v=" + hv)
+            r.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            r.headers["Pragma"] = "no-cache"
+            return r
+        html = raw.decode("utf-8")
         # 每次直接读盘并做 CLOUD_ONLY 替换，不依赖 mtime 内存缓存
         # （Windows 上同一秒内多次保存 st_mtime 不变，会导致缓存不刷新、
         #  前端一直看到旧版 HTML，表现为"改了代码却没效果"）。
-        with io.open(src, encoding="utf-8") as f:
-            html = f.read()
         html = re.sub(r"var CLOUD_ONLY\s*=\s*\[[\s\S]*?\];",
                       "var CLOUD_ONLY = [];  /* 本机模式：全部接口走 localhost */",
                       html, count=1)

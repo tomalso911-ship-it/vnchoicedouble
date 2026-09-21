@@ -3282,7 +3282,6 @@ function _ovLoadChartLib(cb){
         <div class="page-header">
           <h2 data-i18n="prod_title">生产管理 · 现场工厂</h2>
           <span class="prod-sub" data-i18n="prod_sub">每个签约项目 = 一个独立现场工厂（人员/产能/设备/库存互不串）</span>
-          <button class="btn-sync" style="float:right" onclick="prod_syncAllToServer()">同步全部到服务器</button>
         </div>
         <div id="prod-cards" class="prod-cards"></div>
       </div>
@@ -3290,7 +3289,6 @@ function _ovLoadChartLib(cb){
         <div class="prod-detail-head">
           <button class="prod-back" onclick="prod_back()" data-i18n="prod_back">← 返回列表</button>
           <div class="prod-detail-title" id="prod-detail-title"></div>
-          <button class="btn-sync" style="margin-left:auto" onclick="prod_syncAllToServer()">同步全部到服务器</button>
         </div>
         <div class="prod-tabs" id="prod-tabs"></div>
         <div class="prod-tab-body" id="prod-tab-body"></div>
@@ -3352,6 +3350,12 @@ function _ovLoadChartLib(cb){
       .prod-table{width:100%;border-collapse:collapse;font-size:13px;}
       .prod-table th,.prod-table td{border:1px solid #eee;padding:5px 6px;text-align:left;}
       .prod-table th{background:#f7f9f4;font-size:11px;white-space:normal;vertical-align:bottom;}
+      .plc-scroll{max-height:360px;overflow-y:auto;border:1px solid #e6e9ee;border-radius:6px;}
+      .plc-legend{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 22px;margin:6px 0 2px;}
+      .plc-legend .plc-lg-item{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:12px;color:#444;user-select:none;transition:opacity .15s;}
+      .plc-legend .plc-lg-item.off{opacity:.35;text-decoration:line-through;}
+      .plc-table{margin:0;}
+      .plc-table thead th{position:sticky;top:0;background:#f7f9f4;z-index:2;box-shadow:inset 0 -1px 0 #eee;}
       .prod-table td{white-space:normal;word-break:break-word;}
       .prod-table tbody tr:nth-child(even){background:#fafafa;}
       .prod-table tbody tr:hover{background:#f0f4ff;}
@@ -3660,11 +3664,12 @@ function _ovLoadChartLib(cb){
     var PROD_TREND_RESIZE = false;
     var PROD_TREND_DATA = null;
     var PROD_ESTATS_SORT = {col:null, dir:0};
+    var PROD_LINE_EXPANDED = false;  /* 各条生产线对比分析折叠状态：跨语言/重渲染保持 */
     /* ===== 生产管理三语包（zh/en/vi），随系统 CUR_LANG 切换 ===== */
     var PROD_I18N = {
       zh: {
         prod_tab_A:'工厂概况&速览', prod_tab_B:'生产计划', prod_tab_C:'日记录:人工/天气', prod_tab_D:'原料库存', prod_tab_E:'每日生产', prod_tab_H:'成品库存', prod_tab_F:'设备与故障', prod_tab_G:'交付',
-        prod_overview:'工厂概况', lbl_contract_date:'合同签约日', lbl_contract_signing_date:'合同签订日期', lbl_project_due:'项目交期', lbl_start_prod_date:'开始生产日期', lbl_addr:'现场地址', lbl_line:'生产线', opt_line_1:'1条', opt_line_2:'2条', opt_line_3:'3条', opt_line_4:'4条', lbl_shift:'班次', opt_shift_1:'1班/天', opt_shift_2:'2班/天', btn_save:'保存',
+        prod_overview:'工厂概况', lbl_contract_date:'合同签约日', lbl_contract_signing_date:'合同签订日期', lbl_project_due:'项目交期', lbl_start_prod_date:'开始生产日期', lbl_addr:'现场地址', lbl_line:'生产线', opt_line_1:'1条', opt_line_2:'2条', opt_line_3:'3条', opt_line_4:'4条', lbl_shift:'班次', opt_shift_1:'1班/天', opt_shift_2:'2班/天', btn_save:'保存', prod_line_cmp_title:'各条生产线对比分析', prod_line_chart_title:'生产线曲线对比图', prod_line_table_title:'生产线曲线对比表', prod_line_seq:'序号', prod_line_date:'日期', prod_line_prefix:'线', prod_line_empty:'暂无生产产出记录。',
         sec_usage:'项目用量分解（规格 × 栋舍，源自签约项目规格表）', empty_no_spec:'本项目尚未录入水泥漏缝地板规格。请回到「签约项目」打开该项目，点“编辑”填写“水泥漏缝地板规格”。', empty_no_spec_sel:'请点选上方规格以录入片数',
         th_spec:'规格(长×宽×高 mm)', thr_house:'栋舍', th_total:'总需求量', th_shared:'共用情况', share_excl:'专属', share_cross_pre:'跨', share_cross_suf:'共用',
         sec_mat_spec:'按规格 × 栋舍 的材料用量', sec_mat_house:'按栋舍 × 规格 的材料用量', th_qty_whole:'数量/整场', th_rebar:'钢筋', th_cement:'水泥/吨', th_sand:'黄砂/吨', th_gravel:'石子/吨', thr_total:'总计',
@@ -3697,7 +3702,7 @@ function _ovLoadChartLib(cb){
       },
       en: {
         prod_tab_A:'Factory Overview & Quick View', prod_tab_B:'Production Plan', prod_tab_C:'Daily: Labor/Weather', prod_tab_D:'Raw Material Stock', prod_tab_E:'Daily Production', prod_tab_H:'Finished Goods Stock', prod_tab_F:'Equipment & Failures', prod_tab_G:'Delivery',
-        prod_overview:'Factory Overview', lbl_contract_date:'Contract Signing Date', lbl_contract_signing_date:'Contract Signing Date', lbl_project_due:'Ngày bàn giao dự án', lbl_start_prod_date:'Production Start Date', lbl_addr:'Site Address', lbl_line:'Production Line', opt_line_1:'1 line', opt_line_2:'2 lines', opt_line_3:'3 lines', opt_line_4:'4 lines', lbl_shift:'Shift', opt_shift_1:'1 shift/day', opt_shift_2:'2 shifts/day', btn_save:'Save',
+        prod_overview:'Factory Overview', lbl_contract_date:'Contract Signing Date', lbl_contract_signing_date:'Contract Signing Date', lbl_project_due:'Ngày bàn giao dự án', lbl_start_prod_date:'Production Start Date', lbl_addr:'Site Address', lbl_line:'Production Line', opt_line_1:'1 line', opt_line_2:'2 lines', opt_line_3:'3 lines', opt_line_4:'4 lines', lbl_shift:'Shift', opt_shift_1:'1 shift/day', opt_shift_2:'2 shifts/day', btn_save:'Save', prod_line_cmp_title:'Production Line Comparison Analysis', prod_line_chart_title:'Production Line Comparison Chart', prod_line_table_title:'Production Line Comparison Table', prod_line_seq:'#', prod_line_date:'Date', prod_line_prefix:'Line ', prod_line_empty:'No production records yet.',
         sec_usage:'Project Usage Breakdown (Spec × House, from signed project spec sheet)', empty_no_spec:'This project has not entered concrete slatted floor specs. Please go back to "Signed Projects", open the project, click "Edit" and fill in "Concrete Slatted Floor Specs".', empty_no_spec_sel:'Select specs above to enter qty',
         th_spec:'Spec (L×W×H mm)', thr_house:'House', th_total:'Total Demand', th_shared:'Sharing', share_excl:' exclusive', share_cross_pre:'shared by ', share_cross_suf:'',
         sec_mat_spec:'Material Usage by Spec × House', sec_mat_house:'Material Usage by House × Spec', th_qty_whole:'Qty / Whole Site', th_rebar:'Rebar', th_cement:'Cement/Tons', th_sand:'Sand/Tons', th_gravel:'Gravel/Tons', thr_total:'Grand Total',
@@ -3729,7 +3734,7 @@ function _ovLoadChartLib(cb){
       },
       vi: {
         prod_tab_A:'Tổng quan nhà máy & Xem nhanh', prod_tab_B:'Kế hoạch sản xuất', prod_tab_C:'Nhật ký: Nhân công/Thời tiết', prod_tab_D:'Kho nguyên liệu', prod_tab_E:'Sản xuất hàng ngày', prod_tab_H:'Kho thành phẩm', prod_tab_F:'Thiết bị & Sự cố', prod_tab_G:'Giao hàng',
-        prod_overview:'Tổng quan nhà máy', lbl_contract_date:'Ngày ký hợp đồng', lbl_contract_signing_date:'Ngày ký hợp đồng', lbl_project_due:'Ngày bàn giao dự án', lbl_start_prod_date:'Ngày bắt đầu sản xuất', lbl_addr:'Địa chỉ công trường', lbl_line:'Dây chuyền sản xuất', opt_line_1:'1 dây chuyền', opt_line_2:'2 dây chuyền', opt_line_3:'3 dây chuyền', opt_line_4:'4 dây chuyền', lbl_shift:'Ca làm việc', opt_shift_1:'1 ca/ngày', opt_shift_2:'2 ca/ngày', btn_save:'Lưu',
+        prod_overview:'Tổng quan nhà máy', lbl_contract_date:'Ngày ký hợp đồng', lbl_contract_signing_date:'Ngày ký hợp đồng', lbl_project_due:'Ngày bàn giao dự án', lbl_start_prod_date:'Ngày bắt đầu sản xuất', lbl_addr:'Địa chỉ công trường', lbl_line:'Dây chuyền sản xuất', opt_line_1:'1 dây chuyền', opt_line_2:'2 dây chuyền', opt_line_3:'3 dây chuyền', opt_line_4:'4 dây chuyền', lbl_shift:'Ca làm việc', opt_shift_1:'1 ca/ngày', opt_shift_2:'2 ca/ngày', btn_save:'Lưu', prod_line_cmp_title:'Phân tích so sánh các dây chuyền', prod_line_chart_title:'Biểu đồ so sánh dây chuyền', prod_line_table_title:'Bảng so sánh đường cong các dây chuyền sản xuất', prod_line_seq:'STT', prod_line_date:'Ngày', prod_line_prefix:'Dây ', prod_line_empty:'Chưa có dữ liệu sản xuất.',
         sec_usage:'Phân tích lượng dùng dự án (Quy cách × Chuồng, từ bảng quy cách dự án ký)', empty_no_spec:'Dự án này chưa nhập quy cách sàn khe hở bê tông. Vui lòng quay lại "Dự án ký", mở dự án, nhấn "Sửa" và điền "Quy cách sàn khe hở bê tông".', empty_no_spec_sel:'Chọn quy cách bên trên để nhập số lượng',
         th_spec:'Quy cách (D×R×C mm)', thr_house:'Chuồng', th_total:'Tổng nhu cầu', th_shared:'Dùng chung', share_excl:' riêng', share_cross_pre:'dùng chung ', share_cross_suf:'',
         sec_mat_spec:'Lượng vật liệu theo Quy cách × Chuồng', sec_mat_house:'Lượng vật liệu theo Chuồng × Quy cách', th_qty_whole:'SL / Toàn công trường', th_rebar:'Thép', th_cement:'Xi măng/Tấn', th_sand:'Cát/Tấn', th_gravel:'Sỏi/Tấn', thr_total:'Tổng cộng',
@@ -4404,11 +4409,11 @@ function _ovLoadChartLib(cb){
       var tabs = prod_el('prod-tabs').children;
       for(var j=0;j<tabs.length;j++){ tabs[j].classList.toggle('active', tabs[j].getAttribute('data-key')===key); }
       var body = prod_el('prod-tab-body'); var f = prod_get(PROD_CUR);
-      if(key==='A'){ body.innerHTML = prod_tabA(f); prod_syncContractDate(); prod_linkDueToCard(); }
+      if(key==='A'){ body.innerHTML = prod_tabA(f); prod_syncContractDate(); prod_linkDueToCard(); prod_drawLineCompare(); }
       else if(key==='B'){ body.innerHTML = prod_tabB(f); prod_syncContractDate(); prod_applyHouseFilter(); }
       else if(key==='C'){ body.innerHTML = prod_tabC(f); prod_drawTrends(); PROD_LABOR_SORT = {col:null, dir:0}; }
       else if(key==='D'){ body.innerHTML = prod_tabD(f); prodReceiptRenderRows(); prod_receiptApplyHouse(); prod_updateHouseFilterTip(); prod_updateHousePreview(); }
-      else if(key==='E'){ body.innerHTML = prod_tabE(f); prod_drawEStats(f); }
+      else if(key==='E'){ body.innerHTML = prod_tabE(f); prod_drawEStats(f); prod_drawLineCompare(); }
       else if(key==='H') body.innerHTML = prod_tabH(f);
       else if(key==='F') body.innerHTML = prod_tabF(f);
       else if(key==='G') body.innerHTML = prod_tabG(f);
@@ -4568,6 +4573,158 @@ function _ovLoadChartLib(cb){
         + '<button class="prod-btn" onclick="prod_openSlats(true)">'+pt('btn_view_slats')+'</button>'
         + (prod_canEditSlats() ? '<button class="prod-btn sec" onclick="prod_openSlats(false)">'+pt('btn_edit_slats')+'</button>' : '')
         + '</div>';
+    }
+    /* ===== A 页：各条生产线对比分析（历史产出，按线拆分） ===== */
+    function prod_lineCompareData(f){
+      var prod = (f && f.production) || {};
+      var dmyKeys = Object.keys(prod);
+      if(!dmyKeys.length) return null;
+      var ymds = dmyKeys.map(dmyToYmd).filter(function(y){ return /^\d{4}-\d{2}-\d{2}$/.test(y); });
+      if(!ymds.length) return null;
+      ymds.sort();
+      var start = ymds[0], end = ymds[ymds.length-1];
+      var p = f.profile||{};
+      var N = parseInt(p.capacityNote) || 0;
+      var maxLine = 0;
+      dmyKeys.forEach(function(d){ var rec=prod[d]; if(rec&&rec.lines){ for(var n in rec.lines){ var k=parseInt(n)||0; if(k>maxLine) maxLine=k; } } });
+      if(!N || N<1) N = maxLine || 1;
+      if(N<1) N = 1;
+      var a = new Date(start+'T00:00:00'), b = new Date(end+'T00:00:00');
+      var rows = [];
+      for(var dt=new Date(a); dt<=b; dt.setDate(dt.getDate()+1)){
+        var y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,'0'), d2=String(dt.getDate()).padStart(2,'0');
+        var ymd=y+'-'+m+'-'+d2;
+        var dmy=ymdToDmy(ymd);
+        var rec=prod[dmy];
+        var vals=[];
+        for(var n=1;n<=N;n++){
+          var tot=0;
+          if(rec && rec.lines && rec.lines[n]){ var per={}; prod_lineAddQty(rec.lines[n], per); for(var s in per){ tot+=(per[s]||0); } }
+          vals.push(tot);
+        }
+        rows.push({date:dmy, vals:vals});
+      }
+      return {N:N, rows:rows};
+    }
+    function prod_tabALineCompare(f){
+      /* 大标题行：标题 + 右侧 +/- 文本按钮；下方 #plcBody 默认按 PROD_LINE_EXPANDED 显示/隐藏 */
+      var isExpanded = PROD_LINE_EXPANDED;
+      var head = '<div class="plc-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;">'
+        + '<span style="display:inline-flex;align-items:center;gap:8px">'
+        + '<div class="prod-sec-title" style="margin:0">'+pt('prod_line_cmp_title')+'</div>'
+        + '<button class="prod-btn mini plc-toggle-btn" type="button" onclick="prod_toggleLineCompare()">'+(isExpanded?'-':'+')+'</button>'
+        + '</span>'
+        + '<button class="prod-btn mini plc-toggle-btn" type="button" onclick="prod_toggleLineCompare()">'+(isExpanded?'-':'+')+'</button>'
+        + '</div>';
+      var bodyOpen = '<div id="plcBody" class="plc-body" style="display:'+(isExpanded?'block':'none')+'">';
+      var bodyClose = '</div>';
+      try {
+        var data = prod_lineCompareData(f);
+        if(!data) return head + bodyOpen + '<div class="prod-empty">'+pt('prod_line_empty')+'</div>' + bodyClose;
+        var N=data.N, rows=data.rows;
+        var th = '<th>'+pt('prod_line_seq')+'</th><th>'+pt('prod_line_date')+'</th>';
+        for(var n=1;n<=N;n++){ th += '<th>'+pt('prod_line_prefix')+n+'</th>'; }
+        var tb = '';
+        rows.forEach(function(r,i){
+          var tds = '<td>'+(i+1)+'</td><td>'+r.date+'</td>';
+          for(var n=1;n<=N;n++){ tds += '<td>'+prod_fmtNum(r.vals[n-1])+'</td>'; }
+          tb += '<tr>'+tds+'</tr>';
+        });
+        return head + bodyOpen
+          + '<div class="prod-sec-title" style="margin-top:14px">'+pt('prod_line_table_title')+'</div>'
+          + '<div class="plc-scroll"><table class="prod-table plc-table"><thead><tr>'+th+'</tr></thead><tbody>'+tb+'</tbody></table></div>'
+          + '<div class="prod-sec-title" style="margin-top:14px;font-size:14px">'+pt('prod_line_chart_title')+'</div>'
+          + '<div id="plcLegend" class="plc-legend"></div>'
+          + '<div id="plcChart" style="width:100%;height:340px"></div>'
+          + bodyClose;
+      } catch(e){
+        return head + bodyOpen + '<div class="prod-empty" style="color:#E53935">render error: '+((e&&e.message)||e)+'</div>' + bodyClose;
+      }
+    }
+    /* 折叠：以 PROD_LINE_EXPANDED 为唯一真值源，点击只做翻转，避免与 body.style.display 失同步导致点了+反而收起 */
+    function prod_toggleLineCompare(){
+      PROD_LINE_EXPANDED = !PROD_LINE_EXPANDED;
+      var body = prod_el('plcBody'); if(body) body.style.display = PROD_LINE_EXPANDED ? 'block' : 'none';
+      var btns = document.querySelectorAll('.plc-toggle-btn');
+      [].forEach.call(btns, function(b){ b.textContent = PROD_LINE_EXPANDED ? '-' : '+'; });
+      if(PROD_LINE_EXPANDED){ prod_drawLineCompare(); }  /* 展开后可见，尺寸正常，安全初始化曲线图 */
+    }
+    function prod_drawLineCompare(){
+      var f = prod_get(PROD_CUR); if(!f) return;
+      var _body = prod_el('plcBody'); if(_body && _body.style.display === 'none') return;  /* 折叠态不初始化图表 */
+      prod_ensureEcharts().then(function(){
+        if(PROD_ACTIVE_TAB!=='A' && PROD_ACTIVE_TAB!=='E') return;
+        if(!PROD_ECHARTS_RESIZED){ PROD_ECHARTS_RESIZED = true; window.addEventListener('resize', function(){ for(var id in PROD_ECHARTS){ if(PROD_ECHARTS[id]) PROD_ECHARTS[id].resize(); } }); }
+        var data = prod_lineCompareData(f); if(!data) return;
+        var N=data.N, rows=data.rows;
+        var dates = rows.map(function(r){ return r.date; });
+        var palette = ['#e07c5a','#3b7dc0','#1ab6a3','#ff6b81'];
+        /* 计算 y 轴像素比例，用于按数值差自动拉开上下标签，避免重叠 */
+        var _yv = [];
+        for(var _i=0;_i<rows.length;_i++){ for(var _j=0;_j<rows[_i].vals.length;_j++){ _yv.push(rows[_i].vals[_j]); } }
+        var _yMin = Math.min.apply(null, _yv), _yMax = Math.max.apply(null, _yv);
+        var _cont = prod_el('plcChart');
+        var _contH = (_cont && _cont.clientHeight) ? _cont.clientHeight : 240;
+        var _plotH = Math.max(120, _contH - 58 - 55);
+        var _yScale = _plotH / Math.max(1, (_yMax - _yMin));
+        var _base = 10, _labelH = 12;  /* 标签离点的基础距离，近距离时自动缩小防止重叠 */
+        var series = [];
+        for(var n=1;n<=N;n++){
+          var col = palette[(n-1)%palette.length];
+          var nm = pt('prod_line_prefix')+n;
+          /* 红色(奇数线)标签在曲线上方，蓝色(偶数线)在曲线下方；同 X 处数值接近时自动上下再拉开避免重叠 */
+          series.push({
+            name: nm,
+            type:'line', smooth:true, showSymbol:true, symbolSize:4,
+            itemStyle:{color:col}, lineStyle:{color:col, width:2},
+            data: rows.map(function(r, i){
+              var v = r.vals[n-1];
+              if(i % 5 !== 0) return { value:v, label:{ show:false } };
+              var mx = Math.max.apply(null, r.vals), mn = Math.min.apply(null, r.vals);
+              var pixelGap = (mx - mn) * _yScale;
+              /* 自动监控：同一 X 处标签不能重叠，且高值标签始终位于低值标签上方 */
+              var margin = 6;
+              var maxDist = (pixelGap - _labelH - margin) / 2;
+              var dist = Math.max(4, Math.min(_base, maxDist));
+              var pos = (v === mx) ? 'top' : 'bottom';
+              return { value:v, label:{ show:true, position:pos, align:'center', distance:dist, fontSize:10, color:col, formatter:function(p){ return prod_fmtNum(p.value); } } };
+            })
+          });
+        }
+        prod_eSet('plcChart', {
+          animation:false,
+          tooltip:{trigger:'axis'},
+          legend:{show:false},
+          grid:{left:55, right:30, top:58, bottom:55, containLabel:true},
+          xAxis:{type:'category', data:dates, boundaryGap:false, axisLabel:{fontSize:10, hideOverlap:true, formatter:function(v){ return v?v.slice(0,5):''; }}},
+          yAxis:{type:'value', name: pt('unit_pcs')||'片', nameLocation:'end', nameRotate:0, nameGap:40, nameTextStyle:{fontWeight:'bold', align:'right', verticalAlign:'bottom', padding:[0,0,6,0]}},
+          series:series
+        });
+        /* 渲染自定义 HTML 图例：间距完全由 CSS 控制，点击可切换对应曲线显隐 */
+        var lgEl = prod_el('plcLegend');
+        if(lgEl){
+          var lgHtml = '';
+          for(var n=1;n<=N;n++){
+            var col = palette[(n-1)%palette.length];
+            var nm = pt('prod_line_prefix')+n;
+            var mk = "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'>"
+                   + "<line x1='0' y1='7' x2='14' y2='7' stroke='"+col+"' stroke-width='2'/>"
+                   + "<circle cx='7' cy='7' r='3' fill='"+col+"'/></svg>";
+            lgHtml += "<span class='plc-lg-item' data-name='"+nm+"' title='"+nm+"'>"
+                    + "<span class='plc-lg-ic' style='width:14px;height:14px;display:inline-flex'>"+mk+"</span>"
+                    + "<span class='plc-lg-tx'>"+nm+"</span></span>";
+          }
+          lgEl.innerHTML = lgHtml;
+          lgEl.onclick = function(ev){
+            var it = ev.target.closest ? ev.target.closest('.plc-lg-item') : null;
+            if(!it) return;
+            var name = it.getAttribute('data-name');
+            var ch = PROD_ECHARTS['plcChart']; if(!ch) return;
+            ch.dispatchAction({type:'legendToggleSelect', name:name});
+            it.classList.toggle('off');
+          };
+        }
+      }).catch(function(e){ console.error('[line compare] echarts load failed', e); });
     }
     function prod_saveProfile(){
       var f = prod_get(PROD_CUR);
@@ -7165,6 +7322,8 @@ function _ovLoadChartLib(cb){
         + '</div>';
       if(N<=0){ h += '<div class="prod-empty">'+pt('empty_no_lines')+'</div>'; }
       else { h += '<div class="pe-lines">'; for(var n=1;n<=N;n++){ h += prod_dailyLineCard(n, specs, houses); } h += '</div>'; }
+      /* 各条生产线对比分析：置于线1/线2 录入卡片下方、历史产出上方 */
+      h += prod_tabALineCompare(f);
       if(noSpec){ h += '<div class="prod-empty">'+pt('empty_no_spec')+'</div>'; }
       h += '<div class="prod-sec-title" style="border-color:#6c757d;display:flex;align-items:center;justify-content:space-between;gap:10px;">'
         + '<span>'+pt('sec_history')+'</span>'
