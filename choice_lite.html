@@ -23519,10 +23519,10 @@ var _slatsPieLabelsPlugin = {
       var cos = Math.cos(mid), sin = Math.sin(mid);
       items.push({
         value:value, pct:pct, angle: mid, cos: cos, sin: sin,
+        label: (chart.data.labels ? chart.data.labels[i] : ''),
         arcX: arc.x, arcY: arc.y, oR: arc.outerRadius,
         color: bg[i%bg.length],
-        edgeX: arc.x + cos*(arc.outerRadius+1), edgeY: arc.y + sin*(arc.outerRadius+1),
-        text: pct.toFixed(1)+'% / '+_slatsFmtNum(value) + (options.unit||'')
+        edgeX: arc.x + cos*(arc.outerRadius+1), edgeY: arc.y + sin*(arc.outerRadius+1)
       });
     });
     var boxW = 116, boxH = 22, minGap = 6, boxGap = 12;
@@ -23537,33 +23537,23 @@ var _slatsPieLabelsPlugin = {
     function rectHit(a, b){
       return Math.abs(a.x - b.x) < (boxW + minGap) && Math.abs(a.y - b.y) < (boxH + minGap);
     }
-    function axisOf(it){ return (Math.abs(it.cos) >= Math.abs(it.sin)) ? 'v' : 'h'; }
-    // 初始：每个标签都贴在自己扇区角度方向外侧，不强行对齐到同一行/列
+    // 初始：每个标签都贴在自己扇区角度方向外侧
     items.forEach(function(it){ it.R = R0; it.x = cx + Math.cos(it.angle)*it.R; it.y = cy + Math.sin(it.angle)*it.R; });
-    // 迭代求解：只有两个标签真正重叠时才把其中一个轻微错开（阶梯状）；
-    //           标签框碰到饼圆盘时才沿自身角度径向外移。允许引导线略长/略斜。
-    for(var pass = 0; pass < 240; pass++){
+    // 迭代求解：两个标签真正重叠时，沿各自扇区角度径向交错外推（阶梯状）；
+    //           径向外推只会远离饼、不会碰饼；允许引导线略长/略斜。
+    var step = 15;
+    for(var pass = 0; pass < 300; pass++){
       var moved = false;
       for(var i = 0; i < items.length; i++){
         for(var j = i + 1; j < items.length; j++){
           var a = items[i], b = items[j];
           if(rectHit(a, b)){
-            var step = (boxH + minGap) / 2;
-            if(axisOf(a) === 'v'){ a.y += (a.y <= b.y ? -step : step); }
-            else { a.x += (a.x <= b.x ? -step : step); }
-            if(axisOf(b) === 'v'){ b.y += (b.y <= a.y ? -step : step); }
-            else { b.x += (b.x <= a.x ? -step : step); }
+            if(a.R <= b.R){ a.R = Math.min(Rmax, a.R + step); }
+            else { b.R = Math.min(Rmax, b.R + step); }
+            a.x = cx + Math.cos(a.angle)*a.R; a.y = cy + Math.sin(a.angle)*a.R;
+            b.x = cx + Math.cos(b.angle)*b.R; b.y = cy + Math.sin(b.angle)*b.R;
             moved = true;
           }
-        }
-      }
-      for(var i = 0; i < items.length; i++){
-        var it = items[i];
-        if(touchesPie(it.x, it.y)){
-          it.R = Math.min(Rmax, it.R + 3);
-          it.x = cx + Math.cos(it.angle)*it.R;
-          it.y = cy + Math.sin(it.angle)*it.R;
-          moved = true;
         }
       }
       if(!moved) break;
@@ -23621,12 +23611,18 @@ var _slatsPieLabelsPlugin = {
       ctx.lineWidth = 2;
       roundRect(ctx, bx, by, boxW, boxH, 9);
       ctx.stroke();
-      // 框内文本
+      // 框外上方：百分比（同扇区色）
+      ctx.fillStyle = it.color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(it.pct.toFixed(1)+'%', it.x, by - 3);
+      // 框内：类别名称
       ctx.fillStyle = isLight(it.color) ? '#222' : '#fff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.font = 'bold 10px sans-serif';
-      ctx.fillText(it.text, it.x, it.y);
+      ctx.fillText(it.label, it.x, it.y);
     });
     ctx.restore();
   }
@@ -23724,10 +23720,11 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
       Chart.register(_slatsPieLabelsPlugin);
     }
     var chart=new Chart(ctx, {
-      type: 'pie',
+      type: 'doughnut',
       data: { labels: labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 1, borderColor: '#fff', offset: 24 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
+        cutout: '45%',
         layout: { padding: { top: 100, right: 185, bottom: 100, left: 185 } },
         plugins: {
           legend: { display: false },
