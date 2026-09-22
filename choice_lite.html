@@ -15117,14 +15117,7 @@ function fitTopbarFontsNow() {
       items[j].style.fontWeight = isVi ? '700' : '';   // 仅越南语标签加粗
       items[j].style.padding = vPad + 'px ' + pad + 'px';
     }
-    // 空间足够时等距分布；将要溢出时改用固定 gap 紧凑排列，配合下方缩小字号/短标签避免滚动条
-    if (overflow()) {
-      menu.style.justifyContent = 'flex-start';
-      menu.style.gap = gap + 'px';
-    } else {
-      menu.style.justifyContent = 'space-evenly';
-      menu.style.gap = '0';
-    }
+    menu.style.gap = gap + 'px';   // 307c02c 原逻辑：仅自适应调整间距，不碰 justify-content
   }
   function overflow() {
     return menu.scrollWidth > menu.clientWidth + 1;
@@ -15187,6 +15180,14 @@ function fitTopbarFontsNow() {
       if (mq.addEventListener) mq.addEventListener('change', onCompactChange);
       else if (mq.addListener) mq.addListener(onCompactChange);
     } catch (e) { /* 老浏览器不支持 matchMedia 监听则忽略 */ }
+  }
+  // 导航标签等距铺满整条：空间足够时用 space-evenly（首尾留白、均匀分布）；
+  // 将要溢出时保留自适应压缩（flex-start + gap，配合上方缩小字号/短标签避免滚动条）
+  if (overflow()) {
+    menu.style.justifyContent = 'flex-start';
+  } else {
+    menu.style.justifyContent = 'space-evenly';
+    menu.style.gap = '0';
   }
   // 仍溢出时，把当前激活的标签滚动到可见区域
   scrollActiveTabIntoView();
