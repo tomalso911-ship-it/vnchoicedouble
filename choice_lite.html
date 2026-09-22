@@ -9645,7 +9645,7 @@ function _ovLoadChartLib(cb){
 .slats-report-table tbody tr:last-child td:last-child { border-radius: 0 0 10px 0; }
 .slats-report-desc { color: #555; font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
 .slats-report-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; }
-.slats-report-chart-wrap { flex: 1 1 420px; height: 320px; position: relative; min-width: 300px; }
+.slats-report-chart-wrap { flex: 1 1 480px; height: 400px; position: relative; min-width: 300px; }
 .slats-report-data-table-wrap { flex: 0 1 340px; align-self: center; margin-top: 0; }
 .slats-report-data-table-wrap .slats-report-table { font-size: 12px; width: 100%; max-width: 340px; margin: 0 auto; }
 .slats-report-summary { background: #fffdf5; border: 1px solid #f0e2b6; border-left: 4px solid #E53935; border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 2; color: #444; }
@@ -23520,14 +23520,15 @@ var _slatsPieLabelsPlugin = {
         color: bg[i%bg.length],
         edgeX: cx + cos*(outer+1), edgeY: cy + sin*(outer+1),
         r: outer + 8,
-        text: pct.toFixed(1)+'% / '+_slatsFmtNum(value) + (options.unit||'')
+        pctText: pct.toFixed(1)+'%',
+        valText: _slatsFmtNum(value) + (options.unit||'')
       });
     });
     // 径向防重叠：按角度排序，相邻标签太近则沿各自径向向外推（花瓣散开，保持角度方向）
     function radialPush(side){
       if(!side.length) return;
       side.sort(function(a,b){ return Math.atan2(a.sin, a.cos) - Math.atan2(b.sin, b.cos); });
-      var gap = 15, step = 12, maxExtra = 55;
+      var gap = 14, step = 9, maxExtra = 35;
       for(var i=1;i<side.length;i++){
         var it = side[i], prev = side[i-1];
         while(it.r - outer < maxExtra){
@@ -23545,9 +23546,10 @@ var _slatsPieLabelsPlugin = {
       it.labelY = cy + it.sin*it.r;
     });
     ctx.save();
-    ctx.font = 'bold 11px sans-serif';
     ctx.lineWidth = 1;
     items.forEach(function(it){
+      var lx = it.labelX + (it.cos>=0? 4 : -4);
+      var align = it.cos >= 0 ? 'left' : 'right';
       // 同色引导线
       ctx.strokeStyle = it.color;
       ctx.beginPath();
@@ -23559,11 +23561,15 @@ var _slatsPieLabelsPlugin = {
       ctx.beginPath();
       ctx.arc(it.edgeX, it.edgeY, 2.6, 0, Math.PI*2);
       ctx.fill();
-      // 文本
+      // 两行文本：占比（上，加粗）+ 绝对值（下），宽度减半避免越界
       ctx.fillStyle = '#333';
-      ctx.textAlign = it.cos >= 0 ? 'left' : 'right';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(it.text, it.labelX + (it.cos>=0? 4 : -4), it.labelY);
+      ctx.textAlign = align;
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(it.pctText, lx, it.labelY - 1);
+      ctx.font = '10px sans-serif';
+      ctx.textBaseline = 'top';
+      ctx.fillText(it.valText, lx, it.labelY + 1);
     });
     ctx.restore();
   }
@@ -23665,8 +23671,8 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
       data: { labels: labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 1, borderColor: '#fff' }] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        cutout: '58%',
-        layout: { padding: { top: 20, right: 72, bottom: 20, left: 72 } },
+        cutout: '70%',
+        layout: { padding: { top: 70, right: 100, bottom: 70, left: 100 } },
         plugins: {
           legend: { display: false },
           tooltip: {
