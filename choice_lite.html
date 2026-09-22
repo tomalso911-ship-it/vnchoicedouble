@@ -3688,7 +3688,6 @@ function _ovLoadChartLib(cb){
     var PROD_TREND_ROLES = {};
     var PROD_HIST_HIDEZERO = false;
     var PROD_DUE_EDITING = false;
-    var PROD_PROFILE_EDITING = false;
     var PROD_TREND_RESIZE = false;
     var PROD_TREND_DATA = null;
     var PROD_ESTATS_SORT = {col:null, dir:0};
@@ -4531,8 +4530,8 @@ function _ovLoadChartLib(cb){
       }
     }
     /* A 工厂概况 */
-    function prod_sel(label,id,opts,val,disabled){
-      var h = '<div class="prod-field"><label>'+label+'</label><select id="'+id+'"'+(disabled?' disabled':'')+'>';
+    function prod_sel(label,id,opts,val){
+      var h = '<div class="prod-field"><label>'+label+'</label><select id="'+id+'">';
       h += '<option value=""></option>';
       opts.forEach(function(o){ h += '<option value="'+prod_esc(o)+'"'+(o===val?' selected':'')+'>'+prod_esc(o)+'</option>'; });
       h += '</select></div>';
@@ -4587,7 +4586,6 @@ function _ovLoadChartLib(cb){
       var shiftNum = parseInt(String(p.shifts||'').replace(/[^0-9]/g,''),10) || 0;
       var shiftOpts = [pt('opt_shift_1'), pt('opt_shift_2')];
       var shiftVal = (shiftNum>=1 && shiftNum<=shiftOpts.length) ? shiftOpts[shiftNum-1] : '';
-      var profileLocked = !!(lineVal && shiftVal && !PROD_PROFILE_EDITING);
       var cDate = prod_contractDateRaw();
       var dueDate = p.dueDate || prod_dueDateFromData() || '';
       var hasDue = !!dueDate && !PROD_DUE_EDITING;
@@ -4610,11 +4608,9 @@ function _ovLoadChartLib(cb){
         + dueHtml
         + '<div class="prod-field"><label>'+pt('lbl_start_prod_date')+'</label><input id="pa_start_prod" value="'+prod_esc(startProdDate)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
         + prod_fld(pt('lbl_addr'),'pa_addr',p.address||'')
-        + prod_sel(pt('lbl_line'),'pa_cap',lineOpts,lineVal,profileLocked)
-        + prod_sel(pt('lbl_shift'),'pa_shift',shiftOpts,shiftVal,profileLocked)
-        + (profileLocked
-          ? '<button class="prod-btn sec" onclick="prod_editProfile()">'+pt('btn_edit')+'</button>'
-          : '<button class="prod-btn" onclick="prod_saveProfile()">'+pt('btn_save')+'</button>')
+        + prod_sel(pt('lbl_line'),'pa_cap',lineOpts,lineVal)
+        + prod_sel(pt('lbl_shift'),'pa_shift',shiftOpts,shiftVal)
+        + '<button class="prod-btn" onclick="prod_saveProfile()">'+pt('btn_save')+'</button>'
         + '</div>'
         + '<div class="prod-sec-title" style="margin-top:18px">'+pt('sec_slats_info')+'</div>'
         + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
@@ -4786,12 +4782,7 @@ function _ovLoadChartLib(cb){
         dailyCapacity:(f.profile && f.profile.dailyCapacity) || ''
       });
       prod_save(f);
-      PROD_PROFILE_EDITING = false;
       prod_toast(pt('toast_saved'));
-      prod_renderTab('A');
-    }
-    function prod_editProfile(){
-      PROD_PROFILE_EDITING = true;
       prod_renderTab('A');
     }
     /* 项目交期选择确认：选定后保存并锁定，仅 tom/cuong/james 可重新调整 */
