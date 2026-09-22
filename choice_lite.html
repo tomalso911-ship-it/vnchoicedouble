@@ -14580,7 +14580,9 @@ function wonDetailLinkCell(p, field, labelKey) {
     _st.id = 'langfit-style';
     _st.textContent = [
       '.tb-menu{flex-wrap:nowrap !important;overflow-x:auto;}',
-      '.tb-item{flex:0 0 auto !important;white-space:nowrap;overflow:hidden;}',
+      '.tb-item{white-space:nowrap;}',
+      '.prod-tabs{flex-wrap:nowrap !important;overflow-x:auto;}',
+      '.prod-tab{white-space:nowrap;overflow:visible !important;}',
       '.prod-form{flex-wrap:nowrap !important;overflow-x:auto;}',
       '.prod-form > .prod-field{flex:0 0 auto;}',
       'th,td{white-space:nowrap;}'
@@ -14611,9 +14613,13 @@ function wonDetailLinkCell(p, field, labelKey) {
       var dict = window.I18N;
       if (dict && dict[lang] && dict[lang][k] !== undefined) return dict[lang][k];
       if (window.__EXTRA_I18N && window.__EXTRA_I18N[k] && window.__EXTRA_I18N[k][lang] !== undefined) return window.__EXTRA_I18N[k][lang];
+      // 生产模块使用独立 PROD_I18N 字典
+      var pdict = window.PROD_I18N;
+      if (pdict && pdict[lang] && pdict[lang][k] !== undefined) return pdict[lang][k];
       var order = ['zh', 'en', 'vi'];
       for (var i = 0; i < 3; i++) {
         if (dict && dict[order[i]] && dict[order[i]][k] !== undefined) return dict[order[i]][k];
+        if (pdict && pdict[order[i]] && pdict[order[i]][k] !== undefined) return pdict[order[i]][k];
       }
     }
     return el.textContent;
@@ -14646,7 +14652,6 @@ function wonDetailLinkCell(p, field, labelKey) {
       if (cs.display === 'inline' || cs.display === 'inline-block') el.style.display = 'inline-block';
       el.style.minWidth = total + 'px';
       el.style.whiteSpace = 'nowrap';
-      el.style.overflow = 'hidden';
     }
     // 当前语言动态缩放填充（Q9=C 不设下限，仅做 7px 兜底防不可读）
     var idx = langs.indexOf(window.CUR_LANG || 'zh');
@@ -14663,7 +14668,7 @@ function wonDetailLinkCell(p, field, labelKey) {
   }
 
   // 候选选择器（覆盖全页面所有会位移的标签/按钮/导航/tab/表头）
-  var FIT_SEL = '[data-i18n], .tb-item, th, .prod-tab, .btn-action, .prod-btn, .ov-btn, .cp-btn, .cm-btn, .cp-add-btn, .header-btns button, .page-header button';
+  var FIT_SEL = '[data-i18n], th, .prod-tab, .btn-action, .prod-btn, .ov-btn, .cp-btn, .cm-btn, .cp-add-btn, .header-btns button, .page-header button';
 
   function applyLangFit(root) {
     if (!root) root = document.body;
