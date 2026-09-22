@@ -23523,7 +23523,8 @@ var _slatsPieLabelsPlugin = {
         valText: _slatsFmtNum(value) + (options.unit||'')
       });
     });
-    var r0 = outer + 8, pushMax = 42, rMax = outer + 8 + pushMax, step = 7;
+    var r0 = outer + 6, pushMax = 28, rMax = outer + 6 + pushMax, step = 5;
+    var maxSwing = 0.35, swingStep = 0.05, maxSwingSteps = 7; // ±0.35 rad ≈ ±20°，禁止跨到饼图另一侧
     var halfW = 22, halfH = 12; // 两行标签包围盒半宽/半高
     var placed = [];
     function inBounds(x, y){
@@ -23536,27 +23537,23 @@ var _slatsPieLabelsPlugin = {
       }
       return false;
     }
+    function tryPlace(r, a){
+      var x = cx + Math.cos(a)*r, y = cy + Math.sin(a)*r;
+      if(inBounds(x,y) && !hit(x,y)){ it.labelX = x; it.labelY = y; return true; }
+      return false;
+    }
     items.sort(function(a,b){ return a.angle - b.angle; });
     items.forEach(function(it){
       var ok = false;
-      // 1) 沿半径递增，找第一个不重叠位置
-      for(var r = r0; r <= rMax; r += step){
-        var x = cx + Math.cos(it.angle)*r, y = cy + Math.sin(it.angle)*r;
-        if(inBounds(x,y) && !hit(x,y)){ it.labelX = x; it.labelY = y; ok = true; break; }
-      }
-      // 2) 到边界仍重叠：沿圆周切向左右摆动错开（花瓣散开）
-      if(!ok){
-        var swing = 0.05;
-        for(var s = 1; s <= 36 && !ok; s++){
-          var dirs = (s % 2 === 1) ? [1, -1] : [-1, 1];
-          for(var d = 0; d < 2; d++){
-            var a = it.angle + dirs[d]*s*swing;
-            var x = cx + Math.cos(a)*rMax, y = cy + Math.sin(a)*rMax;
-            if(inBounds(x,y) && !hit(x,y)){ it.labelX = x; it.labelY = y; ok = true; break; }
-          }
+      // 1) 沿半径递增；在每个半径上优先原角度，再 ±0.05、±0.10… 轻微摆动，始终限制在原扇区 ±20° 内
+      for(var r = r0; r <= rMax && !ok; r += step){
+        if(tryPlace(r, it.angle)){ ok = true; break; }
+        for(var s = 1; s <= maxSwingSteps && !ok; s++){
+          if(tryPlace(r, it.angle + s*swingStep)){ ok = true; break; }
+          if(tryPlace(r, it.angle - s*swingStep)){ ok = true; break; }
         }
       }
-      // 3) 兜底：放在 rMax 处（极端情况下仍可见）
+      // 2) 兜底：放在原角度 rMax 处
       if(!ok){ it.labelX = cx + Math.cos(it.angle)*rMax; it.labelY = cy + Math.sin(it.angle)*rMax; }
       placed.push({ x: it.labelX, y: it.labelY });
     });
