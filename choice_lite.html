@@ -2062,26 +2062,18 @@ function _ovLoadChartLib(cb){
     padding:6px 16px; font-size:12px; font-weight:700; cursor:pointer; }
   .comm-react-btn:hover { background:#27ae60; }
   .comm-react-btn:disabled { background:#c9ced4; color:#f2f4f6; cursor:not-allowed; }
-  /* 导航菜单：标签较多时横向滚动。
-     原先隐藏了滚动条，导致用户不知道右侧还有内容（审批/用户与授权看不到），
-     改为显示一条细滚动条 + 平滑滚动 + 触摸惯性。 */
+  /* 导航菜单：标签较多时允许横向滚动，但隐藏底部滚动条，避免英文标签多时出现难看/占位的横条。
+     触摸板/鼠标滚轮横向仍可滚动；JS 会动态压缩字号/间距/必要时切换短标签，尽量避免溢出。 */
   .tb-menu {
-    display:flex; align-items:center; gap:14px; flex:1;
+    display:flex; align-items:center; gap:8px; flex:1;
     overflow-x:auto; overflow-y:hidden;
-    /* 横向滚动条轨道常驻预留：出现/消失不再改变内容高度，顶栏标签垂直位置恒定，消除"提升"与滚动条跳动 */
-    scrollbar-gutter: stable;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(46,125,50,.4) transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
-    padding-bottom: 2px;
+    padding-bottom: 0;
   }
-  .tb-menu::-webkit-scrollbar { display:block; height:4px; }
-  .tb-menu::-webkit-scrollbar-track { background: transparent; }
-  .tb-menu::-webkit-scrollbar-thumb {
-    background: rgba(46,125,50,.38); border-radius: 2px;
-  }
-  .tb-menu::-webkit-scrollbar-thumb:hover { background: rgba(46,125,50,.6); }
+  .tb-menu::-webkit-scrollbar { display:none; }
   /* 模态框打开时锁定顶部导航标签（语言切换按钮不受影响） */
   .tb-menu.nav-locked .tb-item { pointer-events:none; opacity:.45; cursor:not-allowed; filter:grayscale(.3); }
   /* 模态框打开时锁定背景表头交互：排序箭头 + 审批表表头排序/筛选，禁点击（不改变外观） */
@@ -2090,12 +2082,12 @@ function _ovLoadChartLib(cb){
   body.ui-locked .th-filter-input { pointer-events:none; }
   .tb-item {
     border:none; background:transparent; color:#000; cursor:pointer;
-    font-size:12px; font-weight:600; padding:6px 14px; border-radius:8px;
+    font-size:11px; font-weight:600; padding:5px 10px; border-radius:8px;
     white-space:nowrap; transition: background .15s, color .15s;
     position:relative;   /* 供 .pend-badge 绝对定位 */
   }
   .tb-item:hover { background:rgba(0,0,0,.1); color:#000; }
-  .tb-item.active { background:#fff; color:#D32F2F; margin:4px 0; padding:11px 16px; border-radius:22px; }
+  .tb-item.active { background:#fff; color:#D32F2F; margin:2px 0; padding:8px 12px; border-radius:22px; }
   /* ===== 待审批角标（Approvals 导航右上角红底白字数字） ===== */
   .pend-badge {
     position:absolute; top:2px; right:3px;
@@ -14784,14 +14776,15 @@ function fitTopbarFontsNow() {
   // 基准值必须与 CSS 保持一致（CSS 在矮屏横屏下用的是紧凑样式）。
   // 若 JS 按宽松值起算再二分缩小，会先放大后缩小，出现一次肉眼可见的"抖动"。
   var compact = topbarCompact();
-  var baseFont = compact ? 12 : 15, basePad = compact ? 10 : 18, baseGap = compact ? 6 : 14;
-  var minFont  = compact ? 8  : 9,  minPad  = compact ? 4  : 8,  minGap  = compact ? 2  : 5;
-  var vPad = compact ? 7 : 10;   // 纵向内边距（CSS 紧凑模式为 7px，普通为 10px）
-  // 越南语特殊处理：优先完整标签（绝不缩写）、字号起步更大、标签加粗；通过收紧 padding/gap 来容纳更长文字
+  // 基准值与上方 CSS 保持一致，避免先放大再缩小的抖动
+  var baseFont = compact ? 10 : 11, basePad = compact ? 10 : 10, baseGap = compact ? 6 : 8;
+  var minFont  = compact ? 8  : 9,  minPad  = compact ? 4  : 5,  minGap  = compact ? 2  : 4;
+  var vPad = compact ? 7 : 5;   // 纵向内边距（CSS 紧凑模式为 7px，普通为 5px）
+  // 越南语特殊处理：优先完整标签（绝不缩写）、通过收紧 padding/gap 来容纳更长文字
   var isVi = (CUR_LANG === 'vi');
   if (isVi) {
-    baseFont = 18; basePad = 12; baseGap = 8;
-    minFont = 8; minPad = 4; minGap = 2;   // 收紧下限，给完整文字更多空间
+    baseFont = 14; basePad = 10; baseGap = 6;
+    minFont = 8; minPad = 4; minGap = 2;
   }
   // 先恢复每个标签的"首选文字"：紧凑模式用短标签，否则用完整标签。
   // 目的：窗口变宽时自动还原完整标签；窗口变窄时下方再按需降级到短标签，避免横向滚动条。
