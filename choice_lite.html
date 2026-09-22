@@ -23494,7 +23494,7 @@ function _slatsLoadChartLib(cb){
   s.onerror=function(){ s.onerror=null; s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'; s.onload=cb; s.onerror=cb; };
   document.head.appendChild(s);
 }
-// 饼图自定义插件：环形图（doughnut），每个扇区合并标签「占比% / 绝对值」沿各自角度方向环绕外围，重叠时径向推开，同色引导线+扇区端小圆点
+// 饼图自定义插件：实心爆炸饼，每个扇区合并标签「占比% / 绝对值」放入圆角矩形框，引导线紧贴扇区边缘短折线引出
 var _slatsPieLabelsPlugin = {
   id: 'slatsPieLabels',
   afterDraw: function(chart, args, options){
@@ -23504,10 +23504,10 @@ var _slatsPieLabelsPlugin = {
     var bg = dataset.backgroundColor;
     var total = dataset.data.reduce(function(a,b){return a+b;},0);
     if(!total) return;
-    var arc0 = meta.data[0];
-    var cx = arc0.x, cy = arc0.y, outer = arc0.outerRadius;
     var ca = chart.chartArea;
-    // 外部标签 + 短折线引导线：默认贴在各自扇区外侧（沿角度方向），同一侧重叠时上下/左右均匀错开
+    var cx = ca.left + ca.width/2, cy = ca.top + ca.height/2; // 布局圆心（饼中心）
+    var outer = meta.data[0].outerRadius;
+    // 实心爆炸饼：每个标签带圆角矩形框，引导线紧贴各自扇区边缘短折线引出
     var items = [];
     meta.data.forEach(function(arc, i){
       var value = dataset.data[i];
@@ -23517,13 +23517,14 @@ var _slatsPieLabelsPlugin = {
       var cos = Math.cos(mid), sin = Math.sin(mid);
       items.push({
         value:value, pct:pct, angle: mid, cos: cos, sin: sin,
+        arcX: arc.x, arcY: arc.y, oR: arc.outerRadius,
         color: bg[i%bg.length],
-        edgeX: cx + cos*(outer+1), edgeY: cy + sin*(outer+1),
+        edgeX: arc.x + cos*(arc.outerRadius+1), edgeY: arc.y + sin*(arc.outerRadius+1),
         text: pct.toFixed(1)+'% / '+_slatsFmtNum(value) + (options.unit||'')
       });
     });
-    var W = chart.width, H = chart.height, txtW = 96, txtH = 16, minGap = 4;
-    var R0 = outer + 8; // 默认紧贴扇区外侧
+    var W = chart.width, H = chart.height, txtW = 104, txtH = 18, minGap = 6;
+    var R0 = outer + 12; // 紧贴扇区外侧
     var sides = { right:[], left:[], top:[], bottom:[] };
     items.forEach(function(it){
       var ax = Math.abs(it.cos), ay = Math.abs(it.sin);
@@ -23560,13 +23561,13 @@ var _slatsPieLabelsPlugin = {
     // 从 Rmin 开始找最小的 R 让单行/单列放得下
     function fitSide(side, kind, Rmin){
       var R = Rmin;
-      while(R <= outer + 45){
+      while(R <= outer + 50){
         if(layoutRow(side, kind, R)) return R;
         R += 3;
       }
       return null;
     }
-    // 默认贴扇区外侧；同一侧放不下时，拆成多行/多列（近-远分层），轻微上下/左右错开
+    // 默认贴扇区外侧；同一侧放不下时拆成多行/多列（近-远分层），轻微错开
     function placeSide(side, kind){
       var n = side.length;
       if(!n) return;
@@ -23584,33 +23585,43 @@ var _slatsPieLabelsPlugin = {
           if(!Rfound){ ok=false; break; }
           R = Rfound + gap;
         }
-        if(ok){
-          for(var i=0;i<rows;i++) layoutRow(groups[i], kind, groups[i][0].r);
-        }
+        if(ok){ for(var i=0;i<rows;i++) layoutRow(groups[i], kind, groups[i][0].r); }
       }
-      if(!ok) layoutRow(side, kind, outer + 45);
+      if(!ok) layoutRow(side, kind, outer + 50);
     }
     placeSide(sides.right, 'right'); placeSide(sides.left, 'left');
     placeSide(sides.top, 'top'); placeSide(sides.bottom, 'bottom');
 
+    function roundRect(c, x, y, w, h, r){
+      c.beginPath();
+      c.moveTo(x+r, y);
+      c.arcTo(x+w, y, x+w, y+h, r);
+      c.arcTo(x+w, y+h, x, y+h, r);
+      c.arcTo(x, y+h, x, y, r);
+      c.arcTo(x, y, x+w, y, r);
+      c.closePath();
+    }
     ctx.save();
-    ctx.lineWidth = 1.2;
     items.forEach(function(it){
-      var align = 'center', lx = it.labelX;
-      if(it.cos >= 0.3){ align = 'left'; lx += 4; }
-      else if(it.cos <= -0.3){ align = 'right'; lx -= 4; }
-      // 折线：扇区边缘 -> 沿角度到半径 R -> 水平/垂直到标签列/行 -> 到标签
-      var sx = cx + Math.cos(it.angle)*it.r, sy = cy + Math.sin(it.angle)*it.r;
+      var bx = it.labelX - txtW/2, by = it.labelY - txtH/2;
+      // 引导线：扇区边缘 -> 沿各自扇区角度到 R -> 水平/垂直折到标签框边缘
+      var sx = it.arcX + Math.cos(it.angle)*it.r, sy = it.arcY + Math.sin(it.angle)*it.r;
+      var edgeX, edgeY;
+      if(it.cos >= 0.3){ edgeX = bx; edgeY = it.labelY; }
+      else if(it.cos <= -0.3){ edgeX = bx + txtW; edgeY = it.labelY; }
+      else if(it.sin < 0){ edgeX = it.labelX; edgeY = by + txtH; }
+      else { edgeX = it.labelX; edgeY = by; }
       ctx.strokeStyle = it.color;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.moveTo(it.edgeX, it.edgeY);
       ctx.lineTo(sx, sy);
       if(it.cos >= 0.3 || it.cos <= -0.3){
-        ctx.lineTo(it.labelX, sy);
-        ctx.lineTo(it.labelX, it.labelY);
+        ctx.lineTo(edgeX, sy);
+        ctx.lineTo(edgeX, edgeY);
       } else {
-        ctx.lineTo(sx, it.labelY);
-        ctx.lineTo(it.labelX, it.labelY);
+        ctx.lineTo(sx, edgeY);
+        ctx.lineTo(edgeX, edgeY);
       }
       ctx.stroke();
       // 扇区端同色小圆点
@@ -23618,12 +23629,19 @@ var _slatsPieLabelsPlugin = {
       ctx.beginPath();
       ctx.arc(it.edgeX, it.edgeY, 2.6, 0, Math.PI*2);
       ctx.fill();
-      // 单行文本
+      // 圆角矩形标签框（白底、同色边框）
+      roundRect(ctx, bx, by, txtW, txtH, 4);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.strokeStyle = it.color;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      // 框内文本
       ctx.fillStyle = '#333';
-      ctx.textAlign = align;
-      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(it.text, lx, it.labelY);
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(it.text, it.labelX, it.labelY);
     });
     ctx.restore();
   }
@@ -23721,12 +23739,11 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
       Chart.register(_slatsPieLabelsPlugin);
     }
     var chart=new Chart(ctx, {
-      type: 'doughnut',
-      data: { labels: labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 1, borderColor: '#fff' }] },
+      type: 'pie',
+      data: { labels: labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 1, borderColor: '#fff', offset: 12 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        cutout: '70%',
-        layout: { padding: { top: 110, right: 170, bottom: 110, left: 170 } },
+        layout: { padding: { top: 64, right: 118, bottom: 64, left: 118 } },
         plugins: {
           legend: { display: false },
           tooltip: {
