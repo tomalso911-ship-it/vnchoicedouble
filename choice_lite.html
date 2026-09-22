@@ -4428,6 +4428,21 @@ function _ovLoadChartLib(cb){
       prod_el('prod-list').style.display = 'block';
       prod_renderProduction();
     }
+    function prod_fitTabs(){
+      var box = prod_el('prod-tabs'); if(!box) return;
+      var tabs = box.children; if(!tabs.length) return;
+      var W = box.clientWidth; if(!W) return;
+      var base = 13, minF = 8, gap = 6;
+      for(var i=0;i<tabs.length;i++){ tabs[i].style.fontSize = base + 'px'; }
+      var total = 0;
+      for(var i=0;i<tabs.length;i++){ total += tabs[i].offsetWidth; }
+      total += gap * (tabs.length - 1);
+      var font = base;
+      if(total > W){ font = Math.max(minF, Math.floor(base * W / total)); }
+      var isVi = (typeof CUR_LANG!=='undefined' && CUR_LANG==='vi');
+      for(var i=0;i<tabs.length;i++){ tabs[i].style.fontSize = font + 'px'; tabs[i].style.fontWeight = isVi ? '700' : ''; }
+    }
+    if(!window.__prodFitBound){ window.__prodFitBound = true; window.addEventListener('resize', function(){ var p = prod_el('prod-tabs'); if(p) prod_fitTabs(); }); }
     function prod_renderTabs(active){
       PROD_ACTIVE_TAB = active;
       var box = prod_el('prod-tabs'); var h = '';
@@ -4441,6 +4456,7 @@ function _ovLoadChartLib(cb){
       });
       box.innerHTML = h;
       prod_renderTab(active);
+      prod_fitTabs();
     }
     function prod_renderTab(key){
       PROD_ACTIVE_TAB = key;
@@ -14582,7 +14598,7 @@ function wonDetailLinkCell(p, field, labelKey) {
       '.tb-menu{flex-wrap:nowrap !important;overflow-x:auto;}',
       '.tb-item{white-space:nowrap;}',
       '.prod-tabs{flex-wrap:nowrap !important;overflow-x:auto !important;}',
-      '.prod-tab{flex:1 1 0% !important;min-width:0 !important;white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important;text-align:center !important;font-size:9px !important;padding:4px 4px !important;}',
+      '.prod-tab{flex:0 0 auto !important;white-space:nowrap !important;overflow:visible !important;text-align:center !important;}',
       '.prod-form{flex-wrap:wrap !important;overflow-x:visible !important;}',
       '.prod-form > .prod-field{flex:1 1 160px !important;min-width:0 !important;}',
       '.pc-labor-form .prod-form > .prod-field{flex:0 0 auto !important;min-width:auto !important;}',
