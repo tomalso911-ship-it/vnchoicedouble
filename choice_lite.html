@@ -23495,7 +23495,7 @@ function _slatsLoadChartLib(cb){
   document.head.appendChild(s);
 }
 // 饼图自定义插件：饼内显示大扇区百分比，饼外用短引导线显示绝对值；扇区已爆炸偏移，标签紧贴各自扇区
-// 饼图自定义插件：交错爆炸式饼图，内部显示百分比，外部显示绝对值并带同色引导线
+// 饼图自定义插件：交错爆炸式饼图，内部显示百分比，外部绝对值沿各自角度方向贴圆弧，重叠时径向推开并带同色引导线
 var _slatsPieLabelsPlugin = {
   id: 'slatsPieLabels',
   afterDraw: function(chart, args, options){
@@ -23517,30 +23517,38 @@ var _slatsPieLabelsPlugin = {
       var mid = (arc.startAngle + arc.endAngle)/2;
       var cos = Math.cos(mid), sin = Math.sin(mid);
       var off = (Array.isArray(dataset.offset) ? dataset.offset[i] : dataset.offset) || 0;
-      var edgeR = outer + off + 1;
       var baseR = outer + off + 6;
       items.push({
         i:i, value:value, pct:pct, cos:cos, sin:sin, off:off,
         color: bg[i%bg.length],
-        edgeX: cx + cos*edgeR, edgeY: cy + sin*edgeR,
-        baseX: cx + cos*baseR, baseY: cy + sin*baseR,
+        edgeX: cx + cos*(outer+off+1), edgeY: cy + sin*(outer+off+1),
+        r: baseR,
         text: _slatsFmtNum(value) + (options.unit||'')
       });
     });
-    // 防重叠：同侧标签按 y 排序，过近则向下推开，被推开的标签引导线自然变长
-    function adjust(side){
+    // 径向防重叠：按角度排序，相邻标签太近则沿各自径向向外推，保持角度方向不变
+    function radialPush(side){
       if(!side.length) return;
-      side.sort(function(a,b){ return a.baseY - b.baseY; });
-      side.forEach(function(it){ it.labelX = it.baseX; it.labelY = it.baseY; });
-      var gap = 13;
+      side.sort(function(a,b){ return Math.atan2(a.sin, a.cos) - Math.atan2(b.sin, b.cos); });
+      var gap = 15, step = 12;
       for(var i=1;i<side.length;i++){
-        if(side[i].labelY - side[i-1].labelY < gap) side[i].labelY = side[i-1].labelY + gap;
+        var it = side[i], prev = side[i-1];
+        var maxR = it.r + 60; // 最多额外外推 60px
+        while(it.r < maxR){
+          var dx = (cx + it.cos*it.r) - (cx + prev.cos*prev.r);
+          var dy = (cy + it.sin*it.r) - (cy + prev.sin*prev.r);
+          if(Math.sqrt(dx*dx + dy*dy) >= gap) break;
+          it.r += step;
+        }
       }
-      side.forEach(function(it){ it.labelY = Math.max(ca.top+12, Math.min(ca.bottom-12, it.labelY)); });
+      side.forEach(function(it){
+        it.labelX = cx + it.cos*it.r;
+        it.labelY = cy + it.sin*it.r;
+      });
     }
     var right = items.filter(function(it){ return it.cos >= 0; });
     var left = items.filter(function(it){ return it.cos < 0; });
-    adjust(right); adjust(left);
+    radialPush(right); radialPush(left);
     ctx.save();
     // 内部百分比（仅较大扇区）
     ctx.textAlign = 'center';
@@ -23552,7 +23560,7 @@ var _slatsPieLabelsPlugin = {
       ctx.font = 'bold 11px sans-serif';
       ctx.fillText(it.pct.toFixed(1)+'%', cx + it.cos*r, cy + it.sin*r);
     });
-    // 外部绝对值（贴圆弧，必要时带同色引导线）
+    // 外部绝对值（贴圆弧；若被径向推开则用同色引导线连回扇区）
     items.forEach(function(it){
       ctx.strokeStyle = it.color;
       ctx.fillStyle = '#333';
@@ -23666,7 +23674,7 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
       data: { labels: labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 1, borderColor: '#fff', offset: offsets }] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        layout: { padding: 40 },
+        layout: { padding: 65 },
         plugins: {
           legend: { display: false },
           tooltip: {
