@@ -9645,7 +9645,7 @@ function _ovLoadChartLib(cb){
 .slats-report-table tbody tr:last-child td:last-child { border-radius: 0 0 10px 0; }
 .slats-report-desc { color: #555; font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
 .slats-report-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; }
-.slats-report-chart-wrap { flex: 1 1 480px; height: 400px; position: relative; min-width: 300px; }
+.slats-report-chart-wrap { flex: 1 1 520px; height: 440px; position: relative; min-width: 300px; }
 .slats-report-data-table-wrap { flex: 0 1 340px; align-self: center; margin-top: 0; }
 .slats-report-data-table-wrap .slats-report-table { font-size: 12px; width: 100%; max-width: 340px; margin: 0 auto; }
 .slats-report-summary { background: #fffdf5; border: 1px solid #f0e2b6; border-left: 4px solid #E53935; border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 2; color: #444; }
@@ -23507,43 +23507,58 @@ var _slatsPieLabelsPlugin = {
     var arc0 = meta.data[0];
     var cx = arc0.x, cy = arc0.y, outer = arc0.outerRadius;
     var ca = chart.chartArea;
-    // 所有扇区：合并标签 占比% / 绝对值，沿各自扇区角度方向环绕在环形图外围；重叠时沿径向向外推开
+    // 花瓣布局：每个扇区两行标签（占比% / 绝对值）沿各自扇区角度方向放射；重叠时先径向拉远，到边界仍重叠则沿圆周切向左右错开
     var items = [];
     meta.data.forEach(function(arc, i){
       var value = dataset.data[i];
       if(!value) return;
       var pct = (value/total)*100;
       var mid = (arc.startAngle + arc.endAngle)/2;
-      var cos = Math.cos(mid), sin = Math.sin(mid);
       items.push({
-        value:value, pct:pct, cos:cos, sin:sin,
+        value:value, pct:pct, angle: mid,
+        cos: Math.cos(mid), sin: Math.sin(mid),
         color: bg[i%bg.length],
-        edgeX: cx + cos*(outer+1), edgeY: cy + sin*(outer+1),
-        r: outer + 8,
+        edgeX: cx + Math.cos(mid)*(outer+1), edgeY: cy + Math.sin(mid)*(outer+1),
         pctText: pct.toFixed(1)+'%',
         valText: _slatsFmtNum(value) + (options.unit||'')
       });
     });
-    // 径向防重叠：按角度排序，相邻标签太近则沿各自径向向外推（花瓣散开，保持角度方向）
-    function radialPush(side){
-      if(!side.length) return;
-      side.sort(function(a,b){ return Math.atan2(a.sin, a.cos) - Math.atan2(b.sin, b.cos); });
-      var gap = 14, step = 9, maxExtra = 35;
-      for(var i=1;i<side.length;i++){
-        var it = side[i], prev = side[i-1];
-        while(it.r - outer < maxExtra){
-          var dx = (cx + it.cos*it.r) - (cx + prev.cos*prev.r);
-          var dy = (cy + it.sin*it.r) - (cy + prev.sin*prev.r);
-          if(Math.sqrt(dx*dx + dy*dy) >= gap) break;
-          it.r += step;
+    var r0 = outer + 8, pushMax = 42, rMax = outer + 8 + pushMax, step = 7;
+    var halfW = 22, halfH = 12; // 两行标签包围盒半宽/半高
+    var placed = [];
+    function inBounds(x, y){
+      return x >= ca.left + 4 && x <= ca.right - 4 && y >= ca.top + 14 && y <= ca.bottom - 14;
+    }
+    function hit(x, y){
+      for(var k=0;k<placed.length;k++){
+        var p = placed[k];
+        if(Math.abs(x - p.x) < halfW*2 + 2 && Math.abs(y - p.y) < halfH*2 + 2) return true;
+      }
+      return false;
+    }
+    items.sort(function(a,b){ return a.angle - b.angle; });
+    items.forEach(function(it){
+      var ok = false;
+      // 1) 沿半径递增，找第一个不重叠位置
+      for(var r = r0; r <= rMax; r += step){
+        var x = cx + Math.cos(it.angle)*r, y = cy + Math.sin(it.angle)*r;
+        if(inBounds(x,y) && !hit(x,y)){ it.labelX = x; it.labelY = y; ok = true; break; }
+      }
+      // 2) 到边界仍重叠：沿圆周切向左右摆动错开（花瓣散开）
+      if(!ok){
+        var swing = 0.05;
+        for(var s = 1; s <= 36 && !ok; s++){
+          var dirs = (s % 2 === 1) ? [1, -1] : [-1, 1];
+          for(var d = 0; d < 2; d++){
+            var a = it.angle + dirs[d]*s*swing;
+            var x = cx + Math.cos(a)*rMax, y = cy + Math.sin(a)*rMax;
+            if(inBounds(x,y) && !hit(x,y)){ it.labelX = x; it.labelY = y; ok = true; break; }
+          }
         }
       }
-    }
-    radialPush(items.filter(function(it){ return it.cos >= 0; }));
-    radialPush(items.filter(function(it){ return it.cos < 0; }));
-    items.forEach(function(it){
-      it.labelX = cx + it.cos*it.r;
-      it.labelY = cy + it.sin*it.r;
+      // 3) 兜底：放在 rMax 处（极端情况下仍可见）
+      if(!ok){ it.labelX = cx + Math.cos(it.angle)*rMax; it.labelY = cy + Math.sin(it.angle)*rMax; }
+      placed.push({ x: it.labelX, y: it.labelY });
     });
     ctx.save();
     ctx.lineWidth = 1;
@@ -23672,7 +23687,7 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
       options: {
         responsive: true, maintainAspectRatio: false,
         cutout: '70%',
-        layout: { padding: { top: 70, right: 100, bottom: 70, left: 100 } },
+        layout: { padding: { top: 70, right: 110, bottom: 70, left: 110 } },
         plugins: {
           legend: { display: false },
           tooltip: {
