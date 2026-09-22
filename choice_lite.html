@@ -23537,7 +23537,7 @@ var _slatsPieLabelsPlugin = {
       }
       return false;
     }
-    function tryPlace(r, a){
+    function tryPlace(it, r, a){
       var x = cx + Math.cos(a)*r, y = cy + Math.sin(a)*r;
       if(inBounds(x,y) && !hit(x,y)){ it.labelX = x; it.labelY = y; return true; }
       return false;
@@ -23547,10 +23547,10 @@ var _slatsPieLabelsPlugin = {
       var ok = false;
       // 1) 沿半径递增；在每个半径上优先原角度，再 ±0.05、±0.10… 轻微摆动，始终限制在原扇区 ±20° 内
       for(var r = r0; r <= rMax && !ok; r += step){
-        if(tryPlace(r, it.angle)){ ok = true; break; }
+        if(tryPlace(it, r, it.angle)){ ok = true; break; }
         for(var s = 1; s <= maxSwingSteps && !ok; s++){
-          if(tryPlace(r, it.angle + s*swingStep)){ ok = true; break; }
-          if(tryPlace(r, it.angle - s*swingStep)){ ok = true; break; }
+          if(tryPlace(it, r, it.angle + s*swingStep)){ ok = true; break; }
+          if(tryPlace(it, r, it.angle - s*swingStep)){ ok = true; break; }
         }
       }
       // 2) 兜底：放在原角度 rMax 处
