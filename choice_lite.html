@@ -37332,7 +37332,9 @@ function _doExportOverviewPDF(){
 
     // 给每个弹窗标题栏旁注入 □ 最大化按钮（与关闭按钮并排）
     function injectMaxBtn(box) {
-      if (!box || box.getAttribute('data-mmax-btn')) return;
+      if (!box) return;
+      // 已标记且按钮容器存在则跳过；若已标记但按钮被异常清除，允许重新注入
+      if (box.getAttribute('data-mmax-btn') === '1' && box.querySelector('.modal-actions')) return;
       box.setAttribute('data-mmax-btn', '1');
       box.setAttribute('data-modal-ctrl', '1');
 
@@ -37419,7 +37421,9 @@ function _doExportOverviewPDF(){
 
     // 弹窗打开时(title 可能被 innerText 清掉按钮)再补一次,保证任何弹窗(含将来)都有按钮
     function reinjectMaxBtn(box) {
-      if (!box || box.getAttribute('data-mmax-btn') === '1') return;
+      if (!box) return;
+      // 已标记且按钮容器存在则跳过；否则清除旧状态重新注入
+      if (box.getAttribute('data-mmax-btn') === '1' && box.querySelector('.modal-actions')) return;
       var actions = box.querySelector('.modal-actions');
       if (actions) actions.remove();
       box.removeAttribute('data-mmax-btn');
