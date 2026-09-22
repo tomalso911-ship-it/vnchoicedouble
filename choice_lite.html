@@ -23528,7 +23528,9 @@ var _slatsPieLabelsPlugin = {
     var boxW = 116, boxH = 22, minGap = 6, boxGap = 12;
     var pieOuter = outer + 24;                 // 扇区实际外缘（含 offset=24）
     var R0 = pieOuter + boxGap + boxH/2 + 4;    // 标签框中心初始半径：贴各自扇区
-    var Rmax = outer + 90;
+    var W = chart.width, H = chart.height;
+    var minX = boxW/2 + 2, maxX = W - boxW/2 - 2;
+    var minY = boxH/2 + 2, maxY = H - boxH/2 - 2;
     function touchesPie(x, y){
       var dx = Math.max(Math.abs(x - cx) - boxW/2, 0);
       var dy = Math.max(Math.abs(y - cy) - boxH/2, 0);
@@ -23537,23 +23539,41 @@ var _slatsPieLabelsPlugin = {
     function rectHit(a, b){
       return Math.abs(a.x - b.x) < (boxW + minGap) && Math.abs(a.y - b.y) < (boxH + minGap);
     }
+    function clamp(it){
+      var moved = false;
+      if(it.x < minX){ it.x = minX; moved = true; }
+      if(it.x > maxX){ it.x = maxX; moved = true; }
+      if(it.y < minY){ it.y = minY; moved = true; }
+      if(it.y > maxY){ it.y = maxY; moved = true; }
+      return moved;
+    }
     // 初始：每个标签都贴在自己扇区角度方向外侧
     items.forEach(function(it){ it.R = R0; it.x = cx + Math.cos(it.angle)*it.R; it.y = cy + Math.sin(it.angle)*it.R; });
-    // 迭代求解：两个标签真正重叠时，沿各自扇区角度径向交错外推（阶梯状）；
-    //           径向外推只会远离饼、不会碰饼；允许引导线略长/略斜。
-    var step = 12;
-    for(var pass = 0; pass < 300; pass++){
+    // 迭代求解：任何两个标签重叠时，自动沿中心连线反向推开；
+    //           推到画布边缘则拉回画布内；推到饼圆盘则沿自身角度再外移。
+    for(var pass = 0; pass < 400; pass++){
       var moved = false;
       for(var i = 0; i < items.length; i++){
         for(var j = i + 1; j < items.length; j++){
           var a = items[i], b = items[j];
           if(rectHit(a, b)){
-            if(a.R <= b.R){ a.R = Math.min(Rmax, a.R + step); }
-            else { b.R = Math.min(Rmax, b.R + step); }
-            a.x = cx + Math.cos(a.angle)*a.R; a.y = cy + Math.sin(a.angle)*a.R;
-            b.x = cx + Math.cos(b.angle)*b.R; b.y = cy + Math.sin(b.angle)*b.R;
+            var dx = a.x - b.x, dy = a.y - b.y;
+            var dist = Math.sqrt(dx*dx + dy*dy) || 1;
+            var ux = dx/dist, uy = dy/dist;
+            var push = Math.max((boxW + minGap - Math.abs(dx))/2, (boxH + minGap - Math.abs(dy))/2) + 1;
+            a.x += ux*push; a.y += uy*push;
+            b.x -= ux*push; b.y -= uy*push;
             moved = true;
           }
+        }
+      }
+      for(var i = 0; i < items.length; i++){
+        var it = items[i];
+        if(clamp(it)) moved = true;
+        if(touchesPie(it.x, it.y)){
+          it.R += 4;
+          it.x = cx + Math.cos(it.angle)*it.R; it.y = cy + Math.sin(it.angle)*it.R;
+          moved = true;
         }
       }
       if(!moved) break;
@@ -23725,7 +23745,7 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
       options: {
         responsive: true, maintainAspectRatio: false,
         cutout: '45%',
-        layout: { padding: { top: 160, right: 230, bottom: 160, left: 230 } },
+        layout: { padding: { top: 200, right: 260, bottom: 200, left: 260 } },
         plugins: {
           legend: { display: false },
           tooltip: {
