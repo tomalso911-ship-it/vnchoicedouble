@@ -3454,7 +3454,7 @@ function _ovLoadChartLib(cb){
       .inv-sd-row .sd label{color:#666;}
       .inv-sd-row .sd input{width:54px;text-align:center;padding:3px 5px;font-size:12px;}
       .inv-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(520px,1fr));gap:8px;}
-      .inv-card{border:1px solid #eee;border-radius:8px;background:#fff;padding:5px 8px;font-size:12px;display:grid;grid-template-columns:110px 160px 85px 110px;gap:2px 8px;align-items:center;}
+      .inv-card{border:1px solid #eee;border-radius:8px;background:#fff;padding:5px 8px;font-size:12px;display:grid;grid-template-columns:1fr 160px 85px 110px;gap:2px 8px;align-items:center;}
       .inv-card .spec{font-weight:700;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;grid-row:1/span 1;align-self:center;}
       .inv-card .fld{display:flex;flex-direction:column;gap:1px;min-width:0;}
       .inv-card .fld label{font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -4194,7 +4194,7 @@ function _ovLoadChartLib(cb){
       });
       var h='<div class="prod-sec-title" style="border-color:#6c757d">'+title+'</div>';
       h+='<table class="prod-table"><thead><tr>';
-      h+= groupBy==='spec' ? '<th>'+pt('th_spec')+'</th><th>'+pt('thr_house')+'</th>' : '<th>'+pt('thr_house')+'</th><th>'+pt('th_spec')+'</th>';
+      h+= groupBy==='spec' ? '<th>'+pt('thr_no')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_house')+'</th>' : '<th>'+pt('thr_house')+'</th><th>'+pt('th_spec')+'</th>';
       h+='<th>'+pt('th_qty_whole')+'</th>';
       usedSizes.forEach(function(s){ h+='<th>'+pt('th_rebar')+' φ'+s+' ('+pt('unit_ton')+')</th>'; });
       h+='<th>'+pt('kpi_cement')+' ('+pt('unit_ton')+')</th><th>'+pt('kpi_sand')+' ('+pt('unit_ton')+'/'+pt('unit_m3')+')</th><th>'+pt('kpi_gravel')+' ('+pt('unit_ton')+'/'+pt('unit_m3')+')</th></tr></thead><tbody>';
@@ -4204,14 +4204,21 @@ function _ovLoadChartLib(cb){
       var _GRP = (groupBy==='spec') ? 'spec' : 'ph';
       var _runs = []; var _cur = null;
       sorted.forEach(function(o){ var _g = (_GRP==='spec') ? o.spec : o.ph; if(!_cur || _cur.key!==_g){ _cur={key:_g, rows:[]}; _runs.push(_cur); } _cur.rows.push(o); });
-      _runs.forEach(function(_run){
+      _runs.forEach(function(_run, runIdx){
         var _rs = _run.rows.length + 1; // +1 含小计行
         var _sq=0, _srebar={}, _scement=0, _ssand=0, _sgravel=0; usedSizes.forEach(function(s){ _srebar[s]=0; });
         _run.rows.forEach(function(o){ var _rt={}; usedSizes.forEach(function(s){ _rt[s]=o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; _srebar[s]+=_rt[s]; }); _sq+=o.qty; _scement+=o.cement; _ssand+=o.sand; _sgravel+=o.gravel; });
         _run.rows.forEach(function(o, _idx){
           var _rt={}; usedSizes.forEach(function(s){ _rt[s]=o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
           h+='<tr>';
-          if(_idx===0) h+='<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #000;vertical-align:middle">'+prod_esc((_GRP==='spec')?_run.key:prod_phName(_run.key))+'</td>';
+          if(_idx===0){
+            if(groupBy==='spec'){
+              h+='<td rowspan="'+_rs+'" class="merge-cell" style="text-align:center;vertical-align:middle">'+(runIdx+1)+'</td>';
+              h+='<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #000;vertical-align:middle">'+prod_esc(_run.key)+'</td>';
+            } else {
+              h+='<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #000;vertical-align:middle">'+prod_esc(prod_phName(_run.key))+'</td>';
+            }
+          }
           h+= (groupBy==='spec') ? '<td>'+prod_esc(prod_phName(o.ph))+'</td>' : '<td>'+prod_esc(o.spec)+'</td>';
           h+='<td>'+prod_fmtNumRed(o.qty)+'</td>';
           usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(_rt[s])+'</td>'; });
@@ -4225,7 +4232,7 @@ function _ovLoadChartLib(cb){
         h+='<td>'+fmt1Red(_scement)+'</td><td>'+fmt1Red(_ssand)+prod_m3suf(_ssand,'sand')+'</td><td>'+fmt1Red(_sgravel)+prod_m3suf(_sgravel,'gravel')+'</td></tr>';
       });
       var totRt={}; usedSizes.forEach(function(s){ totRt[s]=totals.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
-      h+='<tr style="font-weight:700;background:#eef2f7"><td colspan="2">'+pt('thr_total')+'</td>';
+      h+='<tr style="font-weight:700;background:#eef2f7"><td colspan="'+(groupBy==='spec'?3:2)+'">'+pt('thr_total')+'</td>';
       h+='<td>'+prod_fmtNumRed(totals.qty)+'</td>';
       usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(totRt[s])+'</td>'; });
       h+='<td>'+fmt1Red(totals.cement)+'</td><td>'+fmt1Red(totals.sand)+prod_m3suf(totals.sand,'sand')+'</td><td>'+fmt1Red(totals.gravel)+prod_m3suf(totals.gravel,'gravel')+'</td></tr>';
@@ -4915,7 +4922,7 @@ function _ovLoadChartLib(cb){
           var rate = savedRate || 300;
           var days = Math.ceil(r.qty/rate);
           totQty += r.qty; totDays += days;
-          h += '<div class="inv-card"><span class="spec">'+prod_esc(r.spec)+'</span>'
+          h += '<div class="inv-card"><span class="spec">'+(i+1)+'. '+prod_esc(r.spec)+'</span>'
             + '<span class="fld"><label>'+pt('th_qty_whole')+'</label>'+prod_fmtNum(r.qty)+'</span>'
             + '<span class="fld"><label>'+pt('thr_rate')+'</label><input id="pg_rate_'+i+'" value="'+(savedRate||300)+'"></span>'
             + '<span class="fld"><label>'+pt('thr_days')+'</label>'+(days?days+pt('unit_day'):'—')+'</span></div>';
