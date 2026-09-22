@@ -23507,7 +23507,9 @@ var _slatsPieLabelsPlugin = {
     var ca = chart.chartArea;
     var cx = ca.left + ca.width/2, cy = ca.top + ca.height/2; // 布局圆心（饼中心）
     var outer = meta.data[0].outerRadius;
-    // 实心爆炸饼：每个标签带圆角矩形框，引导线紧贴各自扇区边缘短折线引出
+    // 实心爆炸饼 + 彩色圆角标签框 + 短直角折线引导线
+    // 关键约束：1) 标签框绝不触碰饼（与饼圆盘保留 boxGap 间隙）
+    //          2) 同侧标签沿主方向（左右侧=竖直、上下侧=水平）强制间隔，绝不重叠
     var items = [];
     meta.data.forEach(function(arc, i){
       var value = dataset.data[i];
@@ -23523,40 +23525,58 @@ var _slatsPieLabelsPlugin = {
         text: pct.toFixed(1)+'% / '+_slatsFmtNum(value) + (options.unit||'')
       });
     });
-    var W = chart.width, H = chart.height, txtW = 104, txtH = 20, minGap = 6;
-    var R0 = outer + 16;          // 默认贴扇区外侧
-    var Rmax = outer + 95;        // 必要时最多外推到此
-    // 智能布局：默认沿各自扇区角度贴饼；若与已放置标签碰撞则沿该角度向外推，仍碰则切向微调
-    var placed = [];
-    function boxHit(x, y){
-      for(var k=0; k<placed.length; k++){
-        var p = placed[k];
-        if(Math.abs(x - p.x) < (txtW + p.w)/2 + minGap && Math.abs(y - p.y) < (txtH + p.h)/2 + minGap) return true;
-      }
-      return false;
-    }
-    function inCanvas(x, y){
-      return x > txtW/2 + 2 && x < W - txtW/2 - 2 && y > txtH/2 + 2 && y < H - txtH/2 - 2;
-    }
-    items.sort(function(a,b){ return a.angle - b.angle; });
+    var boxW = 112, boxH = 22, minGap = 6, boxGap = 12;
+    var pieOuter = outer + 24;                 // 扇区实际外缘（含 offset=24）
+    var R0 = pieOuter + boxGap + boxH/2 + 4;    // 标签框中心初始半径：内边离饼 boxGap
+    var Rmax = outer + 140;
+    // 四侧分边（互斥分类，不会出现角落重叠）
+    var sides = { right:[], left:[], top:[], bottom:[] };
     items.forEach(function(it){
-      var ok = false, R = R0;
-      while(R <= Rmax){
-        for(var d=0; d<=8 && !ok; d++){
-          var da = (d===0 ? 0 : (d%2===1 ? (d+1)/2 : -d/2)) * 0.06; // 0, +, -, +, - ... 小角度切向微调
-          var a2 = it.angle + da;
-          var x = cx + Math.cos(a2)*R, y = cy + Math.sin(a2)*R;
-          if(inCanvas(x, y) && !boxHit(x, y)){
-            it.labelX = x; it.labelY = y; it.r = R; it.a2 = a2;
-            placed.push({ x:x, y:y, w:txtW, h:txtH });
-            ok = true; break;
+      var ax = Math.abs(it.cos), ay = Math.abs(it.sin);
+      if(it.cos >= 0 && ax >= ay) sides.right.push(it);
+      else if(it.cos < 0 && ax >= ay) sides.left.push(it);
+      else if(it.sin < 0 && ay > ax) sides.top.push(it);
+      else sides.bottom.push(it);
+    });
+    function touchesPie(x, y){
+      var dx = Math.max(Math.abs(x - cx) - boxW/2, 0);
+      var dy = Math.max(Math.abs(y - cy) - boxH/2, 0);
+      return (dx*dx + dy*dy) < (pieOuter + boxGap) * (pieOuter + boxGap);
+    }
+    function solveSide(side, kind){
+      var n = side.length; if(!n) return;
+      var vertical = (kind === 'right' || kind === 'left');
+      // 初始理想位置：沿各自扇区角度、贴近饼
+      side.forEach(function(it){ it.R = R0; it.x0 = cx + it.cos*it.R; it.y0 = cy + it.sin*it.R;
+                                 it.x = it.x0; it.y = it.y0; });
+      // 沿该侧主方向升序排列（右/左按 x，上/下按 y）
+      side.sort(function(a, b){ return vertical ? (a.y0 - b.y0) : (a.x0 - b.x0); });
+      // 迭代求解：先沿主方向强制间隔（不重叠），再处理碰饼（径向外移）
+      for(var pass = 0; pass < 80; pass++){
+        var moved = false;
+        for(var i = 1; i < n; i++){
+          var prev = side[i-1], cur = side[i];
+          if(vertical){
+            var need = prev.y + (boxH + minGap);
+            if(cur.y < need){ cur.y = need; moved = true; }
+          } else {
+            var need = prev.x + (boxW + minGap);
+            if(cur.x < need){ cur.x = need; moved = true; }
           }
         }
-        if(ok) break;
-        R += 6;
+        for(var i = 0; i < n; i++){
+          var it = side[i];
+          if(touchesPie(it.x, it.y)){
+            it.R = Math.min(Rmax, it.R + 4);
+            it.x0 = cx + it.cos*it.R; it.y0 = cy + it.sin*it.R;
+            it.x = it.x0; it.y = it.y0; moved = true;
+          }
+        }
+        if(!moved) break;
       }
-      if(!ok){ it.labelX = cx + Math.cos(it.angle)*Rmax; it.labelY = cy + Math.sin(it.angle)*Rmax; it.r = Rmax; it.a2 = it.angle; }
-    });
+    }
+    solveSide(sides.right, 'right'); solveSide(sides.left, 'left');
+    solveSide(sides.top, 'top');   solveSide(sides.bottom, 'bottom');
 
     function roundRect(c, x, y, w, h, r){
       c.beginPath();
@@ -23576,45 +23596,46 @@ var _slatsPieLabelsPlugin = {
     ctx.save();
     ctx.lineJoin = 'round';
     items.forEach(function(it){
-      var bx = it.labelX - txtW/2, by = it.labelY - txtH/2;
-      var a = it.a2 != null ? it.a2 : it.angle;
-      var sx = it.arcX + Math.cos(a)*it.r, sy = it.arcY + Math.sin(a)*it.r;
-      var edgeX, edgeY;
-      if(it.cos >= 0.3){ edgeX = bx; edgeY = it.labelY; }
-      else if(it.cos <= -0.3){ edgeX = bx + txtW; edgeY = it.labelY; }
-      else if(it.sin < 0){ edgeX = it.labelX; edgeY = by + txtH; }
-      else { edgeX = it.labelX; edgeY = by; }
-      // 引导线：扇区边缘 -> 沿角度到 R -> 折到框边
+      var bx = it.x - boxW/2, by = it.y - boxH/2;
+      // 框边连接点：右/左侧接框的左右边、上/下侧接框的上下边
+      var connX, connY;
+      if(it.cos >= 0.3){ connX = bx;          connY = it.y; }
+      else if(it.cos <= -0.3){ connX = bx + boxW; connY = it.y; }
+      else if(it.sin < 0){ connX = it.x;      connY = by + boxH; }
+      else { connX = it.x;      connY = by; }
+      // 短直角折线：扇区边缘 -> 沿角度到转折点 -> 水平/垂直折到框边
+      var sx = it.arcX + it.cos*(it.oR + 6), sy = it.arcY + it.sin*(it.oR + 6);
       ctx.strokeStyle = it.color;
       ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.moveTo(it.edgeX, it.edgeY);
       ctx.lineTo(sx, sy);
-      ctx.lineTo(edgeX, edgeY);
+      if(it.cos >= 0.3 || it.cos <= -0.3){ ctx.lineTo(connX, sy); ctx.lineTo(connX, connY); }
+      else { ctx.lineTo(sx, connY); ctx.lineTo(connX, connY); }
       ctx.stroke();
       // 扇区端同色小圆点
       ctx.fillStyle = it.color;
       ctx.beginPath();
-      ctx.arc(it.edgeX, it.edgeY, 3.2, 0, Math.PI*2);
+      ctx.arc(it.edgeX, it.edgeY, 3, 0, Math.PI*2);
       ctx.fill();
       // 卡通标签框：彩色填充 + 大圆角 + 轻阴影 + 白描边
       ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.20)';
+      ctx.shadowColor = 'rgba(0,0,0,0.18)';
       ctx.shadowBlur = 5; ctx.shadowOffsetY = 1.5;
-      roundRect(ctx, bx, by, txtW, txtH, 9);
+      roundRect(ctx, bx, by, boxW, boxH, 9);
       ctx.fillStyle = it.color;
       ctx.fill();
       ctx.restore();
       ctx.strokeStyle = 'rgba(255,255,255,0.95)';
       ctx.lineWidth = 2;
-      roundRect(ctx, bx, by, txtW, txtH, 9);
+      roundRect(ctx, bx, by, boxW, boxH, 9);
       ctx.stroke();
-      // 框内文本：按颜色亮度自动选黑/白
+      // 框内文本
       ctx.fillStyle = isLight(it.color) ? '#222' : '#fff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(it.text, it.labelX, it.labelY);
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(it.text, it.x, it.y);
     });
     ctx.restore();
   }
@@ -23716,7 +23737,7 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
       data: { labels: labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 1, borderColor: '#fff', offset: 24 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        layout: { padding: { top: 78, right: 120, bottom: 78, left: 120 } },
+        layout: { padding: { top: 100, right: 185, bottom: 100, left: 185 } },
         plugins: {
           legend: { display: false },
           tooltip: {
