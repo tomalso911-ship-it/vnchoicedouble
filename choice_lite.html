@@ -23525,58 +23525,49 @@ var _slatsPieLabelsPlugin = {
         text: pct.toFixed(1)+'% / '+_slatsFmtNum(value) + (options.unit||'')
       });
     });
-    var boxW = 112, boxH = 22, minGap = 6, boxGap = 12;
+    var boxW = 116, boxH = 22, minGap = 6, boxGap = 12;
     var pieOuter = outer + 24;                 // 扇区实际外缘（含 offset=24）
-    var R0 = pieOuter + boxGap + boxH/2 + 4;    // 标签框中心初始半径：内边离饼 boxGap
+    var R0 = pieOuter + boxGap + boxH/2 + 4;    // 标签框中心初始半径：贴各自扇区
     var Rmax = outer + 140;
-    // 四侧分边（互斥分类，不会出现角落重叠）
-    var sides = { right:[], left:[], top:[], bottom:[] };
-    items.forEach(function(it){
-      var ax = Math.abs(it.cos), ay = Math.abs(it.sin);
-      if(it.cos >= 0 && ax >= ay) sides.right.push(it);
-      else if(it.cos < 0 && ax >= ay) sides.left.push(it);
-      else if(it.sin < 0 && ay > ax) sides.top.push(it);
-      else sides.bottom.push(it);
-    });
     function touchesPie(x, y){
       var dx = Math.max(Math.abs(x - cx) - boxW/2, 0);
       var dy = Math.max(Math.abs(y - cy) - boxH/2, 0);
       return (dx*dx + dy*dy) < (pieOuter + boxGap) * (pieOuter + boxGap);
     }
-    function solveSide(side, kind){
-      var n = side.length; if(!n) return;
-      var vertical = (kind === 'right' || kind === 'left');
-      // 初始理想位置：沿各自扇区角度、贴近饼
-      side.forEach(function(it){ it.R = R0; it.x0 = cx + it.cos*it.R; it.y0 = cy + it.sin*it.R;
-                                 it.x = it.x0; it.y = it.y0; });
-      // 沿该侧主方向升序排列（右/左按 x，上/下按 y）
-      side.sort(function(a, b){ return vertical ? (a.y0 - b.y0) : (a.x0 - b.x0); });
-      // 迭代求解：先沿主方向强制间隔（不重叠），再处理碰饼（径向外移）
-      for(var pass = 0; pass < 80; pass++){
-        var moved = false;
-        for(var i = 1; i < n; i++){
-          var prev = side[i-1], cur = side[i];
-          if(vertical){
-            var need = prev.y + (boxH + minGap);
-            if(cur.y < need){ cur.y = need; moved = true; }
-          } else {
-            var need = prev.x + (boxW + minGap);
-            if(cur.x < need){ cur.x = need; moved = true; }
-          }
-        }
-        for(var i = 0; i < n; i++){
-          var it = side[i];
-          if(touchesPie(it.x, it.y)){
-            it.R = Math.min(Rmax, it.R + 4);
-            it.x0 = cx + it.cos*it.R; it.y0 = cy + it.sin*it.R;
-            it.x = it.x0; it.y = it.y0; moved = true;
-          }
-        }
-        if(!moved) break;
-      }
+    function rectHit(a, b){
+      return Math.abs(a.x - b.x) < (boxW + minGap) && Math.abs(a.y - b.y) < (boxH + minGap);
     }
-    solveSide(sides.right, 'right'); solveSide(sides.left, 'left');
-    solveSide(sides.top, 'top');   solveSide(sides.bottom, 'bottom');
+    function axisOf(it){ return (Math.abs(it.cos) >= Math.abs(it.sin)) ? 'v' : 'h'; }
+    // 初始：每个标签都贴在自己扇区角度方向外侧，不强行对齐到同一行/列
+    items.forEach(function(it){ it.R = R0; it.x = cx + Math.cos(it.angle)*it.R; it.y = cy + Math.sin(it.angle)*it.R; });
+    // 迭代求解：只有两个标签真正重叠时才把其中一个轻微错开（阶梯状）；
+    //           标签框碰到饼圆盘时才沿自身角度径向外移。允许引导线略长/略斜。
+    for(var pass = 0; pass < 240; pass++){
+      var moved = false;
+      for(var i = 0; i < items.length; i++){
+        for(var j = i + 1; j < items.length; j++){
+          var a = items[i], b = items[j];
+          if(rectHit(a, b)){
+            var step = (boxH + minGap) / 2;
+            if(axisOf(a) === 'v'){ a.y += (a.y <= b.y ? -step : step); }
+            else { a.x += (a.x <= b.x ? -step : step); }
+            if(axisOf(b) === 'v'){ b.y += (b.y <= a.y ? -step : step); }
+            else { b.x += (b.x <= a.x ? -step : step); }
+            moved = true;
+          }
+        }
+      }
+      for(var i = 0; i < items.length; i++){
+        var it = items[i];
+        if(touchesPie(it.x, it.y)){
+          it.R = Math.min(Rmax, it.R + 3);
+          it.x = cx + Math.cos(it.angle)*it.R;
+          it.y = cy + Math.sin(it.angle)*it.R;
+          moved = true;
+        }
+      }
+      if(!moved) break;
+    }
 
     function roundRect(c, x, y, w, h, r){
       c.beginPath();
