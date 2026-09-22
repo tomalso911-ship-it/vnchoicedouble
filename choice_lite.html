@@ -23495,20 +23495,20 @@ function _slatsLoadChartLib(cb){
   document.head.appendChild(s);
 }
 // 饼图自定义插件：饼内显示大扇区百分比，饼外用短引导线显示绝对值；扇区已爆炸偏移，标签紧贴各自扇区
-// 饼图自定义插件：饼内显示大扇区百分比，饼外用极短引导线显示绝对值；扇区按占比差异化爆炸，标签紧贴外缘
+// 饼图自定义插件：交错爆炸式饼图，数据标签放在每个扇区内部靠近外缘，不跨区重叠
 var _slatsPieLabelsPlugin = {
   id: 'slatsPieLabels',
   afterDraw: function(chart, args, options){
     var ctx = chart.ctx;
     var dataset = chart.data.datasets[0];
     var meta = chart.getDatasetMeta(0);
-    var bg = dataset.backgroundColor;
     var total = dataset.data.reduce(function(a,b){return a+b;},0);
     if(!total) return;
     var arc0 = meta.data[0];
     var cx = arc0.x, cy = arc0.y, outer = arc0.outerRadius;
-    var ca = chart.chartArea;
-    var items = [];
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     meta.data.forEach(function(arc, i){
       var value = dataset.data[i];
       if(!value) return;
@@ -23516,52 +23516,13 @@ var _slatsPieLabelsPlugin = {
       var mid = (arc.startAngle + arc.endAngle)/2;
       var cos = Math.cos(mid), sin = Math.sin(mid);
       var off = (Array.isArray(dataset.offset) ? dataset.offset[i] : dataset.offset) || 0;
-      var labelR = outer + off + 5;
-      items.push({
-        i:i, value:value, pct:pct, cos:cos, sin:sin, off:off,
-        color: bg[i%bg.length],
-        edgeX: cx + cos*(outer+off+1), edgeY: cy + sin*(outer+off+1),
-        labelX: cx + cos*labelR, labelY: cy + sin*labelR,
-        text: _slatsFmtNum(value) + (options.unit||'')
-      });
-    });
-    // 防重叠：同侧标签按 y 排序，若间距过近则向下推开
-    function adjust(side){
-      if(!side.length) return;
-      side.sort(function(a,b){ return a.labelY - b.labelY; });
-      var gap = 13;
-      for(var i=1;i<side.length;i++){
-        if(side[i].labelY - side[i-1].labelY < gap) side[i].labelY = side[i-1].labelY + gap;
-      }
-      side.forEach(function(it){ it.labelY = Math.max(ca.top+12, Math.min(ca.bottom-12, it.labelY)); });
-    }
-    var right = items.filter(function(it){ return it.cos >= 0; });
-    var left = items.filter(function(it){ return it.cos < 0; });
-    adjust(right); adjust(left);
-    ctx.save();
-    ctx.font = 'bold 10px sans-serif';
-    ctx.lineWidth = 1;
-    // 饼内百分比（仅较大扇区，避免小扇区堆叠）
-    items.forEach(function(it){
-      if(it.pct < 4) return;
-      var ir = (outer + it.off) * 0.55;
-      var ix = cx + it.cos*ir, iy = cy + it.sin*ir;
+      var r = (outer + off) * 0.78;
+      var ix = cx + cos*r, iy = cy + sin*r;
+      // 大扇区显示百分比，小扇区显示绝对值，确保都能看清
+      var text = pct >= 5 ? pct.toFixed(1)+'%' : (_slatsFmtNum(value) + (options.unit||''));
       ctx.fillStyle = '#fff';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(it.pct.toFixed(1)+'%', ix, iy);
-    });
-    // 极短引导线与外部数值（引导线颜色跟随扇区）
-    items.forEach(function(it){
-      ctx.strokeStyle = it.color;
-      ctx.fillStyle = '#333';
-      ctx.beginPath();
-      ctx.moveTo(it.edgeX, it.edgeY);
-      ctx.lineTo(it.labelX, it.labelY);
-      ctx.stroke();
-      ctx.textAlign = it.cos >= 0 ? 'left' : 'right';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(it.text, it.labelX + (it.cos>=0?3:-3), it.labelY);
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(text, ix, iy);
     });
     ctx.restore();
   }
@@ -23664,7 +23625,7 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
       data: { labels: labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 1, borderColor: '#fff', offset: offsets }] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        layout: { padding: 45 },
+        layout: { padding: 25 },
         plugins: {
           legend: { display: false },
           tooltip: {
