@@ -23519,18 +23519,18 @@ var _slatsPieLabelsPlugin = {
         cos: Math.cos(mid), sin: Math.sin(mid),
         color: bg[i%bg.length],
         edgeX: cx + Math.cos(mid)*(outer+1), edgeY: cy + Math.sin(mid)*(outer+1),
-        pctText: pct.toFixed(1)+'%',
-        valText: _slatsFmtNum(value) + (options.unit||'')
+        text: pct.toFixed(1)+'% / '+_slatsFmtNum(value) + (options.unit||'')
       });
     });
-    var r0 = outer + 5, step = 5;
-    var maxSwing = 0.4, swingStep = 0.05, maxSwingSteps = 8; // ±0.4 rad ≈ ±23°，允许在原扇区附近切向错开
-    var halfW = 22, halfH = 12; // 两行标签包围盒半宽/半高
+    // 分层花瓣布局：标签按扇区大小自然分成 2~3 圈；重叠时升到外层，折线引导线连接
+    var layers = [outer + 8, outer + 38, outer + 68]; // 第1层贴饼，第2、3层依次向外
+    var halfW = 46, halfH = 9; // 单行标签包围盒半宽/半高
     var W = chart.width, H = chart.height;
     var placed = [];
-    function inBounds(x, y){
-      // 允许标签进入 padding 区域（只要不超出画布），给花瓣充分展开空间
-      return x >= 42 && x <= W - 42 && y >= 14 && y <= H - 14;
+    function inBounds(it, x, y){
+      var w = halfW*2 + 6; // 单行文本宽度
+      if(it.cos < 0) return x >= w && x <= W - 10 && y >= 14 && y <= H - 14;       // 左半边文字向左，需 x 足够靠右
+      return x >= 10 && x <= W - w && y >= 14 && y <= H - 14;                       // 右半边文字向右
     }
     function hit(x, y){
       for(var k=0;k<placed.length;k++){
@@ -23541,22 +23541,25 @@ var _slatsPieLabelsPlugin = {
     }
     function tryPlace(it, r, a){
       var x = cx + Math.cos(a)*r, y = cy + Math.sin(a)*r;
-      if(inBounds(x,y) && !hit(x,y)){ it.labelX = x; it.labelY = y; return true; }
+      if(inBounds(it, x, y) && !hit(x, y)){ it.labelX = x; it.labelY = y; return true; }
       return false;
     }
     items.sort(function(a,b){ return a.angle - b.angle; });
     items.forEach(function(it){
       var ok = false;
-      // 沿半径递增；每个半径上优先原扇区角度，再 ±摆动错开；重叠时沿径向拉远
-      for(var r = r0; r <= 2000 && !ok; r += step){
-        if(tryPlace(it, r, it.angle)){ ok = true; break; }
-        for(var s = 1; s <= maxSwingSteps && !ok; s++){
-          if(tryPlace(it, r, it.angle + s*swingStep)){ ok = true; break; }
-          if(tryPlace(it, r, it.angle - s*swingStep)){ ok = true; break; }
+      // 1) 由内到外逐层尝试（固定扇区角度），重叠则升层
+      for(var li=0; li<layers.length && !ok; li++){
+        if(tryPlace(it, layers[li], it.angle)){ ok = true; break; }
+      }
+      // 2) 三层仍重叠：最外层做小幅切向错开兜底
+      if(!ok){
+        for(var s=1; s<=10 && !ok; s++){
+          if(tryPlace(it, layers[layers.length-1], it.angle + s*0.04)){ ok = true; break; }
+          if(tryPlace(it, layers[layers.length-1], it.angle - s*0.04)){ ok = true; break; }
         }
       }
-      // 兜底：放在原扇区角度 r0 处
-      if(!ok){ it.labelX = cx + Math.cos(it.angle)*r0; it.labelY = cy + Math.sin(it.angle)*r0; }
+      // 3) 兜底：最外层原角度
+      if(!ok){ it.labelX = cx + Math.cos(it.angle)*layers[layers.length-1]; it.labelY = cy + Math.sin(it.angle)*layers[layers.length-1]; }
       placed.push({ x: it.labelX, y: it.labelY });
     });
     ctx.save();
@@ -23564,7 +23567,7 @@ var _slatsPieLabelsPlugin = {
     items.forEach(function(it){
       var lx = it.labelX + (it.cos>=0? 4 : -4);
       var align = it.cos >= 0 ? 'left' : 'right';
-      // 肘形同色引导线：扇区边缘 → 沿原扇区角度的肩点 → 标签（第一段放射，互不交叉；第二段短折线，不斜穿饼心）
+      // 肘形同色引导线：扇区边缘 → 沿原扇区角度的肩点 → 标签（第一段放射不交叉，第二段短折线不斜穿饼心）
       var sx = cx + Math.cos(it.angle)*(outer+6), sy = cy + Math.sin(it.angle)*(outer+6);
       ctx.strokeStyle = it.color;
       ctx.beginPath();
@@ -23577,15 +23580,12 @@ var _slatsPieLabelsPlugin = {
       ctx.beginPath();
       ctx.arc(it.edgeX, it.edgeY, 2.6, 0, Math.PI*2);
       ctx.fill();
-      // 两行文本：占比（上，加粗）+ 绝对值（下）
+      // 单行文本：占比% / 绝对值
       ctx.fillStyle = '#333';
       ctx.textAlign = align;
       ctx.font = 'bold 11px sans-serif';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(it.pctText, lx, it.labelY - 1);
-      ctx.font = '10px sans-serif';
-      ctx.textBaseline = 'top';
-      ctx.fillText(it.valText, lx, it.labelY + 1);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(it.text, lx, it.labelY);
     });
     ctx.restore();
   }
@@ -23688,7 +23688,7 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
       options: {
         responsive: true, maintainAspectRatio: false,
         cutout: '70%',
-        layout: { padding: { top: 90, right: 120, bottom: 90, left: 120 } },
+        layout: { padding: { top: 110, right: 170, bottom: 110, left: 170 } },
         plugins: {
           legend: { display: false },
           tooltip: {
