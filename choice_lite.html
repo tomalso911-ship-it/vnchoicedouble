@@ -3310,7 +3310,8 @@ function _ovLoadChartLib(cb){
       .st-done{background:#E9ECEF;color:#555;}
       .st-over{background:#F8D7DA;color:#a31515;}
       .prod-detail-head{display:flex;align-items:center;gap:12px;margin:4px 0 10px;}
-      .prod-back{border:1px solid #ccc;background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;}
+      .prod-back{border:1px solid #e6c200;background:#ffd700;color:#333;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;}
+      .prod-back:hover{background:#ffdf33;}
       .prod-detail-title{font-weight:700;font-size:16px;}
       .prod-tabs{display:flex;flex-wrap:nowrap;gap:6px;border-bottom:2px solid #E7F2D4;padding-bottom:6px;margin-bottom:12px;overflow-x:auto;white-space:nowrap;-ms-overflow-style:none;scrollbar-width:none;}
       .prod-tabs::-webkit-scrollbar{display:none;}
@@ -4069,6 +4070,12 @@ function _ovLoadChartLib(cb){
     function prod_phName(v){
       var s = String(v == null ? '' : v).trim();
       if(!s) return '';
+      // 后缀形式：2-a → 当前语言名称-a（如 配种舍-a / Mating barn-a）
+      var suffixMatch = /^(\d+)-([a-z0-9]{1,4})$/.exec(s);
+      if(suffixMatch){
+        var baseName = prod_phName(suffixMatch[1]);
+        if(baseName) return baseName + '-' + suffixMatch[2];
+      }
       var lang = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
       var d = (typeof I18N!=='undefined' && I18N) ? I18N : null;
       var tr = function(id){
@@ -9445,6 +9452,20 @@ function _ovLoadChartLib(cb){
 .slats-spec-btn-merge:hover { background: #fff3e0; border-color: #FF9800; }
 .slats-spec-select { appearance:none; -webkit-appearance:none; -moz-appearance:none; padding:2px 0; cursor:pointer; text-align:center; text-align-last:center; }
 .slats-spec-remark { text-align:left; }
+/* 猪舍后缀 + 按钮与浮层 */
+.slats-ph-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:100%;width:100%;}
+.slats-ph-wrap select.slats-spec-select{width:100%;text-align:center;text-align-last:center;}
+.slats-suffix-plus{display:none;width:18px;height:18px;line-height:16px;text-align:center;border:1px solid #1f6feb;background:#1f6feb;color:#fff;border-radius:50%;font-size:13px;cursor:pointer;padding:0;align-items:center;justify-content:center;}
+.slats-suffix-plus:hover{background:#155bb5;}
+.slats-suffix-pop{position:fixed;z-index:1200;background:#fff;border:1px solid #cfd6e0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.18);padding:10px 12px;width:208px;}
+.slats-suffix-pop-title{font-size:13px;font-weight:600;color:#333;margin-bottom:8px;}
+.slats-suffix-pop-row{display:flex;align-items:center;gap:2px;margin-bottom:10px;}
+.slats-suffix-dash{font-size:15px;font-weight:700;color:#333;}
+.slats-suffix-input{flex:1;width:100%;padding:6px 8px;border:1px solid #ccc;border-radius:6px;font-size:14px;text-transform:lowercase;}
+.slats-suffix-pop-btns{display:flex;gap:6px;justify-content:flex-end;}
+.slats-suffix-btn{font-size:12px;padding:4px 10px;border:1px solid #cfd6e0;border-radius:6px;background:#f5f7fa;cursor:pointer;}
+.slats-suffix-btn:hover{background:#e9ecef;}
+.slats-suffix-btn[data-act="save"]{background:#1f6feb;color:#fff;border-color:#1f6feb;}
 
 /* ===== 十字高亮方案：当前单元格所在行+列高亮，当前单元格（含内部 input/select）填充淡黄色 ===== */
 .slats-spec-table tbody tr.slats-cross-row > td { background-color: #fff9c4 !important; }
@@ -10385,7 +10406,7 @@ var I18N = {
     nav_production:"生产管理", prod_title:"生产管理 · 现场工厂", prod_sub:"每个签约项目 = 一个独立现场工厂（人员/产能/设备/库存互不串）", prod_back:"← 返回列表",
     slats_mesh_1:"1", slats_mesh_2:"2",
     slats_rebar_φ6:"φ6", slats_rebar_φ8:"φ8", slats_rebar_φ10:"φ10", slats_rebar_φ12:"φ12",
-    slats_table_btn_delete:"删除", slats_table_btn_copy:"复制", slats_table_btn_merge:"合并", btnAddWon:"+ 新建签约", btnExportExcel:"📊 导出 Excel", btnSave:"保存", btnCancel:"取消", btnEdit:"编辑", btnDelete:"删除", btnMove:"上移或下移该行", btnMoveUp:"上移", btnMoveDown:"下移", confirmDelTitle:"确认删除", confirmDel:"确定删除该项目？", btnConfirm:"确定", btnCancel:"取消", saveOk:"保存成功", pending:"已提交审批", fillAll:"请填写所有必填项", noData:"暂无数据", hiddenColumns:"已隐藏列:", cur_col_toggle:"点击显示/隐藏该货币列（至少保留一项）",
+    slats_table_btn_delete:"删除", slats_table_btn_copy:"复制", slats_table_btn_merge:"合并", slats_suffix_tip:"需要增加后缀吗？比如育肥舍加后缀变成育肥舍-a?", slats_suffix_title:"为猪舍添加后缀", slats_suffix_ph:"输入后缀（小写字母/数字，最多4位）", slats_suffix_save:"保存", slats_suffix_clear:"清除", slats_suffix_exit:"退出", btnAddWon:"+ 新建签约", btnExportExcel:"📊 导出 Excel", btnSave:"保存", btnCancel:"取消", btnEdit:"编辑", btnDelete:"删除", btnMove:"上移或下移该行", btnMoveUp:"上移", btnMoveDown:"下移", confirmDelTitle:"确认删除", confirmDel:"确定删除该项目？", btnConfirm:"确定", btnCancel:"取消", saveOk:"保存成功", pending:"已提交审批", fillAll:"请填写所有必填项", noData:"暂无数据", hiddenColumns:"已隐藏列:", cur_col_toggle:"点击显示/隐藏该货币列（至少保留一项）",
     contract_no:"合同编号", customer_name:"客户名称", signing_date:"签约日期", parties:"签约双方", currency:"签约货币", contract_rate:"合同使用汇率", incoterms:"贸易术语", include_install:"含安装吗？",
     p1_payment_method:"P1:合同付款方式", p1_equipment_amount:"P1:合同设备金额", p1_guide_install:"P1:合同指导安装费", p1_budget_freight_ins:"P1:合同预算运费&保险费", p1_actual_freight_ins:"P1:合同实际运费&保险费",
     p1_budget_customs_inland:"P1:合同预算清关&内陆运输", p1_actual_customs_inland:"P1:合同实际清关&内陆运输费用", p1_equipment_combined:"P1:合同设备综合价格", p1_budget_install:"P1:合同预算安装费", p1_actual_install:"P1:合同实际安装费",
@@ -11153,7 +11174,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     nav_production:"Production Management", prod_title:"Production Management · On-site Factory", prod_sub:"Each signed project = one independent on-site factory (staff / capacity / equipment / inventory are isolated)", prod_back:"← Back to list",
     slats_mesh_1:"1", slats_mesh_2:"2",
     slats_rebar_φ6:"φ6", slats_rebar_φ8:"φ8", slats_rebar_φ10:"φ10", slats_rebar_φ12:"φ12",
-    slats_table_btn_delete:"Delete", slats_table_btn_copy:"Copy", slats_table_btn_merge:"Merge", btnAddWon:"+ New Won", btnExportExcel:"📊 Export Excel", btnSave:"Save", btnCancel:"Cancel", btnEdit:"Edit", btnDelete:"Delete", btnMoveUp:"Move up", btnMoveDown:"Move down", confirmDelTitle:"Confirm Delete", confirmDel:"Delete this project?", btnConfirm:"Confirm", btnCancel:"Cancel", saveOk:"Saved", pending:"Pending approval", fillAll:"Please fill all required fields", noData:"No data", hiddenColumns:"Hidden Columns:", cur_col_toggle:"Click to show/hide this currency column (keep at least one)",
+    slats_table_btn_delete:"Delete", slats_table_btn_copy:"Copy", slats_table_btn_merge:"Merge", slats_suffix_tip:"Need to add a suffix? e.g. add suffix to 育肥舍 → 育肥舍-a?", slats_suffix_title:"Add suffix to house", slats_suffix_ph:"Enter suffix (lowercase letters/digits, max 4)", slats_suffix_save:"Save", slats_suffix_clear:"Clear", slats_suffix_exit:"Exit", btnAddWon:"+ New Won", btnExportExcel:"📊 Export Excel", btnSave:"Save", btnCancel:"Cancel", btnEdit:"Edit", btnDelete:"Delete", btnMoveUp:"Move up", btnMoveDown:"Move down", confirmDelTitle:"Confirm Delete", confirmDel:"Delete this project?", btnConfirm:"Confirm", btnCancel:"Cancel", saveOk:"Saved", pending:"Pending approval", fillAll:"Please fill all required fields", noData:"No data", hiddenColumns:"Hidden Columns:", cur_col_toggle:"Click to show/hide this currency column (keep at least one)",
     contract_no:"Contract No.", customer_name:"Customer Name", signing_date:"Contract Date", parties:"Signing Parties", currency:"Contract Currency", contract_rate:"Contract Exchange Rate", incoterms:"Incoterms", include_install:"Including Installation?",
     p1_payment_method:"P1:Payment Method", p1_equipment_amount:"P1:Equipment Amount", p1_guide_install:"P1:Guide Installation Fee", p1_budget_freight_ins:"P1:Budget Freight & Ins.", p1_actual_freight_ins:"P1:Actual Freight & Ins.",
     p1_budget_customs_inland:"P1:Budget Customs & Inland", p1_actual_customs_inland:"P1:Actual Customs & Inland", p1_equipment_combined:"P1:Equip. Combined Price", p1_budget_install:"P1:Budget Installation Fee", p1_actual_install:"P1:Actual Installation Fee",
@@ -11924,7 +11945,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     nav_production:"Quản lý Sản xuất", prod_title:"Quản lý Sản xuất · Nhà máy tại công trường", prod_sub:"Mỗi dự án đã ký = một nhà máy độc lập tại công trường (nhân sự / công suất / thiết bị / tồn kho độc lập)", prod_back:"← Quay lại danh sách",
     slats_mesh_1:"1", slats_mesh_2:"2",
     slats_rebar_φ6:"φ6", slats_rebar_φ8:"φ8", slats_rebar_φ10:"φ10", slats_rebar_φ12:"φ12",
-    slats_table_btn_delete:"Xóa", slats_table_btn_copy:"Sao chép", slats_table_btn_merge:"Gộp", btnAddWon:"+ Thắng Mới", btnExportExcel:"📊 Xuất Excel", btnSave:"Lưu", btnCancel:"Hủy", btnEdit:"Sửa", btnDelete:"Xóa", btnMove:"Di chuyển dòng này lên hoặc xuống", btnMoveUp:"Lên", btnMoveDown:"Xuống", confirmDelTitle:"Xác nhận xóa", confirmDel:"Xóa dự án này?", btnConfirm:"Xác nhận", btnCancel:"Hủy", saveOk:"Đã lưu", pending:"Chờ phê duyệt", fillAll:"Vui lòng điền đủ thông tin", noData:"Không có dữ liệu", hiddenColumns:"Cột đã ẩn:", cur_col_toggle:"Bấm để hiện/ẩn cột tiền tệ này (giữ ít nhất một)",
+    slats_table_btn_delete:"Xóa", slats_table_btn_copy:"Sao chép", slats_table_btn_merge:"Gộp", slats_suffix_tip:"Cần thêm hậu tố? Ví dụ 育肥舍 thêm hậu tố thành 育肥舍-a?", slats_suffix_title:"Thêm hậu tố cho chuồng", slats_suffix_ph:"Nhập hậu tố (chữ thường/số, tối đa 4)", slats_suffix_save:"Lưu", slats_suffix_clear:"Xóa", slats_suffix_exit:"Thoát", btnAddWon:"+ Thắng Mới", btnExportExcel:"📊 Xuất Excel", btnSave:"Lưu", btnCancel:"Hủy", btnEdit:"Sửa", btnDelete:"Xóa", btnMove:"Di chuyển dòng này lên hoặc xuống", btnMoveUp:"Lên", btnMoveDown:"Xuống", confirmDelTitle:"Xác nhận xóa", confirmDel:"Xóa dự án này?", btnConfirm:"Xác nhận", btnCancel:"Hủy", saveOk:"Đã lưu", pending:"Chờ phê duyệt", fillAll:"Vui lòng điền đủ thông tin", noData:"Không có dữ liệu", hiddenColumns:"Cột đã ẩn:", cur_col_toggle:"Bấm để hiện/ẩn cột tiền tệ này (giữ ít nhất một)",
     contract_no:"Số hợp đồng", customer_name:"Tên khách hàng", signing_date:"Ngày ký", parties:"Các bên ký kết", currency:"Loại tiền tệ", contract_rate:"Tỷ giá HĐ", incoterms:"Incoterms", include_install:"Có bao gồm lắp đặt?",
     p1_payment_method:"P1:Phương thức thanh toán", p1_equipment_amount:"P1:Giá trị thiết bị (HĐ)", p1_guide_install:"P1:Phí hướng dẫn lắp đặt", p1_budget_freight_ins:"P1:Cước VC & BH dự toán", p1_actual_freight_ins:"P1:Cước VC & BH thực tế",
     p1_budget_customs_inland:"P1:HQ & VC nội địa dự toán", p1_actual_customs_inland:"P1:HQ & VC nội địa thực tế", p1_equipment_combined:"P1:Giá tổng hợp thiết bị", p1_budget_install:"P1:Phí lắp đặt dự toán", p1_actual_install:"P1:Phí lắp đặt thực tế",
@@ -14447,6 +14468,28 @@ function setLangDebug(lang) {
   try { localStorage.setItem('won_lang', JSON.stringify(lang)); } catch(e){}
   window.__rmSnapWon = __rmSnapWon; window.__rmSnapCrm = __rmSnapCrm;
 
+  // ---- 语言切换前：快照所有已打开的弹窗/浮层，切换后强制恢复，确保它们不消失 ----
+  var __langPreserveList = [];
+  try {
+    document.querySelectorAll('.modal-overlay.show, .modal.show, .auth-modal-overlay:not(.hidden), .modal-mask.show').forEach(function(el){
+      __langPreserveList.push({type:'class', el:el, cls:'show'});
+    });
+    document.querySelectorAll('.slats-suffix-pop').forEach(function(el){
+      if(el.style.display==='block') __langPreserveList.push({type:'style', el:el, display:'block'});
+    });
+  } catch(e) {}
+  window.__langPreserveList = __langPreserveList;
+
+  function __restoreLangPreserve(){
+    try {
+      (window.__langPreserveList||[]).forEach(function(item){
+        if(!item.el || !item.el.parentNode) return;
+        if(item.type==='class' && !item.el.classList.contains(item.cls)) item.el.classList.add(item.cls);
+        if(item.type==='style') item.el.style.display = item.display;
+      });
+    } catch(e) {}
+  }
+
   try { updateLangSwitchUI(); } catch(e) { console.warn('[lang] updateLangSwitchUI failed:', e); }
   // 登录页右上角的语言切换按钮也要同步高亮（独立于主顶栏的 lang-switch）
   try {
@@ -14569,6 +14612,7 @@ function setLangDebug(lang) {
       console.warn('[lang] ' + heavySteps[j] + ' failed:', e);
     }
   }
+  __restoreLangPreserve();
 
   // ---- 第三步：重活延后到下一帧，避免阻塞上面的 UI 更新 ----
   try {
@@ -14626,6 +14670,7 @@ function setLangDebug(lang) {
         } catch (e) {}
 
       } catch (e) {}
+      __restoreLangPreserve();
     }, 16);
   } catch (e) { /* 忽略 */ }
 
@@ -22776,14 +22821,9 @@ function openSlatsReportModal(){
     }
     return '';
   }
-  // 辅助：翻译猪舍名称（三语）
+  // 辅助：翻译猪舍名称（三语，含后缀 2-a）
   function _phLabel(v){
-    var s=String(v||'').trim();
-    var key='slats_pig_house_'+s;
-    if(t[key]!==undefined) return t[key];
-    var id=_phIdFromName(s);
-    if(id){ var key2='slats_pig_house_'+id; if(t[key2]!==undefined) return t[key2]; }
-    return s;
+    return prod_phName(v);
   }
   // 辅助：翻译钢筋/钢网选项（三语）
   function _rebarLabel(v){
@@ -23194,7 +23234,12 @@ var SLATS_MESH=[1,2];
 var SLATS_REBAR=['φ6','φ8','φ10','φ12'];
 // 四类特殊房舍：12=过道、13=自留备用、14=其他房舍、15=其他用途（这四类不参与整场栋数统计，且 5 个字段强制=1）
 var SLATS_SPECIAL_HOUSES=['12','13','14','15'];
-function slatsIsSpecialHouse(v){ return SLATS_SPECIAL_HOUSES.indexOf(String(v==null?'':v).trim())>=0; }
+function slatsIsSpecialHouse(v){
+  var s=String(v==null?'':v).trim();
+  var m=/^(\d+)-/.exec(s);
+  if(m) s=m[1];
+  return SLATS_SPECIAL_HOUSES.indexOf(s)>=0;
+}
 function slatsArrForPrefix(p){
   if(p==='slats_pig_house_') return SLATS_PIG_HOUSE;
   if(p==='slats_mesh_') return SLATS_MESH;
@@ -23208,6 +23253,11 @@ function slatsOptHtml(arr, prefix, selected){
     var label=t[k]!==undefined?t[k]:v;
     return '<option value="'+v+'"'+(String(v)===String(selected)?' selected':'')+'>'+label+'</option>';
   }).join('');
+}
+/* 猪舍下拉自定义值显示：统一走 prod_phName（已处理后缀） */
+function slatsPigHouseLabel(v){
+  var name = (typeof prod_phName==='function') ? prod_phName(v) : '';
+  return name || String(v==null?'':v).trim();
 }
 function slatsSelectCell(prefix, arr, selected){
   var td=document.createElement('td');
@@ -23265,11 +23315,105 @@ function slatsActionCell(){
   '</div>';
   return td;
 }
+function slatsSyncToModel(){
+  try{
+    var data = slatsSpecSerialize();
+    var json = JSON.stringify(data);
+    var cfsEl = el('w_concrete_floor_spec'); if(cfsEl) cfsEl.value = json;
+    window.__slatsSpecByPid = window.__slatsSpecByPid || {};
+    var mid = (el('wonModal')?el('wonModal').dataset.id:'')||'';
+    window.__slatsSpecByPid[mid] = json;
+    if(typeof globalWonData!=='undefined' && globalWonData){
+      var p = globalWonData.find(function(x){ return String(x.id)===String(mid); });
+      if(p) p.concrete_floor_spec = json;
+    }
+  }catch(e){}
+}
+/* 猪舍单元格：下拉 +「+」后缀按钮 + 后缀浮层（仅用于 slats_pig_house_） */
+function slatsPigHouseCell(initVal){
+  var td = slatsSelectCell('slats_pig_house_', SLATS_PIG_HOUSE, '');
+  var sel = td.querySelector('select');
+  var init = (initVal!=null?String(initVal):'')||'';
+  if(init){
+    var has=false;
+    for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value===init){ has=true; break; } }
+    if(!has){ var o=document.createElement('option'); o.value=init; o.textContent=slatsPigHouseLabel(init); sel.appendChild(o); }
+    sel.value=init;
+  }
+  var base = init;
+  var mm = /^(\d+)-([a-z0-9]{1,4})$/.exec(init);
+  if(mm) base = mm[1];
+  sel.setAttribute('data-base-house', base);
+  var plus = document.createElement('button');
+  plus.type='button'; plus.className='slats-suffix-plus'; plus.textContent='+';
+  plus.setAttribute('data-i18n-attr','title:slats_suffix_tip');
+  plus.title = (T()['slats_suffix_tip']||'');
+  plus.style.display = (init? 'inline-flex':'none');
+  var pop = document.createElement('div');
+  pop.className='slats-suffix-pop'; pop.style.display='none';
+  pop.innerHTML = '<div class="slats-suffix-pop-title" data-i18n="slats_suffix_title">'+T()['slats_suffix_title']+'</div>'
+    + '<div class="slats-suffix-pop-row"><span class="slats-suffix-dash">-</span>'
+    + '<input class="slats-suffix-input" type="text" maxlength="4" data-i18n-attr="placeholder:slats_suffix_ph" placeholder="'+T()['slats_suffix_ph']+'"></div>'
+    + '<div class="slats-suffix-pop-btns">'
+    + '<button type="button" class="slats-suffix-btn" data-act="save" data-i18n="slats_suffix_save">'+T()['slats_suffix_save']+'</button>'
+    + '<button type="button" class="slats-suffix-btn" data-act="clear" data-i18n="slats_suffix_clear">'+T()['slats_suffix_clear']+'</button>'
+    + '<button type="button" class="slats-suffix-btn" data-act="exit" data-i18n="slats_suffix_exit">'+T()['slats_suffix_exit']+'</button>'
+    + '</div>';
+  // 垂直布局：+ 按钮在输入框上方，与右侧房舍编号对齐
+  var wrap = document.createElement('div'); wrap.className='slats-ph-wrap';
+  wrap.appendChild(plus); wrap.appendChild(sel);
+  td.innerHTML=''; td.appendChild(wrap); td.appendChild(pop);
+  var inp = pop.querySelector('.slats-suffix-input');
+  sel.addEventListener('change', function(){
+    var _base = sel.value;
+    var _m = /^(\d+)-([a-z0-9]{1,4})$/.exec(_base);
+    if(_m) _base = _m[1];
+    sel.setAttribute('data-base-house', _base);
+    plus.style.display = (sel.value?'inline-flex':'none');
+  });
+  plus.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(pop.style.display==='block'){ pop.style.display='none'; return; }
+    var r = plus.getBoundingClientRect();
+    pop.style.position='fixed'; pop.style.left=(r.right+4)+'px'; pop.style.top=r.top+'px';
+    pop.style.display='block'; inp.value=''; inp.focus();
+  });
+  inp.addEventListener('input', function(){ var v=inp.value.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,4); if(v!==inp.value){ inp.value=v; } });
+  pop.querySelectorAll('.slats-suffix-btn').forEach(function(b){
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      var act=b.getAttribute('data-act');
+      if(act==='save'){
+        var sf=inp.value, b0=sel.getAttribute('data-base-house')||sel.value;
+        var newVal = sf? b0+'-'+sf : b0;
+        var ex=false; for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value===newVal){ ex=true; break; } }
+        if(!ex){ var op=document.createElement('option'); op.value=newVal; op.textContent=slatsPigHouseLabel(newVal); sel.appendChild(op); }
+        sel.value=newVal;
+        slatsSyncToModel();
+        pop.style.display='none';
+      } else if(act==='clear'){ inp.value=''; inp.focus(); }
+      else { pop.style.display='none'; }
+    });
+  });
+  if(!document._slatsSuffixCloseInit){
+    document._slatsSuffixCloseInit=true;
+    document.addEventListener('click', function(e){
+      var p=document.querySelector('.slats-suffix-pop');
+      if(!p || p.style.display==='none') return;
+      if(p.contains(e.target)) return;
+      if(e.target.closest && e.target.closest('.slats-suffix-plus')) return;
+      p.style.display='none';
+    });
+    var sc=document.querySelector('.slats-spec-table-scroll');
+    if(sc) sc.addEventListener('scroll', function(){ var p=document.querySelector('.slats-suffix-pop'); if(p) p.style.display='none'; });
+  }
+  return td;
+}
 function slatsBuildRow(groupId, idx, values){
   var tr=document.createElement('tr');
   tr.setAttribute('data-slats-group', groupId);
   var idxTd=document.createElement('td'); idxTd.className='slats-spec-idx'; idxTd.textContent=idx; tr.appendChild(idxTd);
-  tr.appendChild(slatsSelectCell('slats_pig_house_', SLATS_PIG_HOUSE, ''));
+  tr.appendChild(slatsPigHouseCell(values && values[1] ? values[1] : ''));
   tr.appendChild(slatsInputCell('text',''));
   tr.appendChild(slatsInputCell('int',''));
   tr.appendChild(slatsInputCell('decimal2',''));   // 长/单元
@@ -23292,9 +23436,11 @@ function slatsBuildRow(groupId, idx, values){
   tr.appendChild(slatsActionCell());
   for(var _oci=0;_oci<tr.children.length;_oci++){ tr.children[_oci].setAttribute('data-oci', _oci); }
   if(values && values.length){
-    var inputs=tr.querySelectorAll('input,select');
-    // values[0] 是序号列（没有 input），input 从 values[1] 开始对应
-    for(var i=0;i<inputs.length && (i+1)<values.length;i++){ inputs[i].value=values[i+1]||''; }
+    // 按列赋值，避免猪舍单元格里的后缀浮层 input 打乱顺序
+    for(var ci=1;ci<values.length;ci++){
+      var v=values[ci];
+      if(v!==undefined && v!==null) slatsSetInputValue(tr, ci, v);
+    }
   }
   slatsApplyDefaultState(tr);
   return tr;
@@ -23710,7 +23856,21 @@ function refreshSlatsSelectOptions(){
     var sel=selects[i];
     var prefix=sel.getAttribute('data-prefix');
     var val=sel.value;
-    sel.innerHTML=slatsOptHtml(slatsArrForPrefix(prefix), prefix, val);
+    var arr = slatsArrForPrefix(prefix);
+    // 保留自定义选项（如猪舍后缀 "育肥舍-a"），避免切语言等刷新时丢失
+    var extras=[];
+    for(var j=0;j<sel.options.length;j++){
+      var ov=sel.options[j].value;
+      if(ov && arr.indexOf(ov)<0 && extras.indexOf(ov)<0) extras.push(ov);
+    }
+    sel.innerHTML=slatsOptHtml(arr, prefix, val);
+    extras.forEach(function(v){
+      if(arr.indexOf(v)<0){
+        var exists=false;
+        for(var k=0;k<sel.options.length;k++){ if(sel.options[k].value===v){ exists=true; break; } }
+        if(!exists){ var o=document.createElement('option'); o.value=v; o.textContent=(prefix==='slats_pig_house_'?slatsPigHouseLabel(v):v); sel.appendChild(o); }
+      }
+    });
     sel.value=val;
   }
   refreshSlatsDefaultTooltips();
