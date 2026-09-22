@@ -3344,8 +3344,17 @@ function _ovLoadChartLib(cb){
       .prod-table th,.prod-table td{border:1px solid #eee;padding:5px 6px;text-align:left;}
       .prod-table .pe-col-no{width:36px;text-align:center;cursor:default;}
       .prod-table th{background:#f7f9f4;font-size:11px;white-space:normal;vertical-align:bottom;}
+      .prod-table .ho-head{white-space:normal;line-height:1.25;max-width:150px;vertical-align:bottom;}
+      .prod-table .ho-input{width:100%;box-sizing:border-box;text-align:center;border:1px solid #d8e0d2;border-radius:6px;padding:4px 4px;font-size:13px;font-variant-numeric:tabular-nums;}
+      .prod-table .ho-input.ho-out{background:#f6fff8;}
+      .prod-table .ho-input.ho-ret{background:#fff6f8;}
+      .prod-table .ho-input:focus{outline:none;border-color:#E53935;}
+      .prod-table .ho-calc{text-align:center;font-weight:700;font-variant-numeric:tabular-nums;}
       .prod-demand-title{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f0f6ff;border-color:#9fc4ff;}
       .prod-demand-title .prod-btn.mini{font-size:16px;line-height:1;padding:1px 9px;min-width:26px;height:24px;}
+      .prod-stockout-title{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f0f6ff;border-color:#9fc4ff;}
+      .prod-stockout-title .prod-btn.mini{font-size:13px;line-height:1;padding:4px 12px;height:auto;}
+      .prod-table .ho-disabled{text-align:center;color:#bbb;background:#f7f7f7;font-variant-numeric:tabular-nums;}
       .prod-demand-panel{padding:2px 0 6px;}
       .prod-sub-title{font-size:13px;font-weight:600;color:#1f3a5f;margin:12px 0 4px;border-left:3px solid #E53935;padding-left:8px;}
       .pe-group-end td,td.pe-group-end{border-bottom:2px solid #333!important;}
@@ -3640,7 +3649,7 @@ function _ovLoadChartLib(cb){
       .pe-specname{flex:1;font-size:14px;font-weight:500;color:#333;}
       .pe-specrow .pe-q{width:100px;padding:7px 10px;border:1px solid #ccc;border-radius:8px;font-size:14px;text-align:right;}
       .prod-kpi{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
-      .prod-kpi .k{background:#f7f9f4;border-radius:10px;padding:8px 14px;font-size:13px;}
+      .prod-kpi .k{background:#f7f9f4;border-radius:10px;padding:8px 14px;font-size:13px;text-align:center;flex:1;min-width:110px;}
       .prod-house-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin:8px 0 4px;}
       .prod-house-card{background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;box-shadow:0 1px 5px rgba(20,40,80,.06);transition:opacity .2s,border-color .2s,box-shadow .2s;}
       .prod-house-card.highlight{border-color:#E53935;box-shadow:0 0 0 3px rgba(229,57,53,.18);}
@@ -3679,6 +3688,7 @@ function _ovLoadChartLib(cb){
     var PROD_TREND_ROLES = {};
     var PROD_HIST_HIDEZERO = false;
     var PROD_DUE_EDITING = false;
+    var PROD_PROFILE_EDITING = false;
     var PROD_TREND_RESIZE = false;
     var PROD_TREND_DATA = null;
     var PROD_ESTATS_SORT = {col:null, dir:0};
@@ -3708,7 +3718,7 @@ function _ovLoadChartLib(cb){
         note_d:'注：需求按规格体积折算标准板(1500×600×70)后，套用水泥24.4/黄砂22.6/石子68 kg·每标准板计算，与系统“智能报告”完全一致。',
         sec_receipt:'收货确认', lang_zh:'中文', lang_en:'English', lang_vi:'Tiếng Việt', lbl_newly_added_specs:'本次新增规格', btn_show_all_added_specs:'显示全部新增规格', btn_show_current_mat_specs:'只显示当前材料新增规格', th_added_mat:'材料', th_added_spec_zh:'增加的规格-中文', th_added_spec_en:'增加的规格-英文', th_added_spec_vi:'增加的规格-越南文', toast_no_auth_del:'无权限删除', lbl_arr_date:'到货日期', lbl_material:'材料', lbl_floor_spec:'当前生产的地板规格', lbl_supplier:'供应商', lbl_plate:'车牌', lbl_location:'库位', lbl_for_house:'用于猪舍', lbl_unit_price:'每吨单价', lbl_total_vnd:'总价(VND)', lbl_price_rmb:'折合RMB', lbl_price_usd:'折合USD', lbl_photos:'收货照片', btn_upload_photos:'上传照片', btn_choose_photos:'选择照片', lbl_no_photos_selected:'暂无已选照片', lbl_no_photos_chosen:'未选择照片', err_photo_type:'只能上传图片文件，不支持文档或其它格式', btn_view:'查看', btn_add_photo:'增加', btn_remove_photo:'移除', btn_submit_receipt:'提交收货单', btn_confirm_receipt:'采购确认', status_pending:'待采购确认', status_confirmed:'已确认入库', receipt_empty:'暂无收货单', btn_show_more_receipts:'显示剩余 {n} 条', btn_hide_more_receipts:'收起', tri_lang_no_existing:'暂无已有规格', tri_lang_no_added:'暂无新增规格', lbl_existing_specs:'已有规格（系统默认·锁定）', op_created_by:'录入人', lbl_for_house2:'采购物资用于生产下面猪舍的水泥地板', sec_receipt_lines:'收货明细', sec_receipt_list:'已提交收货单', btn_add_line:'+ 添加一行', lbl_spec:'规格', lbl_unit:'单位', lbl_price_vnd:'单价(VND)', lbl_price_rmb:'单价(RMB)', lbl_price_usd:'单价(USD)', lbl_sub_vnd:'小计(VND)', lbl_sub_rmb:'小计(RMB)', lbl_sub_usd:'小计(USD)', lbl_note:'备注', lbl_op:'操作', lbl_edit_spec:'编辑规格', lbl_existing_specs:'已有规格（已锁定）', hint_spec_lines:'每行一个规格，空行忽略', toast_spec_saved:'规格已保存', toast_spec_cleared:'已清空规格', editable:'可编辑', auto_translate:'自动翻译', tri_lang_clear:'清空三语', receipt_no_line:'暂未添加明细行', lbl_total:'合计', toast_line_req:'请填全每行 材料/规格/数量/单价', toast_floor_req:'请选择当前生产的地板规格', submit_warn:'请检查提交明细是否正确，确认后提交采购确认，确认完毕后本次入库流程结束！', appr_title_PROD_RECEIPT:'收货单审批', appr_content_PROD_RECEIPT:'厂长提交的原料收货单，请核对明细后通过（可修改数量/单价/规格），通过后自动入库。', toast_sent_approve:'已提交采购经理审批', toast_appr_exists:'已有待处理的审批，请勿重复提交', status_returned:'已驳回', status_need_edit:'待重新填写', btn_reedit_receipt:'重新填写', toast_receipt_need_edit:'收货单已返回，请修改后重新提交', btn_del_receipt:'删除', del_receipt_confirm:'确定删除该条收货单信息及附带的照片吗？', toast_receipt_deleted:'收货单已删除', btn_edit:'编辑', btn_confirm:'确认', btn_cancel:'取消', sync_all_confirm:'将把本浏览器内所有现场工厂数据与材料规格上传到服务器，供全体用户共享。确定吗？', sync_all_done:'已上传 {n} 个现场工厂到服务器',
         sec_daily:'每日生产 / 盘点', lbl_daily_common:'公共信息', lbl_specs_qty:'规格产量（片）', btn_add_spec:'+ 产出规格', btn_add_mat:'+ 耗料', btn_save_prod:'保存当日生产', btn_auto_hist:'自动补录历史产出', auto_hist_confirm:'将清空 31-08 至今的每日产出并重新随机灌入，确定吗？', toast_auto_hist:'已自动补录历史产出', sec_history:'历史产出', prod_stats_title:'生产统计 & 曲线图', lbl_demand:'总需求量', lbl_produced:'当前生产总量', lbl_gap:'缺口量', th_house_names:'用于猪舍的名称', th_share_rank:'占比/排名', chart_bar:'规格需求 vs 已生产（柱状对比）', chart_prod_per_spec:'各规格每日产量（片）', chart_weather:'天气（温度/湿度）与总产量（片）', lbl_total_prod:'总产量', thr_good:'良品', thr_bad:'不良', thr_mat_used:'耗料', lbl_spec:'规格', lbl_good2:'良品', lbl_bad2:'不良', btn_x:'×', lbl_mat_name:'耗料名称',
-        sec_finished:'成品库存（水泥漏缝地板，按规格）', kpi_prod_in:'累计生产入库', kpi_out2:'累计出库', kpi_balance:'结余', thr_produced:'生产入库', thr_out3:'出库', thr_balance2:'结余', empty_finished:'暂无成品。请在「每日生产」录入产出后自动累计。', sec_demand_vs_prod:'地板需求 v.s 实际产量明细表', th_demand_by_house:'按猪舍汇总', th_demand_by_spec:'按规格汇总', th_spec_list:'规格清单', thr_pct:'占比', thr_rank:'排名', sec_line_daily:'各条生产线每日生产详细', empty_line_daily:'暂无每日生产线产出记录', warn_overprod_title:'注意：以下规格的水泥板实际产量已超过需求量', warn_overprod_desc:'请及时调整生产计划，避免库存积压。', warn_overprod_tip:'实际产量超过需求：已生产 {produced} / 需求 {demand}',
+        sec_finished:'成品库存（水泥漏缝地板，按规格）', kpi_prod_in:'累计生产入库', kpi_out2:'累计出库', kpi_balance:'结余', thr_produced:'生产入库', thr_out3:'出库', thr_balance2:'结余', empty_finished:'暂无成品。请在「每日生产」录入产出后自动累计。', sec_stock_out:'生产库存及出库明细', thr_out_house:'出库/转移至猪舍待安装', thr_return_stock:'返回库存', thr_actual_stock:'实际库存', thr_actual_out:'实际出库数量', btn_hide_zero_prod:'隐藏生产数量为0的行', btn_restore_all_data:'恢复全部数据', sec_demand_vs_prod:'地板需求 v.s 实际产量明细表', th_demand_by_house:'按猪舍汇总', th_demand_by_spec:'按规格汇总', th_spec_list:'规格清单', thr_pct:'占比', thr_rank:'排名', sec_line_daily:'各条生产线每日生产详细', empty_line_daily:'暂无每日生产线产出记录', warn_overprod_title:'注意：以下规格的水泥板实际产量已超过需求量', warn_overprod_desc:'请及时调整生产计划，避免库存积压。', warn_overprod_tip:'实际产量超过需求：已生产 {produced} / 需求 {demand}',
         sec_equip:'设备台账与高价值工具等级表', lbl_grade:'等级', lbl_maint:'保养说明', btn_add_equip:'添加设备/工具', thr_grade2:'等级', thr_maint2:'保养', sec_fault:'设备故障记录', lbl_equip:'设备', lbl_down:'停机(h)', lbl_reason:'原因', lbl_repair:'维修', btn_add_fault:'记录故障', thr_down2:'停机(h)', thr_reason2:'原因', thr_repair2:'维修',
         sec_delivery:'交付（出库，自动过账成品库存）', lbl_spec2:'规格', thr_qty3:'出库数量', lbl_client:'客户', btn_deliver:'出库交付', thr_client2:'客户', empty_delivery:'暂无成品规格，请先在每日生产录入产出。',
         toast_inv_saved:'库存计划已保存', toast_saved:'已保存', toast_sched:'排程已更新', toast_priority:'优先猪舍已设置', toast_name_req:'请填名称', toast_prod_saved:'已保存，并自动过账成品入库', toast_deliver_req:'请选规格并填数量', toast_delivered:'已出库，成品库存结余已更新', toast_before_start:'日期不能早于开始生产日期',
@@ -3740,7 +3750,7 @@ function _ovLoadChartLib(cb){
         note_d:'Note: demand = spec volume converted to standard slab (1500×600×70), using cement 24.4 / sand 22.6 / gravel 68 kg per standard slab; identical to system "Smart Report".',
         sec_receipt:'Goods Receipt', lang_zh:'Chinese', lang_en:'English', lang_vi:'Vietnamese', lbl_newly_added_specs:'Newly added specs', btn_show_all_added_specs:'Show all custom specs', btn_show_current_mat_specs:'Show current material specs only', th_added_mat:'Material', th_added_spec_zh:'Added spec - Chinese', th_added_spec_en:'Added spec - English', th_added_spec_vi:'Added spec - Vietnamese', toast_no_auth_del:'Unauthorized to delete', lbl_arr_date:'Receipt date', lbl_material:'Material', lbl_floor_spec:'Current floor specs', lbl_supplier:'Supplier', lbl_plate:'License plate', lbl_location:'Location', lbl_for_house:'For house(s)', lbl_unit_price:'Unit price (VND)', lbl_total_vnd:'Total (VND)', lbl_price_rmb:'≈ RMB', lbl_price_usd:'≈ USD', lbl_photos:'Photos', btn_upload_photos:'Upload', btn_choose_photos:'Choose Photos', lbl_no_photos_selected:'No photos selected', lbl_no_photos_chosen:'No photos chosen', err_photo_type:'Only image files are allowed; documents or other formats are not supported', btn_view:'View', btn_add_photo:'Add', btn_remove_photo:'Remove', btn_submit_receipt:'Submit receipt', btn_confirm_receipt:'Confirm', status_pending:'Pending confirmation', status_confirmed:'Confirmed / stocked', receipt_empty:'No receipts yet', btn_show_more_receipts:'Show {n} more', btn_hide_more_receipts:'Collapse', tri_lang_no_existing:'No existing specs', tri_lang_no_added:'No added specs', lbl_existing_specs:'Existing specs (system default · locked)', op_created_by:'Created by', lbl_for_house2:'Materials for pig-house cement floor', sec_receipt_lines:'Receipt lines', sec_receipt_list:'Submitted receipts', btn_add_line:'+ Add line', lbl_spec:'Spec', lbl_unit:'Unit', lbl_price_vnd:'Unit price (VND)', lbl_price_rmb:'Unit price (RMB)', lbl_price_usd:'Unit price (USD)', lbl_sub_vnd:'Subtotal (VND)', lbl_sub_rmb:'Subtotal (RMB)', lbl_sub_usd:'Subtotal (USD)', lbl_note:'Note', lbl_op:'Op', lbl_edit_spec:'Edit spec', lbl_existing_specs:'Existing specs (locked)', editable:'Editable', auto_translate:'Auto-translate', tri_lang_clear:'Clear all languages', hint_spec_lines:'One spec per line, blank ignored', toast_spec_saved:'Spec saved', toast_spec_cleared:'Specs cleared', receipt_no_line:'No lines added', lbl_total:'Total', toast_line_req:'Fill material/spec/qty/price for each line', toast_floor_req:'Select current floor specs', submit_warn:'Please check the details. After confirmation it will be sent for procurement approval; the inbound process ends once approved.', appr_title_PROD_RECEIPT:'Goods Receipt Approval', appr_content_PROD_RECEIPT:'Raw material receipt submitted by plant manager. Verify and approve (you may edit qty/price/spec); on approval it is auto-stocked.', toast_sent_approve:'Sent to procurement manager for approval', toast_appr_exists:'An approval for this is already pending, please do not resubmit', status_returned:'Returned', status_need_edit:'Pending re-fill', btn_reedit_receipt:'Re-fill', toast_receipt_need_edit:'Receipt returned; please edit and resubmit', btn_del_receipt:'Delete', del_receipt_confirm:'Delete this receipt and its attached photos?', toast_receipt_deleted:'Receipt deleted', btn_edit:'Edit', btn_confirm:'Confirm', btn_cancel:'Cancel', sync_all_confirm:'Upload all on-site factory data & material specs from this browser to the server for sharing with all users. Continue?', sync_all_done:'Uploaded {n} factories to server',
         sec_daily:'Daily Production / Inventory', lbl_daily_common:'Common', lbl_specs_qty:'Output qty (pcs)', btn_add_spec:'+ Output spec', btn_add_mat:'+ Material used', btn_save_prod:'Save daily production', btn_auto_hist:'Auto-fill History Output', auto_hist_confirm:'This will clear daily output from 31-08 to today and re-randomize. Continue?', toast_auto_hist:'History output auto-filled', sec_history:'Historical output', prod_stats_title:'Production Stats & Charts', lbl_demand:'Total Demand', lbl_produced:'Produced', lbl_gap:'Gap', th_house_names:'House Name(s)', th_share_rank:'Share / Rank', chart_bar:'Spec Demand vs Produced (bar)', chart_prod_per_spec:'Daily Output per Spec (pcs)', chart_weather:'Weather (Temp/Humidity) & Total Output (pcs)', lbl_total_prod:'Total Output', thr_good:'Good', thr_bad:'Defect', thr_mat_used:'Material used', lbl_spec:'Spec', lbl_good2:'Good', lbl_bad2:'Defect', btn_x:'×', lbl_mat_name:'Material name',
-        sec_finished:'Finished Goods Stock (concrete slatted floor, by spec)', kpi_prod_in:'Cumulative produced inbound', kpi_out2:'Cumulative outbound', kpi_balance:'Balance', thr_produced:'Produced inbound', thr_out3:'Outbound', thr_balance2:'Balance', empty_finished:'No finished goods yet. They accumulate automatically after you enter output in "Daily Production".', sec_demand_vs_prod:'Floor Demand vs Actual Production Detail', th_demand_by_house:'By Pig House', th_demand_by_spec:'By Spec', th_spec_list:'Spec List', thr_pct:'Share', thr_rank:'Rank', sec_line_daily:'Daily Production Detail by Production Line', empty_line_daily:'No daily line output recorded', warn_overprod_title:'Attention: The following floor plate specifications have exceeded demand', warn_overprod_desc:'Please adjust the production plan in time to avoid inventory backlog.', warn_overprod_tip:'Production exceeded demand: Produced {produced} / Demand {demand}',
+        sec_finished:'Finished Goods Stock (concrete slatted floor, by spec)', kpi_prod_in:'Cumulative produced inbound', kpi_out2:'Cumulative outbound', kpi_balance:'Balance', thr_produced:'Produced inbound', thr_out3:'Outbound', thr_balance2:'Balance', empty_finished:'No finished goods yet. They accumulate automatically after you enter output in "Daily Production".', sec_stock_out:'Production stock & outbound details', thr_out_house:'Issue/Transfer to house (pending install)', thr_return_stock:'Return to stock', thr_actual_stock:'Actual stock', thr_actual_out:'Actual issued qty', btn_hide_zero_prod:'Hide rows with 0 production', btn_restore_all_data:'Restore all data', sec_demand_vs_prod:'Floor Demand vs Actual Production Detail', th_demand_by_house:'By Pig House', th_demand_by_spec:'By Spec', th_spec_list:'Spec List', thr_pct:'Share', thr_rank:'Rank', sec_line_daily:'Daily Production Detail by Production Line', empty_line_daily:'No daily line output recorded', warn_overprod_title:'Attention: The following floor plate specifications have exceeded demand', warn_overprod_desc:'Please adjust the production plan in time to avoid inventory backlog.', warn_overprod_tip:'Production exceeded demand: Produced {produced} / Demand {demand}',
         sec_equip:'Equipment ledger & high-value tool grade table', lbl_grade:'Grade', lbl_maint:'Maintenance note', btn_add_equip:'Add equipment/tool', thr_grade2:'Grade', thr_maint2:'Maintenance', sec_fault:'Equipment failure log', lbl_equip:'Equipment', lbl_down:'Downtime(h)', lbl_reason:'Reason', lbl_repair:'Repair', btn_add_fault:'Log failure', thr_down2:'Downtime(h)', thr_reason2:'Reason', thr_repair2:'Repair',
         sec_delivery:'Delivery (outbound, auto-posts finished stock)', lbl_spec2:'Spec', thr_qty3:'Outbound qty', lbl_client:'Client', btn_deliver:'Deliver outbound', thr_client2:'Client', empty_delivery:'No finished spec yet; please enter output in Daily Production first.',
         toast_inv_saved:'Inventory plan saved', toast_saved:'Saved', toast_sched:'Schedule updated', toast_priority:'Priority house set', toast_name_req:'Please enter name', toast_prod_saved:'Saved, and auto-posted finished inbound', toast_deliver_req:'Please select spec and enter qty', toast_delivered:'Outbound done, finished stock balance updated', toast_before_start:'Date cannot be earlier than production start date',
@@ -3772,7 +3782,7 @@ function _ovLoadChartLib(cb){
         note_d:'Lưu ý: nhu cầu = thể tích quy cách quy đổi tấm chuẩn (1500×600×70), dùng xi măng 24.4 / cát 22.6 / sỏi 68 kg mỗi tấm chuẩn; hoàn toàn khớp "Báo cáo thông minh" hệ thống.',
         sec_receipt:'Xác nhận nhập hàng', lang_zh:'Tiếng Trung', lang_en:'Tiếng Anh', lang_vi:'Tiếng Việt', lbl_newly_added_specs:'Quy cách mới thêm', btn_show_all_added_specs:'Hiển thị tất cả quy cách mới', btn_show_current_mat_specs:'Chỉ hiện quy cách của vật liệu này', th_added_mat:'Vật liệu', th_added_spec_zh:'Quy cách thêm - Tiếng Trung', th_added_spec_en:'Quy cách thêm - Tiếng Anh', th_added_spec_vi:'Quy cách thêm - Tiếng Việt', toast_no_auth_del:'Không có quyền xóa', lbl_arr_date:'Ngày nhận hàng', lbl_material:'Vật liệu', lbl_floor_spec:'Quy cách sàn đang SX', lbl_supplier:'Nhà cung cấp', lbl_plate:'Biển số xe', lbl_location:'Vị trí kho', lbl_for_house:'Dùng cho chuồng', lbl_unit_price:'Đơn giá (VND)', lbl_total_vnd:'Tổng (VND)', lbl_price_rmb:'≈ RMB', lbl_price_usd:'≈ USD', lbl_photos:'Ảnh', btn_upload_photos:'Tải ảnh', btn_choose_photos:'Chọn ảnh', lbl_no_photos_selected:'Chưa chọn ảnh', lbl_no_photos_chosen:'Chưa chọn ảnh', err_photo_type:'Chỉ cho phép tệp ảnh; không hỗ trợ tài liệu hay định dạng khác', btn_view:'Xem', btn_add_photo:'Thêm', btn_remove_photo:'Xóa', btn_submit_receipt:'Gửi phiếu', btn_confirm_receipt:'Xác nhận', status_pending:'Chờ xác nhận', status_confirmed:'Đã xác nhận/nhập', receipt_empty:'Chưa có phiếu', btn_show_more_receipts:'Hiển thị thêm {n}', btn_hide_more_receipts:'Thu gọn', tri_lang_no_existing:'Chưa có quy cách đã có', tri_lang_no_added:'Chưa có quy cách mới', op_created_by:'Người nhập', lbl_for_house2:'Vật tư dùng SX sàn xi măng cho chuồng', sec_receipt_lines:'Chi tiết nhận hàng', sec_receipt_list:'Phiếu đã gửi', btn_add_line:'+ Thêm dòng', lbl_spec:'Quy cách', lbl_unit:'Đơn vị', lbl_price_vnd:'Đơn giá (VND)', lbl_price_rmb:'Đơn giá (RMB)', lbl_price_usd:'Đơn giá (USD)', lbl_sub_vnd:'Thành tiền (VND)', lbl_sub_rmb:'Thành tiền (RMB)', lbl_sub_usd:'Thành tiền (USD)', lbl_note:'Ghi chú', lbl_op:'Thao tác', lbl_edit_spec:'Sửa quy cách', lbl_existing_specs:'Quy cách đã có (khóa)', editable:'Có thể sửa', auto_translate:'Tự động dịch', tri_lang_clear:'Xóa cả 3 ngôn ngữ', hint_spec_lines:'Mỗi dòng một quy cách, bỏ qua dòng trống', toast_spec_saved:'Đã lưu quy cách', toast_spec_cleared:'Đã xóa quy cách', receipt_no_line:'Chưa có dòng', lbl_total:'Tổng', toast_line_req:'Điền vật liệu/quy cách/số lượng/đơn giá mỗi dòng', toast_floor_req:'Chọn quy cách sàn đang SX', submit_warn:'Vui lòng kiểm tra chi tiết. Sau khi xác nhận sẽ gửi duyệt thu mua; quy trình nhập kho kết thúc khi được duyệt.', appr_title_PROD_RECEIPT:'Duyệt phiếu nhận hàng', appr_content_PROD_RECEIPT:'Phiếu nhận vật tư trưởng xưởng gửi. Kiểm tra và duyệt (có thể sửa SL/đơn giá/quy cách); khi duyệt tự động nhập kho.', toast_sent_approve:'Đã gửi trưởng thu mua duyệt', toast_appr_exists:'Đã có yêu cầu đang chờ duyệt, vui lòng không gửi lại', status_returned:'Bị trả lại', status_need_edit:'Chờ điền lại', btn_reedit_receipt:'Điền lại', toast_receipt_need_edit:'Phiếu đã được trả lại; vui lòng sửa và gửi lại', btn_del_receipt:'Xóa', del_receipt_confirm:'Xóa phiếu nhận hàng này cùng các ảnh đính kèm?', toast_receipt_deleted:'Đã xóa phiếu nhận hàng', btn_edit:'Sửa', btn_confirm:'Xác nhận', btn_cancel:'Hủy', sync_all_confirm:'Tải tất cả dữ liệu nhà máy & quy cách vật tư từ trình duyệt này lên máy chủ để chia sẻ cho mọi người. Tiếp tục?', sync_all_done:'Đã tải {n} nhà máy lên máy chủ',
         sec_daily:'Sản xuất hàng ngày / Kiểm kê', lbl_daily_common:'Chung', lbl_specs_qty:'Sản lượng (tấm)', btn_add_spec:'+ Quy cách đầu ra', btn_add_mat:'+ Vật liệu dùng', btn_save_prod:'Lưu SX ngày', btn_auto_hist:'Tự động điền lịch sử SX', auto_hist_confirm:'Thao tác sẽ xóa dữ liệu sản xuất từ 31-08 đến nay và điền ngẫu nhiên lại. Tiếp tục?', toast_auto_hist:'Đã tự động điền lịch sử SX', sec_history:'Sản lượng lịch sử', prod_stats_title:'Thống kê SX & Biểu đồ', lbl_demand:'Tổng nhu cầu', lbl_produced:'Đã SX', lbl_gap:'Thiếu hụt', th_house_names:'Tên chuồng sử dụng', th_share_rank:'Tỷ lệ / Hạng', chart_bar:'Nhu cầu vs Đã SX (cột)', chart_prod_per_spec:'Sản lượng ngày theo quy cách (tấm)', chart_weather:'Thời tiết (Nhiệt/Ẩm) & Tổng SX (tấm)', lbl_total_prod:'Tổng SX', thr_good:'Tốt', thr_bad:'Lỗi', thr_mat_used:'Vật liệu dùng', lbl_spec:'Quy cách', lbl_good2:'Tốt', lbl_bad2:'Lỗi', btn_x:'×', lbl_mat_name:'Tên vật liệu',
-        sec_finished:'Kho thành phẩm (sàn khe hở bê tông, theo quy cách)', kpi_prod_in:'Tổng SX nhập kho', kpi_out2:'Tổng xuất kho', kpi_balance:'Tồn', thr_produced:'Nhập kho SX', thr_out3:'Xuất kho', thr_balance2:'Tồn', empty_finished:'Chưa có thành phẩm. Tự động cộng dồn sau khi nhập đầu ra tại "Sản xuất hàng ngày".', sec_demand_vs_prod:'Bảng chi tiết nhu cầu vs sản lượng thực tế sàn', th_demand_by_house:'Theo chuồng', th_demand_by_spec:'Theo quy cách', th_spec_list:'Danh sách quy cách', thr_pct:'Tỷ lệ', thr_rank:'Hạng', sec_line_daily:'Chi tiết sản xuất hàng ngày theo dây chuyền', empty_line_daily:'Chưa có dữ liệu sản xuất theo dây chuyền', warn_overprod_title:'Chú ý: Các kích thước tấm xi măng sau đã vượt quá nhu cầu', warn_overprod_desc:'Vui lòng điều chỉnh kế hoạch sản xuất kịp thời để tránh tồn kho.', warn_overprod_tip:'Sản lượng vượt nhu cầu: Đã SX {produced} / Nhu cầu {demand}',
+        sec_finished:'Kho thành phẩm (sàn khe hở bê tông, theo quy cách)', kpi_prod_in:'Tổng SX nhập kho', kpi_out2:'Tổng xuất kho', kpi_balance:'Tồn', thr_produced:'Nhập kho SX', thr_out3:'Xuất kho', thr_balance2:'Tồn', empty_finished:'Chưa có thành phẩm. Tự động cộng dồn sau khi nhập đầu ra tại "Sản xuất hàng ngày".', sec_stock_out:'Chi tiết tồn kho & xuất kho sản xuất', thr_out_house:'Xuất/Chuyển đến chuồng chờ lắp đặt', thr_return_stock:'Trả lại kho', thr_actual_stock:'Tồn kho thực tế', thr_actual_out:'Số lượng xuất thực tế', btn_hide_zero_prod:'Ẩn dòng có sản lượng bằng 0', btn_restore_all_data:'Khôi phục tất cả dữ liệu', sec_demand_vs_prod:'Bảng chi tiết nhu cầu vs sản lượng thực tế sàn', th_demand_by_house:'Theo chuồng', th_demand_by_spec:'Theo quy cách', th_spec_list:'Danh sách quy cách', thr_pct:'Tỷ lệ', thr_rank:'Hạng', sec_line_daily:'Chi tiết sản xuất hàng ngày theo dây chuyền', empty_line_daily:'Chưa có dữ liệu sản xuất theo dây chuyền', warn_overprod_title:'Chú ý: Các kích thước tấm xi măng sau đã vượt quá nhu cầu', warn_overprod_desc:'Vui lòng điều chỉnh kế hoạch sản xuất kịp thời để tránh tồn kho.', warn_overprod_tip:'Sản lượng vượt nhu cầu: Đã SX {produced} / Nhu cầu {demand}',
         sec_equip:'Sổ thiết bị & bảng cấp công cụ giá trị cao', lbl_grade:'Cấp', lbl_maint:'Ghi chú bảo trì', btn_add_equip:'Thêm thiết bị/công cụ', thr_grade2:'Cấp', thr_maint2:'Bảo trì', sec_fault:'Nhật ký sự cố thiết bị', lbl_equip:'Thiết bị', lbl_down:'Dừng (h)', lbl_reason:'Nguyên nhân', lbl_repair:'Sửa chữa', btn_add_fault:'Ghi sự cố', thr_down2:'Dừng (h)', thr_reason2:'Nguyên nhân', thr_repair2:'Sửa chữa',
         sec_delivery:'Giao hàng (xuất kho, tự động ghi nhận tồn kho thành phẩm)', lbl_spec2:'Quy cách', thr_qty3:'SL xuất kho', lbl_client:'Khách hàng', btn_deliver:'Xuất giao hàng', thr_client2:'Khách hàng', empty_delivery:'Chưa có quy cách thành phẩm, vui lòng nhập đầu ra tại Sản xuất hàng ngày trước.',
         toast_inv_saved:'Đã lưu kế hoạch tồn kho', toast_saved:'Đã lưu', toast_sched:'Lịch trình đã cập nhật', toast_priority:'Đã đặt chuồng ưu tiên', toast_name_req:'Vui lòng nhập tên', toast_prod_saved:'Đã lưu, tự động ghi nhận nhập kho thành phẩm', toast_deliver_req:'Vui lòng chọn quy cách và nhập số lượng', toast_delivered:'Đã xuất kho, tồn kho thành phẩm đã cập nhật', toast_before_start:'Ngày không thể sớm hơn ngày bắt đầu sản xuất',
@@ -3932,7 +3942,10 @@ function _ovLoadChartLib(cb){
       // 防止服务端旧快照覆盖本地新增字段（例如 dueDate），导致交期刷新后丢失
       if(localF.profile && typeof localF.profile==='object'){
         out.profile = out.profile || {};
-        for(var pk in localF.profile){ if(!(pk in out.profile)) out.profile[pk] = localF.profile[pk]; }
+        for(var pk in localF.profile){
+          var lv = localF.profile[pk], sv = out.profile[pk];
+          if(!(pk in out.profile) || (lv && !sv)){ out.profile[pk] = lv; }
+        }
       }
       if(localF.plan && !out.plan) out.plan = localF.plan;
       return prod_normalizeDates(out);
@@ -4518,8 +4531,8 @@ function _ovLoadChartLib(cb){
       }
     }
     /* A 工厂概况 */
-    function prod_sel(label,id,opts,val){
-      var h = '<div class="prod-field"><label>'+label+'</label><select id="'+id+'">';
+    function prod_sel(label,id,opts,val,disabled){
+      var h = '<div class="prod-field"><label>'+label+'</label><select id="'+id+'"'+(disabled?' disabled':'')+'>';
       h += '<option value=""></option>';
       opts.forEach(function(o){ h += '<option value="'+prod_esc(o)+'"'+(o===val?' selected':'')+'>'+prod_esc(o)+'</option>'; });
       h += '</select></div>';
@@ -4567,6 +4580,14 @@ function _ovLoadChartLib(cb){
     }
     function prod_tabA(f){
       var p = f.profile||{};
+      /* 生产线/班次：后台存纯数字，加载时按当前语言匹配选项；兼容旧数据（中文/英文/越南文标签） */
+      var capNum = parseInt(String(p.capacityNote||'').replace(/[^0-9]/g,''),10) || 0;
+      var lineOpts = [pt('opt_line_1'), pt('opt_line_2'), pt('opt_line_3'), pt('opt_line_4')];
+      var lineVal = (capNum>=1 && capNum<=lineOpts.length) ? lineOpts[capNum-1] : '';
+      var shiftNum = parseInt(String(p.shifts||'').replace(/[^0-9]/g,''),10) || 0;
+      var shiftOpts = [pt('opt_shift_1'), pt('opt_shift_2')];
+      var shiftVal = (shiftNum>=1 && shiftNum<=shiftOpts.length) ? shiftOpts[shiftNum-1] : '';
+      var profileLocked = !!(lineVal && shiftVal && !PROD_PROFILE_EDITING);
       var cDate = prod_contractDateRaw();
       var dueDate = p.dueDate || prod_dueDateFromData() || '';
       var hasDue = !!dueDate && !PROD_DUE_EDITING;
@@ -4589,9 +4610,11 @@ function _ovLoadChartLib(cb){
         + dueHtml
         + '<div class="prod-field"><label>'+pt('lbl_start_prod_date')+'</label><input id="pa_start_prod" value="'+prod_esc(startProdDate)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
         + prod_fld(pt('lbl_addr'),'pa_addr',p.address||'')
-        + prod_sel(pt('lbl_line'),'pa_cap',[pt('opt_line_1'),pt('opt_line_2'),pt('opt_line_3'),pt('opt_line_4')],p.capacityNote||'')
-        + prod_sel(pt('lbl_shift'),'pa_shift',[pt('opt_shift_1'),pt('opt_shift_2')],p.shifts||'')
-        + '<button class="prod-btn" onclick="prod_saveProfile()">'+pt('btn_save')+'</button>'
+        + prod_sel(pt('lbl_line'),'pa_cap',lineOpts,lineVal,profileLocked)
+        + prod_sel(pt('lbl_shift'),'pa_shift',shiftOpts,shiftVal,profileLocked)
+        + (profileLocked
+          ? '<button class="prod-btn sec" onclick="prod_editProfile()">'+pt('btn_edit')+'</button>'
+          : '<button class="prod-btn" onclick="prod_saveProfile()">'+pt('btn_save')+'</button>')
         + '</div>'
         + '<div class="prod-sec-title" style="margin-top:18px">'+pt('sec_slats_info')+'</div>'
         + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
@@ -4753,8 +4776,23 @@ function _ovLoadChartLib(cb){
     }
     function prod_saveProfile(){
       var f = prod_get(PROD_CUR);
-      f.profile = Object.assign(f.profile || {}, { address:prod_val('pa_addr'), capacityNote:prod_val('pa_cap'), shifts:prod_val('pa_shift'), dailyCapacity:(f.profile && f.profile.dailyCapacity) || '' });
-      prod_save(f); prod_toast(pt('toast_saved'));
+      var rawCap = prod_val('pa_cap'), rawShift = prod_val('pa_shift');
+      var capNum = parseInt(String(rawCap||'').replace(/[^0-9]/g,''),10) || 0;
+      var shiftNum = parseInt(String(rawShift||'').replace(/[^0-9]/g,''),10) || 0;
+      f.profile = Object.assign(f.profile || {}, {
+        address:prod_val('pa_addr'),
+        capacityNote: capNum ? String(capNum) : '',
+        shifts: shiftNum ? String(shiftNum) : '',
+        dailyCapacity:(f.profile && f.profile.dailyCapacity) || ''
+      });
+      prod_save(f);
+      PROD_PROFILE_EDITING = false;
+      prod_toast(pt('toast_saved'));
+      prod_renderTab('A');
+    }
+    function prod_editProfile(){
+      PROD_PROFILE_EDITING = true;
+      prod_renderTab('A');
     }
     /* 项目交期选择确认：选定后保存并锁定，仅 tom/cuong/james 可重新调整 */
     function prod_onDueDatePick(){
@@ -7967,16 +8005,118 @@ function _ovLoadChartLib(cb){
     }
     function prod_tabH(f){
       var fn = f.finished||{}; var specs = Object.keys(fn);
-      var totP = 0, totD = 0; specs.forEach(function(s){ totP += (+fn[s].produced||0); totD += (+fn[s].delivered||0); });
+      var hoDeliv = prod_houseOutBySpec(f);
+      var totP = 0, totD = 0; specs.forEach(function(s){ totP += (+fn[s].produced||0); totD += (hoDeliv[s]||0); });
       var h = prod_demandVsProdSection(f);
       h += '<div class="prod-sec-title">'+pt('sec_finished')+'</div>'
-        + '<div class="prod-kpi"><div class="k">'+pt('kpi_prod_in')+'<b>'+totP+'</b></div><div class="k">'+pt('kpi_out2')+'<b>'+totD+'</b></div><div class="k">'+pt('kpi_balance')+'<b>'+(totP-totD)+'</b></div></div>';
+        + '<div class="prod-kpi"><div class="k">'+pt('kpi_prod_in')+'<b>'+prod_fmtNum(totP)+'</b></div><div class="k">'+pt('kpi_out2')+'<b>'+prod_fmtNum(totD)+'</b></div><div class="k">'+pt('kpi_balance')+'<b>'+prod_fmtNum(totP-totD)+'</b></div></div>';
       h += '<table class="prod-table"><thead><tr><th>'+pt('th_spec')+'</th><th>'+pt('thr_produced')+'</th><th>'+pt('thr_out3')+'</th><th>'+pt('thr_balance2')+'</th></tr></thead><tbody>';
-      specs.forEach(function(s){ var r = fn[s]; var bal = (+r.produced||0)-(+r.delivered||0);
-        h += '<tr><td>'+prod_esc(s)+'</td><td>'+(+r.produced||0)+'</td><td>'+(+r.delivered||0)+'</td><td><b>'+bal+'</b></td></tr>'; });
+      specs.forEach(function(s){ var r = fn[s]; var d = (hoDeliv[s]||0); var bal = (+r.produced||0)-d;
+        h += '<tr><td>'+prod_esc(s)+'</td><td style="text-align:center">'+prod_fmtNum(+r.produced||0)+'</td><td style="text-align:center">'+prod_fmtNum(d)+'</td><td style="text-align:center"><b>'+prod_fmtNum(bal)+'</b></td></tr>'; });
       h += '</tbody></table>';
       if(!specs.length) h += '<div class="prod-empty">'+pt('empty_finished')+'</div>';
+      h += prod_stockOutSection(f);
       return h;
+    }
+    /* 按猪舍汇总的「出库/转移至猪舍待安装」「返回库存」→ 各规格「实际出库数量」汇总（驱动成品库存「出库」） */
+    function prod_houseOutBySpec(f){
+      var ho = f.houseOut||{}; var m = {};
+      for(var key in ho){ if(!ho.hasOwnProperty(key)) continue; var p = key.split('|'); if(p.length<2) continue; var s = p.slice(1).join('|'); var rec = ho[key]||{}; m[s] = (m[s]||0) + ((+rec.out||0)-(+rec.ret||0)); }
+      return m;
+    }
+    /* 新表：生产库存及出库明细（按猪舍，直接展开；出库/待安装、返回库存可编辑，实际库存/实际出库数量自动算） */
+    var PROD_HO_MAP = {}; var PROD_STOCKOUT_HIDEZERO = false; var PROD_STOCKOUT_DIRTY = false;
+    function prod_stockOutSection(f){
+      var mm = prod_slatsMatrix(); var hsp = prod_houseSpecProduced(f);
+      var specKeys = Object.keys(mm.specs).sort(prod_specSortCmp);
+      function fmtSpec(k){ var sp = String(k).split('×'); return prod_esc(sp[0]||'') + ' × ' + prod_esc((sp[1]||'')+'×'+(sp[2]||'')); }
+      function produced(h,k){ return (hsp[h] && hsp[h][k]) || 0; }
+      var byHouse = [];
+      mm.houseOrder.forEach(function(h){ if(h==='—') return; specKeys.forEach(function(k){ var dh = mm.specs[k].houses[h]; if(dh==null) return; byHouse.push({ h:h, k:k, demand:dh, produced:produced(h,k), gap:Math.max(0,dh-produced(h,k)) }); }); });
+      var ho = f.houseOut || {};
+      /* 选项B：当前生产总量为0的规格 → out/ret 强制为0并清空后台保存（不可编辑） */
+      byHouse.forEach(function(r){
+        if(r.produced === 0){
+          var key = r.h+'|'+r.k, rec = ho[key];
+          if(rec && ((+rec.out)||(+rec.ret))){ rec.out = 0; rec.ret = 0; ho[key] = rec; PROD_STOCKOUT_DIRTY = true; }
+        }
+      });
+      /* 折叠：隐藏“当前生产总量=0”的行 */
+      var visHouse = byHouse.filter(function(r){ return !PROD_STOCKOUT_HIDEZERO || r.produced !== 0; });
+      var houseSeq=0, houseSize={}, lastH=null;
+      visHouse.forEach(function(r){ if(r.h!==lastH){ lastH=r.h; houseSeq++; } r.seq=houseSeq; houseSize[r.h]=(houseSize[r.h]||0)+1; });
+      PROD_HO_MAP = {};
+      var html = '<div class="prod-sec-title prod-stockout-title"><span>'+pt('sec_stock_out')+'</span>'
+        + '<button id="prod_stockout_hide_btn" class="prod-btn mini'+(PROD_STOCKOUT_HIDEZERO?' on':'')+'" type="button" onclick="prod_toggleStockOutHide()">'+pt(PROD_STOCKOUT_HIDEZERO?'btn_restore_all_data':'btn_hide_zero_prod')+'</button></div>'
+        + '<table class="prod-table pe-stats prod-stockout"><thead><tr>'
+        + '<th class="pe-col-no">'+pt('thr_no')+'</th><th>'+pt('thr_house')+'</th><th>'+pt('th_spec')+'</th>'
+        + '<th>'+pt('lbl_demand')+'</th><th>'+pt('lbl_produced')+'</th><th>'+pt('lbl_gap')+'</th>'
+        + '<th class="ho-head">'+pt('thr_out_house').replace(/\//g,'/<br>')+'</th>'
+        + '<th class="ho-head">'+pt('thr_return_stock')+'</th>'
+        + '<th class="ho-head">'+pt('thr_actual_stock')+'</th>'
+        + '<th class="ho-head">'+pt('thr_actual_out')+'</th>'
+        + '</tr></thead><tbody>';
+      if(visHouse.length){
+        html += visHouse.map(function(r, idx){
+          var isFirst = idx===0 || visHouse[idx-1].h !== r.h;
+          var isLast = idx===visHouse.length-1 || visHouse[idx+1].h !== r.h;
+          var rowCls = []; if(isLast) rowCls.push('pe-group-end');
+          var trAttr = rowCls.length ? ' class="'+rowCls.join(' ')+'"' : '';
+          var key = r.h+'|'+r.k;
+          var rec = ho[key] || {out:0, ret:0};
+          var disabled = (r.produced === 0);
+          var out = disabled ? 0 : ((+rec.out)||0);
+          var ret = disabled ? 0 : ((+rec.ret)||0);
+          var actualStock = r.produced - out + ret;
+          var actualOut = out - ret;
+          PROD_HO_MAP[idx] = { key:key, produced:r.produced };
+          var houseCell = isFirst ? '<td class="pe-col-no pe-group-end" rowspan="'+houseSize[r.h]+'">'+r.seq+'</td><td class="pe-group-end" rowspan="'+houseSize[r.h]+'">'+prod_esc(prod_phName(r.h))+'</td>' : '';
+          var specCell = '<td>'+fmtSpec(r.k)+'</td>';
+          var outCell = disabled
+            ? '<td class="ho-disabled">0</td>'
+            : '<td><input class="ho-input ho-out" id="ppo_'+idx+'" value="'+prod_fmtNum(out)+'" inputmode="numeric" oninput="prod_hoInput(event,'+idx+',\'out\')" onblur="prod_hoBlur(event,'+idx+',\'out\')"></td>';
+          var retCell = disabled
+            ? '<td class="ho-disabled">0</td>'
+            : '<td><input class="ho-input ho-ret" id="ppr_'+idx+'" value="'+prod_fmtNum(ret)+'" inputmode="numeric" oninput="prod_hoInput(event,'+idx+',\'ret\')" onblur="prod_hoBlur(event,'+idx+',\'ret\')"></td>';
+          return '<tr'+trAttr+'>'+houseCell+specCell
+            + '<td>'+prod_fmtNum(r.demand)+'</td>'
+            + '<td>'+prod_fmtNum(r.produced)+'</td>'
+            + '<td'+(r.gap>0?' class="pe-gap"':'')+'>'+prod_fmtNum(r.gap)+'</td>'
+            + outCell + retCell
+            + '<td id="pas_'+idx+'" class="ho-calc">'+prod_fmtNum(actualStock)+'</td>'
+            + '<td id="pao_'+idx+'" class="ho-calc">'+prod_fmtNum(actualOut)+'</td>'
+            + '</tr>';
+        }).join('');
+      } else { html += '<tr><td colspan="10" class="prod-empty">'+pt('empty_no_spec')+'</td></tr>'; }
+      html += '</tbody></table>';
+      if(PROD_STOCKOUT_DIRTY){ PROD_STOCKOUT_DIRTY = false; f.houseOut = ho; prod_save(f); }
+      return html;
+    }
+    /* 隐藏/恢复“当前生产总量=0”的行（合并单元格按可见行重算，类似 Excel） */
+    function prod_toggleStockOutHide(){
+      PROD_STOCKOUT_HIDEZERO = !PROD_STOCKOUT_HIDEZERO;
+      if(PROD_ACTIVE_TAB==='H') prod_renderTab('H');
+    }
+    function prod_hoInput(e, idx, type){
+      var v = (e.target.value||'').replace(/[^0-9]/g,'');
+      e.target.value = v;
+      var map = PROD_HO_MAP[idx]; if(!map) return;
+      var f = prod_get(PROD_CUR);
+      f.houseOut = f.houseOut||{};
+      var rec = f.houseOut[map.key] || {out:0, ret:0};
+      rec[type] = parseInt(v||'0',10);
+      f.houseOut[map.key] = rec;
+      var out = (+rec.out)||0, ret = (+rec.ret)||0;
+      var ael = prod_el('pas_'+idx), oel = prod_el('pao_'+idx);
+      if(ael) ael.textContent = prod_fmtNum((map.produced||0) - out + ret);
+      if(oel) oel.textContent = prod_fmtNum(out - ret);
+    }
+    function prod_hoBlur(e, idx, type){
+      var v = (e.target.value||'').replace(/[^0-9]/g,'');
+      e.target.value = prod_fmtNum(parseInt(v||'0',10));
+      var f = prod_get(PROD_CUR);
+      prod_save(f);
+      if(PROD_ACTIVE_TAB==='H') prod_renderTab('H');
     }
     /* 从每日生产记录聚合 猪舍×规格 的实际产量（支持 line.qty+houses 与 line.matrix[house][spec]） */
     function prod_houseSpecProduced(f){
