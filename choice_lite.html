@@ -23507,80 +23507,87 @@ var _slatsPieLabelsPlugin = {
     var arc0 = meta.data[0];
     var cx = arc0.x, cy = arc0.y, outer = arc0.outerRadius;
     var ca = chart.chartArea;
-    // 花瓣布局：每个扇区两行标签（占比% / 绝对值）沿各自扇区角度方向放射；重叠时先径向拉远，到边界仍重叠则沿圆周切向左右错开
+    // 外部标签 + 直角折线引导线（类似 ECharts）：标签排在饼图四周，引导线为水平/垂直折线，互不交叉
     var items = [];
     meta.data.forEach(function(arc, i){
       var value = dataset.data[i];
       if(!value) return;
       var pct = (value/total)*100;
       var mid = (arc.startAngle + arc.endAngle)/2;
+      var cos = Math.cos(mid), sin = Math.sin(mid);
       items.push({
-        value:value, pct:pct, angle: mid,
-        cos: Math.cos(mid), sin: Math.sin(mid),
+        value:value, pct:pct, angle: mid, cos: cos, sin: sin,
         color: bg[i%bg.length],
-        edgeX: cx + Math.cos(mid)*(outer+1), edgeY: cy + Math.sin(mid)*(outer+1),
+        edgeX: cx + cos*(outer+1), edgeY: cy + sin*(outer+1),
         text: pct.toFixed(1)+'% / '+_slatsFmtNum(value) + (options.unit||'')
       });
     });
-    // 分层花瓣布局：标签按扇区大小自然分成 2~3 圈；重叠时升到外层，折线引导线连接
-    var layers = [outer + 8, outer + 38, outer + 68]; // 第1层贴饼，第2、3层依次向外
-    var halfW = 46, halfH = 9; // 单行标签包围盒半宽/半高
-    var W = chart.width, H = chart.height;
-    var placed = [];
-    function inBounds(it, x, y){
-      var w = halfW*2 + 6; // 单行文本宽度
-      if(it.cos < 0) return x >= w && x <= W - 10 && y >= 14 && y <= H - 14;       // 左半边文字向左，需 x 足够靠右
-      return x >= 10 && x <= W - w && y >= 14 && y <= H - 14;                       // 右半边文字向右
-    }
-    function hit(x, y){
-      for(var k=0;k<placed.length;k++){
-        var p = placed[k];
-        if(Math.abs(x - p.x) < halfW*2 + 2 && Math.abs(y - p.y) < halfH*2 + 2) return true;
-      }
-      return false;
-    }
-    function tryPlace(it, r, a){
-      var x = cx + Math.cos(a)*r, y = cy + Math.sin(a)*r;
-      if(inBounds(it, x, y) && !hit(x, y)){ it.labelX = x; it.labelY = y; return true; }
-      return false;
-    }
-    items.sort(function(a,b){ return a.angle - b.angle; });
+    var W = chart.width, H = chart.height, txtW = 96, txtH = 16, pad = 10;
+    var R1 = outer + 10; // 折线转折点半径
+    var sides = { right:[], left:[], top:[], bottom:[] };
     items.forEach(function(it){
-      var ok = false;
-      // 1) 由内到外逐层尝试（固定扇区角度），重叠则升层
-      for(var li=0; li<layers.length && !ok; li++){
-        if(tryPlace(it, layers[li], it.angle)){ ok = true; break; }
-      }
-      // 2) 三层仍重叠：最外层做小幅切向错开兜底
-      if(!ok){
-        for(var s=1; s<=10 && !ok; s++){
-          if(tryPlace(it, layers[layers.length-1], it.angle + s*0.04)){ ok = true; break; }
-          if(tryPlace(it, layers[layers.length-1], it.angle - s*0.04)){ ok = true; break; }
-        }
-      }
-      // 3) 兜底：最外层原角度
-      if(!ok){ it.labelX = cx + Math.cos(it.angle)*layers[layers.length-1]; it.labelY = cy + Math.sin(it.angle)*layers[layers.length-1]; }
-      placed.push({ x: it.labelX, y: it.labelY });
+      var ax = Math.abs(it.cos), ay = Math.abs(it.sin);
+      if(it.cos >= 0 && ax >= ay) sides.right.push(it);
+      else if(it.cos < 0 && ax >= ay) sides.left.push(it);
+      else if(it.sin < 0 && ay > ax) sides.top.push(it);
+      else sides.bottom.push(it);
     });
+    // 在各自边缘均匀分布，避免重叠
+    function layoutSide(side, kind){
+      var n = side.length;
+      if(!n) return;
+      if(kind === 'right'){
+        side.sort(function(a,b){ return a.edgeY - b.edgeY; });
+        var gap = (H - pad*2 - txtH) / (n + 1);
+        side.forEach(function(it, idx){ it.labelX = W - pad - txtW/2; it.labelY = pad + txtH/2 + gap*(idx+1); });
+      } else if(kind === 'left'){
+        side.sort(function(a,b){ return a.edgeY - b.edgeY; });
+        var gap = (H - pad*2 - txtH) / (n + 1);
+        side.forEach(function(it, idx){ it.labelX = pad + txtW/2; it.labelY = pad + txtH/2 + gap*(idx+1); });
+      } else if(kind === 'top'){
+        side.sort(function(a,b){ return a.edgeX - b.edgeX; });
+        var gap = (W - pad*2 - txtW) / (n + 1);
+        side.forEach(function(it, idx){ it.labelX = pad + txtW/2 + gap*(idx+1); it.labelY = pad + txtH/2; });
+      } else { // bottom
+        side.sort(function(a,b){ return a.edgeX - b.edgeX; });
+        var gap = (W - pad*2 - txtW) / (n + 1);
+        side.forEach(function(it, idx){ it.labelX = pad + txtW/2 + gap*(idx+1); it.labelY = H - pad - txtH/2; });
+      }
+    }
+    layoutSide(sides.right, 'right'); layoutSide(sides.left, 'left');
+    layoutSide(sides.top, 'top'); layoutSide(sides.bottom, 'bottom');
+
     ctx.save();
     ctx.lineWidth = 1.2;
     items.forEach(function(it){
-      var lx = it.labelX + (it.cos>=0? 4 : -4);
-      var align = it.cos >= 0 ? 'left' : 'right';
-      // 肘形同色引导线：扇区边缘 → 沿原扇区角度的肩点 → 标签（第一段放射不交叉，第二段短折线不斜穿饼心）
-      var sx = cx + Math.cos(it.angle)*(outer+6), sy = cy + Math.sin(it.angle)*(outer+6);
+      var align = 'center', lx = it.labelX;
+      if(it.cos >= 0.3) align = 'left';
+      else if(it.cos <= -0.3) align = 'right';
+      if(align === 'left') lx += 4;
+      else if(align === 'right') lx -= 4;
+      // 转折点半径处
+      var sx = cx + Math.cos(it.angle)*R1, sy = cy + Math.sin(it.angle)*R1;
+      // 同色直角折线引导线
       ctx.strokeStyle = it.color;
       ctx.beginPath();
       ctx.moveTo(it.edgeX, it.edgeY);
       ctx.lineTo(sx, sy);
-      ctx.lineTo(it.labelX, it.labelY);
+      if(it.cos >= 0.3 || it.cos <= -0.3){
+        // 左右侧标签：先水平到标签列，再垂直到标签
+        ctx.lineTo(it.labelX, sy);
+        ctx.lineTo(it.labelX, it.labelY);
+      } else {
+        // 上下侧标签：先垂直到标签行，再水平到标签
+        ctx.lineTo(sx, it.labelY);
+        ctx.lineTo(it.labelX, it.labelY);
+      }
       ctx.stroke();
       // 扇区端同色小圆点
       ctx.fillStyle = it.color;
       ctx.beginPath();
       ctx.arc(it.edgeX, it.edgeY, 2.6, 0, Math.PI*2);
       ctx.fill();
-      // 单行文本：占比% / 绝对值
+      // 单行文本
       ctx.fillStyle = '#333';
       ctx.textAlign = align;
       ctx.font = 'bold 11px sans-serif';
