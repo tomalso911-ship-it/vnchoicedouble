@@ -23494,7 +23494,7 @@ function _slatsLoadChartLib(cb){
   s.onerror=function(){ s.onerror=null; s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'; s.onload=cb; s.onerror=cb; };
   document.head.appendChild(s);
 }
-// 饼图自定义插件：饼内显示大扇区百分比，饼外用折线引导线显示绝对值，左右两侧均匀分布避免重叠
+// 饼图自定义插件：饼内显示大扇区百分比，饼外用短引导线显示绝对值；扇区已爆炸偏移，标签紧贴各自扇区
 var _slatsPieLabelsPlugin = {
   id: 'slatsPieLabels',
   afterDraw: function(chart, args, options){
@@ -23505,7 +23505,6 @@ var _slatsPieLabelsPlugin = {
     if(!total) return;
     var arc0 = meta.data[0];
     var cx = arc0.x, cy = arc0.y, outer = arc0.outerRadius;
-    var r2 = outer * 1.38;
     var ca = chart.chartArea;
     var items = [];
     meta.data.forEach(function(arc, i){
@@ -23514,53 +23513,52 @@ var _slatsPieLabelsPlugin = {
       var pct = (value/total)*100;
       var mid = (arc.startAngle + arc.endAngle)/2;
       var cos = Math.cos(mid), sin = Math.sin(mid);
+      var off = (Array.isArray(dataset.offset) ? dataset.offset[i] : dataset.offset) || 0;
+      var labelR = outer + off + 10;
       items.push({
-        i:i, value:value, pct:pct, cos:cos, sin:sin,
-        edgeX: cx + cos*(outer+2), edgeY: cy + sin*(outer+2),
+        i:i, value:value, pct:pct, cos:cos, sin:sin, off:off,
+        edgeX: cx + cos*(outer+off+2), edgeY: cy + sin*(outer+off+2),
+        labelX: cx + cos*labelR, labelY: cy + sin*labelR,
         text: _slatsFmtNum(value) + (options.unit||'')
       });
     });
+    // 轻微防重叠：同侧标签按 y 排序，若间距过近则向下推开
+    function adjust(side){
+      if(!side.length) return;
+      side.sort(function(a,b){ return a.labelY - b.labelY; });
+      var gap = 14;
+      for(var i=1;i<side.length;i++){
+        if(side[i].labelY - side[i-1].labelY < gap) side[i].labelY = side[i-1].labelY + gap;
+      }
+      side.forEach(function(it){ it.labelY = Math.max(ca.top+12, Math.min(ca.bottom-12, it.labelY)); });
+    }
     var right = items.filter(function(it){ return it.cos >= 0; });
     var left = items.filter(function(it){ return it.cos < 0; });
-    function layout(side, sign){
-      if(!side.length) return;
-      side.sort(function(a,b){ return a.edgeY - b.edgeY; });
-      var minY = ca.top + 16, maxY = ca.bottom - 16;
-      var n = side.length, gap = 18;
-      var step = n>1 ? Math.max(gap, (maxY - minY)/(n-1)) : 0;
-      side.forEach(function(it, idx){
-        it.anchorX = cx + sign*r2;
-        it.y = n===1 ? (minY+maxY)/2 : (minY + idx*step);
-        it.align = sign>0 ? 'left' : 'right';
-      });
-    }
-    layout(right, 1);
-    layout(left, -1);
+    adjust(right); adjust(left);
     ctx.save();
     ctx.font = 'bold 11px sans-serif';
     ctx.lineWidth = 1;
     // 饼内百分比（仅较大扇区，避免小扇区堆叠）
     items.forEach(function(it){
       if(it.pct < 4) return;
-      var ir = outer * 0.55;
+      var ir = (outer + it.off) * 0.55;
       var ix = cx + it.cos*ir, iy = cy + it.sin*ir;
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(it.pct.toFixed(1)+'%', ix, iy);
     });
-    // 引导线与外部数值
+    // 短引导线与外部数值
     ctx.strokeStyle = '#666';
     ctx.fillStyle = '#333';
     items.forEach(function(it){
-      var ax = it.anchorX, ay = it.y;
       ctx.beginPath();
       ctx.moveTo(it.edgeX, it.edgeY);
-      ctx.lineTo(ax, ay);
+      ctx.lineTo(it.labelX, it.labelY);
       ctx.stroke();
-      ctx.textAlign = it.align;
+      ctx.textAlign = it.cos >= 0 ? 'left' : 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(it.text, ax + (it.align==='left'?4:-4), ay);
+      ctx.fillText(it.text, it.labelX + (it.cos>=0?4:-4), it.labelY);
     });
     ctx.restore();
   }
@@ -23659,10 +23657,10 @@ function _slatsRenderPieChart(canvasId, dataMap, total, t, unit){
     }
     var chart=new Chart(ctx, {
       type: 'pie',
-      data: { labels: labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 1, borderColor: '#fff' }] },
+      data: { labels: labels, datasets: [{ data: values, backgroundColor: bg, borderWidth: 1, borderColor: '#fff', offset: values.map(function(){ return 10; }) }] },
       options: {
         responsive: true, maintainAspectRatio: false,
-        layout: { padding: { top: 30, right: 90, bottom: 30, left: 90 } },
+        layout: { padding: 30 },
         plugins: {
           legend: { display: false },
           tooltip: {
