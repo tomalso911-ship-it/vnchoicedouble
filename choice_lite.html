@@ -15117,7 +15117,14 @@ function fitTopbarFontsNow() {
       items[j].style.fontWeight = isVi ? '700' : '';   // 仅越南语标签加粗
       items[j].style.padding = vPad + 'px ' + pad + 'px';
     }
-    menu.style.gap = gap + 'px';
+    // 空间足够时等距分布；将要溢出时改用固定 gap 紧凑排列，配合下方缩小字号/短标签避免滚动条
+    if (overflow()) {
+      menu.style.justifyContent = 'flex-start';
+      menu.style.gap = gap + 'px';
+    } else {
+      menu.style.justifyContent = 'space-evenly';
+      menu.style.gap = '0';
+    }
   }
   function overflow() {
     return menu.scrollWidth > menu.clientWidth + 1;
