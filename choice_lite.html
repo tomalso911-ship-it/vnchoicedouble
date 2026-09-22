@@ -325,6 +325,7 @@ function _ovLoadChartLib(cb){
     var ao = document.getElementById('authModalOverlay');
     if (ao && !ao.classList.contains('hidden')) sweepInto(ao);
     var er = document.getElementById('loginErr'); if (er) er.textContent = '';
+    try { if (typeof window.applyLangFit === 'function') window.applyLangFit(document.getElementById('loginPage') || document.body); } catch (e) {}
     return true;
   };
 
@@ -14552,6 +14553,169 @@ function wonDetailLinkCell(p, field, labelKey) {
  *   3) 重活延后：图表重绘等放到下一帧，不阻塞按钮高亮
  *   4) 异常隔离：任一模块出错不影响其他模块
  */
+/* ============================================================
+ * 语言切换「零位移」适配引擎（lang-fit）
+ * 目标：切换 zh/en/vi 时，所有带 data-i18n 的标签/按钮/表头/导航项/tab，
+ *       盒宽恒定（取三语最长版），文字用 canvas 测宽后动态缩放填充 → 像素级零位移。
+ * 不改动 I18N 锁死字典；硬编码导航项走独立 __EXTRA_I18N（不触碰锁死字典）。
+ * 范围：全页面（顶栏导航 / 所有 tab / 所有弹窗 / 表格表头 / 表单标签按钮）。
+ * 锁死逻辑（保存/禁用下拉等）一律不动，仅在视觉层加宽度锁 + 字号缩放。
+ * ============================================================ */
+(function () {
+  'use strict';
+  // ---- 硬编码项的三语（顶栏导航等无 data-i18n 的元素；不写入锁死的 I18N 字典）----
+  window.__EXTRA_I18N = {
+    nav_dashboard: { zh: '仪表盘', en: 'Dashboard', vi: 'Bảng điều khiển' },
+    nav_won:       { zh: '中标项目', en: 'Won Projects', vi: 'Dự án trúng thầu' },
+    nav_worklog:   { zh: '工作日志', en: 'Work Log', vi: 'Nhật ký công việc' },
+    nav_install:   { zh: '安装管理', en: 'Installation', vi: 'Quản lý lắp đặt' },
+    nav_finance:   { zh: '财务管理', en: 'Finance', vi: 'Quản lý tài chính' },
+    nav_library:   { zh: '资料库', en: 'Library', vi: 'Thư viện' },
+    nav_equity:    { zh: '股东权益', en: 'Equity', vi: 'Quyền lợi cổ đông' }
+  };
+
+  // ---- 注入必要 CSS（强制单行 + 不换行 + 表头不折行）----
+  try {
+    var _st = document.createElement('style');
+    _st.id = 'langfit-style';
+    _st.textContent = [
+      '.tb-menu{flex-wrap:nowrap !important;overflow-x:auto;}',
+      '.tb-item{flex:0 0 auto !important;white-space:nowrap;overflow:hidden;}',
+      '.prod-form{flex-wrap:nowrap !important;overflow-x:auto;}',
+      '.prod-form > .prod-field{flex:0 0 auto;}',
+      'th,td{white-space:nowrap;}'
+    ].join('\n');
+    document.head.appendChild(_st);
+  } catch (e) {}
+
+  // ---- 测宽：离屏 canvas ----
+  var _canvas = document.createElement('canvas');
+  var _ctx = _canvas.getContext('2d');
+  function measureW(text, weight, size, family) {
+    if (text == null) text = '';
+    text = String(text);
+    if (!text) return 0;
+    try { _ctx.font = (weight || '') + ' ' + (size || 13) + 'px ' + (family || 'sans-serif'); }
+    catch (e) { _ctx.font = (size || 13) + 'px sans-serif'; }
+    return _ctx.measureText(text).width;
+  }
+
+  // 取某元素在指定语言下的文本（优先 I18N，缺失回退 __EXTRA_I18N，再回退其它语言，最后用当前文本）
+  function resolveText(el, lang) {
+    var k = el.getAttribute ? el.getAttribute('data-i18n') : null;
+    if (!k) {
+      var v = el.getAttribute ? el.getAttribute('data-view') : null;
+      if (v && window.__EXTRA_I18N && window.__EXTRA_I18N['nav_' + v]) k = 'nav_' + v;
+    }
+    if (k) {
+      var dict = window.I18N;
+      if (dict && dict[lang] && dict[lang][k] !== undefined) return dict[lang][k];
+      if (window.__EXTRA_I18N && window.__EXTRA_I18N[k] && window.__EXTRA_I18N[k][lang] !== undefined) return window.__EXTRA_I18N[k][lang];
+      var order = ['zh', 'en', 'vi'];
+      for (var i = 0; i < 3; i++) {
+        if (dict && dict[order[i]] && dict[order[i]][k] !== undefined) return dict[order[i]][k];
+      }
+    }
+    return el.textContent;
+  }
+
+  function fitOne(el) {
+    if (!el || el.nodeType !== 1) return;
+    var cs0 = getComputedStyle(el);
+    if (cs0.display === 'none' || cs0.visibility === 'hidden') return;
+    // 恢复基础字号（清除上次缩放内联），保证测量基于基准字号，避免缩放累积
+    el.style.fontSize = '';
+    var cs = getComputedStyle(el);
+    var baseSize = parseFloat(cs.fontSize) || 13;
+    var baseFamily = cs.fontFamily || 'sans-serif';
+    var baseWeight = cs.fontWeight || '400';
+    var pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+    var langs = ['zh', 'en', 'vi'], texts = [], maxW = 0;
+    for (var i = 0; i < 3; i++) {
+      var t = resolveText(el, langs[i]);
+      t = (t == null) ? '' : String(t);
+      texts.push(t);
+      var w = measureW(t, baseWeight, baseSize, baseFamily);
+      if (w > maxW) maxW = w;
+    }
+    if (maxW <= 0) return;
+    var total = Math.ceil(maxW + pl + pr + 2);
+    if (el.tagName === 'TH') {
+      el.style.minWidth = total + 'px';
+    } else {
+      if (cs.display === 'inline' || cs.display === 'inline-block') el.style.display = 'inline-block';
+      el.style.minWidth = total + 'px';
+      el.style.whiteSpace = 'nowrap';
+      el.style.overflow = 'hidden';
+    }
+    // 当前语言动态缩放填充（Q9=C 不设下限，仅做 7px 兜底防不可读）
+    var idx = langs.indexOf(window.CUR_LANG || 'zh');
+    var cur = texts[idx] || '';
+    var curW = measureW(cur, baseWeight, baseSize, baseFamily);
+    if (curW > 0) {
+      var avail = total - pl - pr;
+      var scale = avail / curW;
+      if (scale < 1) {
+        var ns = Math.max(7, baseSize * scale);
+        el.style.fontSize = ns.toFixed(1) + 'px';
+      }
+    }
+  }
+
+  // 候选选择器（覆盖全页面所有会位移的标签/按钮/导航/tab/表头）
+  var FIT_SEL = '[data-i18n], .tb-item, th, .prod-tab, .btn-action, .prod-btn, .ov-btn, .cp-btn, .cm-btn, .cp-add-btn, .header-btns button, .page-header button';
+
+  function applyLangFit(root) {
+    if (!root) root = document.body;
+    if (!root || !root.querySelectorAll) return;
+    var list;
+    try { list = root.querySelectorAll(FIT_SEL); } catch (e) { return; }
+    for (var i = 0; i < list.length; i++) {
+      try { fitOne(list[i]); } catch (e) {}
+    }
+  }
+  window.applyLangFit = applyLangFit;
+
+  // MutationObserver：动态插入的节点自动适配（几乎不碰各 render 函数）
+  var _obs = null;
+  function startFitObserver() {
+    if (_obs || !window.MutationObserver) return;
+    _obs = new MutationObserver(function (muts) {
+      for (var m = 0; m < muts.length; m++) {
+        var mu = muts[m];
+        if (mu.type === 'childList') {
+          var nodes = mu.addedNodes;
+          for (var n = 0; n < nodes.length; n++) {
+            var nd = nodes[n];
+            if (nd.nodeType === 1) {
+              try {
+                if (nd.matches && nd.matches(FIT_SEL)) fitOne(nd);
+                if (nd.querySelectorAll) {
+                  var sub = nd.querySelectorAll(FIT_SEL);
+                  for (var s = 0; s < sub.length; s++) fitOne(sub[s]);
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      }
+    });
+    try { _obs.observe(document.body, { childList: true, subtree: true }); } catch (e) {}
+  }
+  window.__startFitObserver = startFitObserver;
+
+  // 首次加载 + 语言切换后统一适配
+  function _langFitInit() {
+    try { applyLangFit(document.body); } catch (e) {}
+    try { startFitObserver(); } catch (e) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _langFitInit);
+  } else {
+    _langFitInit();
+  }
+})();
+
 function setLangDebug(lang) {
   if(!I18N[lang]) { console.warn('[lang] unsupported:', lang); return; }
 
@@ -14794,12 +14958,16 @@ function setLangDebug(lang) {
 
       } catch (e) {}
       __restoreLangPreserve();
+      try { if (typeof window.applyLangFit === 'function') window.applyLangFit(document.body); } catch (e) {}
     }, 16);
   } catch (e) { /* 忽略 */ }
 
   // ---- 第五步（已回滚）----
   // 原后台静默刷新当前视图（loadCrm/Won/Lost）会导致 autoFillRemarks 批量触发
   // /api/translate-remarks 请求风暴 -> Worker 502。I18N 缓存清空保留。
+
+  // ---- 语言切换零位移适配：全页面 data-i18n 元素锁宽 + 字号缩放 ----
+  try { if (typeof window.applyLangFit === 'function') window.applyLangFit(document.body); } catch (e) {}
 }
 // 更新顶部导航栏语言按钮的高亮状态
 function updateLangSwitchUI() {
