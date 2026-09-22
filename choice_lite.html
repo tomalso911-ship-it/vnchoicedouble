@@ -20584,6 +20584,8 @@ function applyWonLang() {
   
   if (document.getElementById('wonModal').classList.contains('show')) {
     var mid = el('wonModal').dataset.id;
+    // ★ 切语言前先快照整个 WON 表单，renderModalBody 重建 DOM 后恢复全部字段（section1/section2 等）
+    var _formSnap = wonSnapshotDraft();
     var _wt1 = el('wonModalTitle'); if (_wt1) { var _wts1 = _wt1.querySelector('.mt'); if (_wts1) _wts1.textContent = mid ? t.btnEdit : t.modalTitle; }
     var _ptSnap = { zh: el('w_payment_terms_zh').value, en: el('w_payment_terms_en').value, vi: el('w_payment_terms_vi').value };
     // ★ 切语言前快照补充协议明细（未保存的新增行在 doc_view_addendum 里，renderModalBody 会重建 DOM 把它覆盖）
@@ -20622,6 +20624,8 @@ function applyWonLang() {
     } catch(e) { console.warn('[lang] remark restore failed:', e); }
     // V56：切换语言后重新锁定/启用三语框
     setTimeout(function(){ RM_WON_BASES.forEach(function(base){ triLangInit('won_' + base, {zh:'w_' + base + '_zh', en:'w_' + base + '_en', vi:'w_' + base + '_vi'}); }); }, 0);
+    // ★ 恢复 section1/section2 等普通字段（覆盖 renderModalBody 重建 DOM 导致的清空）
+    wonRestoreDraft(_formSnap);
   }
 
   // ★ CRM 弹窗开着时：DOM 未重建，直接按新语言显示备注 + 补翻
@@ -22124,6 +22128,14 @@ function renderModalBody() {
     '</div>';
   document.getElementById('modalBody').innerHTML = html;
   bindCurrencyAutoConvert();
+  // ★ 新增草稿自动保存：任何输入/选择变化都写入 localStorage，刷新后可恢复
+  (function(){
+    var inputs = document.querySelectorAll('#modalBody input, #modalBody select, #modalBody textarea');
+    inputs.forEach(function(inp){
+      inp.addEventListener('input', wonSaveDraft);
+      inp.addEventListener('change', wonSaveDraft);
+    });
+  })();
   // 绑定 AGI 应付总额自动计算（在 DOM 渲染完成后重新绑定）
   setTimeout(function() {
     calcAgiPayable();
@@ -22632,6 +22644,92 @@ function resetWonModalData(){
   try{ localStorage.removeItem('agi_payment_report_data'); }catch(e){}
 }
 
+// ===== WON 新增草稿自动保存（防止刷新/误关页面丢失未保存数据）=====
+var WON_DRAFT_KEY = 'won_new_draft';
+function wonSnapshotDraft(){
+  var snap = { data:{}, rm:{} };
+  try {
+    snap.data = collectWonFormData();
+    // collectWonFormData 未返回 gs/agi view detail，手动补上
+    snap.data.gs_view_detail = el('gs_view_detail') ? el('gs_view_detail').value.trim() : '';
+    snap.data.agi_view_detail = el('agi_view_detail') ? el('agi_view_detail').value.trim() : '';
+    var wh = el('w_has_warranty');
+    snap.has_warranty = wh ? wh.value : 'yes';
+    RM_WON_BASES.forEach(function(base){
+      snap.rm[base] = {
+        zh: el('w_'+base+'_zh') ? el('w_'+base+'_zh').value : '',
+        en: el('w_'+base+'_en') ? el('w_'+base+'_en').value : '',
+        vi: el('w_'+base+'_vi') ? el('w_'+base+'_vi').value : ''
+      };
+    });
+  } catch(e) { console.warn('[won draft] snapshot failed', e); }
+  return snap;
+}
+function wonRestoreDraft(snap){
+  if (!snap) return;
+  try {
+    var data = snap.data || {};
+    var map = {
+      contract_no:'w_contract_no', customer:'w_customer', province:'w_province', contract_date:'w_contract_date',
+      rate_rmb_vnd:'w_rate_rmb_vnd', rate_usd_vnd:'w_rate_usd_vnd',
+      include_install:'w_include_install', payment_terms:'w_payment_terms',
+      payment_terms_zh:'w_payment_terms_zh', payment_terms_en:'w_payment_terms_en', payment_terms_vi:'w_payment_terms_vi',
+      salesperson:'w_salesperson',
+      equip_rmb:'w_equip_rmb', equip_usd:'w_equip_usd', equip_vnd:'w_equip_vnd',
+      superv_rmb:'w_superv_rmb', superv_usd:'w_superv_usd', superv_vnd:'w_superv_vnd',
+      total_equip_rmb:'w_total_equip_rmb', total_equip_usd:'w_total_equip_usd', total_equip_vnd:'w_total_equip_vnd',
+      inst_budget_rmb:'w_inst_budget_rmb', inst_budget_usd:'w_inst_budget_usd', inst_budget_vnd:'w_inst_budget_vnd',
+      inst_actual_rmb:'w_inst_actual_rmb', inst_actual_usd:'w_inst_actual_usd', inst_actual_vnd:'w_inst_actual_vnd',
+      total_ei_rmb:'w_total_ei_rmb', total_ei_usd:'w_total_ei_usd', total_ei_vnd:'w_total_ei_vnd',
+      vat_rmb:'w_vat_rmb', vat_usd:'w_vat_usd', vat_vnd:'w_vat_vnd',
+      warranty_rmb:'w_warranty_rmb', warranty_usd:'w_warranty_usd', warranty_vnd:'w_warranty_vnd',
+      warranty_start:'w_warranty_start', warranty_end:'w_warranty_end',
+      cust_pay_count:'w_cust_pay_count',
+      cust_paid_rmb:'w_cust_paid_rmb', cust_paid_usd:'w_cust_paid_usd', cust_paid_vnd:'w_cust_paid_vnd',
+      cust_unpaid_rmb:'w_cust_unpaid_rmb', cust_unpaid_usd:'w_cust_unpaid_usd', cust_unpaid_vnd:'w_cust_unpaid_vnd',
+      cust_remark:'w_cust_remark',
+      cust_remark_zh:'w_cust_remark_zh', cust_remark_en:'w_cust_remark_en', cust_remark_vi:'w_cust_remark_vi',
+      cust_view_detail:'cust_view_detail', gs_view_detail:'gs_view_detail', agi_view_detail:'agi_view_detail',
+      doc_addendum_cnt:'w_doc_addendum_cnt',
+      doc_view_addendum:'doc_view_addendum',
+      doc_equip:'w_doc_equip', doc_install:'w_doc_install',
+      concrete_floor_spec:'w_concrete_floor_spec'
+    };
+    Object.keys(map).forEach(function(key){
+      var e = el(map[key]);
+      if (e && data[key] !== undefined && data[key] !== null) e.value = data[key];
+    });
+    var wh = el('w_has_warranty');
+    if (wh && snap.has_warranty) { wh.value = snap.has_warranty; onHasWarrantyChange(); }
+    if (snap.rm) {
+      RM_WON_BASES.forEach(function(base){
+        var r = snap.rm[base] || {};
+        if (r.zh !== undefined) { var e=el('w_'+base+'_zh'); if(e) e.value=r.zh; }
+        if (r.en !== undefined) { var e=el('w_'+base+'_en'); if(e) e.value=r.en; }
+        if (r.vi !== undefined) { var e=el('w_'+base+'_vi'); if(e) e.value=r.vi; }
+      });
+      RM_WON_BASES.forEach(function(base){ rmShowCurrent(base); });
+    }
+    var zh=el('w_payment_terms_zh'), en=el('w_payment_terms_en'), vi=el('w_payment_terms_vi');
+    var curPt = '';
+    if (CUR_LANG==='zh' && zh) curPt = zh.value;
+    else if (CUR_LANG==='vi' && vi) curPt = vi.value;
+    else if (en) curPt = en.value;
+    if (curPt && el('w_payment_terms')) el('w_payment_terms').value = curPt;
+    if (typeof refreshWonDocBtns === 'function') refreshWonDocBtns();
+  } catch(e) { console.warn('[won draft] restore failed', e); }
+}
+function wonSaveDraft(){
+  try {
+    if (!el('wonModal') || !el('wonModal').classList.contains('show')) return;
+    if (el('wonModal').dataset.id) return;
+    localStorage.setItem(WON_DRAFT_KEY, JSON.stringify(wonSnapshotDraft()));
+  } catch(e) {}
+}
+function wonClearDraft(){
+  try { localStorage.removeItem(WON_DRAFT_KEY); } catch(e){}
+}
+
 function openWonModal(id) {
   // 权限拦截：新增(WON-N1) / 编辑(WON-D2)
   if (!id) { if (!permGuard('WON-N1')) return; }
@@ -22698,6 +22796,11 @@ function openWonModal(id) {
     RM_WON_BASES.forEach(function(base){ triLangInit('won_' + base, {zh:'w_' + base + '_zh', en:'w_' + base + '_en', vi:'w_' + base + '_vi'}); });
     var wHasEl2=el('w_has_warranty'); if(wHasEl2) wHasEl2.value='yes';
     onHasWarrantyChange();
+    // ★ 恢复未保存的新增草稿（刷新/误关页面后再打开可继续填写）
+    try {
+      var draft = JSON.parse(localStorage.getItem(WON_DRAFT_KEY) || 'null');
+      if (draft) wonRestoreDraft(draft);
+    } catch(e){}
     bindAutoCalc();
     calcAgiPayable();
   }
@@ -24921,7 +25024,7 @@ function saveWon() { var t=T();
   fetch('/api/won-projects'+(id?'/'+id:''),{ method:id?'PUT':'POST', credentials:'include', headers:(typeof authHeaders==='function'?authHeaders({'Content-Type':'application/json'}):{'Content-Type':'application/json'}), body:JSON.stringify(data)})
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if(d.ok||d.pending||d.id){ showSaveOk(d.pending?t.pending:t.saveOk); if(d.id) el('wonModal').dataset.id = d.id; loadWon(); }
+      if(d.ok||d.pending||d.id){ showSaveOk(d.pending?t.pending:t.saveOk); if(d.id) el('wonModal').dataset.id = d.id; wonClearDraft(); loadWon(); }
       else showSaveOk(d.error||'Error');
     })
     .catch(function(){ showSaveOk('保存失败：无法连接服务器，数据未写入'); }); }
