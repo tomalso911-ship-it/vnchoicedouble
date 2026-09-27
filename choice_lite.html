@@ -12635,12 +12635,91 @@ var PROD_EQUIP_FAULT_KB = {
     </script>
   </section>
 
-  <!-- 安装管理（占位） -->
+  <!-- 安装管理 -->
   <section class="view" id="view-install">
-    <div class="approvals-page">
-      <div class="page-header"><h2>安装管理</h2></div>
-      <p>安装管理模块开发中，敬请期待。</p>
+    <div class="prod-wrap">
+      <div id="inst-list">
+        <div class="page-header">
+          <h2 data-i18n="inst_title"><span id="inst-list-title">安装管理 · 项目列表</span></h2>
+        </div>
+        <div id="inst-cards" class="prod-cards"></div>
+      </div>
+      <div id="inst-detail" style="display:none">
+        <div class="prod-detail-head">
+          <button class="prod-back" type="button" onclick="inst_back()"><span id="inst-back-label">← 返回列表</span></button>
+          <div class="prod-detail-title" id="inst-detail-title"></div>
+        </div>
+      <div class="prod-tabs" id="inst-tabs"></div>
+        <div id="inst-tab-body" class="prod-tab-body"></div>
+      </div>
     </div>
+    <style>
+      .inst-role-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;}
+      .inst-role-cell{border:1px solid #eef1f4;border-radius:8px;padding:8px 10px;min-width:158px;flex:1 1 158px;background:#fafcff;box-sizing:border-box;}
+      .inst-role-name{font-weight:600;color:#2c3e50;margin-bottom:6px;font-size:13px;}
+      .inst-role-inputs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+      .inst-role-inputs label{font-size:12px;color:#888;margin-right:2px;}
+      .inst-role-inputs input{width:52px;padding:4px 6px;border:1px solid #dce1e6;border-radius:6px;}
+      .inst-stat-grid{display:flex;flex-wrap:wrap;gap:10px;}
+      .inst-stat-card{flex:1 1 130px;background:#fff;border:1px solid #eef1f4;border-radius:10px;padding:12px;text-align:center;box-sizing:border-box;}
+      .inst-stat-val{font-size:22px;font-weight:700;color:#263238;}
+      .inst-stat-label{font-size:12px;color:#888;margin-top:4px;}
+      /* 安装规划-可视化图 */
+      .inst-vis-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 6px;}
+      .inst-zone-btn{margin:0;}
+      .inst-btn-ghost{background:#fff;color:#444;border:1px solid #dce1e6;}
+      .inst-vis-hint{font-size:12px;color:#888;margin:2px 0 12px;}
+      .inst-house-group{margin:0 0 14px;}
+      .inst-house-head{font-weight:600;font-size:13px;color:#37474f;margin-bottom:6px;}
+      .inst-house-cnt{color:#888;font-weight:400;}
+      .inst-bldg-wrap{display:flex;flex-wrap:wrap;gap:4px;}
+      .inst-bldg{width:64px;min-height:66px;padding:18px 4px 12px;background:#f4f6f2;border:1px solid #d6dcd2;border-radius:6px;font-size:11px;line-height:1.25;text-align:center;cursor:pointer;user-select:none;box-sizing:border-box;display:flex;align-items:flex-end;justify-content:center;word-break:break-word;position:relative;}
+      .inst-bldg:hover{border-color:#E53935;}
+      .inst-bldg-sel{outline:3px solid #E53935;outline-offset:1px;}
+      .inst-bldg-sel::after{content:'✓';position:absolute;top:2px;right:3px;font-size:13px;line-height:1;font-weight:bold;}
+      .inst-bldg-zone{border-width:1px;font-weight:600;}
+      .inst-bldg-corner{position:absolute;font-size:9px;line-height:1;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5);pointer-events:none;opacity:.95;}
+      .inst-bldg-corner-tl{top:1px;left:3px;}
+      .inst-bldg-corner-tr{top:1px;right:3px;}
+      .inst-bldg-pill{position:absolute;width:24px;height:5px;border-radius:3px;background:#E53935;overflow:hidden;pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.35);}
+      .inst-bldg-pill-tl{top:11px;left:3px;}
+      .inst-bldg-pill-tr{top:11px;right:3px;}
+      .inst-bldg-pct{position:absolute;top:18px;font-size:8px;line-height:1;font-weight:600;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);pointer-events:none;}
+      .inst-bldg-pct-tl{left:3px;}
+      .inst-bldg-pct-tr{right:3px;}
+      .inst-bldg-pill-fill{height:100%;display:inline-block;vertical-align:top;border-radius:3px;transition:width .15s;min-width:0;box-sizing:border-box;}
+      .inst-bldg-tip{position:fixed;display:none;z-index:10000;background:rgba(30,30,30,.96);color:#fff;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.35);max-width:360px;min-width:220px;pointer-events:none;}
+      .inst-bldg-tip-title{font-weight:700;font-size:13px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.2);}
+      .inst-bldg-tip-body{display:flex;gap:16px;}
+      .inst-bldg-tip-col{flex:1 1 auto;min-width:110px;}
+      .inst-bldg-tip-col+.inst-bldg-tip-col{border-left:1px solid rgba(255,255,255,.15);padding-left:16px;}
+      .inst-bldg-tip-h{font-weight:700;margin-bottom:6px;color:#FDD835;}
+      .inst-bldg-tip-spec{margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.1);}
+      .inst-bldg-tip-spec:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+      .inst-bldg-tip-s{font-weight:600;margin-bottom:3px;}
+      .inst-bldg-tip-row{display:flex;justify-content:space-between;gap:8px;margin:1px 0;}
+      .inst-bldg-tip-k{color:rgba(255,255,255,.75);}
+      .inst-bldg-tip-v{font-weight:600;text-align:right;white-space:nowrap;}
+      .inst-bldg-tip-muted{color:rgba(255,255,255,.55);font-style:italic;}
+      .inst-vis-question{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:#eef5e8;border-radius:6px;font-size:12.5px;line-height:1.35;color:#37474f;}
+      .inst-vis-question label{flex:1 1 auto;min-width:0;}
+      .inst-vis-question select{flex:0 0 auto;min-width:110px;padding:4px 8px;border:1px solid #b8c4b3;border-radius:4px;background:#fff;font-size:13px;}
+      .inst-vis-toggle{margin-left:auto;padding:2px 11px;border:1px solid #E53935;color:#fff;background:#E53935 !important;font-size:16px;font-weight:700;line-height:1.1;cursor:pointer;box-shadow:none !important;border-radius:5px;}
+      .inst-vis-toggle:hover{background:#C62828 !important;border-color:#C62828 !important;color:#fff !important;}
+      .inst-btn-black{background:#263238 !important;color:#fff !important;border-color:#263238 !important;}
+      /* 排程甘特 */
+      .inst-gantt-params{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;}
+      .inst-gantt-table{width:100%;border-collapse:collapse;margin:8px 0 16px;}
+      .inst-gantt-table th,.inst-gantt-table td{border:1px solid #e3e8ee;padding:6px 8px;font-size:12px;}
+      .inst-gantt-table th{background:#f4f6f2;color:#444;}
+      .inst-gantt-table input{width:60px;padding:4px 6px;border:1px solid #dce1e6;border-radius:6px;}
+      .inst-gantt-bar-wrap{margin-top:10px;}
+      .inst-gantt-row{display:flex;align-items:center;gap:8px;margin:6px 0;}
+      .inst-gantt-label{width:120px;font-size:12px;flex:0 0 auto;}
+      .inst-gantt-track{flex:1 1 auto;background:#f4f6f2;border-radius:6px;height:26px;position:relative;overflow:hidden;}
+      .inst-gantt-bar{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;white-space:nowrap;padding:0 6px;box-sizing:border-box;}
+      .inst-gantt-meta{font-size:12px;color:#555;margin-top:4px;}
+    </style>
   </section>
 
   <!-- 财务管理（占位） -->
@@ -33748,6 +33827,24 @@ function switchView(name) {
       prod_renderProduction();
     }
   }
+  // 进入安装管理视图时渲染项目列表（若 won 数据尚未加载则主动拉取并轮询等待）
+  if (name === 'install' && typeof inst_renderProduction === 'function') {
+    if ((typeof globalWonData === 'undefined' || !globalWonData.length) && typeof loadWon === 'function') {
+      loadWon();
+      (function _waitWonDataInst(){
+        _waitWonDataInst._tries = (_waitWonDataInst._tries || 0) + 1;
+        var _has = (typeof globalWonData !== 'undefined' && globalWonData && globalWonData.length);
+        if (_has || _waitWonDataInst._tries > 33 || window.currentView !== 'install') {
+          if(window.currentView === 'install') inst_renderProduction();
+          _waitWonDataInst._tries = 0;
+          return;
+        }
+        setTimeout(_waitWonDataInst, 300);
+      })();
+    } else {
+      inst_renderProduction();
+    }
+  }
   // 进入 CRM 潜在项目视图时确保数据已渲染（100% 复刻 WON 分支结构）
   if (name === 'crm') {
     if (typeof applyCrmLang === 'function' && typeof loadCrm === 'function') {
@@ -42468,5 +42565,1021 @@ window.refreshMoveBtnState = function () {
 <script src="vendor/fx_history.js"></script>
 <script src="vendor/material_prices.js"></script>
 <script src="vn_provinces.js"></script>
+<script>
+/* ==================== 安装管理模块（复用生产 prod_* 全局函数） ==================== */
+(function(){
+  var INST_TABS = [['A','inst_tab_A'],['B','inst_tab_B'],['C','inst_tab_C'],['E','inst_tab_E']];
+  var INST_ROLES = [['reporter','inst_role_reporter'],['leader','inst_role_leader'],['tractor','inst_role_tractor'],['assistant','inst_role_assistant'],['master','inst_role_master'],['hauler','inst_role_hauler'],['other','inst_role_other']];
+  var INST_CUR = null, INST_ACTIVE_TAB = 'A', INST_TABC_SELDATE = '', INST_TABE_SELDATE = '';
+  var INST_CHARTS = [];
+  var INST_ZONE_MAX = 12;
+  var INST_ZONE_COLORS = ['#E53935','#FB8C00','#B8860B','#43A047','#1E88E5','#8E24AA','#00897B','#6D4C41','#3949AB','#D81B60','#5E35B1','#00ACC1'];
+  var INST_SEL = []; /* 当前选中的栋 key 列表（house#idx），仅界面态，不持久化 */
+
+  var INST_I18N = {
+    zh: {
+      inst_title:'安装管理 · 项目列表', inst_back:'返回列表', inst_empty:'暂无项目', inst_tab_A:'安装计划总览', inst_tab_C:'安装小组及人工·天气', inst_tab_E:'日统计-安装', inst_suffix:' 安装',
+      inst_plan_title:'安装计划总览',
+      inst_plan_visual:'安装规划-可视化图',
+      inst_lbl_client:'客户',
+      inst_lbl_province:'省份',
+      inst_lbl_contract:'合同号',
+      inst_tab_B:'排程',
+      inst_vis_hint:'点选小长方形(可多选)，再用上方按钮归入区域；已归入的可用「移出所选」改区',
+      inst_no_house:'暂无猪舍数据（该项目无漏缝地板规格）',
+      inst_assign_to:'归入区域{0}',
+      inst_btn_remove:'移出所选',
+      inst_btn_clear_sel:'退出选择',
+      inst_gen_layout_btn:'按区域规划生产新的排布',
+      inst_gen_layout_incomplete:'仍有房舍未纳入分区，请继续完成！',
+      inst_gen_layout_title:'按区域规划后的房舍排布',
+      inst_gen_layout_ok:'已生成按区域规划的新排布',
+      inst_sel_none:'请先选择小长方形',
+      inst_assigned:'已归入区域{0}',
+      inst_removed:'已移出选定栋',
+      inst_zone:'区域',
+      inst_unit_bldg:'栋',
+      inst_no_count:'（不参与栋数计算）',
+      inst_zone_question:'鉴于本项目房舍类型众多，需进行分区安装管理；每个分区将同步安装、统一交付验收付款。您计划分几个区域？（最多12个）',
+      inst_zone_option:'{0}个区域',
+      inst_gantt_title:'安装排程甘特图',
+      inst_gantt_start:'开始日期',
+      inst_gantt_teams:'安装小组数',
+      inst_house_days:'各房型单栋工期(天)',
+      inst_gantt_save:'保存排程参数',
+      inst_gantt_period:'工期(天)',
+      inst_gantt_start_date:'开始',
+      inst_gantt_end_date:'结束',
+      inst_gantt_buildings:'栋数',
+      inst_gantt_breakdown:'房型明细',
+      inst_gantt_nodata:'请先在「安装规划-可视化图」把猪舍归入区域',
+      inst_teams_warn:'小组数超过上限6，已自动调整为6',
+      inst_house_type:'房型',
+      inst_lbl_plan_start:'安装开始日期', inst_lbl_plan_end:'安装计划完成', inst_lbl_actual_start:'实际开工', inst_lbl_actual_end:'实际完工',
+      inst_lbl_total_pcs:'安装总量(片)', inst_lbl_teams:'计划班组数', inst_lbl_leader:'安装负责人', inst_lbl_remark:'备注',
+      inst_save:'保存', inst_saved:'已保存', inst_progress:'安装进度',
+      inst_sec_labor:'安装小组及人工', inst_btn_save_snap:'保存当日', inst_lbl_date:'日期', inst_lbl_holiday:'节假日', inst_lbl_recorder:'填表人',
+      inst_man:'人数', inst_hours:'工时', inst_sec_weather:'天气', inst_sec_labor_detail:'人工明细',
+      inst_lbl_total_man:'总人力', inst_lbl_total_hours:'总工时',
+      inst_role_reporter:'填表人', inst_role_leader:'安装负责人', inst_role_tractor:'拖拉机司机', inst_role_assistant:'跟车助理', inst_role_master:'安装师傅', inst_role_hauler:'运板员', inst_role_other:'其他人员',
+      inst_sec_stats:'当日录入', inst_btn_add_daily:'保存当日', inst_lbl_pcs:'当日安装片数', inst_lbl_houses:'当日完成房舍',
+      inst_summary:'累计统计', inst_stat_cum_pcs:'累计片数', inst_stat_cum_houses:'累计房舍', inst_stat_remain:'剩余片数', inst_stat_rate:'完成率',
+      inst_chart_title:'安装趋势图', inst_chart_pcs:'当日片数', inst_chart_cum:'累计片数', inst_chart_houses:'当日房舍',
+      inst_sec_daily_detail:'日统计明细', inst_cum_pcs:'累计', inst_confirm_del:'确定删除该记录？', inst_nodata:'暂无数据',
+      inst_bldg_need:'需求', inst_bldg_shipped:'已发', inst_bldg_short:'缺',
+      inst_lbl_ship:'发货', inst_lbl_install:'安装',
+      inst_status_not_install:'未安装', inst_status_installing:'安装中', inst_status_installed:'安装完成', inst_status_accepted:'验收完成',
+      inst_lbl_spec:'规格', inst_bldg_gap:'缺口',
+      inst_lbl_installed:'已安装', inst_lbl_uninstalled:'未安装'
+    },
+    en: {
+      inst_title:'Installation · Projects', inst_back:'Back to List', inst_empty:'No projects', inst_tab_A:'Installation Plan', inst_tab_C:'Teams·Labor·Weather', inst_tab_E:'Daily Stats', inst_suffix:' Install',
+      inst_plan_title:'Installation Plan Overview',
+      inst_plan_visual:'Installation Plan - Visualization',
+      inst_lbl_client:'Client',
+      inst_lbl_province:'Province',
+      inst_lbl_contract:'Contract No.',
+      inst_tab_B:'Schedule',
+      inst_vis_hint:'Click a rectangle (multi-select), then use the buttons above to assign to a zone; assigned ones can be moved via "Remove Selected"',
+      inst_no_house:'No house data (this project has no concrete floor spec)',
+      inst_assign_to:'Assign to Zone {0}',
+      inst_btn_remove:'Remove Selected',
+      inst_btn_clear_sel:'Exit Selection',
+      inst_gen_layout_btn:'Generate Zone Layout',
+      inst_gen_layout_incomplete:'Some houses have not been assigned to zones. Please complete!',
+      inst_gen_layout_title:'Layout by Zone',
+      inst_gen_layout_ok:'New zone layout generated',
+      inst_sel_none:'Please select rectangles first',
+      inst_assigned:'Assigned to Zone {0}',
+      inst_removed:'Removed from selection',
+      inst_zone:'Zone',
+      inst_unit_bldg:'bldg',
+      inst_no_count:'(Not counted in buildings)',
+      inst_zone_question:'This project has many house types and needs to be divided into zones for installation management; each zone is installed together and delivered/accepted/paid as a unit. How many zones do you plan? (Max 12)',
+      inst_zone_option:'{0} Zones',
+      inst_gantt_title:'Installation Schedule Gantt',
+      inst_gantt_start:'Start Date',
+      inst_gantt_teams:'Install Teams',
+      inst_house_days:'Days per house type (days)',
+      inst_gantt_save:'Save Schedule Params',
+      inst_gantt_period:'Duration (days)',
+      inst_gantt_start_date:'Start',
+      inst_gantt_end_date:'End',
+      inst_gantt_buildings:'Buildings',
+      inst_gantt_breakdown:'House breakdown',
+      inst_gantt_nodata:'Please assign houses to zones in "Installation Plan - Visualization" first',
+      inst_teams_warn:'Teams exceed max 6, auto-adjusted to 6',
+      inst_house_type:'House type',
+      inst_lbl_plan_start:'Install Start', inst_lbl_plan_end:'Plan Finish', inst_lbl_actual_start:'Actual Start', inst_lbl_actual_end:'Actual Finish',
+      inst_lbl_total_pcs:'Total (pcs)', inst_lbl_teams:'Planned Teams', inst_lbl_leader:'Install Leader', inst_lbl_remark:'Remark',
+      inst_save:'Save', inst_saved:'Saved', inst_progress:'Progress',
+      inst_sec_labor:'Teams & Labor', inst_btn_save_snap:'Save Day', inst_lbl_date:'Date', inst_lbl_holiday:'Holiday', inst_lbl_recorder:'Recorder',
+      inst_man:'Headcount', inst_hours:'Hours', inst_sec_weather:'Weather', inst_sec_labor_detail:'Labor Detail',
+      inst_lbl_total_man:'Total Man', inst_lbl_total_hours:'Total Hours',
+      inst_role_reporter:'Recorder', inst_role_leader:'Leader', inst_role_tractor:'Tractor Driver', inst_role_assistant:'Truck Assistant', inst_role_master:'Installer', inst_role_hauler:'Slab Transporter', inst_role_other:'Others',
+      inst_sec_stats:'Daily Entry', inst_btn_add_daily:'Save Day', inst_lbl_pcs:'Pcs Installed', inst_lbl_houses:'Houses Done',
+      inst_summary:'Summary', inst_stat_cum_pcs:'Cum. Pcs', inst_stat_cum_houses:'Cum. Houses', inst_stat_remain:'Remaining', inst_stat_rate:'Completion',
+      inst_chart_title:'Installation Trend', inst_chart_pcs:'Daily Pcs', inst_chart_cum:'Cumulative', inst_chart_houses:'Daily Houses',
+      inst_sec_daily_detail:'Daily Detail', inst_cum_pcs:'Cum', inst_confirm_del:'Delete this record?', inst_nodata:'No data',
+      inst_bldg_need:'Required', inst_bldg_shipped:'Shipped', inst_bldg_short:'Short',
+      inst_lbl_ship:'Ship', inst_lbl_install:'Install',
+      inst_status_not_install:'Not installed', inst_status_installing:'Installing', inst_status_installed:'Installed', inst_status_accepted:'Accepted',
+      inst_lbl_spec:'Spec', inst_bldg_gap:'Gap',
+      inst_lbl_installed:'Installed', inst_lbl_uninstalled:'Not installed'
+    },
+    vi: {
+      inst_title:'Lắp đặt · Dự án', inst_back:'Quay lại danh sách', inst_empty:'Chưa có dự án', inst_tab_A:'Tổng quan kế hoạch', inst_tab_C:'Đội·Nhân công·Thời tiết', inst_tab_E:'Thống kê ngày', inst_suffix:' Lắp đặt',
+      inst_plan_title:'Tổng quan kế hoạch lắp đặt',
+      inst_plan_visual:'Quy hoạch lắp đặt - Biểu đồ trực quan',
+      inst_lbl_client:'Khách hàng',
+      inst_lbl_province:'Tỉnh',
+      inst_lbl_contract:'Số HĐ',
+      inst_tab_B:'Lịch trình',
+      inst_vis_hint:'Nhấn vào hình chữ nhật (chọn nhiều), rồi dùng nút trên để gán vào khu vực; đã gán có thể chuyển bằng "Gỡ chọn"',
+      inst_no_house:'Chưa có dữ liệu chuồng (dự án này không có thông số sàn bê tông)',
+      inst_assign_to:'Gán vào Khu {0}',
+      inst_btn_remove:'Gỡ đã chọn',
+      inst_btn_clear_sel:'Thoát chọn',
+      inst_gen_layout_btn:'Tạo bố trí theo khu vực',
+      inst_gen_layout_incomplete:'Vẫn còn chuồng chưa được gán khu vực, vui lòng hoàn thành!',
+      inst_gen_layout_title:'Bố trí theo khu vực',
+      inst_gen_layout_ok:'Đã tạo bố trí mới theo khu vực',
+      inst_sel_none:'Hãy chọn hình chữ nhật trước',
+      inst_assigned:'Đã gán vào Khu {0}',
+      inst_removed:'Đã gỡ khỏi chọn',
+      inst_zone:'Khu',
+      inst_unit_bldg:'tòa',
+      inst_no_count:'(Không tính vào số dãy)',
+      inst_zone_question:'Do dự án có nhiều loại chuồng, cần chia khu vực để quản lý lắp đặt; mỗi khu vực sẽ lắp đặt chung và bàn giao/nghiệm thu/thanh toán cùng nhau. Bạn dự định chia mấy khu vực? (Tối đa 12)',
+      inst_zone_option:'{0} khu vực',
+      inst_gantt_title:'Biểu đồ Gantt lắp đặt',
+      inst_gantt_start:'Ngày bắt đầu',
+      inst_gantt_teams:'Số đội lắp',
+      inst_house_days:'Số ngày mỗi loại chuồng',
+      inst_gantt_save:'Lưu tham số',
+      inst_gantt_period:'Thời gian (ngày)',
+      inst_gantt_start_date:'Bắt đầu',
+      inst_gantt_end_date:'Kết thúc',
+      inst_gantt_buildings:'Số tòa',
+      inst_gantt_breakdown:'Chi tiết chuồng',
+      inst_gantt_nodata:'Hãy gán chuồng vào khu vực trong "Quy hoạch lắp đặt" trước',
+      inst_teams_warn:'Số đội vượt quá 6, tự động điều chỉnh về 6',
+      inst_house_type:'Loại chuồng',
+      inst_lbl_plan_start:'Bắt đầu lắp', inst_lbl_plan_end:'Kế hoạch xong', inst_lbl_actual_start:'Thực tế bắt đầu', inst_lbl_actual_end:'Thực tế xong',
+      inst_lbl_total_pcs:'Tổng (tấm)', inst_lbl_teams:'Số đội kế hoạch', inst_lbl_leader:'Chỉ huy lắp đặt', inst_lbl_remark:'Ghi chú',
+      inst_save:'Lưu', inst_saved:'Đã lưu', inst_progress:'Tiến độ',
+      inst_sec_labor:'Đội & Nhân công', inst_btn_save_snap:'Lưu ngày', inst_lbl_date:'Ngày', inst_lbl_holiday:'Nghỉ', inst_lbl_recorder:'Người ghi',
+      inst_man:'Số người', inst_hours:'Giờ', inst_sec_weather:'Thời tiết', inst_sec_labor_detail:'Chi tiết nhân công',
+      inst_lbl_total_man:'Tổng nhân', inst_lbl_total_hours:'Tổng giờ',
+      inst_role_reporter:'Người ghi', inst_role_leader:'Chỉ huy', inst_role_tractor:'Lái kéo', inst_role_assistant:'Phụ xe', inst_role_master:'Thợ lắp', inst_role_hauler:'Chở tấm', inst_role_other:'Khác',
+      inst_sec_stats:'Nhập ngày', inst_btn_add_daily:'Lưu ngày', inst_lbl_pcs:'Tấm lắp ngày', inst_lbl_houses:'Nhà xong ngày',
+      inst_summary:'Tổng kết', inst_stat_cum_pcs:'Tích lũy tấm', inst_stat_cum_houses:'Tích lũy nhà', inst_stat_remain:'Còn lại', inst_stat_rate:'Tỷ lệ',
+      inst_chart_title:'Xu hướng lắp đặt', inst_chart_pcs:'Tấm/ngày', inst_chart_cum:'Tích lũy', inst_chart_houses:'Nhà/ngày',
+      inst_sec_daily_detail:'Chi tiết ngày', inst_cum_pcs:'Tích lũy', inst_confirm_del:'Xóa bản ghi này?', inst_nodata:'Chưa có dữ liệu',
+      inst_bldg_need:'Cần', inst_bldg_shipped:'Đã gửi', inst_bldg_short:'Thiếu',
+      inst_lbl_ship:'Gửi', inst_lbl_install:'Lắp',
+      inst_status_not_install:'Chưa lắp', inst_status_installing:'Đang lắp', inst_status_installed:'Đã lắp', inst_status_accepted:'Đã nghiệm thu',
+      inst_lbl_spec:'Quy cách', inst_bldg_gap:'Thiếu',
+      inst_lbl_installed:'Đã lắp', inst_lbl_uninstalled:'Chưa lắp'
+    }
+  };
+
+  function it(k){
+    var lang = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
+    var d = INST_I18N[lang]; if (d && d[k]!==undefined) return d[k];
+    var z = INST_I18N.zh[k]; if (z!==undefined) return z;
+    return k;
+  }
+  function inst_el(id){ return document.getElementById(id); }
+  function inst_get(id){
+    var f = (typeof prod_get==='function') ? prod_get(id) : { id:id, installation:{plan:{},workers:{},daily:{}} };
+    f.installation = f.installation || {plan:{},workers:{},daily:{}};
+    return f;
+  }
+  function inst_save(f){ if(typeof prod_save==='function'){ try{ prod_save(f); }catch(e){} } }
+  function inst_proj(){ return (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==INST_CUR; }) : null; }
+  function inst_provKey(){
+    var p = inst_proj(); return p ? (p.province||p.region||'') : '';
+  }
+  function inst_cumPcs(f){ var d=(f.installation&&f.installation.daily)||{}; var s=0; for(var k in d){ s+=(+d[k].pcs||0); } return s; }
+  function inst_cumHouses(f){ var d=(f.installation&&f.installation.daily)||{}; var s=0; for(var k in d){ s+=(+d[k].houses||0); } return s; }
+
+  function inst_renderProduction(){
+    var box = inst_el('inst-cards'); if(!box) return;
+    var titleEl = document.querySelector('#inst-list #inst-list-title');
+    if(titleEl) titleEl.textContent = it('inst_title');
+    var data = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData : [];
+    if(!data.length){ box.innerHTML = '<div class="prod-empty">'+it('inst_empty')+'</div>'; return; }
+    var h = '';
+    data.forEach(function(p){
+      var id = p.id; var f = inst_get(id);
+      var client = p.client || p.customer || p.name || '—';
+      var prov = p.province || p.region || '';
+      var code = p.contract_no || p.code || ('#'+id);
+      var cum = inst_cumPcs(f);
+      var cumH = inst_cumHouses(f);
+      h += '<div class="prod-card" onclick="inst_openProject(\''+id+'\')">'
+        + '<div class="pc-title">'+prod_esc(client)+(prov?' · '+prod_esc(prov):'')+'</div>'
+        + '<span class="pc-chip">'+it('inst_lbl_contract')+' '+prod_esc(String(code))+'</span>'
+        + '<div class="pc-row">'+it('inst_stat_cum_pcs')+' '+cum+'</div>'
+        + '<div class="pc-row">'+it('inst_stat_cum_houses')+' '+cumH+'</div>'
+        + '</div>';
+    });
+    box.innerHTML = h;
+  }
+
+  function inst_openProject(id){
+    INST_CUR = id;
+    var p = inst_proj();
+    var t = inst_el('inst-detail-title');
+    if(t) t.textContent = (p ? (p.client||p.customer||p.name||'—') : '—') + it('inst_suffix');
+    var back = inst_el('inst-back-label');
+    if(back) back.textContent = '← ' + it('inst_back');
+    if(inst_el('inst-list')) inst_el('inst-list').style.display = 'none';
+    if(inst_el('inst-detail')) inst_el('inst-detail').style.display = 'block';
+    inst_renderTabs('A');
+    if(typeof prod_syncFromServer==='function'){
+      prod_syncFromServer(id, function(){ if(INST_CUR===id) inst_renderTabs(INST_ACTIVE_TAB||'A'); });
+    }
+  }
+  function inst_back(){
+    if(inst_el('inst-detail')) inst_el('inst-detail').style.display = 'none';
+    if(inst_el('inst-list')) inst_el('inst-list').style.display = 'block';
+    inst_renderProduction();
+  }
+
+  function inst_renderTabs(active){
+    INST_ACTIVE_TAB = active;
+    var box = inst_el('inst-tabs'); if(!box) return;
+    var cMiss = inst_tabCMissingCount(), eMiss = inst_tabEMissingCount();
+    var h = '';
+    INST_TABS.forEach(function(t){
+      var count = t[0]==='C' ? cMiss : (t[0]==='E' ? eMiss : 0);
+      var badge = (count>0) ? '<span class="prod-tab-badge">'+count+'</span>' : '';
+      h += '<div class="prod-tab'+(t[0]===active?' active':'')+'" data-key="'+t[0]+'" onclick="inst_renderTab(\''+t[0]+'\')">'+it(t[1])+badge+'</div>';
+    });
+    box.innerHTML = h;
+    inst_renderTab(active);
+  }
+
+  function inst_renderTab(key){
+    INST_ACTIVE_TAB = key;
+    var tabs = inst_el('inst-tabs');
+    if(tabs){ var ch = tabs.children; for(var j=0;j<ch.length;j++){ ch[j].classList.toggle('active', ch[j].getAttribute('data-key')===key); } }
+    var body = inst_el('inst-tab-body');
+    if(!body || !INST_CUR) return;
+    var f = inst_get(INST_CUR);
+    if(key==='A'){ body.innerHTML = inst_tabA(f); }
+    else if(key==='B'){ body.innerHTML = inst_tabB(f); }
+    else if(key==='C'){ body.innerHTML = inst_tabC(f); setTimeout(inst_backfillWeather, 0); }
+    else if(key==='E'){ body.innerHTML = inst_tabE(f); inst_drawStats(f); }
+    inst_updateTabBadges();
+  }
+
+  /* ---------- 子标签 A：安装计划总览 ---------- */
+  function inst_tabA(f){
+    var inst = f.installation || {}; var plan = inst.plan || {};
+    var cum = inst_cumPcs(f);
+    var cumH = inst_cumHouses(f);
+    var h = inst_renderVisual(f);
+    h += '<div class="prod-sec-title">'+it('inst_plan_title')+'</div>';
+    h += '<div class="prod-form">'
+      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_plan_start'),'ia_plan_start',plan.planStart||'','',  '') : '')
+      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_plan_end'),'ia_plan_end',plan.planEnd||'','',  '') : '')
+      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_actual_end'),'ia_actual_end',plan.actualEnd||'','',  '') : '')
+      + '<div class="prod-field"><label>'+it('inst_lbl_teams')+'</label><input id="ia_teams" value="'+prod_esc(plan.teams||'')+'"></div>'
+      + '</div>';
+    h += '<div style="margin:8px 0 16px"><button class="prod-btn" type="button" onclick="inst_savePlan()">'+it('inst_save')+'</button></div>';
+    h += '<div class="prod-sec-title">'+it('inst_summary')+'</div>';
+    h += '<div class="inst-stat-grid">'
+      + instStatCard(it('inst_stat_cum_pcs'), cum)
+      + instStatCard(it('inst_stat_cum_houses'), cumH)
+      + '</div>';
+    return h;
+  }
+  /* ============ 安装规划-可视化图 ============ */
+  function inst_visualExcludeHouse(v){
+    return false;
+  }
+  function inst_houseTypes(){
+    var saved = (typeof PROD_CUR!=='undefined') ? PROD_CUR : undefined;
+    var rows = [], list = [];
+    try {
+      if(typeof PROD_CUR!=='undefined'){ PROD_CUR = INST_CUR; }
+      rows = (typeof prod_slatsRows==='function') ? prod_slatsRows() : [];
+      var seen = {}, order = 0;
+      rows.forEach(function(r){
+        var h = String(r.pig_house||'').trim();
+        if(!h) return;
+        if(inst_visualExcludeHouse(h)) return;
+        if(seen[h]) return;
+        seen[h] = 1;
+        var cnt = (typeof prod_buildingCountForHouse==='function') ? prod_buildingCountForHouse(h) : 0;
+        var isSpecial = (typeof slatsIsSpecialHouse==='function' && slatsIsSpecialHouse(h));
+        list.push({ code:h, name:(typeof prod_phName==='function')?prod_phName(h):h, count:Math.round(cnt), order:order++, isSpecial:isSpecial });
+      });
+      list.sort(function(a,b){
+        if(a.isSpecial!==b.isSpecial) return a.isSpecial ? 1 : -1;
+        return a.order - b.order;
+      });
+    } finally {
+      if(typeof PROD_CUR!=='undefined'){ PROD_CUR = saved; }
+    }
+    return list;
+  }
+  function inst_assignMap(f){ return (f.installation && f.installation.assign) || {}; }
+  function inst_tetHolidaySet(){
+    var set = {};
+    (typeof BOARD_HOLIDAYS!=='undefined' ? BOARD_HOLIDAYS : []).forEach(function(h){
+      if(h.zh!=='春节') return;
+      for(var i=-7;i<=10;i++){ set[bdYmd(bdDateAdd(h.from, i))] = 1; }
+    });
+    return set;
+  }
+  function inst_endDateSkipTet(startYmd, workdays){
+    var tet = inst_tetHolidaySet(); var cur = startYmd; var done = (workdays>0?1:0); var guard = 0;
+    while(done < workdays && guard < 10000){
+      guard++; var nx = bdYmd(bdDateAdd(cur,1));
+      if(tet[nx]){ continue; } cur = nx; done++;
+    }
+    return cur;
+  }
+  function inst_nextWorkday(ymd){
+    var tet = inst_tetHolidaySet(); var cur = ymd; var g = 0;
+    while(g < 10000){ g++; var nx = bdYmd(bdDateAdd(cur,1)); if(tet[nx]){ cur = nx; continue; } return nx; }
+    return cur;
+  }
+  function inst_zoneCount(f){
+    var inst = (f && f.installation) || {};
+    var n = parseInt(inst.zoneCount,10) || INST_ZONE_MAX;
+    if(n<1) n=1; if(n>INST_ZONE_MAX) n=INST_ZONE_MAX;
+    return n;
+  }
+  function inst_saveZoneCount(n){
+    if(!INST_CUR) return;
+    var f = inst_get(INST_CUR); f.installation = f.installation||{};
+    f.installation.zoneCount = Math.max(1, Math.min(INST_ZONE_MAX, parseInt(n,10)||INST_ZONE_MAX));
+    var assign = f.installation.assign || {};
+    for(var k in assign){
+      if(assign[k] > f.installation.zoneCount) delete assign[k];
+    }
+    inst_save(f); inst_renderTab('A');
+  }
+  function inst_toggleVisualCollapse(){
+    if(!INST_CUR) return;
+    var f = inst_get(INST_CUR); f.installation = f.installation||{};
+    f.installation.visualCollapsed = !f.installation.visualCollapsed;
+    inst_save(f); inst_renderTab('A');
+  }
+  function inst_isLayoutComplete(f){
+    var assign = inst_assignMap(f);
+    var types = inst_houseTypes();
+    for(var i=0;i<types.length;i++){
+      var ht = types[i];
+      var isNoCount = (typeof slatsIsSpecialHouse==='function' && slatsIsSpecialHouse(ht.code) && ht.count===0);
+      var loop = isNoCount ? 1 : ht.count;
+      for(var j=1;j<=loop;j++){
+        if(!assign[ht.code+'#'+j]) return false;
+      }
+    }
+    return true;
+  }
+  function inst_buildDemandMap(){
+    var map = {};
+    var mm = (typeof prod_slatsMatrix==='function') ? prod_slatsMatrix() : {specs:{},houseOrder:[]};
+    for(var spec in mm.specs){
+      var sp = mm.specs[spec];
+      for(var code in sp.houses){
+        if(!sp.houses.hasOwnProperty(code) || code==='—') continue;
+        var total = sp.houses[code] || 0;
+        var bc = (typeof prod_buildingCountForHouse==='function') ? prod_buildingCountForHouse(code) : 0;
+        var per = bc > 0 ? Math.round(total / bc) : total;
+        map[code] = map[code] || {};
+        map[code][spec] = (map[code][spec]||0) + per;
+      }
+    }
+    return map;
+  }
+  function inst_bldgBcnt(f, code){
+    if(typeof prod_buildingCountForHouse==='function'){
+      var bc = prod_buildingCountForHouse(code);
+      if(bc > 0) return bc;
+    }
+    return 1;
+  }
+  function inst_bldgShipped(f, code, idx){
+    var ho = (f && f.houseOut) || {};
+    var sIdx = String(idx);
+    var sIdxRe = new RegExp('(^|[^0-9])'+sIdx+'([^0-9]|$)');
+    var map = {};
+    for(var key in ho){
+      var parts = key.split('|'); if(parts.length < 2) continue;
+      if(String(parts[0]).trim() !== String(code).trim()) continue;
+      var spec = parts.slice(1).join('|');
+      var rec = ho[key] || {};
+      var total = 0;
+      var hasDestLines = false;
+      var od = rec.outDaily || {};
+      for(var d in od){
+        var day = od[d];
+        (day.lines || []).forEach(function(ln){
+          var dest = String(ln.dest||'').trim();
+          if(dest !== '') hasDestLines = true;
+          if(dest === sIdx || sIdxRe.test(dest)) total += (+ln.qty||0);
+        });
+      }
+      if(total === 0 && (+rec.out||0) > 0 && !hasDestLines){
+        var bcnt = inst_bldgBcnt(f, code);
+        total = Math.round((+rec.out||0) / (bcnt || 1));
+      }
+      if(total > 0) map[spec] = (map[spec]||0) + total;
+    }
+    return map;
+  }
+  function inst_bldgShipStatus(demand, shipped){
+    var has = false, started = false, complete = true, totalNeed = 0, totalShipped = 0;
+    var keys = {};
+    for(var k in demand){ keys[k]=1; }
+    for(var k2 in shipped){ keys[k2]=1; }
+    for(var spec in keys){
+      has = true;
+      var need = demand[spec]||0, sh = shipped[spec]||0;
+      totalNeed += need; totalShipped += sh;
+      if(sh > 0) started = true;
+      if(need > 0 && sh < need) complete = false;
+    }
+    return {has:has, started:started, complete:complete, totalNeed:totalNeed, totalShipped:totalShipped};
+  }
+  function inst_bldgInstallStatus(f, code, idx){
+    var st = ((f && f.installation && f.installation.houseStatus) || {})[code+'|'+idx];
+    var map = {
+      not_install:{color:'#E53935', label:it('inst_status_not_install')},
+      installing:{color:'#FDD835', label:it('inst_status_installing')},
+      installed:{color:'#43A047', label:it('inst_status_installed')},
+      accepted:{color:'#FFFFFF', label:it('inst_status_accepted')}
+    };
+    if(!st || !map[st]) st = 'not_install';
+    return {key:st, color:map[st].color, label:map[st].label};
+  }
+  function inst_bldgTipHtml(f, code, idx, demand, shipped, label){
+    var specs = [];
+    var totalNeed = 0, totalShipped = 0;
+    for(var spec in demand){ var need = demand[spec]||0; totalNeed += need; var sh = shipped[spec]||0; totalShipped += sh; specs.push({spec:spec, need:need, shipped:sh}); }
+    for(var s2 in shipped){ if(!demand || demand[s2]===undefined){ totalShipped += (shipped[s2]||0); specs.push({spec:s2, need:0, shipped:(shipped[s2]||0)}); } }
+    var installQty = ((f && f.installation && f.installation.houseInstallQty) || {})[code+'|'+idx] || 0;
+    installQty = Math.max(0, Math.min(totalNeed, installQty));
+    var uninstalledQty = Math.max(0, totalNeed - installQty);
+    var leftRows = '<div class="inst-bldg-tip-h">'+prod_esc(it('inst_lbl_install'))+'</div>'
+      + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_need')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(totalNeed)+'</span></div>'
+      + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_lbl_installed')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(installQty)+'</span></div>'
+      + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_lbl_uninstalled')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(uninstalledQty)+'</span></div>';
+    var rightRows = '<div class="inst-bldg-tip-h">'+prod_esc(it('inst_lbl_ship'))+'</div>'
+      + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_need')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(totalNeed)+'</span></div>'
+      + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_shipped')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(totalShipped)+'</span></div>';
+    if(!specs.length){
+      rightRows += '<div class="inst-bldg-tip-muted">'+it('inst_nodata')+'</div>';
+    } else {
+      specs.forEach(function(s){
+        var gap = s.shipped < s.need ? ('<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_gap')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(s.need - s.shipped)+'</span></div>') : '';
+        rightRows += '<div class="inst-bldg-tip-spec">'
+          + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+prod_esc(s.spec)+'</div>'
+          + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_need')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(s.need)+'</span></div>'
+          + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_shipped')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(s.shipped)+'</span></div>'
+          + gap
+          + '</div>';
+      });
+    }
+    return '<div class="inst-bldg-tip-title">'+prod_esc(label)+'</div>'
+      + '<div class="inst-bldg-tip-body"><div class="inst-bldg-tip-col">'+leftRows+'</div><div class="inst-bldg-tip-col">'+rightRows+'</div></div>';
+  }
+  function inst_showBldgTip(el){
+    var html = el.getAttribute('data-tip-html'); if(!html) return;
+    var tip = document.getElementById('inst_bldg_tip');
+    if(!tip){
+      tip = document.createElement('div'); tip.id = 'inst_bldg_tip'; tip.className = 'inst-bldg-tip'; document.body.appendChild(tip);
+    }
+    tip.innerHTML = html; tip.style.display = 'block';
+    var rect = el.getBoundingClientRect(); var tipRect = tip.getBoundingClientRect();
+    var left = rect.left + rect.width/2 - tipRect.width/2, top = rect.top - tipRect.height - 8;
+    if(left < 4) left = 4; if(left + tipRect.width > window.innerWidth - 4) left = window.innerWidth - tipRect.width - 4;
+    if(top < 4) top = rect.bottom + 8;
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+  function inst_hideBldgTip(){ var tip = document.getElementById('inst_bldg_tip'); if(tip) tip.style.display = 'none'; }
+  function inst_renderGenLayout(f){
+    var assign = inst_assignMap(f);
+    var zoneCount = inst_zoneCount(f);
+    var byZone = {};
+    for(var k in assign){ if(assign[k]<=zoneCount){ (byZone[assign[k]]||(byZone[assign[k]]=[])).push(k); } }
+    var savedProd = (typeof PROD_CUR!=='undefined') ? PROD_CUR : undefined;
+    var demandMap = {};
+    try {
+      if(typeof PROD_CUR!=='undefined'){ PROD_CUR = INST_CUR; }
+      demandMap = inst_buildDemandMap();
+    } finally {
+      if(typeof PROD_CUR!=='undefined'){ PROD_CUR = savedProd; }
+    }
+    var h = '<div class="prod-sec-title" style="margin-top:18px">'+it('inst_gen_layout_title')+'</div>';
+    for(var z=1; z<=zoneCount; z++){
+      var keys = byZone[z] || [];
+      keys.sort(function(a,b){
+        var ma = a.match(/^(.+)#(.+)$/); var ca = ma ? ma[1] : a;
+        var mb = b.match(/^(.+)#(.+)$/); var cb = mb ? mb[1] : b;
+        var sa = (typeof slatsIsSpecialHouse==='function' && slatsIsSpecialHouse(ca)) ? 1 : 0;
+        var sb = (typeof slatsIsSpecialHouse==='function' && slatsIsSpecialHouse(cb)) ? 1 : 0;
+        return sa - sb;
+      });
+      var regular = 0, specialNames = [];
+      keys.forEach(function(key){
+        var m = key.match(/^(.+)#(.+)$/); var code = m ? m[1] : key;
+        var isSpecial = (typeof slatsIsSpecialHouse==='function' && slatsIsSpecialHouse(code));
+        if(isSpecial){
+          var nm = (typeof prod_phName==='function' ? prod_phName(code) : code) || code;
+          if(specialNames.indexOf(nm)<0) specialNames.push(nm);
+        } else {
+          regular++;
+        }
+      });
+      var specialNote = specialNames.length ? ('<span class="inst-house-cnt" style="margin-left:6px;">'+specialNames.join('、')+'，'+it('inst_no_count')+'</span>') : '';
+      h += '<div class="inst-house-group">';
+      h += '<div class="inst-house-head" style="color:'+INST_ZONE_COLORS[z-1]+'">'+it('inst_zone')+z+' <span class="inst-house-cnt">('+regular+it('inst_unit_bldg')+')</span>'+specialNote+'</div>';
+      h += '<div class="inst-bldg-wrap">';
+      keys.forEach(function(key){
+        var m = key.match(/^(.+)#(.+)$/);
+        var code = m ? m[1] : key; var idx = m ? m[2] : '1';
+        var name = (typeof prod_phName==='function' ? prod_phName(code) : code) || code;
+        var label = name+'#'+idx;
+        var demand = demandMap[code] || {};
+        var shipped = inst_bldgShipped(f, code, idx);
+        var shipSt = inst_bldgShipStatus(demand, shipped);
+        var installSt = inst_bldgInstallStatus(f, code, idx);
+        var tipHtml = inst_bldgTipHtml(f, code, idx, demand, shipped, label);
+        var totalNeed = 0; for(var spec in demand){ totalNeed += (demand[spec]||0); }
+        var installQty = ((f && f.installation && f.installation.houseInstallQty) || {})[code+'|'+idx] || 0;
+        installQty = Math.max(0, Math.min(totalNeed, installQty));
+        var shipProg = (shipSt.has && shipSt.totalNeed>0) ? Math.min(100, Math.round(shipSt.totalShipped/shipSt.totalNeed*100)) : 0;
+        var shipPill = shipSt.has ? ('<span class="inst-bldg-pill inst-bldg-pill-tr" style="background:#E53935;"><span class="inst-bldg-pill-fill" style="width:'+shipProg+'%;background:#43A047;"></span></span>') : '';
+        var shipPct = shipSt.has ? ('<span class="inst-bldg-pct inst-bldg-pct-tr">'+shipProg+'%</span>') : '';
+        var installProg;
+        if(installSt.key === 'accepted') installProg = 100;
+        else installProg = totalNeed>0 ? Math.min(100, Math.round(installQty/totalNeed*100)) : 0;
+        var installPill = '<span class="inst-bldg-pill inst-bldg-pill-tl" style="background:#E53935;"><span class="inst-bldg-pill-fill" style="width:'+installProg+'%;background:#43A047;"></span></span>';
+        var installPct = totalNeed>0 ? ('<span class="inst-bldg-pct inst-bldg-pct-tl">'+installProg+'%</span>') : '';
+        var shipLabel = '<span class="inst-bldg-corner inst-bldg-corner-tr">'+it('inst_lbl_ship')+'</span>';
+        var installLabel = '<span class="inst-bldg-corner inst-bldg-corner-tl">'+it('inst_lbl_install')+'</span>';
+        h += '<div class="inst-bldg" style="background:'+INST_ZONE_COLORS[z-1]+';color:#fff;border-color:'+INST_ZONE_COLORS[z-1]+';cursor:default;" data-tip-html="'+prod_esc(tipHtml)+'" onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_hideBldgTip()">'+installLabel+installPill+installPct+shipLabel+shipPill+shipPct+prod_esc(label)+'</div>';
+      });
+      h += '</div></div>';
+    }
+    return h;
+  }
+  function inst_generateLayout(){
+    var f = inst_get(INST_CUR);
+    if(!inst_isLayoutComplete(f)){ prod_toast(it('inst_gen_layout_incomplete')); return; }
+    f.installation = f.installation||{};
+    f.installation.showGenLayout = true;
+    inst_save(f);
+    inst_renderTab('A');
+    prod_toast(it('inst_gen_layout_ok'));
+  }
+  function inst_renderVisual(f){
+    var types = inst_houseTypes();
+    if(!types.length){ return '<div class="prod-empty">'+it('inst_no_house')+'</div>'; }
+    var assign = inst_assignMap(f);
+    // 清理因房型变更产生的失效分配记录
+    var validKeys = {};
+    types.forEach(function(ht){
+      var isNoCount = (typeof slatsIsSpecialHouse==='function' && slatsIsSpecialHouse(ht.code) && ht.count===0);
+      var loop = isNoCount ? 1 : ht.count;
+      for(var i=1;i<=loop;i++){ validKeys[ht.code+'#'+i] = 1; }
+    });
+    var dirty = false;
+    for(var k in assign){ if(!validKeys[k]){ delete assign[k]; dirty = true; } }
+    if(dirty){ inst_save(f); }
+    var zoneCount = inst_zoneCount(f);
+    var collapsed = !!(f.installation && f.installation.visualCollapsed);
+    var toggle = '<button type="button" class="inst-vis-toggle" onclick="inst_toggleVisualCollapse()">'+(collapsed?'+':'−')+'</button>';
+    var h = '<div class="prod-sec-title" style="display:flex;justify-content:space-between;align-items:center;">'+it('inst_plan_visual')+toggle+'</div>';
+    h += '<div class="inst-vis-question">';
+    h += '<label>'+it('inst_zone_question')+'</label>';
+    h += '<select onchange="inst_saveZoneCount(this.value)">';
+    for(var n=1;n<=INST_ZONE_MAX;n++){
+      h += '<option value="'+n+'"'+(n===zoneCount?' selected':'')+'>'+it('inst_zone_option').replace('{0}', n)+'</option>';
+    }
+    h += '</select></div>';
+    h += '<div class="inst-vis-toolbar">';
+    for(var z=1; z<=zoneCount; z++){
+      h += '<button type="button" class="prod-btn inst-zone-btn" style="background:'+INST_ZONE_COLORS[z-1]+';color:#fff" onclick="inst_assignSelected('+z+')">'+it('inst_assign_to').replace('{0}', z)+'</button>';
+    }
+    h += '<button type="button" class="prod-btn" onclick="inst_removeSelected()">'+it('inst_btn_remove')+'</button>';
+    h += '<button type="button" class="prod-btn inst-btn-ghost" onclick="inst_clearSel()">'+it('inst_btn_clear_sel')+'</button>';
+    h += '<button type="button" class="prod-btn inst-btn-black" onclick="inst_generateLayout()">'+it('inst_gen_layout_btn')+'</button>';
+    h += '</div>';
+    h += '<div class="inst-vis-hint">'+it('inst_vis_hint')+'</div>';
+    h += '<div class="inst-vis-grid"'+(collapsed?' style="display:none;"':'')+'>';
+    types.forEach(function(ht){
+      var isNoCount = (typeof slatsIsSpecialHouse==='function' && slatsIsSpecialHouse(ht.code) && ht.count===0);
+      var loop = isNoCount ? 1 : ht.count;
+      var cntLabel = isNoCount ? it('inst_no_count') : ('('+ht.count+it('inst_unit_bldg')+')');
+      h += '<div class="inst-house-group">';
+      h += '<div class="inst-house-head">'+prod_esc(ht.name)+' <span class="inst-house-cnt">'+cntLabel+'</span></div>';
+      h += '<div class="inst-bldg-wrap">';
+      for(var i=1;i<=loop;i++){
+        var key = ht.code+'#'+i;
+        var zone = assign[key];
+        var cls = 'inst-bldg'; var label = isNoCount ? ht.name : (ht.name+'#'+i);
+        if(zone){ cls += ' inst-bldg-zone'; label = it('inst_zone')+zone+'·'+label; }
+        if(INST_SEL.indexOf(key)>=0) cls += ' inst-bldg-sel';
+        var style = zone ? ('background:'+INST_ZONE_COLORS[zone-1]+';color:#fff;border-color:'+INST_ZONE_COLORS[zone-1]+';') : '';
+        h += '<div class="'+cls+'" style="'+style+'" data-key="'+prod_esc(key)+'" onclick="inst_toggleBld(this)">'+prod_esc(label)+'</div>';
+      }
+      h += '</div></div>';
+    });
+    h += '</div>';
+    if(f.installation && f.installation.showGenLayout && inst_isLayoutComplete(f)){
+      h += inst_renderGenLayout(f);
+    }
+    return h;
+  }
+  function inst_toggleBld(el){
+    var k = el.getAttribute('data-key'); if(!k) return;
+    var idx = INST_SEL.indexOf(k);
+    if(idx>=0){ INST_SEL.splice(idx,1); el.classList.remove('inst-bldg-sel'); }
+    else { INST_SEL.push(k); el.classList.add('inst-bldg-sel'); }
+  }
+  function inst_assignSelected(zone){
+    if(!INST_SEL.length){ prod_toast(it('inst_sel_none')); return; }
+    var f = inst_get(INST_CUR); f.installation = f.installation||{}; f.installation.assign = f.installation.assign||{};
+    INST_SEL.forEach(function(k){ f.installation.assign[k] = zone; });
+    inst_save(f); INST_SEL = [];
+    inst_renderTab('A'); prod_toast(it('inst_assigned').replace('{0}', zone));
+  }
+  function inst_removeSelected(){
+    if(!INST_SEL.length){ prod_toast(it('inst_sel_none')); return; }
+    var f = inst_get(INST_CUR); f.installation = f.installation||{}; f.installation.assign = f.installation.assign||{};
+    INST_SEL.forEach(function(k){ delete f.installation.assign[k]; });
+    inst_save(f); INST_SEL = [];
+    inst_renderTab('A'); prod_toast(it('inst_removed'));
+  }
+  function inst_clearSel(){ INST_SEL = []; inst_renderTab('A'); }
+  function inst_dateDiffDays(a, b){
+    var da = new Date(a+'T00:00:00'), db = new Date(b+'T00:00:00');
+    return Math.round((db - da) / 86400000);
+  }
+  /* ============ 子标签 B：安装排程甘特 ============ */
+  function inst_tabB(f){
+    var inst = f.installation || {}; var plan = inst.plan || {};
+    var types = inst_houseTypes();
+    var houseDays = inst.houseDays || {};
+    var teams = parseInt((plan.teams||'1').replace(/[^0-9]/g,'')||'1',10)||1;
+    if(teams>INST_ZONE_MAX){ teams = INST_ZONE_MAX; }
+    var h = '<div class="prod-sec-title">'+it('inst_gantt_title')+'</div>';
+    h += '<div class="inst-gantt-params">'
+      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_gantt_start'),'ib_start',plan.planStart||'','',  '') : '')
+      + '<div class="prod-field"><label>'+it('inst_gantt_teams')+'</label><input id="ib_teams" value="'+teams+'"></div>'
+      + '<button class="prod-btn" type="button" onclick="inst_saveGantt()">'+it('inst_gantt_save')+'</button>'
+      + '</div>';
+    h += '<div class="prod-sec-title">'+it('inst_house_days')+'</div>';
+    h += '<table class="inst-gantt-table"><thead><tr><th>'+it('inst_house_type')+'</th><th>'+it('inst_house_days')+'</th></tr></thead><tbody>';
+    types.forEach(function(ht){
+      var d = houseDays[ht.code]!=null ? houseDays[ht.code] : 1;
+      h += '<tr><td>'+prod_esc(ht.name)+'</td><td><input id="ib_days_'+prod_esc(ht.code)+'" value="'+d+'"></td></tr>';
+    });
+    h += '</tbody></table>';
+    /* 计算甘特 */
+    var assign = inst_assignMap(f);
+    var zoneBlds = {};
+    for(var k in assign){ if(!assign.hasOwnProperty(k)) continue; var z = assign[k]; if(!z) continue;
+      var parts = k.split('#'); var code = parts[0]; var nm = '';
+      for(var t=0;t<types.length;t++){ if(types[t].code===code){ nm = types[t].name; break; } }
+      zoneBlds[z] = zoneBlds[z] || []; zoneBlds[z].push({ code:code, name:nm });
+    }
+    var startYmd = plan.planStart || prod_today();
+    var cursor = startYmd; var rowsG = [];
+    for(var z2=1; z2<=INST_ZONE_MAX; z2++){
+      var blds = zoneBlds[z2]; if(!blds || !blds.length) continue;
+      var totalDays = 0; var byHouse = {};
+      blds.forEach(function(b){ var dd = (houseDays[b.code]!=null?houseDays[b.code]:1); totalDays += dd; byHouse[b.name] = (byHouse[b.name]||0)+1; });
+      var wd = Math.ceil(totalDays / teams);
+      var zStart = cursor; var zEnd = inst_endDateSkipTet(zStart, wd);
+      rowsG.push({ zone:z2, start:zStart, end:zEnd, workdays:wd, count:blds.length, byHouse:byHouse });
+      cursor = inst_nextWorkday(zEnd);
+    }
+    if(!rowsG.length){ h += '<div class="prod-empty">'+it('inst_gantt_nodata')+'</div>'; }
+    else {
+      var minD = rowsG[0].start, maxD = rowsG[rowsG.length-1].end;
+      var totalSpan = Math.max(1, inst_dateDiffDays(minD, maxD));
+      h += '<div class="inst-gantt-bar-wrap">';
+      rowsG.forEach(function(r){
+        var off = inst_dateDiffDays(minD, r.start); var len = Math.max(1, inst_dateDiffDays(r.start, r.end));
+        var leftPct = (off/totalSpan)*100, widthPct = (len/totalSpan)*100;
+        var breakdown = []; for(var bn in r.byHouse){ breakdown.push(bn+'×'+r.byHouse[bn]); }
+        h += '<div class="inst-gantt-row"><div class="inst-gantt-label" style="color:'+INST_ZONE_COLORS[r.zone-1]+';font-weight:700">'+it('inst_zone')+r.zone+'</div>'
+          + '<div class="inst-gantt-track"><div class="inst-gantt-bar" style="background:'+INST_ZONE_COLORS[r.zone-1]+';margin-left:'+leftPct+'%;width:'+widthPct+'%;">'+ymdToDmy(r.start)+' → '+ymdToDmy(r.end)+'</div></div></div>';
+        h += '<div class="inst-gantt-meta" style="margin-left:128px">'+it('inst_gantt_period')+':'+r.workdays+' · '+it('inst_gantt_buildings')+':'+r.count+' · '+it('inst_gantt_breakdown')+':'+breakdown.join('，')+'</div>';
+      });
+      h += '</div>';
+    }
+    return h;
+  }
+  function inst_saveGantt(){
+    var f = inst_get(INST_CUR); f.installation = f.installation||{}; var inst = f.installation; var plan = inst.plan || {};
+    plan.planStart = dmyToYmd(prod_val('ib_start')||'');
+    var teams = parseInt((prod_val('ib_teams')||'1').replace(/[^0-9]/g,'')||'1',10)||1;
+    if(teams>INST_ZONE_MAX){ teams = INST_ZONE_MAX; prod_toast(it('inst_teams_warn')); }
+    plan.teams = teams;
+    inst.plan = plan;
+    var houseDays = inst.houseDays || {};
+    inst_houseTypes().forEach(function(ht){ var v = parseFloat((prod_val('ib_days_'+ht.code)||'1').replace(/[^0-9.]/g,''))||1; houseDays[ht.code] = v; });
+    inst.houseDays = houseDays;
+    f.installation = inst;
+    inst_save(f);
+    prod_toast(it('inst_saved'));
+    inst_renderTab('B');
+  }
+
+  function inst_savePlan(){
+    var f = inst_get(INST_CUR); f.installation = f.installation || {}; var plan = f.installation.plan || {};
+    plan.planStart = dmyToYmd(prod_val('ia_plan_start')||'');
+    plan.planEnd = dmyToYmd(prod_val('ia_plan_end')||'');
+    plan.actualEnd = dmyToYmd(prod_val('ia_actual_end')||'');
+    plan.teams = prod_val('ia_teams');
+    f.installation.plan = plan;
+    inst_save(f);
+    prod_toast(it('inst_saved'));
+    inst_renderTab('A');
+  }
+
+  /* ---------- 子标签 C：安装小组及人工·天气 ---------- */
+  function inst_weatherForDate(dmy){
+    var f = inst_get(INST_CUR); var inst = f.installation || {}; var w = (inst.workers && inst.workers[dmy]) || null;
+    return { am: w ? (w.weatherAm||null) : null, pm: w ? (w.weatherPm||null) : null };
+  }
+  function inst_tabC(f){
+    var inst = f.installation || {}; inst.workers = inst.workers || {};
+    var d = prod_dmy(prod_val('ic_date')||INST_TABC_SELDATE||ymdToDmy(prod_today()));
+    var w = inst.workers[d] || {};
+    var allDates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(inst.workers||{}), false) : Object.keys(inst.workers||{});
+    var latest = (allDates.length) ? inst.workers[allDates[allDates.length-1]] : null;
+    var rec = (w.recorder && w.recorder!=='') ? w.recorder : (typeof prod_loginUser==='function'?prod_loginUser():'');
+    var h = '<div class="prod-sec-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+it('inst_sec_labor')+'<button class="prod-btn mini" type="button" onclick="inst_saveWorkers()">'+it('inst_btn_save_snap')+'</button></div>';
+    h += '<div class="prod-form">'
+      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_date'),'ic_date',dmyToYmd(d),'INST_TABC_SELDATE=this.value', prod_today()) : '')
+      + '<div class="prod-field"><label>'+it('inst_lbl_holiday')+'</label><select id="ic_holiday">'
+        + '<option value="no"'+(((w.holiday||(latest?latest.holiday:''))!=='yes')?' selected':'')+'>'+pt('opt_no')+'</option>'
+        + '<option value="yes"'+(((w.holiday||(latest?latest.holiday:''))==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option>'
+        + '</select></div>'
+      + '<div class="prod-field"><label>'+it('inst_lbl_recorder')+'</label><input id="ic_recorder" value="'+prod_esc(rec)+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
+      + '</div>';
+    h += '<div class="inst-role-grid">';
+    INST_ROLES.forEach(function(rk){
+      var val = (w[rk[0]]!=null ? w[rk[0]] : (latest ? (latest[rk[0]]||0) : 0));
+      var hrs = (w[rk[0]+'_h']!=null ? w[rk[0]+'_h'] : (latest ? (latest[rk[0]+'_h']||0) : 0));
+      h += '<div class="inst-role-cell"><div class="inst-role-name">'+it(rk[1])+'</div>'
+        + '<div class="inst-role-inputs">'
+        + '<label>'+it('inst_man')+'</label><input id="ic_'+rk[0]+'" inputmode="numeric" value="'+prod_esc(val)+'">'
+        + '<label>'+it('inst_hours')+'</label><input id="ic_'+rk[0]+'_h" inputmode="numeric" value="'+prod_esc(hrs)+'">'
+        + '</div></div>';
+    });
+    h += '</div>';
+    var wx = inst_weatherForDate(d);
+    h += '<div class="prod-sec-title" style="margin-top:18px;">'+it('inst_sec_weather')+'</div>';
+    h += '<div class="pc-weather-cards">'+(typeof prod_wxCard==='function'?prod_wxCard('am','ic_wx_am',wx.am):'')+(typeof prod_wxCard==='function'?prod_wxCard('pm','ic_wx_pm',wx.pm):'')+'</div>';
+    h += '<div class="prod-sec-title" style="margin-top:24px;">'+it('inst_sec_labor_detail')+'</div>';
+    h += '<div class="prod-table-scroll pc-labor-scroll"><table class="prod-table pc-labor-hist"><thead><tr>'
+      + '<th>'+pt('thr_no')+'</th><th>'+it('inst_lbl_date')+'</th><th>'+it('inst_lbl_holiday')+'</th><th>'+pt('thr_recorder')+'</th>';
+    INST_ROLES.forEach(function(rk){ h += '<th>'+it(rk[1])+'</th>'; });
+    h += '<th>'+it('inst_lbl_total_man')+'</th><th>'+it('inst_lbl_total_hours')+'</th><th>'+pt('wx_am')+'</th><th>'+pt('wx_pm')+'</th><th>'+pt('op_actions')+'</th></tr></thead><tbody>';
+    var dates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(inst.workers||{}), true) : Object.keys(inst.workers||{});
+    var total = dates.length;
+    dates.forEach(function(dd, idx){
+      var ww = inst.workers[dd]; var sum=0, hsum=0;
+      INST_ROLES.forEach(function(rk){ var v=+ww[rk[0]]||0; sum+=v; var hh=+ww[rk[0]+'_h']||0; hsum+=hh; });
+      h += '<tr><td>'+(total-idx)+'</td><td>'+ymdToDmy(dd)+'</td>'
+        + '<td>'+((ww.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'</td>'
+        + '<td>'+prod_esc(ww.recorder||'')+'</td>';
+      INST_ROLES.forEach(function(rk){ var v=ww[rk[0]]||0; h += '<td'+(v===0?' class="pc-zero"':'')+'>'+v+'</td>'; });
+      h += '<td><b>'+sum+'</b></td><td>'+hsum+'</td>'
+        + '<td class="pc-wx-cell">'+(typeof prod_wxCompact==='function'?prod_wxCompact(ww.weatherAm):'—')+'</td>'
+        + '<td class="pc-wx-cell">'+(typeof prod_wxCompact==='function'?prod_wxCompact(ww.weatherPm):'—')+'</td>'
+        + '<td><button class="prod-op" type="button" onclick="inst_editWorkers(\''+dd+'\')">✏️</button>'
+        + '<button class="prod-op" type="button" onclick="inst_delWorkers(\''+dd+'\')">🗑️</button></td></tr>';
+    });
+    h += '</tbody></table></div>';
+    return h;
+  }
+  function inst_saveWorkers(){
+    var f = inst_get(INST_CUR); f.installation = f.installation || {}; var workers = f.installation.workers || {};
+    var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
+    var w = workers[d] || {};
+    w.holiday = prod_val('ic_holiday');
+    w.recorder = prod_val('ic_recorder') || (typeof prod_loginUser==='function'?prod_loginUser():'');
+    INST_ROLES.forEach(function(rk){
+      w[rk[0]] = parseInt((prod_val('ic_'+rk[0])||'0').replace(/[^0-9]/g,'')||'0',10)||0;
+      w[rk[0]+'_h'] = parseInt((prod_val('ic_'+rk[0]+'_h')||'0').replace(/[^0-9]/g,'')||'0',10)||0;
+    });
+    workers[d] = w; f.installation.workers = workers;
+    inst_save(f);
+    prod_toast(it('inst_saved'));
+    inst_renderTab('C');
+  }
+  function inst_editWorkers(dd){ INST_TABC_SELDATE = dd; var el = inst_el('ic_date'); if(el){ el.value = ymdToDmy(dd); } inst_renderTab('C'); }
+  function inst_delWorkers(dd){
+    if(typeof confirm==='function' && !confirm(it('inst_confirm_del'))) return;
+    var f = inst_get(INST_CUR); var w = (f.installation && f.installation.workers) || {}; delete w[dd]; f.installation.workers = w;
+    inst_save(f); inst_renderTab('C');
+  }
+  function inst_backfillWeather(){
+    if(!INST_CUR) return;
+    var prov = inst_provKey(); if(!prov) return;
+    var f = inst_get(INST_CUR); f.installation = f.installation || {}; f.installation.workers = f.installation.workers || {};
+    var today = prod_today();
+    var missing = [];
+    Object.keys(f.installation.workers).forEach(function(dd){
+      var ymd = dmyToYmd(dd); if(!ymd || ymd >= today) return;
+      var w = f.installation.workers[dd]; if(!w) return;
+      if(!w.weatherAm || !w.weatherPm) missing.push({dd:dd, ymd:ymd});
+    });
+    if(!missing.length) return;
+    missing.sort(function(a,b){ return a.ymd.localeCompare(b.ymd); });
+    var start = missing[0].ymd, end = missing[missing.length-1].ymd;
+    if(typeof prodLoadWeatherArchive==='function'){
+      prodLoadWeatherArchive(prov, start, end, function(hr){
+        if(!hr) return;
+        var ch = false;
+        missing.forEach(function(m){
+          var w = f.installation.workers[m.dd];
+          var am = (typeof prodWxFromHourly==='function' && typeof prodHourIdx==='function') ? prodWxFromHourly(hr, prodHourIdx(hr, m.ymd, '09')) : null;
+          var pm = (typeof prodWxFromHourly==='function' && typeof prodHourIdx==='function') ? prodWxFromHourly(hr, prodHourIdx(hr, m.ymd, '14')) : null;
+          if(am && !w.weatherAm){ w.weatherAm = am; ch = true; }
+          if(pm && !w.weatherPm){ w.weatherPm = pm; ch = true; }
+        });
+        if(ch){ inst_save(f); if(INST_ACTIVE_TAB==='C') inst_renderTab('C'); }
+      });
+    }
+  }
+
+  /* ---------- 子标签 E：日统计-安装 ---------- */
+  function instStatCard(label,val){ return '<div class="inst-stat-card"><div class="inst-stat-val">'+prod_esc(val)+'</div><div class="inst-stat-label">'+prod_esc(label)+'</div></div>'; }
+  function inst_tabE(f){
+    var inst = f.installation || {}; inst.daily = inst.daily || {};
+    var d = prod_dmy(prod_val('ie_date')||INST_TABE_SELDATE||ymdToDmy(prod_today()));
+    var rec = inst.daily[d] || {};
+    var plan = inst.plan || {};
+    var totalPcs = +plan.totalPcs||0;
+    var cum = inst_cumPcs(f), cumH = inst_cumHouses(f);
+    var remain = Math.max(0, totalPcs - cum);
+    var rate = totalPcs>0 ? Math.round(cum/totalPcs*100) : 0;
+    var h = '<div class="prod-sec-title">'+it('inst_sec_stats')+'</div>';
+    h += '<div class="prod-form">'
+      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_date'),'ie_date',dmyToYmd(d),'INST_TABE_SELDATE=this.value', prod_today()) : '')
+      + (typeof prod_numFld==='function' ? prod_numFld(it('inst_lbl_pcs'),'ie_pcs',(rec.pcs!=null?rec.pcs:0)) : '')
+      + (typeof prod_numFld==='function' ? prod_numFld(it('inst_lbl_houses'),'ie_houses',(rec.houses!=null?rec.houses:0)) : '')
+      + '</div>';
+    h += '<div style="margin:8px 0 16px"><button class="prod-btn" type="button" onclick="inst_saveDaily()">'+it('inst_btn_add_daily')+'</button></div>';
+    h += '<div class="prod-sec-title">'+it('inst_summary')+'</div>';
+    h += '<div class="inst-stat-grid">'
+      + instStatCard(it('inst_stat_cum_pcs'), cum)
+      + instStatCard(it('inst_stat_cum_houses'), cumH);
+    if(totalPcs>0){
+      h += instStatCard(it('inst_lbl_total_pcs'), totalPcs)
+        + instStatCard(it('inst_stat_remain'), remain)
+        + instStatCard(it('inst_stat_rate'), rate+'%');
+    }
+    h += '</div>';
+    h += '<div class="prod-sec-title" style="margin-top:18px;">'+it('inst_chart_title')+'</div>';
+    h += '<div class="prod-eq-chart-box" style="flex:1 1 100%;max-width:none;height:340px;"><canvas id="instStatsChart"></canvas></div>';
+    h += '<div class="prod-sec-title" style="margin-top:18px;">'+it('inst_sec_daily_detail')+'</div>';
+    h += '<div class="prod-table-scroll"><table class="prod-table"><thead><tr>'
+      + '<th>'+pt('thr_no')+'</th><th>'+it('inst_lbl_date')+'</th><th>'+it('inst_lbl_pcs')+'</th><th>'+it('inst_lbl_houses')+'</th><th>'+it('inst_cum_pcs')+'</th><th>'+pt('op_actions')+'</th></tr></thead><tbody>';
+    var dates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(inst.daily||{}), true) : Object.keys(inst.daily||{});
+    var tc = 0;
+    dates.forEach(function(dd, idx){
+      var rr = inst.daily[dd]; tc += (+rr.pcs||0);
+      h += '<tr><td>'+(dates.length-idx)+'</td><td>'+ymdToDmy(dd)+'</td><td>'+ (+rr.pcs||0) +'</td><td>'+ (+rr.houses||0) +'</td><td>'+tc+'</td>'
+        + '<td><button class="prod-op" type="button" onclick="inst_delDaily(\''+dd+'\')">🗑️</button></td></tr>';
+    });
+    if(!dates.length){ h += '<tr><td colspan="6" style="text-align:center;color:#aaa">'+it('inst_nodata')+'</td></tr>'; }
+    h += '</tbody></table></div>';
+    return h;
+  }
+  function inst_saveDaily(){
+    var f = inst_get(INST_CUR); f.installation = f.installation || {}; var daily = f.installation.daily || {};
+    var d = prod_dmy(prod_val('ie_date')||ymdToDmy(prod_today()));
+    var pcs = parseInt((prod_val('ie_pcs')||'0').replace(/[^0-9]/g,'')||'0',10)||0;
+    var houses = parseInt((prod_val('ie_houses')||'0').replace(/[^0-9]/g,'')||'0',10)||0;
+    daily[d] = { pcs:pcs, houses:houses };
+    f.installation.daily = daily;
+    inst_save(f);
+    prod_toast(it('inst_saved'));
+    inst_renderTab('E');
+  }
+  function inst_delDaily(dd){
+    if(typeof confirm==='function' && !confirm(it('inst_confirm_del'))) return;
+    var f = inst_get(INST_CUR); var d = (f.installation && f.installation.daily) || {}; delete d[dd]; f.installation.daily = d;
+    inst_save(f); inst_renderTab('E');
+  }
+  function inst_drawStats(f){
+    if(INST_ACTIVE_TAB!=='E' || !f) return;
+    var inst = f.installation || {}; var daily = inst.daily || {};
+    var dates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(daily), false) : Object.keys(daily);
+    if(!dates.length) return;
+    var pcs=[], houses=[], cum=[], s=0;
+    dates.forEach(function(dd){ var v=+daily[dd].pcs||0; s+=v; pcs.push(v); houses.push(+daily[dd].houses||0); cum.push(s); });
+    if(typeof _ovLoadChartLib!=='function') return;
+    _ovLoadChartLib(function(){
+      try{
+        INST_CHARTS.forEach(function(c){ try{ c.destroy(); }catch(e){} });
+        INST_CHARTS = [];
+        var cv = inst_el('instStatsChart'); if(!cv) return;
+        INST_CHARTS.push(new Chart(cv.getContext('2d'), {
+          type:'bar',
+          data:{ labels: dates.map(ymdToDmy), datasets:[
+            { label:it('inst_chart_pcs'), data:pcs, backgroundColor:'#42A5F5', yAxisID:'yP' },
+            { label:it('inst_chart_houses'), data:houses, backgroundColor:'#66BB6A', yAxisID:'yH' },
+            { label:it('inst_chart_cum'), data:cum, type:'line', borderColor:'#E53935', backgroundColor:'#E53935', yAxisID:'yP', fill:false, tension:0.2 }
+          ]},
+          options:{ responsive:true, maintainAspectRatio:false,
+            layout:{ padding:{ bottom:14 } },
+            scales:{ x:{ ticks:{ autoSkip:false, maxRotation:0 } },
+              yP:{ position:'left', beginAtZero:true, grace:'0%', title:{ display:true, text:it('inst_chart_pcs') }, ticks:{ precision:0 } },
+              yH:{ position:'right', beginAtZero:true, title:{ display:true, text:it('inst_chart_houses') }, grid:{ drawOnChartArea:false }, ticks:{ precision:0 } } } }
+        }));
+      }catch(e){ console.warn('[inst chart]', e); }
+    });
+  }
+
+  /* ---------- 角标：待补录天数 ---------- */
+  function inst_expectedMissing(obj){
+    var dates = Object.keys(obj||{}).map(function(d){ return dmyToYmd(d); }).filter(function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(d); });
+    if(!dates.length) return 0;
+    dates.sort(); var first = dates[0]; var today = prod_today();
+    if(first > today) return 0;
+    var a = new Date(first+'T00:00:00'), b = new Date(today+'T00:00:00');
+    var expected = Math.floor((b - a)/(1000*60*60*24)) + 1;
+    var actual = {}; dates.forEach(function(d){ if(d>=first && d<=today) actual[d]=1; });
+    return Math.max(0, expected - Object.keys(actual).length);
+  }
+  function inst_tabCMissingCount(){ var f = inst_get(INST_CUR); return f ? inst_expectedMissing((f.installation && f.installation.workers)||{}) : 0; }
+  function inst_tabEMissingCount(){ var f = inst_get(INST_CUR); return f ? inst_expectedMissing((f.installation && f.installation.daily)||{}) : 0; }
+  function inst_updateTabBadges(){
+    var c = inst_tabCMissingCount(); var tC = document.querySelector('.prod-tab[data-key="C"]');
+    if(tC){ var b = tC.querySelector('.prod-tab-badge'); if(c>0){ if(!b){ b=document.createElement('span'); b.className='prod-tab-badge'; tC.appendChild(b); } b.textContent=c; } else if(b){ b.remove(); } }
+    var e = inst_tabEMissingCount(); var tE = document.querySelector('.prod-tab[data-key="E"]');
+    if(tE){ var b2 = tE.querySelector('.prod-tab-badge'); if(e>0){ if(!b2){ b2=document.createElement('span'); b2.className='prod-tab-badge'; tE.appendChild(b2); } b2.textContent=e; } else if(b2){ b2.remove(); } }
+  }
+
+  /* 暴露到全局，供 switchView / 内联 onclick 调用 */
+  window.inst_renderProduction = inst_renderProduction;
+  window.inst_openProject = inst_openProject;
+  window.inst_back = inst_back;
+  window.inst_renderTabs = inst_renderTabs;
+  window.inst_renderTab = inst_renderTab;
+  window.inst_savePlan = inst_savePlan;
+  window.inst_saveWorkers = inst_saveWorkers;
+  window.inst_editWorkers = inst_editWorkers;
+  window.inst_delWorkers = inst_delWorkers;
+  window.inst_saveDaily = inst_saveDaily;
+  window.inst_delDaily = inst_delDaily;
+  window.inst_toggleBld = inst_toggleBld;
+  window.inst_assignSelected = inst_assignSelected;
+  window.inst_removeSelected = inst_removeSelected;
+  window.inst_clearSel = inst_clearSel;
+  window.inst_saveZoneCount = inst_saveZoneCount;
+  window.inst_toggleVisualCollapse = inst_toggleVisualCollapse;
+  window.inst_showBldgTip = inst_showBldgTip;
+  window.inst_hideBldgTip = inst_hideBldgTip;
+  window.inst_generateLayout = inst_generateLayout;
+  window.inst_saveGantt = inst_saveGantt;
+
+  /* 语言切换时重渲染安装模块（若可见） */
+  window.addEventListener('app:langchange', function(){
+    var v = inst_el('view-install');
+    if(v && v.classList.contains('active')){
+      var back = inst_el('inst-back-label');
+      if(back) back.textContent = '← ' + it('inst_back');
+      if(inst_el('inst-detail') && inst_el('inst-detail').style.display!=='none' && INST_CUR){ inst_renderTab(INST_ACTIVE_TAB); }
+      else { inst_renderProduction(); }
+    }
+  });
+  // 模块初始化兜底：若页面初始视图就是安装管理，确保加载 won 数据后渲染
+  if (window.currentView === 'install') {
+    if ((typeof globalWonData === 'undefined' || !globalWonData.length) && typeof loadWon === 'function') {
+      loadWon();
+      (function _waitInstInit(){
+        _waitInstInit._tries = (_waitInstInit._tries || 0) + 1;
+        var _has = (typeof globalWonData !== 'undefined' && globalWonData && globalWonData.length);
+        if (_has || _waitInstInit._tries > 33) {
+          if(window.currentView === 'install') inst_renderProduction();
+          return;
+        }
+        setTimeout(_waitInstInit, 300);
+      })();
+    } else if(window.currentView === 'install') {
+      inst_renderProduction();
+    }
+  }
+})();
+</script>
 </body>
 </html>
