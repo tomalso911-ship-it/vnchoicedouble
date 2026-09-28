@@ -2723,6 +2723,7 @@ function _ovLoadChartLib(cb){
 
   .hidden { display:none !important; }
   </style>
+  <link rel="stylesheet" href="vendor/frappe-gantt/frappe-gantt.css">
 </head>
 
 <body>
@@ -3332,6 +3333,7 @@ function _ovLoadChartLib(cb){
     </div>
     <style id="prodStyle">
       .prod-wrap{max-width:1120px;margin:0 auto;padding:8px 12px 40px;}
+      .prod-wrap.inst-gantt-full{max-width:none;}
       .prod-sub{font-size:12px;color:#666;margin-left:8px;}
       .prod-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:14px;}
       .prod-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:.15s;}
@@ -3417,6 +3419,24 @@ function _ovLoadChartLib(cb){
       .inst-gantt-summary{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px 28px;font-size:12.5px;color:#37474f;background:#f7f9fb;border:1px solid #e3e8ef;border-left:3px solid #1E88E5;border-radius:8px;padding:10px 14px;line-height:1.55;}
       .inst-gantt-summary-line{margin:0;}
       .inst-gantt-summary-line:last-child{margin-bottom:0;}
+      /* Frappe Gantt 容器与工具栏 */
+      .inst-frappe{margin:12px 0;padding:8px;background:#fff;border:1px solid #eee;border-radius:8px;overflow-x:auto;}
+      .inst-frappe .gantt-container{ min-width:100%; }
+      .inst-fg-toolbar{display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap;}
+      .inst-fg-hint{font-size:11px;color:#8a96a3;}
+      .inst-z1 .bar{fill:#E53935;} .inst-z1 .bar-progress{fill:#b71c1c;}
+      .inst-z2 .bar{fill:#FB8C00;} .inst-z2 .bar-progress{fill:#e65100;}
+      .inst-z3 .bar{fill:#B8860B;} .inst-z3 .bar-progress{fill:#8d6e00;}
+      .inst-z4 .bar{fill:#43A047;} .inst-z4 .bar-progress{fill:#2e7d32;}
+      .inst-z5 .bar{fill:#1E88E5;} .inst-z5 .bar-progress{fill:#1565c0;}
+      .inst-z6 .bar{fill:#8E24AA;} .inst-z6 .bar-progress{fill:#6a1b9a;}
+      .inst-z7 .bar{fill:#00897B;} .inst-z7 .bar-progress{fill:#00695c;}
+      .inst-z8 .bar{fill:#6D4C41;} .inst-z8 .bar-progress{fill:#4e342e;}
+      .inst-z9 .bar{fill:#3949AB;} .inst-z9 .bar-progress{fill:#283593;}
+      .inst-z10 .bar{fill:#D81B60;} .inst-z10 .bar-progress{fill:#ad1457;}
+      .inst-z11 .bar{fill:#5E35B1;} .inst-z11 .bar-progress{fill:#4527a0;}
+      .inst-z12 .bar{fill:#00ACC1;} .inst-z12 .bar-progress{fill:#00838f;}
+      .inst-arr .bar{fill:#ffd166;} .inst-arr .bar-label{fill:#333;}
       .inst-gantt-scale-sel{font-size:12px;color:#455a64;margin-bottom:6px;}
       .inst-gantt-scale-sel select{font-size:12px;padding:2px 6px;border-radius:6px;border:1px solid #ccc;margin-left:4px;}
       .inst-gantt-header{display:flex;align-items:center;font-size:12px;font-weight:700;color:#455a64;border-bottom:1px solid #e0e0e0;padding:6px 0;margin-bottom:4px;}
@@ -3434,6 +3454,45 @@ function _ovLoadChartLib(cb){
       .inst-gantt-grid{position:absolute;top:0;height:100%;border-left:1px solid #f0f0f0;}
       .inst-gantt-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:#546e7a;}
       .inst-gantt-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
+      /* 类 Power BI 甘特：左侧任务表 + 右侧时间轴 + 右侧设置面板 */
+      .inst-gantt-layout{display:flex;gap:0;border:1px solid #e3e8ee;border-radius:8px;overflow:hidden;background:#fff;margin:10px 0;height:520px;position:relative;}
+      .inst-gantt-table-wrap{width:360px;flex:0 0 auto;overflow:auto;background:#fafbfc;border-right:1px solid #e3e8ee;}
+      .inst-gantt-table-wrap table{width:auto;border-collapse:collapse;font-size:12px;table-layout:fixed;}
+      .inst-gantt-table-wrap th{background:#f4f6f8;color:#455a64;font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid #e3e8ee;white-space:nowrap;height:85px;box-sizing:border-box;vertical-align:middle;}
+      .inst-gantt-table-wrap td{padding:5px 8px;border-bottom:1px solid #eef1f4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:40px;box-sizing:border-box;vertical-align:middle;}
+      .inst-gantt-table-wrap tr:hover td{background:#f0f7ff;}
+      .inst-gantt-table-wrap tr.selected td{background:#e3f2fd;}
+      .inst-gantt-table-wrap input,.inst-gantt-table-wrap select{width:100%;box-sizing:border-box;font-size:11px;padding:3px 4px;border:1px solid #cfd8dc;border-radius:4px;background:#fff;}
+      .inst-gantt-chart-wrap{flex:1 1 auto;overflow:auto;background:#fff;position:relative;}
+      .inst-gantt-chart-wrap .inst-frappe{margin:0;padding:0;border:none;border-radius:0;background:transparent;}
+      .inst-gantt-chart-wrap .gantt-container{min-width:100%;}
+      .inst-gantt-chart-wrap.hide-weekend .holiday-highlight{display:none !important;}
+      .inst-gantt-chart-wrap.hide-today .current-highlight,.inst-gantt-chart-wrap.hide-today .current-ball-highlight{display:none !important;}
+      .inst-gantt-chart-wrap.hide-grid .lines_layer,.inst-gantt-chart-wrap.hide-grid .tick,.inst-gantt-chart-wrap.hide-grid .row-line{display:none !important;}
+      /* 里程碑：菱形 */
+      .inst-milestone .bar{transform-box:fill-box;transform-origin:center;transform:rotate(45deg);width:14px !important;height:14px !important;rx:2px;ry:2px;}
+      .inst-milestone .bar-label{display:none;}
+      .inst-milestone .bar-progress{display:none;}
+      /* 分组/项目行 */
+      .inst-group .bar{fill:#455a64 !important;height:18px !important;opacity:0.9;}
+      .inst-group .bar-progress{fill:#263238 !important;}
+      .inst-group .bar-label{fill:#fff !important;font-weight:700;}
+      /* 设置面板 */
+      .inst-gantt-config{position:absolute;top:0;right:0;width:260px;height:100%;background:#fff;border-left:1px solid #e3e8ee;box-shadow:-2px 0 8px rgba(0,0,0,.08);overflow-y:auto;z-index:10;transform:translateX(100%);transition:transform .2s;}
+      .inst-gantt-config.open{transform:translateX(0);}
+      .inst-gantt-config-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e3e8ee;background:#f4f6f8;}
+      .inst-gantt-config-head span{font-size:13px;font-weight:600;color:#37474f;}
+      .inst-gantt-config-head button{background:none;border:none;font-size:18px;color:#78909c;cursor:pointer;}
+      .inst-gantt-config-body{padding:10px 12px;font-size:12px;color:#455a64;}
+      .inst-gantt-config-section{margin-bottom:14px;}
+      .inst-gantt-config-title{font-size:11px;font-weight:700;color:#E53935;margin-bottom:6px;text-transform:uppercase;}
+      .inst-gantt-config label{display:flex;align-items:center;gap:6px;margin-bottom:5px;cursor:pointer;}
+      .inst-gantt-config input[type=checkbox]{margin:0;flex:0 0 auto;}
+      .inst-gantt-config select,.inst-gantt-config input[type=range],.inst-gantt-config input[type=number]{width:100%;font-size:11px;padding:3px 5px;border:1px solid #cfd8dc;border-radius:4px;box-sizing:border-box;}
+      .inst-gantt-config-btns{display:flex;gap:6px;margin-top:10px;}
+      .inst-gantt-config-toggle{position:absolute;top:6px;right:6px;z-index:5;background:#fff;border:1px solid #e3e8ee;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;color:#455a64;}
+      .inst-gantt-config-toggle:hover{background:#f4f6f8;}
+      @media (max-width:900px){ .inst-gantt-layout{height:auto;flex-direction:column;} .inst-gantt-table-wrap{width:100%;max-height:220px;border-right:none;border-bottom:1px solid #e3e8ee;} .inst-gantt-chart-wrap{min-height:320px;} .inst-gantt-config{width:220px;} }
       @media (max-width:900px){ .inst-gantt-summary{flex-direction:column;gap:6px;} }
       /* 安装计划#2：可手动输入的数值字段（平均每天产量/线、安装数量/组/天）红色加粗 */
       #ia_rate_per_line, #ia_install_rate_per_team{color:#E53935 !important;font-weight:700 !important;text-align:center !important;padding-top:6px !important;padding-bottom:6px !important;line-height:1.2 !important;}
@@ -3584,6 +3643,7 @@ function _ovLoadChartLib(cb){
       .prod-out-records .out-edit-qty::-webkit-inner-spin-button{-webkit-appearance:none;appearance:none;margin:0;}
       .prod-out-records .out-edit-dest,
       .prod-out-records .out-edit-area{width:100%;min-width:110px;box-sizing:border-box;}
+      .prod-out-records tr.pe-op-editing td:nth-child(10){overflow:visible;}
       .prod-out-records tr.pe-op-editing td{background:#fffbe6;}
       /* 出库记录表 + 表格分析：表身最多显示 10 行，右侧垂直滚动，表头锁定 */
       .prod-out-records-scroll,.prod-analysis-scroll{overflow-y:auto;overflow-x:hidden;background:#fff;border:1px solid #e6eaee;border-radius:6px;}
@@ -4049,6 +4109,7 @@ function _ovLoadChartLib(cb){
     var PROD_WORKERS = [['manager','厂长'],['machinist','机器维修员'],['welder','焊工'],['forklift','叉车工'],['loader','铲车工'],['mixer','搅拌机工'],['press','打板机操作工'],['repair','修水泥板工'],['cook','厨师'],['temp','其他临时工'],['keeper','材料看管员']];
     var PROD_TABS = [['A','工厂概况'],['B','生产计划'],['C','人员(日)'],['D','原料库存'],['E','每日生产'],['H','入库与出库'],['F','设备与故障']];
     var PROD_CUR = null;
+    var PROD_OUT_JUMP_KEY = ''; /* 从表格分析「出库后移动至猪舍」跳入区域分布弹窗时，需高亮圈出的房舍 key（house#idx） */
     var PROD_ACTIVE_TAB = 'A';
     var PROD_F_SUBTAB = 'list'; /* F 设备与故障：子标签 list=配置清单&故障报备 / chart=设备故障图标报告 */
     var PROD_TABC_SELDATE = '';
@@ -4095,7 +4156,7 @@ function _ovLoadChartLib(cb){
         prod_role_welder:'焊工', prod_role_forklift:'叉车工', prod_role_loader:'铲车工', prod_role_mixer:'搅拌机工', prod_role_press:'打板机操作工', prod_role_repair:'修水泥板工', prod_role_cook:'厨师', prod_role_temp:'其他临时工', prod_role_keeper:'材料看管员', sec_labor:'人工', sec_weather:'天气', wx_am:'上午天气', wx_pm:'下午天气', wx_temp:'温度', wx_cond:'天气', wx_hum:'湿度', wx_wind:'风力', wx_notyet:'未录入', btn_backfill_wx:'补抓历史天气', toast_wx_loading:'正在补抓历史天气…', toast_wx_backfilled:'已补抓历史天气', toast_wx_noprov:'未取到工厂省份，无法补抓天气', toast_wx_fail:'历史天气获取失败', op_actions:'操作', op_total_qty:'小计', op_edit:'编辑', op_del:'删除', copy_no_gap:'目前暂无缺失的记录，点击复制意味着将开始记录人工的日期往前推移，确认这么操作吗？', wx_backfill_hint:'该日期天气缺失，点击下方按钮补录', trend_title:'趋势图', trend_all:'全部', trend_7:'近7天', trend_30:'近30天', trend_labor:'人工数量曲线', trend_weather:'温度&湿度曲线（晴雨带）', trend_total:'总人工数', trend_sun:'晴', trend_rain:'雨', trend_cloud:'多云', trend_sun_days:'天晴朗', trend_rain_days:'天下雨', trend_cloud_days:'天多云', trend_nodata:'暂无历史数据', lbl_prod_days:'生产天数', lbl_avg_daily:'平均每天产量', lbl_per_day:'/天',         prod_role_manager:'厂长', prod_role_machinist:'机器维修员', lbl_recorder:'填表人', thr_recorder:'填表人', lbl_holiday:'春节', opt_yes:'是', opt_no:'否', sec_labor_wx_detail:'人工-天气明细表', prod_status_wait:'待排产', toast_copied:'已复制该行', editing_label:'正在修改', confirm_del_title:'确认删除', confirm_del_msg:'确定要删除这条产出记录吗？', btn_ok:'确定', btn_cancel:'取消',
       btn_change_due_date:'更改日期', msg_due_date_locked:'项目交期一经选定后不可更改，确定要选择 {date} 吗？', toast_due_date_saved:'项目交期已保存', toast_no_auth_due:'无权限更改项目交期', msg_due_stop:'已到项目交期（{date}），停止计算',
       sec_slats_info:'水泥漏缝地板配置基础信息', btn_view_slats:'查看水泥漏缝地板详细配置', btn_edit_slats:'编辑水泥漏缝地板详细配置',
-      btn_report:'查看入库原料统计&生产物料总需求对比分析报告', rpt_title:'入库原料统计 & 生产物料总需求对比分析报告', rpt_section_summary:'一、按栋舍 × 物料 费用汇总（按设定单价）', rpt_section_gap:'二、已入库统计与缺口（含待审/退回/已确认/入库直录）', rpt_section_pie:'三、已花费金额占比（饼图）', rpt_section_bar:'四、需求总价 vs 已采购总价（柱状图）', thr_house:'猪舍', thr_total_cost:'费用合计', thr_material:'物料', thr_demand_ton:'需求(吨)', thr_bought_ton:'已采购(吨)', thr_gap_ton:'缺口(吨)', thr_spent:'已花费', thr_need:'还需花费', rpt_cat_rebar6:'钢筋φ6', rpt_cat_rebar8:'钢筋φ8', rpt_cat_rebar10:'钢筋φ10', rpt_cat_rebar12:'钢筋φ12', rpt_cat_cement:'水泥', rpt_cat_sand:'黄砂', rpt_cat_gravel:'石子', rpt_grand_total:'总计', btn_collapse_all:'收缩', btn_expand_all:'展开', lbl_receipt_no:'第{n}次', prod_line_n:'线{n}', btn_copy_line1:'与线1生产的规格相同', thr_total_pcs:'总计', lbl_houses:'猪舍', lbl_specs:'规格', lbl_matrix_qty:'片数', lbl_line_total:'本线合计', lbl_house_spec:'猪舍 / 规格', empty_sel_house:'请先选择猪舍', empty_sel_spec:'请先选择规格', empty_no_lines:'未设置生产线（请在「工厂概况」设置生产线数量）', thr_pcs:'片',         hist_hide_zero:'隐藏 0 值列', hist_show_all:'显示全部列', toast_out_exceeds_produced:'出库数量不能大于生产数量！请修改！', toast_out_qty_required:'出库量必须大于0', out_area_label:'区域{0}', out_area_empty:'—', toast_no_area_config:'请先设置安装规划区域后再出库'
+      btn_report:'查看入库原料统计&生产物料总需求对比分析报告', rpt_title:'入库原料统计 & 生产物料总需求对比分析报告', rpt_section_summary:'一、按栋舍 × 物料 费用汇总（按设定单价）', rpt_section_gap:'二、已入库统计与缺口（含待审/退回/已确认/入库直录）', rpt_section_pie:'三、已花费金额占比（饼图）', rpt_section_bar:'四、需求总价 vs 已采购总价（柱状图）', thr_house:'猪舍', thr_total_cost:'费用合计', thr_material:'物料', thr_demand_ton:'需求(吨)', thr_bought_ton:'已采购(吨)', thr_gap_ton:'缺口(吨)', thr_spent:'已花费', thr_need:'还需花费', rpt_cat_rebar6:'钢筋φ6', rpt_cat_rebar8:'钢筋φ8', rpt_cat_rebar10:'钢筋φ10', rpt_cat_rebar12:'钢筋φ12', rpt_cat_cement:'水泥', rpt_cat_sand:'黄砂', rpt_cat_gravel:'石子', rpt_grand_total:'总计', btn_collapse_all:'收缩', btn_expand_all:'展开', lbl_receipt_no:'第{n}次', prod_line_n:'线{n}', btn_copy_line1:'与线1生产的规格相同', thr_total_pcs:'总计', lbl_houses:'猪舍', lbl_specs:'规格', lbl_matrix_qty:'片数', lbl_line_total:'本线合计', lbl_house_spec:'猪舍 / 规格', empty_sel_house:'请先选择猪舍', empty_sel_spec:'请先选择规格', empty_no_lines:'未设置生产线（请在「工厂概况」设置生产线数量）', thr_pcs:'片',         hist_hide_zero:'隐藏 0 值列', hist_show_all:'显示全部列', toast_out_exceeds_produced:'出库数量不能大于生产数量！请修改！', toast_out_qty_required:'出库量必须大于0', out_area_label:'区域{0}', out_area_empty:'—', toast_no_area_config:'请先设置安装规划区域后再出库', confirm_out_dest_demand_met:'该规格在{0} {1} {2}，已达到需求，是否继续出库到该舍？', confirm_dup_out_title:'重复出库提醒', confirm_dup_out_msg:'同一栋舍({0})、同一尺寸({1})、同一天({2})已存在出库记录，是否跳去编辑该记录？', confirm_dup_out_ok:'去编辑', toast_dup_out_same_bldg:'同一天、同一目标猪舍、同一栋号、同一规格已存在出库记录，请找到对应记录修改！', out_exceed_demand:'本次发货量超过了该猪舍此规格的实际需求数量，确认仍要出库吗？'
       },
       en: {
         prod_tab_A:'Factory Overview & Quick View', prod_tab_B:'Production Plan', prod_tab_C:'Daily: Labor/Weather', prod_tab_D:'Raw Material Stock', prod_tab_E:'Daily Production', prod_tab_H:'Inbound & Outbound', prod_tab_F:'Equipment & Failures',
@@ -4127,7 +4188,7 @@ function _ovLoadChartLib(cb){
         prod_role_welder:'Welder', prod_role_forklift:'Forklift Operator', prod_role_loader:'Loader Operator', prod_role_mixer:'Mixer Operator', prod_role_press:'Slats Press Operator', prod_role_repair:'Slats Repairer', prod_role_cook:'Cook', prod_role_temp:'Other Temporary Workers', prod_role_keeper:'Material Keeper', sec_labor:'Labor', sec_weather:'Weather', wx_am:'Morning', wx_pm:'Afternoon', wx_temp:'Temp', wx_cond:'Condition', wx_hum:'Humidity', wx_wind:'Wind', wx_notyet:'Not recorded', btn_backfill_wx:'Backfill Weather', toast_wx_loading:'Backfilling historical weather…', toast_wx_backfilled:'Historical weather backfilled', toast_wx_noprov:'Factory province not found', toast_wx_fail:'Failed to fetch historical weather', op_actions:'Actions', op_total_qty:'Subtotal', op_edit:'Edit', op_del:'Delete', copy_no_gap:'No missing records at present. Copying will start recording labor data on earlier dates. Confirm this operation?', wx_backfill_hint:'Weather for this date is missing. Click below to backfill.', trend_title:'Trends', trend_all:'All', trend_7:'Last 7d', trend_30:'Last 30d', trend_labor:'Labor Count', trend_weather:'Temp & Humidity (sun/rain band)', trend_total:'Total', trend_sun:'Sun', trend_rain:'Rain', trend_cloud:'Cloudy', trend_sun_days:' sunny days', trend_rain_days:' rainy days', trend_cloud_days:' cloudy days', trend_nodata:'No history', lbl_prod_days:'Production days', lbl_avg_daily:'Avg daily output', lbl_per_day:'/day',         prod_role_manager:'Factory Manager', prod_role_machinist:'Machine Repairman', lbl_recorder:'Recorder', thr_recorder:'Recorder', lbl_holiday:'TET', opt_yes:'Yes', opt_no:'No', sec_labor_wx_detail:'Labor & Weather Detail', prod_status_wait:'Pending Scheduling', toast_copied:'Row copied', editing_label:'Editing', confirm_del_title:'Confirm Delete', confirm_del_msg:'Are you sure you want to delete this production record?', btn_ok:'OK', btn_cancel:'Cancel',
       btn_change_due_date:'Change Date', msg_due_date_locked:'Once selected, the project delivery date cannot be changed. Confirm {date}?', toast_due_date_saved:'Project delivery date saved', toast_no_auth_due:'No permission to change project delivery date', msg_due_stop:'Project delivery date reached ({date}). Calculation stopped.',
       btn_report:'View Inbound Material Stats & Production Demand Comparison Report', rpt_title:'Inbound Material Stats & Production Demand Comparison Report', rpt_section_summary:'1. Cost summary by House × Material (at set unit prices)', rpt_section_gap:'2. Received stats & gap (incl. pending/returned/confirmed/direct inbound)', rpt_section_pie:'3. Spent amount share (pie)', rpt_section_bar:'4. Total demand cost vs purchased cost (bar)', thr_house:'House', thr_total_cost:'Total Cost', thr_material:'Material', thr_demand_ton:'Demand (t)', thr_bought_ton:'Purchased (t)', thr_gap_ton:'Gap (t)', thr_spent:'Spent', thr_need:'Need', rpt_cat_rebar6:'Rebar φ6', rpt_cat_rebar8:'Rebar φ8', rpt_cat_rebar10:'Rebar φ10', rpt_cat_rebar12:'Rebar φ12', rpt_cat_cement:'Cement', rpt_cat_sand:'Sand', rpt_cat_gravel:'Gravel', rpt_grand_total:'Grand Total',
-      sec_slats_info:'Concrete Slatted Floor Configuration Basic Info', btn_view_slats:'View Concrete Slatted Floor Detailed Config',         btn_edit_slats:'Edit Concrete Slatted Floor Detailed Config', btn_collapse_all:'Collapse', btn_expand_all:'Expand', lbl_receipt_no:'No.{n}', prod_line_n:'Line {n}', btn_copy_line1:'Same specs as Line 1', thr_total_pcs:'Total', lbl_houses:'Houses', lbl_specs:'Specs', lbl_matrix_qty:'Qty (slats)', lbl_line_total:'Line total', lbl_house_spec:'House / Spec', empty_sel_house:'Select houses first', empty_sel_spec:'Select specs first', empty_no_lines:'No production lines set (set line count in Factory Overview)', thr_pcs:'slats',         hist_hide_zero:'Hide 0-value cols', hist_show_all:'Show all cols', toast_out_exceeds_produced:'Outbound quantity cannot exceed production quantity! Please modify!', toast_out_qty_required:'Outbound qty must be greater than 0', out_area_label:'Zone {0}', out_area_empty:'—', toast_no_area_config:'Please configure installation areas before outbound'
+      sec_slats_info:'Concrete Slatted Floor Configuration Basic Info', btn_view_slats:'View Concrete Slatted Floor Detailed Config',         btn_edit_slats:'Edit Concrete Slatted Floor Detailed Config', btn_collapse_all:'Collapse', btn_expand_all:'Expand', lbl_receipt_no:'No.{n}', prod_line_n:'Line {n}', btn_copy_line1:'Same specs as Line 1', thr_total_pcs:'Total', lbl_houses:'Houses', lbl_specs:'Specs', lbl_matrix_qty:'Qty (slats)', lbl_line_total:'Line total', lbl_house_spec:'House / Spec', empty_sel_house:'Select houses first', empty_sel_spec:'Select specs first', empty_no_lines:'No production lines set (set line count in Factory Overview)', thr_pcs:'slats',         hist_hide_zero:'Hide 0-value cols', hist_show_all:'Show all cols', toast_out_exceeds_produced:'Outbound quantity cannot exceed production quantity! Please modify!', toast_out_qty_required:'Outbound qty must be greater than 0', out_area_label:'Zone {0}', out_area_empty:'—', toast_no_area_config:'Please configure installation areas before outbound', confirm_out_dest_demand_met:'This spec at {0} {1} {2} has already met demand. Continue outbound to this house?', confirm_dup_out_title:'Duplicate outbound', confirm_dup_out_msg:'House {0}, spec {1}, date {2} already has an outbound record. Jump to edit it?', confirm_dup_out_ok:'Edit', toast_dup_out_same_bldg:'An outbound record already exists for the same destination house, building, spec and date. Please find that record and modify it.', out_exceed_demand:'The shipped quantity exceeds the actual demand of this house for this spec. Confirm shipping anyway?'
       },
       vi: {
         prod_tab_A:'Tổng quan nhà máy & Xem nhanh', prod_tab_B:'Kế hoạch sản xuất', prod_tab_C:'Nhật ký: Nhân công/Thời tiết', prod_tab_D:'Kho nguyên liệu', prod_tab_E:'Sản xuất hàng ngày', prod_tab_H:'Nhập & Xuất', prod_tab_F:'Thiết bị & Sự cố',
@@ -4159,7 +4220,7 @@ function _ovLoadChartLib(cb){
         prod_role_welder:'Thợ hàn', prod_role_forklift:'Lái xe nâng', prod_role_loader:'Lái xe xúc', prod_role_mixer:'Vận hành máy trộn', prod_role_press:'Vận hành máy ép tấm', prod_role_repair:'Thợ sửa tấm xi măng', prod_role_cook:'Đầu bếp', prod_role_temp:'Công nhân tạm thời khác', prod_role_keeper:'Người trông vật liệu', sec_labor:'Nhân công', sec_weather:'Thời tiết', wx_am:'Sáng', wx_pm:'Chiều', wx_temp:'Nhiệt độ', wx_cond:'Tình trạng', wx_hum:'Độ ẩm', wx_wind:'Gió', wx_notyet:'Chưa ghi', btn_backfill_wx:'Bù thời tiết lịch sử', toast_wx_loading:'Đang bù thời tiết lịch sử…', toast_wx_backfilled:'Đã bù thời tiết lịch sử', toast_wx_noprov:'Không tìm thấy tỉnh nhà máy', toast_wx_fail:'Lỗi lấy thời tiết lịch sử', op_actions:'Thao tác', op_total_qty:'Tổng', op_edit:'Sửa', op_del:'Xóa', copy_no_gap:'Hiện tại không có ngày nào bị thiếu. Sao chép sẽ bắt đầu ghi nhận dữ liệu nhân công vào các ngày trước đó. Xác nhận thao tác này?', wx_backfill_hint:'Thời tiết ngày này bị thiếu, nhấn nút bên dưới để bổ sung.', trend_title:'Xu hướng', trend_all:'Tất cả', trend_7:'7 ngày', trend_30:'30 ngày', trend_labor:'Số nhân công', trend_weather:'Nhiệt độ & Độ ẩm (dải nắng/mưa)', trend_total:'Tổng', trend_sun:'Nắng', trend_rain:'Mưa', trend_cloud:'Nhiều mây', trend_sun_days:' ngày nắng', trend_rain_days:' ngày mưa', trend_cloud_days:' ngày nhiều mây', trend_nodata:'Chưa có dữ liệu', lbl_prod_days:'Số ngày SX', lbl_avg_daily:'Trung bình/ngày', lbl_per_day:'/ngày', prod_role_manager:'Giám đốc nhà máy', prod_role_machinist:'Thợ sửa máy', lbl_recorder:'Người lập biểu', thr_recorder:'Người lập biểu', lbl_holiday:'TET', opt_yes:'Có', opt_no:'Không', sec_labor_wx_detail:'Bảng chi tiết nhân công & thời tiết',         prod_status_wait:'Chờ lập lịch', toast_copied:'Đã sao chép dòng',         editing_label:'Đang chỉnh sửa', confirm_del_title:'Xác nhận xóa', confirm_del_msg:'Bạn có chắc muốn xóa bản ghi sản xuất này?', btn_ok:'Đồng ý', btn_cancel:'Hủy',
       btn_change_due_date:'Thay đổi ngày', msg_due_date_locked:'Ngày bàn giao dự án sau khi chọn không thể thay đổi. Xác nhận {date}?', toast_due_date_saved:'Đã lưu ngày bàn giao dự án', toast_no_auth_due:'Không có quyền thay đổi ngày bàn giao dự án', msg_due_stop:'Đã đến ngày bàn giao dự án ({date}). Dừng tính toán.',
       sec_slats_info:'Thông tin cơ bản cấu hình sàn khe hở bê tông', btn_view_slats:'Xem cấu hình chi tiết sàn khe hở bê tông', btn_edit_slats:'Sửa cấu hình chi tiết sàn khe hở bê tông',
-      btn_report:'Xem thống kê nguyên liệu nhập kho & Báo cáo so sánh nhu cầu vật liệu SX', rpt_title:'Thống kê nguyên liệu nhập kho & Báo cáo so sánh nhu cầu vật liệu SX', rpt_section_summary:'1. Tổng hợp chi phí theo Chuồng × Vật liệu (theo đơn giá đặt)', rpt_section_gap:'2. Thống kê đã nhập & thiếu hụt (gồm chờ duyệt/bị trả/đã xác nhận/nhập trực tiếp)', rpt_section_pie:'3. Tỷ lệ số tiền đã chi (biểu đồ tròn)', rpt_section_bar:'4. Tổng chi phí nhu cầu vs đã mua (biểu đồ cột)', thr_house:'Chuồng', thr_total_cost:'Tổng chi phí', thr_material:'Vật liệu', thr_demand_ton:'Nhu cầu (t)', thr_bought_ton:'Đã mua (t)', thr_gap_ton:'Thiếu (t)', thr_spent:'Đã chi', thr_need:'Cần mua', rpt_cat_rebar6:'Thép φ6', rpt_cat_rebar8:'Thép φ8', rpt_cat_rebar10:'Thép φ10', rpt_cat_rebar12:'Thép φ12', rpt_cat_cement:'Xi măng', rpt_cat_sand:'Cát', rpt_cat_gravel:'Sỏi',         rpt_grand_total:'Tổng cộng', btn_collapse_all:'Thu gọn', btn_expand_all:'Mở rộng', lbl_receipt_no:'Lần {n}', prod_line_n:'Dây chuyền {n}', btn_copy_line1:'Cùng quy cách với dây chuyền 1', thr_total_pcs:'Tổng', lbl_houses:'Chuồng', lbl_specs:'Quy cách', lbl_matrix_qty:'SL (tấm)', lbl_line_total:'Tổng dây chuyền', lbl_house_spec:'Chuồng / Quy cách', empty_sel_house:'Chọn chuồng trước', empty_sel_spec:'Chọn quy cách trước', empty_no_lines:'Chưa cài đặt dây chuyền (thiết lập trong Tổng quan nhà máy)', thr_pcs:'tấm',         hist_hide_zero:'Ẩn cột 0', hist_show_all:'Hiện tất cả cột', toast_out_exceeds_produced:'Số lượng xuất kho không được lớn hơn sản lượng! Vui lòng sửa!', toast_out_qty_required:'Số lượng xuất kho phải lớn hơn 0', out_area_label:'Khu vực {0}', out_area_empty:'—', toast_no_area_config:'Vui lòng cấu hình khu vực lắp đặt trước khi xuất kho'
+      btn_report:'Xem thống kê nguyên liệu nhập kho & Báo cáo so sánh nhu cầu vật liệu SX', rpt_title:'Thống kê nguyên liệu nhập kho & Báo cáo so sánh nhu cầu vật liệu SX', rpt_section_summary:'1. Tổng hợp chi phí theo Chuồng × Vật liệu (theo đơn giá đặt)', rpt_section_gap:'2. Thống kê đã nhập & thiếu hụt (gồm chờ duyệt/bị trả/đã xác nhận/nhập trực tiếp)', rpt_section_pie:'3. Tỷ lệ số tiền đã chi (biểu đồ tròn)', rpt_section_bar:'4. Tổng chi phí nhu cầu vs đã mua (biểu đồ cột)', thr_house:'Chuồng', thr_total_cost:'Tổng chi phí', thr_material:'Vật liệu', thr_demand_ton:'Nhu cầu (t)', thr_bought_ton:'Đã mua (t)', thr_gap_ton:'Thiếu (t)', thr_spent:'Đã chi', thr_need:'Cần mua', rpt_cat_rebar6:'Thép φ6', rpt_cat_rebar8:'Thép φ8', rpt_cat_rebar10:'Thép φ10', rpt_cat_rebar12:'Thép φ12', rpt_cat_cement:'Xi măng', rpt_cat_sand:'Cát', rpt_cat_gravel:'Sỏi',         rpt_grand_total:'Tổng cộng', btn_collapse_all:'Thu gọn', btn_expand_all:'Mở rộng', lbl_receipt_no:'Lần {n}', prod_line_n:'Dây chuyền {n}', btn_copy_line1:'Cùng quy cách với dây chuyền 1', thr_total_pcs:'Tổng', lbl_houses:'Chuồng', lbl_specs:'Quy cách', lbl_matrix_qty:'SL (tấm)', lbl_line_total:'Tổng dây chuyền', lbl_house_spec:'Chuồng / Quy cách', empty_sel_house:'Chọn chuồng trước', empty_sel_spec:'Chọn quy cách trước', empty_no_lines:'Chưa cài đặt dây chuyền (thiết lập trong Tổng quan nhà máy)', thr_pcs:'tấm',         hist_hide_zero:'Ẩn cột 0', hist_show_all:'Hiện tất cả cột', toast_out_exceeds_produced:'Số lượng xuất kho không được lớn hơn sản lượng! Vui lòng sửa!', toast_out_qty_required:'Số lượng xuất kho phải lớn hơn 0', out_area_label:'Khu vực {0}', out_area_empty:'—', toast_no_area_config:'Vui lòng cấu hình khu vực lắp đặt trước khi xuất kho', confirm_out_dest_demand_met:'Quy cách này tại {0} {1} {2} đã đủ nhu cầu. Bạn có tiếp tục xuất kho đến chuồng này không?', confirm_dup_out_title:'Nhắc nhở xuất kho trùng', confirm_dup_out_msg:'Chuồng {0}, quy cách {1}, ngày {2} đã có bản ghi xuất kho. Chuyển đến sửa?', confirm_dup_out_ok:'Sửa', toast_dup_out_same_bldg:'Đã tồn tại bản ghi xuất kho cùng chuồng đích, dãy, quy cách và ngày. Vui lòng tìm bản ghi đó và sửa.', out_exceed_demand:'Số lượng xuất vượt quá nhu cầu thực tế của chuồng này cho quy cách này, xác nhận vẫn xuất kho?'
       }
     };
     function pt(k){
@@ -4546,8 +4607,22 @@ function _ovLoadChartLib(cb){
     /* 读取签约项目里的水泥漏缝地板规格（concrete_floor_spec，与系统智能报告同源） */
     function prod_slatsRows(){
       var pid = PROD_CUR;
+      var raw = '';
+      // 1) 优先从全局 WON 数据读取
       var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==pid; }) : null;
-      var raw = p && p.concrete_floor_spec ? p.concrete_floor_spec : '';
+      if(p && p.concrete_floor_spec){ raw = p.concrete_floor_spec; }
+      // 2) 全局数据未加载或缺失时，回退到内存备份 / 隐藏域（安装模块、智能报告已写入）
+      if(!raw){
+        try{
+          var _pid = String(pid||'');
+          if(window.__slatsSpecByPid && window.__slatsSpecByPid[_pid]) raw = window.__slatsSpecByPid[_pid];
+          if(!raw){
+            var cfs = document.getElementById('w_concrete_floor_spec');
+            var wm = document.getElementById('wonModal');
+            if(cfs && wm && wm.dataset.id == _pid) raw = cfs.value;
+          }
+        }catch(e){}
+      }
       if(raw && typeof raw !== 'string'){ try { raw = JSON.stringify(raw); } catch(e){ raw=''; } }
       try { var a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch(e){ return []; }
     }
@@ -4908,6 +4983,18 @@ function _ovLoadChartLib(cb){
       prod_el('prod-detail').style.display = 'block';
       var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==id; }) : null;
       prod_el('prod-detail-title').textContent = (p ? (p.client||p.customer||p.name||'—') : pt('factory_label')) + pt('factory_suffix');
+      // 备份水泥漏缝地板规格到内存与隐藏域，确保生产模块各弹窗（区域分布、智能报告等）与安装模块读取同源
+      if(p && p.concrete_floor_spec){
+        try{
+          var _raw = (typeof p.concrete_floor_spec==='string') ? p.concrete_floor_spec : JSON.stringify(p.concrete_floor_spec);
+          if(!window.__slatsSpecByPid) window.__slatsSpecByPid = {};
+          window.__slatsSpecByPid[id] = _raw;
+          var cfs = document.getElementById('w_concrete_floor_spec');
+          if(!cfs){ cfs = document.createElement('input'); cfs.type='hidden'; cfs.id='w_concrete_floor_spec'; document.body.appendChild(cfs); }
+          cfs.value = _raw;
+          try{ var wm = document.getElementById('wonModal'); if(wm) wm.dataset.id = id; }catch(e){}
+        }catch(e){}
+      }
       prod_pullSpecsFromServer();
       prod_syncFromServer(id, function(){ prod_renderTabs('A'); });
     }
@@ -9048,6 +9135,69 @@ function _ovLoadChartLib(cb){
       if(!bc || total<=0) return false;
       return Math.round(total/bc)>0;
     }
+    /* 某规格在指定猪舍每栋的需求量（按总需求÷栋数四舍五入） */
+    function prod_outDemandPerBldg(h, spec){
+      var matrix=prod_slatsMatrix();
+      var total=(matrix.specs[spec]&&matrix.specs[spec].houses[h])||0;
+      var bc=prod_buildingCountForHouse(h)||0;
+      if(!bc || total<=0) return 0;
+      return Math.round(total/bc);
+    }
+    /* 某规格在指定区域的总需求量 */
+    function prod_outZoneDemand(zone, spec){
+      var f=prod_get(PROD_CUR); if(!f) return 0;
+      var assign=(f.installation&&f.installation.assign)||{};
+      var matrix=prod_slatsMatrix();
+      var specData=matrix.specs[spec]; if(!specData) return 0;
+      var sum=0;
+      Object.keys(specData.houses||{}).forEach(function(h){
+        if(!prod_specHasDemandForHouse(h, spec)) return;
+        var bc=prod_buildingCountForHouse(h)||0;
+        var per=prod_outDemandPerBldg(h, spec);
+        for(var i=1;i<=bc;i++){
+          if(String(assign[h+'#'+i])===String(zone)) sum+=per;
+        }
+      });
+      return sum;
+    }
+    /* 汇总某规格已发往各目标猪舍#栋 / 各区域的出库量（含当前正在编辑的行，保证标红反映真实已保存状态）。
+       目标猪舍按如下优先级解析，避免旧数据把 destHouse 存成“源猪舍”导致标红永远匹配不上：
+       1) 记录带 zone 时，用安装规划 assign 反查「该区域 + 该栋号」对应的猪舍；
+       2) 否则回退到记录里的 destHouse。 */
+    function prod_outShippedSummary(spec){
+      var f=prod_get(PROD_CUR); if(!f) return {bldg:{}, zone:{}};
+      var assign=(f.installation&&f.installation.assign)||{};
+      var ho=f.houseOut||{};
+      var bldg={}, zone={};
+      for(var key in ho){ if(!ho.hasOwnProperty(key)) continue;
+        var kp=key.split('|'); var keySpec=kp.slice(1).join('|');
+        if(keySpec!==spec) continue;
+        var rec=ho[key]||{}; var od=rec.outDaily||{};
+        for(var d in od){ if(!od.hasOwnProperty(d)) continue;
+          var e=od[d]; var destHouse=e.destHouse||'';
+          (e.lines||[]).forEach(function(L){
+            var b=L.dest||'', q=+(L.qty||0)||0; if(!b || !q) return;
+            var nb=String(parseInt(b,10)||0);
+            /* 1) 用 zone + assign 反查目标猪舍 */
+            var hs=[];
+            if(e.zone){
+              for(var ak in assign){ if(!assign.hasOwnProperty(ak)) continue;
+                if(String(assign[ak])!==String(e.zone)) continue;
+                var ap=ak.split('#');
+                if(String(parseInt(ap[1]||'0',10))===nb) hs.push(ap[0]);
+              }
+            }
+            /* 2) 回退到记录存储的 destHouse */
+            if(!hs.length && destHouse) hs.push(destHouse);
+            hs.forEach(function(hh){
+              var bk=hh+'#'+b; bldg[bk]=(bldg[bk]||0)+q;
+              var z=assign[bk]; if(z) zone[z]=(zone[z]||0)+q;
+            });
+          });
+        }
+      }
+      return {bldg:bldg, zone:zone};
+    }
     /* 获取某规格下，所有“有需求且已归入区域”的区域号列表（跨猪舍） */
     function prod_outAreaDemand(spec){
       var f=prod_get(PROD_CUR); if(!f) return [];
@@ -9070,77 +9220,195 @@ function _ovLoadChartLib(cb){
     function prod_outAreaOptions(spec, selZone){
       var zones=prod_outAreaDemand(spec);
       if(!zones.length) return '<option value="">'+prod_esc(pt('out_area_empty'))+'</option>';
+      var shipped=prod_outShippedSummary(spec).zone;
       return zones.map(function(z){
-        return '<option value="'+z+'"'+(String(selZone)===String(z)?' selected':'')+'>'+prod_esc(pt('out_area_label').replace('{0}', z))+'</option>';
+        var demand=prod_outZoneDemand(z, spec);
+        var red=(demand>0 && (shipped[z]||0)>=demand);
+        return '<option value="'+z+'"'+(String(selZone)===String(z)?' selected':'')+(red?' style="color:#E53935"':'')+'>'+prod_esc(pt('out_area_label').replace('{0}', z))+'</option>';
       }).join('');
     }
-    /* 根据已选区域，生成目标猪舍+栋号下拉（跨猪舍；兼容旧数据：当前选中项始终保留） */
-    function prod_outDestOptions(spec, selVal, zone){
-      var f=prod_get(PROD_CUR); if(!f) return '';
+    /* 组装某规格下目标猪舍+栋号的选项数据（含 tooltip 与是否发够标红）。
+       区域筛选仅用于“优先展示”，若该区域下没有任何栋号匹配，则回退为列出全部有需求的栋号，
+       避免下拉被过滤成空白、导致红色选项与确认框永远点不到。当前已选项恒保留。 */
+    function prod_outDestItems(spec, selVal, zone){
+      var f=prod_get(PROD_CUR); if(!f) return [];
       var assign=(f.installation&&f.installation.assign)||{};
       var matrix=prod_slatsMatrix();
-      var specData=matrix.specs[spec]; if(!specData) return '<option value="">'+prod_esc(pt('out_area_empty'))+'</option>';
-      var html='';
+      var specData=matrix.specs[spec]; if(!specData) return [];
+      var shipped=prod_outShippedSummary(spec).bldg;
+      var all=[];
       Object.keys(specData.houses||{}).forEach(function(h){
         if(!prod_specHasDemandForHouse(h, spec)) return;
         var bc=prod_buildingCountForHouse(h)||0;
+        var per=prod_outDemandPerBldg(h, spec);
         for(var i=1;i<=bc;i++){
           var val=h+'#'+i;
           var inArea=assign[val];
-          if(zone && String(inArea)!==String(zone)) continue;
-          if(!zone && !inArea && val!==selVal) continue; // 无区域筛选时只显示已归入区域的栋号（当前旧数据选中项除外）
           var txt=prod_phName(h)+' - '+pt('bldg_label').replace('{0}', i);
-          html+='<option value="'+prod_esc(val)+'"'+(val===selVal?' selected':'')+'>'+prod_esc(txt)+'</option>';
+          var red=(per>0 && (shipped[val]||0)>=per);
+          var tip=prod_outBldgTipHtml(h, i, txt, spec);
+          all.push({val:val, txt:txt, red:red, tip:tip, inArea:inArea});
         }
       });
-      if(!html) html='<option value="">'+prod_esc(pt('out_area_empty'))+'</option>';
-      return html;
+      var items = zone ? all.filter(function(it){ return String(it.inArea)===String(zone) || it.val===selVal; }) : all;
+      if(!items.length) items = all;
+      return items;
     }
+    function prod_outBldgTipHtml(code, idx, label, currentSpec){
+      var f=prod_get(PROD_CUR); if(!f) return '';
+      idx = idx || '1';
+      var demand=(inst_buildDemandMap()[code])||{};
+      var shipped=inst_bldgShipped(f, code, idx)||{};
+      return inst_bldgTipHtml(f, code, idx, demand, shipped, label, currentSpec);
+    }
+    function prod_outDestCellHtml(destHouse, destBuildings){
+      var f=prod_get(PROD_CUR);
+      if(!f) return prod_esc(prod_phName(destHouse));
+      if(!destBuildings || !destBuildings.length){
+        var label=prod_phName(destHouse);
+        var tip=prod_outBldgTipHtml(destHouse, '1', label);
+        return '<span class="prod-out-dest" data-jump-house="'+prod_esc(destHouse)+'" data-jump-bldg="1" data-tip-html="'+prod_esc(tip)+'" onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_hideBldgTip()" onclick="prod_outJumpToAreaDist(event,this)">'+prod_esc(label)+'</span>';
+      }
+      return destBuildings.map(function(b){
+        var label=prod_phName(destHouse)+' - '+pt('bldg_label').replace('{0}', b);
+        var tip=prod_outBldgTipHtml(destHouse, b, label);
+        return '<span class="prod-out-dest" data-jump-house="'+prod_esc(destHouse)+'" data-jump-bldg="'+prod_esc(b)+'" data-tip-html="'+prod_esc(tip)+'" onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_hideBldgTip()" onclick="prod_outJumpToAreaDist(event,this)">'+prod_esc(label)+'</span>';
+      }).join('<span style="color:#999">, </span>');
+    }
+    /* 点击表格分析「出库后移动至猪舍及猪舍编号」→ 直接打开区域分布弹窗，并用黑圈高亮对应房舍卡片 */
+    function prod_outJumpToAreaDist(e, el){
+      if(e && e.stopPropagation) e.stopPropagation();
+      if(!el || !el.getAttribute) return;
+      var destHouse = el.getAttribute('data-jump-house');
+      var bldgIdx = el.getAttribute('data-jump-bldg') || '1';
+      if(!destHouse) return;
+      inst_hideBldgTip();
+      prod_outOpenAreaDist(String(destHouse)+'#'+String(bldgIdx));
+    }
+    /* 根据已选区域，生成目标猪舍+栋号下拉（跨猪舍；兼容旧数据：当前选中项始终保留） */
+    function prod_outDestOptions(spec, selVal, zone){
+      var items=prod_outDestItems(spec, selVal, zone);
+      if(!items.length) return '<option value="">'+prod_esc(pt('out_area_empty'))+'</option>';
+      return items.map(function(it){
+        return '<option value="'+prod_esc(it.val)+'"'+(it.val===selVal?' selected':'')+(it.red?' style="color:#E53935"':'')+'>'+prod_esc(it.txt)+'</option>';
+      }).join('');
+    }
+    function prod_outDestSelectHtml(spec, selVal, zone){
+      var items=prod_outDestItems(spec, selVal, zone);
+      var curLabel=pt('out_area_empty'), curVal=selVal, curTip='';
+      if(items.length){
+        var cur=items.filter(function(it){ return it.val===selVal; })[0];
+        if(!cur){ cur=items[0]; curVal=cur.val; }
+        if(cur){ curLabel=cur.txt; curTip=cur.tip; }
+      }
+      var list=items.map(function(it){
+        return '<div class="out-edit-dest-item'+(it.val===curVal?' selected':'')+(it.red?' red':'')+'" data-val="'+prod_esc(it.val)+'" data-tip-html="'+prod_esc(it.tip)+'" onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_hideBldgTip()" onclick="prod_outDestItemClick(this)">'+prod_esc(it.txt)+'</div>';
+      }).join('');
+      if(!list) list='<div class="out-edit-dest-item disabled">'+prod_esc(pt('out_area_empty'))+'</div>';
+      return '<div class="out-edit-dest-wrap" id="out_edit_dest_wrap" data-spec="'+prod_esc(spec)+'">'
+        + '<input type="hidden" id="out_edit_dest" value="'+prod_esc(curVal)+'" data-spec="'+prod_esc(spec)+'">'
+        + '<div class="out-edit-dest-trigger" tabindex="0" data-tip-html="'+prod_esc(curTip)+'" onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_hideBldgTip()" onclick="prod_outDestToggle(event)" onkeydown="prod_outDestKey(event)">'+prod_esc(curLabel)+'</div>'
+        + '<div class="out-edit-dest-list">'+list+'</div>'
+        + '</div>';
+    }
+    function prod_outDestCloseAll(){ document.querySelectorAll('.out-edit-dest-list').forEach(function(el){ el.style.display='none'; }); }
+    function prod_outDestToggle(e){ e.stopPropagation(); var list=e.currentTarget.nextElementSibling; var open=(list.style.display==='block'); prod_outDestCloseAll(); list.style.display=open?'none':'block'; }
+    function prod_outDestItemClick(el){
+      var wrap=el.closest('.out-edit-dest-wrap');
+      var inp=wrap.querySelector('#out_edit_dest');
+      var trig=wrap.querySelector('.out-edit-dest-trigger');
+      var val=el.getAttribute('data-val');
+      /* 选中的就是当前值：直接关闭下拉，不重复确认 */
+      if(inp && val===inp.value){ prod_outDestCloseAll(); return; }
+      function doSelect(){
+        if(inp) inp.value=val;
+        if(trig){ trig.textContent=el.textContent; trig.setAttribute('data-tip-html', el.getAttribute('data-tip-html')||''); }
+        prod_outDestCloseAll();
+        prod_outDestChanged();
+      }
+      if(el.classList.contains('red')){
+        var parsed=prod_parseBldgVal(val);
+        var zone=prod_bldgToZone(parsed.h, parsed.b);
+        var zoneLabel=zone?pt('out_area_label').replace('{0}', zone):pt('out_area_empty');
+        var msg=pt('confirm_out_dest_demand_met')
+          .replace('{0}', zoneLabel)
+          .replace('{1}', prod_phName(parsed.h))
+          .replace('{2}', pt('bldg_label').replace('{0}', parsed.b));
+        prod_confirmAt(null, {
+          center:true,
+          msg:msg, msgKey:'confirm_out_dest_demand_met',
+          ok:pt('btn_ok'), okKey:'btn_ok',
+          cancel:pt('btn_cancel'), cancelKey:'btn_cancel'
+        }, doSelect);
+        return;
+      }
+      doSelect();
+    }
+    function prod_outDestKey(e){ if(e.key==='Escape'){ prod_outDestCloseAll(); } }
+    document.addEventListener('click', function(e){ if(!e.target.closest('.out-edit-dest-wrap')) prod_outDestCloseAll(); });
     /* 编辑行：区域切换时联动刷新目标猪舍+栋号下拉并回选第一个 */
     function prod_outAreaChanged(){
       var areaSel=document.getElementById('out_edit_area');
-      var destSel=document.getElementById('out_edit_dest');
-      if(!areaSel || !destSel) return;
+      var destInput=document.getElementById('out_edit_dest');
+      var destWrap=destInput ? destInput.closest('.out-edit-dest-wrap') : null;
+      if(!areaSel || !destInput || !destWrap) return;
       var spec=areaSel.getAttribute('data-spec');
       var zone=areaSel.value;
-      var curDest=destSel.value;
-      destSel.innerHTML=prod_outDestOptions(spec, curDest, zone);
-      if(!destSel.value && destSel.options.length){ var first=destSel.options[0].value; if(first){ destSel.value=first; } }
+      var curDest=destInput.value;
+      destWrap.outerHTML=prod_outDestSelectHtml(spec, curDest, zone);
+      destInput=document.getElementById('out_edit_dest');
+      if(destInput && !destInput.value){
+        var firstItem=document.querySelector('.out-edit-dest-item[data-val]');
+        if(firstItem){
+          destInput.value=firstItem.getAttribute('data-val');
+          var trig=document.querySelector('.out-edit-dest-trigger');
+          if(trig) trig.textContent=firstItem.textContent;
+        }
+      }
       prod_outDestChanged();
     }
     /* 编辑行：目标猪舍+栋号切换时反向回显所属区域，并刷新下拉为对应区域 */
     function prod_outDestChanged(){
       var areaSel=document.getElementById('out_edit_area');
-      var destSel=document.getElementById('out_edit_dest');
-      if(!areaSel || !destSel) return;
-      var spec=destSel.getAttribute('data-spec');
-      var val=destSel.value;
+      var destInput=document.getElementById('out_edit_dest');
+      var destWrap=destInput ? destInput.closest('.out-edit-dest-wrap') : null;
+      if(!areaSel || !destInput || !destWrap) return;
+      var spec=destInput.getAttribute('data-spec');
+      var val=destInput.value;
       if(!val) return;
       var parsed=prod_parseBldgVal(val);
       var zone=prod_bldgToZone(parsed.h, parsed.b);
       if(zone){
         areaSel.value=zone;
-        destSel.innerHTML=prod_outDestOptions(spec, val, zone);
+        destWrap.outerHTML=prod_outDestSelectHtml(spec, val, zone);
       }
     }
-    /* 复用安装计划的区域分布图，但改为在独立模态框中展示 */
+    /* 复用安装计划的区域分布图，但改为在独立模态框中展示。
+       注意：INST_CUR 是安装模块 IIFE 的闭包变量，生产侧访问不到，
+       因此不能靠改写 INST_CUR 来切换项目；改为由 inst_renderGenLayout 的 modal 模式直接使用当前 PROD_CUR。 */
     function prod_outRenderAreaDist(f){
-      var savedInstCur=(typeof INST_CUR!=='undefined') ? INST_CUR : undefined;
-      try {
-        if(typeof INST_CUR!=='undefined') INST_CUR = PROD_CUR;
-        var html = inst_renderGenLayout(f);
-        html = html.replace(/onclick="inst_toggleHideShipZero\(\)"/g, 'onclick="prod_outToggleHideShipZero()"');
-        html = html.replace(/onclick="inst_toggleHideInstallZero\(\)"/g, 'onclick="prod_outToggleHideInstallZero()"');
-        return html;
-      } finally {
-        if(typeof INST_CUR!=='undefined') INST_CUR = savedInstCur;
-      }
+      var html = inst_renderGenLayout(f, {modal:true});
+      html = html.replace(/onclick="inst_toggleHideShipZero\(\)"/g, 'onclick="prod_outToggleHideShipZero()"');
+      html = html.replace(/onclick="inst_toggleHideInstallZero\(\)"/g, 'onclick="prod_outToggleHideInstallZero()"');
+      return html;
     }
     function prod_outRenderAreaDistBody(){
       var ov=document.getElementById('prodOutAreaDistOverlay'); if(!ov) return;
       var f=prod_get(PROD_CUR); if(!f) return;
       var body=ov.querySelector('.prod-out-area-dist-body'); if(!body) return;
       body.innerHTML=prod_outRenderAreaDist(f);
+      prod_outScrollJumpIntoView();
+    }
+    /* 点击表格分析里的「出库后移动至猪舍」跳进来后，把被黑圈高亮的卡片滚动到可视区域 */
+    function prod_outScrollJumpIntoView(){
+      if(!PROD_OUT_JUMP_KEY) return;
+      var _doScroll=function(){
+        var el=document.querySelector('#prodOutAreaDistOverlay .inst-bldg-jump');
+        if(el && el.scrollIntoView) el.scrollIntoView({block:'center',inline:'center'});
+      };
+      /* 弹窗打开后会立即最大化，布局会变，故延时并二次校正 */
+      setTimeout(_doScroll, 120);
+      setTimeout(_doScroll, 360);
     }
     function prod_outToggleHideShipZero(){
       var f=prod_get(PROD_CUR); if(!f) return;
@@ -9156,12 +9424,13 @@ function _ovLoadChartLib(cb){
       prod_save(f);
       prod_outRenderAreaDistBody();
     }
-    function prod_outOpenAreaDist(){
+    function prod_outOpenAreaDist(jumpKey){
       var f=prod_get(PROD_CUR); if(!f) return;
       if(!prod_outHasAreaConfig()){
         try{ prod_toast(pt('toast_no_area_config')); }catch(err){ alert(pt('toast_no_area_config')); }
         return;
       }
+      PROD_OUT_JUMP_KEY = jumpKey || '';
       var ov=document.getElementById('prodOutAreaDistOverlay');
       if(!ov){
         ov=document.createElement('div'); ov.id='prodOutAreaDistOverlay'; ov.className='modal-overlay';
@@ -9496,17 +9765,7 @@ function _ovLoadChartLib(cb){
           rows.push({ date:_md, qty:(+rec.out||0), h:h, k:k, destHouse:(rec.destHouse||h), destBuildings:(rec.destBuildings||[]), zone:(rec.zone||''), wx:{am:_wx.am, pm:_wx.pm}, recorder:(rec.recorder||'') });
         }
       }
-      /* 默认排序：日期降序（最新记录在最上）；有显式列排序时按列升降
-         给每行打上原始索引，让相等值稳定排序；日期/猪舍用 key 比较，避免切换语言后顺序跳动 */
-      rows.forEach(function(r, idx){ r._outIdx = idx; });
-      if(!(PROD_OUT_EDIT && PROD_OUT_EDIT.isNew)){
-        if(PROD_OUT_SORT.col && PROD_OUT_SORT.dir){
-          rows.sort(function(a,b){ var c=prod_outCompare(a,b,PROD_OUT_SORT.col); if(c!==0) return PROD_OUT_SORT.dir==='asc'?c:-c; return a._outIdx-b._outIdx; });
-        } else {
-          rows.sort(function(a,b){ var c=prod_outCompare(a,b,'date'); if(c!==0) return -c; return a._outIdx-b._outIdx; });
-        }
-      }
-      /* 新增：点击上方「出库」按钮后，在记录表顶部插入一条待编辑的新记录行 */
+      /* 新增：点击上方「出库」按钮后，在记录表中插入一条待编辑的新记录行，随后统一排序 */
       if(PROD_OUT_EDIT && PROD_OUT_EDIT.isNew){
         var newDateYmd = PROD_OUT_EDIT.date || ymdToDmy(prod_today());
         var newDestHouse=PROD_OUT_EDIT.h, newBldg=(prod_buildingCountForHouse(PROD_OUT_EDIT.h)>0)?'1':'', newZone='';
@@ -9526,10 +9785,18 @@ function _ovLoadChartLib(cb){
             }
           }
         }
-        rows.unshift({ isNew:true, date:newDateYmd, qty:0, h:PROD_OUT_EDIT.h, k:PROD_OUT_EDIT.k, destHouse:newDestHouse, destBuildings:(newBldg?[newBldg]:[]), zone:newZone, wx:prod_weatherForDate(newDateYmd), recorder:prod_loginUser() });
+        rows.push({ isNew:true, date:newDateYmd, qty:0, h:PROD_OUT_EDIT.h, k:PROD_OUT_EDIT.k, destHouse:newDestHouse, destBuildings:(newBldg?[newBldg]:[]), zone:newZone, wx:prod_weatherForDate(newDateYmd), recorder:prod_loginUser(), _outIdx:-1 });
+      }
+      /* 默认排序：日期降序（最新记录在最上），编辑状态也保持排序不变；有显式列排序时按列升降
+         给每行打上原始索引，让相等值稳定排序；日期/猪舍用 key 比较，避免切换语言后顺序跳动 */
+      rows.forEach(function(r, idx){ if(r._outIdx==null) r._outIdx = idx; });
+      if(PROD_OUT_SORT.col && PROD_OUT_SORT.dir){
+        rows.sort(function(a,b){ var c=prod_outCompare(a,b,PROD_OUT_SORT.col); if(c!==0) return PROD_OUT_SORT.dir==='asc'?c:-c; return a._outIdx-b._outIdx; });
+      } else {
+        rows.sort(function(a,b){ var c=prod_outCompare(a,b,'date'); if(c!==0) return -c; return a._outIdx-b._outIdx; });
       }
       function _jsStr(s){ return "'"+String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+"'"; }
-      function _displayNo(i){ return rows.length - i; }
+      function _displayNo(i){ return i + 1; }
       function _outTh(label, col){
         var cls='sortable';
         var icon='▼';
@@ -9567,7 +9834,7 @@ function _ovLoadChartLib(cb){
             var curDestVal = (r.destHouse && r.destBuildings&&r.destBuildings.length) ? (r.destHouse+'#'+r.destBuildings[0]) : '';
             var curZone = r.zone || (curDestVal ? prod_bldgToZone(r.destHouse, r.destBuildings[0]) : '') || '';
             var areaOpts = prod_outAreaOptions(r.k, curZone);
-            var destOpts = prod_outDestOptions(r.k, curDestVal, curZone);
+            var destSelHtml = prod_outDestSelectHtml(r.k, curDestVal, curZone);
             var dataK = prod_esc(r.k);
             return '<tr id="prod_out_edit_row" class="pe-op-editing prod-out-editing-row">'
               + '<td class="pe-col-no">'+_displayNo(i)+'</td>'
@@ -9583,12 +9850,13 @@ function _ovLoadChartLib(cb){
               + '<td>'+prod_esc(prod_phName(r.h))+'</td>'
               + '<td>'+prod_fmtSpec(r.k)+'</td>'
               + '<td><select id="out_edit_area" class="out-edit-area" data-spec="'+dataK+'" onchange="prod_outAreaChanged()">'+areaOpts+'</select></td>'
-              + '<td><select id="out_edit_dest" class="out-edit-dest" data-spec="'+dataK+'" onchange="prod_outDestChanged()">'+destOpts+'</select></td>'
+              + '<td>'+destSelHtml+'</td>'
               + '<td class="pe-op-act">'
                 + '<button class="pe-op-ibtn pe-op-save" type="button" data-tip="保存" onclick="prod_outSaveInline()">'+PROD_OP_ICON_SAVE+'</button>'
                 + '<button class="pe-op-ibtn pe-op-cancel" type="button" data-tip="取消" onclick="prod_outCancelInline()">'+PROD_OP_ICON_CANCEL+'</button>'
               + '</td>';
           }
+          var destCell = prod_outDestCellHtml(r.destHouse, r.destBuildings);
           return '<tr class="prod-trace-row" onclick="prod_traceStockout(event,'+_jsStr(r.h)+','+_jsStr(r.k)+')" oncontextmenu="return prod_outRightDelete(event,'+_jsStr(r.date)+','+_jsStr(r.h)+','+_jsStr(r.k)+')">'
             + '<td class="pe-col-no">'+_displayNo(i)+'</td>'
             + '<td class="pe-col-recorder">'+prod_esc(r.recorder||'')+'</td>'
@@ -9599,7 +9867,7 @@ function _ovLoadChartLib(cb){
             + '<td>'+prod_esc(prod_phName(r.h))+'</td>'
             + '<td>'+prod_fmtSpec(r.k)+'</td>'
             + '<td>'+prod_esc(zoneLabel)+'</td>'
-            + '<td>'+prod_esc(dest)+'</td>'
+            + '<td>'+destCell+'</td>'
             + '<td class="pe-op-act"><button class="pe-op-ibtn pe-op-edit" type="button" data-tip="编辑" onclick="prod_outEditInline('+_jsStr(r.date)+','+_jsStr(r.h)+','+_jsStr(r.k)+')">'+PROD_OP_ICON_EDIT+'</button></td>'
           ;
         }).join('');
@@ -9669,9 +9937,9 @@ function _ovLoadChartLib(cb){
           var dateHtml = prod_esc(ymdToDmy(g.date));
           var subHtml = '<b>'+prod_fmtNum(g.subtotal)+'</b>';
           var span = g.items.length;
-          var serial = groups.length - gi; /* 序号与出库表一致：最新日期最大 */
+          var serial = gi + 1; /* 序号与出库表一致：最新日期在最上，序号从 1 开始 */
           g.items.forEach(function(r, ri){
-            var dest = (r.destBuildings&&r.destBuildings.length) ? prod_phName(r.destHouse)+' - '+r.destBuildings.map(function(b){ return pt('bldg_label').replace('{0}', b); }).join(', ') : prod_phName(r.destHouse);
+            var destCell = prod_outDestCellHtml(r.destHouse, r.destBuildings);
             var zoneLabel = r.zone ? pt('out_area_label').replace('{0}', r.zone) : pt('out_area_empty');
             html += '<tr>';
             if(ri===0){
@@ -9685,7 +9953,7 @@ function _ovLoadChartLib(cb){
               + '<td>'+prod_esc(prod_phName(r.h))+'</td>'
               + '<td>'+prod_fmtSpec(r.k)+'</td>'
               + '<td>'+prod_esc(zoneLabel)+'</td>'
-              + '<td>'+prod_esc(dest)+'</td>'
+              + '<td>'+destCell+'</td>'
               + '</tr>';
           });
         });
@@ -9834,23 +10102,30 @@ function _ovLoadChartLib(cb){
       /* 日期框现在就是 #pc_date 同款 DD-MM-YYYY 文本，保存时转成 ymd */
       var dateEl=document.getElementById('out_edit_date');
       var newDateYmd = (dateEl ? dmyToYmd(dateEl.value.trim()) : '') || date;
-      /* 规则1（保存时把关）：若改后的日期已存在另一条出库记录（非本行原日期），即“同日+同猪舍+同规格”重复，
-         弹出对话框提示并不保存；点“确定”跳去编辑那条已有的记录 */
-      /* 规则1（保存时把关）：同一天 + 同一猪舍 + 同一规格 已存在出库记录 → 提示不保存，点“确定”跳去编辑那条已有记录 */
+      /* 规则1（保存时把关）：同一天 + 同一栋舍(目标猪舍+栋号) + 同一规格(尺寸) 已存在出库记录 → 仅提示并不保存 */
       var isNewEdit = !!PROD_OUT_EDIT.isNew;
-      var dupDate = null;
-      if(rec.outDaily){
-        if(isNewEdit){ if(newDateYmd && rec.outDaily[newDateYmd]) dupDate = newDateYmd; }
-        else if(newDateYmd && newDateYmd!==date && rec.outDaily[newDateYmd]) dupDate = newDateYmd;
+      /* 先读取本次目标栋舍（出库后移动至猪舍及猪舍编号） */
+      var newDestVal=document.getElementById('out_edit_dest').value;
+      var parsedDest=prod_parseBldgVal(newDestVal);
+      var newDestHouse=parsedDest.h;
+      var newDest=parsedDest.b;
+      var newZone=document.getElementById('out_edit_area').value;
+      var dupKey=null;
+      if(f.houseOut && newDateYmd){
+        for(var _key in f.houseOut){
+          if(!f.houseOut.hasOwnProperty(_key)) continue;
+          if(_key.split('|')[1]!==k) continue;                 // 同一尺寸（规格）
+          var _r=f.houseOut[_key];
+          if(!_r.outDaily || !_r.outDaily[newDateYmd]) continue;
+          var _dd=_r.outDaily[newDateYmd];
+          if(_dd.destHouse!==newDestHouse) continue;            // 同一目标猪舍
+          if(newDest && _dd.destBuildings && _dd.destBuildings.indexOf(newDest)<0) continue; // 同一栋号
+          if(!isNewEdit && _key===(h+'|'+k) && newDateYmd===date) continue; // 编辑自身且日期未变，跳过
+          dupKey=_key; break;
+        }
       }
-      if(dupDate){
-        prod_confirmAt(null, {
-          center:true,
-          title: pt('confirm_dup_out_title'), titleKey:'confirm_dup_out_title',
-          msg: pt('confirm_dup_out_msg'), msgKey:'confirm_dup_out_msg',
-          ok: pt('confirm_dup_out_ok'), okKey:'confirm_dup_out_ok',
-          cancel: pt('btn_cancel'), cancelKey:'btn_cancel'
-        }, function(){ prod_outEditInline(dupDate, h, k); });
+      if(dupKey){
+        try{ prod_toast(pt('toast_dup_out_same_bldg')); }catch(err){ alert(pt('toast_dup_out_same_bldg')); }
         return;
       }
       var newQty=Math.max(0, Math.round(+(document.getElementById('out_edit_qty').value||0)||0));
@@ -9864,11 +10139,6 @@ function _ovLoadChartLib(cb){
         try{ prod_toast(pt('toast_no_area_config')); }catch(err){ alert(pt('toast_no_area_config')); }
         return;
       }
-      var newDestVal=document.getElementById('out_edit_dest').value;
-      var parsedDest=prod_parseBldgVal(newDestVal);
-      var newDestHouse=parsedDest.h;
-      var newDest=parsedDest.b;
-      var newZone=document.getElementById('out_edit_area').value;
       var startYmd=prod_startProdYmd();
       if(startYmd && newDateYmd && newDateYmd<startYmd){ try{ prod_toast(pt('toast_before_start')); }catch(e){} if(dateEl){ dateEl.value=ymdToDmy(startYmd); dateEl.focus(); } return; }
       var idx=prod_outFindIdx(h,k);
@@ -9880,18 +10150,33 @@ function _ovLoadChartLib(cb){
         var qe=document.getElementById('out_edit_qty'); if(qe){ qe.focus(); try{ qe.select(); }catch(e){} }
         return;
       }
-      if(rec.outDaily && rec.outDaily[date]) delete rec.outDaily[date];
-      rec.outDaily=rec.outDaily||{};
-      var buildings=newDest?[newDest]:[];
-      /* 天气接口按 dmy 查询，必须转一下；之前传 ymd 导致查不到天气 */
-      var wxSnap=prod_weatherForDate(ymdToDmy(newDateYmd));
-      rec.outDaily[newDateYmd]={ date:newDateYmd, lines:[{seq:1, qty:newQty, dest:newDest, zone:newZone}], qty:newQty, destHouse:newDestHouse||h, destBuildings:buildings, zone:newZone, recorder:oldRecorder, weatherAm:wxSnap.am, weatherPm:wxSnap.pm };
-      rec.out=0; for(var d2 in rec.outDaily){ if(rec.outDaily.hasOwnProperty(d2)) rec.out+=(rec.outDaily[d2].qty||0); }
-      rec.outDate=newDateYmd;
-      f.houseOut[h+'|'+k]=rec; prod_save(f);
-      PROD_OUT_EDIT=null;
-      if(PROD_ACTIVE_TAB==='H') prod_renderTab('H');
-      prod_toast(pt('toast_op_saved'));
+      /* 实际写入（确认超需求后也会走到这里；取消则留在编辑态重填） */
+      function prod_outSaveInlineCore(){
+        if(rec.outDaily && rec.outDaily[date]) delete rec.outDaily[date];
+        rec.outDaily=rec.outDaily||{};
+        var buildings=newDest?[newDest]:[];
+        /* 天气接口按 dmy 查询，必须转一下；之前传 ymd 导致查不到天气 */
+        var wxSnap=prod_weatherForDate(ymdToDmy(newDateYmd));
+        rec.outDaily[newDateYmd]={ date:newDateYmd, lines:[{seq:1, qty:newQty, dest:newDest, zone:newZone}], qty:newQty, destHouse:newDestHouse||h, destBuildings:buildings, zone:newZone, recorder:oldRecorder, weatherAm:wxSnap.am, weatherPm:wxSnap.pm };
+        rec.out=0; for(var d2 in rec.outDaily){ if(rec.outDaily.hasOwnProperty(d2)) rec.out+=(rec.outDaily[d2].qty||0); }
+        rec.outDate=newDateYmd;
+        f.houseOut[h+'|'+k]=rec; prod_save(f);
+        PROD_OUT_EDIT=null;
+        if(PROD_ACTIVE_TAB==='H') prod_renderTab('H');
+        prod_toast(pt('toast_op_saved'));
+      }
+      /* 规则2（保存时把关）：本次发货量超过该猪舍此规格的实际需求 → 三语确认，确认继续、取消重填 */
+      var demandBldg=prod_outDemandPerBldg(newDestHouse, k);
+      if(demandBldg>0){
+        var _shippedAll=prod_outShippedSummary(k).bldg;
+        var _already=(_shippedAll[newDestHouse+'#'+newDest]||0);
+        if(old && old.destHouse===newDestHouse && (old.destBuildings||[]).indexOf(newDest)>=0) _already-=(old.qty||0);
+        if(_already+newQty>demandBldg){
+          prodModalConfirm(pt('out_exceed_demand'), prod_outSaveInlineCore, 'out_exceed_demand');
+          return;
+        }
+      }
+      prod_outSaveInlineCore();
     }
     function prod_outEdit(date,h,k){
       prod_outEditInline(date,h,k);
@@ -9937,8 +10222,25 @@ function _ovLoadChartLib(cb){
       if(!snap) return;
       var d=document.getElementById('out_edit_date'); if(d && snap.dateDisp!=='') d.value=snap.dateDisp;
       var q=document.getElementById('out_edit_qty'); if(q && snap.qty!=='') q.value=snap.qty;
-      var s=document.getElementById('out_edit_dest'); if(s && snap.dest!=='') s.value=snap.dest;
-      if(snap.focus){ var el=document.getElementById(snap.focus); if(el){ try{ el.focus(); if(typeof el.setSelectionRange==='function' && snap.selStart!==undefined){ el.setSelectionRange(snap.selStart,snap.selEnd); } else if(el.select){ el.select(); } }catch(e){} } }
+      var s=document.getElementById('out_edit_dest'); if(s && snap.dest!==''){
+        s.value=snap.dest;
+        var wrap=s.closest('.out-edit-dest-wrap');
+        if(wrap){
+          var items=wrap.querySelectorAll('.out-edit-dest-item[data-val]');
+          for(var ii=0;ii<items.length;ii++){
+            if(items[ii].getAttribute('data-val')===snap.dest){ var trig=wrap.querySelector('.out-edit-dest-trigger'); if(trig){ trig.textContent=items[ii].textContent; trig.setAttribute('data-tip-html', items[ii].getAttribute('data-tip-html')||''); } break; }
+          }
+        }
+      }
+      if(snap.focus){
+        var fid=snap.focus==='out_edit_dest'?'out_edit_dest_trigger_id_not_exist':snap.focus;
+        var el=document.getElementById(fid);
+        if(!el && snap.focus==='out_edit_dest'){
+          var wrap2=document.querySelector('.out-edit-dest-wrap');
+          if(wrap2){ var trig2=wrap2.querySelector('.out-edit-dest-trigger'); if(trig2){ trig2.focus(); el=trig2; } }
+        }
+        if(el){ try{ el.focus(); if(typeof el.setSelectionRange==='function' && snap.selStart!==undefined){ el.setSelectionRange(snap.selStart,snap.selEnd); } else if(el.select){ el.select(); } }catch(e){} }
+      }
     }
     /* [锁死] 出库/转移至猪舍待安装 的数值上限 = 当前生产总量；超限时夹回并弹出主题色提示 */
     function prod_hoAlertExceeds(){
@@ -13021,14 +13323,33 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-bldg-pct-tl{left:3px;}
       .inst-bldg-pct-tr{right:3px;}
       .inst-bldg-pill-fill{height:100%;display:inline-block;vertical-align:top;border-radius:3px;transition:width .15s;min-width:0;box-sizing:border-box;}
-      .inst-bldg-tip{position:fixed;display:none;z-index:10000;background:rgba(30,30,30,.96);color:#fff;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.35);max-width:360px;min-width:220px;pointer-events:none;}
-      .inst-bldg-tip-title{font-weight:700;font-size:13px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.2);}
+      /* 出库记录「查看区域分布」模态框专用卡片：与截图一致，标签+百分比置顶、房舍名置底 */
+      .inst-bldg-modal{width:86px;min-height:68px;padding:24px 3px 6px;border-radius:6px;}
+      .inst-bldg-modal .inst-bldg-corner{font-size:8px;white-space:nowrap;}
+      .inst-bldg-modal .inst-bldg-name-wrap{font-size:12px;font-weight:600;line-height:1.25;text-align:center;width:100%;}
+      /* 从表格分析跳转进来时，用黑圈圈出对应房舍卡片，便于一眼识别 */
+      .inst-bldg.inst-bldg-jump{outline:3px solid #000;outline-offset:2px;z-index:3;animation:instBldgJumpPulse 1.1s ease-in-out 4;}
+      @keyframes instBldgJumpPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
+      .inst-bldg-tip{position:fixed;display:none;z-index:10000;background:#092475;color:#fff;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.35);max-width:360px;min-width:220px;pointer-events:none;}
+      .inst-bldg-tip-title{font-weight:700;font-size:13px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.25);}
       .inst-bldg-tip-body{display:flex;gap:16px;}
       .inst-bldg-tip-col{flex:1 1 auto;min-width:110px;}
-      .inst-bldg-tip-col+.inst-bldg-tip-col{border-left:1px solid rgba(255,255,255,.15);padding-left:16px;}
-      .inst-bldg-tip-h{font-weight:700;margin-bottom:6px;color:#FDD835;}
+      .inst-bldg-tip-col+.inst-bldg-tip-col{border-left:1px solid rgba(255,255,255,.2);padding-left:16px;}
+      .inst-bldg-tip-h{font-weight:700;margin-bottom:6px;color:#ffd54f;}
+      .prod-out-dest{cursor:pointer;border-bottom:1px dashed rgba(30,58,95,.5);}
+      .out-edit-dest-wrap{position:relative;display:inline-block;width:100%;box-sizing:border-box;}
+      .out-edit-dest-trigger{width:100%;box-sizing:border-box;padding:3px 4px;border:1px solid #cfd8dc;border-radius:4px;background:#fff;font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .out-edit-dest-list{position:absolute;top:100%;left:0;right:0;max-height:240px;overflow-y:auto;background:#fff;border:1px solid #cfd8dc;border-radius:4px;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none;}
+      .out-edit-dest-item{padding:5px 6px;font-size:11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .out-edit-dest-item:hover{background:#e3f2fd;}
+      .out-edit-dest-item.selected{background:#bbdefb;}
+      .out-edit-dest-item.red{color:#E53935;}
       .inst-bldg-tip-spec{margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.1);}
       .inst-bldg-tip-spec:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+      .inst-bldg-tip-spec.warn,
+      .inst-bldg-tip-spec.warn .inst-bldg-tip-s,
+      .inst-bldg-tip-spec.warn .inst-bldg-tip-k,
+      .inst-bldg-tip-spec.warn .inst-bldg-tip-v{color:#ff6b6b !important;}
       .inst-bldg-tip-s{font-weight:600;margin-bottom:3px;}
       .inst-bldg-tip-row{display:flex;justify-content:space-between;gap:8px;margin:1px 0;}
       .inst-bldg-tip-k{color:rgba(255,255,255,.75);}
@@ -13042,10 +13363,6 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-btn-black{background:#263238 !important;color:#fff !important;border-color:#263238 !important;}
       /* 排程甘特 */
       .inst-gantt-params{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;}
-      .inst-gantt-table{width:100%;border-collapse:collapse;margin:8px 0 16px;}
-      .inst-gantt-table th,.inst-gantt-table td{border:1px solid #e3e8ee;padding:6px 8px;font-size:12px;}
-      .inst-gantt-table th{background:#f4f6f2;color:#444;}
-      .inst-gantt-table input{width:60px;padding:4px 6px;border:1px solid #dce1e6;border-radius:6px;}
       .inst-gantt-bar-wrap{margin-top:10px;}
       .inst-gantt-row{display:flex;align-items:center;gap:8px;margin:6px 0;}
       .inst-gantt-label{width:120px;font-size:12px;flex:0 0 auto;}
@@ -43125,6 +43442,7 @@ window.refreshMoveBtnState = function () {
 <script src="vendor/fx_history.js"></script>
 <script src="vendor/material_prices.js"></script>
 <script src="vn_provinces.js"></script>
+<script src="vendor/frappe-gantt/frappe-gantt.umd.js"></script>
 <script>
 /* ==================== 安装管理模块（复用生产 prod_* 全局函数） ==================== */
 (function(){
@@ -43134,7 +43452,24 @@ window.refreshMoveBtnState = function () {
   var INST_CHARTS = [];
   var INST_ZONE_MAX = 12;
   var INST_ZONE_COLORS = ['#E53935','#FB8C00','#B8860B','#43A047','#1E88E5','#8E24AA','#00897B','#6D4C41','#3949AB','#D81B60','#5E35B1','#00ACC1'];
+  var INST_GANTT = null, INST_GANTT_SEL = null;
   var INST_SEL = []; /* 当前选中的栋 key 列表（house#idx），仅界面态，不持久化 */
+  var INST_GANTT_COLS = [
+    {key:'name', width:150, edit:true},
+    {key:'start', width:90, edit:'date'},
+    {key:'end', width:90, edit:'date'},
+    {key:'owner', width:90, edit:true},
+    {key:'progress', width:58, edit:'number'},
+    {key:'status', width:86, edit:'status'},
+    {key:'dependencies', width:86, edit:true},
+    {key:'baseline_start', width:90, edit:'date'},
+    {key:'baseline_end', width:90, edit:'date'},
+    {key:'parent', width:86, edit:true},
+    {key:'milestone', width:54, edit:'bool'},
+    {key:'id', width:70}
+  ];
+  var INST_OWNER_COLORS = ['#E53935','#FB8C00','#43A047','#1E88E5','#8E24AA','#00897B','#6D4C41','#3949AB','#D81B60','#5E35B1','#00ACC1','#FDD835'];
+  var INST_STATUS_COLORS = {'not_install':'#9e9e9e','installing':'#FB8C00','installed':'#43A047','accepted':'#1E88E5'};
 
   var INST_I18N = {
     zh: {
@@ -43144,7 +43479,7 @@ window.refreshMoveBtnState = function () {
       inst_lbl_client:'客户',
       inst_lbl_province:'省份',
       inst_lbl_contract:'合同号',
-      inst_tab_B:'排程',
+      inst_tab_B:'安装计划详细安排',
       inst_vis_hint:'点选小长方形(可多选)，再用上方按钮归入区域；已归入的可用「移出所选」改区',
       inst_no_house:'暂无猪舍数据（该项目无漏缝地板规格）',
       inst_assign_to:'归入区域{0}',
@@ -43161,6 +43496,21 @@ window.refreshMoveBtnState = function () {
       inst_assigned:'已归入区域{0}',
       inst_removed:'已移出选定栋',
       inst_zone:'区域',
+      inst_new_task:'新任务', inst_arr:'到货',
+      inst_gantt_add:'+ 新增任务', inst_gantt_del:'删除所选', inst_gantt_save2:'保存',
+      inst_gantt_hint:'拖拽条形改期、拖右端改工期，点击查看详情；虚线箭头为依赖关系',
+      inst_gantt_sel_first:'请先点击选中一个任务再删除', inst_gantt_nodata:'暂无任务（点击“新增任务”创建）',       inst_gantt_total:'总工期', inst_gantt_cnt:'任务数',
+      inst_gantt_settings:'设置', inst_gantt_visual:'可视化', inst_gantt_data_fields:'数据字段',
+      inst_gantt_show_weekend:'显示周末底色', inst_gantt_show_today:'显示今日线', inst_gantt_show_grid:'显示网格线',
+      inst_gantt_view_mode:'时间粒度', inst_gantt_col_width:'列宽', inst_gantt_bar_height:'条高',
+      inst_gantt_color_by:'着色维度', inst_gantt_color_owner:'负责人', inst_gantt_color_zone:'区域', inst_gantt_color_status:'状态',
+      inst_col_name:'任务', inst_col_start:'开始', inst_col_end:'结束', inst_col_owner:'负责人', inst_col_progress:'进度%',
+      inst_col_status:'状态', inst_col_dependencies:'依赖', inst_col_baseline_start:'基线开始', inst_col_baseline_end:'基线结束',
+      inst_col_parent:'父任务', inst_col_milestone:'里程碑', inst_col_id:'ID',
+      inst_gantt_edit_task:'编辑任务', inst_gantt_task_name:'任务名称', inst_gantt_task_owner:'负责人',
+      inst_gantt_task_status:'状态', inst_gantt_task_progress:'进度', inst_gantt_task_deps:'依赖（逗号分隔）',
+      inst_gantt_task_baseline_start:'基线开始', inst_gantt_task_baseline_end:'基线结束', inst_gantt_task_parent:'父任务ID',
+      inst_gantt_task_milestone:'里程碑', inst_gantt_cancel:'取消', inst_gantt_ok:'确定',
       inst_unit_bldg:'栋',
       inst_no_count:'（不参与栋数计算）',
       inst_zone_summary_sep:' · ',
@@ -43175,7 +43525,6 @@ window.refreshMoveBtnState = function () {
       inst_gantt_title:'安装排程甘特图',
       inst_gantt_start:'开始日期',
       inst_gantt_teams:'安装小组数',
-      inst_house_days:'各房型单栋工期(天)',
       inst_gantt_save:'保存排程参数',
       inst_gantt_period:'工期(天)',
       inst_gantt_start_date:'开始',
@@ -43184,7 +43533,6 @@ window.refreshMoveBtnState = function () {
       inst_gantt_breakdown:'房型明细',
       inst_gantt_nodata:'请先在「安装规划-可视化图」把猪舍归入区域',
       inst_teams_warn:'小组数超过上限6，已自动调整为6',
-      inst_house_type:'房型',
       inst_lbl_plan_start:'安装开始日期', inst_lbl_plan_end:'安装计划完成', inst_lbl_actual_start:'实际开工', inst_lbl_actual_end:'实际完工', inst_lbl_project_due:'项目交期',
       inst_lbl_total_pcs:'安装总量(片)', inst_lbl_teams:'计划班组数', inst_lbl_leader:'安装负责人', inst_lbl_remark:'备注',
       inst_lbl_ppt:'人/班组', inst_lbl_total_people:'总计人员', inst_lbl_ppt_pcs:'平均安装片数/日/班组', inst_lbl_total_pcs_day:'全部班组安装片数/天', inst_lbl_theory_days:'理论安装完成所需天数', inst_lbl_spans_tet:'期间是否跨度春节', inst_lbl_tet_days:'春节休息的天数', inst_unit_people:'人', inst_unit_day:'天', inst_unit_pcs:'片', inst_opt_yes:'是', inst_opt_no:'否',
@@ -43217,7 +43565,7 @@ window.refreshMoveBtnState = function () {
       inst_lbl_client:'Client',
       inst_lbl_province:'Province',
       inst_lbl_contract:'Contract No.',
-      inst_tab_B:'Schedule',
+      inst_tab_B:'Detailed Installation Plan',
       inst_vis_hint:'Click a rectangle (multi-select), then use the buttons above to assign to a zone; assigned ones can be moved via "Remove Selected"',
       inst_no_house:'No house data (this project has no concrete floor spec)',
       inst_assign_to:'Assign to Zone {0}',
@@ -43234,6 +43582,21 @@ window.refreshMoveBtnState = function () {
       inst_assigned:'Assigned to Zone {0}',
       inst_removed:'Removed from selection',
       inst_zone:'Zone',
+      inst_new_task:'New Task', inst_arr:'Arrival',
+      inst_gantt_add:'+ Add Task', inst_gantt_del:'Delete Selected', inst_gantt_save2:'Save',
+      inst_gantt_hint:'Drag a bar to reschedule / drag its right edge to change duration; click for details; dashed arrows = dependencies',
+      inst_gantt_sel_first:'Click a task to select it before deleting', inst_gantt_nodata:'No tasks yet (click “Add Task”)',       inst_gantt_total:'Total', inst_gantt_cnt:'Tasks',
+      inst_gantt_settings:'Settings', inst_gantt_visual:'Visual', inst_gantt_data_fields:'Data Fields',
+      inst_gantt_show_weekend:'Weekend color', inst_gantt_show_today:'Today line', inst_gantt_show_grid:'Grid lines',
+      inst_gantt_view_mode:'View mode', inst_gantt_col_width:'Col width', inst_gantt_bar_height:'Bar height',
+      inst_gantt_color_by:'Color by', inst_gantt_color_owner:'Owner', inst_gantt_color_zone:'Zone', inst_gantt_color_status:'Status',
+      inst_col_name:'Task', inst_col_start:'Start', inst_col_end:'End', inst_col_owner:'Owner', inst_col_progress:'Progress%',
+      inst_col_status:'Status', inst_col_dependencies:'Predecessors', inst_col_baseline_start:'Baseline Start', inst_col_baseline_end:'Baseline End',
+      inst_col_parent:'Parent', inst_col_milestone:'Milestone', inst_col_id:'ID',
+      inst_gantt_edit_task:'Edit Task', inst_gantt_task_name:'Task Name', inst_gantt_task_owner:'Owner',
+      inst_gantt_task_status:'Status', inst_gantt_task_progress:'Progress', inst_gantt_task_deps:'Dependencies (comma)',
+      inst_gantt_task_baseline_start:'Baseline Start', inst_gantt_task_baseline_end:'Baseline End', inst_gantt_task_parent:'Parent ID',
+      inst_gantt_task_milestone:'Milestone', inst_gantt_cancel:'Cancel', inst_gantt_ok:'OK',
       inst_unit_bldg:'bldg',
       inst_no_count:'(Not counted in buildings)',
       inst_zone_summary_sep:' · ',
@@ -43248,7 +43611,6 @@ window.refreshMoveBtnState = function () {
       inst_gantt_title:'Installation Schedule Gantt',
       inst_gantt_start:'Start Date',
       inst_gantt_teams:'Install Teams',
-      inst_house_days:'Days per house type (days)',
       inst_gantt_save:'Save Schedule Params',
       inst_gantt_period:'Duration (days)',
       inst_gantt_start_date:'Start',
@@ -43257,7 +43619,6 @@ window.refreshMoveBtnState = function () {
       inst_gantt_breakdown:'House breakdown',
       inst_gantt_nodata:'Please assign houses to zones in "Installation Plan - Visualization" first',
       inst_teams_warn:'Teams exceed max 6, auto-adjusted to 6',
-      inst_house_type:'House type',
       inst_lbl_plan_start:'Install Start', inst_lbl_plan_end:'Plan Finish', inst_lbl_actual_start:'Actual Start', inst_lbl_actual_end:'Actual Finish', inst_lbl_project_due:'Project Due Date',
       inst_lbl_total_pcs:'Total (pcs)', inst_lbl_teams:'Planned Teams', inst_lbl_leader:'Install Leader', inst_lbl_remark:'Remark',
       inst_lbl_ppt:'People/Team', inst_lbl_total_people:'Total People', inst_lbl_ppt_pcs:'Avg Pcs/Day/Team', inst_lbl_total_pcs_day:'Total Pcs/Day', inst_lbl_theory_days:'Theoretical Days', inst_lbl_spans_tet:'Spans Spring Festival', inst_lbl_tet_days:'Spring Festival Days', inst_unit_people:'people', inst_unit_day:'days', inst_unit_pcs:'pcs', inst_opt_yes:'Yes', inst_opt_no:'No',
@@ -43290,7 +43651,7 @@ window.refreshMoveBtnState = function () {
       inst_lbl_client:'Khách hàng',
       inst_lbl_province:'Tỉnh',
       inst_lbl_contract:'Số HĐ',
-      inst_tab_B:'Lịch trình',
+      inst_tab_B:'Kế hoạch lắp đặt chi tiết',
       inst_vis_hint:'Nhấn vào hình chữ nhật (chọn nhiều), rồi dùng nút trên để gán vào khu vực; đã gán có thể chuyển bằng "Gỡ chọn"',
       inst_no_house:'Chưa có dữ liệu chuồng (dự án này không có thông số sàn bê tông)',
       inst_assign_to:'Gán vào Khu {0}',
@@ -43307,6 +43668,21 @@ window.refreshMoveBtnState = function () {
       inst_assigned:'Đã gán vào Khu {0}',
       inst_removed:'Đã gỡ khỏi chọn',
       inst_zone:'Khu',
+      inst_new_task:'Công việc mới', inst_arr:'Hàng đến',
+      inst_gantt_add:'+ Thêm công việc', inst_gantt_del:'Xóa đã chọn', inst_gantt_save2:'Lưu',
+      inst_gantt_hint:'Kéo thanh đổi lịch / kéo cạnh phải đổi thời gian; nhấp xem chi tiết; mũi tên nét đứt = phụ thuộc',
+      inst_gantt_sel_first:'Hãy nhấp chọn một công việc trước khi xóa', inst_gantt_nodata:'Chưa có công việc (nhấn “Thêm”)',       inst_gantt_total:'Tổng', inst_gantt_cnt:'Số công việc',
+      inst_gantt_settings:'Cài đặt', inst_gantt_visual:'Trực quan', inst_gantt_data_fields:'Trường dữ liệu',
+      inst_gantt_show_weekend:'Màu cuối tuần', inst_gantt_show_today:'Đường hôm nay', inst_gantt_show_grid:'Lưới',
+      inst_gantt_view_mode:'Chế độ xem', inst_gantt_col_width:'Độ rộng cột', inst_gantt_bar_height:'Chiều cao thanh',
+      inst_gantt_color_by:'Tô màu theo', inst_gantt_color_owner:'Người phụ trách', inst_gantt_color_zone:'Khu vực', inst_gantt_color_status:'Trạng thái',
+      inst_col_name:'Công việc', inst_col_start:'Bắt đầu', inst_col_end:'Kết thúc', inst_col_owner:'Phụ trách', inst_col_progress:'Tiến độ%',
+      inst_col_status:'Trạng thái', inst_col_dependencies:'Phụ thuộc', inst_col_baseline_start:'Cơ sở bắt đầu', inst_col_baseline_end:'Cơ sở kết thúc',
+      inst_col_parent:'Cha', inst_col_milestone:'Mốc', inst_col_id:'ID',
+      inst_gantt_edit_task:'Sửa công việc', inst_gantt_task_name:'Tên công việc', inst_gantt_task_owner:'Phụ trách',
+      inst_gantt_task_status:'Trạng thái', inst_gantt_task_progress:'Tiến độ', inst_gantt_task_deps:'Phụ thuộc (phân cách bằng dấu phẩy)',
+      inst_gantt_task_baseline_start:'Cơ sở bắt đầu', inst_gantt_task_baseline_end:'Cơ sở kết thúc', inst_gantt_task_parent:'ID cha',
+      inst_gantt_task_milestone:'Mốc', inst_gantt_cancel:'Hủy', inst_gantt_ok:'OK',
       inst_unit_bldg:'tòa',
       inst_no_count:'(Không tính vào số dãy)',
       inst_zone_summary_sep:' · ',
@@ -43321,7 +43697,6 @@ window.refreshMoveBtnState = function () {
       inst_gantt_title:'Biểu đồ Gantt lắp đặt',
       inst_gantt_start:'Ngày bắt đầu',
       inst_gantt_teams:'Số đội lắp',
-      inst_house_days:'Số ngày mỗi loại chuồng',
       inst_gantt_save:'Lưu tham số',
       inst_gantt_period:'Thời gian (ngày)',
       inst_gantt_start_date:'Bắt đầu',
@@ -43330,7 +43705,6 @@ window.refreshMoveBtnState = function () {
       inst_gantt_breakdown:'Chi tiết chuồng',
       inst_gantt_nodata:'Hãy gán chuồng vào khu vực trong "Quy hoạch lắp đặt" trước',
       inst_teams_warn:'Số đội vượt quá 6, tự động điều chỉnh về 6',
-      inst_house_type:'Loại chuồng',
       inst_lbl_plan_start:'Bắt đầu lắp', inst_lbl_plan_end:'Kế hoạch xong', inst_lbl_actual_start:'Thực tế bắt đầu', inst_lbl_actual_end:'Thực tế xong', inst_lbl_project_due:'Ngày bàn giao dự án',
       inst_lbl_total_pcs:'Tổng (tấm)', inst_lbl_teams:'Số đội kế hoạch', inst_lbl_leader:'Chỉ huy lắp đặt', inst_lbl_remark:'Ghi chú',
       inst_lbl_ppt:'Người/đội', inst_lbl_total_people:'Tổng nhân sự', inst_lbl_ppt_pcs:'Tấm/ngày/đội', inst_lbl_total_pcs_day:'Tấm/ngày tất cả', inst_lbl_theory_days:'Ngày lý thuyết', inst_lbl_spans_tet:'Qua Tết', inst_lbl_tet_days:'Ngày nghỉ Tết', inst_unit_people:'người', inst_unit_day:'ngày', inst_unit_pcs:'tấm', inst_opt_yes:'Có', inst_opt_no:'Không',
@@ -43429,6 +43803,8 @@ window.refreshMoveBtnState = function () {
   function inst_back(){
     if(inst_el('inst-detail')) inst_el('inst-detail').style.display = 'none';
     if(inst_el('inst-list')) inst_el('inst-list').style.display = 'block';
+    var instWrap = inst_el('inst-detail') ? inst_el('inst-detail').closest('.prod-wrap') : null;
+    if(instWrap) instWrap.classList.remove('inst-gantt-full');
     inst_renderProduction();
   }
 
@@ -43451,10 +43827,12 @@ window.refreshMoveBtnState = function () {
     var tabs = inst_el('inst-tabs');
     if(tabs){ var ch = tabs.children; for(var j=0;j<ch.length;j++){ ch[j].classList.toggle('active', ch[j].getAttribute('data-key')===key); } }
     var body = inst_el('inst-tab-body');
+    var instWrap = body ? body.closest('.prod-wrap') : null;
+    if(instWrap){ instWrap.classList.toggle('inst-gantt-full', key==='B'); }
     if(!body || !INST_CUR) return;
     var f = inst_get(INST_CUR);
     if(key==='A'){ body.innerHTML = inst_tabA(f); inst_calcPlan(); }
-    else if(key==='B'){ body.innerHTML = inst_tabB(f); }
+    else if(key==='B'){ body.innerHTML = inst_tabB(f); setTimeout(inst_renderFrappeGantt, 0); }
     else if(key==='C'){ body.innerHTML = inst_tabC(f); setTimeout(inst_backfillWeather, 0); }
     else if(key==='E'){ body.innerHTML = inst_tabE(f); inst_drawStats(f); }
     inst_updateTabBadges();
@@ -43753,7 +44131,7 @@ window.refreshMoveBtnState = function () {
     if(!st || !map[st]) st = 'not_install';
     return {key:st, color:map[st].color, label:map[st].label};
   }
-  function inst_bldgTipHtml(f, code, idx, demand, shipped, label){
+  function inst_bldgTipHtml(f, code, idx, demand, shipped, label, currentSpec){
     var specs = [];
     var totalNeed = 0, totalShipped = 0;
     for(var spec in demand){ var need = demand[spec]||0; totalNeed += need; var sh = shipped[spec]||0; totalShipped += sh; specs.push({spec:spec, need:need, shipped:sh}); }
@@ -43773,7 +44151,10 @@ window.refreshMoveBtnState = function () {
     } else {
       specs.forEach(function(s){
         var gap = s.shipped < s.need ? ('<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_gap')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(s.need - s.shipped)+'</span></div>') : '';
-        rightRows += '<div class="inst-bldg-tip-spec">'
+        var isCurrent = currentSpec && String(s.spec)===String(currentSpec);
+        var hasGap = s.shipped < s.need;
+        var warnClass = (isCurrent && hasGap) ? ' warn' : '';
+        rightRows += '<div class="inst-bldg-tip-spec'+warnClass+'">'
           + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+prod_esc(s.spec)+'</div>'
           + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_need')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(s.need)+'</span></div>'
           + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_shipped')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(s.shipped)+'</span></div>'
@@ -43798,18 +44179,26 @@ window.refreshMoveBtnState = function () {
     tip.style.left = left + 'px'; tip.style.top = top + 'px';
   }
   function inst_hideBldgTip(){ var tip = document.getElementById('inst_bldg_tip'); if(tip) tip.style.display = 'none'; }
-  function inst_renderGenLayout(f){
+  function inst_renderGenLayout(f, opts){
+    opts = opts || {};
+    var isModal = !!opts.modal;
     var assign = inst_assignMap(f);
     var zoneCount = inst_zoneCount(f);
     var byZone = {};
     for(var k in assign){ if(assign[k]<=zoneCount){ (byZone[assign[k]]||(byZone[assign[k]]=[])).push(k); } }
     var savedProd = (typeof PROD_CUR!=='undefined') ? PROD_CUR : undefined;
     var demandMap = {};
-    try {
-      if(typeof PROD_CUR!=='undefined'){ PROD_CUR = INST_CUR; }
+    if(isModal){
+      /* 出库记录弹窗：INST_CUR 属于安装模块闭包，生产侧拿不到；
+         此时全局 PROD_CUR 就是生产项目本身，直接用它算需求，绝不覆盖。 */
       demandMap = inst_buildDemandMap();
-    } finally {
-      if(typeof PROD_CUR!=='undefined'){ PROD_CUR = savedProd; }
+    } else {
+      try {
+        if(typeof PROD_CUR!=='undefined'){ PROD_CUR = INST_CUR; }
+        demandMap = inst_buildDemandMap();
+      } finally {
+        if(typeof PROD_CUR!=='undefined'){ PROD_CUR = savedProd; }
+      }
     }
     var hideShipZero = !!(f && f.installation && f.installation.hideShipZero);
     var hideInstallZero = !!(f && f.installation && f.installation.hideInstallZero);
@@ -43879,21 +44268,20 @@ window.refreshMoveBtnState = function () {
           }
         }
       });
-      var summaryParts = [];
-      summaryParts.push(it('inst_zone_summary_buildings').replace('{0}', regular));
       var specKeys = Object.keys(zoneSpecCounts);
+      var sep = it('inst_zone_summary_sep');
+      var zoneSummary = it('inst_zone_summary_buildings').replace('{0}', regular) + '：';
       if(specKeys.length > 0){
         var specItems = specKeys.map(function(sp){ return it('inst_zone_summary_spec_item').replace('{0}', prod_fmtSpec(sp)).replace('{1}', prod_fmtNum(zoneSpecCounts[sp])); });
-        summaryParts.push(it('inst_zone_summary_spec_count').replace('{0}', specKeys.length) + '：' + specItems.join('、'));
+        zoneSummary += it('inst_zone_summary_spec_count').replace('{0}', specKeys.length) + '：' + specItems.join('、') + sep;
       }
-      summaryParts.push(it('inst_zone_summary_total').replace('{0}', prod_fmtNum(zoneTotalNeed)).replace('{1}', prod_fmtNum(zoneM2)));
+      zoneSummary += it('inst_zone_summary_total').replace('{0}', prod_fmtNum(zoneTotalNeed)).replace('{1}', prod_fmtNum(zoneM2));
       var shipPct = zoneTotalNeed > 0 ? Math.min(100, Math.round(zoneTotalShipped / zoneTotalNeed * 100)) : 0;
       var installPct = zoneTotalNeed > 0 ? Math.min(100, Math.round(zoneTotalInstalled / zoneTotalNeed * 100)) : 0;
-      summaryParts.push(it('inst_zone_summary_ship').replace('{0}', prod_fmtNum(zoneTotalShipped)).replace('{1}', prod_fmtNum(zoneTotalNeed)).replace('{2}', shipPct));
-      summaryParts.push(it('inst_zone_summary_install').replace('{0}', prod_fmtNum(zoneTotalInstalled)).replace('{1}', prod_fmtNum(zoneTotalNeed)).replace('{2}', installPct));
-      var zoneSummary = summaryParts.join(it('inst_zone_summary_sep'));
+      zoneSummary += sep + it('inst_zone_summary_ship').replace('{0}', prod_fmtNum(zoneTotalShipped)).replace('{1}', prod_fmtNum(zoneTotalNeed)).replace('{2}', shipPct);
+      zoneSummary += sep + it('inst_zone_summary_install').replace('{0}', prod_fmtNum(zoneTotalInstalled)).replace('{1}', prod_fmtNum(zoneTotalNeed)).replace('{2}', installPct);
       h += '<div class="inst-house-group">';
-      h += '<div class="inst-house-head" style="color:'+INST_ZONE_COLORS[z-1]+'">'+it('inst_zone')+z+' <span class="inst-house-cnt">('+regular+it('inst_unit_bldg')+')</span>'+specialNote+'</div>';
+      h += '<div class="inst-house-head" style="color:'+INST_ZONE_COLORS[z-1]+'">'+it('inst_zone')+z+'<span class="inst-house-cnt">('+regular+it('inst_unit_bldg')+')</span>'+specialNote+'</div>';
       if(regular > 0){
         h += '<div class="inst-zone-summary">'+zoneSummary+'</div>';
       }
@@ -43913,16 +44301,26 @@ window.refreshMoveBtnState = function () {
         var installQty = ((f && f.installation && f.installation.houseInstallQty) || {})[code+'|'+idx] || 0;
         installQty = Math.max(0, Math.min(totalNeed, installQty));
         var shipProg = (shipSt.has && shipSt.totalNeed>0) ? Math.min(100, Math.round(shipSt.totalShipped/shipSt.totalNeed*100)) : 0;
-        var shipPill = shipSt.has ? ('<span class="inst-bldg-pill inst-bldg-pill-tr" style="background:#E53935;"><span class="inst-bldg-pill-fill" style="width:'+shipProg+'%;background:#43A047;"></span></span>') : '';
-        var shipPct = shipSt.has ? ('<span class="inst-bldg-pct inst-bldg-pct-tr">'+shipProg+'%</span>') : '';
         var installProg;
         if(installSt.key === 'accepted') installProg = 100;
         else installProg = totalNeed>0 ? Math.min(100, Math.round(installQty/totalNeed*100)) : 0;
-        var installPill = isSpareHouse ? '' : '<span class="inst-bldg-pill inst-bldg-pill-tl" style="background:#E53935;"><span class="inst-bldg-pill-fill" style="width:'+installProg+'%;background:#43A047;"></span></span>';
-        var installPct = isSpareHouse ? '' : (totalNeed>0 ? ('<span class="inst-bldg-pct inst-bldg-pct-tl">'+installProg+'%</span>') : '');
-        var shipLabel = '<span class="inst-bldg-corner inst-bldg-corner-tr">'+it('inst_lbl_ship')+'</span>';
-        var installLabel = isSpareHouse ? '' : '<span class="inst-bldg-corner inst-bldg-corner-tl">'+it('inst_lbl_install')+'</span>';
-        h += '<div class="inst-bldg" style="background:'+INST_ZONE_COLORS[z-1]+';color:#fff;border-color:'+INST_ZONE_COLORS[z-1]+';cursor:default;" data-tip-html="'+prod_esc(tipHtml)+'" onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_hideBldgTip()">'+installLabel+installPill+installPct+shipLabel+shipPill+shipPct+prod_esc(label)+'</div>';
+        if(isModal){
+          var shipPillM = shipSt.has ? ('<span class="inst-bldg-pill inst-bldg-pill-tr" style="background:#E53935;"><span class="inst-bldg-pill-fill" style="width:'+shipProg+'%;background:#43A047;"></span></span>') : '';
+          var installPillM = isSpareHouse ? '' : '<span class="inst-bldg-pill inst-bldg-pill-tl" style="background:#E53935;"><span class="inst-bldg-pill-fill" style="width:'+installProg+'%;background:#43A047;"></span></span>';
+          var shipLabelM = '<span class="inst-bldg-corner inst-bldg-corner-tr">'+it('inst_lbl_ship')+' '+shipProg+'%</span>';
+          var installLabelM = isSpareHouse ? '' : '<span class="inst-bldg-corner inst-bldg-corner-tl">'+it('inst_lbl_install')+' '+installProg+'%</span>';
+          var _jumpKey = (typeof PROD_OUT_JUMP_KEY!=='undefined') ? PROD_OUT_JUMP_KEY : '';
+          var _jumpCls = (_jumpKey && String(key)===String(_jumpKey)) ? ' inst-bldg-jump' : '';
+          h += '<div class="inst-bldg inst-bldg-modal'+_jumpCls+'" style="background:'+INST_ZONE_COLORS[z-1]+';color:#fff;border-color:'+INST_ZONE_COLORS[z-1]+';cursor:default;" data-tip-html="'+prod_esc(tipHtml)+'" onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_hideBldgTip()">'+installLabelM+installPillM+shipLabelM+shipPillM+'<div class="inst-bldg-name-wrap">'+prod_esc(label)+'</div></div>';
+        } else {
+          var shipPill = shipSt.has ? ('<span class="inst-bldg-pill inst-bldg-pill-tr" style="background:#E53935;"><span class="inst-bldg-pill-fill" style="width:'+shipProg+'%;background:#43A047;"></span></span>') : '';
+          var shipPct = shipSt.has ? ('<span class="inst-bldg-pct inst-bldg-pct-tr">'+shipProg+'%</span>') : '';
+          var installPill = isSpareHouse ? '' : '<span class="inst-bldg-pill inst-bldg-pill-tl" style="background:#E53935;"><span class="inst-bldg-pill-fill" style="width:'+installProg+'%;background:#43A047;"></span></span>';
+          var installPct = isSpareHouse ? '' : (totalNeed>0 ? ('<span class="inst-bldg-pct inst-bldg-pct-tl">'+installProg+'%</span>') : '');
+          var shipLabel = '<span class="inst-bldg-corner inst-bldg-corner-tr">'+it('inst_lbl_ship')+'</span>';
+          var installLabel = isSpareHouse ? '' : '<span class="inst-bldg-corner inst-bldg-corner-tl">'+it('inst_lbl_install')+'</span>';
+          h += '<div class="inst-bldg" style="background:'+INST_ZONE_COLORS[z-1]+';color:#fff;border-color:'+INST_ZONE_COLORS[z-1]+';cursor:default;" data-tip-html="'+prod_esc(tipHtml)+'" onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_hideBldgTip()">'+installLabel+installPill+installPct+shipLabel+shipPill+shipPct+prod_esc(label)+'</div>';
+        }
       });
       h += '</div></div>';
     }
@@ -44040,7 +44438,7 @@ window.refreshMoveBtnState = function () {
     var inst = f.installation || {}; var plan = inst.plan || {};
     var types = inst_houseTypes();
     var houseDays = inst.houseDays || {};
-    var teams = parseInt((plan.teams||'1').replace(/[^0-9]/g,'')||'1',10)||1;
+    var teams = parseInt(String(plan.teams||'1').replace(/[^0-9]/g,'')||'1',10)||1;
     if(teams>INST_ZONE_MAX){ teams = INST_ZONE_MAX; }
     var h = '<div class="prod-sec-title">'+it('inst_gantt_title')+'</div>';
     h += '<div class="inst-gantt-params">'
@@ -44048,48 +44446,334 @@ window.refreshMoveBtnState = function () {
       + '<div class="prod-field"><label>'+it('inst_gantt_teams')+'</label><input id="ib_teams" value="'+teams+'"></div>'
       + '<button class="prod-btn" type="button" onclick="inst_saveGantt()">'+it('inst_gantt_save')+'</button>'
       + '</div>';
-    h += '<div class="prod-sec-title">'+it('inst_house_days')+'</div>';
-    h += '<table class="inst-gantt-table"><thead><tr><th>'+it('inst_house_type')+'</th><th>'+it('inst_house_days')+'</th></tr></thead><tbody>';
-    types.forEach(function(ht){
-      var d = houseDays[ht.code]!=null ? houseDays[ht.code] : 1;
-      h += '<tr><td>'+prod_esc(ht.name)+'</td><td><input id="ib_days_'+prod_esc(ht.code)+'" value="'+d+'"></td></tr>';
+    /* 类 Power BI 甘特：左侧任务表 + 右侧时间轴 + 设置面板 */
+    h += '<div class="inst-fg-toolbar">'
+      + '<button class="prod-btn mini" type="button" onclick="inst_ganttAddTask()">+ '+it('inst_gantt_add')+'</button>'
+      + '<button class="prod-btn mini" type="button" onclick="inst_ganttDelTask()">'+it('inst_gantt_del')+'</button>'
+      + '<button class="prod-btn mini" type="button" onclick="inst_ganttSave()">'+it('inst_gantt_save2')+'</button>'
+      + '<button class="prod-btn mini ghost" type="button" onclick="inst_ganttToggleConfig()">'+it('inst_gantt_settings')+'</button>'
+      + '<span class="inst-fg-hint">'+it('inst_gantt_hint')+'</span>'
+      + '</div>';
+    h += '<div class="inst-gantt-layout" id="iaGanttLayout">'
+      + '<div class="inst-gantt-table-wrap" id="iaGanttTableWrap"></div>'
+      + '<div class="inst-gantt-chart-wrap" id="iaGanttChartWrap"><div id="iaGanttFrappe"></div></div>'
+      + '<div class="inst-gantt-config" id="iaGanttConfig"></div>'
+      + '</div>';
+    h += '<div class="inst-gantt-summary" id="iaGanttSummary"></div>';
+    return h;
+  }
+  /* ============ 安装排程：Frappe Gantt（可编辑） ============ */
+  // 安全化任务 ID（防止 # / . 等特殊字符破坏 Frappe Gantt 的 querySelector）
+  function inst_safeId(s){ return String(s||'').replace(/[^a-zA-Z0-9_-]/g,'_'); }
+  function inst_sanitizeGanttIds(f){
+    var arr = (f.installation && f.installation.ganttTasks) || [];
+    var map = {}, changed = false;
+    arr.forEach(function(t){ if(t.id && /[^a-zA-Z0-9_-]/.test(t.id)){ var nid = inst_safeId(t.id); map[t.id]=nid; t.id=nid; changed=true; } });
+    if(Object.keys(map).length){
+      arr.forEach(function(t){
+        if(t.dependencies){
+          var deps = String(t.dependencies).split(',').map(function(d){ return map[d.trim()] || d.trim(); }).join(',');
+          if(deps !== t.dependencies){ t.dependencies = deps; changed = true; }
+        }
+      });
+    }
+    if(changed) inst_save(f);
+  }
+  // 首次进入且无任务时，按现有分区/房型种子生成「区域+栋舍+到货里程碑」任务
+  function inst_seedGanttTasks(f){
+    var inst = f.installation; if(!inst) return;
+    if(inst.ganttTasks && inst.ganttTasks.length) return;
+    var plan = inst.plan || {};
+    var types = inst_houseTypes();
+    var houseDays = inst.houseDays || {};
+    var assign = inst_assignMap(f);
+    var zoneCount = inst_zoneCount(f);
+    var base = plan.planStart || prod_today();
+    var tasks = [];
+    for(var z=1; z<=zoneCount; z++){
+      var houses = [];
+      for(var k in assign){ if(assign.hasOwnProperty(k) && assign[k]===z) houses.push(k); }
+      if(!houses.length) continue;
+      var zoneDays = 0;
+      houses.forEach(function(k){ var code=k.split('#')[0]; var d = (houseDays[code]!=null?houseDays[code]:1); zoneDays += d; });
+      var zStart = base, zEnd = bdYmd(bdDateAdd(zStart, zoneDays));
+      tasks.push({ id:'z'+z, name: it('inst_zone')+' '+z, start:zStart, end:zEnd, progress:0, type:'project', custom_class:'inst-z'+z });
+      var cur = zStart;
+      houses.forEach(function(k){
+        var code=k.split('#')[0]; var d = (houseDays[code]!=null?houseDays[code]:1);
+        var hs = cur, he = bdYmd(bdDateAdd(hs, d));
+        var hname = ''; for(var t=0;t<types.length;t++){ if(types[t].code===code){ hname=types[t].name; break; } }
+        var no = k.split('#')[1]; var safeK = inst_safeId(k);
+        tasks.push({ id:'h'+safeK, name: (it('inst_zone')+' '+z+' · '+hname+' #'+no), start:hs, end:he, progress:0, dependencies:'z'+z, type:'task', custom_class:'inst-z'+z });
+        tasks.push({ id:'a'+safeK, name_key:'inst_arr', start:hs, end:hs, progress:100, dependencies:'', type:'milestone', custom_class:'inst-arr' });
+        cur = he;
+      });
+    }
+    inst.ganttTasks = tasks;
+  }
+  function inst_ganttConfig(f){
+    var cfg = (f.installation && f.installation.ganttConfig) || {};
+    return {
+      showWeekend: cfg.showWeekend!==false,
+      showToday: cfg.showToday!==false,
+      showGrid: cfg.showGrid!==false,
+      colWidth: cfg.colWidth || 38,
+      barHeight: cfg.barHeight || 26,
+      viewMode: cfg.viewMode || 'Week',
+      colorBy: cfg.colorBy || 'owner',
+      visibleCols: cfg.visibleCols || ['name','start','end','owner','progress','status','dependencies']
+    };
+  }
+  function inst_ownerColor(s){
+    var str = String(s||''); var idx = 0;
+    for(var i=0;i<str.length;i++){ idx = (idx*31 + str.charCodeAt(i)) % INST_OWNER_COLORS.length; }
+    return INST_OWNER_COLORS[idx];
+  }
+  function inst_statusColor(s){ return INST_STATUS_COLORS[s] || '#9e9e9e'; }
+  function inst_taskColor(t, cfg){
+    if(t.milestone || t.type==='milestone') return {bar:'#E53935',progress:'#b71c1c'};
+    if(cfg.colorBy==='owner' && t.owner) return {bar:inst_ownerColor(t.owner),progress:'#263238'};
+    if(cfg.colorBy==='status' && t.status) return {bar:inst_statusColor(t.status),progress:'#263238'};
+    return null;
+  }
+  // 把存储的任务（含 name_key）转成 Frappe Gantt 所需格式（按当前语言解析名称）
+  function inst_buildFrappeTasks(f){
+    var inst = f.installation || {};
+    var raw = inst.ganttTasks || [];
+    var cfg = inst_ganttConfig(f);
+    return raw.map(function(t){
+      var name = t.name_key ? it(t.name_key) : (t.name || t.id);
+      var baseCls = (t.custom_class||'');
+      if(cfg.colorBy!=='zone') baseCls = baseCls.replace(/\binst-z\d+\b/g,'').trim();
+      var cls = baseCls + (t.milestone || t.type==='milestone' ? ' inst-milestone':'') + (t.type==='project' || t.type==='group' ? ' inst-group':'');
+      var start = t.start, end = t.end;
+      if(t.milestone || t.type==='milestone'){ end = bdYmd(bdDateAdd(start,1)); }
+      var out = { id:t.id, name:name, start:start, end:end, progress:(t.progress||0), dependencies:(t.dependencies||''), custom_class:cls.trim(), type:t.type||'task' };
+      var c = inst_taskColor(t, cfg);
+      if(c){ out.color=c.bar; out.color_progress=c.progress; }
+      return out;
+    });
+  }
+  function inst_ganttRenderTable(f){
+    var box = inst_el('iaGanttTableWrap'); if(!box) return;
+    var cfg = inst_ganttConfig(f);
+    var arr = (f.installation && f.installation.ganttTasks) || [];
+    var cols = INST_GANTT_COLS.filter(function(c){ return cfg.visibleCols.indexOf(c.key)>=0; });
+    var h = '<table><thead><tr>';
+    cols.forEach(function(c){ h += '<th style="width:'+c.width+'px">'+it('inst_col_'+c.key)+'</th>'; });
+    h += '</tr></thead><tbody>';
+    arr.forEach(function(t, idx){
+      var sel = t.id === INST_GANTT_SEL ? ' selected' : '';
+      h += '<tr class="inst-gantt-row-'+idx+sel+'" data-id="'+prod_esc(t.id)+'" onclick="inst_ganttSelectRow(\''+prod_esc(t.id)+'\')">';
+      cols.forEach(function(c){ h += '<td style="width:'+c.width+'px">'+inst_ganttCellHtml(t,c)+'</td>'; });
+      h += '</tr>';
     });
     h += '</tbody></table>';
-    /* 计算甘特 */
-    var assign = inst_assignMap(f);
-    var zoneBlds = {};
-    for(var k in assign){ if(!assign.hasOwnProperty(k)) continue; var z = assign[k]; if(!z) continue;
-      var parts = k.split('#'); var code = parts[0]; var nm = '';
-      for(var t=0;t<types.length;t++){ if(types[t].code===code){ nm = types[t].name; break; } }
-      zoneBlds[z] = zoneBlds[z] || []; zoneBlds[z].push({ code:code, name:nm });
+    box.innerHTML = h;
+  }
+  function inst_ganttCellHtml(t,c){
+    if(c.key==='milestone') return '<input type="checkbox" '+(t.milestone?'checked':'')+' onclick="event.stopPropagation();inst_ganttFieldBool(\''+prod_esc(t.id)+'\',\'milestone\',this.checked)">';
+    if(!c.edit) return prod_esc(t[c.key]||'');
+    var v = t[c.key]||'';
+    if(c.edit==='date') v = ymdToDmy(v);
+    if(c.edit==='status'){
+      var opts = [['','—'],['not_install',it('inst_status_not_install')],['installing',it('inst_status_installing')],['installed',it('inst_status_installed')],['accepted',it('inst_status_accepted')]];
+      var s = '<select onchange="event.stopPropagation();inst_ganttFieldChange(\''+prod_esc(t.id)+'\',\''+c.key+'\',this.value)">';
+      opts.forEach(function(o){ s += '<option value="'+o[0]+'" '+(v===o[0]?'selected':'')+'>'+o[1]+'</option>'; });
+      return s + '</select>';
     }
-    var startYmd = plan.planStart || prod_today();
-    var cursor = startYmd; var rowsG = [];
-    for(var z2=1; z2<=INST_ZONE_MAX; z2++){
-      var blds = zoneBlds[z2]; if(!blds || !blds.length) continue;
-      var totalDays = 0; var byHouse = {};
-      blds.forEach(function(b){ var dd = (houseDays[b.code]!=null?houseDays[b.code]:1); totalDays += dd; byHouse[b.name] = (byHouse[b.name]||0)+1; });
-      var wd = Math.ceil(totalDays / teams);
-      var zStart = cursor; var zEnd = inst_endDateSkipTet(zStart, wd);
-      rowsG.push({ zone:z2, start:zStart, end:zEnd, workdays:wd, count:blds.length, byHouse:byHouse });
-      cursor = inst_nextWorkday(zEnd);
+    var type = c.edit==='number' ? 'number' : 'text';
+    return '<input type="'+type+'" value="'+prod_esc(v)+'" onchange="event.stopPropagation();inst_ganttFieldChange(\''+prod_esc(t.id)+'\',\''+c.key+'\',this.value)">';
+  }
+  function inst_ganttUpdate(id, patch){
+    var f = inst_get(INST_CUR); if(!f || !f.installation || !f.installation.ganttTasks) return;
+    var arr = f.installation.ganttTasks;
+    for(var i=0;i<arr.length;i++){ if(arr[i].id===id){ for(var k in patch){ arr[i][k]=patch[k]; } break; } }
+    if(arr[i] && arr[i].milestone){ arr[i].end = arr[i].start; arr[i].progress = 100; }
+    inst_save(f);
+  }
+  function inst_ganttFieldChange(id, field, value){
+    if(field==='start' || field==='end' || field==='baseline_start' || field==='baseline_end') value = dmyToYmd(value) || value;
+    if(field==='progress') value = Math.max(0, Math.min(100, parseInt(value,10)||0));
+    var patch = {}; patch[field] = value;
+    inst_ganttUpdate(id, patch);
+    inst_renderFrappeGantt();
+  }
+  function inst_ganttFieldBool(id, field, checked){ var patch={}; patch[field]=!!checked; inst_ganttUpdate(id,patch); inst_renderFrappeGantt(); }
+  function inst_ganttSelectRow(id){ INST_GANTT_SEL=id; var f=inst_get(INST_CUR); inst_ganttRenderTable(f); inst_ganttEditModal(id); }
+  function inst_ganttSyncScroll(){
+    var table = inst_el('iaGanttTableWrap'), chart = inst_el('iaGanttChartWrap');
+    if(!table || !chart) return;
+    table.onscroll = function(){ chart.scrollTop = table.scrollTop; };
+    chart.onscroll = function(){ table.scrollTop = chart.scrollTop; };
+  }
+  function inst_ganttSummary(f, tasks){
+    var box = inst_el('iaGanttSummary'); if(!box) return;
+    if(!tasks || !tasks.length){ box.innerHTML = ''; return; }
+    var minD = tasks[0].start, maxD = tasks[0].end;
+    tasks.forEach(function(t){ if(t.start<minD) minD=t.start; if(t.end>maxD) maxD=t.end; });
+    var days = Math.max(1, inst_dateDiffDays(minD, maxD));
+    var months = (days/30.4); var mTxt = months>=1 ? (Math.round(months*10)/10)+' 月' : days+' 天';
+    box.innerHTML = '<span class="inst-gantt-summary-line">'+it('inst_gantt_total')+'：'+ymdToDmy(minD)+' → '+ymdToDmy(maxD)+' · '+mTxt+'</span>'
+      + '<span class="inst-gantt-summary-line">'+it('inst_gantt_cnt')+'：'+tasks.length+'</span>';
+  }
+  function inst_renderFrappeGantt(){
+    var box = inst_el('iaGanttFrappe'); if(!box) return;
+    if(typeof Gantt==='undefined'){ box.innerHTML='<div class="prod-empty">Frappe Gantt 未加载（vendor/frappe-gantt）</div>'; return; }
+    var f = inst_get(INST_CUR); if(!f) return;
+    inst_seedGanttTasks(f);
+    inst_sanitizeGanttIds(f);
+    var cfg = inst_ganttConfig(f);
+    inst_ganttRenderTable(f);
+    inst_ganttRenderConfig(f);
+    var chartWrap = inst_el('iaGanttChartWrap');
+    if(chartWrap){
+      chartWrap.classList.toggle('hide-weekend', !cfg.showWeekend);
+      chartWrap.classList.toggle('hide-today', !cfg.showToday);
+      chartWrap.classList.toggle('hide-grid', !cfg.showGrid);
     }
-    if(!rowsG.length){ h += '<div class="prod-empty">'+it('inst_gantt_nodata')+'</div>'; }
-    else {
-      var minD = rowsG[0].start, maxD = rowsG[rowsG.length-1].end;
-      var totalSpan = Math.max(1, inst_dateDiffDays(minD, maxD));
-      h += '<div class="inst-gantt-bar-wrap">';
-      rowsG.forEach(function(r){
-        var off = inst_dateDiffDays(minD, r.start); var len = Math.max(1, inst_dateDiffDays(r.start, r.end));
-        var leftPct = (off/totalSpan)*100, widthPct = (len/totalSpan)*100;
-        var breakdown = []; for(var bn in r.byHouse){ breakdown.push(bn+'×'+r.byHouse[bn]); }
-        h += '<div class="inst-gantt-row"><div class="inst-gantt-label" style="color:'+INST_ZONE_COLORS[r.zone-1]+';font-weight:700">'+it('inst_zone')+r.zone+'</div>'
-          + '<div class="inst-gantt-track"><div class="inst-gantt-bar" style="background:'+INST_ZONE_COLORS[r.zone-1]+';margin-left:'+leftPct+'%;width:'+widthPct+'%;">'+ymdToDmy(r.start)+' → '+ymdToDmy(r.end)+'</div></div></div>';
-        h += '<div class="inst-gantt-meta" style="margin-left:128px">'+it('inst_gantt_period')+':'+r.workdays+' · '+it('inst_gantt_buildings')+':'+r.count+' · '+it('inst_gantt_breakdown')+':'+breakdown.join('，')+'</div>';
-      });
-      h += '</div>';
-    }
-    return h;
+    var tasks = inst_buildFrappeTasks(f);
+    box.innerHTML = '';
+    INST_GANTT = new Gantt(box, tasks, {
+      view_mode_select: true, view_mode: cfg.viewMode, popup_on: 'click', readonly: false,
+      bar_height: cfg.barHeight, padding: 14, column_width: cfg.colWidth,
+      holidays: cfg.showWeekend ? {"var(--g-weekend-highlight-color)":"weekend"} : {},
+      lines: cfg.showGrid ? 'both' : 'none',
+      today_button: cfg.showToday,
+      on_click: function(task){ INST_GANTT_SEL = task.id; inst_ganttRenderTable(f); },
+      on_date_change: function(task, start, end){ inst_ganttUpdate(task.id, { start: bdYmd(start), end: bdYmd(end) }); inst_ganttRenderTable(f); },
+      on_progress_change: function(task, progress){ inst_ganttUpdate(task.id, { progress: Math.round(progress) }); inst_ganttRenderTable(f); },
+      popup: function(opts){ return inst_ganttPopupHtml(opts); }
+    });
+    inst_ganttSummary(f, tasks);
+    inst_ganttSyncScroll();
+  }
+  function inst_ganttPopupHtml(opts){
+    var t = opts.task;
+    var s = ymdToDmy(bdYmd(t._start)) || '';
+    var e = ymdToDmy(bdYmd(t._end)) || '';
+    return '<div style="font-size:12px;line-height:1.5;min-width:140px;">'
+      + '<strong>'+prod_esc(t.name)+'</strong><br>'
+      + s + ' → ' + e + ' · ' + (t.actual_duration||1) + ' '+it('inst_unit_day')+'<br>'
+      + it('inst_progress') + ': ' + Math.floor(t.progress)+'%<br>'
+      + (t.dependencies && t.dependencies.length ? it('inst_col_dependencies')+': '+prod_esc(t.dependencies.join(',')) : '')
+      + '</div>';
+  }
+  function inst_ganttRenderConfig(f){
+    var box = inst_el('iaGanttConfig'); if(!box) return;
+    var cfg = inst_ganttConfig(f);
+    var h = '<div class="inst-gantt-config-head"><span>'+it('inst_gantt_settings')+'</span><button type="button" onclick="inst_ganttToggleConfig()">×</button></div>';
+    h += '<div class="inst-gantt-config-body">';
+    h += '<div class="inst-gantt-config-section"><div class="inst-gantt-config-title">'+it('inst_gantt_visual')+'</div>';
+    h += '<label><input type="checkbox" '+(cfg.showWeekend?'checked':'')+' onchange="inst_ganttSetCfg(\'showWeekend\',this.checked)"> '+it('inst_gantt_show_weekend')+'</label>';
+    h += '<label><input type="checkbox" '+(cfg.showToday?'checked':'')+' onchange="inst_ganttSetCfg(\'showToday\',this.checked)"> '+it('inst_gantt_show_today')+'</label>';
+    h += '<label><input type="checkbox" '+(cfg.showGrid?'checked':'')+' onchange="inst_ganttSetCfg(\'showGrid\',this.checked)"> '+it('inst_gantt_show_grid')+'</label>';
+    var vmOpts = [['Day','Day'],['Week','Week'],['Month','Month']];
+    h += '<label>'+it('inst_gantt_view_mode')+' <select onchange="inst_ganttSetCfg(\'viewMode\',this.value)">';
+    vmOpts.forEach(function(o){ h += '<option value="'+o[0]+'" '+(cfg.viewMode===o[0]?'selected':'')+'>'+o[1]+'</option>'; });
+    h += '</select></label>';
+    h += '<label>'+it('inst_gantt_col_width')+' <input type="range" min="24" max="80" value="'+cfg.colWidth+'" onchange="inst_ganttSetCfg(\'colWidth\',+this.value)"></label>';
+    h += '<label>'+it('inst_gantt_bar_height')+' <input type="range" min="16" max="40" value="'+cfg.barHeight+'" onchange="inst_ganttSetCfg(\'barHeight\',+this.value)"></label>';
+    h += '<label>'+it('inst_gantt_color_by')+' <select onchange="inst_ganttSetCfg(\'colorBy\',this.value)">';
+    [['owner',it('inst_gantt_color_owner')],['zone',it('inst_gantt_color_zone')],['status',it('inst_gantt_color_status')]].forEach(function(o){ h += '<option value="'+o[0]+'" '+(cfg.colorBy===o[0]?'selected':'')+'>'+o[1]+'</option>'; });
+    h += '</select></label>';
+    h += '</div>';
+    h += '<div class="inst-gantt-config-section"><div class="inst-gantt-config-title">'+it('inst_gantt_data_fields')+'</div>';
+    INST_GANTT_COLS.forEach(function(c){
+      h += '<label><input type="checkbox" '+(cfg.visibleCols.indexOf(c.key)>=0?'checked':'')+' onchange="inst_ganttToggleCol(\''+c.key+'\',this.checked)"> '+it('inst_col_'+c.key)+'</label>';
+    });
+    h += '</div></div>';
+    box.innerHTML = h;
+  }
+  function inst_ganttSetCfg(k,v){
+    var f=inst_get(INST_CUR); f.installation=f.installation||{}; var cfg=f.installation.ganttConfig=f.installation.ganttConfig||{};
+    cfg[k]=v; inst_save(f); inst_renderTab('B');
+  }
+  function inst_ganttToggleCol(k,on){
+    var f=inst_get(INST_CUR); var cfg=inst_ganttConfig(f);
+    var arr=cfg.visibleCols.slice();
+    var i=arr.indexOf(k);
+    if(on && i<0) arr.push(k); else if(!on && i>=0) arr.splice(i,1);
+    inst_ganttSetCfg('visibleCols',arr);
+  }
+  function inst_ganttToggleConfig(){ var el=inst_el('iaGanttConfig'); if(el) el.classList.toggle('open'); }
+  function inst_ganttAddTask(){
+    var f = inst_get(INST_CUR); if(!f) return;
+    f.installation = f.installation || {}; f.installation.ganttTasks = f.installation.ganttTasks || [];
+    var base = prod_today();
+    var id = 't' + Date.now();
+    f.installation.ganttTasks.push({ id:id, name_key:'inst_new_task', start:base, end:bdYmd(bdDateAdd(base,5)), progress:0, dependencies:'', type:'task', custom_class:'', owner:'', status:'', milestone:false, parent:'', baseline_start:'', baseline_end:'' });
+    inst_save(f); prod_toast(it('inst_saved')); inst_renderTab('B');
+  }
+  function inst_ganttDelTask(){
+    var f = inst_get(INST_CUR); if(!f) return;
+    var id = INST_GANTT_SEL;
+    if(!id){ prod_toast(it('inst_gantt_sel_first')); return; }
+    var arr = f.installation.ganttTasks || [];
+    f.installation.ganttTasks = arr.filter(function(t){ return t.id!==id && (','+t.dependencies+',').indexOf(','+id+',')<0; });
+    INST_GANTT_SEL = null;
+    inst_save(f); prod_toast(it('inst_saved')); inst_renderTab('B');
+  }
+  function inst_ganttSave(){ var f = inst_get(INST_CUR); if(f){ inst_save(f); } prod_toast(it('inst_saved')); }
+  function inst_ganttEditModal(id){
+    var f=inst_get(INST_CUR); var arr=(f.installation&&f.installation.ganttTasks)||[];
+    var t=null; for(var i=0;i<arr.length;i++){ if(arr[i].id===id){ t=arr[i]; break; } }
+    if(!t) return;
+    var ov=document.createElement('div'); ov.className='modal-overlay show'; ov.id='instGanttEditOverlay';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    var sels = [['','—'],['not_install',it('inst_status_not_install')],['installing',it('inst_status_installing')],['installed',it('inst_status_installed')],['accepted',it('inst_status_accepted')]];
+    var statusOpts='';
+    sels.forEach(function(o){ statusOpts += '<option value="'+o[0]+'" '+(t.status===o[0]?'selected':'')+'>'+o[1]+'</option>'; });
+    ov.innerHTML = '<div class="modal" style="width:560px;max-width:96vw;">'
+      + '<h2>'+it('inst_gantt_edit_task')+'</h2>'
+      + '<div class="form-row">'
+      + '<div><label>'+it('inst_gantt_task_name')+'</label><input id="igem_name" value="'+prod_esc(t.name||'')+'"></div>'
+      + '<div><label>'+it('inst_gantt_task_owner')+'</label><input id="igem_owner" value="'+prod_esc(t.owner||'')+'"></div>'
+      + '</div>'
+      + '<div class="form-row">'
+      + '<div><label>'+it('inst_gantt_task_status')+'</label><select id="igem_status">'+statusOpts+'</select></div>'
+      + '<div><label>'+it('inst_gantt_task_progress')+'</label><input id="igem_progress" type="number" min="0" max="100" value="'+(t.progress||0)+'"></div>'
+      + '</div>'
+      + '<div class="form-row">'
+      + '<div><label>'+it('inst_col_start')+'</label><input id="igem_start" value="'+ymdToDmy(t.start||'')+'"></div>'
+      + '<div><label>'+it('inst_col_end')+'</label><input id="igem_end" value="'+ymdToDmy(t.end||'')+'"></div>'
+      + '</div>'
+      + '<div class="form-row">'
+      + '<div><label>'+it('inst_gantt_task_baseline_start')+'</label><input id="igem_bs" value="'+ymdToDmy(t.baseline_start||'')+'"></div>'
+      + '<div><label>'+it('inst_gantt_task_baseline_end')+'</label><input id="igem_be" value="'+ymdToDmy(t.baseline_end||'')+'"></div>'
+      + '</div>'
+      + '<div class="form-row">'
+      + '<div><label>'+it('inst_gantt_task_parent')+'</label><input id="igem_parent" value="'+prod_esc(t.parent||'')+'"></div>'
+      + '<div><label>'+it('inst_gantt_task_deps')+'</label><input id="igem_deps" value="'+prod_esc(t.dependencies||'')+'"></div>'
+      + '</div>'
+      + '<div class="form-row" style="align-items:center;"><label><input type="checkbox" id="igem_ms" '+(t.milestone?'checked':'')+'> '+it('inst_gantt_task_milestone')+'</label></div>'
+      + '<div class="inst-gantt-config-btns">'
+      + '<button class="prod-btn" type="button" onclick="inst_ganttEditSave(\''+prod_esc(id)+'\')">'+it('inst_gantt_ok')+'</button>'
+      + '<button class="prod-btn sec" type="button" onclick="document.getElementById(\'instGanttEditOverlay\').remove()">'+it('inst_gantt_cancel')+'</button>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(ov);
+  }
+  function inst_ganttEditSave(id){
+    var f=inst_get(INST_CUR); var arr=(f.installation&&f.installation.ganttTasks)||[];
+    var t=null; for(var i=0;i<arr.length;i++){ if(arr[i].id===id){ t=arr[i]; break; } }
+    if(!t) return;
+    t.name = prod_val('igem_name') || t.name;
+    t.owner = prod_val('igem_owner');
+    t.status = prod_val('igem_status');
+    t.progress = Math.max(0, Math.min(100, parseInt(prod_val('igem_progress')||'0',10)||0));
+    t.start = dmyToYmd(prod_val('igem_start')||'') || t.start;
+    t.end = dmyToYmd(prod_val('igem_end')||'') || t.end;
+    t.baseline_start = dmyToYmd(prod_val('igem_bs')||'');
+    t.baseline_end = dmyToYmd(prod_val('igem_be')||'');
+    t.parent = prod_val('igem_parent');
+    t.dependencies = prod_val('igem_deps');
+    t.milestone = !!inst_el('igem_ms').checked;
+    if(t.milestone){ t.progress=100; t.end = t.start; }
+    inst_save(f);
+    var ov=inst_el('instGanttEditOverlay'); if(ov) ov.remove();
+    prod_toast(it('inst_saved'));
+    inst_renderTab('B');
   }
   function inst_saveGantt(){
     var f = inst_get(INST_CUR); f.installation = f.installation||{}; var inst = f.installation; var plan = inst.plan || {};
@@ -44098,9 +44782,6 @@ window.refreshMoveBtnState = function () {
     if(teams>INST_ZONE_MAX){ teams = INST_ZONE_MAX; prod_toast(it('inst_teams_warn')); }
     plan.teams = teams;
     inst.plan = plan;
-    var houseDays = inst.houseDays || {};
-    inst_houseTypes().forEach(function(ht){ var v = parseFloat((prod_val('ib_days_'+ht.code)||'1').replace(/[^0-9.]/g,''))||1; houseDays[ht.code] = v; });
-    inst.houseDays = houseDays;
     f.installation = inst;
     inst_save(f);
     prod_toast(it('inst_saved'));
@@ -44573,11 +45254,25 @@ window.refreshMoveBtnState = function () {
   window.inst_toggleVisualCollapse = inst_toggleVisualCollapse;
   window.inst_showBldgTip = inst_showBldgTip;
   window.inst_hideBldgTip = inst_hideBldgTip;
+  window.inst_buildDemandMap = inst_buildDemandMap;
+  window.inst_bldgShipped = inst_bldgShipped;
+  window.inst_bldgTipHtml = inst_bldgTipHtml;
   window.inst_generateLayout = inst_generateLayout;
   window.inst_renderGenLayout = inst_renderGenLayout;
   window.inst_toggleHideShipZero = inst_toggleHideShipZero;
   window.inst_toggleHideInstallZero = inst_toggleHideInstallZero;
   window.inst_saveGantt = inst_saveGantt;
+  window.inst_ganttAddTask = inst_ganttAddTask;
+  window.inst_ganttDelTask = inst_ganttDelTask;
+  window.inst_ganttSave = inst_ganttSave;
+  window.inst_ganttSelectRow = inst_ganttSelectRow;
+  window.inst_ganttFieldChange = inst_ganttFieldChange;
+  window.inst_ganttFieldBool = inst_ganttFieldBool;
+  window.inst_ganttEditModal = inst_ganttEditModal;
+  window.inst_ganttEditSave = inst_ganttEditSave;
+  window.inst_ganttToggleConfig = inst_ganttToggleConfig;
+  window.inst_ganttSetCfg = inst_ganttSetCfg;
+  window.inst_ganttToggleCol = inst_ganttToggleCol;
 
   /* 语言切换时重渲染安装模块（若可见） */
   window.addEventListener('app:langchange', function(){
@@ -44585,7 +45280,7 @@ window.refreshMoveBtnState = function () {
     if(v && v.classList.contains('active')){
       var back = inst_el('inst-back-label');
       if(back) back.textContent = '← ' + it('inst_back');
-      if(inst_el('inst-detail') && inst_el('inst-detail').style.display!=='none' && INST_CUR){ inst_renderTab(INST_ACTIVE_TAB); }
+      if(inst_el('inst-detail') && inst_el('inst-detail').style.display!=='none' && INST_CUR){ inst_renderTabs(INST_ACTIVE_TAB); }
       else { inst_renderProduction(); }
     }
   });
