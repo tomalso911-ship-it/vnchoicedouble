@@ -2267,8 +2267,7 @@ function _ovLoadChartLib(cb){
 .bd-view { padding:16px; box-sizing:border-box; background:#092475; }
 .bd-grid { display:grid; grid-template-columns:repeat(12,1fr); gap:14px; }
 .bd-card { background:#092475; border:1px solid rgba(57,230,255,0.35); border-radius:14px; padding:14px; box-shadow:0 6px 20px rgba(0,0,0,.35); display:flex; flex-direction:column; min-height:160px; position:relative; --bd-brx:22px; --bd-brw:2px; }
-.bd-cal-nav button, .bd-cal-today-btn, .bd-hol-chip, .bd-fx-cell, .bd-hol-toggle { background:#092475; border:1px solid rgba(57,230,255,0.35); position:relative; --bd-brx:10px; --bd-brw:1px; }
-.bd-card::before, .bd-cal-nav button::before, .bd-cal-today-btn::before, .bd-hol-chip::before, .bd-fx-cell::before, .bd-hol-toggle::before {
+.bd-card::before, .bd-fx-cell::before {
   content:''; position:absolute; top:0; left:0; right:0; bottom:0; border-radius:inherit; pointer-events:none; z-index:1;
   background-image:
     linear-gradient(90deg, rgba(57,230,255,0.95), rgba(57,230,255,0.95)),
@@ -2315,7 +2314,7 @@ function _ovLoadChartLib(cb){
 .bd-cal { grid-column:span 4; }
 .bd-fx { grid-column:span 12; }
 .bd-cal-today { box-shadow:inset 0 0 0 2px #ff3b3b !important; color:#ff6b6b !important; font-weight:800 !important; }
-.bd-cal-today-btn { width:auto !important; padding:0 8px; font-size:11px; background:#092475; color:#eceff2; border:1px solid rgba(57,230,255,0.35); border-radius:6px; cursor:pointer; position:relative; }
+.bd-cal-today-btn { width:auto !important; padding:0 8px; font-size:11px; background:#092475; color:#eceff2; border:1px solid rgba(57,230,255,0.35); border-radius:6px; cursor:pointer; }
 .bd-ph { grid-column:span 4; }
 #bdWorkers, #bdProd { grid-column:span 6; }
 .bd-map-body, .bd-cal-body, .bd-fx-body, .bd-ph-body { flex:1; }
@@ -2325,7 +2324,7 @@ function _ovLoadChartLib(cb){
 .bd-loading { color:#aab4c0; font-size:13px; }
 .bd-err { color:#ff8a8a; font-size:12px; }
 .bd-cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; color:#eceff2; }
-.bd-cal-nav button { background:#092475; color:#eceff2; border:1px solid rgba(57,230,255,0.35); border-radius:6px; width:28px; height:24px; cursor:pointer; position:relative; }
+.bd-cal-nav button { background:#092475; color:#eceff2; border:1px solid rgba(57,230,255,0.35); border-radius:6px; width:28px; height:24px; cursor:pointer; }
 .bd-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
 .bd-cal-dows div { text-align:center; font-size:11px; color:#aab4c0; padding:2px 0; }
 .bd-cal-cell { text-align:center; font-size:12px; color:#eceff2; padding:6px 0; border-radius:6px; position:relative; }
@@ -2338,14 +2337,14 @@ function _ovLoadChartLib(cb){
 .bd-hol-legend-wrap { overflow:hidden; transition:max-height .25s ease; margin-top:4px; }
 .bd-hol-legend-wrap.collapsed { max-height:26px; }
 .bd-hol-legend { display:flex; flex-wrap:wrap; gap:5px; }
-.bd-hol-chip { display:inline-flex; align-items:center; gap:5px; background:#092475; border:1px solid rgba(57,230,255,0.35); border-radius:8px; padding:3px 7px; font-size:11px; color:#eceff2; position:relative; }
+.bd-hol-chip { display:inline-flex; align-items:center; gap:5px; background:#092475; border:1px solid rgba(57,230,255,0.35); border-radius:8px; padding:3px 7px; font-size:11px; color:#eceff2; }
 .bd-hol-chip i { width:10px; height:10px; border-radius:3px; display:inline-block; }
-.bd-hol-toggle { background:#092475; color:#eceff2; border:1px solid rgba(57,230,255,0.35); border-radius:6px; width:28px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; margin:0; position:relative; }
+.bd-hol-toggle { background:#092475; color:#eceff2; border:1px solid rgba(57,230,255,0.35); border-radius:6px; width:28px; height:24px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; margin:0; }
 .bd-hol-toggle:hover { background:#1640a0; }
 .bd-leg-vn, .bd-leg-cn { width:10px; height:10px; border-radius:3px; display:inline-block; }
 .bd-leg-vn { background:#ff5d73; } .bd-leg-cn { background:#4da3ff; }
 .bd-fx-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-.bd-fx-cell { background:#092475; border:1px solid rgba(57,230,255,0.35); border-radius:10px; padding:10px; text-align:center; position:relative; }
+.bd-fx-cell { background:#092475; border:1px solid rgba(57,230,255,0.35); border-radius:10px; padding:10px; text-align:center; position:relative; --bd-brx:10px; --bd-brw:1px; }
 .bd-row5 { grid-column: 1 / -1; display:grid; grid-template-columns: repeat(5,1fr); gap:14px; }
 /* 五行容器内强制每卡占 1 格：否则子卡自带的 .bd-ph(span 4) / #bdWorkers,#bdProd(span 6)
    会在 5 列容器里撑宽，导致 5 张卡被挤成多行 */
@@ -3412,6 +3411,12 @@ function _ovLoadChartLib(cb){
       .prod-field select.prod-holiday-yes{background:#ffe6e6;border-color:#ff4d4f;color:#a8071a;font-weight:600;}
       /* 安装计划甘特图 */
       .inst-gantt{margin:12px 0;padding:12px;background:#fff;border:1px solid #eee;border-radius:8px;}
+      .inst-gantt-wrap{display:flex;gap:12px;align-items:flex-start;}
+      .inst-gantt-main{flex:1;min-width:0;}
+      /* 甘特图底部工期说明：两行并排，浅色卡片 + 左侧蓝色强调条 */
+      .inst-gantt-summary{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px 28px;font-size:12.5px;color:#37474f;background:#f7f9fb;border:1px solid #e3e8ef;border-left:3px solid #1E88E5;border-radius:8px;padding:10px 14px;line-height:1.55;}
+      .inst-gantt-summary-line{margin:0;}
+      .inst-gantt-summary-line:last-child{margin-bottom:0;}
       .inst-gantt-scale-sel{font-size:12px;color:#455a64;margin-bottom:6px;}
       .inst-gantt-scale-sel select{font-size:12px;padding:2px 6px;border-radius:6px;border:1px solid #ccc;margin-left:4px;}
       .inst-gantt-header{display:flex;align-items:center;font-size:12px;font-weight:700;color:#455a64;border-bottom:1px solid #e0e0e0;padding:6px 0;margin-bottom:4px;}
@@ -3429,6 +3434,7 @@ function _ovLoadChartLib(cb){
       .inst-gantt-grid{position:absolute;top:0;height:100%;border-left:1px solid #f0f0f0;}
       .inst-gantt-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:#546e7a;}
       .inst-gantt-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
+      @media (max-width:900px){ .inst-gantt-summary{flex-direction:column;gap:6px;} }
       /* 安装计划#2：可手动输入的数值字段（平均每天产量/线、安装数量/组/天）红色加粗 */
       #ia_rate_per_line, #ia_install_rate_per_team{color:#E53935 !important;font-weight:700 !important;text-align:center !important;padding-top:6px !important;padding-bottom:6px !important;line-height:1.2 !important;}
       /* 对应标签也红色加粗 */
@@ -43200,7 +43206,9 @@ window.refreshMoveBtnState = function () {
       inst_lbl_ship:'发货', inst_lbl_install:'安装',
       inst_status_not_install:'未安装', inst_status_installing:'安装中', inst_status_installed:'安装完成', inst_status_accepted:'验收完成',
       inst_lbl_spec:'规格', inst_bldg_gap:'缺口',
-      inst_lbl_installed:'已安装', inst_lbl_uninstalled:'未安装'
+      inst_lbl_installed:'已安装', inst_lbl_uninstalled:'未安装',
+      inst_gantt_summary_contract_to_accept:'从签订合同至全部验收结束，需要 {months} 月，{days} 天',
+      inst_gantt_summary_prod_to_accept:'从正式生产日截止全部验收结束，需要 {months} 月，{days} 天'
     },
     en: {
       inst_title:'Installation · Projects', inst_back:'Back to List', inst_empty:'No projects', inst_tab_A:'Installation Plan', inst_tab_C:'Teams·Labor·Weather', inst_tab_E:'Daily Stats', inst_suffix:' Install',
@@ -43271,7 +43279,9 @@ window.refreshMoveBtnState = function () {
       inst_lbl_ship:'Ship', inst_lbl_install:'Install',
       inst_status_not_install:'Not installed', inst_status_installing:'Installing', inst_status_installed:'Installed', inst_status_accepted:'Accepted',
       inst_lbl_spec:'Spec', inst_bldg_gap:'Gap',
-      inst_lbl_installed:'Installed', inst_lbl_uninstalled:'Not installed'
+      inst_lbl_installed:'Installed', inst_lbl_uninstalled:'Not installed',
+      inst_gantt_summary_contract_to_accept:'From contract signing to final acceptance completion: {months} months, {days} days',
+      inst_gantt_summary_prod_to_accept:'From official production start to final acceptance completion: {months} months, {days} days'
     },
     vi: {
       inst_title:'Lắp đặt · Dự án', inst_back:'Quay lại danh sách', inst_empty:'Chưa có dự án', inst_tab_A:'Tổng quan kế hoạch', inst_tab_C:'Đội·Nhân công·Thời tiết', inst_tab_E:'Thống kê ngày', inst_suffix:' Lắp đặt',
@@ -43342,7 +43352,9 @@ window.refreshMoveBtnState = function () {
       inst_lbl_ship:'Gửi', inst_lbl_install:'Lắp',
       inst_status_not_install:'Chưa lắp', inst_status_installing:'Đang lắp', inst_status_installed:'Đã lắp', inst_status_accepted:'Đã nghiệm thu',
       inst_lbl_spec:'Quy cách', inst_bldg_gap:'Thiếu',
-      inst_lbl_installed:'Đã lắp', inst_lbl_uninstalled:'Chưa lắp'
+      inst_lbl_installed:'Đã lắp', inst_lbl_uninstalled:'Chưa lắp',
+      inst_gantt_summary_contract_to_accept:'Từ ngày ký hợp đồng đến khi nghiệm thu toàn bộ kết thúc: {months} tháng, {days} ngày',
+      inst_gantt_summary_prod_to_accept:'Từ ngày bắt đầu sản xuất chính thức đến khi nghiệm thu toàn bộ kết thúc: {months} tháng, {days} ngày'
     }
   };
 
@@ -44178,7 +44190,27 @@ window.refreshMoveBtnState = function () {
     html += mileRow(++n, it('inst_lbl_install_start_date'), data.installStart, '#1E88E5');
     html += barRow(++n, it('inst_lbl_install_end_date')+(data.installDaysForProd?(' ('+prod_fmtNum(data.installDaysForProd)+' '+it('inst_unit_day')+')'):''), data.installStart, data.installEnd, '#1E88E5');
     html += barRow(++n, it('inst_lbl_accept_period'), data.installEnd, data.finalAccept, '#8E24AA', '', '10 '+it('inst_unit_day'));
-    box.innerHTML = html;
+
+    // 右侧汇总：合同签订 → 最终验收；正式生产 → 最终验收
+    var summaryHtml = '';
+    var finalYmd = toYmd(data.finalAccept);
+    if(finalYmd){
+      var contractYmd = toYmd(data.contractDate);
+      if(contractYmd){
+        var d1 = durDays(contractYmd, finalYmd);
+        var m1 = (d1 / 30).toFixed(2);
+        summaryHtml += '<div class="inst-gantt-summary-line">'+it('inst_gantt_summary_contract_to_accept').replace('{months}', m1).replace('{days}', d1)+'</div>';
+      }
+      var prodYmd = toYmd(data.prodStart);
+      if(prodYmd){
+        var d2 = durDays(prodYmd, finalYmd);
+        var m2 = (d2 / 30).toFixed(2);
+        summaryHtml += '<div class="inst-gantt-summary-line">'+it('inst_gantt_summary_prod_to_accept').replace('{months}', m2).replace('{days}', d2)+'</div>';
+      }
+    }
+    if(!summaryHtml) summaryHtml = '<div class="inst-gantt-summary-line">-</div>';
+
+    box.innerHTML = html + '<div class="inst-gantt-summary">' + summaryHtml + '</div>';
   }
   window.inst_renderGantt = inst_renderGantt;
 
