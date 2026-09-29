@@ -44042,6 +44042,7 @@ var cfg={};
 var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'parallel',view:'house',
   color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},
   visible:['zone','name','panels','done','prog','days','team','start','end'],
+  cfgOpen:false,
   showWeekend:true,
   showToday:true,showGrid:true,showDeps:true,showBase:true,viewMode:'Week',colWidth:40,barHeight:22};
 
@@ -44966,7 +44967,16 @@ function toggleCol(k,on){
   if(!cfg.visible.length) cfg.visible=['name'];
   renderAll(); saveCfg();
 }
-function gToggleCfg(){ var p=document.getElementById('cfgPanel'); if(p) p.classList.toggle('open'); }
+function gToggleCfg(){
+  var p=document.getElementById('cfgPanel'); if(!p) return;
+  p.classList.toggle('open');
+  cfg.cfgOpen=p.classList.contains('open');
+  saveCfg();
+}
+function syncCfgOpen(){
+  var p=document.getElementById('cfgPanel'); if(!p) return;
+  if(cfg.cfgOpen) p.classList.add('open'); else p.classList.remove('open');
+}
 function renderCfg(){
   var box=document.getElementById('cfgPanel'); if(!box) return;
   var h='<div class="cfg-h"><span>'+it('g_cfg_title')+'</span><button type="button" onclick="gToggleCfg()">×</button></div><div class="cfg-b">';
@@ -45035,6 +45045,7 @@ function renderAll(){
   applyTblW();
   buildRows(); renderChart(); renderTable();
   renderKPI(); renderZoneTbl(); renderLoad(); renderCfg(); syncScroll();
+  syncCfgOpen();
 }
 function rebuild(){ loadHouses(); schedule(); renderAll(); }
 
