@@ -43550,6 +43550,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !imp
 
 /* ---------- 显示设置面板 ---------- */
 .cfg{width:0;overflow:hidden;transition:width .18s ease;background:#fff;flex:0 0 auto}
+.cfg.no-anim{transition:none !important}
 .cfg.open{width:250px;border-left:1px solid var(--bd);overflow:auto}
 .cfg-h{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;
   font-weight:600;font-size:12px;color:#37474f;border-bottom:1px solid var(--bd2);
@@ -44975,7 +44976,16 @@ function gToggleCfg(){
 }
 function syncCfgOpen(){
   var p=document.getElementById('cfgPanel'); if(!p) return;
-  if(cfg.cfgOpen) p.classList.add('open'); else p.classList.remove('open');
+  var shouldOpen=cfg.cfgOpen, isOpen=p.classList.contains('open');
+  if(shouldOpen===isOpen) return;
+  if(shouldOpen){
+    p.classList.add('no-anim');
+    p.classList.add('open');
+    void p.offsetWidth;          // force reflow before re-enabling transition
+    p.classList.remove('no-anim');
+  } else {
+    p.classList.remove('open');
+  }
 }
 function renderCfg(){
   var box=document.getElementById('cfgPanel'); if(!box) return;
@@ -45140,6 +45150,7 @@ document.addEventListener('click', function(e){
 });
 
 localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); initSplitter();
+window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); };
 </script>
 </body>
   </template>
@@ -46661,12 +46672,34 @@ localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI()
   window.inst_toggleHideInstallZero = inst_toggleHideInstallZero;
 
   /* 语言切换时重渲染安装模块（若可见） */
-  window.addEventListener('app:langchange', function(){
+  window.addEventListener('app:langchange', function(e){
     var v = inst_el('view-install');
     if(v && v.classList.contains('active')){
       var back = inst_el('inst-back-label');
       if(back) back.textContent = '← ' + it('inst_back');
-      if(inst_el('inst-detail') && inst_el('inst-detail').style.display!=='none' && INST_CUR){ inst_renderTabs(INST_ACTIVE_TAB); }
+      if(inst_el('inst-detail') && inst_el('inst-detail').style.display!=='none' && INST_CUR){
+        if(INST_ACTIVE_TAB==='B'){
+          var fr=document.getElementById('instGanttFrame');
+          if(fr && fr.contentWindow && typeof fr.contentWindow.ganttSetLang==='function'){
+            try{
+              /* 只刷新标签页头，保留 iframe，避免甘特面板折叠/重载 */
+              var tabsBox=inst_el('inst-tabs');
+              if(tabsBox){
+                var cMiss=inst_tabCMissingCount(), eMiss=inst_tabEMissingCount(), h='';
+                INST_TABS.forEach(function(t){
+                  var count=t[0]==='C'?cMiss:(t[0]==='E'?eMiss:0);
+                  var badge=(count>0)?'<span class="prod-tab-badge">'+count+'</span>':'';
+                  h+='<div class="prod-tab'+(t[0]==='B'?' active':'')+'" data-key="'+t[0]+'" onclick="inst_renderTab(\''+t[0]+'\')">'+it(t[1])+badge+'</div>';
+                });
+                tabsBox.innerHTML=h;
+              }
+              fr.contentWindow.ganttSetLang(e.detail && e.detail.lang ? e.detail.lang : (window.CUR_LANG||'en'));
+              return;
+            }catch(err){ console.warn('[lang] gantt refresh failed:', err); }
+          }
+        }
+        inst_renderTabs(INST_ACTIVE_TAB);
+      }
       else { inst_renderProduction(); }
     }
   });
