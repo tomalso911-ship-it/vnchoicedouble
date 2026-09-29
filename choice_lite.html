@@ -43548,6 +43548,30 @@ body.col-resizing,body.col-resizing *{cursor:col-resize !important;user-select:n
 .splitter:hover .knob,.splitter.on .knob{opacity:1}
 body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !important}
 
+/* ---------- 显示设置面板 ---------- */
+.cfg{width:0;overflow:hidden;transition:width .18s ease;background:#fff;flex:0 0 auto}
+.cfg.open{width:250px;border-left:1px solid var(--bd);overflow:auto}
+.cfg-h{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;
+  font-weight:600;font-size:12px;color:#37474f;border-bottom:1px solid var(--bd2);
+  position:sticky;top:0;background:#fff;z-index:2}
+.cfg-h button{border:0;background:none;color:var(--txt3);font-size:16px;cursor:pointer;line-height:1}
+.cfg-b{padding:9px 11px 20px}
+.cfg-sec{margin-bottom:16px}
+.cfg-t{font-size:11px;font-weight:600;color:#78909c;margin-bottom:7px;
+  text-transform:uppercase;letter-spacing:.4px}
+.cfg label{display:flex;align-items:center;gap:7px;font-size:12px;color:#455a64;padding:4px 0}
+.cfg select,.cfg input[type=range]{flex:1;min-width:0}
+.cfg input[type=range]{accent-color:var(--pri)}
+.cfg input[type=checkbox]{accent-color:var(--pri)}
+.cfg label .cw{margin-left:auto;font-size:10px;color:var(--txt3);font-variant-numeric:tabular-nums}
+.cfg .fld-lbl{display:block;font-size:12px;color:#455a64;padding:4px 0}
+.cfg textarea{width:100%;min-height:46px;font-size:11px;margin-top:3px}
+.cfg-btns{display:flex;gap:6px;margin-top:8px}
+.cfg-btns button{flex:1;border:1px solid var(--bd);background:#fff;border-radius:5px;
+  padding:4px 6px;font-size:11px;color:var(--txt2);cursor:pointer}
+.cfg-btns button:hover{border-color:var(--pri);color:var(--pri)}
+.cfg-hint{font-size:10px;color:var(--txt3);margin-top:7px;line-height:1.5}
+
 /* ---------- 甘特 ---------- */
 .chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff}
 .ci{position:relative}
@@ -43623,6 +43647,7 @@ table.zt tr:hover td{background:#f7fbff}
   .tbl-wrap{width:100% !important;max-height:260px;border-right:0;border-bottom:1px solid var(--bd)}
   .chart-wrap{min-height:360px}
   .splitter{display:none}
+  .cfg.open{width:100%}
   }
   /* ===== 日历弹出框（iframe 内自包含，与父页 cp-cal 标准设计一致） ===== */
   .cp-date-input-wrapper { display:inline-flex; align-items:center; width:100%; gap:2px; min-width:100px; }
@@ -43666,37 +43691,11 @@ table.zt tr:hover td{background:#f7fbff}
   <div class="card">
     <h2><span data-i18n="g_params">排程参数</span> <span class="tg" data-i18n="g_params_tip">改完点「重新排程」</span></h2>
     <div class="row">
-      <div class="fld"><label data-i18n="g_lbl_cap">日产能（片/组/天）</label><input id="p_cap" type="number" min="1" value="200"></div>
+      <div class="fld"><label data-i18n="g_lbl_cap">日产能（片/组/天）</label><input id="p_cap" type="number" min="1" value="200" onchange="recompute()"></div>
       <div class="fld"><label data-i18n="g_lbl_start">项目开工日</label><div class="cp-date-input-wrapper" onclick="event.stopPropagation()"><input type="text" id="p_start" placeholder="DD/MM/YYYY" readonly onfocus="cpOpenCalendar(this)" oninput="recompute()" style="width:100%;cursor:pointer;"></div></div>
-      <div class="fld"><label data-i18n="g_lbl_cal">工作日历</label><select id="p_cal">
-        <option value="natural" data-i18n="g_cal_natural">自然日（天天作业）</option>
-        <option value="week" data-i18n="g_cal_week">跳过周六日</option>
-        <option value="work" data-i18n="g_cal_work">周末+停工日</option>
-      </select></div>
-      <div class="fld"><label data-i18n="g_lbl_strat">区内房舍分配</label><select id="p_strat">
-        <option value="lpt" data-i18n="g_strat_lpt">大栋优先（LPT）</option>
-        <option value="greedy" data-i18n="g_strat_greedy">按清单顺序，谁空谁接</option>
-      </select></div>
-      <div class="fld"><label data-i18n="g_lbl_zmode">区与区之间</label><select id="p_zmode">
-        <option value="parallel" data-i18n="g_zmode_parallel">同时开工</option>
-        <option value="serial" data-i18n="g_zmode_serial">串行（前区完工才开下一区）</option>
-      </select></div>
-      <div class="fld"><label data-i18n="g_lbl_view">甘特行视图</label><select id="p_view">
-        <option value="house" data-i18n="g_view_house">按房舍（每栋一行）</option>
-        <option value="team" data-i18n="g_view_team">按小组泳道</option>
-      </select></div>
-      <div class="fld"><label data-i18n="g_lbl_color">配色依据</label><select id="p_color">
-        <option value="zone" data-i18n="g_color_zone">按分区</option>
-        <option value="team" data-i18n="g_color_team">按小组</option>
-      </select></div>
       <button class="btn primary" onclick="recompute()" data-i18n="g_btn_recompute">重新排程</button>
-      <button class="btn" onclick="snapBaseline()" data-i18n="g_btn_baseline">设为基线</button>
-      <button class="btn" onclick="clearBaseline()" data-i18n="g_btn_clearbase">清除基线</button>
       <button class="btn" onclick="unlockAll()" data-i18n="g_btn_unlock">解除全部锁定</button>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <div class="fld" style="flex:1 1 240px"><label data-i18n="g_lbl_hol">停工日 / 节假日（每行一个，支持 2026-10-01 或 01/10/2026）</label>
-        <textarea id="p_hol" style="min-height:52px"></textarea></div>
+      <button class="btn" id="btnDisplayCfg" onclick="gToggleCfg()" data-i18n="g_btn_displaycfg">⚙ 显示设置</button>
     </div>
   </div>
 
@@ -43735,6 +43734,7 @@ table.zt tr:hover td{background:#f7fbff}
     <div class="tbl-wrap" id="tblWrap"></div>
     <div class="splitter" id="splitter" data-i18n-title="g_splitter_title" title="拖动调整宽度 · 双击适应列宽"><i class="knob"></i></div>
     <div class="chart-wrap" id="chartWrap"><div class="ci" id="chartInner"></div></div>
+    <div class="cfg" id="cfgPanel"></div>
   </div>
 
   <!-- 区汇总 -->
@@ -43789,6 +43789,13 @@ var GANTT_I18N = {
     g_lbl_view:'甘特行视图', g_view_house:'按房舍（每栋一行）', g_view_team:'按小组泳道',
     g_lbl_color:'配色依据', g_color_zone:'按分区', g_color_team:'按小组',
     g_btn_recompute:'重新排程', g_btn_baseline:'设为基线', g_btn_clearbase:'清除基线', g_btn_unlock:'解除全部锁定',
+    g_btn_displaycfg:'⚙ 显示设置',
+    g_cfg_title:'显示设置', g_cfg_visual:'可视化',
+    g_cfg_weekend:'周末底色', g_cfg_today:'今日基准线', g_cfg_grid:'网格线', g_cfg_deps:'依赖连线', g_cfg_base:'基线对比条',
+    g_cfg_granularity:'时间粒度', g_gran_day:'日', g_gran_week:'周', g_gran_month:'月',
+    g_cfg_datesep:'日期分隔', g_cfg_colwidth:'列宽', g_cfg_rowheight:'列高', g_cfg_color:'配色',
+    g_cfg_fields:'数据字段', g_btn_colfit:'列宽自适应', g_btn_colreset:'恢复默认',
+    g_cfg_hint:'勾选数据字段可显示/隐藏左侧列；拖表头右边缘调宽，双击自适应',
     g_lbl_hol:'停工日 / 节假日（每行一个，支持 2026-10-01 或 01/10/2026）',
     g_houses:'房舍清单', g_houses_tip:'来源：现有数据源 / 粘贴 / 文件',
     g_btn_imp:'粘贴 / 导入数据', g_btn_sample:'载入示例', g_btn_add:'+ 新增房舍', g_btn_csv:'导出 CSV',
@@ -43830,6 +43837,13 @@ var GANTT_I18N = {
     g_lbl_view:'Gantt row view', g_view_house:'By house (one row each)', g_view_team:'By team lane',
     g_lbl_color:'Color by', g_color_zone:'By zone', g_color_team:'By team',
     g_btn_recompute:'Recompute', g_btn_baseline:'Set baseline', g_btn_clearbase:'Clear baseline', g_btn_unlock:'Unlock all',
+    g_btn_displaycfg:'⚙ Display settings',
+    g_cfg_title:'Display Settings', g_cfg_visual:'Visualization',
+    g_cfg_weekend:'Weekend shading', g_cfg_today:'Today line', g_cfg_grid:'Grid lines', g_cfg_deps:'Dependency arrows', g_cfg_base:'Baseline bars',
+    g_cfg_granularity:'Time unit', g_gran_day:'Day', g_gran_week:'Week', g_gran_month:'Month',
+    g_cfg_datesep:'Date separator', g_cfg_colwidth:'Column width', g_cfg_rowheight:'Row height', g_cfg_color:'Color by',
+    g_cfg_fields:'Data fields', g_btn_colfit:'Fit columns', g_btn_colreset:'Reset',
+    g_cfg_hint:'Tick data fields to show/hide left columns; drag header right edge to resize, double-click to fit',
     g_lbl_hol:'Off-days / Holidays (one per line; 2026-10-01 or 01/10/2026)',
     g_houses:'House List', g_houses_tip:'Source: data source / paste / file',
     g_btn_imp:'Paste / Import', g_btn_sample:'Load sample', g_btn_add:'+ Add house', g_btn_csv:'Export CSV',
@@ -43871,6 +43885,13 @@ var GANTT_I18N = {
     g_lbl_view:'Kiểu hàng Gantt', g_view_house:'Theo chuồng (mỗi chuồng 1 hàng)', g_view_team:'Theo làn đội',
     g_lbl_color:'Tô màu theo', g_color_zone:'Theo vùng', g_color_team:'Theo đội',
     g_btn_recompute:'Tính lại', g_btn_baseline:'Đặt baseline', g_btn_clearbase:'Xóa baseline', g_btn_unlock:'Mở khóa tất cả',
+    g_btn_displaycfg:'⚙ Cài đặt hiển thị',
+    g_cfg_title:'Cài đặt hiển thị', g_cfg_visual:'Trực quan',
+    g_cfg_weekend:'Nền cuối tuần', g_cfg_today:'Đường hôm nay', g_cfg_grid:'Lưới', g_cfg_deps:'Mũi tên phụ thuộc', g_cfg_base:'Thanh cơ sở',
+    g_cfg_granularity:'Đơn vị thời gian', g_gran_day:'Ngày', g_gran_week:'Tuần', g_gran_month:'Tháng',
+    g_cfg_datesep:'Dấu cách ngày', g_cfg_colwidth:'Độ rộng cột', g_cfg_rowheight:'Chiều cao hàng', g_cfg_color:'Tô màu theo',
+    g_cfg_fields:'Trường dữ liệu', g_btn_colfit:'Vừa cột', g_btn_colreset:'Khôi phục',
+    g_cfg_hint:'Tick trường dữ liệu để ẩn/hiện cột trái; kéo cạnh phải tiêu đề để đổi rộng, nhấp đúp để vừa',
     g_lbl_hol:'Ngày nghỉ (mỗi dòng một; 2026-10-01 hoặc 01/10/2026)',
     g_houses:'Danh sách chuồng', g_houses_tip:'Nguồn: dữ liệu / dán / tệp',
     g_btn_imp:'Dán / Nhập', g_btn_sample:'Tải mẫu', g_btn_add:'+ Thêm chuồng', g_btn_csv:'Xuất CSV',
@@ -44019,7 +44040,9 @@ var houses=[];   // {id,zone,name,panels,done,days,team,start,end,lockStart,lock
 var zones=[];    // {name,teams,start}
 var cfg={};
 var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'parallel',view:'house',
-  color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},showWeekend:true,
+  color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},
+  visible:['zone','name','panels','done','prog','days','team','start','end'],
+  showWeekend:true,
   showToday:true,showGrid:true,showDeps:true,showBase:true,viewMode:'Week',colWidth:40,barHeight:22};
 
 var COLS=[
@@ -44046,6 +44069,7 @@ function loadCfg(){
   var c={}; for(var k in DEF) c[k]=DEF[k];
   var raw=null; try{ raw=localStorage.getItem('house_sched_v1'); }catch(e){}
   if(raw){ try{ var o=JSON.parse(raw); for(var k2 in o) if(o[k2]!==undefined&&o[k2]!==null) c[k2]=o[k2]; }catch(e){} }
+  if(!c.visible||!c.visible.length) c.visible=DEF.visible.slice();
   if(!c.start) c.start=today();
   cfg=c;
 }
@@ -44362,10 +44386,11 @@ function tipOf(r){
  * ======================================================================= */
 function renderTable(){
   var box=document.getElementById('tblWrap'), h='';
+  var cols=visibleCols();
   h+='<table><colgroup>';
-  COLS.forEach(function(c){ h+='<col data-k="'+c.k+'" style="width:'+colW(c.k)+'px">'; });
+  cols.forEach(function(c){ h+='<col data-k="'+c.k+'" style="width:'+colW(c.k)+'px">'; });
   h+='</colgroup><thead><tr>';
-  COLS.forEach(function(c){
+  cols.forEach(function(c){
     h+='<th data-k="'+c.k+'" title="'+it('g_col_resize_tip')+'">'+esc(c.n)
       +'<i class="rs" onmousedown="colResizeStart(event,this)" ondblclick="colAutoFit(\''+c.k+'\')"></i></th>';
   });
@@ -44373,69 +44398,101 @@ function renderTable(){
   if(cfg.view==='team'){
     zones.forEach(function(z){
       var zs=houses.filter(function(x){return x.zone===z.name;});
+      if(!zs.length) return;
       var collapsed=isZoneCollapsed(z.name);
-      var icon=collapsed?'▶':'▼', tip=collapsed?it('g_expand'):it('g_collapse');
-      /* 9 个单元格严格对应 COLS 的 9 列，用 colspan 会在 table-layout:fixed 下错位 */
-      h+='<tr class="zrow'+(collapsed?' collapsed':'')+'"><td><i class="collapse-btn" onclick="toggleZone(\''+esc(z.name)+'\',event)" title="'+esc(tip)+'">'+icon+'</i>'+esc(z.name)+'</td><td>'+it('g_zone_summary')+'</td><td class="num">'+sum(zs,'panels')
-        +'</td><td class="num">'+sum(zs,'done')+'</td><td>'+(sum(zs,'panels')?Math.round(sum(zs,'done')/sum(zs,'panels')*100)+'%':'0%')
-        +'</td><td>'+(z.days||0)+'</td><td>'+Math.max(1,z.teams|0)+it('g_unit_group')+'</td><td>'+dmy(z.start)+'</td><td>'+dmy(z.end)+'</td></tr>';
+      h+='<tr class="zrow'+(collapsed?' collapsed':'')+'">'+cellsZone(z,cols,collapsed)+'</tr>';
       if(collapsed) return;
       for(var t=0;t<Math.max(1,z.teams|0);t++){
-        /* 必须按 start 排序再取首尾，否则 houses 原顺序会让「开始」晚于「结束」 */
-        var ths=houses.filter(function(x){ return x.zone===z.name&&x.team===t; })
-                      .sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
-        var last=ths.length?ths[ths.length-1]:null;
-        h+='<tr class="trow"><td></td><td>'+teamLabel(t)+'</td><td class="num">'+(ths.length?sum(ths,'panels'):'—')
-          +'</td><td class="num">'+(ths.length?sum(ths,'done'):'—')
-          +'</td><td></td><td>'+(ths.length?ths.length+it('g_load_dong'):it('g_idle'))+'</td><td></td><td>'
-          +(ths.length?dmy(ths[0].start):'—')+'</td><td>'+(last?dmy(last.end):'—')+'</td></tr>';
+        h+='<tr class="trow">'+cellsTeam(z,t,cols)+'</tr>';
       }
-      h+='<tr class="msrow"><td></td><td>🏁 完工</td><td></td><td></td><td></td><td></td><td></td>'
-        +'<td>'+dmy(z.end)+'</td><td>'+dmy(z.end)+'</td></tr>';
+      h+='<tr class="msrow">'+cellsMs(z,cols,false)+'</tr>';
     });
   }else{
-    /* 房舍视图：左表必须与 buildRows() 严格同序（区汇总 → 按小组分组 → 组内按开工日 → 区完工）
-       直接按 zones/houses 重建，避免依赖可能被外部改动的 rows 数组 */
+    /* 房舍视图：左表必须与 buildRows() 严格同序（区汇总 → 按小组分组 → 组内按开工日 → 区完工） */
     zones.forEach(function(z){
       var hs=houses.filter(function(h){ return h.zone===z.name; });
       if(!hs.length) return;
-      /* 区汇总行 */
       var collapsed=isZoneCollapsed(z.name);
-      var icon=collapsed?'▶':'▼', tip=collapsed?it('g_expand'):it('g_collapse');
-      h+='<tr class="zrow'+(collapsed?' collapsed':'')+'"><td><i class="collapse-btn" onclick="toggleZone(\''+esc(z.name)+'\',event)" title="'+esc(tip)+'">'+icon+'</i>'+esc(z.name)+'</td><td>'+it('g_zone_summary')+'</td><td class="num">'+sum(hs,'panels')
-        +'</td><td class="num">'+sum(hs,'done')+'</td><td>'+(sum(hs,'panels')?Math.round(sum(hs,'done')/sum(hs,'panels')*100)+'%':'0%')
-        +'</td><td>'+(z.days||0)+'</td>'
-        +'<td>'+Math.max(1,z.teams|0)+it('g_unit_group')+'</td><td>'+dmy(z.start)+'</td><td>'+dmy(z.end)+'</td></tr>';
+      h+='<tr class="zrow'+(collapsed?' collapsed':'')+'">'+cellsZone(z,cols,collapsed)+'</tr>';
       if(collapsed) return;
-      /* 按小组聚合成道，组内按开工日 */
       var byTeam={};
       hs.forEach(function(h){ (byTeam[h.team]=byTeam[h.team]||[]).push(h); });
       Object.keys(byTeam).sort(function(a,b){ return (+a)-(+b); }).forEach(function(tk){
         var arr=byTeam[tk].slice().sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
         arr.forEach(function(hh){
-          h+='<tr data-id="'+esc(hh.id)+'" onclick="selRow(this)">';
-          h+='<td>'+esc(hh.zone)+'</td>';
-          h+='<td>'+esc(hh.name)+'</td>';
-          h+='<td class="num"><input type="number" min="0" value="'+hh.panels+'" onchange="evNum(\''+hh.id+'\',\'panels\',this.value)"></td>';
-          h+='<td class="num"><input type="number" min="0" value="'+hh.done+'" onchange="evNum(\''+hh.id+'\',\'done\',this.value)"></td>';
-          h+='<td>'+(hh.panels?Math.round((hh.done||0)/hh.panels*100)+'%':'0%')+'</td>';
-          h+='<td class="num">'+hh.days+'</td>';
-          h+='<td><select onchange="evTeam(\''+hh.id+'\',this.value)">'+teamOpts(hh)+'</select></td>';
-          h+='<td><input value="'+esc(dmy(hh.start))+'" onchange="evStart(\''+hh.id+'\',this.value)">'
-            +(hh.lockStart?'<span class="lk" title="'+it('g_locked_tip')+'">🔒</span>':'')+'</td>';
-          h+='<td>'+dmy(hh.end)+'</td>';
-          h+='</tr>';
+          h+='<tr data-id="'+esc(hh.id)+'" onclick="selRow(this)">'+cellsHouse(hh,cols)+'</tr>';
         });
       });
-      /* 区完工里程碑 */
-      h+='<tr class="msrow"><td>'+esc(z.name)+'</td><td>🏁 完工</td><td></td><td></td><td></td><td></td><td></td>'
-        +'<td>'+dmy(z.end)+'</td><td>'+dmy(z.end)+'</td></tr>';
+      h+='<tr class="msrow">'+cellsMs(z,cols,true)+'</tr>';
     });
   }
-  if(!houses.length) h+='<tr><td class="empty" colspan="'+COLS.length+'">'+it('g_empty_houses')+'</td></tr>';
+  if(!houses.length) h+='<tr><td class="empty" colspan="'+(cols.length||1)+'">'+it('g_empty_houses')+'</td></tr>';
   h+='</tbody></table>';
   box.innerHTML=h;
   syncTableWidth();
+}
+/* 可见列（至少保留一列，否则表格无法渲染） */
+function visibleCols(){
+  var cols=COLS.filter(function(c){ return (cfg.visible||[]).indexOf(c.k)>=0; });
+  if(!cols.length) cols=[findCol('name')||COLS[0]];
+  return cols;
+}
+/* 逐列拼单元格：隐藏某列时其余列仍能正确对齐 */
+function rowCells(map, cols){
+  var s=''; cols.forEach(function(c){ s+=(map[c.k]!==undefined?map[c.k]:'<td></td>'); }); return s;
+}
+function cellsZone(z, cols, collapsed){
+  var hs=houses.filter(function(h){ return h.zone===z.name; });
+  var pn=sum(hs,'panels'), dn=sum(hs,'done');
+  return rowCells({
+    zone:'<td><i class="collapse-btn" onclick="toggleZone(\''+esc(z.name)+'\',event)" title="'+esc(collapsed?it('g_expand'):it('g_collapse'))+'">'+(collapsed?'▶':'▼')+'</i>'+esc(z.name)+'</td>',
+    name:'<td>'+it('g_zone_summary')+'</td>',
+    panels:'<td class="num">'+pn+'</td>',
+    done:'<td class="num">'+dn+'</td>',
+    prog:'<td>'+(pn?Math.round(dn/pn*100)+'%':'0%')+'</td>',
+    days:'<td>'+(z.days||0)+'</td>',
+    team:'<td>'+Math.max(1,z.teams|0)+it('g_unit_group')+'</td>',
+    start:'<td>'+dmy(z.start)+'</td>',
+    end:'<td>'+dmy(z.end)+'</td>'
+  }, cols);
+}
+function cellsTeam(z, t, cols){
+  var ths=houses.filter(function(x){ return x.zone===z.name&&x.team===t; })
+                .sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
+  var last=ths.length?ths[ths.length-1]:null;
+  return rowCells({
+    zone:'<td></td>',
+    name:'<td>'+teamLabel(t)+'</td>',
+    panels:'<td class="num">'+(ths.length?sum(ths,'panels'):'—')+'</td>',
+    done:'<td class="num">'+(ths.length?sum(ths,'done'):'—')+'</td>',
+    prog:'<td></td>',
+    days:'<td>'+(ths.length?ths.length+it('g_load_dong'):it('g_idle'))+'</td>',
+    team:'<td></td>',
+    start:'<td>'+(ths.length?dmy(ths[0].start):'—')+'</td>',
+    end:'<td>'+(last?dmy(last.end):'—')+'</td>'
+  }, cols);
+}
+function cellsMs(z, cols, showZone){
+  return rowCells({
+    zone:'<td>'+(showZone?esc(z.name):'')+'</td>',
+    name:'<td>🏁'+it('g_finish')+'</td>',
+    start:'<td>'+dmy(z.end)+'</td>',
+    end:'<td>'+dmy(z.end)+'</td>'
+  }, cols);
+}
+function cellsHouse(hh, cols){
+  return rowCells({
+    zone:'<td>'+esc(hh.zone)+'</td>',
+    name:'<td>'+esc(hh.name)+'</td>',
+    panels:'<td class="num"><input type="number" min="0" value="'+hh.panels+'" onchange="evNum(\''+hh.id+'\',\'panels\',this.value)"></td>',
+    done:'<td class="num"><input type="number" min="0" value="'+hh.done+'" onchange="evNum(\''+hh.id+'\',\'done\',this.value)"></td>',
+    prog:'<td>'+(hh.panels?Math.round((hh.done||0)/hh.panels*100)+'%':'0%')+'</td>',
+    days:'<td class="num">'+hh.days+'</td>',
+    team:'<td><select onchange="evTeam(\''+hh.id+'\',this.value)">'+teamOpts(hh)+'</select></td>',
+    start:'<td><input value="'+esc(dmy(hh.start))+'" onchange="evStart(\''+hh.id+'\',this.value)">'
+      +(hh.lockStart?'<span class="lk" title="'+it('g_locked_tip')+'">🔒</span>':'')+'</td>',
+    end:'<td>'+dmy(hh.end)+'</td>'
+  }, cols);
 }
 function pctOf(r){ return r.panels?Math.round((r.done||0)/r.panels*100)+'%':'0%'; }
 function teamOpts(h){
@@ -44459,7 +44516,8 @@ function selRow(tr){ var id=tr.getAttribute('data-id');
   for(var j=0;j<bs.length;j++) bs[j].classList.toggle('sel',bs[j].getAttribute('data-id')===id); }
 function syncTableWidth(){
   var box=document.getElementById('tblWrap'), tb=box&&box.querySelector('table'); if(!tb) return;
-  var s=0; COLS.forEach(function(c){ s+=colW(c.k); });
+  var cols=visibleCols();
+  var s=0; cols.forEach(function(c){ s+=colW(c.k); });
   var avail=Math.max(0,(box.clientWidth||0)-2), extra=avail>s?(avail-s):0;
   tb.style.width=(s+extra)+'px';
   var nm=tb.querySelector('col[data-k="name"]');
@@ -44475,7 +44533,7 @@ function colResizeStart(e,el){
   function mv(ev){ var w=Math.max(COL_MIN,Math.min(COL_MAX,Math.round(w0+ev.clientX-x0)));
     cfg.colW=cfg.colW||{}; cfg.colW[k]=w; col.style.width=w+'px'; syncTableWidth(); }
   function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
-    th.classList.remove('rs-on'); document.body.classList.remove('col-resizing'); saveCfg(); }
+    th.classList.remove('rs-on'); document.body.classList.remove('col-resizing'); saveCfg(); renderCfg(); }
   document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
 }
 function estText(s){ s=String(s==null?'':s); var n=0;
@@ -44489,14 +44547,25 @@ function measureText(s){
     document.body.appendChild(d); }
   d.textContent=s; var m=d.scrollWidth; return m>0?m:estText(s);
 }
-function colAutoFit(k){
+function colAutoFit(k, quiet){
   var c=findCol(k); if(!c) return;
   var mx=measureText(c.n)+30;
   if(k==='name') houses.forEach(function(h){ mx=Math.max(mx,measureText(h.name)+22); });
   if(k==='zone') houses.forEach(function(h){ mx=Math.max(mx,measureText(h.zone)+22); });
   if(k==='team') mx=Math.max(mx,measureText(it('g_team_fmt').replace('{n}',1))+40);
+  if(k==='prog'||k==='days') mx=Math.max(mx, measureText('100%')+22);
   cfg.colW=cfg.colW||{}; cfg.colW[k]=Math.max(COL_MIN,Math.min(COL_MAX,Math.ceil(mx)));
-  saveCfg(); renderTable();
+  if(!quiet){ saveCfg(); renderTable(); syncTableWidth(); renderCfg(); }
+}
+function colFitAll(){
+  cfg.colW={};
+  visibleCols().forEach(function(c){ colAutoFit(c.k, true); });
+  renderTable(); saveCfg(); syncTableWidth(); renderCfg();
+}
+function colReset(){
+  cfg.colW={};
+  cfg.visible=DEF.visible.slice();
+  renderAll(); saveCfg();
 }
 
 /* =========================================================================
@@ -44871,41 +44940,104 @@ function addHouse(){
  * 13. 参数绑定 / 主入口
  * ======================================================================= */
 function readParams(){
-  cfg.cap=Math.max(1,parseInt(document.getElementById('p_cap').value,10)||200);
-  cfg.start=toYmd(document.getElementById('p_start').value)||cfg.start||today();
-  cfg.cal=document.getElementById('p_cal').value;
-  cfg.strat=document.getElementById('p_strat').value;
-  cfg.zmode=document.getElementById('p_zmode').value;
-  cfg.view=document.getElementById('p_view').value;
-  cfg.color=document.getElementById('p_color').value;
-  cfg.holidays=document.getElementById('p_hol').value;
+  var e=document.getElementById('p_cap'); if(e) cfg.cap=Math.max(1,parseInt(e.value,10)||200);
+  e=document.getElementById('p_start'); if(e) cfg.start=toYmd(e.value)||cfg.start||today();
 }
 function syncParamUI(){
-  document.getElementById('p_cap').value=cfg.cap;
-  document.getElementById('p_start').value=cfg.start?cpFmtDDMMYYYY(+cfg.start.slice(0,4),+cfg.start.slice(5,7)-1,+cfg.start.slice(8,10)):'';
-  document.getElementById('p_cal').value=cfg.cal;
-  document.getElementById('p_strat').value=cfg.strat;
-  document.getElementById('p_zmode').value=cfg.zmode;
-  document.getElementById('p_view').value=cfg.view;
-  document.getElementById('p_color').value=cfg.color;
-  document.getElementById('p_hol').value=cfg.holidays||'';
-  document.getElementById('p_hol').parentNode.parentNode.style.display=(cfg.cal==='work')?'':'none';
+  var e=document.getElementById('p_cap'); if(e) e.value=cfg.cap;
+  e=document.getElementById('p_start');
+  if(e) e.value=cfg.start?cpFmtDDMMYYYY(+cfg.start.slice(0,4),+cfg.start.slice(5,7)-1,+cfg.start.slice(8,10)):'';
 }
 function recompute(){ readParams(); schedule(); renderAll(); saveCfg(); }
+/* ---------- 显示设置面板 ---------- */
+var CFG_SCHED_KEYS={cap:1,start:1,cal:1,strat:1,zmode:1,holidays:1};
+function setCfg(k,v){
+  if(k==='cap') cfg.cap=Math.max(1,parseInt(v,10)||200);
+  else if(k==='start') cfg.start=toYmd(v)||cfg.start||today();
+  else cfg[k]=v;
+  if(CFG_SCHED_KEYS[k]) schedule();
+  renderAll(); saveCfg();
+}
+function toggleCol(k,on){
+  cfg.visible=cfg.visible||[];
+  var i=cfg.visible.indexOf(k);
+  if(on&&i<0) cfg.visible.push(k);
+  if(!on&&i>=0) cfg.visible.splice(i,1);
+  if(!cfg.visible.length) cfg.visible=['name'];
+  renderAll(); saveCfg();
+}
+function gToggleCfg(){ var p=document.getElementById('cfgPanel'); if(p) p.classList.toggle('open'); }
+function renderCfg(){
+  var box=document.getElementById('cfgPanel'); if(!box) return;
+  var h='<div class="cfg-h"><span>'+it('g_cfg_title')+'</span><button type="button" onclick="gToggleCfg()">×</button></div><div class="cfg-b">';
+  /* 可视化 */
+  h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_cfg_visual')+'</div>';
+  [['showWeekend','g_cfg_weekend'],['showToday','g_cfg_today'],['showGrid','g_cfg_grid'],
+   ['showDeps','g_cfg_deps'],['showBase','g_cfg_base']].forEach(function(o){
+    h+='<label><input type="checkbox" '+(cfg[o[0]]?'checked':'')+' onchange="setCfg(\''+o[0]+'\',this.checked)"> '+it(o[1])+'</label>';
+  });
+  h+='<label>'+it('g_cfg_granularity')+' <select onchange="setCfg(\'viewMode\',this.value)">';
+  [['Day','g_gran_day'],['Week','g_gran_week'],['Month','g_gran_month']].forEach(function(o){
+    h+='<option value="'+o[0]+'"'+(cfg.viewMode===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
+  }); h+='</select></label>';
+  h+='<label>'+it('g_cfg_datesep')+' <select onchange="setCfg(\'dateSep\',this.value)">';
+  [['/','17/08/2026'],['-','17-08-2026'],['.','17.08.2026']].forEach(function(o){
+    h+='<option value="'+o[0]+'"'+(cfg.dateSep===o[0]?' selected':'')+'>'+o[1]+'</option>';
+  }); h+='</select></label>';
+  h+='<label>'+it('g_cfg_colwidth')+' <input type="range" min="24" max="110" value="'+cfg.colWidth+'" onchange="setCfg(\'colWidth\',+this.value)"><span class="cw">'+cfg.colWidth+'</span></label>';
+  h+='<label>'+it('g_cfg_rowheight')+' <input type="range" min="14" max="38" value="'+cfg.barHeight+'" onchange="setCfg(\'barHeight\',+this.value)"><span class="cw">'+cfg.barHeight+'</span></label>';
+  h+='<label>'+it('g_cfg_color')+' <select onchange="setCfg(\'color\',this.value)">';
+  [['zone','g_color_zone'],['team','g_color_team']].forEach(function(o){
+    h+='<option value="'+o[0]+'"'+(cfg.color===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
+  }); h+='</select></label>';
+  h+='</div>';
+  /* 排程参数（原顶部下拉 / 基线按钮已并入此处） */
+  h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_params')+'</div>';
+  h+='<label>'+it('g_lbl_cal')+' <select onchange="setCfg(\'cal\',this.value)">';
+  [['natural','g_cal_natural'],['week','g_cal_week'],['work','g_cal_work']].forEach(function(o){
+    h+='<option value="'+o[0]+'"'+(cfg.cal===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
+  }); h+='</select></label>';
+  h+='<label>'+it('g_lbl_strat')+' <select onchange="setCfg(\'strat\',this.value)">';
+  [['lpt','g_strat_lpt'],['greedy','g_strat_greedy']].forEach(function(o){
+    h+='<option value="'+o[0]+'"'+(cfg.strat===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
+  }); h+='</select></label>';
+  h+='<label>'+it('g_lbl_zmode')+' <select onchange="setCfg(\'zmode\',this.value)">';
+  [['parallel','g_zmode_parallel'],['serial','g_zmode_serial']].forEach(function(o){
+    h+='<option value="'+o[0]+'"'+(cfg.zmode===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
+  }); h+='</select></label>';
+  h+='<label>'+it('g_lbl_view')+' <select onchange="setCfg(\'view\',this.value)">';
+  [['house','g_view_house'],['team','g_view_team']].forEach(function(o){
+    h+='<option value="'+o[0]+'"'+(cfg.view===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
+  }); h+='</select></label>';
+  if(cfg.cal==='work'){
+    h+='<div class="fld-lbl">'+it('g_lbl_hol')+'<textarea onchange="setCfg(\'holidays\',this.value)">'+esc(cfg.holidays||'')+'</textarea></div>';
+  }
+  h+='<div class="cfg-btns"><button type="button" onclick="snapBaseline()">'+it('g_btn_baseline')+'</button>'
+    +'<button type="button" onclick="clearBaseline()">'+it('g_btn_clearbase')+'</button></div>';
+  h+='</div>';
+  /* 数据字段 */
+  h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_cfg_fields')+'</div>';
+  COLS.forEach(function(c){
+    h+='<label><input type="checkbox" '+(cfg.visible.indexOf(c.k)>=0?'checked':'')
+      +' onchange="toggleCol(\''+c.k+'\',this.checked)"> '+esc(c.n)
+      +'<span class="cw">'+colW(c.k)+'</span></label>';
+  });
+  h+='<div class="cfg-btns"><button type="button" onclick="colFitAll()">'+it('g_btn_colfit')+'</button>'
+    +'<button type="button" onclick="colReset()">'+it('g_btn_colreset')+'</button></div>';
+  h+='<div class="cfg-hint">'+it('g_cfg_hint')+'</div>';
+  h+='</div>';
+  h+='</div>';
+  box.innerHTML=h;
+}
 function renderAll(){
   document.documentElement.style.setProperty('--row-h',rowH()+'px');
   document.documentElement.style.setProperty('--head-h','66px');
   applyTblW();
   buildRows(); renderChart(); renderTable();
-  renderKPI(); renderZoneTbl(); renderLoad(); syncScroll();
+  renderKPI(); renderZoneTbl(); renderLoad(); renderCfg(); syncScroll();
 }
 function rebuild(){ loadHouses(); schedule(); renderAll(); }
 
-document.getElementById('p_cal').addEventListener('change',function(){ readParams(); syncParamUI(); schedule(); renderAll(); saveCfg(); });
-['p_strat','p_zmode','p_view','p_color'].forEach(function(id){
-  document.getElementById(id).addEventListener('change',recompute); });
-['p_cap','p_start','p_hol'].forEach(function(id){
-  document.getElementById(id).addEventListener('change',recompute); });
 document.getElementById('impText').addEventListener('input',impFillMapping);
 document.getElementById('impFile').addEventListener('change',function(e){
   var f=e.target.files&&e.target.files[0]; if(!f) return;
