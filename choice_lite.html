@@ -43601,15 +43601,17 @@ body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !imp
 .deps{position:absolute;left:0;top:0;overflow:visible;z-index:3;pointer-events:none}
 .deps.dragging{opacity:.35}
 .bar{position:absolute;border-radius:3px;z-index:2;cursor:grab;touch-action:none;
-  background-repeat:no-repeat;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+  background:transparent;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .bar:active{cursor:grabbing}
 .bar.sel{outline:2px solid var(--pri);outline-offset:1px}
 .bar::before{content:attr(data-lbl);position:absolute;left:6px;top:0;bottom:0;display:flex;align-items:center;
-  font-size:10px;white-space:nowrap;pointer-events:none;color:var(--fg,#fff);
+  font-size:10px;white-space:nowrap;pointer-events:none;color:var(--fg,#fff);z-index:4;
   text-shadow:0 1px 2px rgba(0,0,0,.5)}
 .bar.out::before{left:calc(100% + 6px);color:var(--txt2);text-shadow:none}
-.bar::after{content:'';position:absolute;right:0;top:0;bottom:0;width:7px;background:transparent}
+.bar::after{content:'';position:absolute;right:0;top:0;bottom:0;width:7px;background:transparent;z-index:4}
 .bar:hover::after{background:rgba(255,255,255,.42)}
+.bar-seg{position:absolute;top:0;height:100%;border-radius:0;pointer-events:none}
+.bar-progress{position:absolute;top:0;left:0;height:100%;z-index:3;pointer-events:none}
 .bar:hover{box-shadow:0 1px 2px rgba(0,0,0,.12),inset 0 -7px 0 -4px rgba(255,255,255,.55)}
 .bar.sum{border-radius:2px;height:9px !important;z-index:2}
 .bar.sum::before{content:none}
@@ -44010,15 +44012,11 @@ function shade(hex,a){ var n=parseInt(hex.slice(1),16);
   return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1); }
 
 /* =========================================================================
- * 2. 工作日历
+ * 2. 工作日历（已锁定：除越南春节外，全年无休；春节停工日由生产模块自动注入）
  * ======================================================================= */
 var HOL={};
-function isWork(d){
-  if(cfg.cal==='natural') return true;
-  var w=dow(d); if(w===0||w===6) return false;
-  if(cfg.cal==='work'&&HOL[d]) return false;
-  return true;
-}
+var TET={};
+function isWork(d){ return !TET[d]; }
 function nextWork(d){ var g=0; while(!isWork(d)&&g++<400) d=addDays(d,1); return d; }
 /* 从 start 起，占用 n 个工作日，返回最后一个工作日 */
 function addWork(s,n){ var d=nextWork(s), rem=Math.max(0,(n|0)-1), g=0;
@@ -44027,8 +44025,19 @@ function nextAfter(e){ return nextWork(addDays(e,1)); }
 /* 区间内工作日数 */
 function workDaysBetween(a,b){ var n=0,d=toYmd(a),e=toYmd(b),g=0;
   while(d&&d<=e&&g++<4000){ if(isWork(d)) n++; d=addDays(d,1); } return n; }
+function parseTetHolidays(){
+  TET={};
+  try{
+    var list=(typeof window.parent!=='undefined' && window.parent.BOARD_HOLIDAYS)?window.parent.BOARD_HOLIDAYS:[];
+    list.forEach(function(h){
+      if(h.zh!=='春节' || !h.vn) return;
+      for(var i=-7;i<=10;i++){ TET[addDays(h.from,i)]=1; }
+    });
+  }catch(e){}
+}
 function parseHolidays(){
   HOL={}; (cfg.holidays||'').split(/\n|,|;/).forEach(function(x){ var y=toYmd(x); if(y) HOL[y]=1; });
+  parseTetHolidays();
 }
 
 /* =========================================================================
@@ -44364,18 +44373,51 @@ function renderChart(){
       var bx=S.x(r.house.bs), bw=Math.max(S.x(addDays(r.house.be,1))-bx,3);
       h+='<div class="base" style="left:'+Math.round(bx)+'px;top:'+Math.round(top-5)+'px;width:'+Math.round(bw)+'px"></div>';
     }
-    h+='<div class="bar'+(w2<48?' out':'')+locked+'" data-id="'+esc(r.id)+'" data-lbl="'+esc(lbl)+'"'
+    h+='<div id="bar-'+esc(r.id)+'" class="bar'+(w2<48?' out':'')+locked+'" data-id="'+esc(r.id)+'" data-lbl="'+esc(lbl)+'"'
       +' style="left:'+Math.round(x2)+'px;top:'+Math.round(top)+'px;width:'+w2+'px;height:'+bh+'px;'
-      +bgFor(col3,pct)+';--fg:'+fgOn(col3)+'"'
+      +'--fg:'+fgOn(col3)+'"'
       +' title="'+tipOf(r)+'"'
-      +(r.kind==='house'?' onmousedown="dragStart(event,this)" ontouchstart="dragStart(event,this)"':'')+'"></div>';
+      +(r.kind==='house'?' onmousedown="dragStart(event,this)" ontouchstart="dragStart(event,this)"':'')+'></div>';
   });
   h+='</div>';   /* ← .bd 在这里才闭合：所有条形/依赖线都是它的子元素 */
   inner.style.width=S.width+'px';
   inner.innerHTML=h;
+  rows.forEach(function(r,i){
+    if(r.kind==='house'||r.kind==='team'){
+      var el=document.getElementById('bar-'+esc(r.id));
+      if(el){ var col=barColorOf(r); var pct=r.panels?Math.round(Math.min(100,(r.done||0)/r.panels*100)):0; setBarBody(el,r,S.x(r.start),Math.max(Math.round(S.dayW*(diffDays(r.start,r.end)+1)),4),col,pct); }
+    }
+  });
 }
-function bgFor(col,p){ return 'background-color:'+col+';background-image:linear-gradient(to right,'
+function bgForProgress(col,p){ return 'background-image:linear-gradient(to right,'
   +shade(col,-30)+' 0 '+p+'%,rgba(0,0,0,0) '+p+'% 100%)'; }
+function barSegs(s,e){
+  var segs=[]; var cur=toYmd(s), last=toYmd(e);
+  if(!cur||!last) return segs;
+  var curTet=!!TET[cur], segStart=cur;
+  while(cur<last){
+    cur=addDays(cur,1);
+    var t=!!TET[cur];
+    if(t!==curTet){ segs.push({start:segStart,end:addDays(cur,-1),tet:curTet}); segStart=cur; curTet=t; }
+  }
+  segs.push({start:segStart,end:last,tet:curTet});
+  return segs;
+}
+function setBarBody(el,r,x,w,col,pct){
+  var segs=barSegs(r.start,r.end), gray='#9e9e9e', h='';
+  if(segs.length<=1){
+    var fill=(segs[0]&&segs[0].tet)?gray:col;
+    h+='<div class="bar-seg" style="left:0;top:0;width:100%;background:'+fill+'"></div>';
+  } else {
+    segs.forEach(function(seg){
+      var sx=Math.round(S.x(seg.start)-x);
+      var sw=Math.max(1, Math.round(S.x(addDays(seg.end,1))-S.x(seg.start)));
+      h+='<div class="bar-seg" style="left:'+sx+'px;width:'+sw+'px;background:'+(seg.tet?gray:col)+'"></div>';
+    });
+  }
+  h+='<div class="bar-progress" style="width:100%;'+bgForProgress(col,pct)+'"></div>';
+  el.innerHTML=h;
+}
 function tipOf(r){
   if(r.kind==='house'){
     var h=r.house, rest=h.panels-h.done, wd=workDaysBetween(h.start,h.end);
@@ -44786,8 +44828,8 @@ function updateBar(i){
   var col=barColorOf(r);
   var x=S.x(r.start), w=Math.max(Math.round(S.dayW*(diffDays(r.start,r.end)+1)),4);
   el.className='bar'+(w<48?' out':'')+(r.house&&r.house.lockStart?' locked':'');
-  el.style.cssText='left:'+Math.round(x)+'px;top:'+Math.round(top)+'px;width:'+w+'px;height:'+bh+'px;'
-    +bgFor(col,pct)+';--fg:'+fgOn(col);
+  el.style.cssText='left:'+Math.round(x)+'px;top:'+Math.round(top)+'px;width:'+w+'px;height:'+bh+'px;';
+  setBarBody(el,r,x,w,col,pct);
   if(r.kind==='house') el.setAttribute('data-lbl',r.name+' '+(r.days||0)+it('g_unit_day'));
 }
 function cssEsc(s){ return String(s).replace(/([ #.;?%&,@+*~':"!\^$[\]()=>|/])/g,'\\$1'); }
@@ -45018,10 +45060,7 @@ function renderCfg(){
   h+='</div>';
   /* 排程参数（原顶部下拉已并入此处，基线控制已并入「可视化」复选框） */
   h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_params')+'</div>';
-  h+='<label>'+it('g_lbl_cal')+' <select onchange="setCfg(\'cal\',this.value)">';
-  [['natural','g_cal_natural'],['week','g_cal_week'],['work','g_cal_work']].forEach(function(o){
-    h+='<option value="'+o[0]+'"'+(cfg.cal===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
-  }); h+='</select></label>';
+
   h+='<label>'+it('g_lbl_strat')+' <select onchange="setCfg(\'strat\',this.value)">';
   [['lpt','g_strat_lpt'],['greedy','g_strat_greedy']].forEach(function(o){
     h+='<option value="'+o[0]+'"'+(cfg.strat===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
@@ -45034,9 +45073,7 @@ function renderCfg(){
   [['house','g_view_house'],['team','g_view_team']].forEach(function(o){
     h+='<option value="'+o[0]+'"'+(cfg.view===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
   }); h+='</select></label>';
-  if(cfg.cal==='work'){
-    h+='<div class="fld-lbl">'+it('g_lbl_hol')+'<textarea onchange="setCfg(\'holidays\',this.value)">'+esc(cfg.holidays||'')+'</textarea></div>';
-  }
+  /* 春节停工日由生产模块 BOARD_HOLIDAYS 自动注入，无需手动输入 */
   h+='</div>';
   /* 数据字段 */
   h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_cfg_fields')+'</div>';
