@@ -43533,6 +43533,8 @@ textarea:focus{outline:none;border-color:var(--pri)}
 .tbl-wrap input[type=checkbox]{width:auto}
 .tbl-wrap .num{text-align:right;font-variant-numeric:tabular-nums}
 .tbl-wrap .lk{color:var(--warn);font-size:10px;margin-left:2px}
+.collapse-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid var(--bd);border-radius:4px;background:#fff;cursor:pointer;font-size:10px;line-height:1;margin-right:6px;color:var(--txt2);transition:.15s;vertical-align:middle}
+.collapse-btn:hover{border-color:var(--pri);color:var(--pri)}
 .empty{height:auto !important;text-align:center;color:var(--txt3);padding:22px 0 !important}
 body.col-resizing,body.col-resizing *{cursor:col-resize !important;user-select:none !important}
 
@@ -43797,6 +43799,7 @@ var GANTT_I18N = {
     g_splitter_title:'拖动调整宽度 · 双击适应列宽',
     g_zone_sum_h2:'分区汇总', g_load:'小组负载', g_load_tip:'利用率 = 作业天数 ÷ 该组占用跨度',
     g_zone_summary:'（区汇总）', g_finish:' 完工',
+    g_collapse:'收起详细栋舍', g_expand:'展开详细栋舍',
     g_col_resize_tip:'拖右边缘调宽，双击自适应',
     g_unit_group:'组', g_idle:'空闲', g_unit_pcs:'片', g_unit_day:'天', g_kpi_done:'已装', g_lbl_remaining:'剩', g_locked_tip:'开工日已锁定',
     g_load_dong:'栋', g_overlap_with:' 与 ', g_time_overlap:'时间重叠', g_not_scheduled:'未排上期',
@@ -43837,6 +43840,7 @@ var GANTT_I18N = {
     g_splitter_title:'Drag to resize · double-click to fit',
     g_zone_sum_h2:'Zone Summary', g_load:'Team Load', g_load_tip:'Utilization = workdays ÷ team span',
     g_zone_summary:'(zone summary)', g_finish:' done',
+    g_collapse:'Collapse houses', g_expand:'Expand houses',
     g_col_resize_tip:'Drag right edge to resize, double-click to fit',
     g_unit_group:' teams', g_idle:'idle', g_unit_pcs:'pcs', g_unit_day:'days', g_kpi_done:'Installed', g_lbl_remaining:'left', g_locked_tip:'Start date locked',
     g_load_dong:' bldg', g_overlap_with:' and ', g_time_overlap:'time overlap', g_not_scheduled:'not scheduled',
@@ -43877,6 +43881,7 @@ var GANTT_I18N = {
     g_splitter_title:'Kéo đổi rộng · nhấn đúp vừa cột',
     g_zone_sum_h2:'Tổng hợp vùng', g_load:'Tải đội', g_load_tip:'Tỷ lệ = ngày làm ÷ trải đội',
     g_zone_summary:'(tổng vùng)', g_finish:' hoàn thành',
+    g_collapse:'Thu gọn các tòa', g_expand:'Mở rộng các tòa',
     g_col_resize_tip:'Kéo cạnh phải đổi rộng, nhấn đúp vừa',
     g_unit_group:' đội', g_idle:'rảnh', g_unit_pcs:'viên', g_unit_day:'ngày', g_kpi_done:'Đã lắp', g_lbl_remaining:'còn', g_locked_tip:'Ngày bắt đầu đã khóa',
     g_load_dong:' chuồng', g_overlap_with:' và ', g_time_overlap:'trùng thời gian', g_not_scheduled:'chưa lên lịch',
@@ -44014,7 +44019,7 @@ var houses=[];   // {id,zone,name,panels,done,days,team,start,end,lockStart,lock
 var zones=[];    // {name,teams,start}
 var cfg={};
 var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'parallel',view:'house',
-  color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},showWeekend:true,
+  color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},showWeekend:true,
   showToday:true,showGrid:true,showDeps:true,showBase:true,viewMode:'Week',colWidth:40,barHeight:22};
 
 var COLS=[
@@ -44118,6 +44123,19 @@ function snapBaseline(){ houses.forEach(function(h){ h.bs=h.start; h.be=h.end; }
 function clearBaseline(){ houses.forEach(function(h){ h.bs=''; h.be=''; }); renderAll(); saveCfg(); }
 
 /* =========================================================================
+ * 4.5 区折叠状态
+ * ======================================================================= */
+function isZoneCollapsed(zname){ return !!(cfg.collapsed||{})[zname]; }
+function toggleZone(zname, ev){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  cfg.collapsed=cfg.collapsed||{};
+  cfg.collapsed[zname]=!cfg.collapsed[zname];
+  renderAll(); saveCfg();
+}
+function expandAllZones(){ cfg.collapsed={}; renderAll(); saveCfg(); }
+function collapseAllZones(){ cfg.collapsed={}; zones.forEach(function(z){ cfg.collapsed[z.name]=true; }); renderAll(); saveCfg(); }
+
+/* =========================================================================
  * 5. 行模型（甘特行）
  * ======================================================================= */
 var rows=[];
@@ -44130,6 +44148,7 @@ function buildRows(){
       rows.push({kind:'zone',id:'Z:'+z.name,name:z.name+it('g_zone_summary'),zone:z.name,
         start:z.start,end:z.end,days:diffDays(z.start,z.end)+1,
         panels:sum(hs,'panels'),done:sum(hs,'done')});
+      if(isZoneCollapsed(z.name)) return;
       for(var t=0;t<Math.max(1,z.teams|0);t++){
         var ths=hs.filter(function(h){ return h.team===t; }).sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
         rows.push({kind:'team',id:'T:'+z.name+':'+(t+1),name:z.name+' · '+teamLabel(t),zone:z.name,team:t,
@@ -44147,6 +44166,7 @@ function buildRows(){
       rows.push({kind:'zone',id:'Z:'+z.name,name:z.name+it('g_zone_summary'),zone:z.name,
         start:z.start,end:z.end,days:diffDays(z.start,z.end)+1,
         panels:sum(hs,'panels'),done:sum(hs,'done')});
+      if(isZoneCollapsed(z.name)) return;
       /* 区内按小组聚合成道，组内按开始时间 */
       var byTeam={};
       hs.forEach(function(h){ (byTeam[h.team]=byTeam[h.team]||[]).push(h); });
@@ -44353,10 +44373,13 @@ function renderTable(){
   if(cfg.view==='team'){
     zones.forEach(function(z){
       var zs=houses.filter(function(x){return x.zone===z.name;});
+      var collapsed=isZoneCollapsed(z.name);
+      var icon=collapsed?'▶':'▼', tip=collapsed?it('g_expand'):it('g_collapse');
       /* 9 个单元格严格对应 COLS 的 9 列，用 colspan 会在 table-layout:fixed 下错位 */
-      h+='<tr class="zrow"><td>'+esc(z.name)+'</td><td>'+it('g_zone_summary')+'</td><td class="num">'+sum(zs,'panels')
+      h+='<tr class="zrow'+(collapsed?' collapsed':'')+'"><td><i class="collapse-btn" onclick="toggleZone(\''+esc(z.name)+'\',event)" title="'+esc(tip)+'">'+icon+'</i>'+esc(z.name)+'</td><td>'+it('g_zone_summary')+'</td><td class="num">'+sum(zs,'panels')
         +'</td><td class="num">'+sum(zs,'done')+'</td><td>'+(sum(zs,'panels')?Math.round(sum(zs,'done')/sum(zs,'panels')*100)+'%':'0%')
         +'</td><td>'+(z.days||0)+'</td><td>'+Math.max(1,z.teams|0)+it('g_unit_group')+'</td><td>'+dmy(z.start)+'</td><td>'+dmy(z.end)+'</td></tr>';
+      if(collapsed) return;
       for(var t=0;t<Math.max(1,z.teams|0);t++){
         /* 必须按 start 排序再取首尾，否则 houses 原顺序会让「开始」晚于「结束」 */
         var ths=houses.filter(function(x){ return x.zone===z.name&&x.team===t; })
@@ -44377,10 +44400,13 @@ function renderTable(){
       var hs=houses.filter(function(h){ return h.zone===z.name; });
       if(!hs.length) return;
       /* 区汇总行 */
-      h+='<tr class="zrow"><td>'+esc(z.name)+'</td><td>'+it('g_zone_summary')+'</td><td class="num">'+sum(hs,'panels')
+      var collapsed=isZoneCollapsed(z.name);
+      var icon=collapsed?'▶':'▼', tip=collapsed?it('g_expand'):it('g_collapse');
+      h+='<tr class="zrow'+(collapsed?' collapsed':'')+'"><td><i class="collapse-btn" onclick="toggleZone(\''+esc(z.name)+'\',event)" title="'+esc(tip)+'">'+icon+'</i>'+esc(z.name)+'</td><td>'+it('g_zone_summary')+'</td><td class="num">'+sum(hs,'panels')
         +'</td><td class="num">'+sum(hs,'done')+'</td><td>'+(sum(hs,'panels')?Math.round(sum(hs,'done')/sum(hs,'panels')*100)+'%':'0%')
         +'</td><td>'+(z.days||0)+'</td>'
         +'<td>'+Math.max(1,z.teams|0)+it('g_unit_group')+'</td><td>'+dmy(z.start)+'</td><td>'+dmy(z.end)+'</td></tr>';
+      if(collapsed) return;
       /* 按小组聚合成道，组内按开工日 */
       var byTeam={};
       hs.forEach(function(h){ (byTeam[h.team]=byTeam[h.team]||[]).push(h); });
