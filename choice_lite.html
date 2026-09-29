@@ -44147,6 +44147,10 @@ function setLockTeam(h,v){ h.lockTeam=(v===''||v==null)?null:(+v|0); schedule();
 function unlockAll(){ houses.forEach(function(h){ h.lockStart=''; h.lockTeam=null; }); schedule(); renderAll(); saveCfg(); }
 function snapBaseline(){ houses.forEach(function(h){ h.bs=h.start; h.be=h.end; }); renderAll(); saveCfg(); }
 function clearBaseline(){ houses.forEach(function(h){ h.bs=''; h.be=''; }); renderAll(); saveCfg(); }
+function toggleBaseline(checked){
+  cfg.showBase=!!checked;
+  if(checked) snapBaseline(); else clearBaseline();
+}
 
 /* =========================================================================
  * 4.5 区折叠状态
@@ -44993,9 +44997,10 @@ function renderCfg(){
   /* 可视化 */
   h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_cfg_visual')+'</div>';
   [['showWeekend','g_cfg_weekend'],['showToday','g_cfg_today'],['showGrid','g_cfg_grid'],
-   ['showDeps','g_cfg_deps'],['showBase','g_cfg_base']].forEach(function(o){
+   ['showDeps','g_cfg_deps']].forEach(function(o){
     h+='<label><input type="checkbox" '+(cfg[o[0]]?'checked':'')+' onchange="setCfg(\''+o[0]+'\',this.checked)"> '+it(o[1])+'</label>';
   });
+  h+='<label><input type="checkbox" '+(cfg.showBase?'checked':'')+' onchange="toggleBaseline(this.checked)"> '+it('g_cfg_base')+'</label>';
   h+='<label>'+it('g_cfg_granularity')+' <select onchange="setCfg(\'viewMode\',this.value)">';
   [['Day','g_gran_day'],['Week','g_gran_week'],['Month','g_gran_month']].forEach(function(o){
     h+='<option value="'+o[0]+'"'+(cfg.viewMode===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
@@ -45011,7 +45016,7 @@ function renderCfg(){
     h+='<option value="'+o[0]+'"'+(cfg.color===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
   }); h+='</select></label>';
   h+='</div>';
-  /* 排程参数（原顶部下拉 / 基线按钮已并入此处） */
+  /* 排程参数（原顶部下拉已并入此处，基线控制已并入「可视化」复选框） */
   h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_params')+'</div>';
   h+='<label>'+it('g_lbl_cal')+' <select onchange="setCfg(\'cal\',this.value)">';
   [['natural','g_cal_natural'],['week','g_cal_week'],['work','g_cal_work']].forEach(function(o){
@@ -45032,8 +45037,6 @@ function renderCfg(){
   if(cfg.cal==='work'){
     h+='<div class="fld-lbl">'+it('g_lbl_hol')+'<textarea onchange="setCfg(\'holidays\',this.value)">'+esc(cfg.holidays||'')+'</textarea></div>';
   }
-  h+='<div class="cfg-btns"><button type="button" onclick="snapBaseline()">'+it('g_btn_baseline')+'</button>'
-    +'<button type="button" onclick="clearBaseline()">'+it('g_btn_clearbase')+'</button></div>';
   h+='</div>';
   /* 数据字段 */
   h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_cfg_fields')+'</div>';
