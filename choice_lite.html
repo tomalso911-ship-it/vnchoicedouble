@@ -3332,7 +3332,8 @@ function _ovLoadChartLib(cb){
     </div>
     <style id="prodStyle">
       .prod-wrap{max-width:1120px;margin:0 auto;padding:8px 12px 40px;}
-      .prod-wrap.inst-gantt-full{max-width:none;}
+      .prod-wrap.inst-gantt-full{max-width:none;padding-left:0;padding-right:0;}
+      .prod-wrap.inst-gantt-full .prod-tab-body{padding:0;border:0;border-radius:0;background:transparent;min-height:600px;}
       .prod-sub{font-size:12px;color:#666;margin-left:8px;}
       .prod-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:14px;}
       .prod-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:.15s;}
@@ -13363,155 +13364,6 @@ var PROD_EQUIP_FAULT_KB = {
       /* 排程甘特 */
       .inst-gantt-params{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;}
       /* ===== 自研甘特（ig- 前缀，避免与全局 .empty / .legend 冲突） ===== */
-      .ig-layout{--ig-row-h:42px;--ig-head-h:65px;--ig-tbl-w:404px;--ig-bd:#e3e8ee;--ig-bd2:#eef1f4;
-        --ig-txt:#263238;--ig-txt2:#546e7a;--ig-txt3:#90a4ae;--ig-pri:#1e88e5;
-        display:flex;border:1px solid var(--ig-bd);border-radius:10px;overflow:hidden;background:#fff;
-        height:540px;position:relative}
-      .ig-tbl-wrap{width:var(--ig-tbl-w);flex:0 0 auto;overflow:auto;background:#fafbfc;
-        border-right:1px solid var(--ig-bd);scrollbar-width:thin}
-      .ig-tbl-wrap::-webkit-scrollbar{width:0;height:9px}
-      .ig-tbl-wrap::-webkit-scrollbar-track{background:#f0f2f5}
-      .ig-tbl-wrap::-webkit-scrollbar-thumb{background:#c4cdd4;border-radius:5px}
-      .ig-tbl-wrap::-webkit-scrollbar-thumb:hover{background:#9aa7b0}
-      .ig-tbl-wrap table{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px}
-      .ig-tbl-wrap th{position:sticky;top:0;z-index:3;background:#f4f6f8;color:#455a64;font-weight:600;
-        height:var(--ig-head-h);padding:0 8px;text-align:left;border-bottom:1px solid var(--ig-bd);
-        white-space:nowrap;vertical-align:middle;position:relative}
-      .ig-tbl-wrap td{height:var(--ig-row-h);padding:0 6px;border-bottom:1px solid var(--ig-bd2);
-        white-space:nowrap;overflow:hidden;vertical-align:middle}
-      .ig-tbl-wrap th .ig-rs{position:absolute;right:0;top:0;bottom:0;width:8px;cursor:col-resize;z-index:4}
-      .ig-tbl-wrap th .ig-rs::after{content:'';position:absolute;right:3px;top:6px;bottom:6px;width:1px;background:#cfd8dc}
-      .ig-tbl-wrap th .ig-rs:hover::after{right:2px;width:3px;background:var(--ig-pri);top:2px;bottom:2px}
-      .ig-tbl-wrap th.ig-rs-on{background:#e3f2fd !important}
-      body.ig-col-resizing,body.ig-col-resizing *{cursor:col-resize !important;user-select:none !important}
-      .ig-tbl-wrap tr:hover td{background:#f0f7ff}
-      .ig-tbl-wrap tr.sel td{background:#e3f2fd}
-      .ig-tbl-wrap tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--ig-pri)}
-      .ig-tbl-wrap input,.ig-tbl-wrap select{width:100%;border:1px solid transparent;background:transparent;
-        font:inherit;font-size:11px;padding:3px 4px;border-radius:4px;color:var(--ig-txt)}
-      .ig-tbl-wrap input:hover,.ig-tbl-wrap select:hover{border-color:#cfd8dc;background:#fff}
-      .ig-tbl-wrap input:focus,.ig-tbl-wrap select:focus{outline:none;border-color:var(--ig-pri);background:#fff}
-      .ig-tbl-wrap input[type=checkbox]{width:auto}
-      .ig-nm{display:inline-flex;align-items:center;gap:4px;overflow:hidden}
-      .ig-branch{width:7px;height:7px;border-left:1px solid #b0bec5;border-bottom:1px solid #b0bec5;
-        display:inline-block;margin-bottom:3px;flex:0 0 auto}
-      .ig-ms-dot{width:9px;height:9px;background:#ffa726;transform:rotate(45deg);display:inline-block;flex:0 0 auto}
-      .ig-empty{height:auto !important;text-align:center;color:var(--ig-txt3);padding:22px 0 !important}
-      .ig-splitter{flex:0 0 auto;width:7px;margin:0 -1px;cursor:col-resize;position:relative;z-index:6;background:transparent}
-      .ig-splitter::before{content:'';position:absolute;inset:0 -4px}
-      .ig-splitter::after{content:'';position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--ig-bd)}
-      .ig-splitter:hover::after,.ig-splitter.on::after{left:2.5px;width:2px;background:var(--ig-pri)}
-      .ig-splitter.on{background:#e3f2fd}
-      .ig-splitter .ig-knob{position:absolute;left:1px;top:50%;width:5px;height:26px;margin-top:-13px;
-        border-radius:3px;background:#cfd8dc;opacity:0}
-      .ig-splitter:hover .ig-knob,.ig-splitter.on .ig-knob{opacity:1;background:var(--ig-pri)}
-      body.ig-resizing,body.ig-resizing *{cursor:col-resize !important;user-select:none !important}
-      .ig-chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff}
-      .ig-ci{position:relative}
-      .ig-thead{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--ig-bd)}
-      .ig-tu{display:flex;height:30px;border-bottom:1px solid var(--ig-bd2)}
-      .ig-tu>div{font-size:11px;font-weight:600;color:#455a64;padding:0 6px;border-right:1px solid var(--ig-bd2);
-        overflow:hidden;white-space:nowrap;display:flex;align-items:center;justify-content:center;text-align:center}
-      .ig-tl{display:flex;height:34px}
-      .ig-tl>div{font-size:10px;color:var(--ig-txt2);border-right:1px solid var(--ig-bd2);overflow:hidden;
-        display:flex;flex-direction:column;align-items:center;justify-content:center;white-space:nowrap}
-      .ig-tl>div .ig-t1{line-height:13px;font-weight:600}
-      .ig-tl>div .ig-t2{line-height:12px;font-size:9px;color:var(--ig-txt3);margin-top:1px}
-      .ig-tl>div.we .ig-t1{color:#e57373}
-      .ig-tl>div.we{background:#fff8f8}
-      .ig-bd{position:relative;background-image:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 calc(var(--ig-row-h) - 1px),var(--ig-bd2) calc(var(--ig-row-h) - 1px) var(--ig-row-h));background-position:0 top;background-repeat:repeat}
-      .ig-wkend{position:absolute;top:0;bottom:0;background:#fafbfc}
-      .ig-cl{position:absolute;top:0;bottom:0;width:1px;background:var(--ig-bd2)}
-      .ig-today{position:absolute;top:0;bottom:0;width:2px;background:#e53935;z-index:2;opacity:.85}
-      .ig-today::after{content:'';position:absolute;top:0;left:-4px;border:5px solid transparent;border-top-color:#e53935}
-      .ig-deps{position:absolute;left:0;top:0;overflow:visible;z-index:3;pointer-events:none}
-      .ig-deps.dragging{opacity:.35}
-      .ig-bar{position:absolute;border-radius:3px;z-index:2;cursor:grab;touch-action:none;
-        background-repeat:no-repeat;box-shadow:0 1px 2px rgba(0,0,0,.12)}
-      .ig-bar:active{cursor:grabbing}
-      .ig-bar.sel{outline:2px solid var(--ig-pri);outline-offset:1px}
-      .ig-bar::before{content:attr(data-lbl);position:absolute;left:6px;top:0;bottom:0;display:flex;align-items:center;
-        font-size:10px;white-space:nowrap;pointer-events:none;color:var(--ig-fg,#fff);text-shadow:0 1px 2px rgba(0,0,0,.5)}
-      .ig-bar.out::before{left:calc(100% + 6px);color:var(--ig-txt2);text-shadow:none}
-      .ig-bar::after{content:'';position:absolute;right:0;top:0;bottom:0;width:7px;background:transparent}
-      .ig-bar:hover::after{background:rgba(255,255,255,.42)}
-      .ig-bar:hover{box-shadow:0 1px 2px rgba(0,0,0,.12),inset 0 -7px 0 -4px rgba(255,255,255,.55)}
-      .ig-bar.ms{border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);box-shadow:none;
-        filter:drop-shadow(0 1px 2px rgba(0,0,0,.28))}
-      .ig-bar.ms::before,.ig-bar.ms::after{content:none}
-      .ig-bar.ms:hover{box-shadow:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}
-      /* 区域汇总条：深色、两端收窄，区别于普通栋条 */
-      .ig-bar.grp{height:12px !important;border-radius:2px;opacity:.92}
-      .ig-bar.grp::before{font-size:9px;left:auto;right:8px}
-      .ig-bar.late{box-shadow:0 0 0 1px #ef5350,0 1px 2px rgba(0,0,0,.12)}
-      .ig-bar.late:hover{box-shadow:0 0 0 1px #ef5350,0 1px 2px rgba(0,0,0,.12),inset 0 -7px 0 -4px rgba(255,255,255,.55)}
-      .ig-base{position:absolute;height:4px;background:#cbd5e0;border-radius:2px;z-index:1;opacity:.9}
-      .ig-base::after{content:'';position:absolute;left:-1px;top:-3px;width:2px;height:10px;background:#cbd5e0}
-      .ig-cfg{width:0;overflow:hidden;transition:width .18s ease;background:#fff;flex:0 0 auto}
-      .ig-cfg.open{width:250px;border-left:1px solid var(--ig-bd);overflow:auto}
-      .ig-cfg-h{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;font-weight:600;
-        font-size:12px;color:#37474f;border-bottom:1px solid var(--ig-bd2);position:sticky;top:0;background:#fff}
-      .ig-cfg-h button{border:0;background:none;color:var(--ig-txt3);font-size:16px;cursor:pointer;line-height:1}
-      .ig-cfg-b{padding:9px 11px 20px}
-      .ig-cfg-sec{margin-bottom:16px}
-      .ig-cfg-t{font-size:11px;font-weight:600;color:#78909c;margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px}
-      .ig-cfg label{display:flex;align-items:center;gap:7px;font-size:12px;color:#455a64;padding:4px 0}
-      .ig-cfg select,.ig-cfg input[type=range]{flex:1;min-width:0}
-      .ig-cfg input[type=range]{accent-color:var(--ig-pri)}
-      .ig-cfg input[type=checkbox]{accent-color:var(--ig-pri)}
-      .ig-cfg label .ig-cw{margin-left:auto;font-size:10px;color:var(--ig-txt3);font-variant-numeric:tabular-nums}
-      .ig-cfg-btns{display:flex;gap:6px;margin-top:8px}
-      .ig-cfg-btns button{flex:1;border:1px solid var(--ig-bd);background:#fff;border-radius:5px;padding:4px 6px;
-        font-size:11px;color:var(--ig-txt2);cursor:pointer}
-      .ig-cfg-btns button:hover{border-color:var(--ig-pri);color:var(--ig-pri)}
-      .ig-cfg-hint{font-size:10px;color:var(--ig-txt3);margin-top:7px;line-height:1.5}
-      .ig-cfg input[type=text]{width:100%;border:1px solid var(--ig-bd);border-radius:5px;padding:4px 7px;
-        font:inherit;font-size:11px;box-sizing:border-box}
-      .ig-cfg input[type=text]:focus{outline:none;border-color:var(--ig-pri)}
-      .ig-own-cell{position:relative;width:100%;min-height:22px;display:flex;align-items:center;gap:5px;padding:0 5px;
-        border-radius:4px;cursor:pointer;overflow:hidden}
-      .ig-own-cell:hover{background:#eceff1;box-shadow:inset 0 0 0 1px #cfd8dc}
-      .ig-own-cell::after{content:'\25BE';margin-left:auto;font-size:9px;color:var(--ig-txt3);flex:0 0 auto}
-      .ig-own-cell:hover::after{color:var(--ig-pri)}
-      .ig-av{width:16px;height:16px;border-radius:50%;color:#fff;font-size:9px;font-style:normal;
-        display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
-      #igOwnPop{position:fixed;z-index:99;background:#fff;border:1px solid var(--ig-bd);border-radius:8px;
-        box-shadow:0 10px 28px rgba(0,0,0,.16);min-width:168px;padding:4px;display:none;font-size:12px}
-      #igOwnPop.open{display:block}
-      #igOwnPop .ig-oi{display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:5px;cursor:pointer}
-      #igOwnPop .ig-oi:hover{background:#e3f2fd}
-      #igOwnPop .ig-oi .ig-ck{margin-left:auto;color:var(--ig-pri);font-weight:700}
-      #igOwnPop .ig-oi.clear{color:var(--ig-txt3);border-top:1px solid var(--ig-bd2);margin-top:3px}
-      #igOwnPop .ig-add{border-top:1px solid var(--ig-bd2);margin-top:3px;padding:7px 7px 5px}
-      #igOwnPop .ig-add input{width:100%;border:1px solid var(--ig-bd);border-radius:5px;padding:4px 7px;
-        font:inherit;font-size:11px;box-sizing:border-box}
-      #igOwnPop .ig-add input:focus{outline:none;border-color:var(--ig-pri)}
-      .ig-own-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
-      .ig-ochip{display:inline-flex;align-items:center;gap:5px;background:#f4f6f8;border:1px solid var(--ig-bd);
-        border-radius:12px;padding:2px 7px;font-size:11px;color:var(--ig-txt2)}
-      .ig-ochip b{margin-left:2px;color:var(--ig-txt3);cursor:pointer;font-weight:700;padding:0 1px}
-      .ig-ochip b:hover{color:#e53935}
-      .ig-summary{margin:12px 0 0}
-      .ig-chips{display:flex;flex-wrap:wrap;gap:8px}
-      .ig-chip{background:#fff;border:1px solid var(--ig-bd);border-radius:14px;padding:4px 11px;font-size:12px;color:var(--ig-txt2)}
-      .ig-chip b{color:var(--ig-txt);font-weight:600}
-      .ig-chip.danger{background:#ffebee;border-color:#ffcdd2;color:#c62828}
-      .ig-chip.danger b{color:#b71c1c}
-      .ig-warn{margin-top:10px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:9px 12px;
-        font-size:12px;color:#795548}
-      .ig-warn b{display:block;margin-bottom:4px}
-      .ig-warn ul{margin:0;padding-left:18px}
-      .ig-legend{margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ig-txt2)}
-      .ig-legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px;vertical-align:-1px}
-      .ig-hint{font-size:11px;color:var(--ig-txt3)}
-      .ig-hint b{color:var(--ig-pri);font-weight:600}
-      @media (max-width:960px){
-        .ig-layout{height:auto;flex-direction:column}
-        .ig-tbl-wrap{width:100% !important;max-height:240px;border-right:0;border-bottom:1px solid var(--ig-bd)}
-        .ig-splitter{display:none}
-        .ig-chart-wrap{min-height:340px}
-        .ig-cfg.open{width:100%}
-      }
       .inst-gantt-bar-wrap{margin-top:10px;}
       .inst-gantt-row{display:flex;align-items:center;gap:8px;margin:6px 0;}
       .inst-gantt-label{width:120px;font-size:12px;flex:0 0 auto;}
@@ -43591,6 +43443,1247 @@ window.refreshMoveBtnState = function () {
 <script src="vendor/fx_history.js"></script>
 <script src="vendor/material_prices.js"></script>
 <script src="vn_provinces.js"></script>
+  <template id="instGanttTpl">
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>房舍水泥板安装排程甘特</title>
+<style>
+:root{
+  --row-h:40px; --head-h:65px;
+  --bd:#e3e8ee; --bd2:#eef1f4;
+  --txt:#263238; --txt2:#546e7a; --txt3:#90a4ae;
+  --bg:#f6f8fa; --card:#fff; --pri:#1e88e5;
+  --ok:#43a047; --warn:#fb8c00; --bad:#e53935;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:13px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif}
+.page{margin:0;padding:8px 0 24px}
+.hdr{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:2px}
+.hdr h1{font-size:18px;margin:0;font-weight:600}
+.hdr .sub{font-size:12px;color:var(--txt3)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-top:12px}
+.card h2{font-size:13px;margin:0 0 10px;font-weight:600;color:#37474f;display:flex;align-items:center;gap:8px}
+.card h2 .tg{font-size:11px;font-weight:400;color:var(--txt3)}
+.btn{border:1px solid var(--bd);background:#fff;color:var(--txt2);border-radius:6px;
+  padding:5px 11px;font-size:12px;cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--pri);color:var(--pri)}
+.btn.primary{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.primary:hover{background:#1976d2;color:#fff}
+.btn.ghost{background:transparent}
+.btn.mini{padding:3px 8px;font-size:11px}
+.hint{font-size:11px;color:var(--txt3);line-height:1.6}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.fld{display:flex;flex-direction:column;gap:3px}
+.fld label{font-size:11px;color:var(--txt2)}
+.fld input,.fld select{border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;background:#fff;min-width:88px}
+.fld input:focus,.fld select:focus{outline:none;border-color:var(--pri)}
+textarea{width:100%;min-height:78px;border:1px solid var(--bd);border-radius:6px;padding:7px 9px;
+  font:11px/1.6 ui-monospace,Menlo,Consolas,monospace;resize:vertical;background:#fff}
+textarea:focus{outline:none;border-color:var(--pri)}
+
+/* ---------- KPI ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:4px 11px;font-size:12px;color:var(--txt2)}
+.chip b{color:var(--txt);font-weight:600}
+.chip.danger{background:#ffebee;border-color:#ffcdd2;color:#c62828}
+.chip.danger b{color:#b71c1c}
+.chip.ok{background:#e8f5e9;border-color:#c8e6c9;color:#2e7d32}
+.chip.ok b{color:#1b5e20}
+
+/* ---------- 布局 ---------- */
+.layout{display:flex;border:1px solid var(--bd);border-radius:10px;overflow:hidden;
+  background:var(--card);height:560px;position:relative;margin-top:12px}
+.tbl-wrap{width:var(--tbl-w,470px);flex:0 0 auto;overflow:auto;background:#fafbfc;
+  border-right:1px solid var(--bd);scrollbar-width:thin}
+.tbl-wrap::-webkit-scrollbar{width:0;height:9px}
+.tbl-wrap::-webkit-scrollbar-track{background:#f0f2f5}
+.tbl-wrap::-webkit-scrollbar-thumb{background:#c4cdd4;border-radius:5px}
+.tbl-wrap table{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px}
+.tbl-wrap th{position:sticky;top:0;z-index:3;background:#f4f6f8;color:#455a64;font-weight:600;
+  height:var(--head-h);padding:0 8px;text-align:left;border-bottom:1px solid var(--bd);
+  white-space:nowrap;vertical-align:middle;position:relative}
+.tbl-wrap th .rs{position:absolute;right:0;top:0;bottom:0;width:8px;cursor:col-resize;z-index:4}
+.tbl-wrap th .rs::after{content:'';position:absolute;right:3px;top:6px;bottom:6px;width:1px;background:#cfd8dc}
+.tbl-wrap th .rs:hover::after{right:2px;width:3px;background:var(--pri);top:2px;bottom:2px}
+.tbl-wrap th.rs-on{background:#e3f2fd !important}
+.tbl-wrap td{height:var(--row-h);padding:0 6px;border-bottom:1px solid var(--bd2);
+  white-space:nowrap;overflow:hidden;vertical-align:middle}
+.tbl-wrap tr:hover td{background:#f0f7ff}
+.tbl-wrap tr.sel td{background:#e3f2fd}
+.tbl-wrap tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--pri)}
+.tbl-wrap tr.zrow td{background:#f7f9fb;font-weight:600;color:#37474f}
+.tbl-wrap tr.trow td{background:#fcfdfe;color:var(--txt2);font-style:italic}
+.tbl-wrap input,.tbl-wrap select{width:100%;border:1px solid transparent;background:transparent;
+  font:inherit;font-size:11px;padding:3px 4px;border-radius:4px;color:var(--txt)}
+.tbl-wrap input:hover,.tbl-wrap select:hover{border-color:#cfd8dc;background:#fff}
+.tbl-wrap input:focus,.tbl-wrap select:focus{outline:none;border-color:var(--pri);background:#fff}
+.tbl-wrap input[type=checkbox]{width:auto}
+.tbl-wrap .num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl-wrap .lk{color:var(--warn);font-size:10px;margin-left:2px}
+.empty{height:auto !important;text-align:center;color:var(--txt3);padding:22px 0 !important}
+body.col-resizing,body.col-resizing *{cursor:col-resize !important;user-select:none !important}
+
+.splitter{flex:0 0 auto;width:7px;margin:0 -1px;cursor:col-resize;position:relative;z-index:6}
+.splitter::before{content:'';position:absolute;inset:0 -4px}
+.splitter::after{content:'';position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--bd)}
+.splitter:hover::after,.splitter.on::after{left:2.5px;width:2px;background:var(--pri)}
+.splitter.on{background:#e3f2fd}
+.splitter .knob{position:absolute;left:1px;top:50%;width:5px;height:26px;margin-top:-13px;
+  border-radius:3px;background:var(--pri);opacity:0;transition:opacity .15s}
+.splitter:hover .knob,.splitter.on .knob{opacity:1}
+body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !important}
+
+/* ---------- 甘特 ---------- */
+.chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff}
+.ci{position:relative}
+.thead{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--bd)}
+.tu{display:flex;height:30px;border-bottom:1px solid var(--bd2)}
+.tu>div{font-size:11px;font-weight:600;color:#455a64;padding:0 6px;border-right:1px solid var(--bd2);
+  overflow:hidden;white-space:nowrap;display:flex;align-items:center;justify-content:center}
+.tl{display:flex;height:34px}
+.tl>div{font-size:10px;color:var(--txt2);border-right:1px solid var(--bd2);overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;white-space:nowrap}
+.tl>div .t1{line-height:13px;font-weight:600}
+.tl>div .t2{line-height:12px;font-size:9px;color:var(--txt3);margin-top:1px}
+.tl>div.we .t1{color:#e57373}
+.tl>div.we{background:#fff8f8}
+.bd{position:relative;
+  background-image:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 calc(var(--row-h) - 1px),
+    var(--bd2) calc(var(--row-h) - 1px) var(--row-h))}
+.wkend{position:absolute;top:0;bottom:0;background:#fafbfc}
+.wkend.sat{border-right:1px dashed #eceff1}
+.cl{position:absolute;top:0;bottom:0;width:1px;background:var(--bd2)}
+.today{position:absolute;top:0;bottom:0;width:2px;background:#e53935;z-index:2;opacity:.85}
+.today::after{content:'';position:absolute;top:0;left:-4px;border:5px solid transparent;border-top-color:#e53935}
+.deps{position:absolute;left:0;top:0;overflow:visible;z-index:3;pointer-events:none}
+.deps.dragging{opacity:.35}
+.bar{position:absolute;border-radius:3px;z-index:2;cursor:grab;touch-action:none;
+  background-repeat:no-repeat;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.bar:active{cursor:grabbing}
+.bar.sel{outline:2px solid var(--pri);outline-offset:1px}
+.bar::before{content:attr(data-lbl);position:absolute;left:6px;top:0;bottom:0;display:flex;align-items:center;
+  font-size:10px;white-space:nowrap;pointer-events:none;color:var(--fg,#fff);
+  text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.bar.out::before{left:calc(100% + 6px);color:var(--txt2);text-shadow:none}
+.bar::after{content:'';position:absolute;right:0;top:0;bottom:0;width:7px;background:transparent}
+.bar:hover::after{background:rgba(255,255,255,.42)}
+.bar:hover{box-shadow:0 1px 2px rgba(0,0,0,.12),inset 0 -7px 0 -4px rgba(255,255,255,.55)}
+.bar.sum{border-radius:2px;height:9px !important;z-index:2}
+.bar.sum::before{content:none}
+.bar.sum::after{content:none}
+.bar.ms{border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
+  box-shadow:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.28))}
+.bar.ms::before,.bar.ms::after{content:none}
+.bar.ms:hover{filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}
+.bar.fixed{cursor:default;opacity:.97}
+.bar.locked{box-shadow:0 0 0 1.5px var(--warn),0 1px 2px rgba(0,0,0,.12)}
+.base{position:absolute;height:4px;background:#cbd5e0;border-radius:2px;z-index:1;opacity:.9}
+.deps.dragging{opacity:.35}
+
+/* ---------- 资源负载 ---------- */
+.loadgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.load{background:#fff;border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+.load .lh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.load .ln{font-size:12px;font-weight:600;color:#37474f}
+.load .lv{font-size:11px;color:var(--txt2)}
+.load .lbar{height:14px;background:#eceff1;border-radius:4px;overflow:hidden;display:flex}
+.load .lbar i{display:block;height:100%}
+.load .lf{font-size:10px;color:var(--txt3);margin-top:5px;line-height:1.5}
+.load .lf b{color:var(--txt2);font-weight:600}
+.warnbox{margin-top:10px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;
+  padding:8px 11px;font-size:12px;color:#795548}
+.warnbox ul{margin:4px 0 0;padding-left:18px}
+.legend{margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--txt2)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+table.zt{width:100%;border-collapse:collapse;font-size:12px}
+table.zt th{background:#f4f6f8;color:#455a64;font-weight:600;text-align:left;padding:6px 9px;border-bottom:1px solid var(--bd)}
+table.zt td{padding:6px 9px;border-bottom:1px solid var(--bd2)}
+table.zt td.n{text-align:right;font-variant-numeric:tabular-nums}
+table.zt tr:hover td{background:#f7fbff}
+@media (max-width:1000px){
+  .layout{height:auto;flex-direction:column}
+  .tbl-wrap{width:100% !important;max-height:260px;border-right:0;border-bottom:1px solid var(--bd)}
+  .chart-wrap{min-height:360px}
+  .splitter{display:none}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hdr">
+    <h1>房舍水泥板安装排程</h1>
+    <span class="sub">分区 · 房舍 · 小组产能驱动 · 自动生成甘特</span>
+  </div>
+
+  <!-- 参数 -->
+  <div class="card">
+    <h2>排程参数 <span class="tg">改完点「重新排程」</span></h2>
+    <div class="row">
+      <div class="fld"><label>日产能（片/组/天）</label><input id="p_cap" type="number" min="1" value="200"></div>
+      <div class="fld"><label>项目开工日</label><input id="p_start" value=""></div>
+      <div class="fld"><label>工作日历</label><select id="p_cal">
+        <option value="natural">自然日（天天作业）</option>
+        <option value="week">跳过周六日</option>
+        <option value="work">周末+停工日</option>
+      </select></div>
+      <div class="fld"><label>区内房舍分配</label><select id="p_strat">
+        <option value="lpt">大栋优先（LPT）</option>
+        <option value="greedy">按清单顺序，谁空谁接</option>
+      </select></div>
+      <div class="fld"><label>区与区之间</label><select id="p_zmode">
+        <option value="parallel">同时开工</option>
+        <option value="serial">串行（前区完工才开下一区）</option>
+      </select></div>
+      <div class="fld"><label>甘特行视图</label><select id="p_view">
+        <option value="house">按房舍（每栋一行）</option>
+        <option value="team">按小组泳道</option>
+      </select></div>
+      <div class="fld"><label>配色依据</label><select id="p_color">
+        <option value="zone">按分区</option>
+        <option value="team">按小组</option>
+      </select></div>
+      <button class="btn primary" onclick="recompute()">重新排程</button>
+      <button class="btn" onclick="snapBaseline()">设为基线</button>
+      <button class="btn" onclick="clearBaseline()">清除基线</button>
+      <button class="btn" onclick="unlockAll()">解除全部锁定</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="fld" style="flex:1 1 240px"><label>停工日 / 节假日（每行一个，支持 2026-10-01 或 01/10/2026）</label>
+        <textarea id="p_hol" style="min-height:52px"></textarea></div>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="card"><div class="chips" id="kpi"></div></div>
+
+  <!-- 导入 -->
+  <div class="card">
+    <h2>房舍清单 <span class="tg">来源：现有数据源 / 粘贴 / 文件</span></h2>
+    <div class="row">
+      <button class="btn mini" onclick="impOpen()">粘贴 / 导入数据</button>
+      <button class="btn mini" onclick="loadSample()">载入示例</button>
+      <button class="btn mini" onclick="addHouse()">+ 新增房舍</button>
+      <button class="btn mini" onclick="expCsv()">导出 CSV</button>
+      <span class="hint">直接改下表里的「板数 / 已装 / 小组」即可；改完自动重排</span>
+    </div>
+    <div id="impBox" style="display:none;margin-top:10px">
+      <textarea id="impText" placeholder="从 Excel 直接复制粘贴（自动识别制表符/逗号），或粘贴 CSV / JSON&#10;&#10;示例：&#10;区&#9;房舍&#9;水泥板数&#9;已装&#10;A区&#9;1号舍&#9;2400&#9;600&#10;A区&#9;2号舍&#9;1800&#9;0"></textarea>
+      <div class="row" style="margin-top:8px">
+        <div class="fld"><label>区列</label><select id="m_zone"></select></div>
+        <div class="fld"><label>房舍列</label><select id="m_name"></select></div>
+        <div class="fld"><label>板数列</label><select id="m_pan"></select></div>
+        <div class="fld"><label>已装列（可选）</label><select id="m_done"></select></div>
+        <label class="fld" style="flex-direction:row;align-items:center;gap:5px">
+          <input type="checkbox" id="m_hdr" checked style="min-width:auto"><span style="font-size:11px;color:var(--txt2)">首行为表头</span></label>
+        <button class="btn primary" onclick="impApply()">解析并替换</button>
+        <button class="btn" onclick="impCancel()">取消</button>
+        <input type="file" id="impFile" accept=".csv,.txt,.json" style="font-size:11px">
+      </div>
+      <div id="impMsg" class="hint" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <!-- 甘特 -->
+  <div class="layout">
+    <div class="tbl-wrap" id="tblWrap"></div>
+    <div class="splitter" id="splitter" title="拖动调整宽度 · 双击适应列宽"><i class="knob"></i></div>
+    <div class="chart-wrap" id="chartWrap"><div class="ci" id="chartInner"></div></div>
+  </div>
+
+  <!-- 区汇总 -->
+  <div class="card">
+    <h2>分区汇总</h2>
+    <table class="zt" id="zoneTbl"></table>
+  </div>
+
+  <!-- 小组负载 -->
+  <div class="card">
+    <h2>小组负载 <span class="tg">利用率 = 作业天数 ÷ 该组占用跨度</span></h2>
+    <div class="loadgrid" id="loadBox"></div>
+    <div id="conflict"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================================
+ * 0. 数据源接入点  ★★★
+ *    把你的现有数据源结果赋给 HOUSE_SOURCE，再调 rebuild() 即可。
+ *    要求的字段：{ zone:区名, name:房舍名, panels:水泥板数, done:已装板数(可选) }
+ *    例：
+ *      fetch('/api/houses').then(r=>r.json()).then(d=>{ HOUSE_SOURCE=d; rebuild(); });
+ *    或在本文件末尾直接写： HOUSE_SOURCE = [...]; rebuild();
+ * ======================================================================= */
+var HOUSE_SOURCE = null;
+var SAMPLE = [
+  {zone:'A区',name:'1号舍',panels:2400,done:600},
+  {zone:'A区',name:'2号舍',panels:1800,done:1800},
+  {zone:'A区',name:'3号舍',panels:3000,done:0},
+  {zone:'A区',name:'4号舍',panels:1200,done:0},
+  {zone:'A区',name:'5号舍',panels:2000,done:0},
+  {zone:'A区',name:'6号舍',panels:1600,done:0},
+  {zone:'A区',name:'7号舍',panels:2800,done:0},
+  {zone:'B区',name:'1号舍',panels:2200,done:2200},
+  {zone:'B区',name:'2号舍',panels:1900,done:900},
+  {zone:'B区',name:'3号舍',panels:2600,done:0},
+  {zone:'B区',name:'4号舍',panels:1400,done:0},
+  {zone:'B区',name:'5号舍',panels:2100,done:0},
+  {zone:'C区',name:'1号舍',panels:3200,done:0},
+  {zone:'C区',name:'2号舍',panels:1700,done:0},
+  {zone:'C区',name:'3号舍',panels:2300,done:0},
+  {zone:'C区',name:'4号舍',panels:1500,done:0},
+  {zone:'C区',name:'5号舍',panels:2900,done:0},
+  {zone:'C区',name:'6号舍',panels:1300,done:0}
+];
+
+/* =========================================================================
+ * 1. 日期工具（UTC，避免时区；存储 YYYY-MM-DD，显示 DD/MM/YYYY）
+ * ======================================================================= */
+function pad2(n){ n=parseInt(n,10)||0; return (n<10?'0':'')+n; }
+function validYmd(y){
+  if(!y) return ''; var p=String(y).split('-'); if(p.length!==3) return '';
+  var Y=+p[0],M=+p[1],D=+p[2];
+  if(Y<1970||Y>2100||M<1||M>12||D<1||D>31) return '';
+  var d=new Date(Date.UTC(Y,M-1,D));
+  if(d.getUTCFullYear()!==Y||d.getUTCMonth()!==M-1||d.getUTCDate()!==D) return '';
+  return p[0]+'-'+pad2(M)+'-'+pad2(D);
+}
+function toYmd(v){
+  if(v===null||v===undefined||v==='') return '';
+  if(v instanceof Date) return isNaN(v.getTime())?'':toYmd(v.getUTCFullYear()+'-'+pad2(v.getUTCMonth()+1)+'-'+pad2(v.getUTCDate()));
+  var s=String(v).trim(); if(!s) return '';
+  if(/^\d{10,13}$/.test(s)){ var ts=+s; if(s.length<=10) ts*=1000; return toYmd(new Date(ts)); }
+  var m=s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/); if(m) return validYmd(m[1]+'-'+m[2]+'-'+m[3]);
+  m=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/); if(m) return validYmd(m[3]+'-'+m[2]+'-'+m[1]);
+  m=s.match(/^(\d{4})(\d{2})(\d{2})$/); if(m) return validYmd(m[1]+'-'+m[2]+'-'+m[3]);
+  m=s.match(/^(\d{1,2})[-/.](\d{1,2})$/); if(m) return validYmd(new Date().getFullYear()+'-'+m[2]+'-'+m[1]);
+  return '';
+}
+function dSep(){ return (cfg.dateSep==='-')?'-':'/'; }
+function dmy(v){ var y=toYmd(v); if(!y) return ''; var p=y.split('-'),s=dSep(); return p[2]+s+p[1]+s+p[0]; }
+function today(){ return toYmd(new Date()); }
+function addDays(y,n){ y=toYmd(y); if(!y) return ''; var p=y.split('-'),d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+  d.setUTCDate(d.getUTCDate()+(parseInt(n,10)||0)); return toYmd(d); }
+function diffDays(a,b){ a=toYmd(a);b=toYmd(b); if(!a||!b) return 0;
+  return Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000); }
+function dow(y){ y=toYmd(y); if(!y) return 1; var p=y.split('-');
+  return new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).getUTCDay(); }
+function isoWeek(d){ var p=toYmd(d).split('-'); if(p.length<3) return {w:0,y:''};
+  var t=new Date(Date.UTC(+p[0],+p[1]-1,+p[2])), dn=t.getUTCDay()||7;
+  t.setUTCDate(t.getUTCDate()+4-dn); var y=t.getUTCFullYear();
+  return {w:Math.ceil(((t.getTime()-Date.UTC(y,0,1))/86400000+1)/7),y:y}; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function hash(s){ var h=0;s=String(s||'');for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h; }
+function lum(hex){ var n=parseInt(hex.slice(1),16),c=[(n>>16)&255,(n>>8)&255,n&255].map(function(v){
+  v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); });
+  return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; }
+function fgOn(hex){ return lum(hex)>0.45?'#263238':'#fff'; }
+function shade(hex,a){ var n=parseInt(hex.slice(1),16);
+  var r=Math.max(0,Math.min(255,(n>>16)+a)),g=Math.max(0,Math.min(255,((n>>8)&255)+a)),b=Math.max(0,Math.min(255,(n&255)+a));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1); }
+
+/* =========================================================================
+ * 2. 工作日历
+ * ======================================================================= */
+var HOL={};
+function isWork(d){
+  if(cfg.cal==='natural') return true;
+  var w=dow(d); if(w===0||w===6) return false;
+  if(cfg.cal==='work'&&HOL[d]) return false;
+  return true;
+}
+function nextWork(d){ var g=0; while(!isWork(d)&&g++<400) d=addDays(d,1); return d; }
+/* 从 start 起，占用 n 个工作日，返回最后一个工作日 */
+function addWork(s,n){ var d=nextWork(s), rem=Math.max(0,(n|0)-1), g=0;
+  while(rem>0&&g++<4000){ d=addDays(d,1); if(isWork(d)) rem--; } return d; }
+function nextAfter(e){ return nextWork(addDays(e,1)); }
+/* 区间内工作日数 */
+function workDaysBetween(a,b){ var n=0,d=toYmd(a),e=toYmd(b),g=0;
+  while(d&&d<=e&&g++<4000){ if(isWork(d)) n++; d=addDays(d,1); } return n; }
+function parseHolidays(){
+  HOL={}; (cfg.holidays||'').split(/\n|,|;/).forEach(function(x){ var y=toYmd(x); if(y) HOL[y]=1; });
+}
+
+/* =========================================================================
+ * 3. 数据模型
+ * ======================================================================= */
+var ZONE_C=['#5c6bc0','#26a69a','#ffa726','#ef5350','#66bb6a','#ab47bc','#29b6f6','#8d6e63'];
+var TEAM_C=['#42a5f5','#26a69a','#ffa726','#ab47bc','#5c6bc0','#ec407a','#8d6e63','#78909c'];
+
+var houses=[];   // {id,zone,name,panels,done,days,team,start,end,lockStart,lockTeam,bs,be}
+var zones=[];    // {name,teams,start}
+var cfg={};
+var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'parallel',view:'house',
+  color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},showWeekend:true,
+  showToday:true,showGrid:true,showDeps:true,showBase:true,viewMode:'Week',colWidth:40,barHeight:22};
+
+var COLS=[
+  {k:'zone',   w:72, n:'区',     e:'text'},
+  {k:'name',   w:92, n:'房舍',   e:'text'},
+  {k:'panels', w:76, n:'水泥板', e:'num', align:'right'},
+  {k:'done',   w:72, n:'已装',   e:'num', align:'right'},
+  {k:'prog',   w:58, n:'进度%',  e:'ro'},
+  {k:'days',   w:52, n:'天数',   e:'ro'},
+  {k:'team',   w:76, n:'小组',   e:'team'},
+  {k:'start',  w:92, n:'开始',   e:'date'},
+  {k:'end',    w:92, n:'结束',   e:'ro'}
+];
+var COL_MIN=40, COL_MAX=420;
+function findCol(k){ var r=null; COLS.forEach(function(c){ if(c.k===k) r=c; }); return r; }
+function colW(k){ var c=findCol(k); return Math.max(COL_MIN,Math.min(COL_MAX,(cfg.colW||{})[k]||(c?c.w:80))); }
+
+function zoneOf(n){ var r=null; zones.forEach(function(z){ if(z.name===n) r=z; }); return r; }
+function teamsOf(n){ var z=zoneOf(n); return z?Math.max(1,z.teams|0):1; }
+function zoneColor(n){ return ZONE_C[hash(n)%8]; }
+function teamColor(z,t){ return TEAM_C[hash(z+'#'+t)%8]; }
+
+function loadCfg(){
+  var c={}; for(var k in DEF) c[k]=DEF[k];
+  var raw=null; try{ raw=localStorage.getItem('house_sched_v1'); }catch(e){}
+  if(raw){ try{ var o=JSON.parse(raw); for(var k2 in o) if(o[k2]!==undefined&&o[k2]!==null) c[k2]=o[k2]; }catch(e){} }
+  if(!c.start) c.start=today();
+  cfg=c;
+}
+function saveCfg(){ try{ localStorage.setItem('house_sched_v1',JSON.stringify(cfg)); }catch(e){} }
+
+function loadHouses(){
+  var src=HOUSE_SOURCE||SAMPLE;
+  houses=(src||[]).map(function(h,i){
+    return {id:'H'+(i+1), zone:String(h.zone||'未分区'), name:String(h.name||('房舍'+(i+1))),
+      panels:Math.max(0,Math.round(+h.panels||0)), done:Math.max(0,Math.round(+h.done||0)),
+      days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bs:'',be:''};
+  });
+  // 区表：按出现顺序，默认 2 组（可在区汇总表里改）
+  var seen={}; zones=[];
+  houses.forEach(function(h){ if(!seen[h.zone]){ seen[h.zone]=1; zones.push({name:h.zone,teams:2,start:''}); } });
+  try{
+    var raw=localStorage.getItem('house_zones_v1');
+    if(raw){ var oz=JSON.parse(raw)||[];
+      zones.forEach(function(z){ oz.forEach(function(o){ if(o.name===z.name) z.teams=Math.max(1,o.teams|0); }); }); }
+  }catch(e){}
+}
+
+/* =========================================================================
+ * 4. 排程核心
+ *    规则：日产能固定 → 天数 = ceil(板数/产能)
+ *          一组独占一栋 → 组内严格串行，本栋完成「次日」才开下一栋
+ *          区内专属     → 小组只在自己区内流转
+ * ======================================================================= */
+function houseDays(h){ return Math.max(1,Math.ceil(h.panels/Math.max(1,cfg.cap))); }
+
+function schedule(){
+  parseHolidays();
+  var projStart=nextWork(toYmd(cfg.start)||today());
+  var prevEnd=null;
+  zones.forEach(function(z){
+    /* userStart = 用户显式指定的区开工日；为空则跟随项目开工日。
+       不要把排程算出的 z.start 当用户输入，否则串行切回并行会残留旧日期 */
+    var base = z.userStart ? nextWork(toYmd(z.userStart)) : projStart;
+    z.start = (cfg.zmode==='serial'&&prevEnd) ? nextWork(nextAfter(prevEnd)) : base;
+    var hs=houses.filter(function(h){ return h.zone===z.name; });
+    if(!hs.length){ z.end=''; z.days=0; return; }
+
+    /* 分配顺序 */
+    var order=hs.slice();
+    if(cfg.strat==='lpt') order.sort(function(a,b){ return b.panels-a.panels || a.name.localeCompare(b.name,'zh'); });
+
+    var n=Math.max(1,z.teams|0), free=[];
+    for(var i=0;i<n;i++) free[i]=z.start;
+
+    order.forEach(function(h){
+      h.days=houseDays(h);
+      /* 选组：锁定优先，否则选最早空闲的组（并列取组号小的）
+         注意：free 里存的是 'YYYY-MM-DD' 字符串，定宽格式下字典序 == 时间序，
+         不能用 free[j] < Infinity 这种写法（字符串转数字得 NaN，比较恒 false） */
+      var k=0;
+      if(h.lockTeam!=null&&h.lockTeam<n&&h.lockTeam>=0) k=h.lockTeam|0;
+      else{ for(var j=1;j<n;j++){ if(free[j]<free[k]) k=j; } }
+      var s=h.lockStart?nextWork(h.lockStart):nextWork(free[k]);
+      var e=addWork(s,h.days);
+      h.start=s; h.end=e; h.team=k;
+      free[k]=nextAfter(e);
+    });
+
+    var mn='',mx='';
+    hs.forEach(function(h){ if(!mn||h.start<mn) mn=h.start; if(!mx||h.end>mx) mx=h.end; });
+    z.start=mn; z.end=mx; z.days=diffDays(mn,mx)+1;
+    prevEnd=mx;
+  });
+}
+/* 锁定：手改开始日 / 手选小组 */
+function setLockStart(h,v){ h.lockStart=toYmd(v)||''; schedule(); renderAll(); saveCfg(); }
+function setLockTeam(h,v){ h.lockTeam=(v===''||v==null)?null:(+v|0); schedule(); renderAll(); saveCfg(); }
+function unlockAll(){ houses.forEach(function(h){ h.lockStart=''; h.lockTeam=null; }); schedule(); renderAll(); saveCfg(); }
+function snapBaseline(){ houses.forEach(function(h){ h.bs=h.start; h.be=h.end; }); renderAll(); saveCfg(); }
+function clearBaseline(){ houses.forEach(function(h){ h.bs=''; h.be=''; }); renderAll(); saveCfg(); }
+
+/* =========================================================================
+ * 5. 行模型（甘特行）
+ * ======================================================================= */
+var rows=[];
+function buildRows(){
+  rows=[];
+  if(cfg.view==='team'){
+    zones.forEach(function(z){
+      var hs=houses.filter(function(h){ return h.zone===z.name; });
+      if(!hs.length) return;
+      rows.push({kind:'zone',id:'Z:'+z.name,name:z.name+'（区汇总）',zone:z.name,
+        start:z.start,end:z.end,days:diffDays(z.start,z.end)+1,
+        panels:sum(hs,'panels'),done:sum(hs,'done')});
+      for(var t=0;t<Math.max(1,z.teams|0);t++){
+        var ths=hs.filter(function(h){ return h.team===t; }).sort(function(a,b){ return a.start<b.start?-1:1; });
+        rows.push({kind:'team',id:'T:'+z.name+':'+(t+1),name:z.name+' · '+teamLabel(t),zone:z.name,team:t,
+          start:ths.length?ths[0].start:'',end:ths.length?ths[ths.length-1].end:'',
+          panels:sum(ths,'panels'),done:sum(ths,'done'),houses:ths});
+        ths.forEach(function(h){ h._prev = ths[ths.indexOf(h)-1]; });
+      }
+      /* 区完工里程碑 */
+      rows.push({kind:'ms',id:'M:'+z.name,name:z.name+' 完工',zone:z.name,start:z.end,end:z.end});
+    });
+  }else{
+    zones.forEach(function(z){
+      var hs=houses.filter(function(h){ return h.zone===z.name; });
+      if(!hs.length) return;
+      rows.push({kind:'zone',id:'Z:'+z.name,name:z.name+'（区汇总）',zone:z.name,
+        start:z.start,end:z.end,days:diffDays(z.start,z.end)+1,
+        panels:sum(hs,'panels'),done:sum(hs,'done')});
+      /* 区内按小组聚合成道，组内按开始时间 */
+      var byTeam={};
+      hs.forEach(function(h){ (byTeam[h.team]=byTeam[h.team]||[]).push(h); });
+      Object.keys(byTeam).sort(function(a,b){ return (+a)-(+b); }).forEach(function(tk){
+        var arr=byTeam[tk].slice().sort(function(a,b){ return a.start<b.start?-1:1; });
+        arr.forEach(function(h,i){
+          h._prev=i>0?arr[i-1]:null;
+          rows.push({kind:'house',id:h.id,name:h.name,zone:z.name,team:h.team,house:h,
+            start:h.start,end:h.end,panels:h.panels,done:h.done,days:h.days});
+        });
+      });
+      rows.push({kind:'ms',id:'M:'+z.name,name:z.name+' 完工',zone:z.name,start:z.end,end:z.end});
+    });
+  }
+}
+function sum(arr,k){ var n=0; arr.forEach(function(x){ n+=(+x[k]||0); }); return n; }
+function teamLabel(t){ return '第'+(t+1)+'组'; }
+
+/* =========================================================================
+ * 6. 时间刻度
+ * ======================================================================= */
+var S=null;
+function buildScale(){
+  var ds=[]; rows.forEach(function(r){ if(r.start) ds.push(r.start); if(r.end) ds.push(r.end); });
+  ds.push(today());
+  ds=ds.filter(Boolean).sort();
+  var min=ds[0]||today(), max=ds[ds.length-1]||min;
+  var vm=cfg.viewMode;
+  if(vm==='Day'){ min=addDays(min,-3); max=addDays(max,4); }
+  else if(vm==='Week'){ min=addDays(min,-7); max=addDays(max,10); }
+  else { min=addDays(min,-20); max=addDays(max,30); }
+  if(vm==='Week') min=addDays(min,-((dow(min)+6)%7));
+  if(vm==='Month') min=min.slice(0,8)+'01';
+
+  var cw=cfg.colWidth, cols=[], width=0, ppd;
+  if(vm==='Month'){
+    var mStartX={}, cur=min, cx=0, g=0;
+    while(cur<=max&&g++<400){
+      var y=+cur.slice(0,4), m=+cur.slice(5,7), dim=new Date(Date.UTC(y,m,0)).getUTCDate();
+      mStartX[y+'-'+pad2(m)]=cx;
+      cols.push({s:cur,e:cur.slice(0,8)+pad2(dim),l1:m+'月',ym:y+'-'+pad2(m)});
+      cx+=cw; cur=addDays(cur,dim);
+    }
+    width=cx;
+    S={min:min,max:max,cols:cols,x:function(d){ d=toYmd(d); if(!d) return 0;
+      var ym=d.slice(0,7); if(mStartX[ym]==null) return 0;
+      return mStartX[ym]+(parseInt(d.slice(8),10)-1)*cw/new Date(Date.UTC(+d.slice(0,4),+d.slice(5,7),0)).getUTCDate(); },
+       dayW:cw/30, width:Math.max(width,200)};
+  }else{
+    ppd = vm==='Day' ? cw : cw/7;
+    var d2=min,g2=0;
+    while(d2<=max&&g2++<1500){
+      var end= vm==='Day'? d2 : addDays(d2,6);
+      var l1= vm==='Day' ? String(parseInt(d2.slice(8),10)) : weekLabel(d2,end,cw);
+      S=S||null;
+      cols.push({s:d2,e:end,l1:l1,l2:'W'+isoWeek(d2).w,ym:(vm==='Day'?d2.slice(0,7):addDays(d2,3).slice(0,7))});
+      d2=addDays(end,1);
+    }
+    width=cols.length*cw;
+    S={min:min,max:max,cols:cols,x:function(d){ d=toYmd(d); if(!d) return 0; return diffDays(min,d)*ppd; },
+       dayW:ppd, width:Math.max(width,200)};
+  }
+  var up=[],last=null;
+  S.cols.forEach(function(c,i){
+    var key=(cfg.viewMode==='Month')?c.ym.slice(0,4):c.ym;
+    var lb=(cfg.viewMode==='Month')?key+'年':(c.ym.slice(0,4)+'年'+parseInt(c.ym.slice(5),10)+'月');
+    if(!last||last.key!==key){ last={key:key,w:cw,label:lb}; up.push(last); } else last.w+=cw;
+  });
+  S.up=up; S.rowsH=rows.length*rowH(); S.colW=cw;
+  return S;
+}
+function weekLabel(s,e,cw){
+  var sp=dSep(), sd=pad2(s.slice(8)), sm=pad2(s.slice(5,7)), ed=pad2(e.slice(8)), em=pad2(e.slice(5,7));
+  if(cw>=62) return sd+sp+sm+' - '+ed+sp+em;
+  if(cw>=44) return sd+sp+sm+' - '+ed+(em!==sm?(sp+em):'');
+  return parseInt(sd,10)+'-'+parseInt(ed,10)+(em!==sm?(sp+parseInt(em,10)):'');
+}
+function rowH(){ return cfg.barHeight+18; }
+
+/* =========================================================================
+ * 7. 渲染甘特
+ * ======================================================================= */
+function barColorOf(r){
+  if(cfg.color==='team'&&r.team!=null) return teamColor(r.zone,r.team);
+  return zoneColor(r.zone);
+}
+function renderChart(){
+  buildScale();
+  var inner=document.getElementById('chartInner'), rh=rowH(), bh=cfg.barHeight, h='';
+  h+='<div class="thead">';
+  h+='<div class="tu">'; S.up.forEach(function(u){
+    h+='<div style="width:'+u.w+'px">'+esc(u.w>=68?u.label:u.label.replace(/^\d{4}年/,''))+'</div>'; }); h+='</div>';
+  h+='<div class="tl">'; S.cols.forEach(function(c){
+    var we=(cfg.viewMode==='Day'&&(dow(c.s)===0||dow(c.s)===6));
+    h+='<div class="'+(we?'we':'')+'" style="width:'+S.colW+'px" title="'+esc(dmy(c.s))+'">'
+      +'<span class="t1">'+esc(c.l1)+'</span><span class="t2">'+esc(c.l2||'')+'</span></div>'; }); h+='</div></div>';
+  h+='<div class="bd" style="height:'+S.rowsH+'px">';
+  if(cfg.showWeekend&&cfg.viewMode!=='Month'){
+    if(cfg.viewMode==='Day'){
+      S.cols.forEach(function(c,i){ if(dow(c.s)===0||dow(c.s)===6)
+        h+='<div class="wkend'+(dow(c.s)===6?' sat':'')+'" style="left:'+(i*S.colW)+'px;width:'+S.colW+'px"></div>'; });
+    }else{
+      S.cols.forEach(function(c){
+        var sx=S.x(addDays(c.s,5)), ex=S.x(addDays(c.s,7));
+        h+='<div class="wkend" style="left:'+sx+'px;width:'+(ex-sx)+'px"></div>'; });
+    }
+  }
+  if(cfg.showGrid) S.cols.forEach(function(c,i){ h+='<div class="cl" style="left:'+(i*S.colW)+'px"></div>'; });
+  if(cfg.showToday){ var tx=S.x(today())+S.dayW/2;
+    if(tx>=0&&tx<=S.width) h+='<div class="today" style="left:'+tx+'px"></div>'; }
+  h+='</div>';
+
+  /* 依赖：组内上一栋 -> 本栋 */
+  if(cfg.showDeps&&cfg.view==='house'){
+    var paths='', idx={}; rows.forEach(function(r,i){ idx[r.id]=i; });
+    rows.forEach(function(r,i){
+      if(r.kind!=='house'||!r.house||!r.house._prev) return;
+      var pi=idx['H'+0]!==undefined?null:null;
+      var prevRow=null;
+      for(var k=0;k<i;k++){ if(rows[k].kind==='house'&&rows[k].house===r.house._prev){ prevRow=k; break; } }
+      if(prevRow==null) return;
+      var y1=prevRow*rh+rh/2, y2=i*rh+rh/2;
+      var x1=S.x(r.house._prev.end)+S.dayW, x2=S.x(r.start);
+      var d;
+      if(x2>x1+12) d='M'+x1+' '+y1+' H'+(x1+8)+' V'+y2+' H'+(x2-1);
+      else d='M'+x1+' '+y1+' H'+(x1+8)+' V'+(y1+rh/2-3)+' H'+(x2-11)+' V'+y2+' H'+(x2-1);
+      paths+='<path d="'+d+'" fill="none" stroke="#90a4ae" stroke-width="1.2" marker-end="url(#arw)"/>';
+    });
+    h+='<svg class="deps" id="depSvg" width="'+S.width+'" height="'+S.rowsH+'">'
+      +'<defs><marker id="arw" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">'
+      +'<path d="M0,0 L7,3.5 L0,7 Z" fill="#90a4ae"/></marker></defs>'+paths+'</svg>';
+  }
+
+  /* 条 */
+  rows.forEach(function(r,i){
+    var top=i*rh+(rh-bh)/2;
+    if(r.kind==='ms'){
+      var sz=Math.round(bh*0.8), col=zoneColor(r.zone);
+      h+='<div class="bar ms" data-id="'+esc(r.id)+'" style="left:'+Math.round(S.x(r.start)+S.dayW/2-sz/2)
+        +'px;top:'+Math.round(top+(bh-sz)/2)+'px;width:'+sz+'px;height:'+sz+'px;background-color:'+col+'"'
+        +' title="'+esc(r.name)+' · '+dmy(r.start)+'"></div>';
+      return;
+    }
+    if(r.kind==='zone'){
+      var x=S.x(r.start), w=Math.max(S.x(addDays(r.end,1))-x,3), col2=zoneColor(r.zone);
+      h+='<div class="bar sum" data-id="'+esc(r.id)+'" style="left:'+Math.round(x)+'px;top:'+Math.round(top+bh/2-4)
+        +'px;width:'+Math.round(w)+'px;background-color:'+col2+'" title="'+esc(r.name)+' | '+dmy(r.start)+' ~ '+dmy(r.end)
+        +' | '+r.panels+'片 | '+(r.days||0)+'天"></div>';
+      return;
+    }
+    /* house / team */
+    var pct= r.panels? Math.round(Math.min(100,(r.done||0)/r.panels*100)) : 0;
+    var col3=barColorOf(r);
+    var x2=S.x(r.start), w2=Math.max(Math.round(S.dayW*(diffDays(r.start,r.end)+1)),4);
+    var lbl;
+    if(r.kind==='house') lbl=r.name+' '+(r.days||0)+'天';
+    else lbl=r.name+' · '+((r.houses&&r.houses.length)||0)+'栋';
+    var locked=(r.kind==='house'&&r.house&&r.house.lockStart)?' locked':'';
+    if(cfg.showBase&&r.kind==='house'&&r.house&&r.house.bs){
+      var bx=S.x(r.house.bs), bw=Math.max(S.x(addDays(r.house.be,1))-bx,3);
+      h+='<div class="base" style="left:'+Math.round(bx)+'px;top:'+Math.round(top-5)+'px;width:'+Math.round(bw)+'px"></div>';
+    }
+    h+='<div class="bar'+(w2<48?' out':'')+locked+'" data-id="'+esc(r.id)+'" data-lbl="'+esc(lbl)+'"'
+      +' style="left:'+Math.round(x2)+'px;top:'+Math.round(top)+'px;width:'+w2+'px;height:'+bh+'px;'
+      +bgFor(col3,pct)+';--fg:'+fgOn(col3)+'"'
+      +' title="'+tipOf(r)+'"'
+      +(r.kind==='house'?' onmousedown="dragStart(event,this)" ontouchstart="dragStart(event,this)"':'')+'"></div>';
+  });
+  inner.style.width=S.width+'px';
+  inner.innerHTML=h;
+}
+function bgFor(col,p){ return 'background-color:'+col+';background-image:linear-gradient(to right,'
+  +shade(col,-30)+' 0 '+p+'%,rgba(0,0,0,0) '+p+'% 100%)'; }
+function tipOf(r){
+  if(r.kind==='house'){
+    var h=r.house, rest=h.panels-h.done, wd=workDaysBetween(h.start,h.end);
+    return esc(h.zone+' '+h.name+' | '+h.panels+'片 → '+h.days+'天（'+cfg.cap+'片/天）'
+      +' | '+teamLabel(h.team)+' | '+dmy(h.start)+' ~ '+dmy(h.end)
+      +' | 已装'+h.done+'（剩'+rest+'）'+(h.lockStart?' | 开工日已锁定':''));
+  }
+  if(r.kind==='team') return esc(r.name+' | '+((r.houses&&r.houses.length)||0)+'栋 | '+r.panels+'片 | '+dmy(r.start)+' ~ '+dmy(r.end));
+  return esc(r.name+' | '+dmy(r.start)+' ~ '+dmy(r.end)+' | '+r.panels+'片');
+}
+
+/* =========================================================================
+ * 8. 左侧表
+ * ======================================================================= */
+function renderTable(){
+  var box=document.getElementById('tblWrap'), h='';
+  h+='<table><colgroup>';
+  COLS.forEach(function(c){ h+='<col data-k="'+c.k+'" style="width:'+colW(c.k)+'px">'; });
+  h+='</colgroup><thead><tr>';
+  COLS.forEach(function(c){
+    h+='<th data-k="'+c.k+'" title="拖右边缘调宽，双击自适应">'+esc(c.n)
+      +'<i class="rs" onmousedown="colResizeStart(event,this)" ondblclick="colAutoFit(\''+c.k+'\')"></i></th>';
+  });
+  h+='</tr></thead><tbody>';
+  if(cfg.view==='team'){
+    zones.forEach(function(z){
+      var zs=houses.filter(function(x){return x.zone===z.name;});
+      /* 9 个单元格严格对应 COLS 的 9 列，用 colspan 会在 table-layout:fixed 下错位 */
+      h+='<tr class="zrow"><td>'+esc(z.name)+'</td><td>区汇总</td><td class="num">'+sum(zs,'panels')
+        +'</td><td class="num">'+sum(zs,'done')+'</td><td>'+(sum(zs,'panels')?Math.round(sum(zs,'done')/sum(zs,'panels')*100)+'%':'0%')
+        +'</td><td>'+(z.days||0)+'</td><td>'+Math.max(1,z.teams|0)+'组</td><td>'+dmy(z.start)+'</td><td>'+dmy(z.end)+'</td></tr>';
+      for(var t=0;t<Math.max(1,z.teams|0);t++){
+        /* 必须按 start 排序再取首尾，否则 houses 原顺序会让「开始」晚于「结束」 */
+        var ths=houses.filter(function(x){ return x.zone===z.name&&x.team===t; })
+                      .sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
+        var last=ths.length?ths[ths.length-1]:null;
+        h+='<tr class="trow"><td></td><td>'+teamLabel(t)+'</td><td class="num">'+(ths.length?sum(ths,'panels'):'—')
+          +'</td><td class="num">'+(ths.length?sum(ths,'done'):'—')
+          +'</td><td></td><td>'+(ths.length?ths.length+'栋':'空闲')+'</td><td></td><td>'
+          +(ths.length?dmy(ths[0].start):'—')+'</td><td>'+(last?dmy(last.end):'—')+'</td></tr>';
+      }
+    });
+  }else{
+    var curZone=null;
+    rows.forEach(function(r){
+      if(r.kind==='zone'){
+        curZone=r.zone;
+        var z=zoneOf(r.zone);
+        /* 列位对齐：房舍列写「区汇总」，组数放到「小组」列，避免语义串位 */
+        h+='<tr class="zrow"><td>'+esc(r.zone)+'</td><td>区汇总</td><td class="num">'+r.panels
+          +'</td><td class="num">'+r.done+'</td><td>'+pctOf(r)+'</td><td>'+(r.days||0)+'</td>'
+          +'<td>'+Math.max(1,z?z.teams:1)+'组</td><td>'
+          +dmy(r.start)+'</td><td>'+dmy(r.end)+'</td></tr>';
+        return;
+      }
+      if(r.kind==='ms') return;
+      var hh=r.house;
+      h+='<tr data-id="'+esc(hh.id)+'" onclick="selRow(this)">';
+      h+='<td>'+esc(hh.zone)+'</td>';
+      h+='<td>'+esc(hh.name)+'</td>';
+      h+='<td class="num"><input type="number" min="0" value="'+hh.panels+'" onchange="evNum(\''+hh.id+'\',\'panels\',this.value)"></td>';
+      h+='<td class="num"><input type="number" min="0" value="'+hh.done+'" onchange="evNum(\''+hh.id+'\',\'done\',this.value)"></td>';
+      h+='<td>'+pctOf(r)+'</td>';
+      h+='<td class="num">'+hh.days+'</td>';
+      h+='<td><select onchange="evTeam(\''+hh.id+'\',this.value)">'+teamOpts(hh)+'</select></td>';
+      h+='<td><input value="'+esc(dmy(hh.start))+'" onchange="evStart(\''+hh.id+'\',this.value)">'
+        +(hh.lockStart?'<span class="lk" title="开工日已锁定">🔒</span>':'')+'</td>';
+      h+='<td>'+dmy(hh.end)+'</td>';
+      h+='</tr>';
+    });
+  }
+  if(!houses.length) h+='<tr><td class="empty" colspan="'+COLS.length+'">暂无房舍，点上方「载入示例」或「粘贴/导入数据」</td></tr>';
+  h+='</tbody></table>';
+  box.innerHTML=h;
+  syncTableWidth();
+}
+function pctOf(r){ return r.panels?Math.round((r.done||0)/r.panels*100)+'%':'0%'; }
+function teamOpts(h){
+  var n=teamsOf(h.zone), s='<option value="">自动</option>';
+  for(var i=0;i<n;i++) s+='<option value="'+i+'"'+(h.lockTeam===i?' selected':'')+'>'+teamLabel(i)+'</option>';
+  return s;
+}
+function evNum(id,k,v){
+  var h=byId(id); if(!h) return;
+  var n=Math.max(0,Math.round(+v||0));
+  if(k==='done') n=Math.min(n,h.panels);
+  h[k]=n; schedule(); renderAll(); saveCfg();
+}
+function evTeam(id,v){ var h=byId(id); if(!h) return; setLockTeam(h,v); }
+function evStart(id,v){ var h=byId(id); if(!h) return; setLockStart(h,v); }
+function byId(id){ var r=null; houses.forEach(function(h){ if(h.id===id) r=h; }); return r; }
+function selRow(tr){ var id=tr.getAttribute('data-id');
+  var rs=document.querySelectorAll('#tblWrap tr[data-id]');
+  for(var i=0;i<rs.length;i++) rs[i].classList.toggle('sel',rs[i].getAttribute('data-id')===id);
+  var bs=document.querySelectorAll('#chartInner .bar');
+  for(var j=0;j<bs.length;j++) bs[j].classList.toggle('sel',bs[j].getAttribute('data-id')===id); }
+function syncTableWidth(){
+  var box=document.getElementById('tblWrap'), tb=box&&box.querySelector('table'); if(!tb) return;
+  var s=0; COLS.forEach(function(c){ s+=colW(c.k); });
+  var avail=Math.max(0,(box.clientWidth||0)-2), extra=avail>s?(avail-s):0;
+  tb.style.width=(s+extra)+'px';
+  var nm=tb.querySelector('col[data-k="name"]');
+  if(nm) nm.style.width=(colW('name')+extra)+'px';
+}
+function colResizeStart(e,el){
+  if(e.button!==undefined&&e.button!==0) return;
+  var th=el.parentNode, k=th.getAttribute('data-k');
+  e.preventDefault(); e.stopPropagation();
+  var col=document.querySelector('#tblWrap col[data-k="'+k+'"]'); if(!col) return;
+  var w0=colW(k), x0=e.clientX;
+  th.classList.add('rs-on'); document.body.classList.add('col-resizing');
+  function mv(ev){ var w=Math.max(COL_MIN,Math.min(COL_MAX,Math.round(w0+ev.clientX-x0)));
+    cfg.colW=cfg.colW||{}; cfg.colW[k]=w; col.style.width=w+'px'; syncTableWidth(); }
+  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+    th.classList.remove('rs-on'); document.body.classList.remove('col-resizing'); saveCfg(); }
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+function estText(s){ s=String(s==null?'':s); var n=0;
+  for(var i=0;i<s.length;i++) n+=(s.charCodeAt(i)>0x2e80)?12:6.6; return n; }
+function measureText(s){
+  s=String(s==null?'':s);
+  var d=document.getElementById('igMeasure');
+  if(!d){ d=document.createElement('span'); d.id='igMeasure';
+    d.style.cssText='position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;'
+      +'font:12px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Arial,sans-serif';
+    document.body.appendChild(d); }
+  d.textContent=s; var m=d.scrollWidth; return m>0?m:estText(s);
+}
+function colAutoFit(k){
+  var c=findCol(k); if(!c) return;
+  var mx=measureText(c.n)+30;
+  if(k==='name') houses.forEach(function(h){ mx=Math.max(mx,measureText(h.name)+22); });
+  if(k==='zone') houses.forEach(function(h){ mx=Math.max(mx,measureText(h.zone)+22); });
+  if(k==='team') mx=Math.max(mx,measureText('第1组')+40);
+  cfg.colW=cfg.colW||{}; cfg.colW[k]=Math.max(COL_MIN,Math.min(COL_MAX,Math.ceil(mx)));
+  saveCfg(); renderTable();
+}
+
+/* =========================================================================
+ * 9. KPI / 区汇总 / 负载
+ * ======================================================================= */
+function renderKPI(){
+  var box=document.getElementById('kpi');
+  if(!houses.length){ box.innerHTML='<span class="chip">暂无数据</span>'; return; }
+  var tp=sum(houses,'panels'), td=sum(houses,'done');
+  var mn='',mx='',lateZone='',zt={};
+  zones.forEach(function(z){ if(!z.start) return;
+    if(!mn||z.start<mn) mn=z.start;
+    if(!mx||z.end>mx){ mx=z.end; lateZone=z.name; } });
+  var totalDays=mn?diffDays(mn,mx)+1:0;
+  /* 总作业组日 vs 总容量组日 */
+  var work=0, span=0;
+  zones.forEach(function(z){
+    var n=Math.max(1,z.teams|0);
+    houses.filter(function(h){ return h.zone===z.name; }).forEach(function(h){ work+=h.days; });
+    if(z.start&&z.end) span+= workDaysBetween(z.start,z.end)*n;
+  });
+  var util=span?Math.round(work/span*100):0;
+  var h='<span class="chip">分区 <b>'+zones.length+'</b></span>'
+   +'<span class="chip">房舍 <b>'+houses.length+'</b> 栋</span>'
+   +'<span class="chip">总板数 <b>'+tp.toLocaleString()+'</b> 片</span>'
+   +'<span class="chip">已装 <b>'+td.toLocaleString()+'</b> 片（'+Math.round(td/tp*100)+'%）</span>'
+   +'<span class="chip">产能 <b>'+cfg.cap+'</b> 片/组/天</span>'
+   +'<span class="chip">安装小组 <b>'+zones.reduce(function(a,z){return a+Math.max(1,z.teams|0);},0)+'</b> 组</span>'
+   +'<span class="chip">项目区间 <b>'+dmy(mn)+' ~ '+dmy(mx)+'</b></span>'
+   +'<span class="chip">总工期 <b>'+totalDays+'</b> 天</span>'
+   +'<span class="chip">最晚完工区 <b>'+esc(lateZone)+'</b></span>'
+   +'<span class="chip '+(util>=80?'ok':'')+'">小组平均利用率 <b>'+util+'%</b></span>';
+  box.innerHTML=h;
+}
+function renderZoneTbl(){
+  var t=document.getElementById('zoneTbl');
+  var h='<thead><tr><th>分区</th><th>安装小组</th><th class="n">房舍数</th><th class="n">总板数</th>'
+    +'<th class="n">已装</th><th class="n">开工日(可改)</th><th class="n">完工</th><th class="n">工期(天)</th>'
+    +'<th class="n">理论最少天数</th><th class="n">利用率</th></tr></thead><tbody>';
+  zones.forEach(function(z){
+    var hs=houses.filter(function(x){ return x.zone===z.name; });
+    var n=Math.max(1,z.teams|0), tp=sum(hs,'panels'), td=sum(hs,'done');
+    var work=0; hs.forEach(function(x){ work+=x.days; });
+    var ideal=Math.ceil(tp/Math.max(1,cfg.cap)/n);
+    var real=hs.length?diffDays(z.start,z.end)+1:0;
+    var realW=hs.length?workDaysBetween(z.start,z.end):0;
+    var util=realW?Math.round(work/(realW*n)*100):0;
+    h+='<tr><td><b>'+esc(z.name)+'</b></td>'
+      +'<td><input type="number" min="1" max="12" value="'+n+'" style="width:56px;border:1px solid var(--bd);border-radius:4px;padding:2px 5px"'
+      +' onchange="setTeams(\''+esc(z.name)+'\',this.value)"></td>'
+      +'<td class="n">'+hs.length+'</td><td class="n">'+tp.toLocaleString()+'</td><td class="n">'+td.toLocaleString()+'</td>'
+      +'<td class="n"><input value="'+esc(z.userStart?dmy(z.userStart):'')+'" placeholder="跟随项目"'
+      +' style="width:84px;border:1px solid var(--bd);border-radius:4px;padding:2px 5px"'
+      +' onchange="setZoneStart(\''+esc(z.name)+'\',this.value)" title="留空=跟随项目开工日"></td>'
+      +'<td class="n">'+dmy(z.end)+'</td>'
+      +'<td class="n"><b>'+real+'</b></td><td class="n">'+ideal+'</td>'
+      +'<td class="n"><span style="color:'+(util>=85?'#2e7d32':(util>=65?'#f57c00':'#c62828'))+'"><b>'+util+'%</b></span></td></tr>';
+  });
+  h+='</tbody>';
+  t.innerHTML=h;
+}
+function setZoneStart(zname,v){
+  var z=zoneOf(zname); if(!z) return;
+  z.userStart=toYmd(v)||'';
+  schedule(); renderAll(); saveCfg();
+}
+function setTeams(zname,v){
+  var z=zoneOf(zname); if(!z) return;
+  z.teams=Math.max(1,Math.min(12,parseInt(v,10)||1));
+  houses.forEach(function(h){ if(h.zone===zname&&h.lockTeam!=null&&h.lockTeam>=z.teams) h.lockTeam=null; });
+  try{ localStorage.setItem('house_zones_v1',JSON.stringify(zones)); }catch(e){}
+  schedule(); renderAll(); saveCfg();
+}
+function renderLoad(){
+  var box=document.getElementById('loadBox'), h='';
+  zones.forEach(function(z){
+    for(var t=0;t<Math.max(1,z.teams|0);t++){
+      var hs=houses.filter(function(x){ return x.zone===z.name&&x.team===t; })
+                   .sort(function(a,b){ return a.start<b.start?-1:1; });
+      var work=0; hs.forEach(function(x){ work+=x.days; });
+      var span=hs.length?workDaysBetween(hs[0].start,hs[hs.length-1].end):0;
+      var util=span?Math.round(work/span*100):0;
+      var col=cfg.color==='team'?teamColor(z.name,t):zoneColor(z.name);
+      h+='<div class="load"><div class="lh"><span class="ln">'+esc(z.name)+' · '+teamLabel(t)+'</span>'
+        +'<span class="lv">'+hs.length+'栋 · '+work+'个工作日 · 利用率 <b>'+util+'%</b></span></div>'
+        +'<div class="lbar">';
+      if(span){
+        var cursor=hs[0].start, idle=0;
+        hs.forEach(function(x){
+          var gap=diffDays(cursor,x.start);
+          if(gap>0){ h+='<i style="width:'+(workDaysBetween(cursor,x.start)/span*100)+'%;background:#eceff1"></i>'; }
+          h+='<i style="width:'+(workDaysBetween(x.start,x.end)/span*100)+'%;background:'+col
+            +'" title="'+esc(x.name+' '+dmy(x.start)+'~'+dmy(x.end)+' '+x.days+'天')+'"></i>';
+          cursor=addDays(x.end,1);
+        });
+      }else h+='<i style="width:100%;background:#eceff1"></i>';
+      h+='</div><div class="lf">'+(hs.length?('首栋 <b>'+esc(hs[0].name)+'</b> '+dmy(hs[0].start)
+        +' → 末栋 <b>'+esc(hs[hs.length-1].name)+'</b> '+dmy(hs[hs.length-1].end)
+        +(util<70?' · <span style="color:#c62828">空档较多，可考虑减组或调序</span>':'')):'<b>空闲</b>' )
+        +'</div></div>';
+    }
+  });
+  box.innerHTML=h;
+  /* 冲突检测 */
+  var cb=document.getElementById('conflict'), warn=[];
+  zones.forEach(function(z){
+    var byTeam={};
+    houses.forEach(function(h){ if(h.zone!==z.name) return;
+      (byTeam[h.team]=byTeam[h.team]||[]).push(h); });
+    Object.keys(byTeam).forEach(function(tk){
+      var arr=byTeam[tk].slice().sort(function(a,b){ return a.start<b.start?-1:1; });
+      for(var i=1;i<arr.length;i++){
+        if(arr[i].start<=arr[i-1].end)
+          warn.push(z.name+' '+teamLabel(+tk)+'：'+arr[i-1].name+' 与 '+arr[i].name+' 时间重叠（'+dmy(arr[i-1].end)+' / '+dmy(arr[i].start)+'）');
+      }
+    });
+  });
+  zones.forEach(function(z){ if(z.teams>Math.max(1,z.teams|0)) warn.push(''); });
+  houses.forEach(function(h){ if(!h.start||!h.end) warn.push('【'+h.zone+' '+h.name+'】未排上期'); });
+  cb.innerHTML=warn.filter(Boolean).length
+    ? '<div class="warnbox"><b>排程校验（'+warn.filter(Boolean).length+'）</b><ul>'
+      +warn.filter(Boolean).slice(0,8).map(function(x){ return '<li>'+esc(x)+'</li>'; }).join('')+'</ul></div>' : '';
+  /* 图例 */
+  var lg=document.getElementById('legend');
+  lg.innerHTML=cfg.color==='zone'
+    ? zones.map(function(z){ return '<span><i style="background:'+zoneColor(z.name)+'"></i>'+esc(z.name)+'</span>'; }).join('')
+    : '<span>按小组着色</span>';
+  lg.innerHTML+='<span><i style="background:#eceff1"></i>小组空档</span>'
+    +'<span><i style="background:#cbd5e0"></i>基线计划</span>'
+    +'<span><i style="background:#ffa726;transform:rotate(45deg)"></i>区完工里程碑</span>'
+    +'<span style="color:#c62828">🔒 = 开工日已锁定（手工指定，排程不再自动挪动）</span>';
+}
+
+/* =========================================================================
+ * 10. 拖拽（房舍条 -> 锁定开工日）
+ * ======================================================================= */
+var drag=null;
+function ptX(e){ if(e.touches&&e.touches.length) return e.touches[0].clientX;
+  if(e.changedTouches&&e.changedTouches.length) return e.changedTouches[0].clientX; return e.clientX; }
+function ptY(e){ if(e.touches&&e.touches.length) return e.touches[0].clientY;
+  if(e.changedTouches&&e.changedTouches.length) return e.changedTouches[0].clientY; return e.clientY; }
+function dragStart(e,el){
+  var id=el.getAttribute('data-id'), h=byId(id); if(!h) return;
+  if(e.type==='touchstart'&&e.touches.length>1) return;
+  drag={h:h,x0:ptX(e)+(document.getElementById('chartWrap').scrollLeft||0),moved:false,
+        touch:e.type.indexOf('touch')===0};
+  e.preventDefault();
+  var mv=drag.touch?'touchmove':'mousemove', up=drag.touch?'touchend':'mouseup';
+  document.addEventListener(mv,dragMove,{passive:false});
+  document.addEventListener(up,dragEnd);
+  document.addEventListener('touchcancel',dragEnd);
+}
+function applyDrag(x){
+  if(!drag) return;
+  var cw=document.getElementById('chartWrap');
+  var dx=(x+(cw?cw.scrollLeft:0))-drag.x0;
+  if(Math.abs(dx)>2) drag.moved=true;
+  var target=addDays(drag.h.lockStart||drag.h.start, Math.round(dx/S.dayW));
+  drag.h.start=nextWork(target);
+  drag.h.end=addWork(drag.h.start,drag.h.days);
+  updateRowsAfterDrag();
+}
+function updateRowsAfterDrag(){
+  var r=null; rows.forEach(function(x){ if(x.kind==='house'&&x.house===drag.h) r=x; });
+  if(r){ r.start=drag.h.start; r.end=drag.h.end; }
+  var i=rows.indexOf(r); if(i>=0) updateBar(i);
+  var svg=document.getElementById('depSvg'); if(svg) svg.classList.add('dragging');
+}
+function dragMove(e){
+  if(!drag) return;
+  if(e.cancelable) e.preventDefault();
+  var x=ptX(e), y=ptY(e); drag.lastX=x; drag.lastY=y;
+  applyDrag(x); edgeScroll(x,y);
+}
+var edgeRAF=null;
+function edgeScroll(x,y){
+  var cw=document.getElementById('chartWrap'); if(!cw||!drag) return;
+  var r=cw.getBoundingClientRect(), E=48, hx=0, vy=0;
+  if(x>r.right-E) hx=1; else if(x<r.left+E) hx=-1;
+  if(y>r.bottom-E) vy=1; else if(y<r.top+E) vy=-1;
+  drag.edge=hx; drag.edgeV=vy;
+  if((hx||vy)&&!edgeRAF) edgeRAF=requestAnimationFrame(edgeTick);
+}
+function edgeTick(){
+  edgeRAF=null; if(!drag||(!drag.edge&&!drag.edgeV)) return;
+  var cw=document.getElementById('chartWrap'), tw=document.getElementById('tblWrap');
+  if(drag.edge) cw.scrollLeft+=drag.edge*16;
+  if(drag.edgeV){ var mx=Math.max(0,cw.scrollHeight-cw.clientHeight);
+    var tp=Math.max(0,Math.min(cw.scrollTop+drag.edgeV*10,mx)); cw.scrollTop=tp; if(tw) tw.scrollTop=tp; }
+  if(drag.edge) applyDrag(drag.lastX);
+  edgeRAF=requestAnimationFrame(edgeTick);
+}
+function dragEnd(){
+  if(edgeRAF){ cancelAnimationFrame(edgeRAF); edgeRAF=null; }
+  var svg=document.getElementById('depSvg'); if(svg) svg.classList.remove('dragging');
+  if(drag){
+    if(drag.moved){ drag.h.lockStart=drag.h.start; }   /* 拖过 = 锁定开工日 */
+    schedule(); renderAll(); saveCfg();
+  }
+  drag=null;
+  document.removeEventListener('mousemove',dragMove);
+  document.removeEventListener('mouseup',dragEnd);
+  document.removeEventListener('touchmove',dragMove);
+  document.removeEventListener('touchend',dragEnd);
+  document.removeEventListener('touchcancel',dragEnd);
+}
+function updateBar(i){
+  var r=rows[i]; if(!r) return;
+  var el=document.querySelector('#chartInner .bar[data-id="'+cssEsc(r.id)+'"]'); if(!el) return;
+  var rh=rowH(), bh=cfg.barHeight, top=i*rh+(rh-bh)/2;
+  var pct=r.panels?Math.round(Math.min(100,(r.done||0)/r.panels*100)):0;
+  var col=barColorOf(r);
+  var x=S.x(r.start), w=Math.max(Math.round(S.dayW*(diffDays(r.start,r.end)+1)),4);
+  el.className='bar'+(w<48?' out':'')+(r.house&&r.house.lockStart?' locked':'');
+  el.style.cssText='left:'+Math.round(x)+'px;top:'+Math.round(top)+'px;width:'+w+'px;height:'+bh+'px;'
+    +bgFor(col,pct)+';--fg:'+fgOn(col);
+  if(r.kind==='house') el.setAttribute('data-lbl',r.name+' '+(r.days||0)+'天');
+}
+function cssEsc(s){ return String(s).replace(/([ #.;?%&,@+*~':"!\^$[\]()=>|/])/g,'\\$1'); }
+
+/* =========================================================================
+ * 11. 分隔线
+ * ======================================================================= */
+function applyTblW(){ document.documentElement.style.setProperty('--tbl-w',Math.round(cfg.tableWidth||470)+'px'); }
+function fitTblW(){ var s=0; COLS.forEach(function(c){ s+=colW(c.k); });
+  cfg.tableWidth=Math.max(220,Math.min(s+2,Math.max(window.innerWidth-360,280)));
+  applyTblW(); saveCfg(); }
+function initSplitter(){
+  var sp=document.getElementById('splitter'); if(!sp||sp.__init) return; sp.__init=1;
+  function clamp(w){ return Math.max(220,Math.min(w,Math.max(window.innerWidth-360,300))); }
+  sp.addEventListener('mousedown',function(e){
+    if(e.button!==0) return; e.preventDefault();
+    var w0=cfg.tableWidth||470, x0=e.clientX;
+    sp.classList.add('on'); document.body.classList.add('resizing');
+    function mv(ev){ cfg.tableWidth=Math.round(clamp(w0+ev.clientX-x0)); applyTblW(); }
+    function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+      sp.classList.remove('on'); document.body.classList.remove('resizing'); saveCfg(); }
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); });
+  sp.addEventListener('dblclick',fitTblW);
+}
+function syncScroll(){
+  var a=document.getElementById('tblWrap'), b=document.getElementById('chartWrap');
+  if(!a||!b||a.__sync) return; a.__sync=1; var lock=false;
+  function link(p,q){ p.addEventListener('scroll',function(){
+    if(lock) return; lock=true; q.scrollTop=p.scrollTop;
+    requestAnimationFrame(function(){ lock=false; }); }); }
+  link(a,b); link(b,a);
+}
+
+/* =========================================================================
+ * 12. 导入
+ * ======================================================================= */
+function impOpen(){ document.getElementById('impBox').style.display='block'; }
+function impCancel(){ document.getElementById('impBox').style.display='none'; }
+/* 引号感知切分：支持 CSV 里 "1,800"、"上海,徐汇" 这类带分隔符的字段 */
+function splitLine(line,d){
+  line=String(line==null?'':line);
+  if(d!==',') return line.split(d).map(function(x){ return String(x).replace(/^"|"$/g,'').trim(); });
+  var out=[], cur='', q=false;
+  for(var i=0;i<line.length;i++){
+    var c=line[i];
+    if(c==='"'){ if(q&&line[i+1]==='"'){ cur+='"'; i++; } else q=!q; }
+    else if(c===','&&!q){ out.push(cur); cur=''; }
+    else cur+=c;
+  }
+  out.push(cur);
+  return out.map(function(x){ return x.trim(); });
+}
+function parseTable(text){
+  text=String(text||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  var lines=text.split('\n').filter(function(l){ return l.trim()!==''; });
+  if(!lines.length) return [];
+  var cand=['\t',',',';','|'], best=',', bestN=1;
+  cand.forEach(function(d){ var n=splitLine(lines[0],d).length; if(n>bestN){ bestN=n; best=d; } });
+  return lines.map(function(l){ return splitLine(l,best); });
+}
+/* 数字：去千分位逗号、"1,800片" -> 1800 */
+function toNum(v){
+  var s=String(v==null?'':v).replace(/,/g,'');
+  var n=parseFloat(s.replace(/[^0-9.\-]/g,''));
+  return isNaN(n)?0:n;
+}
+function impApply(){
+  var txt=document.getElementById('impText').value;
+  var msg=document.getElementById('impMsg');
+  var grid;
+  if(!txt.trim()){ msg.textContent='请先粘贴数据或选择文件'; return; }
+  if(txt.trim()[0]==='['||txt.trim()[0]==='{'){
+    try{
+      var o=JSON.parse(txt); var arr=Array.isArray(o)?o:(o.data||o.houses||o.list||[o]);
+      grid=[Object.keys(arr[0]||{})].concat(arr.map(function(x){ return Object.keys(x).map(function(k){ return x[k]; }); }));
+    }catch(e){ msg.textContent='JSON 解析失败：'+e.message; return; }
+  }else grid=parseTable(txt);
+  if(grid.length<1){ msg.textContent='未识别到数据'; return; }
+  var hdr=document.getElementById('m_hdr').checked;
+  var heads=hdr?grid[0]:grid[0].map(function(_,i){ return '列'+(i+1); });
+  var body=hdr?grid.slice(1):grid;
+  var zi=+document.getElementById('m_zone').value,
+      ni=+document.getElementById('m_name').value,
+      pi=+document.getElementById('m_pan').value,
+      di=document.getElementById('m_done').value;
+  di=(di===''||di==null)?-1:+di;
+  var out=[], bad=0;
+  body.forEach(function(r){
+    var z=r[zi], n=r[ni], p=toNum(r[pi]);
+    if(!z&&!n) return;
+    if(!p){ bad++; return; }
+    out.push({zone:z||'未分区',name:n||('房舍'+(out.length+1)),panels:Math.round(p),
+      done:di>=0?Math.max(0,Math.round(toNum(r[di]))):0});
+  });
+  if(!out.length){ msg.textContent='没有解析出有效行（板数列必须是数字）'; return; }
+  HOUSE_SOURCE=out; loadHouses(); schedule(); renderAll(); saveCfg();
+  msg.innerHTML='<span style="color:#2e7d32">已导入 <b>'+out.length+'</b> 栋房舍'
+    +(bad?'（'+bad+' 行板数无效已跳过）':'')+'</span>';
+  impCancel();
+}
+function impFillMapping(){
+  var txt=document.getElementById('impText').value;
+  if(!txt.trim()) return;
+  var grid;
+  try{
+    if(txt.trim()[0]==='['||txt.trim()[0]==='{'){ var o=JSON.parse(txt);
+      var arr=Array.isArray(o)?o:(o.data||o.houses||[o]); grid=[Object.keys(arr[0]||{})]; }
+    else grid=[parseTable(txt)[0]||[]];
+  }catch(e){ return; }
+  var heads=grid[0]||[];
+  ['m_zone','m_name','m_pan','m_done'].forEach(function(id){
+    var sel=document.getElementById(id); sel.innerHTML='';
+    heads.forEach(function(hd,i){ sel.innerHTML+='<option value="'+i+'">'+esc(hd||('列'+(i+1)))+'</option>'; });
+    sel.innerHTML+='<option value="-1" data-none="1">— 无 —</option>';
+  });
+  /* 顺序：区 -> 房舍 -> 已装 -> 板数（已装先占位，避免被 /数/ 抢走）
+     正则没命中时按位置兜底，且已被占用的列不再重复分配 */
+  var used={};
+  function assign(id,re,fb){
+    var sel=document.getElementById(id), idx=-1;
+    heads.forEach(function(hd,i){ if(idx<0&&!used[i]&&re.test(String(hd||''))) idx=i; });
+    if(idx<0&&fb!=null&&fb<heads.length&&!used[fb]) idx=fb;
+    if(idx>=0){ used[idx]=1; sel.value=String(idx); }
+    return idx;
+  }
+  assign('m_zone',/区|zone|分区|area|block|地块/i,0);
+  assign('m_name',/舍|房|栋|名|name|building|house|楼/i,1);
+  var di=assign('m_done',/已|完成|done|installed|finished|已装/i,null);
+  assign('m_pan', /板|片|数|panel|qty|count|数量|pieces/i,2);
+  /* 未匹配时必须显式置「无」，否则会残留上一次的选择而误读别的列 */
+  if(di<0) document.getElementById('m_done').value='-1';
+}
+function expCsv(){
+  var head=['区','房舍','板数','已装','进度%','天数','小组','开始','结束'];
+  var rows=[head.join(',')];
+  houses.forEach(function(h){
+    var p=h.panels?Math.round(h.done/h.panels*100):0;
+    rows.push([h.zone,h.name,h.panels,h.done,p,h.days,teamLabel(h.team),h.start,h.end]
+      .map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(','));
+  });
+  var blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='房舍安装排程_'+today()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+function loadSample(){ HOUSE_SOURCE=null; loadHouses(); schedule(); renderAll(); saveCfg(); }
+function addHouse(){
+  var z=zones.length?zones[0].name:'A区';
+  var hs=houses.filter(function(h){ return h.zone===z; });
+  houses.push({id:'H'+(houses.length+1),zone:z,name:(hs.length+1)+'号舍',panels:1800,done:0,
+    days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bs:'',be:''});
+  if(!zoneOf(z)) zones.push({name:z,teams:2,start:''});
+  schedule(); renderAll(); saveCfg();
+}
+
+/* =========================================================================
+ * 13. 参数绑定 / 主入口
+ * ======================================================================= */
+function readParams(){
+  cfg.cap=Math.max(1,parseInt(document.getElementById('p_cap').value,10)||200);
+  cfg.start=toYmd(document.getElementById('p_start').value)||cfg.start||today();
+  cfg.cal=document.getElementById('p_cal').value;
+  cfg.strat=document.getElementById('p_strat').value;
+  cfg.zmode=document.getElementById('p_zmode').value;
+  cfg.view=document.getElementById('p_view').value;
+  cfg.color=document.getElementById('p_color').value;
+  cfg.holidays=document.getElementById('p_hol').value;
+}
+function syncParamUI(){
+  document.getElementById('p_cap').value=cfg.cap;
+  document.getElementById('p_start').value=dmy(cfg.start);
+  document.getElementById('p_cal').value=cfg.cal;
+  document.getElementById('p_strat').value=cfg.strat;
+  document.getElementById('p_zmode').value=cfg.zmode;
+  document.getElementById('p_view').value=cfg.view;
+  document.getElementById('p_color').value=cfg.color;
+  document.getElementById('p_hol').value=cfg.holidays||'';
+  document.getElementById('p_hol').parentNode.parentNode.style.display=(cfg.cal==='work')?'':'none';
+}
+function recompute(){ readParams(); schedule(); renderAll(); saveCfg(); }
+function renderAll(){
+  document.documentElement.style.setProperty('--row-h',rowH()+'px');
+  document.documentElement.style.setProperty('--head-h','65px');
+  applyTblW();
+  buildRows(); renderChart(); renderTable();
+  renderKPI(); renderZoneTbl(); renderLoad(); syncScroll();
+}
+function rebuild(){ loadHouses(); schedule(); renderAll(); }
+
+document.getElementById('p_cal').addEventListener('change',function(){ readParams(); syncParamUI(); schedule(); renderAll(); saveCfg(); });
+['p_strat','p_zmode','p_view','p_color'].forEach(function(id){
+  document.getElementById(id).addEventListener('change',recompute); });
+['p_cap','p_start','p_hol'].forEach(function(id){
+  document.getElementById(id).addEventListener('change',recompute); });
+document.getElementById('impText').addEventListener('input',impFillMapping);
+document.getElementById('impFile').addEventListener('change',function(e){
+  var f=e.target.files&&e.target.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){ document.getElementById('impText').value=r.result; impFillMapping(); };
+  r.readAsText(f,'utf-8');
+});
+window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); syncTableWidth(); },150); });
+
+loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); initSplitter();
+</script>
+</body>
+  </template>
 <script>
 /* ==================== 安装管理模块（复用生产 prod_* 全局函数） ==================== */
 (function(){
@@ -43668,7 +44761,7 @@ window.refreshMoveBtnState = function () {
       inst_gantt_owners:'负责人名单', inst_gantt_reset_col:'恢复默认', inst_gantt_owner_ph:'新增负责人，回车确认',
       inst_gantt_owner_clear:'清除负责人', inst_gantt_owner_unset:'未指派', inst_gantt_owner_tip:'点击选择负责人',
       inst_gantt_col_resize:'拖右边缘调宽，双击自适应', inst_gantt_panel_split:'拖动调整宽度 · 双击自动适配列宽',
-      inst_gantt_empty:'暂无任务，点击「+ 新增任务」创建', inst_gantt_sum_span:'区间', inst_gantt_sum_days:'总工期',
+      inst_gantt_empty:'暂无任务，点击「+ 新增任务」创建', inst_gantt_empty_chart:'暂无可排程任务：请先在上方填写「排程开始日」并点击「保存排程参数」；若仍为空，请到 Tab A 将猪舍分配到区域并确认产量需求。', inst_gantt_sum_span:'区间', inst_gantt_sum_days:'总工期',
       inst_gantt_sum_workdays:'作业天数', inst_gantt_sum_avg:'平均进度', inst_gantt_sum_done:'已完成',
       inst_gantt_sum_ms:'里程碑', inst_gantt_sum_late:'延期', inst_gantt_warn:'数据校验',
       inst_gantt_legend_late:'延期（结束已过今天且未 100%）', inst_gantt_legend_base:'基线计划',
@@ -43769,7 +44862,7 @@ window.refreshMoveBtnState = function () {
       inst_gantt_owners:'Assignees', inst_gantt_reset_col:'Reset', inst_gantt_owner_ph:'New assignee, press Enter',
       inst_gantt_owner_clear:'Clear assignee', inst_gantt_owner_unset:'Unassigned', inst_gantt_owner_tip:'Click to choose assignee',
       inst_gantt_col_resize:'Drag right edge to resize, double-click to fit', inst_gantt_panel_split:'Drag to resize · double-click to fit columns',
-      inst_gantt_empty:'No tasks yet, click "+ Add Task"', inst_gantt_sum_span:'Span', inst_gantt_sum_days:'Total days',
+      inst_gantt_empty:'No tasks yet, click "+ Add Task"', inst_gantt_empty_chart:'No schedulable tasks: fill in "Schedule Start" above and click "Save Schedule"; if still empty, go to Tab A to assign houses to zones and confirm the production demand.', inst_gantt_sum_span:'Span', inst_gantt_sum_days:'Total days',
       inst_gantt_sum_workdays:'Work days', inst_gantt_sum_avg:'Avg progress', inst_gantt_sum_done:'Done',
       inst_gantt_sum_ms:'Milestones', inst_gantt_sum_late:'Delayed', inst_gantt_warn:'Data check',
       inst_gantt_legend_late:'Delayed (end passed today, not 100%)', inst_gantt_legend_base:'Baseline plan',
@@ -43870,7 +44963,7 @@ window.refreshMoveBtnState = function () {
       inst_gantt_owners:'Danh sách phụ trách', inst_gantt_reset_col:'Khôi phục', inst_gantt_owner_ph:'Thêm người phụ trách, Enter',
       inst_gantt_owner_clear:'Xóa người phụ trách', inst_gantt_owner_unset:'Chưa gán', inst_gantt_owner_tip:'Nhấn để chọn người phụ trách',
       inst_gantt_col_resize:'Kéo mép phải để đổi rộng, nhấp đôi để tự giãn', inst_gantt_panel_split:'Kéo để đổi rộng · nhấp đôi để tự giãn cột',
-      inst_gantt_empty:'Chưa có công việc, nhấn "+ Thêm công việc"', inst_gantt_sum_span:'Khoảng', inst_gantt_sum_days:'Tổng số ngày',
+      inst_gantt_empty:'Chưa có công việc, nhấn "+ Thêm công việc"', inst_gantt_empty_chart:'Chưa có công việc để lập lịch: hãy điền "Ngày bắt đầu lập lịch" ở trên và nhấn "Lưu lịch trình"; nếu vẫn trống, hãy vào Tab A để phân bổ chuồng vào khu vực và xác nhận nhu cầu sản xuất.', inst_gantt_sum_span:'Khoảng', inst_gantt_sum_days:'Tổng số ngày',
       inst_gantt_sum_workdays:'Ngày thi công', inst_gantt_sum_avg:'Tiến độ TB', inst_gantt_sum_done:'Hoàn thành',
       inst_gantt_sum_ms:'Mốc', inst_gantt_sum_late:'Trễ', inst_gantt_warn:'Kiểm tra dữ liệu',
       inst_gantt_legend_late:'Trễ (ngày kết thúc đã qua mà chưa 100%)', inst_gantt_legend_base:'Kế hoạch cơ sở',
@@ -44026,7 +45119,10 @@ window.refreshMoveBtnState = function () {
     if(!body || !INST_CUR) return;
     var f = inst_get(INST_CUR);
     if(key==='A'){ body.innerHTML = inst_tabA(f); inst_calcPlan(); }
-    else if(key==='B'){ body.innerHTML = inst_tabB(f); setTimeout(function(){ if(window.inst_ganttRenderB) window.inst_ganttRenderB(false); }, 0); }
+    else if(key==='B'){ body.innerHTML = inst_tabB(f);
+      var fr=document.getElementById('instGanttFrame');
+      var tpl=document.getElementById('instGanttTpl'); if(fr && tpl) fr.srcdoc = tpl.innerHTML;
+    }
     else if(key==='C'){ body.innerHTML = inst_tabC(f); setTimeout(inst_backfillWeather, 0); }
     else if(key==='E'){ body.innerHTML = inst_tabE(f); inst_drawStats(f); }
     inst_updateTabBadges();
@@ -44627,929 +45723,9 @@ window.refreshMoveBtnState = function () {
     var da = new Date(a+'T00:00:00'), db = new Date(b+'T00:00:00');
     return Math.round((db - da) / 86400000);
   }
-  /* ============ 子标签 B：安装排程甘特（自研引擎） ============ */
+  /* ============ 安装排程甘特：自研独立页面（iframe srcdoc 隔离，避免类名冲突） ============ */
   function inst_tabB(f){
-    var inst = f.installation || {}; var plan = inst.plan || {};
-    var teams = parseInt(String(plan.installTeams!=null?plan.installTeams:2).replace(/[^0-9]/g,'')||'2',10)||2;
-    if(teams>INST_ZONE_MAX){ teams = INST_ZONE_MAX; }
-    var rate = parseInt(String(plan.installRatePerTeam!=null?plan.installRatePerTeam:200).replace(/[^0-9]/g,'')||'200',10)||200;
-    var h = '<div class="prod-sec-title">'+it('inst_gantt_title')+'</div>';
-    h += '<div class="inst-gantt-params">'
-      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_gantt_sched_start'),'ib_schedStart',plan.scheduleStart||'','',  '') : '')
-      + '<div class="prod-field"><label>'+it('inst_gantt_teams')+'</label><input id="ib_teams" value="'+teams+'"></div>'
-      + '<div class="prod-field"><label>'+it('inst_gantt_rate')+'</label><input id="ib_rate" value="'+rate+'"></div>'
-      + '<button class="prod-btn" type="button" onclick="inst_saveGantt()">'+it('inst_gantt_save')+'</button>'
-      + '<button class="prod-btn sec" type="button" onclick="inst_ganttReschedule()">'+it('inst_gantt_resched')+'</button>'
-      + '</div>';
-    h += '<div class="inst-fg-toolbar">'
-      + '<button class="prod-btn mini" type="button" onclick="IGadd()">+ '+it('inst_gantt_add')+'</button>'
-      + '<button class="prod-btn mini" type="button" onclick="IGdel()">'+it('inst_gantt_del')+'</button>'
-      + '<button class="prod-btn mini" type="button" onclick="IGundo()" title="Ctrl+Z">'+it('inst_gantt_undo')+'</button>'
-      + '<button class="prod-btn mini" type="button" onclick="IGsave()">'+it('inst_gantt_save2')+'</button>'
-      + '<button class="prod-btn mini" type="button" onclick="IGexport()">'+it('inst_gantt_export')+'</button>'
-      + '<button class="prod-btn mini ghost" type="button" onclick="IGcolFitAll()">'+it('inst_gantt_colfit')+'</button>'
-      + '<button class="prod-btn mini ghost" type="button" onclick="IGfitTblW()">'+it('inst_gantt_fitpanel')+'</button>'
-      + '<button class="prod-btn mini ghost" type="button" onclick="IGtoggleCfg()">'+it('inst_gantt_settings')+'</button>'
-      + '<span class="ig-hint">'+it('inst_gantt_hint2')+'</span>'
-      + '</div>';
-    h += '<div class="ig-layout" id="igLayout">'
-      + '<div class="ig-tbl-wrap" id="igTblWrap"></div>'
-      + '<div class="ig-splitter" id="igSplitter" title="'+prod_esc(it('inst_gantt_panel_split'))+'"><i class="ig-knob"></i></div>'
-      + '<div class="ig-chart-wrap" id="igChartWrap"><div class="ig-ci" id="igChartInner"></div></div>'
-      + '<div class="ig-cfg" id="igCfgPanel"></div>'
-      + '</div>';
-    h += '<div class="ig-summary" id="igSummary"></div>';
-    return h;
-  }
-  /* ============ 自研甘特引擎（IG）：日期层 + 排程器 ============ */
-  function inst_safeId(s){ return String(s||'').replace(/[^a-zA-Z0-9_-]/g,'_'); }
-  function inst_ganttConfig(f){
-    var cfg = (f.installation && f.installation.ganttConfig) || {};
-    return {
-      showWeekend: cfg.showWeekend!==false,
-      showToday: cfg.showToday!==false,
-      showGrid: cfg.showGrid!==false,
-      showDeps: cfg.showDeps!==false,
-      showBase: cfg.showBase!==false,
-      colWidth: cfg.colWidth || 58,
-      barHeight: cfg.barHeight || 22,
-      viewMode: cfg.viewMode || 'Week',
-      colorBy: cfg.colorBy || 'status',
-      dateSep: cfg.dateSep || '/',
-      tableWidth: cfg.tableWidth || 404,
-      colW: cfg.colW || {},
-      owners: cfg.owners || [],
-      visibleCols: (cfg.visibleCols && cfg.visibleCols.length) ? cfg.visibleCols : ['name','start','end','owner','progress','status']
-    };
-  }
-  function IGpad2(n){ n=parseInt(n,10)||0; return (n<10?'0':'')+n; }
-  function IGvalid(y){
-    if(!y) return '';
-    var p=String(y).split('-'); if(p.length!==3) return '';
-    var Y=+p[0],M=+p[1],D=+p[2];
-    if(Y<1970||Y>2100||M<1||M>12||D<1||D>31) return '';
-    var d=new Date(Date.UTC(Y,M-1,D));
-    if(d.getUTCFullYear()!==Y||d.getUTCMonth()!==M-1||d.getUTCDate()!==D) return '';
-    return p[0]+'-'+IGpad2(M)+'-'+IGpad2(D);
-  }
-  function IGy(v){
-    if(v===null||v===undefined||v==='') return '';
-    if(v instanceof Date) return isNaN(v.getTime())?'':IGy(v.getUTCFullYear()+'-'+IGpad2(v.getUTCMonth()+1)+'-'+IGpad2(v.getUTCDate()));
-    var s=String(v).trim(); if(!s) return '';
-    if(/^\d{10,13}$/.test(s)){ var ts=+s; if(s.length<=10) ts*=1000; return IGy(new Date(ts)); }
-    var m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/); if(m) return IGvalid(m[1]+'-'+m[2]+'-'+m[3]);
-    m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);       if(m) return IGvalid(m[3]+'-'+m[2]+'-'+m[1]);
-    m=s.match(/^(\d{4})(\d{2})(\d{2})$/);                       if(m) return IGvalid(m[1]+'-'+m[2]+'-'+m[3]);
-    return '';
-  }
-  function IGsep(){ return (IG_cfg && IG_cfg.dateSep==='-')?'-':'/'; }
-  function IGdmy(v){ var y=IGy(v); if(!y) return ''; var s=IGsep(), p=y.split('-'); return p[2]+s+p[1]+s+p[0]; }
-  function IGaddDays(y,n){
-    y=IGy(y); if(!y) return '';
-    var p=y.split('-'), d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
-    d.setUTCDate(d.getUTCDate()+(parseInt(n,10)||0)); return IGy(d);
-  }
-  function IGdiffDays(a,b){
-    a=IGy(a); b=IGy(b); if(!a||!b) return 0;
-    return Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000);
-  }
-  function IGdow(y){ y=IGy(y); if(!y) return 1; var p=y.split('-'); return new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).getUTCDay(); }
-  function IGisWeekend(y){ var w=IGdow(y); return w===0||w===6; }
-  function IGdaysInMonth(y,m){ return new Date(Date.UTC(y,m,0)).getUTCDate(); }
-  function IGisoWeek(d){
-    var p=IGy(d).split('-'); if(p.length<3) return {w:0,y:''};
-    var t=new Date(Date.UTC(+p[0],+p[1]-1,+p[2])); var dn=t.getUTCDay()||7;
-    t.setUTCDate(t.getUTCDate()+4-dn); var yy=t.getUTCFullYear();
-    return {w:Math.ceil(((t.getTime()-Date.UTC(yy,0,1))/86400000+1)/7), y:yy};
-  }
-  function IGwnum(d){ return IGisoWeek(d).w; }
-  function IGnextWorkday(y,tet){
-    y=IGy(y); if(!y) return '';
-    var g=0; while(tet && tet[y] && g++<400){ y=IGaddDays(y,1); } return y;
-  }
-  function IGaddWorkdays(s,n,tet){
-    s=IGnextWorkday(s,tet); if(!s) return '';
-    var d=s, cnt=0, g=0;
-    while(cnt<n && g++<4000){ d=IGaddDays(d,1); if(!(tet&&tet[d])) cnt++; }
-    return d;
-  }
-  /* 排程：区串行 / 区内按小组并行 / 每栋 = ceil(板数 ÷ 产能)，只跳春节 */
-  function inst_ganttSchedule(f){
-    var inst = f.installation || {}; var plan = inst.plan || {};
-    var schedStart = IGy(plan.scheduleStart);
-    if(!schedStart) return {ok:false, msg:it('inst_gantt_need_start')};
-    var teams = parseInt(String(plan.installTeams!=null?plan.installTeams:2).replace(/[^0-9]/g,'')||'2',10)||2;
-    if(teams<1) teams=1; if(teams>INST_ZONE_MAX) teams=INST_ZONE_MAX;
-    var rate = parseInt(String(plan.installRatePerTeam!=null?plan.installRatePerTeam:200).replace(/[^0-9]/g,'')||'200',10)||200;
-    if(rate<1) rate=1;
-    var tet = (typeof inst_tetHolidaySet==='function') ? inst_tetHolidaySet() : {};
-    var zoneCount = inst_zoneCount(f);
-    var assign = inst_assignMap(f);
-    var demand = (function(){
-      var sv = (typeof PROD_CUR!=='undefined') ? PROD_CUR : undefined;
-      try { if(typeof PROD_CUR!=='undefined') PROD_CUR = INST_CUR; return inst_buildDemandMap(); }
-      finally { if(typeof PROD_CUR!=='undefined') PROD_CUR = sv; }
-    })();
-    var oldByBk = {};
-    (inst.ganttTasks||[]).forEach(function(t){ if(t && t.bk) oldByBk[t.bk]=t; });
-    var out=[], prevZoneId='', prevZoneEnd=null;
-    for(var z=1; z<=zoneCount; z++){
-      var bks=[];
-      for(var k in assign){ if(assign.hasOwnProperty(k) && String(assign[k])===String(z)) bks.push(k); }
-      if(!bks.length) continue;
-      bks.sort(function(a,b){
-        var ca=String(a).split('#')[0], cb=String(b).split('#')[0];
-        var sa=(typeof slatsIsSpecialHouse==='function'&&slatsIsSpecialHouse(ca))?1:0;
-        var sb=(typeof slatsIsSpecialHouse==='function'&&slatsIsSpecialHouse(cb))?1:0;
-        return sa-sb;
-      });
-      var zoneStart = prevZoneEnd ? IGnextWorkday(IGaddDays(prevZoneEnd,1),tet) : schedStart;
-      var free=[], lastOfTeam=[], i2;
-      for(i2=0;i2<teams;i2++){ free.push(zoneStart); lastOfTeam.push(''); }
-      var Z='Z'+z;
-      var zoneTask={ id:Z, name: it('inst_gantt_zone_name').replace('{0}',z), start:zoneStart, end:zoneStart,
-        baseline_start:zoneStart, baseline_end:zoneStart, progress:0, status:'', owner:'', zone:z,
-        parent:'', dependencies:prevZoneId, type:'group', milestone:false, bk:'' };
-      out.push(zoneTask);
-      var zoneEnd=zoneStart, zoneFirstStart=null, wDone=0, wAll=0;
-      bks.forEach(function(bk){
-        var parts=String(bk).split('#'); var code=parts[0], idx=parts[1]||'1';
-        var d=demand[code]||{}; var slats=0; for(var sp in d){ slats += (d[sp]||0); }
-        var D=Math.max(1, Math.ceil(slats/rate));
-        var ti=0; for(var j=1;j<free.length;j++){ if(free[j]<free[ti]) ti=j; }
-        var s=IGnextWorkday(free[ti],tet);
-        var e=IGaddWorkdays(s,D-1,tet);
-        free[ti]=IGnextWorkday(IGaddDays(e,1),tet);
-        var deps=lastOfTeam[ti]||prevZoneId;
-        var old=oldByBk[bk]||{};
-        var nm=(typeof prod_phName==='function'?prod_phName(code):code);
-        out.push({ id:'B'+inst_safeId(bk), bk:bk, name:nm+' #'+idx, start:s, end:e,
-          baseline_start:s, baseline_end:e,
-          progress:(+old.progress||0), status:(old.status||'not_install'), owner:(old.owner||''),
-          zone:z, slats:slats, days:D, parent:Z, dependencies:deps, type:'task', milestone:false });
-        lastOfTeam[ti]=out[out.length-1].id;
-        if(zoneFirstStart===null||s<zoneFirstStart) zoneFirstStart=s;
-        if(e>zoneEnd) zoneEnd=e;
-        wAll+=slats; wDone+=slats*((+old.progress||0)/100);
-      });
-      zoneTask.end=zoneEnd; zoneTask.baseline_end=zoneEnd;
-      zoneTask.progress = wAll>0 ? Math.round(wDone/wAll) : 0;
-      out.push({ id:'A'+z, bk:'', name_key:'inst_arr', start:zoneFirstStart, end:zoneFirstStart,
-        baseline_start:zoneFirstStart, baseline_end:zoneFirstStart, progress:100, status:'', owner:'',
-        zone:z, parent:Z, dependencies:'', type:'milestone', milestone:true });
-      var acc=IGnextWorkday(IGaddDays(zoneEnd,10),tet);
-      out.push({ id:'F'+z, bk:'', name_key:'inst_gantt_accept', start:acc, end:acc,
-        baseline_start:acc, baseline_end:acc, progress:100, status:'', owner:'',
-        zone:z, parent:Z, dependencies:Z, type:'milestone', milestone:true });
-      prevZoneId=Z; prevZoneEnd=zoneEnd;
-    }
-    inst.ganttTasks=out; f.installation=inst;
-    return {ok:true, count:out.length};
-  }
-  /* ============ IG：状态 / 刻度 / 表格 / 图表渲染 ============ */
-  var IG_tasks=[], IG_cfg=null, IG_S=null, IG_sel='', IG_undo=[], IG_drag=null, IG_edgeRAF=null, IG_sumTimer=0, IG_sumLast=0;
-  var IG_STATUS=[['not_install','inst_status_not_install','#b0bec5'],['installing','inst_status_installing','#42a5f5'],
-                 ['installed','inst_status_installed','#26a69a'],['accepted','inst_status_accepted','#66bb6a']];
-  var IG_OWNER_C=['#42a5f5','#26a69a','#ffa726','#ab47bc','#5c6bc0','#ec407a','#8d6e63','#78909c'];
-  function IGhash(s){ var h=0; s=String(s||''); for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h; }
-  function IGstatusColor(k){ for(var i=0;i<IG_STATUS.length;i++){ if(IG_STATUS[i][0]===k) return IG_STATUS[i][2]; } return '#b0bec5'; }
-  function IGownerColor(n){ return IG_OWNER_C[IGhash(n)%8]; }
-  function IGzoneColor(z){ return INST_ZONE_COLORS[(parseInt(z,10)-1+INST_ZONE_COLORS.length)%INST_ZONE_COLORS.length] || '#5c6bc0'; }
-  function IGbarColor(t){
-    if(IG_cfg.colorBy==='owner') return t.owner?IGownerColor(t.owner):'#b0bec5';
-    if(IG_cfg.colorBy==='zone')  return IGzoneColor(t.zone);
-    return IGstatusColor(t.status);
-  }
-  function IGlate(t){ return (t.progress<100 && t.end < prod_today()); }
-  function IGbarColorOf(t){ return IGlate(t) ? '#ef5350' : IGbarColor(t); }
-  function IGrowH(){ return IG_cfg.barHeight+20; }
-  function IGheadH(){ return 30+34+1; }
-  function IGdur(t){ return IGdiffDays(t.start,t.end)+1; }
-  function IGfindCol(k){ var r=null; INST_GANTT_COLS.forEach(function(c){ if(c.k===k) r=c; }); return r; }
-  function IGcolW(k){ var c=IGfindCol(k); var m=IG_cfg.colW||{}; return Math.max(40, Math.min(460, m[k]||(c?c.w:80))); }
-  function IGcols(){ return INST_GANTT_COLS.filter(function(c){ return IG_cfg.visibleCols.indexOf(c.k)>=0; }); }
-  function IGcolsSum(){ var n=0; IGcols().forEach(function(c){ n+=IGcolW(c.k); }); return n; }
-  function IGbyId(id){ var r=null; IG_tasks.forEach(function(t){ if(t.id===id) r=t; }); return r; }
-  function IGname(t){ return t.name_key ? it(t.name_key) : (t.name||t.id); }
-  function IGsave(){
-    var f=inst_get(INST_CUR); if(!f) return;
-    f.installation=f.installation||{}; f.installation.ganttTasks=IG_tasks; inst_save(f);
-  }
-  function IGpushUndo(){ IG_undo.push(JSON.stringify(IG_tasks)); if(IG_undo.length>40) IG_undo.shift(); }
-  function IGlevels(){
-    var map={}; IG_tasks.forEach(function(t){ map[t.id]=t; });
-    var lv={}, g=0;
-    function dep(t){
-      if(!t) return 0; if(lv[t.id]!=null) return lv[t.id];
-      if(g++>3000) return 0;
-      var d=(t.parent&&map[t.parent]&&map[t.parent]!==t)?dep(map[t.parent])+1:0;
-      lv[t.id]=d; return d;
-    }
-    IG_tasks.forEach(function(t){ g=0; dep(t); });
-    return lv;
-  }
-  function IGbuildScale(){
-    var ds=[prod_today()];
-    IG_tasks.forEach(function(t){ ds.push(t.start,t.end,t.baseline_start,t.baseline_end); });
-    ds=ds.filter(Boolean).sort();
-    var min=ds[0]||prod_today(), max=ds[ds.length-1]||min;
-    if(IG_cfg.viewMode==='Day'){ min=IGaddDays(min,-3); max=IGaddDays(max,4); }
-    else if(IG_cfg.viewMode==='Week'){ min=IGaddDays(min,-7); max=IGaddDays(max,10); }
-    else { min=IGaddDays(min,-20); max=IGaddDays(max,30); }
-    if(IG_cfg.viewMode==='Week') min=IGaddDays(min,-((IGdow(min)+6)%7));
-    if(IG_cfg.viewMode==='Month') min=min.slice(0,8)+'01';
-    var colW=IG_cfg.colWidth;
-    if(IG_cfg.viewMode==='Day') colW=Math.max(22,Math.min(64,Math.round(IG_cfg.colWidth/2)));
-    if(IG_cfg.viewMode==='Month') colW=IG_cfg.colWidth*2;
-    var cols=[], x, width=0, ppd;
-    if(IG_cfg.viewMode==='Month'){
-      var mStartX={}, cur=min, cx=0, gd=0;
-      while(cur<=max&&gd++<400){
-        var y=+cur.slice(0,4), m=+cur.slice(5,7), dim=IGdaysInMonth(y,m);
-        mStartX[y+'-'+IGpad2(m)]=cx;
-        cols.push({s:cur,e:cur.slice(0,8)+IGpad2(dim),ym:y+'-'+IGpad2(m)});
-        cx+=colW; cur=IGaddDays(cur,dim);
-      }
-      width=cx;
-      x=function(d){ d=IGy(d); if(!d) return 0; var ym=d.slice(0,7); if(mStartX[ym]==null) return 0;
-        return mStartX[ym]+(parseInt(d.slice(8),10)-1)*colW/IGdaysInMonth(+d.slice(0,4),+d.slice(5,7)); };
-      ppd=colW/30;
-    }else{
-      ppd = IG_cfg.viewMode==='Day' ? colW : colW/7;
-      var d2=min, g2=0;
-      while(d2<=max&&g2++<1200){
-        var end = IG_cfg.viewMode==='Day' ? d2 : IGaddDays(d2,6);
-        cols.push({s:d2,e:end,ym:(IG_cfg.viewMode==='Day'?d2.slice(0,7):IGaddDays(d2,3).slice(0,7))});
-        d2=IGaddDays(end,1);
-      }
-      width=cols.length*colW;
-      x=function(d){ d=IGy(d); if(!d) return 0; return IGdiffDays(min,d)*ppd; };
-    }
-    var up=[], last=null;
-    cols.forEach(function(c,i){
-      var key=(IG_cfg.viewMode==='Month')?c.ym.slice(0,4):c.ym;
-      var label=(IG_cfg.viewMode==='Month')?(key+'年'):(c.ym.slice(0,4)+'年'+parseInt(c.ym.slice(5),10)+'月');
-      if(!last||last.key!==key){ last={key:key,x:i*colW,w:colW,label:label}; up.push(last); }
-      else last.w+=colW;
-    });
-    return {min:min,max:max,cols:cols,up:up,x:x,width:Math.max(width,200),ppd:ppd,dayW:ppd,colW:colW};
-  }
-  function IGweekLabel(s,e,cw){
-    var sep=IGsep();
-    var sD=s.slice(8), sM=s.slice(5,7), eD=e.slice(8), eM=e.slice(5,7);
-    if(cw>=52) return sD+sep+sM+'-'+eD+sep+eM;
-    if(cw>=38) return sD+sep+sM+'-'+eD+(eM!==sM?(sep+eM):'');
-    return parseInt(sD,10)+'-'+parseInt(eD,10)+(eM!==sM?(sep+parseInt(eM,10)):'');
-  }
-  function IGsyncTableWidth(){
-    var box=document.getElementById('igTblWrap'), tb=box&&box.querySelector('table');
-    if(!tb) return;
-    var sum=IGcolsSum(), avail=Math.max(0,(box.clientWidth||0)-2);
-    var extra=avail>sum?(avail-sum):0;
-    var nm=tb.querySelector('col[data-k="name"]');
-    tb.style.width=(sum+extra)+'px';
-    if(nm) nm.style.width=(IGcolW('name')+extra)+'px';
-  }
-  function IGcellText(t,c){
-    if(c.edit==='bool') return '';
-    if(c.edit==='date') return IGdmy(t[c.k]);
-    if(c.edit==='num')  return String(parseInt(t[c.k],10)||0);
-    if(c.edit==='status'){ for(var i=0;i<IG_STATUS.length;i++){ if(IG_STATUS[i][0]===t[c.k]) return it(IG_STATUS[i][1]); } return '—'; }
-    if(c.edit==='parent'){ var p=t[c.k]?IGbyId(t[c.k]):null; return p?IGname(p):'—'; }
-    return String(t[c.k]==null?'':t[c.k]);
-  }
-  function IGmeasure(str){
-    str=String(str==null?'':str);
-    var d=document.getElementById('igMeasure');
-    if(!d){ d=document.createElement('span'); d.id='igMeasure';
-      d.style.cssText='position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;font:12px sans-serif;';
-      document.body.appendChild(d); }
-    d.textContent=str;
-    var m=d.scrollWidth; if(m>0) return m;
-    var n=0; for(var i=0;i<str.length;i++) n += (str.charCodeAt(i)>0x2e80)?12:6.6;
-    return n;
-  }
-  function IGcolAutoFit(k,quiet){
-    var c=IGfindCol(k); if(!c) return;
-    var pad=(c.edit==='bool')?34:22;
-    if(c.edit==='status'||c.edit==='parent') pad+=20;
-    var mx=IGmeasure(it('inst_col_'+c.k))+30;
-    var lv=(c.k==='name')?IGlevels():null;
-    IG_tasks.forEach(function(t){
-      var extra=0;
-      if(c.k==='name') extra=((lv[t.id]||0)*13+18);
-      if(c.k==='owner') extra=20;
-      mx=Math.max(mx, IGmeasure(IGcellText(t,c))+pad+extra);
-    });
-    IG_cfg.colW=IG_cfg.colW||{};
-    IG_cfg.colW[k]=Math.max(40,Math.min(460,Math.ceil(mx)));
-    if(!quiet) IGrender();
-  }
-  function IGownerCell(t){
-    var inner = t.owner
-      ? '<i class="ig-av" style="background:'+IGownerColor(t.owner)+'">'+prod_esc(t.owner.slice(0,1))+'</i><span>'+prod_esc(t.owner)+'</span>'
-      : '<span style="color:var(--ig-txt3)">'+prod_esc(it('inst_gantt_owner_unset'))+'</span>';
-    return '<div class="ig-own-cell" onclick="event.stopPropagation();IGopenOwner(this)" title="'+prod_esc(it('inst_gantt_owner_tip'))+'">'+inner+'</div>';
-  }
-  function IGcell(t,c){
-    if(c.edit==='bool') return '<input type="checkbox"'+(t[c.k]?' checked':'')+' onchange="IGev(event,this,\''+c.k+'\',this.checked)">';
-    if(c.edit==='date') return '<input value="'+prod_esc(IGdmy(t[c.k]))+'" placeholder="DD/MM/YYYY" onchange="IGev(event,this,\''+c.k+'\',this.value)">';
-    if(c.edit==='num') return '<input type="number" min="0" max="100" value="'+(parseInt(t[c.k],10)||0)+'" onchange="IGev(event,this,\''+c.k+'\',this.value)">';
-    if(c.edit==='status'){
-      var s='<select onchange="IGev(event,this,\''+c.k+'\',this.value)"><option value="">—</option>';
-      IG_STATUS.forEach(function(o){ s+='<option value="'+o[0]+'"'+(t[c.k]===o[0]?' selected':'')+'>'+it(o[1])+'</option>'; });
-      return s+'</select>';
-    }
-    if(c.edit==='parent'){
-      var p='<select onchange="IGev(event,this,\''+c.k+'\',this.value)"><option value="">—</option>';
-      IG_tasks.forEach(function(o){ if(o.id===t.id) return;
-        p+='<option value="'+prod_esc(o.id)+'"'+(t[c.k]===o.id?' selected':'')+'>'+prod_esc(IGname(o))+'</option>'; });
-      return p+'</select>';
-    }
-    if(c.k==='owner') return IGownerCell(t);
-    return prod_esc(t[c.k]==null?'':t[c.k]);
-  }
-  function IGrenderTable(){
-    var box=document.getElementById('igTblWrap'); if(!box) return;
-    var cols=IGcols(), lv=IGlevels();
-    var h='<table><colgroup>';
-    cols.forEach(function(c){ h+='<col data-k="'+c.k+'" style="width:'+IGcolW(c.k)+'px">'; });
-    h+='</colgroup><thead><tr>';
-    cols.forEach(function(c){
-      h+='<th data-k="'+c.k+'" title="'+prod_esc(it('inst_col_'+c.k))+'">'+prod_esc(it('inst_col_'+c.k))
-        +'<i class="ig-rs" onmousedown="IGcolResizeStart(event,this)" ondblclick="IGcolAutoFitEv(\''+c.k+'\')"></i></th>';
-    });
-    h+='</tr></thead><tbody>';
-    IG_tasks.forEach(function(t){
-      h+='<tr class="'+(t.id===IG_sel?'sel':'')+'" data-id="'+prod_esc(t.id)+'" onclick="IGselRow(this)">';
-      cols.forEach(function(c){
-        h+='<td>';
-        if(c.k==='name') h+='<span class="ig-nm" style="padding-left:'+((lv[t.id]||0)*13)+'px">'
-          +((lv[t.id]||0)?'<i class="ig-branch"></i>':'')+((t.milestone||t.type==='milestone')?'<i class="ig-ms-dot"></i>':'');
-        h+=IGcell(t,c);
-        if(c.k==='name') h+='</span>';
-        h+='</td>';
-      });
-      h+='</tr>';
-    });
-    if(!IG_tasks.length) h+='<tr><td class="ig-empty" colspan="'+(cols.length||1)+'">'+prod_esc(it('inst_gantt_empty'))+'</td></tr>';
-    h+='</tbody></table>';
-    box.innerHTML=h;
-    IGsyncTableWidth();
-  }
-  function IGshade(hex,amt){
-    var n=parseInt(hex.slice(1),16);
-    var r=Math.max(0,Math.min(255,(n>>16)+amt)), g=Math.max(0,Math.min(255,((n>>8)&255)+amt)), b=Math.max(0,Math.min(255,(n&255)+amt));
-    return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
-  }
-  function IGfgOn(hex){
-    var n=parseInt(hex.slice(1),16), c=[(n>>16)&255,(n>>8)&255,n&255].map(function(v){
-      v/=255; return v<=0.03928? v/12.92 : Math.pow((v+0.055)/1.055,2.4); });
-    var L=0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
-    return L>0.45?'#263238':'#fff';
-  }
-  function IGbarBg(t,col){
-    var p=Math.max(0,Math.min(100,t.progress||0));
-    return 'background-color:'+col+';background-image:linear-gradient(to right,'+IGshade(col,-30)+' 0 '+p+'%,rgba(0,0,0,0) '+p+'% 100%)';
-  }
-  function IGbarTip(t){
-    return IGname(t)+' | '+IGdmy(t.start)+((t.milestone||t.type==='milestone')?'':' ~ '+IGdmy(t.end)+' | '+IGdur(t)+it('inst_unit_day'))
-      +' | '+t.progress+'%'+(IGlate(t)?' · '+it('inst_gantt_sum_late'):'');
-  }
-  function IGbarTop(i,rh,bh){ return i*rh+(rh-bh)/2; }
-  function IGbarHtml(t,i,rh,bh){
-    var col=IGbarColorOf(t), late=IGlate(t), top=IGbarTop(i,rh,bh), sel=(t.id===IG_sel?' sel':'');
-    if(t.milestone||t.type==='milestone'){
-      var sz=Math.round(bh*1.05);
-      return '<div class="ig-bar ms'+sel+'" data-id="'+prod_esc(t.id)+'" data-lbl="'+prod_esc(IGname(t))+'"'
-        +' style="left:'+Math.round(IG_S.x(t.start)+IG_S.dayW/2-sz/2)+'px;top:'+Math.round(top+(bh-sz)/2)
-        +'px;width:'+sz+'px;height:'+sz+'px;background-color:'+col+'" title="'+prod_esc(IGbarTip(t))+'"'
-        +' onmousedown="IGdragStart(event,this)" ontouchstart="IGdragStart(event,this)"></div>';
-    }
-    if(t.type==='group'){
-      return '<div class="ig-bar grp'+sel+'" data-id="'+prod_esc(t.id)+'" data-lbl="'+prod_esc(IGname(t))+'"'
-        +' style="left:'+Math.round(IG_S.x(t.start))+'px;top:'+Math.round(top+bh/2-6)+'px;width:'
-        +Math.max(Math.round(IG_S.dayW*IGdur(t)),4)+'px;height:12px;background-color:'+col+'"'
-        +' title="'+prod_esc(IGbarTip(t))+'" onmousedown="IGdragStart(event,this)" ontouchstart="IGdragStart(event,this)"></div>';
-    }
-    var x=Math.round(IG_S.x(t.start)), w=Math.max(Math.round(IG_S.dayW*IGdur(t)),4);
-    return '<div class="ig-bar'+sel+(late?' late':'')+(w<46?' out':'')+'" data-id="'+prod_esc(t.id)+'"'
-      +' data-lbl="'+prod_esc(IGname(t)+' '+t.progress+'%')+'"'
-      +' style="left:'+x+'px;top:'+Math.round(top)+'px;width:'+w+'px;height:'+bh+'px;'+IGbarBg(t,col)+';--ig-fg:'+IGfgOn(col)+'"'
-      +' title="'+prod_esc(IGbarTip(t))+'" onmousedown="IGdragStart(event,this)" ontouchstart="IGdragStart(event,this)"></div>';
-  }
-  function IGupdateBar(t){
-    var el=document.querySelector('#igChartInner .ig-bar[data-id="'+t.id+'"]'); if(!el) return;
-    var rh=IGrowH(), bh=IG_cfg.barHeight, i=IG_tasks.indexOf(t); if(i<0) return;
-    var col=IGbarColorOf(t), late=IGlate(t), top=IGbarTop(i,rh,bh);
-    if(t.milestone||t.type==='milestone'){
-      var sz=Math.round(bh*1.05);
-      el.style.cssText='left:'+Math.round(IG_S.x(t.start)+IG_S.dayW/2-sz/2)+'px;top:'+Math.round(top+(bh-sz)/2)+'px;width:'+sz+'px;height:'+sz+'px;background-color:'+col;
-    }else if(t.type==='group'){
-      el.style.cssText='left:'+Math.round(IG_S.x(t.start))+'px;top:'+Math.round(top+bh/2-6)+'px;width:'+Math.max(Math.round(IG_S.dayW*IGdur(t)),4)+'px;height:12px;background-color:'+col;
-    }else{
-      var x=Math.round(IG_S.x(t.start)), w=Math.max(Math.round(IG_S.dayW*IGdur(t)),4);
-      el.className='ig-bar'+(t.id===IG_sel?' sel':'')+(late?' late':'')+(w<46?' out':'');
-      el.style.cssText='left:'+x+'px;top:'+Math.round(top)+'px;width:'+w+'px;height:'+bh+'px;'+IGbarBg(t,col)+';--ig-fg:'+IGfgOn(col);
-      el.setAttribute('data-lbl',IGname(t)+' '+t.progress+'%');
-    }
-    el.title=IGbarTip(t);
-  }
-  function IGdepD(fi,ti,rh,bh){
-    var p=IG_tasks[fi], t=IG_tasks[ti];
-    var y1=fi*rh+rh/2, y2=ti*rh+rh/2;
-    var x1=IG_S.x(p.end)+IG_S.dayW, x2=IG_S.x(t.start);
-    if(p.milestone||p.type==='milestone') x1+=bh*0.5;
-    if(x2>x1+12) return 'M'+x1+' '+y1+' H'+(x1+8)+' V'+y2+' H'+(x2-1);
-    return 'M'+x1+' '+y1+' H'+(x1+8)+' V'+(y1+rh/2-3)+' H'+(x2-11)+' V'+y2+' H'+(x2-1);
-  }
-  function IGupdateDepsFor(id){
-    var svg=document.querySelector('#igChartInner .ig-deps'); if(!svg) return;
-    var rh=IGrowH(), bh=IG_cfg.barHeight, idx={};
-    IG_tasks.forEach(function(t,i){ idx[t.id]=i; });
-    var ps=svg.querySelectorAll('path[data-to]');
-    for(var k=0;k<ps.length;k++){
-      var f=ps[k].getAttribute('data-from'), to=ps[k].getAttribute('data-to');
-      if(f!==id&&to!==id) continue;
-      if(!idx.hasOwnProperty(f)||!idx.hasOwnProperty(to)) continue;
-      ps[k].setAttribute('d',IGdepD(idx[f],idx[to],rh,bh));
-    }
-  }
-  function IGrenderChart(){
-    IG_S=IGbuildScale();
-    var inner=document.getElementById('igChartInner'); if(!inner) return;
-    var rh=IGrowH(), bh=IG_cfg.barHeight, h='';
-    h+='<div class="ig-thead"><div class="ig-tu">';
-    IG_S.up.forEach(function(u){
-      var lbl=(u.w>=68)?u.label:u.label.replace(/^\d{4}年/,'');
-      h+='<div style="width:'+u.w+'px" title="'+prod_esc(u.label)+'">'+prod_esc(lbl)+'</div>';
-    });
-    h+='</div><div class="ig-tl">';
-    IG_S.cols.forEach(function(c){
-      var we=(IG_cfg.viewMode==='Day'&&IGisWeekend(c.s));
-      var l1,l2,tip;
-      if(IG_cfg.viewMode==='Month'){
-        var a=IGisoWeek(c.s), b2=IGisoWeek(c.e);
-        l1=parseInt(c.ym.slice(5),10)+'月'; l2=(a.w&&b2.w)?('W'+a.w+'-'+b2.w):''; tip=l1+' · '+l2;
-      }else if(IG_cfg.viewMode==='Day'){
-        var dd=parseInt(c.s.slice(8),10);
-        l1=(IG_S.colW>=42)?(c.s.slice(8)+IGsep()+c.s.slice(5,7)):String(dd);
-        l2='W'+IGwnum(c.s); tip=IGdmy(c.s)+' · '+IGisoWeek(c.s).y+'-W'+IGpad2(IGwnum(c.s));
-      }else{
-        var wk=IGisoWeek(c.s);
-        l1=IGweekLabel(c.s,c.e,IG_S.colW); l2='W'+wk.w; tip=IGdmy(c.s)+' ~ '+IGdmy(c.e)+' · '+wk.y+'-W'+IGpad2(wk.w);
-      }
-      h+='<div class="'+(we?'we':'')+'" style="width:'+IG_S.colW+'px" title="'+prod_esc(tip)+'">'
-        +'<span class="ig-t1">'+prod_esc(l1)+'</span><span class="ig-t2">'+prod_esc(l2)+'</span></div>';
-    });
-    h+='</div></div>';
-    h+='<div class="ig-bd" style="height:'+(IG_tasks.length*rh)+'px">';
-    if(IG_cfg.showWeekend&&IG_cfg.viewMode!=='Month'){
-      if(IG_cfg.viewMode==='Day'){
-        IG_S.cols.forEach(function(c,i){ if(IGisWeekend(c.s))
-          h+='<div class="ig-wkend" style="left:'+(i*IG_S.colW)+'px;width:'+IG_S.colW+'px"></div>'; });
-      }else{
-        IG_S.cols.forEach(function(c){
-          var sx=IG_S.x(IGaddDays(c.s,5)), ex=IG_S.x(IGaddDays(c.s,7));
-          h+='<div class="ig-wkend" style="left:'+sx+'px;width:'+(ex-sx)+'px"></div>';
-        });
-      }
-    }
-    if(IG_cfg.showGrid) IG_S.cols.forEach(function(c,i){ h+='<div class="ig-cl" style="left:'+(i*IG_S.colW)+'px"></div>'; });
-    if(IG_cfg.showToday){ var tx=IG_S.x(prod_today())+IG_S.dayW/2;
-      if(tx>=0&&tx<=IG_S.width) h+='<div class="ig-today" style="left:'+tx+'px"></div>'; }
-    h+='</div>';
-    if(IG_cfg.showDeps){
-      var paths='', idx={}; IG_tasks.forEach(function(t,i){ idx[t.id]=i; });
-      IG_tasks.forEach(function(t,i){
-        String(t.dependencies||'').split(/[,\s]+/).forEach(function(dp){
-          if(!dp||!idx.hasOwnProperty(dp)) return;
-          paths+='<path d="'+IGdepD(idx[dp],i,rh,bh)+'" fill="none" stroke="#90a4ae" stroke-width="1.2"'
-            +' data-from="'+prod_esc(dp)+'" data-to="'+prod_esc(t.id)+'" marker-end="url(#igArw)"/>';
-        });
-      });
-      h+='<svg class="ig-deps" id="igDepSvg" width="'+IG_S.width+'" height="'+(IG_tasks.length*rh)+'">'
-        +'<defs><marker id="igArw" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">'
-        +'<path d="M0,0 L7,3.5 L0,7 Z" fill="#90a4ae"/></marker></defs>'+paths+'</svg>';
-    }
-    IG_tasks.forEach(function(t,i){
-      if(IG_cfg.showBase&&!(t.milestone||t.type==='milestone')&&t.type!=='group'&&t.baseline_start&&t.baseline_end){
-        var bx=IG_S.x(t.baseline_start), bw=Math.max(IG_S.x(IGaddDays(t.baseline_end,1))-bx,3);
-        h+='<div class="ig-base" style="left:'+bx+'px;top:'+(i*rh+(rh-bh)/2-6)+'px;width:'+bw+'px"></div>';
-      }
-      h+=IGbarHtml(t,i,rh,bh);
-    });
-    inner.style.width=IG_S.width+'px';
-    inner.innerHTML=h;
-  }
-  /* ============ IG：设置面板 / 汇总 / 交互 / 入口 ============ */
-  function IGownerList(){
-    var seen={}, out=[];
-    (IG_cfg.owners||[]).concat(IG_tasks.map(function(t){ return t.owner||''; })).forEach(function(o){
-      o=String(o||'').trim(); if(o&&!seen[o]){ seen[o]=1; out.push(o); } });
-    return out;
-  }
-  function IGrenderCfg(){
-    var box=document.getElementById('igCfgPanel'); if(!box) return;
-    var h='<div class="ig-cfg-h"><span>'+prod_esc(it('inst_gantt_settings'))+'</span><button type="button" onclick="IGtoggleCfg()">×</button></div><div class="ig-cfg-b">';
-    h+='<div class="ig-cfg-sec"><div class="ig-cfg-t">'+prod_esc(it('inst_gantt_visual'))+'</div>';
-    [['showWeekend','inst_gantt_show_weekend'],['showToday','inst_gantt_show_today'],['showGrid','inst_gantt_show_grid'],
-     ['showDeps','inst_gantt_show_deps'],['showBase','inst_gantt_show_base']].forEach(function(o){
-      h+='<label><input type="checkbox" '+(IG_cfg[o[0]]?'checked':'')+' onchange="IGsetCfg(\''+o[0]+'\',this.checked)"> '+prod_esc(it(o[1]))+'</label>'; });
-    h+='<label>'+prod_esc(it('inst_gantt_view_mode'))+' <select onchange="IGsetCfg(\'viewMode\',this.value)">';
-    [['Day','Day'],['Week','Week'],['Month','Month']].forEach(function(o){
-      h+='<option value="'+o[0]+'"'+(IG_cfg.viewMode===o[0]?' selected':'')+'>'+o[1]+'</option>'; });
-    h+='</select></label>';
-    h+='<label>'+prod_esc(it('inst_gantt_date_sep'))+' <select onchange="IGsetCfg(\'dateSep\',this.value)">';
-    [['/','17/08/2026'],['-','17-08-2026']].forEach(function(o){
-      h+='<option value="'+o[0]+'"'+(IG_cfg.dateSep===o[0]?' selected':'')+'>'+o[1]+'</option>'; });
-    h+='</select></label>';
-    h+='<label>'+prod_esc(it('inst_gantt_col_width'))+' <input type="range" min="36" max="110" value="'+IG_cfg.colWidth+'" onchange="IGsetCfg(\'colWidth\',+this.value)"></label>';
-    h+='<label>'+prod_esc(it('inst_gantt_bar_height'))+' <input type="range" min="14" max="38" value="'+IG_cfg.barHeight+'" onchange="IGsetCfg(\'barHeight\',+this.value)"></label>';
-    h+='<label>'+prod_esc(it('inst_gantt_color_by'))+' <select onchange="IGsetCfg(\'colorBy\',this.value)">';
-    [['status','inst_gantt_color_status'],['owner','inst_gantt_color_owner'],['zone','inst_gantt_color_zone']].forEach(function(o){
-      h+='<option value="'+o[0]+'"'+(IG_cfg.colorBy===o[0]?' selected':'')+'>'+prod_esc(it(o[1]))+'</option>'; });
-    h+='</select></label></div>';
-    h+='<div class="ig-cfg-sec"><div class="ig-cfg-t">'+prod_esc(it('inst_gantt_owners'))+'</div><div class="ig-own-chips">';
-    IGownerList().forEach(function(o){
-      h+='<span class="ig-ochip"><i class="ig-av" style="background:'+IGownerColor(o)+'">'+prod_esc(o.slice(0,1))+'</i>'+prod_esc(o)
-        +'<b data-v="'+prod_esc(o)+'" onclick="IGdelOwner(this)" title="×">×</b></span>'; });
-    h+='</div><input type="text" placeholder="'+prod_esc(it('inst_gantt_owner_ph'))+'" onkeydown="if(event.key===\'Enter\')IGaddOwnerCfg(this)"></div>';
-    h+='<div class="ig-cfg-sec"><div class="ig-cfg-t">'+prod_esc(it('inst_gantt_data_fields'))+'</div>';
-    INST_GANTT_COLS.forEach(function(c){
-      h+='<label><input type="checkbox" '+(IG_cfg.visibleCols.indexOf(c.k)>=0?'checked':'')
-        +' onchange="IGtoggleCol(\''+c.k+'\',this.checked)"> '+prod_esc(it('inst_col_'+c.k))
-        +'<span class="ig-cw">'+IGcolW(c.k)+'</span></label>'; });
-    h+='<div class="ig-cfg-btns">'
-      +'<button type="button" onclick="IGcolFitAll()">'+prod_esc(it('inst_gantt_colfit'))+'</button>'
-      +'<button type="button" onclick="IGcolReset()">'+prod_esc(it('inst_gantt_reset_col'))+'</button></div></div></div>';
-    box.innerHTML=h;
-  }
-  function IGrenderSummary(){
-    var box=document.getElementById('igSummary'); if(!box) return;
-    if(!IG_tasks.length){ box.innerHTML=''; return; }
-    var min='',max='',sum=0,done=0,late=0,ms=0,wd=0,cnt=0;
-    IG_tasks.forEach(function(t){
-      if(t.type==='group') return;
-      cnt++;
-      if(!min||t.start<min) min=t.start;
-      if(!max||t.end>max) max=t.end;
-      sum+=t.progress; if(t.progress>=100) done++;
-      if(IGlate(t)) late++;
-      if(t.milestone||t.type==='milestone') ms++; else wd+=IGdur(t);
-    });
-    var h='<div class="ig-chips">'
-      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_cnt'))+' <b>'+IG_tasks.length+'</b></span>'
-      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_span'))+' <b>'+prod_esc(IGdmy(min)+' ~ '+IGdmy(max))+'</b></span>'
-      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_days'))+' <b>'+(IGdiffDays(min,max)+1)+'</b></span>'
-      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_workdays'))+' <b>'+wd+'</b></span>'
-      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_avg'))+' <b>'+(cnt?Math.round(sum/cnt):0)+'%</b></span>'
-      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_done'))+' <b>'+done+'</b></span>'
-      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_ms'))+' <b>'+ms+'</b></span>'
-      +'<span class="ig-chip'+(late?' danger':'')+'">'+prod_esc(it('inst_gantt_sum_late'))+' <b>'+late+'</b></span></div>';
-    h+='<div class="ig-legend">'
-      +IG_STATUS.map(function(o){ return '<span><i style="background:'+o[2]+'"></i>'+prod_esc(it(o[1]))+'</span>'; }).join('')
-      +'<span><i style="background:#ef5350"></i>'+prod_esc(it('inst_gantt_legend_late'))+'</span>'
-      +'<span><i style="background:#cbd5e0"></i>'+prod_esc(it('inst_gantt_legend_base'))+'</span>'
-      +'<span><i style="background:#ffa726;transform:rotate(45deg)"></i>'+prod_esc(it('inst_gantt_legend_ms'))+'</span></div>';
-    box.innerHTML=h;
-  }
-  function IGrender(){
-    var f=inst_get(INST_CUR); if(!f) return;
-    IG_cfg = inst_ganttConfig(f);
-    IG_tasks = (f.installation && f.installation.ganttTasks) || [];
-    var lay=document.getElementById('igLayout');
-    if(lay){
-      lay.style.setProperty('--ig-row-h',IGrowH()+'px');
-      lay.style.setProperty('--ig-head-h',IGheadH()+'px');
-      lay.style.setProperty('--ig-tbl-w',Math.round(IG_cfg.tableWidth||404)+'px');
-    }
-    IGrenderTable(); IGrenderChart(); IGrenderCfg(); IGrenderSummary(); IGsyncScroll();
-  }
-  function IGsyncScroll(){
-    var a=document.getElementById('igTblWrap'), b=document.getElementById('igChartWrap');
-    if(!a||!b||a.__igSync) return; a.__igSync=1; var lock=false;
-    function link(p,q){ p.addEventListener('scroll',function(){
-      if(lock) return; lock=true; q.scrollTop=p.scrollTop;
-      requestAnimationFrame(function(){ lock=false; }); }); }
-    link(a,b); link(b,a);
-  }
-  window.IGsetCfg=function(k,v){
-    var f=inst_get(INST_CUR); if(!f) return;
-    f.installation=f.installation||{}; var c=f.installation.ganttConfig=f.installation.ganttConfig||{};
-    c[k]=v; inst_save(f); IGrender();
-  };
-  window.IGtoggleCol=function(k,on){
-    var f=inst_get(INST_CUR); if(!f) return;
-    f.installation=f.installation||{}; var c=f.installation.ganttConfig=f.installation.ganttConfig||{};
-    var arr=(c.visibleCols&&c.visibleCols.length)?c.visibleCols.slice():inst_ganttConfig(f).visibleCols.slice();
-    var i=arr.indexOf(k);
-    if(on&&i<0) arr.push(k); else if(!on&&i>=0) arr.splice(i,1);
-    c.visibleCols=arr; inst_save(f); IGrender();
-  };
-  window.IGtoggleCfg=function(){ var el=document.getElementById('igCfgPanel'); if(el) el.classList.toggle('open'); };
-  window.IGselRow=function(tr){
-    var id=(tr&&tr.getAttribute)?tr.getAttribute('data-id'):'';
-    IG_sel=id||'';
-    var rows=document.querySelectorAll('#igTblWrap tr[data-id]');
-    for(var i=0;i<rows.length;i++) rows[i].classList.toggle('sel',rows[i].getAttribute('data-id')===IG_sel);
-    var bars=document.querySelectorAll('#igChartInner .ig-bar');
-    for(var j=0;j<bars.length;j++) bars[j].classList.toggle('sel',bars[j].getAttribute('data-id')===IG_sel);
-  };
-  window.IGev=function(e,el,key,val){
-    if(e&&e.stopPropagation) e.stopPropagation();
-    var tr=(el&&el.closest)?el.closest('tr'):null; if(!tr) return;
-    var t=IGbyId(tr.getAttribute('data-id')); if(!t) return;
-    IGpushUndo();
-    var col=IGfindCol(key);
-    if(col&&col.edit==='date'){
-      var nv=IGy(val);
-      if(key==='start'){ var d=IGdiffDays(t.start,t.end); t.start=nv||t.start;
-        if(d>0) t.end=IGaddDays(t.start,d); if(IGdiffDays(t.start,t.end)<0) t.end=t.start; }
-      else if(key==='end'){ t.end=nv||t.start; if(IGdiffDays(t.start,t.end)<0) t.end=t.start; }
-      else t[key]=nv;
-      if(t.milestone||t.type==='milestone') t.end=t.start;
-    }else if(col&&col.edit==='num'){ var p=parseInt(val,10); if(isNaN(p)) p=0; t[key]=Math.max(0,Math.min(100,p)); }
-    else if(col&&col.edit==='bool'){ t[key]=!!val; if(key==='milestone'&&val) t.end=t.start; }
-    else t[key]=val;
-    IGsave(); IGrender();
-  };
-  window.IGadd=function(){
-    if(!inst_get(INST_CUR)) return;
-    IGpushUndo();
-    var s=prod_today();
-    IG_tasks.forEach(function(t){ if(t.start<s&&t.progress<100) s=t.start; });
-    if(!IG_tasks.length) s=prod_today();
-    var id='T'+(Date.now()%100000);
-    IG_tasks.push({ id:id, bk:'', name:it('inst_new_task'), start:s, end:IGaddDays(s,4),
-      baseline_start:s, baseline_end:IGaddDays(s,4), progress:0, status:'not_install', owner:'', zone:'',
-      parent:'', dependencies:'', type:'task', milestone:false });
-    IG_sel=id; IGsave(); IGrender();
-  };
-  window.IGdel=function(){
-    if(!IG_sel) return;
-    IGpushUndo();
-    var id=IG_sel;
-    IG_tasks=IG_tasks.filter(function(t){ return t.id!==id; });
-    IG_tasks.forEach(function(t){
-      if(t.parent===id) t.parent='';
-      t.dependencies=String(t.dependencies||'').split(/[,\s]+/).filter(function(d){ return d&&d!==id; }).join(',');
-    });
-    IG_sel=''; IGsave(); IGrender();
-  };
-  window.IGundo=function(){ if(!IG_undo.length) return; IG_tasks=JSON.parse(IG_undo.pop()); IGsave(); IGrender(); };
-  window.IGsave=function(){ IGsave(); prod_toast(it('inst_saved')); };
-  window.IGexport=function(){
-    var head=['id','name','start','end','owner','zone','progress','status','parent','dependencies','milestone','baseline_start','baseline_end'];
-    var rows=[head.join(',')];
-    IG_tasks.forEach(function(t){ rows.push(head.map(function(k){
-      var v=(k==='name')?IGname(t):((k==='milestone')?(t[k]?'1':'0'):(t[k]==null?'':t[k]));
-      return '"'+String(v).replace(/"/g,'""')+'"'; }).join(',')); });
-    var blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
-    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download='install_schedule_'+prod_today()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
-  };
-  window.IGcolResizeStart=function(e,el){
-    if(e.button!==undefined&&e.button!==0) return;
-    var th=el.parentNode, k=th.getAttribute('data-k');
-    if(e.preventDefault) e.preventDefault(); if(e.stopPropagation) e.stopPropagation();
-    var col=document.querySelector('#igTblWrap col[data-k="'+k+'"]'); if(!col) return;
-    var w0=IGcolW(k), x0=e.clientX;
-    th.classList.add('ig-rs-on'); document.body.classList.add('ig-col-resizing');
-    function mv(ev){
-      var w=Math.max(40,Math.min(460,Math.round(w0+ev.clientX-x0)));
-      IG_cfg.colW=IG_cfg.colW||{}; IG_cfg.colW[k]=w;
-      col.style.width=w+'px'; IGsyncTableWidth();
-    }
-    function up(){
-      document.removeEventListener('mousemove',mv);
-      document.removeEventListener('mouseup',up);
-      th.classList.remove('ig-rs-on'); document.body.classList.remove('ig-col-resizing');
-      var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
-        var c=f.installation.ganttConfig=f.installation.ganttConfig||{}; c.colW=IG_cfg.colW; inst_save(f); }
-    }
-    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
-  };
-  window.IGcolAutoFitEv=function(k){ IGcolAutoFit(k,false); };
-  window.IGcolFitAll=function(){
-    IG_cfg.colW={};
-    IGcols().forEach(function(c){ IGcolAutoFit(c.k,true); });
-    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
-      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.colW=IG_cfg.colW; inst_save(f); }
-    IGrender();
-  };
-  window.IGcolReset=function(){
-    IG_cfg.colW={};
-    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
-      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.colW={}; inst_save(f); }
-    IGrender();
-  };
-  window.IGfitTblW=function(){
-    var need=IGcolsSum()+2;
-    IG_cfg.tableWidth=Math.round(Math.max(200,Math.min(need,Math.max(window.innerWidth-340,260))));
-    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
-      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.tableWidth=IG_cfg.tableWidth; inst_save(f); }
-    var lay=document.getElementById('igLayout');
-    if(lay) lay.style.setProperty('--ig-tbl-w',IG_cfg.tableWidth+'px');
-  };
-  window.IGopenOwner=function(el){
-    var tr=(el&&el.closest)?el.closest('tr'):null; if(!tr) return;
-    var id=tr.getAttribute('data-id'), t=IGbyId(id); if(!t) return;
-    var pop=document.getElementById('igOwnPop');
-    if(!pop){ pop=document.createElement('div'); pop.id='igOwnPop'; document.body.appendChild(pop); }
-    var h='';
-    IGownerList().forEach(function(o){
-      h+='<div class="ig-oi" data-id="'+prod_esc(id)+'" data-v="'+prod_esc(o)+'" onclick="IGpickOwner(this)">'
-        +'<i class="ig-av" style="background:'+IGownerColor(o)+'">'+prod_esc(o.slice(0,1))+'</i>'+prod_esc(o)
-        +(t.owner===o?'<span class="ig-ck">✓</span>':'')+'</div>';
-    });
-    h+='<div class="ig-oi clear" data-id="'+prod_esc(id)+'" data-v="" onclick="IGpickOwner(this)">'+prod_esc(it('inst_gantt_owner_clear'))+'</div>';
-    h+='<div class="ig-add" data-id="'+prod_esc(id)+'"><input placeholder="'+prod_esc(it('inst_gantt_owner_ph'))+'"'
-      +' onkeydown="if(event.key===\'Enter\')IGaddOwner(this);if(event.key===\'Escape\')IGcloseOwner();"></div>';
-    pop.innerHTML=h; pop.classList.add('open');
-    var r=el.getBoundingClientRect();
-    var pw=pop.offsetWidth||170, ph=pop.offsetHeight||210;
-    pop.style.left=Math.max(6,Math.min(r.left,window.innerWidth-pw-10))+'px';
-    pop.style.top=((r.bottom+ph+8>window.innerHeight)?Math.max(6,r.top-ph-4):r.bottom+4)+'px';
-    var inp=pop.querySelector('.ig-add input'); if(inp) inp.focus();
-  };
-  window.IGpickOwner=function(el){
-    var id=el.getAttribute('data-id'), v=el.getAttribute('data-v')||'';
-    window.IGcloseOwner();
-    var t=IGbyId(id); if(!t) return;
-    IGpushUndo(); t.owner=v; IGsave(); IGrender();
-  };
-  window.IGaddOwner=function(inp){
-    var wrap=inp.parentNode, id=wrap.getAttribute('data-id');
-    var v=String(inp.value||'').trim(); if(!v){ window.IGcloseOwner(); return; }
-    IG_cfg.owners=(IG_cfg.owners||[]).slice();
-    if(IG_cfg.owners.indexOf(v)<0) IG_cfg.owners.push(v);
-    var t=IGbyId(id); if(t){ IGpushUndo(); t.owner=v; }
-    window.IGcloseOwner(); IGsave(); IGrender();
-  };
-  window.IGaddOwnerCfg=function(inp){
-    var v=String(inp.value||'').trim(); if(!v) return;
-    IG_cfg.owners=(IG_cfg.owners||[]).slice();
-    if(IG_cfg.owners.indexOf(v)<0) IG_cfg.owners.push(v);
-    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
-      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.owners=IG_cfg.owners; inst_save(f); }
-    IGrender();
-  };
-  window.IGdelOwner=function(btn){
-    var v=btn.getAttribute('data-v'); if(!v) return;
-    IG_cfg.owners=(IG_cfg.owners||[]).filter(function(o){ return o!==v; });
-    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
-      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.owners=IG_cfg.owners; inst_save(f); }
-    IGrender();
-  };
-  window.IGcloseOwner=function(){ var p=document.getElementById('igOwnPop'); if(p) p.classList.remove('open'); };
-  function IGptX(e){ if(e.touches&&e.touches.length) return e.touches[0].clientX;
-    if(e.changedTouches&&e.changedTouches.length) return e.changedTouches[0].clientX; return e.clientX; }
-  function IGptY(e){ if(e.touches&&e.touches.length) return e.touches[0].clientY;
-    if(e.changedTouches&&e.changedTouches.length) return e.changedTouches[0].clientY; return e.clientY; }
-  window.IGdragStart=function(e,el){
-    var t=IGbyId(el.getAttribute('data-id')); if(!t) return;
-    if(e.type==='touchstart'&&e.touches.length>1) return;
-    IG_sel=t.id;
-    var tr=document.querySelector('#igTblWrap tr[data-id="'+t.id+'"]');
-    if(tr) window.IGselRow(tr);
-    var r=el.getBoundingClientRect(), cw=document.getElementById('igChartWrap');
-    var isMs=(t.milestone||t.type==='milestone')||t.type==='group';
-    var inGrip=!isMs&&(IGptX(e)-r.left>r.width-8);
-    var inProg=!isMs&&(IGptY(e)-r.top>r.height-8);
-    IG_drag={t:t,mode:isMs?'move':(inGrip?'resize':(inProg?'prog':'move')),
-      x0:IGptX(e)+(cw?cw.scrollLeft:0), s:t.start,e:t.end,p:t.progress,
-      left:r.left,w:r.width,moved:false,lastX:IGptX(e),lastY:IGptY(e),touch:e.type.indexOf('touch')===0};
-    IGpushUndo();
-    if(e.preventDefault) e.preventDefault();
-    var mv=IG_drag.touch?'touchmove':'mousemove', up=IG_drag.touch?'touchend':'mouseup';
-    document.addEventListener(mv,window.IGdragMove,{passive:false});
-    document.addEventListener(up,window.IGdragEnd);
-    document.addEventListener('touchcancel',window.IGdragEnd);
-    var svg=document.getElementById('igDepSvg'); if(svg) svg.classList.add('dragging');
-  };
-  function IGapplyDrag(x){
-    if(!IG_drag) return;
-    var cw=document.getElementById('igChartWrap'), t=IG_drag.t;
-    var dx=(x+(cw?cw.scrollLeft:0))-IG_drag.x0;
-    if(Math.abs(dx)>2) IG_drag.moved=true;
-    if(IG_drag.mode==='prog'){
-      var pct=Math.round((x-IG_drag.left)/Math.max(IG_drag.w,1)*100);
-      t.progress=Math.max(0,Math.min(100,pct));
-    }else{
-      var dd=Math.round(dx/IG_S.dayW);
-      if(IG_drag.mode==='move'){ t.start=IGaddDays(IG_drag.s,dd); t.end=IGaddDays(IG_drag.e,dd); }
-      else { var ne=IGaddDays(IG_drag.e,dd); t.end=(IGdiffDays(t.start,ne)>=0)?ne:t.start; }
-    }
-    IGupdateBar(t); IGupdateDepsFor(t.id);
-  }
-  window.IGdragMove=function(e){
-    if(!IG_drag) return;
-    if(e.cancelable) e.preventDefault();
-    var x=IGptX(e), y=IGptY(e);
-    IG_drag.lastX=x; IG_drag.lastY=y;
-    IGapplyDrag(x); IGedgeScroll(x,y); IGthrottledSummary();
-  };
-  function IGedgeScroll(x,y){
-    var cw=document.getElementById('igChartWrap'); if(!cw) return;
-    var r=cw.getBoundingClientRect(), EDGE=48, hx=0;
-    if(x>r.right-EDGE) hx=1; else if(x<r.left+EDGE) hx=-1;
-    IG_drag.edge=hx;
-    if(hx&&!IG_edgeRAF) IG_edgeRAF=requestAnimationFrame(IGedgeTick);
-  }
-  function IGedgeTick(){
-    IG_edgeRAF=null;
-    if(!IG_drag||!IG_drag.edge) return;
-    var cw=document.getElementById('igChartWrap');
-    if(cw) cw.scrollLeft+=IG_drag.edge*16;
-    IGapplyDrag(IG_drag.lastX);
-    IG_edgeRAF=requestAnimationFrame(IGedgeTick);
-  }
-  function IGthrottledSummary(){
-    var now=Date.now();
-    if(now-IG_sumLast<150){ if(!IG_sumTimer) IG_sumTimer=setTimeout(function(){ IG_sumTimer=0; IGrenderSummary(); },150); return; }
-    IG_sumLast=now; IGrenderSummary();
-  }
-  window.IGdragEnd=function(){
-    if(IG_edgeRAF){ cancelAnimationFrame(IG_edgeRAF); IG_edgeRAF=null; }
-    if(IG_sumTimer){ clearTimeout(IG_sumTimer); IG_sumTimer=0; }
-    var svg=document.getElementById('igDepSvg'); if(svg) svg.classList.remove('dragging');
-    if(IG_drag){ if(!IG_drag.moved) IG_undo.pop(); }
-    IG_drag=null; IGsave(); IGrender();
-    document.removeEventListener('mousemove',window.IGdragMove);
-    document.removeEventListener('mouseup',window.IGdragEnd);
-    document.removeEventListener('touchmove',window.IGdragMove);
-    document.removeEventListener('touchend',window.IGdragEnd);
-    document.removeEventListener('touchcancel',window.IGdragEnd);
-  };
-  window.IGinitSplitter=function(){
-    var sp=document.getElementById('igSplitter'); if(!sp||sp.__igInit) return; sp.__igInit=1;
-    function clamp(w){ return Math.max(200,Math.min(w,Math.max(window.innerWidth-340,260))); }
-    sp.addEventListener('mousedown',function(e){
-      if(e.button!==0) return;
-      e.preventDefault();
-      var w0=Math.round(IG_cfg.tableWidth||404), x0=e.clientX;
-      sp.classList.add('on'); document.body.classList.add('ig-resizing');
-      function mv(ev){
-        IG_cfg.tableWidth=Math.round(clamp(w0+ev.clientX-x0));
-        var lay=document.getElementById('igLayout');
-        if(lay) lay.style.setProperty('--ig-tbl-w',IG_cfg.tableWidth+'px');
-      }
-      function up(){
-        document.removeEventListener('mousemove',mv);
-        document.removeEventListener('mouseup',up);
-        sp.classList.remove('on'); document.body.classList.remove('ig-resizing');
-        var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
-          var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.tableWidth=IG_cfg.tableWidth; inst_save(f); }
-      }
-      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
-    });
-    sp.addEventListener('dblclick',function(){ window.IGfitTblW(); });
-    sp.tabIndex=0; sp.setAttribute('role','separator');
-  };
-  document.addEventListener('mousedown',function(e){
-    var p=document.getElementById('igOwnPop'); if(!p||!p.classList.contains('open')) return;
-    if(p.contains(e.target)) return;
-    if(e.target.closest&&e.target.closest('.ig-own-cell')) return;
-    window.IGcloseOwner();
-  });
-  window.addEventListener('resize',function(){ if(window.IGcloseOwner) window.IGcloseOwner(); });
-  document.addEventListener('keydown',function(e){
-    if((e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==='z'){ e.preventDefault(); window.IGundo(); }
-  });
-  window.inst_ganttRenderB=function(force){
-    var f=inst_get(INST_CUR); if(!f) return;
-    f.installation=f.installation||{};
-    var arr=(f.installation.ganttTasks)||[];
-    if(force || !arr.length){
-      var r=inst_ganttSchedule(f);
-      inst_save(f);
-      if(!r.ok){ IGrender(); if(r.msg) prod_toast(r.msg); return; }
-    }
-    IGrender();
-    window.IGinitSplitter();
-  };
-  function inst_ganttReschedule(){
-    var f=inst_get(INST_CUR); if(!f) return;
-    if(typeof confirm==='function' && !confirm(it('inst_gantt_resched_confirm'))) return;
-    var r=inst_ganttSchedule(f);
-    if(!r.ok){ if(r.msg) prod_toast(r.msg); return; }
-    inst_save(f); IGrender(); prod_toast(it('inst_saved'));
-  }
-  function inst_saveGantt(){
-    var f=inst_get(INST_CUR); if(!f) return;
-    f.installation=f.installation||{}; var inst=f.installation; var plan=inst.plan||{};
-    var ss=IGy(prod_val('ib_schedStart')||'');
-    if(!ss){ prod_toast(it('inst_gantt_need_start')); return; }
-    plan.scheduleStart=ss;
-    var teams=parseInt((prod_val('ib_teams')||'2').replace(/[^0-9]/g,'')||'2',10)||2;
-    if(teams>INST_ZONE_MAX){ teams=INST_ZONE_MAX; prod_toast(it('inst_teams_warn')); }
-    plan.installTeams=teams;
-    plan.installRatePerTeam=parseInt((prod_val('ib_rate')||'200').replace(/[^0-9]/g,'')||'200',10)||200;
-    inst.plan=plan; f.installation=inst;
-    var r=inst_ganttSchedule(f);
-    inst_save(f); IGrender();
-    prod_toast(r && r.ok ? it('inst_saved') : (r && r.msg ? r.msg : it('inst_saved')));
+    return '<iframe id="instGanttFrame" title="房舍水泥板安装排程甘特" style="width:100%;height:calc(100vh - 120px);min-height:600px;border:0;display:block;background:#fff"></iframe>';
   }
   function inst_renderGantt(boxId, data){
     var box = inst_el(boxId); if(!box) return;
@@ -46024,9 +46200,6 @@ window.refreshMoveBtnState = function () {
   window.inst_renderGenLayout = inst_renderGenLayout;
   window.inst_toggleHideShipZero = inst_toggleHideShipZero;
   window.inst_toggleHideInstallZero = inst_toggleHideInstallZero;
-  window.inst_saveGantt = inst_saveGantt;
-  window.inst_ganttReschedule = inst_ganttReschedule;
-  window.inst_ganttRenderB = inst_ganttRenderB;
 
   /* 语言切换时重渲染安装模块（若可见） */
   window.addEventListener('app:langchange', function(){
