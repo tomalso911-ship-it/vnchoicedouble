@@ -43485,6 +43485,7 @@ body{margin:0;background:var(--bg);color:var(--txt);
 .hdr{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:2px}
 .hdr h1{font-size:18px;margin:0;font-weight:600}
 .hdr .sub{font-size:12px;color:var(--txt3)}
+.hdr-btns{margin-left:auto;display:flex;gap:8px;align-items:center}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-top:12px}
 .card h2{font-size:13px;margin:0 0 10px;font-weight:600;color:#37474f;display:flex;align-items:center;gap:8px}
 .card h2 .tg{font-size:11px;font-weight:400;color:var(--txt3)}
@@ -43510,11 +43511,19 @@ body{margin:0;background:var(--bg);color:var(--txt);
 .fld input,.fld select{border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;background:#fff;min-width:88px}
 .fld input:focus,.fld select:focus{outline:none;border-color:var(--pri)}
 .fld input.ro,.fld input[readonly]{background:#f0f0f0;color:#546e7a;cursor:default}
+/* 日期选择输入框（如「预计安装日期」）：虽 readonly（点击弹日历选择），但外观必须像可编辑输入框，不要灰底 */
+.fld .cp-date-input-wrapper input[readonly]{background:#fff;color:var(--txt);cursor:pointer}
+.fld .cp-date-input-wrapper input[readonly]:hover{border-color:var(--pri)}
+.fld .cp-date-input-wrapper input[readonly]:focus{border-color:var(--pri);outline:none}
 /* 排程参数：强制单行（三语都是一行），等分压缩各输入框宽度 */
-.params-row{flex-wrap:nowrap;gap:8px;align-items:flex-end}
-.params-row .fld{flex:1 1 0;min-width:0}
-.params-row .fld label{font-size:10px;line-height:1.15;white-space:normal;word-break:break-word}
-.params-row .fld input,.params-row .fld select,.params-row .fld .cp-date-input-wrapper{width:100%;min-width:0;box-sizing:border-box;padding:4px 6px;font-size:12px}
+.params-row{flex-wrap:nowrap;gap:6px;align-items:flex-end}
+.params-row .fld{flex:1 1 auto;min-width:0}
+/* 标签与输入框一样左右居中；标签不换行（一行显示），字段宽度按标签内容自适应，多余空间均分 */
+.params-row .fld label{font-size:10px;line-height:1.15;white-space:nowrap;text-align:center;overflow:hidden;text-overflow:ellipsis}
+.params-row .fld input,.params-row .fld select{width:100%;min-width:0;box-sizing:border-box;padding:4px 6px;font-size:12px;text-align:center}
+/* 日期选择框对齐：wrapper 不再加内边距，内部 input 与其它输入框完全同高同基线 */
+.params-row .fld .cp-date-input-wrapper{width:100%;min-width:0;box-sizing:border-box;padding:0;margin:0}
+.params-row .fld .cp-date-input-wrapper input{width:100%;min-width:0;box-sizing:border-box;padding:4px 6px;background:#fff;border:1px solid var(--bd);border-radius:6px;font:inherit;font-size:12px;text-align:center}
 .params-row .btn{flex:0 0 auto;white-space:nowrap}
 textarea{width:100%;min-height:78px;border:1px solid var(--bd);border-radius:6px;padding:7px 9px;
   font:11px/1.6 ui-monospace,Menlo,Consolas,monospace;resize:vertical;background:#fff}
@@ -43727,19 +43736,23 @@ table.zt tr:hover td{background:#f7fbff}
   <div class="hdr">
     <h1 data-i18n="g_title">房舍水泥板安装排程</h1>
     <span class="sub" data-i18n="g_sub">分区 · 房舍 · 小组产能驱动 · 自动生成甘特</span>
+    <div class="hdr-btns">
+      <button type="button" class="btn" onclick="printExcel()" data-i18n="g_btn_excel">打印EXCEL</button>
+      <button type="button" class="btn primary" onclick="printPdf()" data-i18n="g_btn_pdf">打印PDF</button>
+    </div>
   </div>
 
   <!-- 参数 -->
   <div class="card">
     <h2><span data-i18n="g_params">排程参数</span> <span class="tg" data-i18n="g_params_tip">改完点「重新排程」</span></h2>
     <div class="row params-row">
-      <div class="fld"><label data-i18n="g_lbl_cap">日产能（片/组/天）</label><input id="p_cap" type="number" min="1" value="200" onchange="recompute()"></div>
+      <div class="fld"><label data-i18n="g_lbl_cap">日安装(片/组/天)</label><input id="p_cap" type="number" min="1" value="200" onchange="recompute()"></div>
       <div class="fld"><label data-i18n="g_lbl_contract">合同签订日期</label><input id="gp_contract" class="ro" readonly></div>
       <div class="fld"><label data-i18n="g_lbl_prep">建厂筹备至试运营</label><input id="gp_prep" class="ro" readonly></div>
       <div class="fld"><label data-i18n="g_lbl_prep_end">试运营结束（开始生产）</label><input id="gp_prep_end" class="ro" readonly></div>
-      <div class="fld"><label data-i18n="g_lbl_prod_start">开始生产日期</label><input id="gp_prod_start" class="ro" readonly></div>
       <div class="fld"><label data-i18n="g_lbl_start">预计安装日期</label><div class="cp-date-input-wrapper" onclick="event.stopPropagation()"><input type="text" id="p_start" placeholder="DD/MM/YYYY" readonly onfocus="cpOpenCalendar(this)" oninput="recompute()" style="width:100%;cursor:pointer;"></div></div>
       <div class="fld"><label data-i18n="g_lbl_install_end">安装结束日</label><input id="gp_install_end" class="ro" readonly></div>
+      <div class="fld"><label data-i18n="g_lbl_due">项目交期</label><input id="gp_due" class="ro" readonly></div>
       <div class="fld"><label data-i18n="g_lbl_install_days">总安装天数</label><input id="gp_install_days" class="ro" readonly></div>
       <button class="btn primary" onclick="recompute()" data-i18n="g_btn_recompute">重新排程</button>
       <button class="btn" id="btnDisplayCfg" onclick="gToggleCfg()" data-i18n="g_btn_displaycfg">⚙ 显示设置</button>
@@ -43808,8 +43821,8 @@ var GANTT_I18N = {
   zh: {
     g_title:'房舍水泥板安装排程', g_sub:'分区 · 房舍 · 小组产能驱动 · 自动生成甘特',
     g_params:'排程参数', g_params_tip:'改完点「重新排程」',
-    g_lbl_cap:'日安装水泥板（片/组/天）', g_lbl_start:'预计安装日期', g_lbl_cal:'工作日历',
-    g_lbl_contract:'合同签订日期', g_lbl_prep:'建厂筹备至试运营', g_lbl_prep_end:'试运营结束（开始生产）', g_lbl_prod_start:'开始生产日期', g_lbl_install_end:'安装结束日', g_lbl_install_days:'总安装天数',
+    g_lbl_cap:'日安装(片/组/天)', g_lbl_start:'预计安装日期', g_lbl_cal:'工作日历',
+    g_lbl_contract:'合同签订日期', g_lbl_prep:'建厂筹备至试运营', g_lbl_prep_end:'试运营结束（开始生产）', g_lbl_prod_start:'开始生产日期', g_lbl_install_end:'安装结束日', g_lbl_due:'项目交期', g_lbl_install_days:'总安装天数',
     g_cal_natural:'自然日（天天作业）', g_cal_week:'跳过周六日', g_cal_work:'周末+停工日',
     g_lbl_strat:'区内房舍分配', g_strat_lpt:'大栋优先（LPT）', g_strat_greedy:'按清单顺序，谁空谁接',
     g_lbl_zmode:'区与区之间', g_zmode_parallel:'同时开工', g_zmode_serial:'串行（前区完工才开下一区）',
@@ -43847,6 +43860,7 @@ var GANTT_I18N = {
     g_imp_norow:'没有解析出有效行（板数列必须是数字）', g_imp_ok:'已导入 <b>{n}</b> 栋房舍', g_imp_skip:'{n} 行板数无效已跳过',
     g_auto:'全部组', g_csv_name:'房舍安装排程', g_imp_none:'— 无 —', g_ro_auto:'自动生成，不可编辑',
     g_cards_toggle_title:'展开/收起（区汇总 + 小组负载）',
+    g_btn_excel:'打印EXCEL', g_btn_pdf:'打印PDF',
     g_zt_zone:'分区', g_zt_team:'安装小组', g_zt_count:'房舍数', g_zt_panels:'总板数', g_zt_done:'已装',
     g_zt_start:'预计安装日期', g_zt_end:'完工', g_zt_days:'工期(天)', g_zt_ideal:'理论最少天数', g_zt_util:'利用率',
     g_ph_follow:'跟随项目', g_zone_start_tip:'留空=自动顺延（首区=项目开工日，其后各区=前一区完工日+1）',
@@ -43858,8 +43872,8 @@ var GANTT_I18N = {
   en: {
     g_title:'Installation Scheduling', g_sub:'Zones · Houses · Team-capacity driven · Auto Gantt',
     g_params:'Schedule Parameters', g_params_tip:'Click "Recompute" after changes',
-    g_lbl_cap:'Daily cement boards installed (pcs/team/day)', g_lbl_start:'Expected install date', g_lbl_cal:'Work calendar',
-    g_lbl_contract:'Contract date', g_lbl_prep:'Factory prep & trial run', g_lbl_prep_end:'Trial run end (prod start)', g_lbl_prod_start:'Production start date', g_lbl_install_end:'Installation end', g_lbl_install_days:'Total install days',
+    g_lbl_cap:'Daily install (pcs/team/day)', g_lbl_start:'Expected install date', g_lbl_cal:'Work calendar',
+    g_lbl_contract:'Contract date', g_lbl_prep:'Factory prep & trial run', g_lbl_prep_end:'Trial run end (prod start)', g_lbl_prod_start:'Production start date', g_lbl_install_end:'Installation end', g_lbl_due:'Project due date', g_lbl_install_days:'Total install days',
     g_cal_natural:'Natural days (work daily)', g_cal_week:'Skip Sat & Sun', g_cal_work:'Weekends + off-days',
     g_lbl_strat:'House assignment in zone', g_strat_lpt:'Largest first (LPT)', g_strat_greedy:'By list order, first free',
     g_lbl_zmode:'Between zones', g_zmode_parallel:'Parallel', g_zmode_serial:'Serial (next after prev)',
@@ -43897,6 +43911,7 @@ var GANTT_I18N = {
     g_imp_norow:'No valid rows (panels must be numeric)', g_imp_ok:'Imported <b>{n}</b> houses', g_imp_skip:'{n} rows skipped (invalid panels)',
     g_auto:'All teams', g_csv_name:'House install schedule', g_imp_none:'— none —', g_ro_auto:'Auto-generated, read-only',
     g_cards_toggle_title:'Expand/Collapse (Zone Summary + Team Load)',
+    g_btn_excel:'Print Excel', g_btn_pdf:'Print PDF',
     g_zt_zone:'Zone', g_zt_team:'Install team', g_zt_count:'Houses', g_zt_panels:'Total panels', g_zt_done:'Done',
     g_zt_start:'Expected install date', g_zt_end:'Done', g_zt_days:'Duration (days)', g_zt_ideal:'Min ideal days', g_zt_util:'Utilization',
     g_ph_follow:'Follow project', g_zone_start_tip:'Leave empty = auto: 1st zone = project start, later zones = prev zone end +1',
@@ -43908,8 +43923,8 @@ var GANTT_I18N = {
   vi: {
     g_title:'Lập lịch lắp đặt tấm xi măng', g_sub:'Phân vùng · Chuồng · Theo năng suất đội · Tự động Gantt',
     g_params:'Tham số lịch', g_params_tip:'Nhấn "Tính lại" sau khi đổi',
-    g_lbl_cap:'Tấm xi măng lắp mỗi ngày (viên/đội/ngày)', g_lbl_start:'Ngày lắp dự kiến', g_lbl_cal:'Lịch làm việc',
-    g_lbl_contract:'Ngày ký hợp đồng', g_lbl_prep:'Chuẩn bị nhà máy & chạy thử', g_lbl_prep_end:'Kết thúc chạy thử (bắt đầu SX)', g_lbl_prod_start:'Ngày bắt đầu sản xuất', g_lbl_install_end:'Ngày kết thúc lắp đặt', g_lbl_install_days:'Tổng số ngày lắp đặt',
+    g_lbl_cap:'Lắp/ngày (viên/đội/ngày)', g_lbl_start:'Ngày lắp dự kiến', g_lbl_cal:'Lịch làm việc',
+    g_lbl_contract:'Ngày ký hợp đồng', g_lbl_prep:'Chuẩn bị nhà máy & chạy thử', g_lbl_prep_end:'Kết thúc chạy thử (bắt đầu SX)', g_lbl_prod_start:'Ngày bắt đầu sản xuất', g_lbl_install_end:'Ngày kết thúc lắp đặt', g_lbl_due:'Ngày bàn giao dự án', g_lbl_install_days:'Tổng số ngày lắp đặt',
     g_cal_natural:'Ngày tự nhiên (làm hàng ngày)', g_cal_week:'Bỏ T7 & CN', g_cal_work:'Cuối tuần + ngày nghỉ',
     g_lbl_strat:'Phân bổ chuồng trong vùng', g_strat_lpt:'Ưu tiên lớn (LPT)', g_strat_greedy:'Theo thứ tự, đội rảnh nhận',
     g_lbl_zmode:'Giữa các vùng', g_zmode_parallel:'Cùng lúc', g_zmode_serial:'Nối tiếp (xong vùng trước mới tới sau)',
@@ -43947,6 +43962,7 @@ var GANTT_I18N = {
     g_imp_norow:'Không có dòng hợp lệ (cột tấm phải là số)', g_imp_ok:'Đã nhập <b>{n}</b> chuồng', g_imp_skip:'{n} dòng bỏ qua (tấm không hợp lệ)',
     g_auto:'Tất cả đội', g_csv_name:'Lịch lắp đặt chuồng', g_imp_none:'— không —', g_ro_auto:'Tự động tạo, không sửa được',
     g_cards_toggle_title:'Mở rộng/Thu gọn (Tổng hợp vùng + Tải đội)',
+    g_btn_excel:'In Excel', g_btn_pdf:'In PDF',
     g_zt_zone:'Vùng', g_zt_team:'Đội lắp', g_zt_count:'Số chuồng', g_zt_panels:'Tổng tấm', g_zt_done:'Đã lắp',
     g_zt_start:'Ngày lắp dự kiến', g_zt_end:'Xong', g_zt_days:'Thời gian (ngày)', g_zt_ideal:'Số ngày lý thuyết', g_zt_util:'Tỷ lệ',
     g_ph_follow:'Theo dự án', g_zone_start_tip:'Để trống = tự động: vùng đầu = ngày khởi công dự án, vùng sau = vùng trước xong +1',
@@ -45055,7 +45071,7 @@ function applyPlanFields(){
   setv('gp_contract', plan.contract);
   setv('gp_prep', plan.prepStart);
   setv('gp_prep_end', plan.prepEnd);
-  setv('gp_prod_start', plan.prodStart);
+  setv('gp_due', plan.due);
   var endVal='', daysVal='';
   try{
     var rEl=document.querySelector('#kpi > span:nth-child(7) > b');
@@ -45065,6 +45081,92 @@ function applyPlanFields(){
   }catch(e){}
   setv('gp_install_end', endVal);
   setv('gp_install_days', daysVal);
+}
+/* 打印 EXCEL：导出整份计划（参数 + 各区汇总 + 全部房舍明细）为 .xls（Excel 可直接打开） */
+function printExcel(){
+  var cols=[
+    {n:it('g_col_zone'),   v:function(h){ return h.zone; }},
+    {n:it('g_col_name'),   v:function(h){ return h.name1+(h.name2?(' '+h.name2):''); }},
+    {n:it('g_col_panels'), v:function(h){ return fmtNum(h.panels); }, num:1},
+    {n:it('g_col_done'),   v:function(h){ return fmtNum(h.done); }, num:1},
+    {n:it('g_col_prog'),   v:function(h){ return (h.panels?Math.round((h.done||0)/h.panels*100):0)+'%'; }},
+    {n:it('g_col_days'),   v:function(h){ return fmtNum(h.days); }, num:1},
+    {n:it('g_col_team'),   v:function(h){ return (h.lockTeam!=null)?teamLabel(h.lockTeam):it('g_auto'); }},
+    {n:it('g_col_start'),  v:function(h){ return dmy(h.start); }},
+    {n:it('g_col_end'),    v:function(h){ return dmy(h.end); }}
+  ];
+  var N=cols.length;
+  var gv=function(id){ var e=document.getElementById(id); return e&&e.value?e.value:''; };
+  var h='<meta charset="utf-8"><table border="1" cellspacing="0" cellpadding="3" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:11px;">';
+  h+='<tr><td colspan="'+N+'" style="font-size:15px;font-weight:bold;">'+esc(it('g_title'))+'</td></tr>';
+  h+='<tr><td colspan="'+N+'">'
+    +esc(it('g_lbl_contract')+'：'+gv('gp_contract'))
+    +' ｜ '+esc(it('g_lbl_prep')+'：'+gv('gp_prep'))
+    +' ｜ '+esc(it('g_lbl_prep_end')+'：'+gv('gp_prep_end'))
+    +' ｜ '+esc(it('g_lbl_start')+'：'+gv('p_start'))
+    +' ｜ '+esc(it('g_lbl_install_end')+'：'+gv('gp_install_end'))
+    +' ｜ '+esc(it('g_lbl_due')+'：'+gv('gp_due'))
+    +' ｜ '+esc(it('g_lbl_install_days')+'：'+gv('gp_install_days'))
+    +'</td></tr>';
+  h+='<tr>'+cols.map(function(c){ return '<th style="background:#f3eaff;">'+esc(c.n)+'</th>'; }).join('')+'</tr>';
+  zones.forEach(function(z){
+    var hs=houses.filter(function(x){ return x.zone===z.name; });
+    if(!hs.length) return;
+    var _pn=sum(hs,'panels'), _dn=sum(hs,'done');
+    h+='<tr style="background:#f7f9fb;font-weight:bold;">'
+      +'<td>'+esc(z.name)+'</td><td>'+esc(it('g_zone_summary'))+'</td>'
+      +'<td align="right">'+fmtNum(_pn)+'</td><td align="right">'+fmtNum(_dn)+'</td>'
+      +'<td align="center">'+(_pn?Math.round(_dn/_pn*100):0)+'%</td>'
+      +'<td align="right">'+fmtNum(z.days||0)+'</td><td>'+fmtNum(Math.max(1,z.teams|0))+esc(it('g_unit_group'))+'</td>'
+      +'<td>'+esc(dmy(z.start))+'</td><td>'+esc(dmy(z.end))+'</td></tr>';
+    hs.forEach(function(hh){
+      h+='<tr>'+cols.map(function(c){
+        return '<td'+(c.num?' align="right"':'')+'>'+esc(c.v(hh)||'')+'</td>';
+      }).join('')+'</tr>';
+    });
+  });
+  h+='</table>';
+  var blob=new Blob(['\ufeff'+h],{type:'application/vnd.ms-excel;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=it('g_title')+'_'+today()+'.xls';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ try{ URL.revokeObjectURL(a.href); }catch(e){} if(a.parentNode) a.parentNode.removeChild(a); }, 200);
+}
+/* 打印 PDF：A3 横向。左表 + 横道图整体缩放到「一页装下」（宽和高同时适配），
+   并强制不可分页，避免甘特被切成上下两半。 */
+function printPdf(){
+  var st=document.getElementById('printStyle');
+  if(!st){ st=document.createElement('style'); st.id='printStyle'; document.head.appendChild(st); }
+  /* A3 横向可打印区（6mm 页边距）：约 1541 x 1076 px，留点余量 */
+  var pageW=1480, pageH=1020, totalW=0, totalH=0;
+  try{
+    var tw=document.getElementById('tblWrap');
+    var ci=document.getElementById('chartInner');
+    totalW=(tw?tw.scrollWidth:0)+((ci&&ci.scrollWidth)||0);
+    totalH=Math.max(tw?tw.scrollHeight:0, (ci&&ci.scrollHeight)||0);
+  }catch(e){}
+  var z=1;
+  if(totalW>0 && totalH>0){
+    var zw=(totalW>pageW)?(pageW/totalW):1;   /* 按宽度缩放 */
+    var zh=(totalH>pageH)?(pageH/totalH):1;   /* 按高度缩放（防止纵向被切成两页） */
+    z=Math.min(zw,zh);
+  }
+  st.textContent='@media print{'
+    +'@page{size:A3 landscape;margin:6mm;}'
+    +'.hdr-btns,.params-row .btn,.splitter,.cfg,.cards-toggle,#btnDisplayCfg{display:none !important;}'
+    +'.layout{display:flex !important;height:auto !important;max-height:none !important;overflow:visible !important;border:none !important;border-radius:0 !important;'
+    +'break-inside:avoid !important;page-break-inside:avoid !important;break-before:page !important;page-break-before:always !important;break-after:page !important;page-break-after:always !important;}'
+    /* 关键：左表保持原宽度（不要 width:auto，否则 flex:0 0 auto 会吃光整行，把右表挤成 0 宽→横道图消失） */
+    +'.tbl-wrap{flex:0 0 auto !important;width:var(--tbl-w,470px) !important;overflow:visible !important;max-height:none !important;}'
+    +'.chart-wrap{flex:1 1 auto !important;min-width:0 !important;overflow:visible !important;max-height:none !important;}'
+    +'.tbl-wrap table{width:auto !important;}'
+    +'.tbl-wrap th,.thead{position:static !important;}'
+    +'.tbl-wrap,.chart-wrap,.ci,.bd,.thead,.bd *{break-inside:avoid !important;page-break-inside:avoid !important;}'
+    +'.bd,.ci{overflow:visible !important;}'
+    +'*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}'
+    +'html{zoom:'+z.toFixed(3)+' !important;}'
+    +'}';
+  window.print();
 }
 /* 区汇总 + 小组负载：右上角 +/− 一起收起/展开（状态存 cfg，持久化） */
 function applyCardsCollapsed(){
@@ -45748,7 +45850,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         contract: inst_contractDateDisp(),
         prepStart: _dmy(f.prepStart),
         prepEnd: _dmy(f.prepEnd),
-        prodStart: _dmy(f.prepEnd || f.planStart || ((typeof prod_today==='function') ? prod_today() : ''))
+        due: _dmy((f.profile && f.profile.dueDate) || ((typeof prod_dueDateFromData==='function') ? prod_dueDateFromData() : '') || '')
       };
       w.HOUSE_SOURCE = inst_buildGanttHouses(f);
       if(typeof w.loadCfg === 'function') w.loadCfg();
@@ -46874,6 +46976,12 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     if(v && v.classList.contains('active')){
       var back = inst_el('inst-back-label');
       if(back) back.textContent = '← ' + it('inst_back');
+      /* 标题后缀也要跟随语言切换（否则切语言后仍残留旧语言的「安装」二字） */
+      var ttl = inst_el('inst-detail-title');
+      if(ttl && inst_el('inst-detail') && inst_el('inst-detail').style.display!=='none'){
+        var p0 = inst_proj();
+        ttl.textContent = (p0 ? (p0.client||p0.customer||p0.name||'—') : '—') + it('inst_suffix');
+      }
       if(inst_el('inst-detail') && inst_el('inst-detail').style.display!=='none' && INST_CUR){
         if(INST_ACTIVE_TAB==='B'){
           var fr=document.getElementById('instGanttFrame');
