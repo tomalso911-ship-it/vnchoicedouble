@@ -4517,6 +4517,27 @@ function _ovLoadChartLib(cb){
         .catch(function(){})
         .then(function(){ if(cb) cb(); });
     }
+    /* ===== ★ 本地缓存缺 installation 时自动从服务器回填 =====
+       背景：prod_get() 只读 localStorage，而 localStorage 按 origin 隔离：
+         http://localhost:5050、http://127.0.0.1:5050、http://192.168.x.x:5050 是三份互不相通的存储。
+       换地址打开、清站点数据、换电脑后，本地缓存为空 → prod_get() 返回【不含 installation 的空壳】
+       → 安装管理 / 安装规划-可视化图 就"看起来颜色和内容全没了"（区域数还回落成默认 12）。
+       服务端数据是完整的，这里自动回填一次即可，用户无需任何手工操作。 */
+    function prod_localLacksInstallation(id){
+      try{
+        var s = localStorage.getItem(PROD_LS+id);
+        if(!s) return true;
+        var o = JSON.parse(s) || {};
+        return !o.installation;
+      }catch(e){ return true; }
+    }
+    function prod_ensureFactory(id, cb){
+      if(!id){ if(cb) cb(); return; }
+      if(!window.__factoryEnsureTried) window.__factoryEnsureTried = {};
+      if(window.__factoryEnsureTried[id]){ if(cb) cb(); return; }   /* 本次会话已补过：直接回调，避免重复请求/递归 */
+      window.__factoryEnsureTried[id] = 1;
+      prod_syncFromServer(id, cb);                                  /* 内部"以服务端为基"合并并写回 localStorage */
+    }
     // 把材料规格等全局配置从服务端拉到本地（供其他用户使用 tom 设定的规格下拉）
     // 始终以服务端为准覆盖本地，确保全员看到相同规格
     function prod_pullSpecsFromServer(){
@@ -9394,8 +9415,18 @@ function _ovLoadChartLib(cb){
     }
     function prod_outRenderAreaDistBody(){
       var ov=document.getElementById('prodOutAreaDistOverlay'); if(!ov) return;
-      var f=prod_get(PROD_CUR); if(!f) return;
       var body=ov.querySelector('.prod-out-area-dist-body'); if(!body) return;
+      var f=prod_get(PROD_CUR); if(!f) return;
+      /* ★ 本地缓存缺 installation（换 origin / 清缓存 / 换电脑后）→ 先从服务器回填一次再渲染，
+         否则这里会显示成"全部分区都没归入"（无颜色、无数字），看起来像数据丢了。 */
+      if(!window.__areaDistEnsured) window.__areaDistEnsured = {};
+      if(prod_localLacksInstallation(PROD_CUR) && !window.__areaDistEnsured[PROD_CUR] && typeof prod_ensureFactory==='function'){
+        window.__areaDistEnsured[PROD_CUR] = 1;                    /* 只补一次，保证不会递归 */
+        prod_ensureFactory(PROD_CUR, function(){
+          if(document.getElementById('prodOutAreaDistOverlay')) prod_outRenderAreaDistBody();
+        });
+        return;
+      }
       body.innerHTML=prod_outRenderAreaDist(f);
       prod_outScrollJumpIntoView();
     }
@@ -45703,6 +45734,17 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var instWrap = body ? body.closest('.prod-wrap') : null;
     if(instWrap){ instWrap.classList.toggle('inst-gantt-full', key==='B'); }
     if(!body || !INST_CUR) return;
+    /* ★ 本地缓存缺 installation 时，先从服务器回填一次再渲染。
+       否则换访问地址（localhost / 127.0.0.1 / 局域网 IP 是三份不同的 localStorage）、
+       清过站点数据、换电脑后，安装管理会显示成"颜色和内容全没了"（区域数回落默认值）。 */
+    if(!window.__instEnsureDone) window.__instEnsureDone = {};
+    if(typeof prod_localLacksInstallation === 'function' && prod_localLacksInstallation(INST_CUR)
+       && !window.__instEnsureDone[INST_CUR] && typeof prod_ensureFactory === 'function'){
+      window.__instEnsureDone[INST_CUR] = 1;                      /* 只补一次，保证不会递归 */
+      var _id0 = INST_CUR, _key0 = key;
+      prod_ensureFactory(_id0, function(){ if(INST_CUR===_id0) inst_renderTab(_key0); });
+      return;                                                     /* 等回填完成后再渲染 */
+    }
     var f = inst_get(INST_CUR);
     if(key==='A'){ body.innerHTML = inst_tabA(f); inst_calcPlan(); }
     else if(key==='B'){ body.innerHTML = inst_tabB(f);
