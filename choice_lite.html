@@ -2723,7 +2723,6 @@ function _ovLoadChartLib(cb){
 
   .hidden { display:none !important; }
   </style>
-  <link rel="stylesheet" href="vendor/frappe-gantt/frappe-gantt.css">
 </head>
 
 <body>
@@ -13363,6 +13362,156 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-btn-black{background:#263238 !important;color:#fff !important;border-color:#263238 !important;}
       /* 排程甘特 */
       .inst-gantt-params{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;}
+      /* ===== 自研甘特（ig- 前缀，避免与全局 .empty / .legend 冲突） ===== */
+      .ig-layout{--ig-row-h:42px;--ig-head-h:65px;--ig-tbl-w:404px;--ig-bd:#e3e8ee;--ig-bd2:#eef1f4;
+        --ig-txt:#263238;--ig-txt2:#546e7a;--ig-txt3:#90a4ae;--ig-pri:#1e88e5;
+        display:flex;border:1px solid var(--ig-bd);border-radius:10px;overflow:hidden;background:#fff;
+        height:540px;position:relative}
+      .ig-tbl-wrap{width:var(--ig-tbl-w);flex:0 0 auto;overflow:auto;background:#fafbfc;
+        border-right:1px solid var(--ig-bd);scrollbar-width:thin}
+      .ig-tbl-wrap::-webkit-scrollbar{width:0;height:9px}
+      .ig-tbl-wrap::-webkit-scrollbar-track{background:#f0f2f5}
+      .ig-tbl-wrap::-webkit-scrollbar-thumb{background:#c4cdd4;border-radius:5px}
+      .ig-tbl-wrap::-webkit-scrollbar-thumb:hover{background:#9aa7b0}
+      .ig-tbl-wrap table{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px}
+      .ig-tbl-wrap th{position:sticky;top:0;z-index:3;background:#f4f6f8;color:#455a64;font-weight:600;
+        height:var(--ig-head-h);padding:0 8px;text-align:left;border-bottom:1px solid var(--ig-bd);
+        white-space:nowrap;vertical-align:middle;position:relative}
+      .ig-tbl-wrap td{height:var(--ig-row-h);padding:0 6px;border-bottom:1px solid var(--ig-bd2);
+        white-space:nowrap;overflow:hidden;vertical-align:middle}
+      .ig-tbl-wrap th .ig-rs{position:absolute;right:0;top:0;bottom:0;width:8px;cursor:col-resize;z-index:4}
+      .ig-tbl-wrap th .ig-rs::after{content:'';position:absolute;right:3px;top:6px;bottom:6px;width:1px;background:#cfd8dc}
+      .ig-tbl-wrap th .ig-rs:hover::after{right:2px;width:3px;background:var(--ig-pri);top:2px;bottom:2px}
+      .ig-tbl-wrap th.ig-rs-on{background:#e3f2fd !important}
+      body.ig-col-resizing,body.ig-col-resizing *{cursor:col-resize !important;user-select:none !important}
+      .ig-tbl-wrap tr:hover td{background:#f0f7ff}
+      .ig-tbl-wrap tr.sel td{background:#e3f2fd}
+      .ig-tbl-wrap tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--ig-pri)}
+      .ig-tbl-wrap input,.ig-tbl-wrap select{width:100%;border:1px solid transparent;background:transparent;
+        font:inherit;font-size:11px;padding:3px 4px;border-radius:4px;color:var(--ig-txt)}
+      .ig-tbl-wrap input:hover,.ig-tbl-wrap select:hover{border-color:#cfd8dc;background:#fff}
+      .ig-tbl-wrap input:focus,.ig-tbl-wrap select:focus{outline:none;border-color:var(--ig-pri);background:#fff}
+      .ig-tbl-wrap input[type=checkbox]{width:auto}
+      .ig-nm{display:inline-flex;align-items:center;gap:4px;overflow:hidden}
+      .ig-branch{width:7px;height:7px;border-left:1px solid #b0bec5;border-bottom:1px solid #b0bec5;
+        display:inline-block;margin-bottom:3px;flex:0 0 auto}
+      .ig-ms-dot{width:9px;height:9px;background:#ffa726;transform:rotate(45deg);display:inline-block;flex:0 0 auto}
+      .ig-empty{height:auto !important;text-align:center;color:var(--ig-txt3);padding:22px 0 !important}
+      .ig-splitter{flex:0 0 auto;width:7px;margin:0 -1px;cursor:col-resize;position:relative;z-index:6;background:transparent}
+      .ig-splitter::before{content:'';position:absolute;inset:0 -4px}
+      .ig-splitter::after{content:'';position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--ig-bd)}
+      .ig-splitter:hover::after,.ig-splitter.on::after{left:2.5px;width:2px;background:var(--ig-pri)}
+      .ig-splitter.on{background:#e3f2fd}
+      .ig-splitter .ig-knob{position:absolute;left:1px;top:50%;width:5px;height:26px;margin-top:-13px;
+        border-radius:3px;background:#cfd8dc;opacity:0}
+      .ig-splitter:hover .ig-knob,.ig-splitter.on .ig-knob{opacity:1;background:var(--ig-pri)}
+      body.ig-resizing,body.ig-resizing *{cursor:col-resize !important;user-select:none !important}
+      .ig-chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff}
+      .ig-ci{position:relative}
+      .ig-thead{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--ig-bd)}
+      .ig-tu{display:flex;height:30px;border-bottom:1px solid var(--ig-bd2)}
+      .ig-tu>div{font-size:11px;font-weight:600;color:#455a64;padding:0 6px;border-right:1px solid var(--ig-bd2);
+        overflow:hidden;white-space:nowrap;display:flex;align-items:center;justify-content:center;text-align:center}
+      .ig-tl{display:flex;height:34px}
+      .ig-tl>div{font-size:10px;color:var(--ig-txt2);border-right:1px solid var(--ig-bd2);overflow:hidden;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;white-space:nowrap}
+      .ig-tl>div .ig-t1{line-height:13px;font-weight:600}
+      .ig-tl>div .ig-t2{line-height:12px;font-size:9px;color:var(--ig-txt3);margin-top:1px}
+      .ig-tl>div.we .ig-t1{color:#e57373}
+      .ig-tl>div.we{background:#fff8f8}
+      .ig-bd{position:relative;background-image:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 calc(var(--ig-row-h) - 1px),var(--ig-bd2) calc(var(--ig-row-h) - 1px) var(--ig-row-h));background-position:0 top;background-repeat:repeat}
+      .ig-wkend{position:absolute;top:0;bottom:0;background:#fafbfc}
+      .ig-cl{position:absolute;top:0;bottom:0;width:1px;background:var(--ig-bd2)}
+      .ig-today{position:absolute;top:0;bottom:0;width:2px;background:#e53935;z-index:2;opacity:.85}
+      .ig-today::after{content:'';position:absolute;top:0;left:-4px;border:5px solid transparent;border-top-color:#e53935}
+      .ig-deps{position:absolute;left:0;top:0;overflow:visible;z-index:3;pointer-events:none}
+      .ig-deps.dragging{opacity:.35}
+      .ig-bar{position:absolute;border-radius:3px;z-index:2;cursor:grab;touch-action:none;
+        background-repeat:no-repeat;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+      .ig-bar:active{cursor:grabbing}
+      .ig-bar.sel{outline:2px solid var(--ig-pri);outline-offset:1px}
+      .ig-bar::before{content:attr(data-lbl);position:absolute;left:6px;top:0;bottom:0;display:flex;align-items:center;
+        font-size:10px;white-space:nowrap;pointer-events:none;color:var(--ig-fg,#fff);text-shadow:0 1px 2px rgba(0,0,0,.5)}
+      .ig-bar.out::before{left:calc(100% + 6px);color:var(--ig-txt2);text-shadow:none}
+      .ig-bar::after{content:'';position:absolute;right:0;top:0;bottom:0;width:7px;background:transparent}
+      .ig-bar:hover::after{background:rgba(255,255,255,.42)}
+      .ig-bar:hover{box-shadow:0 1px 2px rgba(0,0,0,.12),inset 0 -7px 0 -4px rgba(255,255,255,.55)}
+      .ig-bar.ms{border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);box-shadow:none;
+        filter:drop-shadow(0 1px 2px rgba(0,0,0,.28))}
+      .ig-bar.ms::before,.ig-bar.ms::after{content:none}
+      .ig-bar.ms:hover{box-shadow:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}
+      /* 区域汇总条：深色、两端收窄，区别于普通栋条 */
+      .ig-bar.grp{height:12px !important;border-radius:2px;opacity:.92}
+      .ig-bar.grp::before{font-size:9px;left:auto;right:8px}
+      .ig-bar.late{box-shadow:0 0 0 1px #ef5350,0 1px 2px rgba(0,0,0,.12)}
+      .ig-bar.late:hover{box-shadow:0 0 0 1px #ef5350,0 1px 2px rgba(0,0,0,.12),inset 0 -7px 0 -4px rgba(255,255,255,.55)}
+      .ig-base{position:absolute;height:4px;background:#cbd5e0;border-radius:2px;z-index:1;opacity:.9}
+      .ig-base::after{content:'';position:absolute;left:-1px;top:-3px;width:2px;height:10px;background:#cbd5e0}
+      .ig-cfg{width:0;overflow:hidden;transition:width .18s ease;background:#fff;flex:0 0 auto}
+      .ig-cfg.open{width:250px;border-left:1px solid var(--ig-bd);overflow:auto}
+      .ig-cfg-h{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;font-weight:600;
+        font-size:12px;color:#37474f;border-bottom:1px solid var(--ig-bd2);position:sticky;top:0;background:#fff}
+      .ig-cfg-h button{border:0;background:none;color:var(--ig-txt3);font-size:16px;cursor:pointer;line-height:1}
+      .ig-cfg-b{padding:9px 11px 20px}
+      .ig-cfg-sec{margin-bottom:16px}
+      .ig-cfg-t{font-size:11px;font-weight:600;color:#78909c;margin-bottom:7px;text-transform:uppercase;letter-spacing:.4px}
+      .ig-cfg label{display:flex;align-items:center;gap:7px;font-size:12px;color:#455a64;padding:4px 0}
+      .ig-cfg select,.ig-cfg input[type=range]{flex:1;min-width:0}
+      .ig-cfg input[type=range]{accent-color:var(--ig-pri)}
+      .ig-cfg input[type=checkbox]{accent-color:var(--ig-pri)}
+      .ig-cfg label .ig-cw{margin-left:auto;font-size:10px;color:var(--ig-txt3);font-variant-numeric:tabular-nums}
+      .ig-cfg-btns{display:flex;gap:6px;margin-top:8px}
+      .ig-cfg-btns button{flex:1;border:1px solid var(--ig-bd);background:#fff;border-radius:5px;padding:4px 6px;
+        font-size:11px;color:var(--ig-txt2);cursor:pointer}
+      .ig-cfg-btns button:hover{border-color:var(--ig-pri);color:var(--ig-pri)}
+      .ig-cfg-hint{font-size:10px;color:var(--ig-txt3);margin-top:7px;line-height:1.5}
+      .ig-cfg input[type=text]{width:100%;border:1px solid var(--ig-bd);border-radius:5px;padding:4px 7px;
+        font:inherit;font-size:11px;box-sizing:border-box}
+      .ig-cfg input[type=text]:focus{outline:none;border-color:var(--ig-pri)}
+      .ig-own-cell{position:relative;width:100%;min-height:22px;display:flex;align-items:center;gap:5px;padding:0 5px;
+        border-radius:4px;cursor:pointer;overflow:hidden}
+      .ig-own-cell:hover{background:#eceff1;box-shadow:inset 0 0 0 1px #cfd8dc}
+      .ig-own-cell::after{content:'\25BE';margin-left:auto;font-size:9px;color:var(--ig-txt3);flex:0 0 auto}
+      .ig-own-cell:hover::after{color:var(--ig-pri)}
+      .ig-av{width:16px;height:16px;border-radius:50%;color:#fff;font-size:9px;font-style:normal;
+        display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+      #igOwnPop{position:fixed;z-index:99;background:#fff;border:1px solid var(--ig-bd);border-radius:8px;
+        box-shadow:0 10px 28px rgba(0,0,0,.16);min-width:168px;padding:4px;display:none;font-size:12px}
+      #igOwnPop.open{display:block}
+      #igOwnPop .ig-oi{display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:5px;cursor:pointer}
+      #igOwnPop .ig-oi:hover{background:#e3f2fd}
+      #igOwnPop .ig-oi .ig-ck{margin-left:auto;color:var(--ig-pri);font-weight:700}
+      #igOwnPop .ig-oi.clear{color:var(--ig-txt3);border-top:1px solid var(--ig-bd2);margin-top:3px}
+      #igOwnPop .ig-add{border-top:1px solid var(--ig-bd2);margin-top:3px;padding:7px 7px 5px}
+      #igOwnPop .ig-add input{width:100%;border:1px solid var(--ig-bd);border-radius:5px;padding:4px 7px;
+        font:inherit;font-size:11px;box-sizing:border-box}
+      #igOwnPop .ig-add input:focus{outline:none;border-color:var(--ig-pri)}
+      .ig-own-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+      .ig-ochip{display:inline-flex;align-items:center;gap:5px;background:#f4f6f8;border:1px solid var(--ig-bd);
+        border-radius:12px;padding:2px 7px;font-size:11px;color:var(--ig-txt2)}
+      .ig-ochip b{margin-left:2px;color:var(--ig-txt3);cursor:pointer;font-weight:700;padding:0 1px}
+      .ig-ochip b:hover{color:#e53935}
+      .ig-summary{margin:12px 0 0}
+      .ig-chips{display:flex;flex-wrap:wrap;gap:8px}
+      .ig-chip{background:#fff;border:1px solid var(--ig-bd);border-radius:14px;padding:4px 11px;font-size:12px;color:var(--ig-txt2)}
+      .ig-chip b{color:var(--ig-txt);font-weight:600}
+      .ig-chip.danger{background:#ffebee;border-color:#ffcdd2;color:#c62828}
+      .ig-chip.danger b{color:#b71c1c}
+      .ig-warn{margin-top:10px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:9px 12px;
+        font-size:12px;color:#795548}
+      .ig-warn b{display:block;margin-bottom:4px}
+      .ig-warn ul{margin:0;padding-left:18px}
+      .ig-legend{margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ig-txt2)}
+      .ig-legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+      .ig-hint{font-size:11px;color:var(--ig-txt3)}
+      .ig-hint b{color:var(--ig-pri);font-weight:600}
+      @media (max-width:960px){
+        .ig-layout{height:auto;flex-direction:column}
+        .ig-tbl-wrap{width:100% !important;max-height:240px;border-right:0;border-bottom:1px solid var(--ig-bd)}
+        .ig-splitter{display:none}
+        .ig-chart-wrap{min-height:340px}
+        .ig-cfg.open{width:100%}
+      }
       .inst-gantt-bar-wrap{margin-top:10px;}
       .inst-gantt-row{display:flex;align-items:center;gap:8px;margin:6px 0;}
       .inst-gantt-label{width:120px;font-size:12px;flex:0 0 auto;}
@@ -43442,7 +43591,6 @@ window.refreshMoveBtnState = function () {
 <script src="vendor/fx_history.js"></script>
 <script src="vendor/material_prices.js"></script>
 <script src="vn_provinces.js"></script>
-<script src="vendor/frappe-gantt/frappe-gantt.umd.js"></script>
 <script>
 /* ==================== 安装管理模块（复用生产 prod_* 全局函数） ==================== */
 (function(){
@@ -43459,6 +43607,7 @@ window.refreshMoveBtnState = function () {
     {key:'start', width:90, edit:'date'},
     {key:'end', width:90, edit:'date'},
     {key:'owner', width:90, edit:true},
+    {key:'zone', width:60, edit:true},
     {key:'progress', width:58, edit:'number'},
     {key:'status', width:86, edit:'status'},
     {key:'dependencies', width:86, edit:true},
@@ -43511,6 +43660,21 @@ window.refreshMoveBtnState = function () {
       inst_gantt_task_status:'状态', inst_gantt_task_progress:'进度', inst_gantt_task_deps:'依赖（逗号分隔）',
       inst_gantt_task_baseline_start:'基线开始', inst_gantt_task_baseline_end:'基线结束', inst_gantt_task_parent:'父任务ID',
       inst_gantt_task_milestone:'里程碑', inst_gantt_cancel:'取消', inst_gantt_ok:'确定',
+      inst_gantt_sched_start:'排程开始日', inst_gantt_rate:'每组产能(片/天)', inst_gantt_resched:'重新排程',
+      inst_gantt_resched_confirm:'将按当前参数（开始日 / 小组数 / 产能）重新生成全部排程，手工调整的日期会被覆盖，确定继续吗？',
+      inst_gantt_need_start:'请先填写「排程开始日」', inst_gantt_undo:'撤销', inst_gantt_export:'导出 CSV',
+      inst_gantt_colfit:'列宽自适应', inst_gantt_fitpanel:'适应面板', inst_gantt_slats:'板数',
+      inst_gantt_show_deps:'显示依赖连线', inst_gantt_show_base:'显示基线对比条', inst_gantt_date_sep:'日期分隔',
+      inst_gantt_owners:'负责人名单', inst_gantt_reset_col:'恢复默认', inst_gantt_owner_ph:'新增负责人，回车确认',
+      inst_gantt_owner_clear:'清除负责人', inst_gantt_owner_unset:'未指派', inst_gantt_owner_tip:'点击选择负责人',
+      inst_gantt_col_resize:'拖右边缘调宽，双击自适应', inst_gantt_panel_split:'拖动调整宽度 · 双击自动适配列宽',
+      inst_gantt_empty:'暂无任务，点击「+ 新增任务」创建', inst_gantt_sum_span:'区间', inst_gantt_sum_days:'总工期',
+      inst_gantt_sum_workdays:'作业天数', inst_gantt_sum_avg:'平均进度', inst_gantt_sum_done:'已完成',
+      inst_gantt_sum_ms:'里程碑', inst_gantt_sum_late:'延期', inst_gantt_warn:'数据校验',
+      inst_gantt_legend_late:'延期（结束已过今天且未 100%）', inst_gantt_legend_base:'基线计划',
+      inst_gantt_legend_ms:'里程碑',
+      inst_gantt_hint2:'拖条=移动 · 拖右端=改工期 · 拖下沿=改进度 · 点「负责人」格选人 · 拖表头右边缘调列宽（双击自适应）· 拖中间分隔线调面板宽',
+      inst_col_zone:'分区', inst_gantt_accept:'验收', inst_gantt_zone_name:'区域{0}',
       inst_unit_bldg:'栋',
       inst_no_count:'（不参与栋数计算）',
       inst_zone_summary_sep:' · ',
@@ -43597,6 +43761,21 @@ window.refreshMoveBtnState = function () {
       inst_gantt_task_status:'Status', inst_gantt_task_progress:'Progress', inst_gantt_task_deps:'Dependencies (comma)',
       inst_gantt_task_baseline_start:'Baseline Start', inst_gantt_task_baseline_end:'Baseline End', inst_gantt_task_parent:'Parent ID',
       inst_gantt_task_milestone:'Milestone', inst_gantt_cancel:'Cancel', inst_gantt_ok:'OK',
+      inst_gantt_sched_start:'Schedule Start', inst_gantt_rate:'Capacity/team/day', inst_gantt_resched:'Reschedule',
+      inst_gantt_resched_confirm:'This will regenerate the whole schedule using current parameters (start / teams / capacity). Manually adjusted dates will be overwritten. Continue?',
+      inst_gantt_need_start:'Please fill in "Schedule Start" first', inst_gantt_undo:'Undo', inst_gantt_export:'Export CSV',
+      inst_gantt_colfit:'Fit Columns', inst_gantt_fitpanel:'Fit Panel', inst_gantt_slats:'Slats',
+      inst_gantt_show_deps:'Show dependency lines', inst_gantt_show_base:'Show baseline bars', inst_gantt_date_sep:'Date separator',
+      inst_gantt_owners:'Assignees', inst_gantt_reset_col:'Reset', inst_gantt_owner_ph:'New assignee, press Enter',
+      inst_gantt_owner_clear:'Clear assignee', inst_gantt_owner_unset:'Unassigned', inst_gantt_owner_tip:'Click to choose assignee',
+      inst_gantt_col_resize:'Drag right edge to resize, double-click to fit', inst_gantt_panel_split:'Drag to resize · double-click to fit columns',
+      inst_gantt_empty:'No tasks yet, click "+ Add Task"', inst_gantt_sum_span:'Span', inst_gantt_sum_days:'Total days',
+      inst_gantt_sum_workdays:'Work days', inst_gantt_sum_avg:'Avg progress', inst_gantt_sum_done:'Done',
+      inst_gantt_sum_ms:'Milestones', inst_gantt_sum_late:'Delayed', inst_gantt_warn:'Data check',
+      inst_gantt_legend_late:'Delayed (end passed today, not 100%)', inst_gantt_legend_base:'Baseline plan',
+      inst_gantt_legend_ms:'Milestone',
+      inst_gantt_hint2:'Drag bar = move · drag right edge = duration · drag bottom = progress · click Assignee cell to pick · drag header edge to resize column (double-click to fit) · drag divider to resize panel',
+      inst_col_zone:'Zone', inst_gantt_accept:'Acceptance', inst_gantt_zone_name:'Zone {0}',
       inst_unit_bldg:'bldg',
       inst_no_count:'(Not counted in buildings)',
       inst_zone_summary_sep:' · ',
@@ -43683,6 +43862,21 @@ window.refreshMoveBtnState = function () {
       inst_gantt_task_status:'Trạng thái', inst_gantt_task_progress:'Tiến độ', inst_gantt_task_deps:'Phụ thuộc (phân cách bằng dấu phẩy)',
       inst_gantt_task_baseline_start:'Cơ sở bắt đầu', inst_gantt_task_baseline_end:'Cơ sở kết thúc', inst_gantt_task_parent:'ID cha',
       inst_gantt_task_milestone:'Mốc', inst_gantt_cancel:'Hủy', inst_gantt_ok:'OK',
+      inst_gantt_sched_start:'Ngày bắt đầu lập lịch', inst_gantt_rate:'Năng suất/đội/ngày', inst_gantt_resched:'Lập lại lịch',
+      inst_gantt_resched_confirm:'Thao tác này sẽ tạo lại toàn bộ lịch theo tham số hiện tại (ngày bắt đầu / số đội / năng suất). Các ngày đã chỉnh tay sẽ bị ghi đè. Tiếp tục?',
+      inst_gantt_need_start:'Vui lòng nhập "Ngày bắt đầu lập lịch"', inst_gantt_undo:'Hoàn tác', inst_gantt_export:'Xuất CSV',
+      inst_gantt_colfit:'Tự giãn cột', inst_gantt_fitpanel:'Vừa bảng', inst_gantt_slats:'Số tấm',
+      inst_gantt_show_deps:'Hiện đường phụ thuộc', inst_gantt_show_base:'Hiện thanh cơ sở', inst_gantt_date_sep:'Dấu cách ngày',
+      inst_gantt_owners:'Danh sách phụ trách', inst_gantt_reset_col:'Khôi phục', inst_gantt_owner_ph:'Thêm người phụ trách, Enter',
+      inst_gantt_owner_clear:'Xóa người phụ trách', inst_gantt_owner_unset:'Chưa gán', inst_gantt_owner_tip:'Nhấn để chọn người phụ trách',
+      inst_gantt_col_resize:'Kéo mép phải để đổi rộng, nhấp đôi để tự giãn', inst_gantt_panel_split:'Kéo để đổi rộng · nhấp đôi để tự giãn cột',
+      inst_gantt_empty:'Chưa có công việc, nhấn "+ Thêm công việc"', inst_gantt_sum_span:'Khoảng', inst_gantt_sum_days:'Tổng số ngày',
+      inst_gantt_sum_workdays:'Ngày thi công', inst_gantt_sum_avg:'Tiến độ TB', inst_gantt_sum_done:'Hoàn thành',
+      inst_gantt_sum_ms:'Mốc', inst_gantt_sum_late:'Trễ', inst_gantt_warn:'Kiểm tra dữ liệu',
+      inst_gantt_legend_late:'Trễ (ngày kết thúc đã qua mà chưa 100%)', inst_gantt_legend_base:'Kế hoạch cơ sở',
+      inst_gantt_legend_ms:'Mốc',
+      inst_gantt_hint2:'Kéo thanh = dời · kéo mép phải = đổi thời gian · kéo mép dưới = đổi tiến độ · nhấn ô "Phụ trách" để chọn · kéo mép đầu cột để đổi rộng (nhấp đôi tự giãn) · kéo vạch giữa để đổi rộng bảng',
+      inst_col_zone:'Khu', inst_gantt_accept:'Nghiệm thu', inst_gantt_zone_name:'Khu {0}',
       inst_unit_bldg:'tòa',
       inst_no_count:'(Không tính vào số dãy)',
       inst_zone_summary_sep:' · ',
@@ -43832,7 +44026,7 @@ window.refreshMoveBtnState = function () {
     if(!body || !INST_CUR) return;
     var f = inst_get(INST_CUR);
     if(key==='A'){ body.innerHTML = inst_tabA(f); inst_calcPlan(); }
-    else if(key==='B'){ body.innerHTML = inst_tabB(f); setTimeout(inst_renderFrappeGantt, 0); }
+    else if(key==='B'){ body.innerHTML = inst_tabB(f); setTimeout(function(){ if(window.inst_ganttRenderB) window.inst_ganttRenderB(false); }, 0); }
     else if(key==='C'){ body.innerHTML = inst_tabC(f); setTimeout(inst_backfillWeather, 0); }
     else if(key==='E'){ body.innerHTML = inst_tabE(f); inst_drawStats(f); }
     inst_updateTabBadges();
@@ -44433,361 +44627,930 @@ window.refreshMoveBtnState = function () {
     var da = new Date(a+'T00:00:00'), db = new Date(b+'T00:00:00');
     return Math.round((db - da) / 86400000);
   }
-  /* ============ 子标签 B：安装排程甘特 ============ */
+  /* ============ 子标签 B：安装排程甘特（自研引擎） ============ */
   function inst_tabB(f){
     var inst = f.installation || {}; var plan = inst.plan || {};
-    var types = inst_houseTypes();
-    var houseDays = inst.houseDays || {};
-    var teams = parseInt(String(plan.teams||'1').replace(/[^0-9]/g,'')||'1',10)||1;
+    var teams = parseInt(String(plan.installTeams!=null?plan.installTeams:2).replace(/[^0-9]/g,'')||'2',10)||2;
     if(teams>INST_ZONE_MAX){ teams = INST_ZONE_MAX; }
+    var rate = parseInt(String(plan.installRatePerTeam!=null?plan.installRatePerTeam:200).replace(/[^0-9]/g,'')||'200',10)||200;
     var h = '<div class="prod-sec-title">'+it('inst_gantt_title')+'</div>';
     h += '<div class="inst-gantt-params">'
-      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_gantt_start'),'ib_start',plan.planStart||'','',  '') : '')
+      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_gantt_sched_start'),'ib_schedStart',plan.scheduleStart||'','',  '') : '')
       + '<div class="prod-field"><label>'+it('inst_gantt_teams')+'</label><input id="ib_teams" value="'+teams+'"></div>'
+      + '<div class="prod-field"><label>'+it('inst_gantt_rate')+'</label><input id="ib_rate" value="'+rate+'"></div>'
       + '<button class="prod-btn" type="button" onclick="inst_saveGantt()">'+it('inst_gantt_save')+'</button>'
+      + '<button class="prod-btn sec" type="button" onclick="inst_ganttReschedule()">'+it('inst_gantt_resched')+'</button>'
       + '</div>';
-    /* 类 Power BI 甘特：左侧任务表 + 右侧时间轴 + 设置面板 */
     h += '<div class="inst-fg-toolbar">'
-      + '<button class="prod-btn mini" type="button" onclick="inst_ganttAddTask()">+ '+it('inst_gantt_add')+'</button>'
-      + '<button class="prod-btn mini" type="button" onclick="inst_ganttDelTask()">'+it('inst_gantt_del')+'</button>'
-      + '<button class="prod-btn mini" type="button" onclick="inst_ganttSave()">'+it('inst_gantt_save2')+'</button>'
-      + '<button class="prod-btn mini ghost" type="button" onclick="inst_ganttToggleConfig()">'+it('inst_gantt_settings')+'</button>'
-      + '<span class="inst-fg-hint">'+it('inst_gantt_hint')+'</span>'
+      + '<button class="prod-btn mini" type="button" onclick="IGadd()">+ '+it('inst_gantt_add')+'</button>'
+      + '<button class="prod-btn mini" type="button" onclick="IGdel()">'+it('inst_gantt_del')+'</button>'
+      + '<button class="prod-btn mini" type="button" onclick="IGundo()" title="Ctrl+Z">'+it('inst_gantt_undo')+'</button>'
+      + '<button class="prod-btn mini" type="button" onclick="IGsave()">'+it('inst_gantt_save2')+'</button>'
+      + '<button class="prod-btn mini" type="button" onclick="IGexport()">'+it('inst_gantt_export')+'</button>'
+      + '<button class="prod-btn mini ghost" type="button" onclick="IGcolFitAll()">'+it('inst_gantt_colfit')+'</button>'
+      + '<button class="prod-btn mini ghost" type="button" onclick="IGfitTblW()">'+it('inst_gantt_fitpanel')+'</button>'
+      + '<button class="prod-btn mini ghost" type="button" onclick="IGtoggleCfg()">'+it('inst_gantt_settings')+'</button>'
+      + '<span class="ig-hint">'+it('inst_gantt_hint2')+'</span>'
       + '</div>';
-    h += '<div class="inst-gantt-layout" id="iaGanttLayout">'
-      + '<div class="inst-gantt-table-wrap" id="iaGanttTableWrap"></div>'
-      + '<div class="inst-gantt-chart-wrap" id="iaGanttChartWrap"><div id="iaGanttFrappe"></div></div>'
-      + '<div class="inst-gantt-config" id="iaGanttConfig"></div>'
+    h += '<div class="ig-layout" id="igLayout">'
+      + '<div class="ig-tbl-wrap" id="igTblWrap"></div>'
+      + '<div class="ig-splitter" id="igSplitter" title="'+prod_esc(it('inst_gantt_panel_split'))+'"><i class="ig-knob"></i></div>'
+      + '<div class="ig-chart-wrap" id="igChartWrap"><div class="ig-ci" id="igChartInner"></div></div>'
+      + '<div class="ig-cfg" id="igCfgPanel"></div>'
       + '</div>';
-    h += '<div class="inst-gantt-summary" id="iaGanttSummary"></div>';
+    h += '<div class="ig-summary" id="igSummary"></div>';
     return h;
   }
-  /* ============ 安装排程：Frappe Gantt（可编辑） ============ */
-  // 安全化任务 ID（防止 # / . 等特殊字符破坏 Frappe Gantt 的 querySelector）
+  /* ============ 自研甘特引擎（IG）：日期层 + 排程器 ============ */
   function inst_safeId(s){ return String(s||'').replace(/[^a-zA-Z0-9_-]/g,'_'); }
-  function inst_sanitizeGanttIds(f){
-    var arr = (f.installation && f.installation.ganttTasks) || [];
-    var map = {}, changed = false;
-    arr.forEach(function(t){ if(t.id && /[^a-zA-Z0-9_-]/.test(t.id)){ var nid = inst_safeId(t.id); map[t.id]=nid; t.id=nid; changed=true; } });
-    if(Object.keys(map).length){
-      arr.forEach(function(t){
-        if(t.dependencies){
-          var deps = String(t.dependencies).split(',').map(function(d){ return map[d.trim()] || d.trim(); }).join(',');
-          if(deps !== t.dependencies){ t.dependencies = deps; changed = true; }
-        }
-      });
-    }
-    if(changed) inst_save(f);
-  }
-  // 首次进入且无任务时，按现有分区/房型种子生成「区域+栋舍+到货里程碑」任务
-  function inst_seedGanttTasks(f){
-    var inst = f.installation; if(!inst) return;
-    if(inst.ganttTasks && inst.ganttTasks.length) return;
-    var plan = inst.plan || {};
-    var types = inst_houseTypes();
-    var houseDays = inst.houseDays || {};
-    var assign = inst_assignMap(f);
-    var zoneCount = inst_zoneCount(f);
-    var base = plan.planStart || prod_today();
-    var tasks = [];
-    for(var z=1; z<=zoneCount; z++){
-      var houses = [];
-      for(var k in assign){ if(assign.hasOwnProperty(k) && assign[k]===z) houses.push(k); }
-      if(!houses.length) continue;
-      var zoneDays = 0;
-      houses.forEach(function(k){ var code=k.split('#')[0]; var d = (houseDays[code]!=null?houseDays[code]:1); zoneDays += d; });
-      var zStart = base, zEnd = bdYmd(bdDateAdd(zStart, zoneDays));
-      tasks.push({ id:'z'+z, name: it('inst_zone')+' '+z, start:zStart, end:zEnd, progress:0, type:'project', custom_class:'inst-z'+z });
-      var cur = zStart;
-      houses.forEach(function(k){
-        var code=k.split('#')[0]; var d = (houseDays[code]!=null?houseDays[code]:1);
-        var hs = cur, he = bdYmd(bdDateAdd(hs, d));
-        var hname = ''; for(var t=0;t<types.length;t++){ if(types[t].code===code){ hname=types[t].name; break; } }
-        var no = k.split('#')[1]; var safeK = inst_safeId(k);
-        tasks.push({ id:'h'+safeK, name: (it('inst_zone')+' '+z+' · '+hname+' #'+no), start:hs, end:he, progress:0, dependencies:'z'+z, type:'task', custom_class:'inst-z'+z });
-        tasks.push({ id:'a'+safeK, name_key:'inst_arr', start:hs, end:hs, progress:100, dependencies:'', type:'milestone', custom_class:'inst-arr' });
-        cur = he;
-      });
-    }
-    inst.ganttTasks = tasks;
-  }
   function inst_ganttConfig(f){
     var cfg = (f.installation && f.installation.ganttConfig) || {};
     return {
       showWeekend: cfg.showWeekend!==false,
       showToday: cfg.showToday!==false,
       showGrid: cfg.showGrid!==false,
-      colWidth: cfg.colWidth || 38,
-      barHeight: cfg.barHeight || 26,
+      showDeps: cfg.showDeps!==false,
+      showBase: cfg.showBase!==false,
+      colWidth: cfg.colWidth || 58,
+      barHeight: cfg.barHeight || 22,
       viewMode: cfg.viewMode || 'Week',
-      colorBy: cfg.colorBy || 'owner',
-      visibleCols: cfg.visibleCols || ['name','start','end','owner','progress','status','dependencies']
+      colorBy: cfg.colorBy || 'status',
+      dateSep: cfg.dateSep || '/',
+      tableWidth: cfg.tableWidth || 404,
+      colW: cfg.colW || {},
+      owners: cfg.owners || [],
+      visibleCols: (cfg.visibleCols && cfg.visibleCols.length) ? cfg.visibleCols : ['name','start','end','owner','progress','status']
     };
   }
-  function inst_ownerColor(s){
-    var str = String(s||''); var idx = 0;
-    for(var i=0;i<str.length;i++){ idx = (idx*31 + str.charCodeAt(i)) % INST_OWNER_COLORS.length; }
-    return INST_OWNER_COLORS[idx];
+  function IGpad2(n){ n=parseInt(n,10)||0; return (n<10?'0':'')+n; }
+  function IGvalid(y){
+    if(!y) return '';
+    var p=String(y).split('-'); if(p.length!==3) return '';
+    var Y=+p[0],M=+p[1],D=+p[2];
+    if(Y<1970||Y>2100||M<1||M>12||D<1||D>31) return '';
+    var d=new Date(Date.UTC(Y,M-1,D));
+    if(d.getUTCFullYear()!==Y||d.getUTCMonth()!==M-1||d.getUTCDate()!==D) return '';
+    return p[0]+'-'+IGpad2(M)+'-'+IGpad2(D);
   }
-  function inst_statusColor(s){ return INST_STATUS_COLORS[s] || '#9e9e9e'; }
-  function inst_taskColor(t, cfg){
-    if(t.milestone || t.type==='milestone') return {bar:'#E53935',progress:'#b71c1c'};
-    if(cfg.colorBy==='owner' && t.owner) return {bar:inst_ownerColor(t.owner),progress:'#263238'};
-    if(cfg.colorBy==='status' && t.status) return {bar:inst_statusColor(t.status),progress:'#263238'};
-    return null;
+  function IGy(v){
+    if(v===null||v===undefined||v==='') return '';
+    if(v instanceof Date) return isNaN(v.getTime())?'':IGy(v.getUTCFullYear()+'-'+IGpad2(v.getUTCMonth()+1)+'-'+IGpad2(v.getUTCDate()));
+    var s=String(v).trim(); if(!s) return '';
+    if(/^\d{10,13}$/.test(s)){ var ts=+s; if(s.length<=10) ts*=1000; return IGy(new Date(ts)); }
+    var m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/); if(m) return IGvalid(m[1]+'-'+m[2]+'-'+m[3]);
+    m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);       if(m) return IGvalid(m[3]+'-'+m[2]+'-'+m[1]);
+    m=s.match(/^(\d{4})(\d{2})(\d{2})$/);                       if(m) return IGvalid(m[1]+'-'+m[2]+'-'+m[3]);
+    return '';
   }
-  // 把存储的任务（含 name_key）转成 Frappe Gantt 所需格式（按当前语言解析名称）
-  function inst_buildFrappeTasks(f){
-    var inst = f.installation || {};
-    var raw = inst.ganttTasks || [];
-    var cfg = inst_ganttConfig(f);
-    return raw.map(function(t){
-      var name = t.name_key ? it(t.name_key) : (t.name || t.id);
-      var baseCls = (t.custom_class||'');
-      if(cfg.colorBy!=='zone') baseCls = baseCls.replace(/\binst-z\d+\b/g,'').trim();
-      var cls = baseCls + (t.milestone || t.type==='milestone' ? ' inst-milestone':'') + (t.type==='project' || t.type==='group' ? ' inst-group':'');
-      var start = t.start, end = t.end;
-      if(t.milestone || t.type==='milestone'){ end = bdYmd(bdDateAdd(start,1)); }
-      var out = { id:t.id, name:name, start:start, end:end, progress:(t.progress||0), dependencies:(t.dependencies||''), custom_class:cls.trim(), type:t.type||'task' };
-      var c = inst_taskColor(t, cfg);
-      if(c){ out.color=c.bar; out.color_progress=c.progress; }
-      return out;
+  function IGsep(){ return (IG_cfg && IG_cfg.dateSep==='-')?'-':'/'; }
+  function IGdmy(v){ var y=IGy(v); if(!y) return ''; var s=IGsep(), p=y.split('-'); return p[2]+s+p[1]+s+p[0]; }
+  function IGaddDays(y,n){
+    y=IGy(y); if(!y) return '';
+    var p=y.split('-'), d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+    d.setUTCDate(d.getUTCDate()+(parseInt(n,10)||0)); return IGy(d);
+  }
+  function IGdiffDays(a,b){
+    a=IGy(a); b=IGy(b); if(!a||!b) return 0;
+    return Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000);
+  }
+  function IGdow(y){ y=IGy(y); if(!y) return 1; var p=y.split('-'); return new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).getUTCDay(); }
+  function IGisWeekend(y){ var w=IGdow(y); return w===0||w===6; }
+  function IGdaysInMonth(y,m){ return new Date(Date.UTC(y,m,0)).getUTCDate(); }
+  function IGisoWeek(d){
+    var p=IGy(d).split('-'); if(p.length<3) return {w:0,y:''};
+    var t=new Date(Date.UTC(+p[0],+p[1]-1,+p[2])); var dn=t.getUTCDay()||7;
+    t.setUTCDate(t.getUTCDate()+4-dn); var yy=t.getUTCFullYear();
+    return {w:Math.ceil(((t.getTime()-Date.UTC(yy,0,1))/86400000+1)/7), y:yy};
+  }
+  function IGwnum(d){ return IGisoWeek(d).w; }
+  function IGnextWorkday(y,tet){
+    y=IGy(y); if(!y) return '';
+    var g=0; while(tet && tet[y] && g++<400){ y=IGaddDays(y,1); } return y;
+  }
+  function IGaddWorkdays(s,n,tet){
+    s=IGnextWorkday(s,tet); if(!s) return '';
+    var d=s, cnt=0, g=0;
+    while(cnt<n && g++<4000){ d=IGaddDays(d,1); if(!(tet&&tet[d])) cnt++; }
+    return d;
+  }
+  /* 排程：区串行 / 区内按小组并行 / 每栋 = ceil(板数 ÷ 产能)，只跳春节 */
+  function inst_ganttSchedule(f){
+    var inst = f.installation || {}; var plan = inst.plan || {};
+    var schedStart = IGy(plan.scheduleStart);
+    if(!schedStart) return {ok:false, msg:it('inst_gantt_need_start')};
+    var teams = parseInt(String(plan.installTeams!=null?plan.installTeams:2).replace(/[^0-9]/g,'')||'2',10)||2;
+    if(teams<1) teams=1; if(teams>INST_ZONE_MAX) teams=INST_ZONE_MAX;
+    var rate = parseInt(String(plan.installRatePerTeam!=null?plan.installRatePerTeam:200).replace(/[^0-9]/g,'')||'200',10)||200;
+    if(rate<1) rate=1;
+    var tet = (typeof inst_tetHolidaySet==='function') ? inst_tetHolidaySet() : {};
+    var zoneCount = inst_zoneCount(f);
+    var assign = inst_assignMap(f);
+    var demand = (function(){
+      var sv = (typeof PROD_CUR!=='undefined') ? PROD_CUR : undefined;
+      try { if(typeof PROD_CUR!=='undefined') PROD_CUR = INST_CUR; return inst_buildDemandMap(); }
+      finally { if(typeof PROD_CUR!=='undefined') PROD_CUR = sv; }
+    })();
+    var oldByBk = {};
+    (inst.ganttTasks||[]).forEach(function(t){ if(t && t.bk) oldByBk[t.bk]=t; });
+    var out=[], prevZoneId='', prevZoneEnd=null;
+    for(var z=1; z<=zoneCount; z++){
+      var bks=[];
+      for(var k in assign){ if(assign.hasOwnProperty(k) && String(assign[k])===String(z)) bks.push(k); }
+      if(!bks.length) continue;
+      bks.sort(function(a,b){
+        var ca=String(a).split('#')[0], cb=String(b).split('#')[0];
+        var sa=(typeof slatsIsSpecialHouse==='function'&&slatsIsSpecialHouse(ca))?1:0;
+        var sb=(typeof slatsIsSpecialHouse==='function'&&slatsIsSpecialHouse(cb))?1:0;
+        return sa-sb;
+      });
+      var zoneStart = prevZoneEnd ? IGnextWorkday(IGaddDays(prevZoneEnd,1),tet) : schedStart;
+      var free=[], lastOfTeam=[], i2;
+      for(i2=0;i2<teams;i2++){ free.push(zoneStart); lastOfTeam.push(''); }
+      var Z='Z'+z;
+      var zoneTask={ id:Z, name: it('inst_gantt_zone_name').replace('{0}',z), start:zoneStart, end:zoneStart,
+        baseline_start:zoneStart, baseline_end:zoneStart, progress:0, status:'', owner:'', zone:z,
+        parent:'', dependencies:prevZoneId, type:'group', milestone:false, bk:'' };
+      out.push(zoneTask);
+      var zoneEnd=zoneStart, zoneFirstStart=null, wDone=0, wAll=0;
+      bks.forEach(function(bk){
+        var parts=String(bk).split('#'); var code=parts[0], idx=parts[1]||'1';
+        var d=demand[code]||{}; var slats=0; for(var sp in d){ slats += (d[sp]||0); }
+        var D=Math.max(1, Math.ceil(slats/rate));
+        var ti=0; for(var j=1;j<free.length;j++){ if(free[j]<free[ti]) ti=j; }
+        var s=IGnextWorkday(free[ti],tet);
+        var e=IGaddWorkdays(s,D-1,tet);
+        free[ti]=IGnextWorkday(IGaddDays(e,1),tet);
+        var deps=lastOfTeam[ti]||prevZoneId;
+        var old=oldByBk[bk]||{};
+        var nm=(typeof prod_phName==='function'?prod_phName(code):code);
+        out.push({ id:'B'+inst_safeId(bk), bk:bk, name:nm+' #'+idx, start:s, end:e,
+          baseline_start:s, baseline_end:e,
+          progress:(+old.progress||0), status:(old.status||'not_install'), owner:(old.owner||''),
+          zone:z, slats:slats, days:D, parent:Z, dependencies:deps, type:'task', milestone:false });
+        lastOfTeam[ti]=out[out.length-1].id;
+        if(zoneFirstStart===null||s<zoneFirstStart) zoneFirstStart=s;
+        if(e>zoneEnd) zoneEnd=e;
+        wAll+=slats; wDone+=slats*((+old.progress||0)/100);
+      });
+      zoneTask.end=zoneEnd; zoneTask.baseline_end=zoneEnd;
+      zoneTask.progress = wAll>0 ? Math.round(wDone/wAll) : 0;
+      out.push({ id:'A'+z, bk:'', name_key:'inst_arr', start:zoneFirstStart, end:zoneFirstStart,
+        baseline_start:zoneFirstStart, baseline_end:zoneFirstStart, progress:100, status:'', owner:'',
+        zone:z, parent:Z, dependencies:'', type:'milestone', milestone:true });
+      var acc=IGnextWorkday(IGaddDays(zoneEnd,10),tet);
+      out.push({ id:'F'+z, bk:'', name_key:'inst_gantt_accept', start:acc, end:acc,
+        baseline_start:acc, baseline_end:acc, progress:100, status:'', owner:'',
+        zone:z, parent:Z, dependencies:Z, type:'milestone', milestone:true });
+      prevZoneId=Z; prevZoneEnd=zoneEnd;
+    }
+    inst.ganttTasks=out; f.installation=inst;
+    return {ok:true, count:out.length};
+  }
+  /* ============ IG：状态 / 刻度 / 表格 / 图表渲染 ============ */
+  var IG_tasks=[], IG_cfg=null, IG_S=null, IG_sel='', IG_undo=[], IG_drag=null, IG_edgeRAF=null, IG_sumTimer=0, IG_sumLast=0;
+  var IG_STATUS=[['not_install','inst_status_not_install','#b0bec5'],['installing','inst_status_installing','#42a5f5'],
+                 ['installed','inst_status_installed','#26a69a'],['accepted','inst_status_accepted','#66bb6a']];
+  var IG_OWNER_C=['#42a5f5','#26a69a','#ffa726','#ab47bc','#5c6bc0','#ec407a','#8d6e63','#78909c'];
+  function IGhash(s){ var h=0; s=String(s||''); for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h; }
+  function IGstatusColor(k){ for(var i=0;i<IG_STATUS.length;i++){ if(IG_STATUS[i][0]===k) return IG_STATUS[i][2]; } return '#b0bec5'; }
+  function IGownerColor(n){ return IG_OWNER_C[IGhash(n)%8]; }
+  function IGzoneColor(z){ return INST_ZONE_COLORS[(parseInt(z,10)-1+INST_ZONE_COLORS.length)%INST_ZONE_COLORS.length] || '#5c6bc0'; }
+  function IGbarColor(t){
+    if(IG_cfg.colorBy==='owner') return t.owner?IGownerColor(t.owner):'#b0bec5';
+    if(IG_cfg.colorBy==='zone')  return IGzoneColor(t.zone);
+    return IGstatusColor(t.status);
+  }
+  function IGlate(t){ return (t.progress<100 && t.end < prod_today()); }
+  function IGbarColorOf(t){ return IGlate(t) ? '#ef5350' : IGbarColor(t); }
+  function IGrowH(){ return IG_cfg.barHeight+20; }
+  function IGheadH(){ return 30+34+1; }
+  function IGdur(t){ return IGdiffDays(t.start,t.end)+1; }
+  function IGfindCol(k){ var r=null; INST_GANTT_COLS.forEach(function(c){ if(c.k===k) r=c; }); return r; }
+  function IGcolW(k){ var c=IGfindCol(k); var m=IG_cfg.colW||{}; return Math.max(40, Math.min(460, m[k]||(c?c.w:80))); }
+  function IGcols(){ return INST_GANTT_COLS.filter(function(c){ return IG_cfg.visibleCols.indexOf(c.k)>=0; }); }
+  function IGcolsSum(){ var n=0; IGcols().forEach(function(c){ n+=IGcolW(c.k); }); return n; }
+  function IGbyId(id){ var r=null; IG_tasks.forEach(function(t){ if(t.id===id) r=t; }); return r; }
+  function IGname(t){ return t.name_key ? it(t.name_key) : (t.name||t.id); }
+  function IGsave(){
+    var f=inst_get(INST_CUR); if(!f) return;
+    f.installation=f.installation||{}; f.installation.ganttTasks=IG_tasks; inst_save(f);
+  }
+  function IGpushUndo(){ IG_undo.push(JSON.stringify(IG_tasks)); if(IG_undo.length>40) IG_undo.shift(); }
+  function IGlevels(){
+    var map={}; IG_tasks.forEach(function(t){ map[t.id]=t; });
+    var lv={}, g=0;
+    function dep(t){
+      if(!t) return 0; if(lv[t.id]!=null) return lv[t.id];
+      if(g++>3000) return 0;
+      var d=(t.parent&&map[t.parent]&&map[t.parent]!==t)?dep(map[t.parent])+1:0;
+      lv[t.id]=d; return d;
+    }
+    IG_tasks.forEach(function(t){ g=0; dep(t); });
+    return lv;
+  }
+  function IGbuildScale(){
+    var ds=[prod_today()];
+    IG_tasks.forEach(function(t){ ds.push(t.start,t.end,t.baseline_start,t.baseline_end); });
+    ds=ds.filter(Boolean).sort();
+    var min=ds[0]||prod_today(), max=ds[ds.length-1]||min;
+    if(IG_cfg.viewMode==='Day'){ min=IGaddDays(min,-3); max=IGaddDays(max,4); }
+    else if(IG_cfg.viewMode==='Week'){ min=IGaddDays(min,-7); max=IGaddDays(max,10); }
+    else { min=IGaddDays(min,-20); max=IGaddDays(max,30); }
+    if(IG_cfg.viewMode==='Week') min=IGaddDays(min,-((IGdow(min)+6)%7));
+    if(IG_cfg.viewMode==='Month') min=min.slice(0,8)+'01';
+    var colW=IG_cfg.colWidth;
+    if(IG_cfg.viewMode==='Day') colW=Math.max(22,Math.min(64,Math.round(IG_cfg.colWidth/2)));
+    if(IG_cfg.viewMode==='Month') colW=IG_cfg.colWidth*2;
+    var cols=[], x, width=0, ppd;
+    if(IG_cfg.viewMode==='Month'){
+      var mStartX={}, cur=min, cx=0, gd=0;
+      while(cur<=max&&gd++<400){
+        var y=+cur.slice(0,4), m=+cur.slice(5,7), dim=IGdaysInMonth(y,m);
+        mStartX[y+'-'+IGpad2(m)]=cx;
+        cols.push({s:cur,e:cur.slice(0,8)+IGpad2(dim),ym:y+'-'+IGpad2(m)});
+        cx+=colW; cur=IGaddDays(cur,dim);
+      }
+      width=cx;
+      x=function(d){ d=IGy(d); if(!d) return 0; var ym=d.slice(0,7); if(mStartX[ym]==null) return 0;
+        return mStartX[ym]+(parseInt(d.slice(8),10)-1)*colW/IGdaysInMonth(+d.slice(0,4),+d.slice(5,7)); };
+      ppd=colW/30;
+    }else{
+      ppd = IG_cfg.viewMode==='Day' ? colW : colW/7;
+      var d2=min, g2=0;
+      while(d2<=max&&g2++<1200){
+        var end = IG_cfg.viewMode==='Day' ? d2 : IGaddDays(d2,6);
+        cols.push({s:d2,e:end,ym:(IG_cfg.viewMode==='Day'?d2.slice(0,7):IGaddDays(d2,3).slice(0,7))});
+        d2=IGaddDays(end,1);
+      }
+      width=cols.length*colW;
+      x=function(d){ d=IGy(d); if(!d) return 0; return IGdiffDays(min,d)*ppd; };
+    }
+    var up=[], last=null;
+    cols.forEach(function(c,i){
+      var key=(IG_cfg.viewMode==='Month')?c.ym.slice(0,4):c.ym;
+      var label=(IG_cfg.viewMode==='Month')?(key+'年'):(c.ym.slice(0,4)+'年'+parseInt(c.ym.slice(5),10)+'月');
+      if(!last||last.key!==key){ last={key:key,x:i*colW,w:colW,label:label}; up.push(last); }
+      else last.w+=colW;
     });
+    return {min:min,max:max,cols:cols,up:up,x:x,width:Math.max(width,200),ppd:ppd,dayW:ppd,colW:colW};
   }
-  function inst_ganttRenderTable(f){
-    var box = inst_el('iaGanttTableWrap'); if(!box) return;
-    var cfg = inst_ganttConfig(f);
-    var arr = (f.installation && f.installation.ganttTasks) || [];
-    var cols = INST_GANTT_COLS.filter(function(c){ return cfg.visibleCols.indexOf(c.key)>=0; });
-    var h = '<table><thead><tr>';
-    cols.forEach(function(c){ h += '<th style="width:'+c.width+'px">'+it('inst_col_'+c.key)+'</th>'; });
-    h += '</tr></thead><tbody>';
-    arr.forEach(function(t, idx){
-      var sel = t.id === INST_GANTT_SEL ? ' selected' : '';
-      h += '<tr class="inst-gantt-row-'+idx+sel+'" data-id="'+prod_esc(t.id)+'" onclick="inst_ganttSelectRow(\''+prod_esc(t.id)+'\')">';
-      cols.forEach(function(c){ h += '<td style="width:'+c.width+'px">'+inst_ganttCellHtml(t,c)+'</td>'; });
-      h += '</tr>';
+  function IGweekLabel(s,e,cw){
+    var sep=IGsep();
+    var sD=s.slice(8), sM=s.slice(5,7), eD=e.slice(8), eM=e.slice(5,7);
+    if(cw>=52) return sD+sep+sM+'-'+eD+sep+eM;
+    if(cw>=38) return sD+sep+sM+'-'+eD+(eM!==sM?(sep+eM):'');
+    return parseInt(sD,10)+'-'+parseInt(eD,10)+(eM!==sM?(sep+parseInt(eM,10)):'');
+  }
+  function IGsyncTableWidth(){
+    var box=document.getElementById('igTblWrap'), tb=box&&box.querySelector('table');
+    if(!tb) return;
+    var sum=IGcolsSum(), avail=Math.max(0,(box.clientWidth||0)-2);
+    var extra=avail>sum?(avail-sum):0;
+    var nm=tb.querySelector('col[data-k="name"]');
+    tb.style.width=(sum+extra)+'px';
+    if(nm) nm.style.width=(IGcolW('name')+extra)+'px';
+  }
+  function IGcellText(t,c){
+    if(c.edit==='bool') return '';
+    if(c.edit==='date') return IGdmy(t[c.k]);
+    if(c.edit==='num')  return String(parseInt(t[c.k],10)||0);
+    if(c.edit==='status'){ for(var i=0;i<IG_STATUS.length;i++){ if(IG_STATUS[i][0]===t[c.k]) return it(IG_STATUS[i][1]); } return '—'; }
+    if(c.edit==='parent'){ var p=t[c.k]?IGbyId(t[c.k]):null; return p?IGname(p):'—'; }
+    return String(t[c.k]==null?'':t[c.k]);
+  }
+  function IGmeasure(str){
+    str=String(str==null?'':str);
+    var d=document.getElementById('igMeasure');
+    if(!d){ d=document.createElement('span'); d.id='igMeasure';
+      d.style.cssText='position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;font:12px sans-serif;';
+      document.body.appendChild(d); }
+    d.textContent=str;
+    var m=d.scrollWidth; if(m>0) return m;
+    var n=0; for(var i=0;i<str.length;i++) n += (str.charCodeAt(i)>0x2e80)?12:6.6;
+    return n;
+  }
+  function IGcolAutoFit(k,quiet){
+    var c=IGfindCol(k); if(!c) return;
+    var pad=(c.edit==='bool')?34:22;
+    if(c.edit==='status'||c.edit==='parent') pad+=20;
+    var mx=IGmeasure(it('inst_col_'+c.k))+30;
+    var lv=(c.k==='name')?IGlevels():null;
+    IG_tasks.forEach(function(t){
+      var extra=0;
+      if(c.k==='name') extra=((lv[t.id]||0)*13+18);
+      if(c.k==='owner') extra=20;
+      mx=Math.max(mx, IGmeasure(IGcellText(t,c))+pad+extra);
     });
-    h += '</tbody></table>';
-    box.innerHTML = h;
+    IG_cfg.colW=IG_cfg.colW||{};
+    IG_cfg.colW[k]=Math.max(40,Math.min(460,Math.ceil(mx)));
+    if(!quiet) IGrender();
   }
-  function inst_ganttCellHtml(t,c){
-    if(c.key==='milestone') return '<input type="checkbox" '+(t.milestone?'checked':'')+' onclick="event.stopPropagation();inst_ganttFieldBool(\''+prod_esc(t.id)+'\',\'milestone\',this.checked)">';
-    if(!c.edit) return prod_esc(t[c.key]||'');
-    var v = t[c.key]||'';
-    if(c.edit==='date') v = ymdToDmy(v);
+  function IGownerCell(t){
+    var inner = t.owner
+      ? '<i class="ig-av" style="background:'+IGownerColor(t.owner)+'">'+prod_esc(t.owner.slice(0,1))+'</i><span>'+prod_esc(t.owner)+'</span>'
+      : '<span style="color:var(--ig-txt3)">'+prod_esc(it('inst_gantt_owner_unset'))+'</span>';
+    return '<div class="ig-own-cell" onclick="event.stopPropagation();IGopenOwner(this)" title="'+prod_esc(it('inst_gantt_owner_tip'))+'">'+inner+'</div>';
+  }
+  function IGcell(t,c){
+    if(c.edit==='bool') return '<input type="checkbox"'+(t[c.k]?' checked':'')+' onchange="IGev(event,this,\''+c.k+'\',this.checked)">';
+    if(c.edit==='date') return '<input value="'+prod_esc(IGdmy(t[c.k]))+'" placeholder="DD/MM/YYYY" onchange="IGev(event,this,\''+c.k+'\',this.value)">';
+    if(c.edit==='num') return '<input type="number" min="0" max="100" value="'+(parseInt(t[c.k],10)||0)+'" onchange="IGev(event,this,\''+c.k+'\',this.value)">';
     if(c.edit==='status'){
-      var opts = [['','—'],['not_install',it('inst_status_not_install')],['installing',it('inst_status_installing')],['installed',it('inst_status_installed')],['accepted',it('inst_status_accepted')]];
-      var s = '<select onchange="event.stopPropagation();inst_ganttFieldChange(\''+prod_esc(t.id)+'\',\''+c.key+'\',this.value)">';
-      opts.forEach(function(o){ s += '<option value="'+o[0]+'" '+(v===o[0]?'selected':'')+'>'+o[1]+'</option>'; });
-      return s + '</select>';
+      var s='<select onchange="IGev(event,this,\''+c.k+'\',this.value)"><option value="">—</option>';
+      IG_STATUS.forEach(function(o){ s+='<option value="'+o[0]+'"'+(t[c.k]===o[0]?' selected':'')+'>'+it(o[1])+'</option>'; });
+      return s+'</select>';
     }
-    var type = c.edit==='number' ? 'number' : 'text';
-    return '<input type="'+type+'" value="'+prod_esc(v)+'" onchange="event.stopPropagation();inst_ganttFieldChange(\''+prod_esc(t.id)+'\',\''+c.key+'\',this.value)">';
-  }
-  function inst_ganttUpdate(id, patch){
-    var f = inst_get(INST_CUR); if(!f || !f.installation || !f.installation.ganttTasks) return;
-    var arr = f.installation.ganttTasks;
-    for(var i=0;i<arr.length;i++){ if(arr[i].id===id){ for(var k in patch){ arr[i][k]=patch[k]; } break; } }
-    if(arr[i] && arr[i].milestone){ arr[i].end = arr[i].start; arr[i].progress = 100; }
-    inst_save(f);
-  }
-  function inst_ganttFieldChange(id, field, value){
-    if(field==='start' || field==='end' || field==='baseline_start' || field==='baseline_end') value = dmyToYmd(value) || value;
-    if(field==='progress') value = Math.max(0, Math.min(100, parseInt(value,10)||0));
-    var patch = {}; patch[field] = value;
-    inst_ganttUpdate(id, patch);
-    inst_renderFrappeGantt();
-  }
-  function inst_ganttFieldBool(id, field, checked){ var patch={}; patch[field]=!!checked; inst_ganttUpdate(id,patch); inst_renderFrappeGantt(); }
-  function inst_ganttSelectRow(id){ INST_GANTT_SEL=id; var f=inst_get(INST_CUR); inst_ganttRenderTable(f); inst_ganttEditModal(id); }
-  function inst_ganttSyncScroll(){
-    var table = inst_el('iaGanttTableWrap'), chart = inst_el('iaGanttChartWrap');
-    if(!table || !chart) return;
-    table.onscroll = function(){ chart.scrollTop = table.scrollTop; };
-    chart.onscroll = function(){ table.scrollTop = chart.scrollTop; };
-  }
-  function inst_ganttSummary(f, tasks){
-    var box = inst_el('iaGanttSummary'); if(!box) return;
-    if(!tasks || !tasks.length){ box.innerHTML = ''; return; }
-    var minD = tasks[0].start, maxD = tasks[0].end;
-    tasks.forEach(function(t){ if(t.start<minD) minD=t.start; if(t.end>maxD) maxD=t.end; });
-    var days = Math.max(1, inst_dateDiffDays(minD, maxD));
-    var months = (days/30.4); var mTxt = months>=1 ? (Math.round(months*10)/10)+' 月' : days+' 天';
-    box.innerHTML = '<span class="inst-gantt-summary-line">'+it('inst_gantt_total')+'：'+ymdToDmy(minD)+' → '+ymdToDmy(maxD)+' · '+mTxt+'</span>'
-      + '<span class="inst-gantt-summary-line">'+it('inst_gantt_cnt')+'：'+tasks.length+'</span>';
-  }
-  function inst_renderFrappeGantt(){
-    var box = inst_el('iaGanttFrappe'); if(!box) return;
-    if(typeof Gantt==='undefined'){ box.innerHTML='<div class="prod-empty">Frappe Gantt 未加载（vendor/frappe-gantt）</div>'; return; }
-    var f = inst_get(INST_CUR); if(!f) return;
-    inst_seedGanttTasks(f);
-    inst_sanitizeGanttIds(f);
-    var cfg = inst_ganttConfig(f);
-    inst_ganttRenderTable(f);
-    inst_ganttRenderConfig(f);
-    var chartWrap = inst_el('iaGanttChartWrap');
-    if(chartWrap){
-      chartWrap.classList.toggle('hide-weekend', !cfg.showWeekend);
-      chartWrap.classList.toggle('hide-today', !cfg.showToday);
-      chartWrap.classList.toggle('hide-grid', !cfg.showGrid);
+    if(c.edit==='parent'){
+      var p='<select onchange="IGev(event,this,\''+c.k+'\',this.value)"><option value="">—</option>';
+      IG_tasks.forEach(function(o){ if(o.id===t.id) return;
+        p+='<option value="'+prod_esc(o.id)+'"'+(t[c.k]===o.id?' selected':'')+'>'+prod_esc(IGname(o))+'</option>'; });
+      return p+'</select>';
     }
-    var tasks = inst_buildFrappeTasks(f);
-    box.innerHTML = '';
-    INST_GANTT = new Gantt(box, tasks, {
-      view_mode_select: true, view_mode: cfg.viewMode, popup_on: 'click', readonly: false,
-      bar_height: cfg.barHeight, padding: 14, column_width: cfg.colWidth,
-      holidays: cfg.showWeekend ? {"var(--g-weekend-highlight-color)":"weekend"} : {},
-      lines: cfg.showGrid ? 'both' : 'none',
-      today_button: cfg.showToday,
-      on_click: function(task){ INST_GANTT_SEL = task.id; inst_ganttRenderTable(f); },
-      on_date_change: function(task, start, end){ inst_ganttUpdate(task.id, { start: bdYmd(start), end: bdYmd(end) }); inst_ganttRenderTable(f); },
-      on_progress_change: function(task, progress){ inst_ganttUpdate(task.id, { progress: Math.round(progress) }); inst_ganttRenderTable(f); },
-      popup: function(opts){ return inst_ganttPopupHtml(opts); }
+    if(c.k==='owner') return IGownerCell(t);
+    return prod_esc(t[c.k]==null?'':t[c.k]);
+  }
+  function IGrenderTable(){
+    var box=document.getElementById('igTblWrap'); if(!box) return;
+    var cols=IGcols(), lv=IGlevels();
+    var h='<table><colgroup>';
+    cols.forEach(function(c){ h+='<col data-k="'+c.k+'" style="width:'+IGcolW(c.k)+'px">'; });
+    h+='</colgroup><thead><tr>';
+    cols.forEach(function(c){
+      h+='<th data-k="'+c.k+'" title="'+prod_esc(it('inst_col_'+c.k))+'">'+prod_esc(it('inst_col_'+c.k))
+        +'<i class="ig-rs" onmousedown="IGcolResizeStart(event,this)" ondblclick="IGcolAutoFitEv(\''+c.k+'\')"></i></th>';
     });
-    inst_ganttSummary(f, tasks);
-    inst_ganttSyncScroll();
+    h+='</tr></thead><tbody>';
+    IG_tasks.forEach(function(t){
+      h+='<tr class="'+(t.id===IG_sel?'sel':'')+'" data-id="'+prod_esc(t.id)+'" onclick="IGselRow(this)">';
+      cols.forEach(function(c){
+        h+='<td>';
+        if(c.k==='name') h+='<span class="ig-nm" style="padding-left:'+((lv[t.id]||0)*13)+'px">'
+          +((lv[t.id]||0)?'<i class="ig-branch"></i>':'')+((t.milestone||t.type==='milestone')?'<i class="ig-ms-dot"></i>':'');
+        h+=IGcell(t,c);
+        if(c.k==='name') h+='</span>';
+        h+='</td>';
+      });
+      h+='</tr>';
+    });
+    if(!IG_tasks.length) h+='<tr><td class="ig-empty" colspan="'+(cols.length||1)+'">'+prod_esc(it('inst_gantt_empty'))+'</td></tr>';
+    h+='</tbody></table>';
+    box.innerHTML=h;
+    IGsyncTableWidth();
   }
-  function inst_ganttPopupHtml(opts){
-    var t = opts.task;
-    var s = ymdToDmy(bdYmd(t._start)) || '';
-    var e = ymdToDmy(bdYmd(t._end)) || '';
-    return '<div style="font-size:12px;line-height:1.5;min-width:140px;">'
-      + '<strong>'+prod_esc(t.name)+'</strong><br>'
-      + s + ' → ' + e + ' · ' + (t.actual_duration||1) + ' '+it('inst_unit_day')+'<br>'
-      + it('inst_progress') + ': ' + Math.floor(t.progress)+'%<br>'
-      + (t.dependencies && t.dependencies.length ? it('inst_col_dependencies')+': '+prod_esc(t.dependencies.join(',')) : '')
-      + '</div>';
+  function IGshade(hex,amt){
+    var n=parseInt(hex.slice(1),16);
+    var r=Math.max(0,Math.min(255,(n>>16)+amt)), g=Math.max(0,Math.min(255,((n>>8)&255)+amt)), b=Math.max(0,Math.min(255,(n&255)+amt));
+    return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
   }
-  function inst_ganttRenderConfig(f){
-    var box = inst_el('iaGanttConfig'); if(!box) return;
-    var cfg = inst_ganttConfig(f);
-    var h = '<div class="inst-gantt-config-head"><span>'+it('inst_gantt_settings')+'</span><button type="button" onclick="inst_ganttToggleConfig()">×</button></div>';
-    h += '<div class="inst-gantt-config-body">';
-    h += '<div class="inst-gantt-config-section"><div class="inst-gantt-config-title">'+it('inst_gantt_visual')+'</div>';
-    h += '<label><input type="checkbox" '+(cfg.showWeekend?'checked':'')+' onchange="inst_ganttSetCfg(\'showWeekend\',this.checked)"> '+it('inst_gantt_show_weekend')+'</label>';
-    h += '<label><input type="checkbox" '+(cfg.showToday?'checked':'')+' onchange="inst_ganttSetCfg(\'showToday\',this.checked)"> '+it('inst_gantt_show_today')+'</label>';
-    h += '<label><input type="checkbox" '+(cfg.showGrid?'checked':'')+' onchange="inst_ganttSetCfg(\'showGrid\',this.checked)"> '+it('inst_gantt_show_grid')+'</label>';
-    var vmOpts = [['Day','Day'],['Week','Week'],['Month','Month']];
-    h += '<label>'+it('inst_gantt_view_mode')+' <select onchange="inst_ganttSetCfg(\'viewMode\',this.value)">';
-    vmOpts.forEach(function(o){ h += '<option value="'+o[0]+'" '+(cfg.viewMode===o[0]?'selected':'')+'>'+o[1]+'</option>'; });
-    h += '</select></label>';
-    h += '<label>'+it('inst_gantt_col_width')+' <input type="range" min="24" max="80" value="'+cfg.colWidth+'" onchange="inst_ganttSetCfg(\'colWidth\',+this.value)"></label>';
-    h += '<label>'+it('inst_gantt_bar_height')+' <input type="range" min="16" max="40" value="'+cfg.barHeight+'" onchange="inst_ganttSetCfg(\'barHeight\',+this.value)"></label>';
-    h += '<label>'+it('inst_gantt_color_by')+' <select onchange="inst_ganttSetCfg(\'colorBy\',this.value)">';
-    [['owner',it('inst_gantt_color_owner')],['zone',it('inst_gantt_color_zone')],['status',it('inst_gantt_color_status')]].forEach(function(o){ h += '<option value="'+o[0]+'" '+(cfg.colorBy===o[0]?'selected':'')+'>'+o[1]+'</option>'; });
-    h += '</select></label>';
-    h += '</div>';
-    h += '<div class="inst-gantt-config-section"><div class="inst-gantt-config-title">'+it('inst_gantt_data_fields')+'</div>';
+  function IGfgOn(hex){
+    var n=parseInt(hex.slice(1),16), c=[(n>>16)&255,(n>>8)&255,n&255].map(function(v){
+      v/=255; return v<=0.03928? v/12.92 : Math.pow((v+0.055)/1.055,2.4); });
+    var L=0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
+    return L>0.45?'#263238':'#fff';
+  }
+  function IGbarBg(t,col){
+    var p=Math.max(0,Math.min(100,t.progress||0));
+    return 'background-color:'+col+';background-image:linear-gradient(to right,'+IGshade(col,-30)+' 0 '+p+'%,rgba(0,0,0,0) '+p+'% 100%)';
+  }
+  function IGbarTip(t){
+    return IGname(t)+' | '+IGdmy(t.start)+((t.milestone||t.type==='milestone')?'':' ~ '+IGdmy(t.end)+' | '+IGdur(t)+it('inst_unit_day'))
+      +' | '+t.progress+'%'+(IGlate(t)?' · '+it('inst_gantt_sum_late'):'');
+  }
+  function IGbarTop(i,rh,bh){ return i*rh+(rh-bh)/2; }
+  function IGbarHtml(t,i,rh,bh){
+    var col=IGbarColorOf(t), late=IGlate(t), top=IGbarTop(i,rh,bh), sel=(t.id===IG_sel?' sel':'');
+    if(t.milestone||t.type==='milestone'){
+      var sz=Math.round(bh*1.05);
+      return '<div class="ig-bar ms'+sel+'" data-id="'+prod_esc(t.id)+'" data-lbl="'+prod_esc(IGname(t))+'"'
+        +' style="left:'+Math.round(IG_S.x(t.start)+IG_S.dayW/2-sz/2)+'px;top:'+Math.round(top+(bh-sz)/2)
+        +'px;width:'+sz+'px;height:'+sz+'px;background-color:'+col+'" title="'+prod_esc(IGbarTip(t))+'"'
+        +' onmousedown="IGdragStart(event,this)" ontouchstart="IGdragStart(event,this)"></div>';
+    }
+    if(t.type==='group'){
+      return '<div class="ig-bar grp'+sel+'" data-id="'+prod_esc(t.id)+'" data-lbl="'+prod_esc(IGname(t))+'"'
+        +' style="left:'+Math.round(IG_S.x(t.start))+'px;top:'+Math.round(top+bh/2-6)+'px;width:'
+        +Math.max(Math.round(IG_S.dayW*IGdur(t)),4)+'px;height:12px;background-color:'+col+'"'
+        +' title="'+prod_esc(IGbarTip(t))+'" onmousedown="IGdragStart(event,this)" ontouchstart="IGdragStart(event,this)"></div>';
+    }
+    var x=Math.round(IG_S.x(t.start)), w=Math.max(Math.round(IG_S.dayW*IGdur(t)),4);
+    return '<div class="ig-bar'+sel+(late?' late':'')+(w<46?' out':'')+'" data-id="'+prod_esc(t.id)+'"'
+      +' data-lbl="'+prod_esc(IGname(t)+' '+t.progress+'%')+'"'
+      +' style="left:'+x+'px;top:'+Math.round(top)+'px;width:'+w+'px;height:'+bh+'px;'+IGbarBg(t,col)+';--ig-fg:'+IGfgOn(col)+'"'
+      +' title="'+prod_esc(IGbarTip(t))+'" onmousedown="IGdragStart(event,this)" ontouchstart="IGdragStart(event,this)"></div>';
+  }
+  function IGupdateBar(t){
+    var el=document.querySelector('#igChartInner .ig-bar[data-id="'+t.id+'"]'); if(!el) return;
+    var rh=IGrowH(), bh=IG_cfg.barHeight, i=IG_tasks.indexOf(t); if(i<0) return;
+    var col=IGbarColorOf(t), late=IGlate(t), top=IGbarTop(i,rh,bh);
+    if(t.milestone||t.type==='milestone'){
+      var sz=Math.round(bh*1.05);
+      el.style.cssText='left:'+Math.round(IG_S.x(t.start)+IG_S.dayW/2-sz/2)+'px;top:'+Math.round(top+(bh-sz)/2)+'px;width:'+sz+'px;height:'+sz+'px;background-color:'+col;
+    }else if(t.type==='group'){
+      el.style.cssText='left:'+Math.round(IG_S.x(t.start))+'px;top:'+Math.round(top+bh/2-6)+'px;width:'+Math.max(Math.round(IG_S.dayW*IGdur(t)),4)+'px;height:12px;background-color:'+col;
+    }else{
+      var x=Math.round(IG_S.x(t.start)), w=Math.max(Math.round(IG_S.dayW*IGdur(t)),4);
+      el.className='ig-bar'+(t.id===IG_sel?' sel':'')+(late?' late':'')+(w<46?' out':'');
+      el.style.cssText='left:'+x+'px;top:'+Math.round(top)+'px;width:'+w+'px;height:'+bh+'px;'+IGbarBg(t,col)+';--ig-fg:'+IGfgOn(col);
+      el.setAttribute('data-lbl',IGname(t)+' '+t.progress+'%');
+    }
+    el.title=IGbarTip(t);
+  }
+  function IGdepD(fi,ti,rh,bh){
+    var p=IG_tasks[fi], t=IG_tasks[ti];
+    var y1=fi*rh+rh/2, y2=ti*rh+rh/2;
+    var x1=IG_S.x(p.end)+IG_S.dayW, x2=IG_S.x(t.start);
+    if(p.milestone||p.type==='milestone') x1+=bh*0.5;
+    if(x2>x1+12) return 'M'+x1+' '+y1+' H'+(x1+8)+' V'+y2+' H'+(x2-1);
+    return 'M'+x1+' '+y1+' H'+(x1+8)+' V'+(y1+rh/2-3)+' H'+(x2-11)+' V'+y2+' H'+(x2-1);
+  }
+  function IGupdateDepsFor(id){
+    var svg=document.querySelector('#igChartInner .ig-deps'); if(!svg) return;
+    var rh=IGrowH(), bh=IG_cfg.barHeight, idx={};
+    IG_tasks.forEach(function(t,i){ idx[t.id]=i; });
+    var ps=svg.querySelectorAll('path[data-to]');
+    for(var k=0;k<ps.length;k++){
+      var f=ps[k].getAttribute('data-from'), to=ps[k].getAttribute('data-to');
+      if(f!==id&&to!==id) continue;
+      if(!idx.hasOwnProperty(f)||!idx.hasOwnProperty(to)) continue;
+      ps[k].setAttribute('d',IGdepD(idx[f],idx[to],rh,bh));
+    }
+  }
+  function IGrenderChart(){
+    IG_S=IGbuildScale();
+    var inner=document.getElementById('igChartInner'); if(!inner) return;
+    var rh=IGrowH(), bh=IG_cfg.barHeight, h='';
+    h+='<div class="ig-thead"><div class="ig-tu">';
+    IG_S.up.forEach(function(u){
+      var lbl=(u.w>=68)?u.label:u.label.replace(/^\d{4}年/,'');
+      h+='<div style="width:'+u.w+'px" title="'+prod_esc(u.label)+'">'+prod_esc(lbl)+'</div>';
+    });
+    h+='</div><div class="ig-tl">';
+    IG_S.cols.forEach(function(c){
+      var we=(IG_cfg.viewMode==='Day'&&IGisWeekend(c.s));
+      var l1,l2,tip;
+      if(IG_cfg.viewMode==='Month'){
+        var a=IGisoWeek(c.s), b2=IGisoWeek(c.e);
+        l1=parseInt(c.ym.slice(5),10)+'月'; l2=(a.w&&b2.w)?('W'+a.w+'-'+b2.w):''; tip=l1+' · '+l2;
+      }else if(IG_cfg.viewMode==='Day'){
+        var dd=parseInt(c.s.slice(8),10);
+        l1=(IG_S.colW>=42)?(c.s.slice(8)+IGsep()+c.s.slice(5,7)):String(dd);
+        l2='W'+IGwnum(c.s); tip=IGdmy(c.s)+' · '+IGisoWeek(c.s).y+'-W'+IGpad2(IGwnum(c.s));
+      }else{
+        var wk=IGisoWeek(c.s);
+        l1=IGweekLabel(c.s,c.e,IG_S.colW); l2='W'+wk.w; tip=IGdmy(c.s)+' ~ '+IGdmy(c.e)+' · '+wk.y+'-W'+IGpad2(wk.w);
+      }
+      h+='<div class="'+(we?'we':'')+'" style="width:'+IG_S.colW+'px" title="'+prod_esc(tip)+'">'
+        +'<span class="ig-t1">'+prod_esc(l1)+'</span><span class="ig-t2">'+prod_esc(l2)+'</span></div>';
+    });
+    h+='</div></div>';
+    h+='<div class="ig-bd" style="height:'+(IG_tasks.length*rh)+'px">';
+    if(IG_cfg.showWeekend&&IG_cfg.viewMode!=='Month'){
+      if(IG_cfg.viewMode==='Day'){
+        IG_S.cols.forEach(function(c,i){ if(IGisWeekend(c.s))
+          h+='<div class="ig-wkend" style="left:'+(i*IG_S.colW)+'px;width:'+IG_S.colW+'px"></div>'; });
+      }else{
+        IG_S.cols.forEach(function(c){
+          var sx=IG_S.x(IGaddDays(c.s,5)), ex=IG_S.x(IGaddDays(c.s,7));
+          h+='<div class="ig-wkend" style="left:'+sx+'px;width:'+(ex-sx)+'px"></div>';
+        });
+      }
+    }
+    if(IG_cfg.showGrid) IG_S.cols.forEach(function(c,i){ h+='<div class="ig-cl" style="left:'+(i*IG_S.colW)+'px"></div>'; });
+    if(IG_cfg.showToday){ var tx=IG_S.x(prod_today())+IG_S.dayW/2;
+      if(tx>=0&&tx<=IG_S.width) h+='<div class="ig-today" style="left:'+tx+'px"></div>'; }
+    h+='</div>';
+    if(IG_cfg.showDeps){
+      var paths='', idx={}; IG_tasks.forEach(function(t,i){ idx[t.id]=i; });
+      IG_tasks.forEach(function(t,i){
+        String(t.dependencies||'').split(/[,\s]+/).forEach(function(dp){
+          if(!dp||!idx.hasOwnProperty(dp)) return;
+          paths+='<path d="'+IGdepD(idx[dp],i,rh,bh)+'" fill="none" stroke="#90a4ae" stroke-width="1.2"'
+            +' data-from="'+prod_esc(dp)+'" data-to="'+prod_esc(t.id)+'" marker-end="url(#igArw)"/>';
+        });
+      });
+      h+='<svg class="ig-deps" id="igDepSvg" width="'+IG_S.width+'" height="'+(IG_tasks.length*rh)+'">'
+        +'<defs><marker id="igArw" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">'
+        +'<path d="M0,0 L7,3.5 L0,7 Z" fill="#90a4ae"/></marker></defs>'+paths+'</svg>';
+    }
+    IG_tasks.forEach(function(t,i){
+      if(IG_cfg.showBase&&!(t.milestone||t.type==='milestone')&&t.type!=='group'&&t.baseline_start&&t.baseline_end){
+        var bx=IG_S.x(t.baseline_start), bw=Math.max(IG_S.x(IGaddDays(t.baseline_end,1))-bx,3);
+        h+='<div class="ig-base" style="left:'+bx+'px;top:'+(i*rh+(rh-bh)/2-6)+'px;width:'+bw+'px"></div>';
+      }
+      h+=IGbarHtml(t,i,rh,bh);
+    });
+    inner.style.width=IG_S.width+'px';
+    inner.innerHTML=h;
+  }
+  /* ============ IG：设置面板 / 汇总 / 交互 / 入口 ============ */
+  function IGownerList(){
+    var seen={}, out=[];
+    (IG_cfg.owners||[]).concat(IG_tasks.map(function(t){ return t.owner||''; })).forEach(function(o){
+      o=String(o||'').trim(); if(o&&!seen[o]){ seen[o]=1; out.push(o); } });
+    return out;
+  }
+  function IGrenderCfg(){
+    var box=document.getElementById('igCfgPanel'); if(!box) return;
+    var h='<div class="ig-cfg-h"><span>'+prod_esc(it('inst_gantt_settings'))+'</span><button type="button" onclick="IGtoggleCfg()">×</button></div><div class="ig-cfg-b">';
+    h+='<div class="ig-cfg-sec"><div class="ig-cfg-t">'+prod_esc(it('inst_gantt_visual'))+'</div>';
+    [['showWeekend','inst_gantt_show_weekend'],['showToday','inst_gantt_show_today'],['showGrid','inst_gantt_show_grid'],
+     ['showDeps','inst_gantt_show_deps'],['showBase','inst_gantt_show_base']].forEach(function(o){
+      h+='<label><input type="checkbox" '+(IG_cfg[o[0]]?'checked':'')+' onchange="IGsetCfg(\''+o[0]+'\',this.checked)"> '+prod_esc(it(o[1]))+'</label>'; });
+    h+='<label>'+prod_esc(it('inst_gantt_view_mode'))+' <select onchange="IGsetCfg(\'viewMode\',this.value)">';
+    [['Day','Day'],['Week','Week'],['Month','Month']].forEach(function(o){
+      h+='<option value="'+o[0]+'"'+(IG_cfg.viewMode===o[0]?' selected':'')+'>'+o[1]+'</option>'; });
+    h+='</select></label>';
+    h+='<label>'+prod_esc(it('inst_gantt_date_sep'))+' <select onchange="IGsetCfg(\'dateSep\',this.value)">';
+    [['/','17/08/2026'],['-','17-08-2026']].forEach(function(o){
+      h+='<option value="'+o[0]+'"'+(IG_cfg.dateSep===o[0]?' selected':'')+'>'+o[1]+'</option>'; });
+    h+='</select></label>';
+    h+='<label>'+prod_esc(it('inst_gantt_col_width'))+' <input type="range" min="36" max="110" value="'+IG_cfg.colWidth+'" onchange="IGsetCfg(\'colWidth\',+this.value)"></label>';
+    h+='<label>'+prod_esc(it('inst_gantt_bar_height'))+' <input type="range" min="14" max="38" value="'+IG_cfg.barHeight+'" onchange="IGsetCfg(\'barHeight\',+this.value)"></label>';
+    h+='<label>'+prod_esc(it('inst_gantt_color_by'))+' <select onchange="IGsetCfg(\'colorBy\',this.value)">';
+    [['status','inst_gantt_color_status'],['owner','inst_gantt_color_owner'],['zone','inst_gantt_color_zone']].forEach(function(o){
+      h+='<option value="'+o[0]+'"'+(IG_cfg.colorBy===o[0]?' selected':'')+'>'+prod_esc(it(o[1]))+'</option>'; });
+    h+='</select></label></div>';
+    h+='<div class="ig-cfg-sec"><div class="ig-cfg-t">'+prod_esc(it('inst_gantt_owners'))+'</div><div class="ig-own-chips">';
+    IGownerList().forEach(function(o){
+      h+='<span class="ig-ochip"><i class="ig-av" style="background:'+IGownerColor(o)+'">'+prod_esc(o.slice(0,1))+'</i>'+prod_esc(o)
+        +'<b data-v="'+prod_esc(o)+'" onclick="IGdelOwner(this)" title="×">×</b></span>'; });
+    h+='</div><input type="text" placeholder="'+prod_esc(it('inst_gantt_owner_ph'))+'" onkeydown="if(event.key===\'Enter\')IGaddOwnerCfg(this)"></div>';
+    h+='<div class="ig-cfg-sec"><div class="ig-cfg-t">'+prod_esc(it('inst_gantt_data_fields'))+'</div>';
     INST_GANTT_COLS.forEach(function(c){
-      h += '<label><input type="checkbox" '+(cfg.visibleCols.indexOf(c.key)>=0?'checked':'')+' onchange="inst_ganttToggleCol(\''+c.key+'\',this.checked)"> '+it('inst_col_'+c.key)+'</label>';
+      h+='<label><input type="checkbox" '+(IG_cfg.visibleCols.indexOf(c.k)>=0?'checked':'')
+        +' onchange="IGtoggleCol(\''+c.k+'\',this.checked)"> '+prod_esc(it('inst_col_'+c.k))
+        +'<span class="ig-cw">'+IGcolW(c.k)+'</span></label>'; });
+    h+='<div class="ig-cfg-btns">'
+      +'<button type="button" onclick="IGcolFitAll()">'+prod_esc(it('inst_gantt_colfit'))+'</button>'
+      +'<button type="button" onclick="IGcolReset()">'+prod_esc(it('inst_gantt_reset_col'))+'</button></div></div></div>';
+    box.innerHTML=h;
+  }
+  function IGrenderSummary(){
+    var box=document.getElementById('igSummary'); if(!box) return;
+    if(!IG_tasks.length){ box.innerHTML=''; return; }
+    var min='',max='',sum=0,done=0,late=0,ms=0,wd=0,cnt=0;
+    IG_tasks.forEach(function(t){
+      if(t.type==='group') return;
+      cnt++;
+      if(!min||t.start<min) min=t.start;
+      if(!max||t.end>max) max=t.end;
+      sum+=t.progress; if(t.progress>=100) done++;
+      if(IGlate(t)) late++;
+      if(t.milestone||t.type==='milestone') ms++; else wd+=IGdur(t);
     });
-    h += '</div></div>';
-    box.innerHTML = h;
+    var h='<div class="ig-chips">'
+      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_cnt'))+' <b>'+IG_tasks.length+'</b></span>'
+      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_span'))+' <b>'+prod_esc(IGdmy(min)+' ~ '+IGdmy(max))+'</b></span>'
+      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_days'))+' <b>'+(IGdiffDays(min,max)+1)+'</b></span>'
+      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_workdays'))+' <b>'+wd+'</b></span>'
+      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_avg'))+' <b>'+(cnt?Math.round(sum/cnt):0)+'%</b></span>'
+      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_done'))+' <b>'+done+'</b></span>'
+      +'<span class="ig-chip">'+prod_esc(it('inst_gantt_sum_ms'))+' <b>'+ms+'</b></span>'
+      +'<span class="ig-chip'+(late?' danger':'')+'">'+prod_esc(it('inst_gantt_sum_late'))+' <b>'+late+'</b></span></div>';
+    h+='<div class="ig-legend">'
+      +IG_STATUS.map(function(o){ return '<span><i style="background:'+o[2]+'"></i>'+prod_esc(it(o[1]))+'</span>'; }).join('')
+      +'<span><i style="background:#ef5350"></i>'+prod_esc(it('inst_gantt_legend_late'))+'</span>'
+      +'<span><i style="background:#cbd5e0"></i>'+prod_esc(it('inst_gantt_legend_base'))+'</span>'
+      +'<span><i style="background:#ffa726;transform:rotate(45deg)"></i>'+prod_esc(it('inst_gantt_legend_ms'))+'</span></div>';
+    box.innerHTML=h;
   }
-  function inst_ganttSetCfg(k,v){
-    var f=inst_get(INST_CUR); f.installation=f.installation||{}; var cfg=f.installation.ganttConfig=f.installation.ganttConfig||{};
-    cfg[k]=v; inst_save(f); inst_renderTab('B');
+  function IGrender(){
+    var f=inst_get(INST_CUR); if(!f) return;
+    IG_cfg = inst_ganttConfig(f);
+    IG_tasks = (f.installation && f.installation.ganttTasks) || [];
+    var lay=document.getElementById('igLayout');
+    if(lay){
+      lay.style.setProperty('--ig-row-h',IGrowH()+'px');
+      lay.style.setProperty('--ig-head-h',IGheadH()+'px');
+      lay.style.setProperty('--ig-tbl-w',Math.round(IG_cfg.tableWidth||404)+'px');
+    }
+    IGrenderTable(); IGrenderChart(); IGrenderCfg(); IGrenderSummary(); IGsyncScroll();
   }
-  function inst_ganttToggleCol(k,on){
-    var f=inst_get(INST_CUR); var cfg=inst_ganttConfig(f);
-    var arr=cfg.visibleCols.slice();
+  function IGsyncScroll(){
+    var a=document.getElementById('igTblWrap'), b=document.getElementById('igChartWrap');
+    if(!a||!b||a.__igSync) return; a.__igSync=1; var lock=false;
+    function link(p,q){ p.addEventListener('scroll',function(){
+      if(lock) return; lock=true; q.scrollTop=p.scrollTop;
+      requestAnimationFrame(function(){ lock=false; }); }); }
+    link(a,b); link(b,a);
+  }
+  window.IGsetCfg=function(k,v){
+    var f=inst_get(INST_CUR); if(!f) return;
+    f.installation=f.installation||{}; var c=f.installation.ganttConfig=f.installation.ganttConfig||{};
+    c[k]=v; inst_save(f); IGrender();
+  };
+  window.IGtoggleCol=function(k,on){
+    var f=inst_get(INST_CUR); if(!f) return;
+    f.installation=f.installation||{}; var c=f.installation.ganttConfig=f.installation.ganttConfig||{};
+    var arr=(c.visibleCols&&c.visibleCols.length)?c.visibleCols.slice():inst_ganttConfig(f).visibleCols.slice();
     var i=arr.indexOf(k);
-    if(on && i<0) arr.push(k); else if(!on && i>=0) arr.splice(i,1);
-    inst_ganttSetCfg('visibleCols',arr);
+    if(on&&i<0) arr.push(k); else if(!on&&i>=0) arr.splice(i,1);
+    c.visibleCols=arr; inst_save(f); IGrender();
+  };
+  window.IGtoggleCfg=function(){ var el=document.getElementById('igCfgPanel'); if(el) el.classList.toggle('open'); };
+  window.IGselRow=function(tr){
+    var id=(tr&&tr.getAttribute)?tr.getAttribute('data-id'):'';
+    IG_sel=id||'';
+    var rows=document.querySelectorAll('#igTblWrap tr[data-id]');
+    for(var i=0;i<rows.length;i++) rows[i].classList.toggle('sel',rows[i].getAttribute('data-id')===IG_sel);
+    var bars=document.querySelectorAll('#igChartInner .ig-bar');
+    for(var j=0;j<bars.length;j++) bars[j].classList.toggle('sel',bars[j].getAttribute('data-id')===IG_sel);
+  };
+  window.IGev=function(e,el,key,val){
+    if(e&&e.stopPropagation) e.stopPropagation();
+    var tr=(el&&el.closest)?el.closest('tr'):null; if(!tr) return;
+    var t=IGbyId(tr.getAttribute('data-id')); if(!t) return;
+    IGpushUndo();
+    var col=IGfindCol(key);
+    if(col&&col.edit==='date'){
+      var nv=IGy(val);
+      if(key==='start'){ var d=IGdiffDays(t.start,t.end); t.start=nv||t.start;
+        if(d>0) t.end=IGaddDays(t.start,d); if(IGdiffDays(t.start,t.end)<0) t.end=t.start; }
+      else if(key==='end'){ t.end=nv||t.start; if(IGdiffDays(t.start,t.end)<0) t.end=t.start; }
+      else t[key]=nv;
+      if(t.milestone||t.type==='milestone') t.end=t.start;
+    }else if(col&&col.edit==='num'){ var p=parseInt(val,10); if(isNaN(p)) p=0; t[key]=Math.max(0,Math.min(100,p)); }
+    else if(col&&col.edit==='bool'){ t[key]=!!val; if(key==='milestone'&&val) t.end=t.start; }
+    else t[key]=val;
+    IGsave(); IGrender();
+  };
+  window.IGadd=function(){
+    if(!inst_get(INST_CUR)) return;
+    IGpushUndo();
+    var s=prod_today();
+    IG_tasks.forEach(function(t){ if(t.start<s&&t.progress<100) s=t.start; });
+    if(!IG_tasks.length) s=prod_today();
+    var id='T'+(Date.now()%100000);
+    IG_tasks.push({ id:id, bk:'', name:it('inst_new_task'), start:s, end:IGaddDays(s,4),
+      baseline_start:s, baseline_end:IGaddDays(s,4), progress:0, status:'not_install', owner:'', zone:'',
+      parent:'', dependencies:'', type:'task', milestone:false });
+    IG_sel=id; IGsave(); IGrender();
+  };
+  window.IGdel=function(){
+    if(!IG_sel) return;
+    IGpushUndo();
+    var id=IG_sel;
+    IG_tasks=IG_tasks.filter(function(t){ return t.id!==id; });
+    IG_tasks.forEach(function(t){
+      if(t.parent===id) t.parent='';
+      t.dependencies=String(t.dependencies||'').split(/[,\s]+/).filter(function(d){ return d&&d!==id; }).join(',');
+    });
+    IG_sel=''; IGsave(); IGrender();
+  };
+  window.IGundo=function(){ if(!IG_undo.length) return; IG_tasks=JSON.parse(IG_undo.pop()); IGsave(); IGrender(); };
+  window.IGsave=function(){ IGsave(); prod_toast(it('inst_saved')); };
+  window.IGexport=function(){
+    var head=['id','name','start','end','owner','zone','progress','status','parent','dependencies','milestone','baseline_start','baseline_end'];
+    var rows=[head.join(',')];
+    IG_tasks.forEach(function(t){ rows.push(head.map(function(k){
+      var v=(k==='name')?IGname(t):((k==='milestone')?(t[k]?'1':'0'):(t[k]==null?'':t[k]));
+      return '"'+String(v).replace(/"/g,'""')+'"'; }).join(',')); });
+    var blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='install_schedule_'+prod_today()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+  };
+  window.IGcolResizeStart=function(e,el){
+    if(e.button!==undefined&&e.button!==0) return;
+    var th=el.parentNode, k=th.getAttribute('data-k');
+    if(e.preventDefault) e.preventDefault(); if(e.stopPropagation) e.stopPropagation();
+    var col=document.querySelector('#igTblWrap col[data-k="'+k+'"]'); if(!col) return;
+    var w0=IGcolW(k), x0=e.clientX;
+    th.classList.add('ig-rs-on'); document.body.classList.add('ig-col-resizing');
+    function mv(ev){
+      var w=Math.max(40,Math.min(460,Math.round(w0+ev.clientX-x0)));
+      IG_cfg.colW=IG_cfg.colW||{}; IG_cfg.colW[k]=w;
+      col.style.width=w+'px'; IGsyncTableWidth();
+    }
+    function up(){
+      document.removeEventListener('mousemove',mv);
+      document.removeEventListener('mouseup',up);
+      th.classList.remove('ig-rs-on'); document.body.classList.remove('ig-col-resizing');
+      var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
+        var c=f.installation.ganttConfig=f.installation.ganttConfig||{}; c.colW=IG_cfg.colW; inst_save(f); }
+    }
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+  };
+  window.IGcolAutoFitEv=function(k){ IGcolAutoFit(k,false); };
+  window.IGcolFitAll=function(){
+    IG_cfg.colW={};
+    IGcols().forEach(function(c){ IGcolAutoFit(c.k,true); });
+    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
+      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.colW=IG_cfg.colW; inst_save(f); }
+    IGrender();
+  };
+  window.IGcolReset=function(){
+    IG_cfg.colW={};
+    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
+      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.colW={}; inst_save(f); }
+    IGrender();
+  };
+  window.IGfitTblW=function(){
+    var need=IGcolsSum()+2;
+    IG_cfg.tableWidth=Math.round(Math.max(200,Math.min(need,Math.max(window.innerWidth-340,260))));
+    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
+      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.tableWidth=IG_cfg.tableWidth; inst_save(f); }
+    var lay=document.getElementById('igLayout');
+    if(lay) lay.style.setProperty('--ig-tbl-w',IG_cfg.tableWidth+'px');
+  };
+  window.IGopenOwner=function(el){
+    var tr=(el&&el.closest)?el.closest('tr'):null; if(!tr) return;
+    var id=tr.getAttribute('data-id'), t=IGbyId(id); if(!t) return;
+    var pop=document.getElementById('igOwnPop');
+    if(!pop){ pop=document.createElement('div'); pop.id='igOwnPop'; document.body.appendChild(pop); }
+    var h='';
+    IGownerList().forEach(function(o){
+      h+='<div class="ig-oi" data-id="'+prod_esc(id)+'" data-v="'+prod_esc(o)+'" onclick="IGpickOwner(this)">'
+        +'<i class="ig-av" style="background:'+IGownerColor(o)+'">'+prod_esc(o.slice(0,1))+'</i>'+prod_esc(o)
+        +(t.owner===o?'<span class="ig-ck">✓</span>':'')+'</div>';
+    });
+    h+='<div class="ig-oi clear" data-id="'+prod_esc(id)+'" data-v="" onclick="IGpickOwner(this)">'+prod_esc(it('inst_gantt_owner_clear'))+'</div>';
+    h+='<div class="ig-add" data-id="'+prod_esc(id)+'"><input placeholder="'+prod_esc(it('inst_gantt_owner_ph'))+'"'
+      +' onkeydown="if(event.key===\'Enter\')IGaddOwner(this);if(event.key===\'Escape\')IGcloseOwner();"></div>';
+    pop.innerHTML=h; pop.classList.add('open');
+    var r=el.getBoundingClientRect();
+    var pw=pop.offsetWidth||170, ph=pop.offsetHeight||210;
+    pop.style.left=Math.max(6,Math.min(r.left,window.innerWidth-pw-10))+'px';
+    pop.style.top=((r.bottom+ph+8>window.innerHeight)?Math.max(6,r.top-ph-4):r.bottom+4)+'px';
+    var inp=pop.querySelector('.ig-add input'); if(inp) inp.focus();
+  };
+  window.IGpickOwner=function(el){
+    var id=el.getAttribute('data-id'), v=el.getAttribute('data-v')||'';
+    window.IGcloseOwner();
+    var t=IGbyId(id); if(!t) return;
+    IGpushUndo(); t.owner=v; IGsave(); IGrender();
+  };
+  window.IGaddOwner=function(inp){
+    var wrap=inp.parentNode, id=wrap.getAttribute('data-id');
+    var v=String(inp.value||'').trim(); if(!v){ window.IGcloseOwner(); return; }
+    IG_cfg.owners=(IG_cfg.owners||[]).slice();
+    if(IG_cfg.owners.indexOf(v)<0) IG_cfg.owners.push(v);
+    var t=IGbyId(id); if(t){ IGpushUndo(); t.owner=v; }
+    window.IGcloseOwner(); IGsave(); IGrender();
+  };
+  window.IGaddOwnerCfg=function(inp){
+    var v=String(inp.value||'').trim(); if(!v) return;
+    IG_cfg.owners=(IG_cfg.owners||[]).slice();
+    if(IG_cfg.owners.indexOf(v)<0) IG_cfg.owners.push(v);
+    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
+      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.owners=IG_cfg.owners; inst_save(f); }
+    IGrender();
+  };
+  window.IGdelOwner=function(btn){
+    var v=btn.getAttribute('data-v'); if(!v) return;
+    IG_cfg.owners=(IG_cfg.owners||[]).filter(function(o){ return o!==v; });
+    var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
+      var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.owners=IG_cfg.owners; inst_save(f); }
+    IGrender();
+  };
+  window.IGcloseOwner=function(){ var p=document.getElementById('igOwnPop'); if(p) p.classList.remove('open'); };
+  function IGptX(e){ if(e.touches&&e.touches.length) return e.touches[0].clientX;
+    if(e.changedTouches&&e.changedTouches.length) return e.changedTouches[0].clientX; return e.clientX; }
+  function IGptY(e){ if(e.touches&&e.touches.length) return e.touches[0].clientY;
+    if(e.changedTouches&&e.changedTouches.length) return e.changedTouches[0].clientY; return e.clientY; }
+  window.IGdragStart=function(e,el){
+    var t=IGbyId(el.getAttribute('data-id')); if(!t) return;
+    if(e.type==='touchstart'&&e.touches.length>1) return;
+    IG_sel=t.id;
+    var tr=document.querySelector('#igTblWrap tr[data-id="'+t.id+'"]');
+    if(tr) window.IGselRow(tr);
+    var r=el.getBoundingClientRect(), cw=document.getElementById('igChartWrap');
+    var isMs=(t.milestone||t.type==='milestone')||t.type==='group';
+    var inGrip=!isMs&&(IGptX(e)-r.left>r.width-8);
+    var inProg=!isMs&&(IGptY(e)-r.top>r.height-8);
+    IG_drag={t:t,mode:isMs?'move':(inGrip?'resize':(inProg?'prog':'move')),
+      x0:IGptX(e)+(cw?cw.scrollLeft:0), s:t.start,e:t.end,p:t.progress,
+      left:r.left,w:r.width,moved:false,lastX:IGptX(e),lastY:IGptY(e),touch:e.type.indexOf('touch')===0};
+    IGpushUndo();
+    if(e.preventDefault) e.preventDefault();
+    var mv=IG_drag.touch?'touchmove':'mousemove', up=IG_drag.touch?'touchend':'mouseup';
+    document.addEventListener(mv,window.IGdragMove,{passive:false});
+    document.addEventListener(up,window.IGdragEnd);
+    document.addEventListener('touchcancel',window.IGdragEnd);
+    var svg=document.getElementById('igDepSvg'); if(svg) svg.classList.add('dragging');
+  };
+  function IGapplyDrag(x){
+    if(!IG_drag) return;
+    var cw=document.getElementById('igChartWrap'), t=IG_drag.t;
+    var dx=(x+(cw?cw.scrollLeft:0))-IG_drag.x0;
+    if(Math.abs(dx)>2) IG_drag.moved=true;
+    if(IG_drag.mode==='prog'){
+      var pct=Math.round((x-IG_drag.left)/Math.max(IG_drag.w,1)*100);
+      t.progress=Math.max(0,Math.min(100,pct));
+    }else{
+      var dd=Math.round(dx/IG_S.dayW);
+      if(IG_drag.mode==='move'){ t.start=IGaddDays(IG_drag.s,dd); t.end=IGaddDays(IG_drag.e,dd); }
+      else { var ne=IGaddDays(IG_drag.e,dd); t.end=(IGdiffDays(t.start,ne)>=0)?ne:t.start; }
+    }
+    IGupdateBar(t); IGupdateDepsFor(t.id);
   }
-  function inst_ganttToggleConfig(){ var el=inst_el('iaGanttConfig'); if(el) el.classList.toggle('open'); }
-  function inst_ganttAddTask(){
-    var f = inst_get(INST_CUR); if(!f) return;
-    f.installation = f.installation || {}; f.installation.ganttTasks = f.installation.ganttTasks || [];
-    var base = prod_today();
-    var id = 't' + Date.now();
-    f.installation.ganttTasks.push({ id:id, name_key:'inst_new_task', start:base, end:bdYmd(bdDateAdd(base,5)), progress:0, dependencies:'', type:'task', custom_class:'', owner:'', status:'', milestone:false, parent:'', baseline_start:'', baseline_end:'' });
-    inst_save(f); prod_toast(it('inst_saved')); inst_renderTab('B');
+  window.IGdragMove=function(e){
+    if(!IG_drag) return;
+    if(e.cancelable) e.preventDefault();
+    var x=IGptX(e), y=IGptY(e);
+    IG_drag.lastX=x; IG_drag.lastY=y;
+    IGapplyDrag(x); IGedgeScroll(x,y); IGthrottledSummary();
+  };
+  function IGedgeScroll(x,y){
+    var cw=document.getElementById('igChartWrap'); if(!cw) return;
+    var r=cw.getBoundingClientRect(), EDGE=48, hx=0;
+    if(x>r.right-EDGE) hx=1; else if(x<r.left+EDGE) hx=-1;
+    IG_drag.edge=hx;
+    if(hx&&!IG_edgeRAF) IG_edgeRAF=requestAnimationFrame(IGedgeTick);
   }
-  function inst_ganttDelTask(){
-    var f = inst_get(INST_CUR); if(!f) return;
-    var id = INST_GANTT_SEL;
-    if(!id){ prod_toast(it('inst_gantt_sel_first')); return; }
-    var arr = f.installation.ganttTasks || [];
-    f.installation.ganttTasks = arr.filter(function(t){ return t.id!==id && (','+t.dependencies+',').indexOf(','+id+',')<0; });
-    INST_GANTT_SEL = null;
-    inst_save(f); prod_toast(it('inst_saved')); inst_renderTab('B');
+  function IGedgeTick(){
+    IG_edgeRAF=null;
+    if(!IG_drag||!IG_drag.edge) return;
+    var cw=document.getElementById('igChartWrap');
+    if(cw) cw.scrollLeft+=IG_drag.edge*16;
+    IGapplyDrag(IG_drag.lastX);
+    IG_edgeRAF=requestAnimationFrame(IGedgeTick);
   }
-  function inst_ganttSave(){ var f = inst_get(INST_CUR); if(f){ inst_save(f); } prod_toast(it('inst_saved')); }
-  function inst_ganttEditModal(id){
-    var f=inst_get(INST_CUR); var arr=(f.installation&&f.installation.ganttTasks)||[];
-    var t=null; for(var i=0;i<arr.length;i++){ if(arr[i].id===id){ t=arr[i]; break; } }
-    if(!t) return;
-    var ov=document.createElement('div'); ov.className='modal-overlay show'; ov.id='instGanttEditOverlay';
-    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-    var sels = [['','—'],['not_install',it('inst_status_not_install')],['installing',it('inst_status_installing')],['installed',it('inst_status_installed')],['accepted',it('inst_status_accepted')]];
-    var statusOpts='';
-    sels.forEach(function(o){ statusOpts += '<option value="'+o[0]+'" '+(t.status===o[0]?'selected':'')+'>'+o[1]+'</option>'; });
-    ov.innerHTML = '<div class="modal" style="width:560px;max-width:96vw;">'
-      + '<h2>'+it('inst_gantt_edit_task')+'</h2>'
-      + '<div class="form-row">'
-      + '<div><label>'+it('inst_gantt_task_name')+'</label><input id="igem_name" value="'+prod_esc(t.name||'')+'"></div>'
-      + '<div><label>'+it('inst_gantt_task_owner')+'</label><input id="igem_owner" value="'+prod_esc(t.owner||'')+'"></div>'
-      + '</div>'
-      + '<div class="form-row">'
-      + '<div><label>'+it('inst_gantt_task_status')+'</label><select id="igem_status">'+statusOpts+'</select></div>'
-      + '<div><label>'+it('inst_gantt_task_progress')+'</label><input id="igem_progress" type="number" min="0" max="100" value="'+(t.progress||0)+'"></div>'
-      + '</div>'
-      + '<div class="form-row">'
-      + '<div><label>'+it('inst_col_start')+'</label><input id="igem_start" value="'+ymdToDmy(t.start||'')+'"></div>'
-      + '<div><label>'+it('inst_col_end')+'</label><input id="igem_end" value="'+ymdToDmy(t.end||'')+'"></div>'
-      + '</div>'
-      + '<div class="form-row">'
-      + '<div><label>'+it('inst_gantt_task_baseline_start')+'</label><input id="igem_bs" value="'+ymdToDmy(t.baseline_start||'')+'"></div>'
-      + '<div><label>'+it('inst_gantt_task_baseline_end')+'</label><input id="igem_be" value="'+ymdToDmy(t.baseline_end||'')+'"></div>'
-      + '</div>'
-      + '<div class="form-row">'
-      + '<div><label>'+it('inst_gantt_task_parent')+'</label><input id="igem_parent" value="'+prod_esc(t.parent||'')+'"></div>'
-      + '<div><label>'+it('inst_gantt_task_deps')+'</label><input id="igem_deps" value="'+prod_esc(t.dependencies||'')+'"></div>'
-      + '</div>'
-      + '<div class="form-row" style="align-items:center;"><label><input type="checkbox" id="igem_ms" '+(t.milestone?'checked':'')+'> '+it('inst_gantt_task_milestone')+'</label></div>'
-      + '<div class="inst-gantt-config-btns">'
-      + '<button class="prod-btn" type="button" onclick="inst_ganttEditSave(\''+prod_esc(id)+'\')">'+it('inst_gantt_ok')+'</button>'
-      + '<button class="prod-btn sec" type="button" onclick="document.getElementById(\'instGanttEditOverlay\').remove()">'+it('inst_gantt_cancel')+'</button>'
-      + '</div>'
-      + '</div>';
-    document.body.appendChild(ov);
+  function IGthrottledSummary(){
+    var now=Date.now();
+    if(now-IG_sumLast<150){ if(!IG_sumTimer) IG_sumTimer=setTimeout(function(){ IG_sumTimer=0; IGrenderSummary(); },150); return; }
+    IG_sumLast=now; IGrenderSummary();
   }
-  function inst_ganttEditSave(id){
-    var f=inst_get(INST_CUR); var arr=(f.installation&&f.installation.ganttTasks)||[];
-    var t=null; for(var i=0;i<arr.length;i++){ if(arr[i].id===id){ t=arr[i]; break; } }
-    if(!t) return;
-    t.name = prod_val('igem_name') || t.name;
-    t.owner = prod_val('igem_owner');
-    t.status = prod_val('igem_status');
-    t.progress = Math.max(0, Math.min(100, parseInt(prod_val('igem_progress')||'0',10)||0));
-    t.start = dmyToYmd(prod_val('igem_start')||'') || t.start;
-    t.end = dmyToYmd(prod_val('igem_end')||'') || t.end;
-    t.baseline_start = dmyToYmd(prod_val('igem_bs')||'');
-    t.baseline_end = dmyToYmd(prod_val('igem_be')||'');
-    t.parent = prod_val('igem_parent');
-    t.dependencies = prod_val('igem_deps');
-    t.milestone = !!inst_el('igem_ms').checked;
-    if(t.milestone){ t.progress=100; t.end = t.start; }
-    inst_save(f);
-    var ov=inst_el('instGanttEditOverlay'); if(ov) ov.remove();
-    prod_toast(it('inst_saved'));
-    inst_renderTab('B');
+  window.IGdragEnd=function(){
+    if(IG_edgeRAF){ cancelAnimationFrame(IG_edgeRAF); IG_edgeRAF=null; }
+    if(IG_sumTimer){ clearTimeout(IG_sumTimer); IG_sumTimer=0; }
+    var svg=document.getElementById('igDepSvg'); if(svg) svg.classList.remove('dragging');
+    if(IG_drag){ if(!IG_drag.moved) IG_undo.pop(); }
+    IG_drag=null; IGsave(); IGrender();
+    document.removeEventListener('mousemove',window.IGdragMove);
+    document.removeEventListener('mouseup',window.IGdragEnd);
+    document.removeEventListener('touchmove',window.IGdragMove);
+    document.removeEventListener('touchend',window.IGdragEnd);
+    document.removeEventListener('touchcancel',window.IGdragEnd);
+  };
+  window.IGinitSplitter=function(){
+    var sp=document.getElementById('igSplitter'); if(!sp||sp.__igInit) return; sp.__igInit=1;
+    function clamp(w){ return Math.max(200,Math.min(w,Math.max(window.innerWidth-340,260))); }
+    sp.addEventListener('mousedown',function(e){
+      if(e.button!==0) return;
+      e.preventDefault();
+      var w0=Math.round(IG_cfg.tableWidth||404), x0=e.clientX;
+      sp.classList.add('on'); document.body.classList.add('ig-resizing');
+      function mv(ev){
+        IG_cfg.tableWidth=Math.round(clamp(w0+ev.clientX-x0));
+        var lay=document.getElementById('igLayout');
+        if(lay) lay.style.setProperty('--ig-tbl-w',IG_cfg.tableWidth+'px');
+      }
+      function up(){
+        document.removeEventListener('mousemove',mv);
+        document.removeEventListener('mouseup',up);
+        sp.classList.remove('on'); document.body.classList.remove('ig-resizing');
+        var f=inst_get(INST_CUR); if(f){ f.installation=f.installation||{};
+          var cc=f.installation.ganttConfig=f.installation.ganttConfig||{}; cc.tableWidth=IG_cfg.tableWidth; inst_save(f); }
+      }
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    });
+    sp.addEventListener('dblclick',function(){ window.IGfitTblW(); });
+    sp.tabIndex=0; sp.setAttribute('role','separator');
+  };
+  document.addEventListener('mousedown',function(e){
+    var p=document.getElementById('igOwnPop'); if(!p||!p.classList.contains('open')) return;
+    if(p.contains(e.target)) return;
+    if(e.target.closest&&e.target.closest('.ig-own-cell')) return;
+    window.IGcloseOwner();
+  });
+  window.addEventListener('resize',function(){ if(window.IGcloseOwner) window.IGcloseOwner(); });
+  document.addEventListener('keydown',function(e){
+    if((e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==='z'){ e.preventDefault(); window.IGundo(); }
+  });
+  window.inst_ganttRenderB=function(force){
+    var f=inst_get(INST_CUR); if(!f) return;
+    f.installation=f.installation||{};
+    var arr=(f.installation.ganttTasks)||[];
+    if(force || !arr.length){
+      var r=inst_ganttSchedule(f);
+      inst_save(f);
+      if(!r.ok){ IGrender(); if(r.msg) prod_toast(r.msg); return; }
+    }
+    IGrender();
+    window.IGinitSplitter();
+  };
+  function inst_ganttReschedule(){
+    var f=inst_get(INST_CUR); if(!f) return;
+    if(typeof confirm==='function' && !confirm(it('inst_gantt_resched_confirm'))) return;
+    var r=inst_ganttSchedule(f);
+    if(!r.ok){ if(r.msg) prod_toast(r.msg); return; }
+    inst_save(f); IGrender(); prod_toast(it('inst_saved'));
   }
   function inst_saveGantt(){
-    var f = inst_get(INST_CUR); f.installation = f.installation||{}; var inst = f.installation; var plan = inst.plan || {};
-    plan.planStart = dmyToYmd(prod_val('ib_start')||'');
-    var teams = parseInt((prod_val('ib_teams')||'1').replace(/[^0-9]/g,'')||'1',10)||1;
-    if(teams>INST_ZONE_MAX){ teams = INST_ZONE_MAX; prod_toast(it('inst_teams_warn')); }
-    plan.teams = teams;
-    inst.plan = plan;
-    f.installation = inst;
-    inst_save(f);
-    prod_toast(it('inst_saved'));
-    inst_renderTab('B');
+    var f=inst_get(INST_CUR); if(!f) return;
+    f.installation=f.installation||{}; var inst=f.installation; var plan=inst.plan||{};
+    var ss=IGy(prod_val('ib_schedStart')||'');
+    if(!ss){ prod_toast(it('inst_gantt_need_start')); return; }
+    plan.scheduleStart=ss;
+    var teams=parseInt((prod_val('ib_teams')||'2').replace(/[^0-9]/g,'')||'2',10)||2;
+    if(teams>INST_ZONE_MAX){ teams=INST_ZONE_MAX; prod_toast(it('inst_teams_warn')); }
+    plan.installTeams=teams;
+    plan.installRatePerTeam=parseInt((prod_val('ib_rate')||'200').replace(/[^0-9]/g,'')||'200',10)||200;
+    inst.plan=plan; f.installation=inst;
+    var r=inst_ganttSchedule(f);
+    inst_save(f); IGrender();
+    prod_toast(r && r.ok ? it('inst_saved') : (r && r.msg ? r.msg : it('inst_saved')));
   }
-
   function inst_renderGantt(boxId, data){
     var box = inst_el(boxId); if(!box) return;
     window.INST_GANTT_DATA = data;
@@ -45262,17 +46025,8 @@ window.refreshMoveBtnState = function () {
   window.inst_toggleHideShipZero = inst_toggleHideShipZero;
   window.inst_toggleHideInstallZero = inst_toggleHideInstallZero;
   window.inst_saveGantt = inst_saveGantt;
-  window.inst_ganttAddTask = inst_ganttAddTask;
-  window.inst_ganttDelTask = inst_ganttDelTask;
-  window.inst_ganttSave = inst_ganttSave;
-  window.inst_ganttSelectRow = inst_ganttSelectRow;
-  window.inst_ganttFieldChange = inst_ganttFieldChange;
-  window.inst_ganttFieldBool = inst_ganttFieldBool;
-  window.inst_ganttEditModal = inst_ganttEditModal;
-  window.inst_ganttEditSave = inst_ganttEditSave;
-  window.inst_ganttToggleConfig = inst_ganttToggleConfig;
-  window.inst_ganttSetCfg = inst_ganttSetCfg;
-  window.inst_ganttToggleCol = inst_ganttToggleCol;
+  window.inst_ganttReschedule = inst_ganttReschedule;
+  window.inst_ganttRenderB = inst_ganttRenderB;
 
   /* 语言切换时重渲染安装模块（若可见） */
   window.addEventListener('app:langchange', function(){
