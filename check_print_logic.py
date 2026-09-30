@@ -124,9 +124,15 @@ def main():
         (r"classList\.remove\('printing-dashboard'\);\s*\},\s*300\)", "C1b", "仍有 print() 之后 300ms 摘 .printing-dashboard 的写法"),
     ):
         need(re.search(pat, src) is None, code, msg, "打印是异步的：Edge 抓 DOM 更慢，摘早了打印会空白 / 内容残缺")
-    need("function __clearPrintTarget" in src and "function __lazyClearPrintTarget" in src, "C2",
-         "缺少 __clearPrintTarget / __lazyClearPrintTarget 延迟清理函数")
-    need("function printModalById" in src, "C2b", "缺少 function printModalById")
+    need(re.search(r"function __clearPrintTarget\s*\(", src) is not None, "C2",
+         "缺少 __clearPrintTarget() 延迟清理函数")
+    need(re.search(r"function __lazyClearPrintTarget\s*\(", src) is not None, "C2a",
+         "缺少 __lazyClearPrintTarget() 延迟清理函数")
+    need(re.search(r"setTimeout\(\s*__lazyClearPrintTarget", src) is not None, "C2b",
+         "printModalById / prodReportPrint 没有接上延迟清理（setTimeout(__lazyClearPrintTarget, …)）",
+         "打印结束后必须保留打印标记一段时间，否则 Edge 预览会空白")
+    need(re.search(r"function printModalById\s*\(", src) is not None, "C2c", "缺少 function printModalById()")
+    need(re.search(r"function printDashboard\s*\(", src) is not None, "C2d", "缺少 function printDashboard()")
     need("'<script>(function(){'" not in src, "C3",
          "JS 字符串里出现字面 '<script>(function(){'",
          "会被 HTML 解析器当成真标签切断脚本块 → printModalById / printDashboard 等全部未定义")
