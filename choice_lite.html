@@ -1179,9 +1179,15 @@ function _ovLoadChartLib(cb){
        主界面 #app 被隐藏后照样把报告推到第 2 页 → 打印预览第一页全白。
        改用 display:none 把非目标元素彻底移出布局，第一页直接从报告内容开始。 */
     body > *{display:none !important;}
-    /* 只恢复带 .print-target 标记的打印目标（由 printModalById 在调用 window.print() 前打标） */
+    /* 恢复打印目标：① 带 .print-target 标记的元素（printModalById 打标）
+       ② ★ 兜底：当前正在显示的弹窗 .modal-overlay.show。
+       Edge 的打印预览是异步快照、打印事件时序与 Chrome 不同，只依赖 JS 临时标记的话，
+       标记一旦被摘掉/时序错开，上面这条 display:none 就会让预览整页空白（Edge 打不出 PDF 的主因之一）。
+       用 .modal-overlay.show 兜底后，Edge 也能正常打印；顺带让「弹窗打开时按 Ctrl+P」也能直接出报告。 */
     body > .print-target{display:block !important;}
-    .print-target{position:static !important;background:none !important;padding:0 !important;margin:0 !important;overflow:visible !important;height:auto !important;}
+    body > .modal-overlay.show{display:block !important;}
+    .print-target,
+    body > .modal-overlay.show{position:static !important;background:none !important;padding:0 !important;margin:0 !important;overflow:visible !important;height:auto !important;}
     /* ★ 打印保留背景色/斑马线/图表配色：浏览器默认 print-color-adjust:economy 会丢弃所有背景，
        必须强制 exact 才能把红表头、斑马线、黄色高亮、饼图配色一起打出来 */
     .print-target,.print-target *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}
@@ -1196,10 +1202,14 @@ function _ovLoadChartLib(cb){
     .print-target .rpt-foot{display:none !important;}
 
     /* —— 报告/概况型弹窗（潜在/失败/签约/全部项目概况 modal-overlay）—— */
-    .print-target .modal{position:static !important;top:auto !important;bottom:auto !important;left:auto !important;right:auto !important;margin:0 !important;box-shadow:none !important;max-width:100% !important;width:100% !important;height:auto !important;overflow:visible !important;resize:none !important;}
-    .print-target .modal [style*="max-height"],.print-target .modal [style*="overflow-y"]{max-height:none !important;height:auto !important;overflow:visible !important;}
+    .print-target .modal,
+    body > .modal-overlay.show .modal{position:static !important;top:auto !important;bottom:auto !important;left:auto !important;right:auto !important;margin:0 !important;box-shadow:none !important;max-width:100% !important;width:100% !important;height:auto !important;overflow:visible !important;resize:none !important;display:block !important;}
+    .print-target .modal [style*="max-height"],.print-target .modal [style*="overflow-y"],
+    body > .modal-overlay.show [style*="max-height"],
+    body > .modal-overlay.show [style*="overflow-y"]{max-height:none !important;height:auto !important;overflow:visible !important;}
     /* 打印时隐藏弹窗内所有按钮（关闭 / 打印 / 货币切换 RMB·USD·VND 等），只保留报告正文 */
-    .print-target .modal button{display:none !important;}
+    .print-target .modal button,
+    body > .modal-overlay.show .modal button{display:none !important;}
 
     html,body{height:auto !important;overflow:visible !important;}
     @page { size: auto; margin: 8mm; }
@@ -6605,9 +6615,19 @@ function _ovLoadChartLib(cb){
     function prodReportClose(){ var m=document.getElementById('prod_report_modal'); if(m) m.remove(); }
     function prodReportPrint(){
       var ov=document.getElementById('prod_report_modal'); if(!ov) return;
+      /* 与 printModalById 一致：不能在 print() 之后 300ms 摘标记 ——
+         打印预览是异步快照，Edge 抓 DOM 更慢，摘早了整页会变空白。 */
+      if(typeof __clearPrintTarget==='function') __clearPrintTarget();
       ov.classList.add('print-target');
+      if(typeof __printTargetEl!=='undefined') __printTargetEl = ov;
+      window.__printSeq = (window.__printSeq || 0) + 1;
+      if(typeof __lazyClearPrintTarget==='function' && !window.__printLazyBound){
+        window.__printLazyBound = true;
+        document.addEventListener('pointerdown', __lazyClearPrintTarget, true);
+        document.addEventListener('keydown', __lazyClearPrintTarget, true);
+      }
       window.print();
-      setTimeout(function(){ if(ov) ov.classList.remove('print-target'); }, 300);
+      if(typeof __lazyClearPrintTarget==='function') setTimeout(__lazyClearPrintTarget, 60000);  /* 兜底 */
     }
     /* 语言切换触发的报告重渲染：防抖 320ms，把同步 burst + 300ms fallback 合并为一次 */
     function prodReportRenderBodyLang(){
@@ -14645,22 +14665,63 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-report-summary { background: #fffdf5; border: 1px solid #f0e2b6; border-left: 4px solid #E53935; border-radius: 10px; padding: 12px 16px; font-size: 13px; line-height: 2; color: #444; }
 .slats-report-summary p { margin: 0; }
 .slats-report-empty { text-align: center; padding: 40px 20px; color: #888; font-size: 14px; }
-/* ===== 智能报告打印（复用全局 .print-target display 方案，取消滚动限制保证全文输出） ===== */
+/* ===== 智能报告打印 =====
+   [FROZEN 契约 · 打印] 改动前先读 check_print_logic.py：
+   1) .modal 在打印下必须 display:block —— 它是 display:flex;flex-direction:column，
+      Chrome/Edge 对 flex 容器分页支持极差，会把 <h2> 标题留在第 1 页、正文整块推到第 2 页。
+   2) 必须保留 body > .modal-overlay.show 兜底打印目标 —— Edge 打印预览是异步快照，
+      只靠 JS 临时标记时标记一丢，body>*{display:none} 就会把整页隐藏 → 打印空白。
+   3) #slatsReportBody 必须解除 max-height:65vh 裁剪；段落 break-inside:auto 允许跨页，
+      但图表/表格/表格行保持 break-inside:avoid（图不被切成两半）。
+   4) 打印标记只能在打印结束后延迟清理，禁止 window.print() 之后 300ms 摘标记。 */
 @media print{
-  .print-target .modal{max-height:none !important;width:100% !important;max-width:none !important;box-shadow:none !important;border-radius:0 !important;}
-  .print-target #slatsReportBody{max-height:none !important;overflow:visible !important;padding:0 !important;}
-  .print-target .close{display:none !important;}
-  .print-target .slats-report-section{page-break-inside:avoid;}
+  /* ★ 根因修复「红色标题栏独占一页、正文被推到下一页、页尾大片空白」：
+     .modal 的基础样式是 display:flex; flex-direction:column（见文件下方 .modal 规则），
+     而 Chrome 对 flex 容器的分页支持极差 —— flex 子项会被当作"不可分割的整块"挪到下一页，
+     于是 <h2> 标题栏留在第 1 页，正文 #slatsReportBody 整块被推到第 2 页 → 标题栏独占一页。
+     打印时把弹窗与正文容器改回普通块级流，正文即可正常跨页续排。 */
+  /* 选择器成对出现：.print-target（JS 打的标记） + body>.modal-overlay.show（不依赖 JS 时序的兜底）。 */
+  .print-target .modal,
+  body > .modal-overlay.show .modal{display:block !important;max-height:none !important;width:100% !important;max-width:none !important;box-shadow:none !important;border-radius:0 !important;}
+  .print-target #slatsReportBody,
+  body > .modal-overlay.show #slatsReportBody{display:block !important;max-height:none !important;overflow:visible !important;padding:0 !important;}
+  .print-target .slats-report-wrap,
+  body > .modal-overlay.show .slats-report-wrap{display:block !important;}
+  .print-target .close,
+  body > .modal-overlay.show .close{display:none !important;}
+  /* 段落允许跨页：否则超高段落会被整段推到下一页，同样留出空白。
+     但图表/表格/表格行仍禁止从中间断开，保证图不被切成两半。 */
+  .print-target .slats-report-section,
+  body > .modal-overlay.show .slats-report-section{break-inside:auto !important;page-break-inside:auto !important;}
+  .print-target .slats-report-section > h3,
+  body > .modal-overlay.show .slats-report-section > h3{break-after:avoid !important;page-break-after:avoid !important;}
+  .print-target .slats-report-chart-wrap,
+  .print-target .slats-report-pie-wrap,
+  .print-target .slats-report-data-table-wrap,
+  body > .modal-overlay.show .slats-report-chart-wrap,
+  body > .modal-overlay.show .slats-report-pie-wrap,
+  body > .modal-overlay.show .slats-report-data-table-wrap{break-inside:avoid !important;page-break-inside:avoid !important;}
+  .print-target .slats-report-table tr,
+  body > .modal-overlay.show .slats-report-table tr{break-inside:avoid !important;page-break-inside:avoid !important;}
   /* 表头 sticky 在打印下会出现位置错乱，打印时改为普通表头 */
-  .print-target .slats-report-table thead th{position:static !important;}
+  .print-target .slats-report-table thead th,
+  body > .modal-overlay.show .slats-report-table thead th{position:static !important;}
   /* 图表与表格改为上下堆叠，canvas 强制缩放到容器宽度，避免饼图图例压到数据表上 */
-  .print-target .slats-report-row{display:block !important;}
-  .print-target .slats-report-chart-wrap{width:100% !important;height:auto !important;min-width:0 !important;margin:0 auto 10px !important;}
-  .print-target .slats-report-chart-wrap canvas{width:100% !important;height:auto !important;max-width:100% !important;}
-  .print-target .slats-report-pie-wrap{width:100% !important;height:auto !important;min-width:0 !important;margin:0 auto 10px !important;flex:none !important;}
-  .print-target .slats-report-pie-wrap canvas{width:100% !important;height:auto !important;max-width:100% !important;}
-  .print-target .slats-report-data-table-wrap{width:100% !important;max-width:none !important;flex:none !important;margin:0 auto !important;}
-  .print-target .slats-report-data-table-wrap .slats-report-table{max-width:none !important;}
+  .print-target .slats-report-row,
+  body > .modal-overlay.show .slats-report-row{display:block !important;}
+  .print-target .slats-report-chart-wrap,
+  body > .modal-overlay.show .slats-report-chart-wrap{width:100% !important;height:auto !important;min-width:0 !important;margin:0 auto 10px !important;}
+  /* 图表给固定高度，避免 canvas 按固有比例被拉伸成整页巨幅空白 */
+  .print-target .slats-report-chart-wrap canvas,
+  body > .modal-overlay.show .slats-report-chart-wrap canvas{width:auto !important;height:360px !important;max-width:100% !important;display:block !important;margin:0 auto !important;}
+  .print-target .slats-report-pie-wrap,
+  body > .modal-overlay.show .slats-report-pie-wrap{width:100% !important;height:auto !important;min-width:0 !important;margin:0 auto 10px !important;flex:none !important;}
+  .print-target .slats-report-pie-wrap canvas,
+  body > .modal-overlay.show .slats-report-pie-wrap canvas{width:auto !important;height:280px !important;max-width:100% !important;display:block !important;margin:0 auto !important;}
+  .print-target .slats-report-data-table-wrap,
+  body > .modal-overlay.show .slats-report-data-table-wrap{width:100% !important;max-width:none !important;flex:none !important;margin:0 auto !important;}
+  .print-target .slats-report-data-table-wrap .slats-report-table,
+  body > .modal-overlay.show .slats-report-data-table-wrap .slats-report-table{max-width:none !important;}
 
   /* ===== 水泥漏缝地板规格表打印：取消滚动限制，表头恢复普通行，输出全部行 ===== */
   .print-target #slatsSpecBody,
@@ -42632,13 +42693,42 @@ function syncDashWonBuFromOverview(){
 }
 
 // ===== 打印报告/概况弹窗（与「客户付款智能报告」打印逻辑一致）=====
-// 打印前给目标弹窗打 .print-target 标记，@media print 只显示该弹窗，打印后移除标记。
+// 打印前给目标弹窗打 .print-target 标记，@media print 只显示该弹窗，打印结束后移除标记。
+//
+// ⚠ 为什么不能在 print() 之后用 setTimeout 摘标记：
+//   浏览器打印是【异步】的，window.print() 调完立刻返回、打印预览/出纸在后台渲染。
+//   而 @media print 里有 `body > *{display:none !important}`，只显示带 .print-target 的元素；
+//   300ms 后把标记摘掉时，若渲染还没抓完 DOM，整页就会被隐藏 →
+//   表现为「点打印PDF 后一片空白 / 只打出零散内容 / 标题栏独占一页」。
+//   因此改为：afterprint 才清理（并在 beforeprint 时再补打一次，双保险）。
+var __printTargetEl = null;
+function __clearPrintTarget(){
+  var els = document.querySelectorAll('.print-target');
+  for(var i=0;i<els.length;i++){ try{ els[i].classList.remove('print-target'); }catch(e){} }
+  __printTargetEl = null;
+}
+/* 打印后才清理，且给足宽限：用户回到页面（点击/按键）再延迟 4s 摘标记。
+   Edge 打印预览抓取 DOM 比 Chrome 慢，摘早了 = 预览空白。 */
+function __lazyClearPrintTarget(){
+  var seq = window.__printSeq || 0;
+  setTimeout(function(){ if(seq === (window.__printSeq || 0)) __clearPrintTarget(); }, 4000);
+}
 function printModalById(modalId){
   var m = document.getElementById(modalId);
   if(!m){ window.print(); return; }
+  __clearPrintTarget();                  /* 先清掉上一次的标记，避免多个弹窗被一起打印 */
   m.classList.add('print-target');
+  __printTargetEl = m;
+  window.__printSeq = (window.__printSeq || 0) + 1;
+  if(!window.__printLazyBound){
+    window.__printLazyBound = true;
+    /* 打印真正开始前再补打一次标记，兼容 beforeprint 晚于 print() 的时序 */
+    window.addEventListener('beforeprint', function(){ if(__printTargetEl) __printTargetEl.classList.add('print-target'); });
+    document.addEventListener('pointerdown', __lazyClearPrintTarget, true);
+    document.addEventListener('keydown', __lazyClearPrintTarget, true);
+  }
   window.print();
-  setTimeout(function(){ m.classList.remove('print-target'); }, 300);
+  setTimeout(__lazyClearPrintTarget, 60000);   /* 兜底：用户长时间不操作也会自动清理 */
 }
 
 // ===== 在新窗口打开报告（带独立最大化/关闭按钮）=====
@@ -42669,7 +42759,11 @@ function openReportInNewWindow(modalId){
 
   html += '<div class="cpr-body" style="padding:20px 24px;background:#f5f5f5;max-height:none;overflow:visible;">' + (bodyEl ? bodyEl.innerHTML : '') + '</div>';
 
-  html += '<script>(function(){';
+  /* ⚠ 必须把标签名拆开拼接：直接在 JS 字符串里写未转义的 script 开始标签，
+     会被 HTML 解析器当成真正的开始标签，把本脚本块从中间切断 ——
+     之后定义的所有函数（printModalById / printDashboard / exportAll*PDF 等）全部失效，
+     点「打印PDF」就会报 ReferenceError: printModalById is not defined（按钮毫无反应）。 */
+  html += '<scr' + 'ipt>(function(){';
   html += 'var baseW=1100, baseH=800, isMax=false;';
   html += 'window.__toggleWinMax=function(){';
   html += '  try{';
@@ -42692,9 +42786,24 @@ function openReportInNewWindow(modalId){
   w.document.close();
 }
 function printDashboard(){
+  /* 数据看板打印：同样不能在 print() 之后 300ms 就摘类（Edge 预览快照更慢 → 打出空白或整页 UI），
+     改为用户回到页面后再延迟清理，并加兜底。 */
+  __clearPrintTarget();                       /* 清掉残留的弹窗打印标记，避免两套打印规则互相打架 */
   document.body.classList.add('printing-dashboard');
+  window.__printSeq = (window.__printSeq || 0) + 1;
+  var __seq = window.__printSeq;
+  function __dashClear(){
+    if(__seq !== (window.__printSeq || 0)) return;
+    document.body.classList.remove('printing-dashboard');
+  }
+  function __lazyDash(){ setTimeout(__dashClear, 4000); }
+  if(!window.__dashLazyBound){
+    window.__dashLazyBound = true;
+    document.addEventListener('pointerdown', __lazyDash, true);
+    document.addEventListener('keydown', __lazyDash, true);
+  }
   window.print();
-  setTimeout(function(){ document.body.classList.remove('printing-dashboard'); }, 300);
+  setTimeout(__lazyDash, 60000);              /* 兜底：用户长时间不操作也会自动清理 */
 }
 
 function exportOverviewPDF(){ printModalById('overviewModal'); }
@@ -45163,40 +45272,65 @@ function printExcel(){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ try{ URL.revokeObjectURL(a.href); }catch(e){} if(a.parentNode) a.parentNode.removeChild(a); }, 200);
 }
-/* 打印 PDF：A3 横向。左表 + 横道图整体缩放到「一页装下」（宽和高同时适配），
-   并强制不可分页，避免甘特被切成上下两半。 */
+/* ═══════════════════════════════════════════════════════════════════════════
+   [FROZEN 契约 · 打印] 甘特(横道图)打印 —— 改动前先读 check_print_logic.py
+   ───────────────────────────────────────────────────────────────────────────
+   1) 必须保持「左右两栏」：模板里有 @media (max-width:1000px){.layout{flex-direction:column}}，
+      打印时纸宽按纸张算（A4 竖版可打印宽≈748px < 1000px 会命中这条移动端规则），
+      不覆盖就会把「左表」和「横道图」拆成上下两半 —— 所以必须 flex-direction:row !important。
+   2) 左表必须固定宽度 width:var(--tbl-w,470px) !important
+      （改成 auto 会让 flex:0 0 auto 吃光整行，横道图被挤成 0 宽 → 打印时消失）。
+   3) 三档纸张缩放（A3 横向 / A4 横向 / A4 竖版）必须保留；
+      缩放高度 totalH 必须包含版面上方内容(offTop)，否则甘特被顶到第 2 页。
+   4) 必须排除甘特下方 #cardsWrap（区汇总/小组负载/图例），否则多打一张空白废页。
+   5) 禁止强制分页 break-before:page / page-break-before:always（会把甘特整块顶到第 2 页）。
+   ═══════════════════════════════════════════════════════════════════════════ */
 function printPdf(){
   var st=document.getElementById('printStyle');
   if(!st){ st=document.createElement('style'); st.id='printStyle'; document.head.appendChild(st); }
-  /* A3 横向可打印区（6mm 页边距）：约 1541 x 1076 px，留点余量 */
-  var pageW=1480, pageH=1020, totalW=0, totalH=0;
+  var totalW=0, totalH=0, offTop=0;
   try{
     var tw=document.getElementById('tblWrap');
     var ci=document.getElementById('chartInner');
+    var lay=document.querySelector('.layout');
+    /* 版面上方还有标题/参数卡片，缩放要连它们一起算，否则甘特会被顶到第 2 页 */
+    offTop = lay ? Math.max(0, Math.round(lay.getBoundingClientRect().top + (window.pageYOffset||0))) : 0;
     totalW=(tw?tw.scrollWidth:0)+((ci&&ci.scrollWidth)||0);
-    totalH=Math.max(tw?tw.scrollHeight:0, (ci&&ci.scrollHeight)||0);
+    totalH=offTop + Math.max(tw?tw.scrollHeight:0, (ci&&ci.scrollHeight)||0);
   }catch(e){}
-  var z=1;
-  if(totalW>0 && totalH>0){
-    var zw=(totalW>pageW)?(pageW/totalW):1;   /* 按宽度缩放 */
-    var zh=(totalH>pageH)?(pageH/totalH):1;   /* 按高度缩放（防止纵向被切成两页） */
-    z=Math.min(zw,zh);
+  /* 按「纸张可打印区」算缩放比（96dpi，已扣 6mm 页边距）：
+     A3 横向 ≈1480x1020、A4 横向 ≈1077x720、A4 竖版 ≈748x1030。
+     打印时用 @media print and (max-width:…) 按实际纸张选一套，保证任何纸张都"一页装下"。 */
+  function fitZ(pw, ph){
+    if(!(totalW>0 && totalH>0)) return 1;
+    return Math.min(totalW>pw ? pw/totalW : 1, totalH>ph ? ph/totalH : 1);
   }
+  var zA3=fitZ(1480,1020), zA4L=fitZ(1077,720), zA4P=fitZ(748,1030);
   st.textContent='@media print{'
     +'@page{size:A3 landscape;margin:6mm;}'
     +'.hdr-btns,.params-row .btn,.splitter,.cfg,.cards-toggle,#btnDisplayCfg{display:none !important;}'
-    +'.layout{display:flex !important;height:auto !important;max-height:none !important;overflow:visible !important;border:none !important;border-radius:0 !important;'
-    +'break-inside:avoid !important;page-break-inside:avoid !important;break-before:page !important;page-break-before:always !important;break-after:page !important;page-break-after:always !important;}'
+    /* 甘特下方的「区汇总 + 小组负载 + 图例」不属于打印内容：它在窄纸下会被挤到第 2 页，
+       打出一张几乎空白的废页（用户要的是完整甘特一页）。 */
+    +'.cards-wrap,#cardsWrap,.loadgrid,#loadBox,#conflict,.legend{display:none !important;}'
+    /* ★ 根因修复「左表与横道图被拆成上下两半」：
+       模板里有 @media (max-width:1000px){ .layout{flex-direction:column} .tbl-wrap{width:100% !important} … }
+       这条移动端规则在【窄纸打印】时同样会命中（A4 竖版可打印宽 ≈748px < 1000px），
+       于是 .layout 变成纵向排列 —— 左表跑到上面、横道图被压到下面，看上去就是"左右两部分被拆成上下两半"。
+       这里强制回左右两栏，override 掉移动端规则（本样式在模板样式之后注入，同优先级下后写者胜）。 */
+    +'.layout{display:flex !important;flex-direction:row !important;flex-wrap:nowrap !important;height:auto !important;max-height:none !important;overflow:visible !important;border:none !important;border-radius:0 !important;'
+    +'break-inside:avoid !important;page-break-inside:avoid !important;}'
     /* 关键：左表保持原宽度（不要 width:auto，否则 flex:0 0 auto 会吃光整行，把右表挤成 0 宽→横道图消失） */
-    +'.tbl-wrap{flex:0 0 auto !important;width:var(--tbl-w,470px) !important;overflow:visible !important;max-height:none !important;}'
-    +'.chart-wrap{flex:1 1 auto !important;min-width:0 !important;overflow:visible !important;max-height:none !important;}'
+    +'.tbl-wrap{flex:0 0 auto !important;width:var(--tbl-w,470px) !important;max-height:none !important;overflow:visible !important;border-right:1px solid var(--bd) !important;border-bottom:0 !important;}'
+    +'.chart-wrap{flex:1 1 auto !important;min-width:0 !important;min-height:0 !important;max-height:none !important;overflow:visible !important;}'
     +'.tbl-wrap table{width:auto !important;}'
     +'.tbl-wrap th,.thead{position:static !important;}'
     +'.tbl-wrap,.chart-wrap,.ci,.bd,.thead,.bd *{break-inside:avoid !important;page-break-inside:avoid !important;}'
     +'.bd,.ci{overflow:visible !important;}'
     +'*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}'
-    +'html{zoom:'+z.toFixed(3)+' !important;}'
-    +'}';
+    +'}'
+    +'@media print{html{zoom:'+zA3.toFixed(3)+' !important;}}'
+    +'@media print and (max-width:1120px){html{zoom:'+zA4L.toFixed(3)+' !important;}}'
+    +'@media print and (max-width:800px){html{zoom:'+zA4P.toFixed(3)+' !important;}}';
   window.print();
 }
 /* 区汇总 + 小组负载：右上角 +/− 一起收起/展开（状态存 cfg，持久化） */

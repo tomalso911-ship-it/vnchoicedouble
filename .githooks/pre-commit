@@ -1,0 +1,41 @@
+#!/bin/sh
+# 「锁死」契约检查（git pre-commit 钩子）
+#
+# 目前锁定的契约：
+#   1) check_modal_format.py   —— 模态框放大态 .mmax 几何唯一、无特例覆盖、入口唯一
+#   2) check_print_logic.py    —— 打印逻辑（甘特左右两栏/一页装下、智能报告块级流/兜底目标、
+#                                 打印标记生命周期），见 choice_lite.html 中 [FROZEN 契约 · 打印]
+#
+# 激活方式（任选其一，本仓库已把钩子安装到 .git/hooks/pre-commit）：
+#   1) cp .githooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+#   2) git config core.hooksPath .githooks
+#
+# 也可在 CI 中单独执行：python check_modal_format.py / python check_print_logic.py
+# （退出码非 0 即构建失败。）
+set -e
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$ROOT" ] || ROOT="$(cd "$HERE/.." && pwd)"
+cd "$ROOT"
+
+if command -v python >/dev/null 2>&1; then
+  PY=python
+elif command -v python3 >/dev/null 2>&1; then
+  PY=python3
+else
+  echo "未找到 python，跳过契约检查（请安装 Python 后重试）。"
+  exit 0
+fi
+
+rc=0
+for f in check_modal_format.py check_print_logic.py; do
+  if [ -f "$f" ]; then
+    echo "— 契约检查：$f"
+    if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then
+      echo "✗ 提交被拦截：$f 未通过（契约被破坏），请修复后再提交。"
+      rc=1
+    fi
+  fi
+done
+exit $rc
