@@ -44587,14 +44587,15 @@ function renderChart(){
      实现：把当前视图里带「组」的行按顺序取出，用一个状态机连接。 */
   if(cfg.showDeps){
     var paths='';
-    function depPath(ri, ti){
+    function depPath(ri, ti, cat){
       var r=rows[ri], t=rows[ti];
       if(!r||!t||!r.end||!t.start) return;
+      /* 分道布线：全部组 / 第2组 / 第1组 各走不同竖向通道，线的竖向段互不重叠、不交叉 */
+      var off=(cat==='all')?14:((cat==='t1')?8:2);
       var y1=ri*rh+rh/2, y2=ti*rh+rh/2;
       var x1=S.x(r.end)+S.dayW, x2=S.x(t.start);
-      var d;
-      if(x2>x1+12) d='M'+x1+' '+y1+' H'+(x1+8)+' V'+y2+' H'+(x2-1);
-      else d='M'+x1+' '+y1+' H'+(x1+8)+' V'+(y1+rh/2-3)+' H'+(x2-11)+' V'+y2+' H'+(x2-1);
+      var cx=x1+off;
+      var d='M'+x1+' '+y1+' H'+cx+' V'+y2+' H'+(x2-1);
       paths+='<path d="'+d+'" fill="none" stroke="#607d8b" stroke-width="1.5" marker-end="url(#arw)"/>';
     }
     /* 取出「组行」序列：泳道视图取 team/allgroup 行；房舍视图取每栋房舍行（按列表顺序） */
@@ -44612,12 +44613,12 @@ function renderChart(){
     seq.forEach(function(s){
       if(s.cat==='all'){
         var had=false;
-        for(var tk in lastTeam){ if(lastTeam.hasOwnProperty(tk)){ depPath(lastTeam[tk], s.i); delete lastTeam[tk]; had=true; } }
-        if(!had && lastAll!=null) depPath(lastAll, s.i);   /* 中间没有组行 → 单项指向新全部组 */
+        for(var tk in lastTeam){ if(lastTeam.hasOwnProperty(tk)){ depPath(lastTeam[tk], s.i, tk); delete lastTeam[tk]; had=true; } }
+        if(!had && lastAll!=null) depPath(lastAll, s.i, 'all');   /* 中间没有组行 → 单项指向新全部组 */
         lastAll=s.i; allUsedFor={};
       }else{
-        if(lastAll!=null && !allUsedFor[s.cat]){ depPath(lastAll, s.i); allUsedFor[s.cat]=1; }  /* 全部组 → 下面最近的该组 */
-        else if(lastTeam[s.cat]!=null){ depPath(lastTeam[s.cat], s.i); }                        /* 否则 → 下一个同组 */
+        if(lastAll!=null && !allUsedFor[s.cat]){ depPath(lastAll, s.i, 'all'); allUsedFor[s.cat]=1; }  /* 全部组 → 下面最近的该组 */
+        else if(lastTeam[s.cat]!=null){ depPath(lastTeam[s.cat], s.i, s.cat); }                        /* 否则 → 下一个同组 */
         lastTeam[s.cat]=s.i;
       }
     });
