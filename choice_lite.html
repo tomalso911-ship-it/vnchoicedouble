@@ -44011,7 +44011,7 @@ var GANTT_I18N = {
     g_kpi_zone:'分区', g_kpi_houses:'房舍', g_kpi_panels:'总板数', g_kpi_cap:'产能', g_kpi_teams:'安装小组',
     g_kpi_range:'项目区间', g_kpi_days:'总工期', g_kpi_latezone:'最晚完工区', g_kpi_util:'小组平均利用率',
     g_kpi_empty:'暂无数据', g_empty_houses:'暂无房舍，点上方「载入示例」或「粘贴/导入数据」',
-    g_team_fmt:'第{n}组', g_year:'年', g_month:'月'
+    g_team_fmt:'第{n}组', g_allgroup:'全部组', g_year:'年', g_month:'月'
   },
   en: {
     g_title:'Installation Scheduling', g_sub:'Zones · Houses · Team-capacity driven · Auto Gantt',
@@ -44062,7 +44062,7 @@ var GANTT_I18N = {
     g_kpi_zone:'Zones', g_kpi_houses:'Houses', g_kpi_panels:'Total panels', g_kpi_cap:'Capacity', g_kpi_teams:'Install teams',
     g_kpi_range:'Project span', g_kpi_days:'Total duration', g_kpi_latezone:'Latest zone', g_kpi_util:'Avg team utilization',
     g_kpi_empty:'No data', g_empty_houses:'No houses yet; click "Load sample" or "Paste / Import" above',
-    g_team_fmt:'Team {n}', g_year:'', g_month:''
+    g_team_fmt:'Team {n}', g_allgroup:'All groups', g_year:'', g_month:''
   },
   vi: {
     g_title:'Lập lịch lắp đặt tấm xi măng', g_sub:'Phân vùng · Chuồng · Theo năng suất đội · Tự động Gantt',
@@ -44113,7 +44113,7 @@ var GANTT_I18N = {
     g_kpi_zone:'Vùng', g_kpi_houses:'Chuồng', g_kpi_panels:'Tổng tấm', g_kpi_cap:'Năng suất', g_kpi_teams:'Đội lắp',
     g_kpi_range:'Khoảng dự án', g_kpi_days:'Tổng thời gian', g_kpi_latezone:'Vùng xong muộn', g_kpi_util:'Tỷ lệ đội TB',
     g_kpi_empty:'Chưa có dữ liệu', g_empty_houses:'Chưa có chuồng, nhấn "Tải mẫu" hoặc "Dán / Nhập" bên trên',
-    g_team_fmt:'Đội {n}', g_year:' năm', g_month:' tháng'
+    g_team_fmt:'Đội {n}', g_allgroup:'Tất cả đội', g_year:' năm', g_month:' tháng'
   }
 };
 function curLang(){ return (window.parent&&window.parent.CUR_LANG)?window.parent.CUR_LANG:'zh'; }
@@ -44236,6 +44236,8 @@ function parseHolidays(){
 var ZONE_C=['#5c6bc0','#26a69a','#ffa726','#ef5350','#66bb6a','#ab47bc','#29b6f6','#8d6e63'];
 /* 小组颜色固定：第1组蓝、第2组红、第3组深黄、第4组紫；之后循环回退色 */
 var TEAM_C=['#1E88E5','#E53935','#FBC02D','#8E24AA','#43A047','#FB8C00','#00897B','#78909c'];
+/* 全部组（1组+2组…并行）专属色：深岩灰，不与第1–4组蓝/红/黄/紫冲突 */
+var ALL_C='#37474F';
 
 var houses=[];   // {id,zone,name,panels,done,days,team,start,end,lockStart,lockTeam,bs,be}
 var zones=[];    // {name,teams,start}
@@ -44291,7 +44293,7 @@ function loadHouses(){
     if(name2) name2='#'+name2;
     return {id:'H'+(i+1), zone:String(h.zone||it('g_unzoned')), name:rawName, name1:name1, name2:name2,
       panels:Math.max(0,Math.round(+h.panels||0)), done:Math.max(0,Math.round(+h.done||0)),
-      days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bs:'',be:''};
+      days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bothTeams:false,bs:'',be:''};
   });
   // 区表：按出现顺序，默认 2 组（可在区汇总表里改）
   var seen={}; zones=[];
@@ -44335,6 +44337,17 @@ function schedule(){
     for(var i=0;i<n;i++) free[i]=z.start;
 
     order.forEach(function(h){
+      /* 全部组：1组+2组…全部并行 → 产能 n×cap，且独占全部 n 个组
+         开始取各组最晚空闲（含锁定开始日），完工后把全部组推进到其结束次日 */
+      if(h.bothTeams){
+        h.days=Math.max(1,Math.ceil(h.panels/(n*Math.max(1,cfg.cap))));
+        var s=h.lockStart?nextWork(h.lockStart):nextWork(free[0]);
+        for(var bi=1;bi<n;bi++){ if(free[bi]>s) s=nextWork(free[bi]); }
+        var e=addWork(s,h.days);
+        h.start=s; h.end=e; h.team=0;
+        for(var bj=0;bj<n;bj++){ free[bj]=nextAfter(e); }
+        return;
+      }
       h.days=houseDays(h);
       /* 选组：锁定优先，否则选最早空闲的组（并列取组号小的）
          注意：free 里存的是 'YYYY-MM-DD' 字符串，定宽格式下字典序 == 时间序，
@@ -44356,7 +44369,11 @@ function schedule(){
 }
 /* 锁定：手改开始日 / 手选小组 */
 function setLockStart(h,v){ h.lockStart=toYmd(v)||''; schedule(); renderAll(); saveCfg(); }
-function setLockTeam(h,v){ h.lockTeam=(v===''||v==null)?null:(+v|0); schedule(); renderAll(); saveCfg(); }
+function setLockTeam(h,v){
+  if(v==='all'){ h.bothTeams=true; h.lockTeam=null; }
+  else { h.bothTeams=false; h.lockTeam=(v===''||v==null)?null:(+v|0); }
+  schedule(); renderAll(); saveCfg();
+}
 function snapBaseline(){ houses.forEach(function(h){ h.bs=h.start; h.be=h.end; }); renderAll(); saveCfg(); }
 function clearBaseline(){ houses.forEach(function(h){ h.bs=''; h.be=''; }); renderAll(); saveCfg(); }
 function toggleBaseline(checked){
@@ -44392,11 +44409,17 @@ function buildRows(){
         panels:sum(hs,'panels'),done:sum(hs,'done')});
       if(isZoneCollapsed(z.name)) return;
       for(var t=0;t<Math.max(1,z.teams|0);t++){
-        var ths=hs.filter(function(h){ return h.team===t; }).sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
+        var ths=hs.filter(function(h){ return !h.bothTeams && h.team===t; }).sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
         rows.push({kind:'team',id:'T:'+z.name+':'+(t+1),name:z.name+' · '+teamLabel(t),zone:z.name,team:t,
           start:ths.length?ths[0].start:'',end:ths.length?ths[ths.length-1].end:'',
           panels:sum(ths,'panels'),done:sum(ths,'done'),houses:ths});
-        ths.forEach(function(h){ h._prev = ths[ths.indexOf(h)-1]; });
+      }
+      /* 全部组泳道：本区由 1组+2组…全部并行完成的房（放在各小组泳道最下方、里程碑之前） */
+      var ah=hs.filter(function(h){ return h.bothTeams; }).sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
+      if(ah.length){
+        rows.push({kind:'allgroup',id:'A:'+z.name,name:z.name+' · '+it('g_allgroup'),zone:z.name,team:-1,
+          start:ah[0].start,end:ah[ah.length-1].end,
+          panels:sum(ah,'panels'),done:sum(ah,'done'),houses:ah});
       }
       /* 区完工里程碑 */
       rows.push({kind:'ms',id:'M:'+z.name,name:z.name+it('g_finish'),zone:z.name,start:z.end,end:z.end});
@@ -44490,6 +44513,7 @@ function rowH(){ return cfg.barHeight+18; }
  * 7. 渲染甘特
  * ======================================================================= */
 function barColorOf(r){
+  if(r&&(r.kind==='allgroup'||r.bothTeams)) return ALL_C;   /* 全部组：深岩灰 */
   if((r.kind==='house'||r.kind==='team')&&r.team!=null) return teamColor(r.zone,r.team);
   return zoneColor(r.zone);
 }
@@ -44525,22 +44549,32 @@ function renderChart(){
      整体上移 66px 被表头遮住，表现为「左侧表格与右侧横道图错开一个表头高度」。
      必须让它们成为 .bd 的子元素（.bd 是 position:relative），top 才以行区域顶部为基准。 */
 
-  /* 依赖：组内上一栋 -> 本栋 */
-  if(cfg.showDeps&&cfg.view==='house'){
-    var paths='', idx={}; rows.forEach(function(r,i){ idx[r.id]=i; });
-    rows.forEach(function(r,i){
-      if(r.kind!=='house'||!r.house||!r.house._prev) return;
-      var pi=idx['H'+0]!==undefined?null:null;
-      var prevRow=null;
-      for(var k=0;k<i;k++){ if(rows[k].kind==='house'&&rows[k].house===r.house._prev){ prevRow=k; break; } }
-      if(prevRow==null) return;
-      var y1=prevRow*rh+rh/2, y2=i*rh+rh/2;
-      var x1=S.x(r.house._prev.end)+S.dayW, x2=S.x(r.start);
+  /* 依赖（组级连线，仅 team 视图）：
+     第t组 → 若正下方是本区「全部组」则连全部组，否则连「下一区同组 t」；
+     全部组 → 连正下方那行（第1组/第2组/全部组 都行）。房舍视图不再画房舍间连线。 */
+  if(cfg.showDeps&&cfg.view==='team'){
+    var paths='';
+    for(var ri=0; ri<rows.length; ri++){
+      var r=rows[ri];
+      if(r.kind!=='team'&&r.kind!=='allgroup') continue;
+      if(!r.end) continue;
+      var target=null, ti=null;
+      if(r.kind==='allgroup'){
+        var nb=rows[ri+1];
+        if(nb&&(nb.kind==='team'||nb.kind==='allgroup')){ target=nb; ti=ri+1; }
+      }else{
+        var below=rows[ri+1];
+        if(below&&below.kind==='allgroup'&&below.zone===r.zone){ target=below; ti=ri+1; }
+        else{ for(var ni=ri+1; ni<rows.length; ni++){ if(rows[ni].kind==='team'&&rows[ni].team===r.team){ target=rows[ni]; ti=ni; break; } } }
+      }
+      if(!target||!target.start||ti==null) continue;
+      var y1=ri*rh+rh/2, y2=ti*rh+rh/2;
+      var x1=S.x(r.end)+S.dayW, x2=S.x(target.start);
       var d;
       if(x2>x1+12) d='M'+x1+' '+y1+' H'+(x1+8)+' V'+y2+' H'+(x2-1);
       else d='M'+x1+' '+y1+' H'+(x1+8)+' V'+(y1+rh/2-3)+' H'+(x2-11)+' V'+y2+' H'+(x2-1);
       paths+='<path d="'+d+'" fill="none" stroke="#90a4ae" stroke-width="1.2" marker-end="url(#arw)"/>';
-    });
+    }
     h+='<svg class="deps" id="depSvg" width="'+S.width+'" height="'+S.rowsH+'">'
       +'<defs><marker id="arw" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">'
       +'<path d="M0,0 L7,3.5 L0,7 Z" fill="#90a4ae"/></marker></defs>'+paths+'</svg>';
@@ -44586,7 +44620,7 @@ function renderChart(){
   inner.style.width=S.width+'px';
   inner.innerHTML=h;
   rows.forEach(function(r,i){
-    if(r.kind==='house'||r.kind==='team'){
+    if(r.kind==='house'||r.kind==='team'||r.kind==='allgroup'){
       var el=document.getElementById('bar-'+esc(r.id));
       if(el){ var col=barColorOf(r); var pct=r.panels?Math.round(Math.min(100,(r.done||0)/r.panels*100)):0; setBarBody(el,r,S.x(r.start),Math.max(Math.round(S.dayW*(diffDays(r.start,r.end)+1)),4),col,pct); }
     }
@@ -44757,7 +44791,7 @@ function cellsHouse(hh, cols){
     done:'<td class="num"><input type="text" value="'+fmtNum(hh.done)+'" onchange="evNum(\''+hh.id+'\',\'done\',this.value)"></td>',
     prog:'<td>'+(hh.panels?Math.round((hh.done||0)/hh.panels*100)+'%':'0%')+'</td>',
     days:'<td class="num">'+fmtNum(hh.days)+'</td>',
-    team:'<td><select onchange="evTeam(\''+hh.id+'\',this.value);teamSelColor(this,\''+hh.id+'\')"'+(hh.lockTeam!=null?' style="color:'+teamColor(hh.zone,hh.lockTeam)+'"':'')+'>'+teamOpts(hh)+'</select></td>',
+    team:'<td><select onchange="evTeam(\''+hh.id+'\',this.value);teamSelColor(this,\''+hh.id+'\')"'+(hh.bothTeams?' style="color:'+ALL_C+'"':(hh.lockTeam!=null?' style="color:'+teamColor(hh.zone,hh.lockTeam)+'"':''))+'>'+teamOpts(hh)+'</select></td>',
     start:'<td><input value="'+esc(dmy(hh.start))+'" onchange="evStart(\''+hh.id+'\',this.value)">'
       +(hh.lockStart?'<span class="lk" title="'+it('g_locked_tip')+'">🔒</span>':'')+'</td>',
     end:'<td>'+dmy(hh.end)+'</td>'
@@ -44770,11 +44804,13 @@ function teamOpts(h){
     var col=teamColor(h.zone,i);
     s+='<option value="'+i+'"'+(h.lockTeam===i?' selected':'')+' style="color:'+col+';font-weight:700;">'+teamLabel(i)+'</option>';
   }
+  s+='<option value="all"'+(h.bothTeams?' selected':'')+' style="color:'+ALL_C+';font-weight:700;">'+it('g_allgroup')+'</option>';
   return s;
 }
 function teamSelColor(sel,id){
   var h=byId(id); if(!h) return;
   if(sel.value===''){ sel.style.color=''; return; }
+  if(sel.value==='all'){ sel.style.color=ALL_C; return; }
   sel.style.color=teamColor(h.zone,+sel.value);
 }
 function evNum(id,k,v){
@@ -45246,7 +45282,7 @@ function printExcel(){
     {n:it('g_col_done'),   v:function(h){ return fmtNum(h.done); }, num:1},
     {n:it('g_col_prog'),   v:function(h){ return (h.panels?Math.round((h.done||0)/h.panels*100):0)+'%'; }},
     {n:it('g_col_days'),   v:function(h){ return fmtNum(h.days); }, num:1},
-    {n:it('g_col_team'),   v:function(h){ return (h.lockTeam!=null)?teamLabel(h.lockTeam):it('g_auto'); }},
+    {n:it('g_col_team'),   v:function(h){ return h.bothTeams?it('g_allgroup'):(h.lockTeam!=null?teamLabel(h.lockTeam):it('g_auto')); }},
     {n:it('g_col_start'),  v:function(h){ return dmy(h.start); }},
     {n:it('g_col_end'),    v:function(h){ return dmy(h.end); }}
   ];
