@@ -44757,7 +44757,7 @@ function cellsHouse(hh, cols){
     done:'<td class="num"><input type="text" value="'+fmtNum(hh.done)+'" onchange="evNum(\''+hh.id+'\',\'done\',this.value)"></td>',
     prog:'<td>'+(hh.panels?Math.round((hh.done||0)/hh.panels*100)+'%':'0%')+'</td>',
     days:'<td class="num">'+fmtNum(hh.days)+'</td>',
-    team:'<td><select onchange="evTeam(\''+hh.id+'\',this.value)">'+teamOpts(hh)+'</select></td>',
+    team:'<td><select onchange="evTeam(\''+hh.id+'\',this.value);teamSelColor(this,\''+hh.id+'\')"'+(hh.lockTeam!=null?' style="color:'+teamColor(hh.zone,hh.lockTeam)+'"':'')+'>'+teamOpts(hh)+'</select></td>',
     start:'<td><input value="'+esc(dmy(hh.start))+'" onchange="evStart(\''+hh.id+'\',this.value)">'
       +(hh.lockStart?'<span class="lk" title="'+it('g_locked_tip')+'">🔒</span>':'')+'</td>',
     end:'<td>'+dmy(hh.end)+'</td>'
@@ -44766,8 +44766,16 @@ function cellsHouse(hh, cols){
 function pctOf(r){ return r.panels?Math.round((r.done||0)/r.panels*100)+'%':'0%'; }
 function teamOpts(h){
   var n=teamsOf(h.zone), s='<option value="">'+it('g_auto')+'</option>';
-  for(var i=0;i<n;i++) s+='<option value="'+i+'"'+(h.lockTeam===i?' selected':'')+'>'+teamLabel(i)+'</option>';
+  for(var i=0;i<n;i++){
+    var col=teamColor(h.zone,i);
+    s+='<option value="'+i+'"'+(h.lockTeam===i?' selected':'')+' style="color:'+col+';font-weight:700;">'+teamLabel(i)+'</option>';
+  }
   return s;
+}
+function teamSelColor(sel,id){
+  var h=byId(id); if(!h) return;
+  if(sel.value===''){ sel.style.color=''; return; }
+  sel.style.color=teamColor(h.zone,+sel.value);
 }
 function evNum(id,k,v){
   var h=byId(id); if(!h) return;
