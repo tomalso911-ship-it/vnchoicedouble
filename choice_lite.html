@@ -44248,7 +44248,7 @@ var houses=[];   // {id,zone,name,panels,done,days,team,start,end,lockStart,lock
 var zones=[];    // {name,teams,start}
 var cfg={};
 var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'serial',view:'house',
-  color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},
+  color:'team',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},
   visible:['zone','name','panels','done','prog','days','team','start','end'],
   cfgOpen:false, cardsCollapsed:false,
   showWeekend:true,
@@ -44281,6 +44281,8 @@ function loadCfg(){
   var c={}; for(var k in DEF) c[k]=DEF[k];
   var raw=null; try{ raw=localStorage.getItem(ganttStorageKey('house_sched_v1')); }catch(e){}
   if(raw){ try{ var o=JSON.parse(raw); for(var k2 in o) if(o[k2]!==undefined&&o[k2]!==null) c[k2]=o[k2]; }catch(e){} }
+  /* 迁移：旧默认按分区 → 统一改为按小组着色（2026-09-30 小组配色蓝/红/深黄/紫） */
+  if(c._ver===undefined||c._ver<2){ c.color='team'; c._ver=2; }
   if(!c.visible||!c.visible.length) c.visible=DEF.visible.slice();
   if(!c.start) c.start=(typeof GANTT_DEFAULT_START!=='undefined' && GANTT_DEFAULT_START) ? GANTT_DEFAULT_START : today();
   cfg=c;
