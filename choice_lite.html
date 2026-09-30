@@ -4461,6 +4461,26 @@ function _ovLoadChartLib(cb){
         return fetch('/api/prod-factory/'+encodeURIComponent(f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:f }) });
       } catch(e){ return Promise.resolve(); }
     }
+    /* 深合并：服务端为基，但本地已有的值优先保留（数组按 JSON 并集去重，叶子节点本地非空则用本地）。
+       用于「安装」等本地独有字段，避免服务端旧快照把本地刚录入的数据覆盖清空。 */
+    function prod_mergeKeepLocal(local, server){
+      if(local==null) return server;
+      if(server==null) return local;
+      if(Array.isArray(local)||Array.isArray(server)){
+        var la=Array.isArray(local)?local:[], sa=Array.isArray(server)?server:[];
+        var seen={}, res=[];
+        sa.forEach(function(x){ var k=JSON.stringify(x); if(!seen[k]){ seen[k]=1; res.push(x); } });
+        la.forEach(function(x){ var k=JSON.stringify(x); if(!seen[k]){ seen[k]=1; res.push(x); } });
+        return res;
+      }
+      if(typeof local!=='object'){ return (local!==''&&local!=null)?local:server; }
+      var o=JSON.parse(JSON.stringify(server));
+      for(var k in local){ if(!local.hasOwnProperty(k)) continue;
+        if(!(k in o)||o[k]==null||o[k]==='') o[k]=local[k];
+        else o[k]=prod_mergeKeepLocal(local[k], o[k]);
+      }
+      return o;
+    }
     // 合并两个现场工厂对象：以服务端为准，但保留本地独有的收货单/入库/出库等记录，避免竞态丢失。
     function prod_mergeFactory(localF, serverF){
       if(!localF || typeof localF!=='object') return serverF;
@@ -4504,6 +4524,11 @@ function _ovLoadChartLib(cb){
         }
       }
       if(localF.plan && !out.plan) out.plan = localF.plan;
+      /* ★ 安装/其它本地独有顶层字段：服务端旧快照通常不含这些（尤其 installation），
+         若不在合并里保留，刷新/重新打开项目时就会被清空。这里一律深合并并保留本地。 */
+      ['installation','finished','houseOut','inventoryPlan','prepStart','prepEnd','planStart'].forEach(function(k){
+        if(localF[k]!=null) out[k]=prod_mergeKeepLocal(localF[k], out[k]);
+      });
       return prod_normalizeDates(out);
     }
     // 打开项目时与服务端同步：服务端有数据则与本地合并（全员看到相同内容，且刚提交的数据不丢）；
@@ -44335,6 +44360,9 @@ function schedule(){
 
     var n=Math.max(1,z.teams|0), free=[];
     for(var i=0;i<n;i++) free[i]=z.start;
+    /* 默认（未手选小组）按「房舍列表顺序」第1组、第2组…交替分配，直到本区排完 */
+    var rrMap={}, rrn=0;
+    hs.forEach(function(h){ if(!h.bothTeams && h.lockTeam==null){ rrMap[h.id]=rrn++; } });
 
     order.forEach(function(h){
       /* 全部组：1组+2组…全部并行 → 产能 n×cap，且独占全部 n 个组
@@ -44354,7 +44382,7 @@ function schedule(){
          不能用 free[j] < Infinity 这种写法（字符串转数字得 NaN，比较恒 false） */
       var k=0;
       if(h.lockTeam!=null&&h.lockTeam<n&&h.lockTeam>=0) k=h.lockTeam|0;
-      else{ for(var j=1;j<n;j++){ if(free[j]<free[k]) k=j; } }
+      else{ k=(rrMap[h.id]||0)%n; }
       var s=h.lockStart?nextWork(h.lockStart):nextWork(free[k]);
       var e=addWork(s,h.days);
       h.start=s; h.end=e; h.team=k;
@@ -44513,7 +44541,7 @@ function rowH(){ return cfg.barHeight+10; }
  * 7. 渲染甘特
  * ======================================================================= */
 function barColorOf(r){
-  if(r&&(r.kind==='allgroup'||r.bothTeams||(r.house&&r.house.lockTeam==null))) return ALL_C;   /* 全部组：默认未指定小组也按全部组着色 */
+  if(r&&(r.kind==='allgroup'||r.bothTeams)) return ALL_C;   /* 全部组 */
   if((r.kind==='house'||r.kind==='team')&&r.team!=null) return teamColor(r.zone,r.team);
   return zoneColor(r.zone);
 }
@@ -44791,7 +44819,7 @@ function cellsHouse(hh, cols){
     done:'<td class="num"><input type="text" value="'+fmtNum(hh.done)+'" onchange="evNum(\''+hh.id+'\',\'done\',this.value)"></td>',
     prog:'<td>'+(hh.panels?Math.round((hh.done||0)/hh.panels*100)+'%':'0%')+'</td>',
     days:'<td class="num">'+fmtNum(hh.days)+'</td>',
-    team:'<td><select onchange="evTeam(\''+hh.id+'\',this.value);teamSelColor(this,\''+hh.id+'\')"'+((hh.bothTeams||hh.lockTeam==null)?' style="color:'+ALL_C+'"':(hh.lockTeam!=null?' style="color:'+teamColor(hh.zone,hh.lockTeam)+'"':''))+'>'+teamOpts(hh)+'</select></td>',
+    team:'<td><select onchange="evTeam(\''+hh.id+'\',this.value);teamSelColor(this,\''+hh.id+'\')"'+(hh.bothTeams?' style="color:'+ALL_C+'"':((hh.lockTeam!=null||typeof hh.team==='number')?' style="color:'+teamColor(hh.zone,(hh.lockTeam!=null?hh.lockTeam:hh.team))+'"':''))+'>'+teamOpts(hh)+'</select></td>',
     start:'<td><input value="'+esc(dmy(hh.start))+'" onchange="evStart(\''+hh.id+'\',this.value)">'
       +(hh.lockStart?'<span class="lk" title="'+it('g_locked_tip')+'">🔒</span>':'')+'</td>',
     end:'<td>'+dmy(hh.end)+'</td>'
@@ -44800,10 +44828,12 @@ function cellsHouse(hh, cols){
 function pctOf(r){ return r.panels?Math.round((r.done||0)/r.panels*100)+'%':'0%'; }
 function teamOpts(h){
   var n=teamsOf(h.zone), s='';
-  s+='<option value="all"'+((h.bothTeams||h.lockTeam==null)?' selected':'')+' style="color:'+ALL_C+';font-weight:700;">'+it('g_allgroup')+'</option>';
+  /* 默认显示排程实际分配到的组（未手选时 = h.team），不再默认显示全部组 */
+  var eff=(h.lockTeam!=null)?(h.lockTeam|0):((typeof h.team==='number')?h.team:null);
+  s+='<option value="all"'+(h.bothTeams?' selected':'')+' style="color:'+ALL_C+';font-weight:700;">'+it('g_allgroup')+'</option>';
   for(var i=0;i<n;i++){
     var col=teamColor(h.zone,i);
-    s+='<option value="'+i+'"'+(h.lockTeam===i?' selected':'')+' style="color:'+col+';font-weight:700;">'+teamLabel(i)+'</option>';
+    s+='<option value="'+i+'"'+(!h.bothTeams&&eff===i?' selected':'')+' style="color:'+col+';font-weight:700;">'+teamLabel(i)+'</option>';
   }
   return s;
 }
@@ -45281,7 +45311,7 @@ function printExcel(){
     {n:it('g_col_done'),   v:function(h){ return fmtNum(h.done); }, num:1},
     {n:it('g_col_prog'),   v:function(h){ return (h.panels?Math.round((h.done||0)/h.panels*100):0)+'%'; }},
     {n:it('g_col_days'),   v:function(h){ return fmtNum(h.days); }, num:1},
-    {n:it('g_col_team'),   v:function(h){ return h.bothTeams?it('g_allgroup'):(h.lockTeam!=null?teamLabel(h.lockTeam):it('g_allgroup')); }},
+    {n:it('g_col_team'),   v:function(h){ return h.bothTeams?it('g_allgroup'):teamLabel(h.lockTeam!=null?h.lockTeam:(typeof h.team==='number'?h.team:0)); }},
     {n:it('g_col_start'),  v:function(h){ return dmy(h.start); }},
     {n:it('g_col_end'),    v:function(h){ return dmy(h.end); }}
   ];
@@ -45910,6 +45940,21 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     inst_renderTab(active);
   }
 
+  /* ★ 输入即时保存：避免用户改完没点「保存」就刷新/切换导致丢数据 */
+  function inst_bindAutoSave(key){
+    var body = inst_el('inst-tab-body'); if(!body) return;
+    if(key==='C'){
+      var sel = body.querySelectorAll('#ic_holiday, .inst-role-inputs input');
+      for(var i=0;i<sel.length;i++){
+        (function(el){ el.addEventListener('change', function(){ try{ inst_saveWorkers(); }catch(e){} }); })(sel[i]);
+      }
+    } else if(key==='E'){
+      ['ie_pcs','ie_houses'].forEach(function(id){
+        var el = document.getElementById(id);
+        if(el) el.addEventListener('change', function(){ try{ inst_saveDaily(); }catch(e){} });
+      });
+    }
+  }
   function inst_renderTab(key){
     INST_ACTIVE_TAB = key;
     var tabs = inst_el('inst-tabs');
@@ -45941,8 +45986,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         fr.onload = function(){ inst_ganttInject(fr, f); };
       }
     }
-    else if(key==='C'){ body.innerHTML = inst_tabC(f); setTimeout(inst_backfillWeather, 0); }
-    else if(key==='E'){ body.innerHTML = inst_tabE(f); inst_drawStats(f); }
+    else if(key==='C'){ body.innerHTML = inst_tabC(f); setTimeout(inst_backfillWeather, 0); inst_bindAutoSave('C'); }
+    else if(key==='E'){ body.innerHTML = inst_tabE(f); inst_drawStats(f); inst_bindAutoSave('E'); }
     inst_updateTabBadges();
   }
 
