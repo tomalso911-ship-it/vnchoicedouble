@@ -43924,6 +43924,7 @@ table.zt tr:hover td{background:#f7fbff}
       <div class="fld"><label data-i18n="g_lbl_due">项目交期</label><input id="gp_due" class="ro" readonly></div>
       <div class="fld"><label data-i18n="g_lbl_install_days">总安装天数</label><input id="gp_install_days" class="ro" readonly></div>
       <button class="btn primary" onclick="recompute()" data-i18n="g_btn_recompute">重新排程</button>
+      <button class="btn" id="btnViewQuick" onclick="toggleViewQuick()" title="切换甘特行视图">按小组泳道</button>
       <button class="btn" id="btnDisplayCfg" onclick="gToggleCfg()" data-i18n="g_btn_displaycfg">⚙ 显示设置</button>
     </div>
   </div>
@@ -44601,7 +44602,7 @@ function renderChart(){
       var d;
       if(x2>x1+12) d='M'+x1+' '+y1+' H'+(x1+8)+' V'+y2+' H'+(x2-1);
       else d='M'+x1+' '+y1+' H'+(x1+8)+' V'+(y1+rh/2-3)+' H'+(x2-11)+' V'+y2+' H'+(x2-1);
-      paths+='<path d="'+d+'" fill="none" stroke="#90a4ae" stroke-width="1.2" marker-end="url(#arw)"/>';
+      paths+='<path d="'+d+'" fill="none" stroke="#607d8b" stroke-width="1.5" marker-end="url(#arw)"/>';
     }
     for(var ri=0; ri<rows.length; ri++){
       var r=rows[ri];
@@ -45202,6 +45203,12 @@ function setCfg(k,v){
   if(CFG_SCHED_KEYS[k]) schedule();
   renderAll(); saveCfg();
 }
+/* 顶部快捷按钮：在「按房舍 / 按小组泳道」之间切换（依赖连线只在泳道视图绘制） */
+function toggleViewQuick(){ cfg.view=(cfg.view==='team')?'house':'team'; renderAll(); saveCfg(); }
+function syncViewQuick(){
+  var b=document.getElementById('btnViewQuick');
+  if(b){ b.textContent=it(cfg.view==='team'?'g_view_team':'g_view_house'); b.title=it('g_lbl_view'); }
+}
 function toggleCol(k,on){
   cfg.visible=cfg.visible||[];
   var i=cfg.visible.indexOf(k);
@@ -45284,6 +45291,7 @@ function renderCfg(){
   h+='</div>';
   h+='</div>';
   box.innerHTML=h;
+  syncViewQuick();
 }
 function renderAll(){
   refreshCols();
