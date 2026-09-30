@@ -44490,7 +44490,7 @@ function rowH(){ return cfg.barHeight+18; }
  * 7. 渲染甘特
  * ======================================================================= */
 function barColorOf(r){
-  if(cfg.color==='team'&&r.team!=null) return teamColor(r.zone,r.team);
+  if((r.kind==='house'||r.kind==='team')&&r.team!=null) return teamColor(r.zone,r.team);
   return zoneColor(r.zone);
 }
 function renderChart(){
@@ -44918,7 +44918,7 @@ function renderLoad(){
       var work=0; hs.forEach(function(x){ work+=x.days; });
       var span=hs.length?workDaysBetween(hs[0].start,hs[hs.length-1].end):0;
       var util=span?Math.round(work/span*100):0;
-      var col=cfg.color==='team'?teamColor(z.name,t):zoneColor(z.name);
+      var col=teamColor(z.name,t);
       h+='<div class="load"><div class="lh"><span class="ln">'+esc(z.name)+' · '+teamLabel(t)+'</span>'
         +'<span class="lv">'+fmtNum(hs.length)+it('g_load_dong')+' · '+fmtNum(work)+it('g_load_workday')+' · '+it('g_load_util')+' <b>'+util+'%</b></span></div>'
         +'<div class="lbar">';
