@@ -44578,25 +44578,15 @@ function renderChart(){
      整体上移 66px 被表头遮住，表现为「左侧表格与右侧横道图错开一个表头高度」。
      必须让它们成为 .bd 的子元素（.bd 是 position:relative），top 才以行区域顶部为基准。 */
 
-  /* 依赖（组级连线，仅 team 视图）：
-     1) 第1组结束：本区若有「全部组」，直接指向本区全部组；否则指向下一区的第1组；
-     2) 第2组结束：本区若有「全部组」，直接指向本区全部组；否则指向下一区的第2组；
-        （即本区第1组、第2组都要汇入本区全部组）
-     3) 全部组结束：下一区若有全部组 → 单项指向它；否则同时指向下一区第1组 + 第2组。
-     房舍视图不再画房舍间连线。 */
-  if(cfg.showDeps&&cfg.view==='team'){
+  /* 依赖连线（勾选「依赖连线」时，两个视图都画）：
+     按房舍视图：同组房舍按列表顺序逐栋相连；若本区有「全部组」，各组最后一栋都汇入全部组首栋，
+                 再由全部组末栋连到下一区（下一区有全部组则单项连它，否则连下一区各组首栋）。
+     按小组泳道视图：第1组/第2组末条 → 本区全部组（无则 → 下一区同组）；全部组 → 下一区全部组（无则 → 下一区第1、2组）。 */
+  if(cfg.showDeps){
     var paths='';
-    /* 预扫描：按区收集 第t组 行号 与 全部组 行号，并记录区的先后顺序 */
-    var zOrder=[], zInfo={};
-    rows.forEach(function(r,i){
-      if(r.kind!=='zone'&&r.kind!=='team'&&r.kind!=='allgroup') return;
-      if(!zInfo[r.zone]){ zInfo[r.zone]={teams:{}, all:null}; zOrder.push(r.zone); }
-      if(r.kind==='team') zInfo[r.zone].teams[r.team]=i;
-      if(r.kind==='allgroup') zInfo[r.zone].all=i;
-    });
     function depPath(ri, ti){
       var r=rows[ri], t=rows[ti];
-      if(!t||!t.start) return;
+      if(!r||!t||!r.end||!t.start) return;
       var y1=ri*rh+rh/2, y2=ti*rh+rh/2;
       var x1=S.x(r.end)+S.dayW, x2=S.x(t.start);
       var d;
@@ -44604,27 +44594,73 @@ function renderChart(){
       else d='M'+x1+' '+y1+' H'+(x1+8)+' V'+(y1+rh/2-3)+' H'+(x2-11)+' V'+y2+' H'+(x2-1);
       paths+='<path d="'+d+'" fill="none" stroke="#607d8b" stroke-width="1.5" marker-end="url(#arw)"/>';
     }
-    for(var ri=0; ri<rows.length; ri++){
-      var r=rows[ri];
-      if(r.kind!=='team'&&r.kind!=='allgroup') continue;
-      if(!r.end) continue;
-      var zi=zOrder.indexOf(r.zone); if(zi<0) continue;
-      var nz=zOrder[zi+1];
-      var tgts=[];
-      if(r.kind==='team'){
-        if(zInfo[r.zone].all!=null) tgts=[zInfo[r.zone].all];
-        else if(nz && zInfo[nz].teams[r.team]!=null) tgts=[zInfo[nz].teams[r.team]];
-      }else{
-        if(nz){
-          if(zInfo[nz].all!=null) tgts=[zInfo[nz].all];
-          else { for(var tk in zInfo[nz].teams){ if(zInfo[nz].teams.hasOwnProperty(tk)) tgts.push(zInfo[nz].teams[tk]); } }
+    if(cfg.view==='team'){
+      var zOrder=[], zInfo={};
+      rows.forEach(function(r,i){
+        if(r.kind!=='zone'&&r.kind!=='team'&&r.kind!=='allgroup') return;
+        if(!zInfo[r.zone]){ zInfo[r.zone]={teams:{}, all:null}; zOrder.push(r.zone); }
+        if(r.kind==='team') zInfo[r.zone].teams[r.team]=i;
+        if(r.kind==='allgroup') zInfo[r.zone].all=i;
+      });
+      for(var ri=0; ri<rows.length; ri++){
+        var r=rows[ri];
+        if(r.kind!=='team'&&r.kind!=='allgroup') continue;
+        if(!r.end) continue;
+        var zi=zOrder.indexOf(r.zone); if(zi<0) continue;
+        var nz=zOrder[zi+1];
+        var tgts=[];
+        if(r.kind==='team'){
+          if(zInfo[r.zone].all!=null) tgts=[zInfo[r.zone].all];
+          else if(nz && zInfo[nz].teams[r.team]!=null) tgts=[zInfo[nz].teams[r.team]];
+        }else{
+          if(nz){
+            if(zInfo[nz].all!=null) tgts=[zInfo[nz].all];
+            else { for(var tk in zInfo[nz].teams){ if(zInfo[nz].teams.hasOwnProperty(tk)) tgts.push(zInfo[nz].teams[tk]); } }
+          }
+        }
+        for(var qi=0; qi<tgts.length; qi++) depPath(ri, tgts[qi]);
+      }
+    } else {
+      /* 房舍视图 */
+      var zhOrder=[], zhList={};
+      rows.forEach(function(r,i){
+        if(r.kind!=='house') return;
+        if(!zhList[r.zone]){ zhList[r.zone]=[]; zhOrder.push(r.zone); }
+        zhList[r.zone].push(i);
+      });
+      for(var zj=0; zj<zhOrder.length; zj++){
+        var zone=zhOrder[zj], list=zhList[zone], nzList=zhList[zhOrder[zj+1]];
+        var alls=[], teams={};
+        list.forEach(function(idx){
+          var r=rows[idx];
+          if(r.house&&r.house.bothTeams) alls.push(idx);
+          else { var t=r.team; (teams[t]=teams[t]||[]).push(idx); }
+        });
+        var allStart=alls.length?alls[0]:null, allEnd=alls.length?alls[alls.length-1]:null;
+        for(var tk2 in teams){ if(!teams.hasOwnProperty(tk2)) continue;
+          var arr=teams[tk2], last=null;
+          for(var k=0;k<arr.length;k++){
+            if(last!=null) depPath(last, arr[k]);
+            last=arr[k];
+          }
+          if(last!=null){
+            if(allStart!=null) depPath(last, allStart);
+            else if(nzList){
+              for(var m=0;m<nzList.length;m++){ var nr=rows[nzList[m]]; if(!(nr.house&&nr.house.bothTeams)&&String(nr.team)===String(tk2)){ depPath(last, nzList[m]); break; } }
+            }
+          }
+        }
+        if(allEnd!=null&&nzList){
+          var nAll=null;
+          for(var p=0;p<nzList.length;p++){ var nr2=rows[nzList[p]]; if(nr2.house&&nr2.house.bothTeams){ nAll=nzList[p]; break; } }
+          if(nAll!=null) depPath(allEnd, nAll);
+          else { var seenT={}; for(var q=0;q<nzList.length;q++){ var nr3=rows[nzList[q]]; if(nr3.house&&nr3.house.bothTeams) continue; if(!seenT[nr3.team]){ seenT[nr3.team]=1; depPath(allEnd, nzList[q]); } } }
         }
       }
-      for(var qi=0; qi<tgts.length; qi++) depPath(ri, tgts[qi]);
     }
     h+='<svg class="deps" id="depSvg" width="'+S.width+'" height="'+S.rowsH+'">'
       +'<defs><marker id="arw" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">'
-      +'<path d="M0,0 L7,3.5 L0,7 Z" fill="#90a4ae"/></marker></defs>'+paths+'</svg>';
+      +'<path d="M0,0 L7,3.5 L0,7 Z" fill="#607d8b"/></marker></defs>'+paths+'</svg>';
   }
 
   /* 条 */
