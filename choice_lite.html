@@ -43616,7 +43616,7 @@ window.refreshMoveBtnState = function () {
 <title>房舍水泥板安装排程甘特</title>
 <style>
 :root{
-  --row-h:40px; --head-h:66px;
+  --row-h:40px; --head-h:48px;
   --bd:#e3e8ee; --bd2:#eef1f4;
   --txt:#263238; --txt2:#546e7a; --txt3:#90a4ae;
   --bg:#f6f8fa; --card:#fff; --pri:#1e88e5;
@@ -43763,14 +43763,14 @@ body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !imp
 .chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff;will-change:scroll-position}
 .ci{position:relative}
 .thead{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--bd);height:var(--head-h)}
-.tu{display:flex;height:30px;border-bottom:1px solid var(--bd2)}
+.tu{display:flex;height:24px;border-bottom:1px solid var(--bd2)}
 .tu>div{font-size:11px;font-weight:600;color:#455a64;padding:0 6px;border-right:1px solid var(--bd2);
   overflow:hidden;white-space:nowrap;display:flex;align-items:center;justify-content:center}
-.tl{display:flex;height:34px}
-.tl>div{font-size:10px;color:var(--txt2);border-right:1px solid var(--bd2);overflow:hidden;
+.tl{display:flex;height:22px}
+.tl>div{font-size:9px;color:var(--txt2);border-right:1px solid var(--bd2);overflow:hidden;
   display:flex;flex-direction:column;align-items:center;justify-content:center;white-space:nowrap}
-.tl>div .t1{line-height:13px;font-weight:600}
-.tl>div .t2{line-height:12px;font-size:9px;color:var(--txt3);margin-top:1px}
+.tl>div .t1{line-height:11px;font-weight:600}
+.tl>div .t2{line-height:10px;font-size:8px;color:var(--txt3);margin-top:1px}
 .tl>div.we .t1{color:#e57373}
 .tl>div.we{background:#fff8f8}
 .bd{position:relative;
@@ -44236,8 +44236,8 @@ function parseHolidays(){
 var ZONE_C=['#5c6bc0','#26a69a','#ffa726','#ef5350','#66bb6a','#ab47bc','#29b6f6','#8d6e63'];
 /* 小组颜色固定：第1组蓝、第2组红、第3组深黄、第4组紫；之后循环回退色 */
 var TEAM_C=['#1E88E5','#E53935','#FBC02D','#8E24AA','#43A047','#FB8C00','#00897B','#78909c'];
-/* 全部组（1组+2组…并行）专属色：棕色，不与第1–4组蓝/红/黄/紫冲突 */
-var ALL_C='#795548';
+/* 全部组（1组+2组…并行）专属色：亮品红，不与第1–4组蓝/红/黄/紫冲突 */
+var ALL_C='#D81B60';
 
 var houses=[];   // {id,zone,name,panels,done,days,team,start,end,lockStart,lockTeam,bs,be}
 var zones=[];    // {name,teams,start}
@@ -44507,13 +44507,13 @@ function weekLabel(s,e,cw){
   if(cw>=44) return sd+sp+sm+' - '+ed+(em!==sm?(sp+em):'');
   return parseInt(sd,10)+'-'+parseInt(ed,10)+(em!==sm?(sp+parseInt(em,10)):'');
 }
-function rowH(){ return cfg.barHeight+18; }
+function rowH(){ return cfg.barHeight+10; }
 
 /* =========================================================================
  * 7. 渲染甘特
  * ======================================================================= */
 function barColorOf(r){
-  if(r&&(r.kind==='allgroup'||r.bothTeams)) return ALL_C;   /* 全部组：棕色 */
+  if(r&&(r.kind==='allgroup'||r.bothTeams||(r.house&&r.house.lockTeam==null))) return ALL_C;   /* 全部组：默认未指定小组也按全部组着色 */
   if((r.kind==='house'||r.kind==='team')&&r.team!=null) return teamColor(r.zone,r.team);
   return zoneColor(r.zone);
 }
@@ -44544,7 +44544,7 @@ function renderChart(){
   if(cfg.showGrid) S.cols.forEach(function(c,i){ h+='<div class="cl" style="left:'+(i*S.colW)+'px"></div>'; });
   if(showToday) h+='<div class="today-line" style="left:'+todayX+'px"></div>';
   /* ★ 这里【不能】闭合 .bd！
-     .thead 是 sticky 但仍占 66px 文档流，.bd 从 y=66 才开始；
+     .thead 是 sticky 但仍占 48px 文档流，.bd 从 y=48 才开始；
      条形/依赖线若放在 .bd 外面，top 会以 .ci 的 0 为基准，
      整体上移 66px 被表头遮住，表现为「左侧表格与右侧横道图错开一个表头高度」。
      必须让它们成为 .bd 的子元素（.bd 是 position:relative），top 才以行区域顶部为基准。 */
@@ -45240,7 +45240,7 @@ function renderCfg(){
 function renderAll(){
   refreshCols();
   document.documentElement.style.setProperty('--row-h',rowH()+'px');
-  document.documentElement.style.setProperty('--head-h','66px');
+  document.documentElement.style.setProperty('--head-h','48px');
   applyTblW();
   buildRows(); renderChart(); renderTable();
   renderKPI(); renderZoneTbl(); renderLoad(); renderCfg(); syncScroll();
