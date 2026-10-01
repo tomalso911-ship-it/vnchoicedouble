@@ -45187,13 +45187,14 @@ function cssEsc(s){ return String(s).replace(/([ #.;?%&,@+*~':"!\^$[\]()=>|/])/g
 /* =========================================================================
  * 11. 分隔线
  * ======================================================================= */
+function tableContentWidth(){ var s=0; visibleCols().forEach(function(c){ s+=colW(c.k); }); return s; }
 function applyTblW(){ document.documentElement.style.setProperty('--tbl-w',Math.round(cfg.tableWidth||470)+'px'); }
-function fitTblW(){ var s=0; COLS.forEach(function(c){ s+=colW(c.k); });
+function fitTblW(){ var s=tableContentWidth();
   cfg.tableWidth=Math.max(220,Math.min(s+2,Math.max(window.innerWidth-360,280)));
   applyTblW(); saveCfg(); }
 function initSplitter(){
   var sp=document.getElementById('splitter'); if(!sp||sp.__init) return; sp.__init=1;
-  function clamp(w){ return Math.max(220,Math.min(w,Math.max(window.innerWidth-360,300))); }
+  function clamp(w){ var contentW=tableContentWidth()+2; var maxW=Math.max(window.innerWidth-360,300); return Math.max(220,Math.min(w,maxW,contentW)); }
   sp.addEventListener('mousedown',function(e){
     if(e.button!==0) return; e.preventDefault();
     var w0=cfg.tableWidth||470, x0=e.clientX;
@@ -45571,7 +45572,7 @@ document.addEventListener('click', function(e){
   cpCloseCalendar();
 });
 
-localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); if((cfg.fitVer||0)<2){ colFitAll(); cfg.fitVer=2; saveCfg(); } initSplitter();
+localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); if((cfg.fitVer||0)<3){ colFitAll(); fitTblW(); cfg.fitVer=3; saveCfg(); } initSplitter();
 window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); };
 </script>
 </body>
