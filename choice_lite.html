@@ -43730,6 +43730,7 @@ textarea:focus{outline:none;border-color:var(--pri)}
   white-space:nowrap;overflow:hidden;vertical-align:middle}
 .tbl-wrap th.twoline{white-space:pre-line;line-height:1.2;text-align:center}
 .tbl-wrap td.tc{text-align:center}
+.tbl-wrap td .ans-yes{color:#E53935;font-weight:600}
 .tbl-wrap tr:hover td{background:#f0f7ff}
 .tbl-wrap tr.sel td{background:#e3f2fd}
 .tbl-wrap tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--pri)}
@@ -44814,6 +44815,7 @@ function rowCells(map, cols){
   var s=''; cols.forEach(function(c){ s+=(map[c.k]!==undefined?map[c.k]:'<td></td>'); }); return s;
 }
 function isTodayRange(s,e){ return !!s && !!e && today()>=s && today()<=e; }
+function todayCell(yes){ return '<td class="tc"><span class="'+(yes?'ans-yes':'')+'">'+it(yes?'g_yes':'g_no')+'</span></td>'; }
 function cellsZone(z, cols, collapsed){
   var hs=houses.filter(function(h){ return h.zone===z.name; });
   var pn=sum(hs,'panels'), dn=sum(hs,'done');
@@ -44828,7 +44830,7 @@ function cellsZone(z, cols, collapsed){
     team:'<td>'+fmtNum(Math.max(1,z.teams|0))+it('g_unit_group')+'</td>',
     start:'<td>'+dmy(z.start)+'</td>',
     end:'<td>'+dmy(z.end)+'</td>',
-    today:'<td class="tc">'+(anyToday?it('g_yes'):it('g_no'))+'</td>'
+    today:todayCell(anyToday)
   }, cols);
 }
 function cellsTeam(z, t, cols){
@@ -44846,7 +44848,7 @@ function cellsTeam(z, t, cols){
     team:'<td></td>',
     start:'<td>'+(ths.length?dmy(ths[0].start):'—')+'</td>',
     end:'<td>'+(last?dmy(last.end):'—')+'</td>',
-    today:'<td class="tc">'+(ths.length?(anyToday?it('g_yes'):it('g_no')):'—')+'</td>'
+    today:ths.length?todayCell(anyToday):'<td></td>'
   }, cols);
 }
 function cellsMs(z, cols, showZone){
@@ -44872,7 +44874,7 @@ function cellsHouse(hh, cols){
     start:'<td><input value="'+esc(dmy(hh.start))+'" onchange="evStart(\''+hh.id+'\',this.value)">'
       +(hh.lockStart?'<span class="lk" title="'+it('g_locked_tip')+'">🔒</span>':'')+'</td>',
     end:'<td>'+dmy(hh.end)+'</td>',
-    today:'<td class="tc">'+(isTodayRange(hh.start,hh.end)?it('g_yes'):it('g_no'))+'</td>'
+    today:todayCell(isTodayRange(hh.start,hh.end))
   }, cols);
 }
 function pctOf(r){ return r.panels?Math.round((r.done||0)/r.panels*100)+'%':'0%'; }
@@ -45568,7 +45570,7 @@ document.addEventListener('click', function(e){
   cpCloseCalendar();
 });
 
-localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); initSplitter();
+localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); colAutoFit('name', true); renderTable(); syncTableWidth(); saveCfg(); initSplitter();
 window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); };
 </script>
 </body>
