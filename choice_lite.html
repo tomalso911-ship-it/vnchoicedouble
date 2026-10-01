@@ -44982,7 +44982,7 @@ function colFitAll(){
 function colReset(){
   cfg.colW={};
   cfg.visible=DEF.visible.slice();
-  colFitAll();
+  colFitAll(); fitTblW();
 }
 
 /* =========================================================================
@@ -45215,7 +45215,7 @@ function fitTblW(){ var s=tableContentWidth();
   applyTblW(); saveCfg(); }
 function initSplitter(){
   var sp=document.getElementById('splitter'); if(!sp||sp.__init) return; sp.__init=1;
-  function clamp(w){ var contentW=tableContentWidth()+2; var maxW=Math.max(window.innerWidth-360,contentW); return Math.max(220,Math.min(w,maxW,contentW)); }
+  function clamp(w){ var contentW=tableContentWidth()+2; return Math.max(220,Math.min(w,contentW)); }
   sp.addEventListener('mousedown',function(e){
     if(e.button!==0) return; e.preventDefault();
     var w0=cfg.tableWidth||470, x0=e.clientX;
@@ -45594,7 +45594,9 @@ document.addEventListener('click', function(e){
 });
 
 localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); if((cfg.fitVer||0)<6){ colFitAll(); fitTblW(); cfg.fitVer=6; saveCfg(); } initSplitter();
-window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); colFitAll(); };
+if((cfg.tableWidth||0) < tableContentWidth()+2){ fitTblW(); }
+window.addEventListener('resize', function(){ fitTblW(); });
+window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); colFitAll(); fitTblW(); };
 </script>
 </body>
   </template>
@@ -46210,8 +46212,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       if(typeof w.loadCfg === 'function') w.loadCfg();
       if(typeof w.syncParamUI === 'function') w.syncParamUI();
       if(typeof w.rebuild === 'function') w.rebuild();
-      /* 注入新数据（含新语言房舍/区名）后按真实 DOM 重新自适应列宽，保证文字 100% 可见 */
+      /* 注入新数据（含新语言房舍/区名）后按内容重算列宽并自动调整右分隔线 */
       if(typeof w.colFitAll === 'function') w.colFitAll();
+      if(typeof w.fitTblW === 'function') w.fitTblW();
     } catch(e){}
   }
   function inst_assignMap(f){ return (f.installation && f.installation.assign) || {}; }
