@@ -44944,7 +44944,8 @@ function measureText(s){
 }
 function colAutoFit(k, quiet){
   var c=findCol(k); if(!c) return;
-  var mx=measureText(c.n)+30;
+  var lines=(c.n||'').split(/\r?\n/);
+  var mx=lines.reduce(function(acc,l){return Math.max(acc, measureText(l)+30);},0);
   if(k==='name') houses.forEach(function(h){ var n1=h.name1||h.name||''; mx=Math.max(mx,measureText(n1)+22); if(h.name2) mx=Math.max(mx,measureText(h.name2)+22); });
   if(k==='zone') houses.forEach(function(h){ mx=Math.max(mx,measureText(h.zone)+22); });
   if(k==='team') mx=Math.max(mx,measureText(it('g_team_fmt').replace('{n}',1))+40);
@@ -45570,7 +45571,7 @@ document.addEventListener('click', function(e){
   cpCloseCalendar();
 });
 
-localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); colAutoFit('name', true); renderTable(); syncTableWidth(); saveCfg(); initSplitter();
+localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); if(!cfg.autoFitted){ colFitAll(); cfg.autoFitted=true; saveCfg(); } initSplitter();
 window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); };
 </script>
 </body>
