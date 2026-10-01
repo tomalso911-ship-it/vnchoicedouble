@@ -44816,6 +44816,14 @@ function rowCells(map, cols){
 }
 function isTodayRange(s,e){ return !!s && !!e && today()>=s && today()<=e; }
 function todayCell(yes){ return '<td class="tc"><span class="'+(yes?'ans-yes':'')+'">'+it(yes?'g_yes':'g_no')+'</span></td>'; }
+function fitNameColumn(){
+  var c=findCol('name'); if(!c) return;
+  var lines=(c.n||'').split(/\r?\n/);
+  var mx=lines.reduce(function(acc,l){return Math.max(acc, measureText(l)+30);},0);
+  houses.forEach(function(h){ var n1=h.name1||h.name||''; mx=Math.max(mx,measureText(n1)+22); if(h.name2) mx=Math.max(mx,measureText(h.name2)+22); });
+  cfg.colW=cfg.colW||{}; cfg.colW.name=Math.max(COL_MIN,Math.min(COL_MAX,Math.ceil(mx)));
+  renderTable(); syncTableWidth(); renderCfg(); saveCfg();
+}
 function cellsZone(z, cols, collapsed){
   var hs=houses.filter(function(h){ return h.zone===z.name; });
   var pn=sum(hs,'panels'), dn=sum(hs,'done');
@@ -45573,7 +45581,7 @@ document.addEventListener('click', function(e){
 });
 
 localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); if((cfg.fitVer||0)<3){ colFitAll(); fitTblW(); cfg.fitVer=3; saveCfg(); } initSplitter();
-window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); };
+window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); fitNameColumn(); };
 </script>
 </body>
   </template>
