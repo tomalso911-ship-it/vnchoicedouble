@@ -45607,9 +45607,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
 <script>
 /* ==================== 安装管理模块（复用生产 prod_* 全局函数） ==================== */
 (function(){
-  var INST_TABS = [['A','inst_tab_A'],['B','inst_tab_B'],['C','inst_tab_C'],['E','inst_tab_E']];
+  var INST_TABS = [['A','inst_tab_A'],['B','inst_tab_B'],['C','inst_tab_C']];
   var INST_ROLES = [['reporter','inst_role_reporter'],['leader','inst_role_leader'],['tractor','inst_role_tractor'],['assistant','inst_role_assistant'],['master','inst_role_master'],['hauler','inst_role_hauler'],['other','inst_role_other']];
-  var INST_CUR = null, INST_ACTIVE_TAB = 'A', INST_TABC_SELDATE = '', INST_TABE_SELDATE = '';
+  var INST_CUR = null, INST_ACTIVE_TAB = 'A', INST_TABC_SELDATE = '';
   var INST_CHARTS = [];
   var INST_ZONE_MAX = 12;
   var INST_ZONE_COLORS = ['#E53935','#FB8C00','#B8860B','#43A047','#1E88E5','#8E24AA','#00897B','#6D4C41','#3949AB','#D81B60','#5E35B1','#00ACC1'];
@@ -45635,7 +45635,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
 
   var INST_I18N = {
     zh: {
-      inst_title:'安装管理 · 项目列表', inst_back:'返回列表', inst_empty:'暂无项目', inst_tab_A:'安装计划总览', inst_tab_C:'安装小组及人工·天气', inst_tab_E:'日统计-安装', inst_suffix:' 安装',
+      inst_title:'安装管理 · 项目列表', inst_back:'返回列表', inst_empty:'暂无项目', inst_tab_A:'安装计划总览', inst_tab_C:'人工-天气-安装量', inst_suffix:' 安装',
       inst_plan_title:'安装计划总览',
       inst_plan_visual:'安装规划-可视化图',
       inst_lbl_client:'客户',
@@ -45736,7 +45736,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_gantt_summary_prod_to_accept:'从正式生产日截止全部验收结束，需要 {months} 月，{days} 天'
     },
     en: {
-      inst_title:'Installation · Projects', inst_back:'Back to List', inst_empty:'No projects', inst_tab_A:'Installation Plan', inst_tab_C:'Teams·Labor·Weather', inst_tab_E:'Daily Stats', inst_suffix:' Install',
+      inst_title:'Installation · Projects', inst_back:'Back to List', inst_empty:'No projects', inst_tab_A:'Installation Plan', inst_tab_C:'Labor-Weather-Install Qty', inst_suffix:' Install',
       inst_plan_title:'Installation Plan Overview',
       inst_plan_visual:'Installation Plan - Visualization',
       inst_lbl_client:'Client',
@@ -45837,7 +45837,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_gantt_summary_prod_to_accept:'From official production start to final acceptance completion: {months} months, {days} days'
     },
     vi: {
-      inst_title:'Lắp đặt · Dự án', inst_back:'Quay lại danh sách', inst_empty:'Chưa có dự án', inst_tab_A:'Tổng quan kế hoạch', inst_tab_C:'Đội·Nhân công·Thời tiết', inst_tab_E:'Thống kê ngày', inst_suffix:' Lắp đặt',
+      inst_title:'Lắp đặt · Dự án', inst_back:'Quay lại danh sách', inst_empty:'Chưa có dự án', inst_tab_A:'Tổng quan kế hoạch', inst_tab_C:'Nhân công-Thời tiết-SL lắp', inst_suffix:' Lắp đặt',
       inst_plan_title:'Tổng quan kế hoạch lắp đặt',
       inst_plan_visual:'Quy hoạch lắp đặt - Biểu đồ trực quan',
       inst_lbl_client:'Khách hàng',
@@ -46018,10 +46018,10 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   function inst_renderTabs(active){
     INST_ACTIVE_TAB = active;
     var box = inst_el('inst-tabs'); if(!box) return;
-    var cMiss = inst_tabCMissingCount(), eMiss = inst_tabEMissingCount();
+    var cMiss = inst_tabCMissingCount();
     var h = '';
     INST_TABS.forEach(function(t){
-      var count = t[0]==='C' ? cMiss : (t[0]==='E' ? eMiss : 0);
+      var count = t[0]==='C' ? cMiss : 0;
       var badge = (count>0) ? '<span class="prod-tab-badge">'+count+'</span>' : '';
       h += '<div class="prod-tab'+(t[0]===active?' active':'')+'" data-key="'+t[0]+'" onclick="inst_renderTab(\''+t[0]+'\')">'+it(t[1])+badge+'</div>';
     });
@@ -46037,11 +46037,6 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       for(var i=0;i<sel.length;i++){
         (function(el){ el.addEventListener('change', function(){ try{ inst_saveWorkers(); }catch(e){} }); })(sel[i]);
       }
-    } else if(key==='E'){
-      ['ie_pcs','ie_houses'].forEach(function(id){
-        var el = document.getElementById(id);
-        if(el) el.addEventListener('change', function(){ try{ inst_saveDaily(); }catch(e){} });
-      });
     }
   }
   function inst_renderTab(key){
@@ -46076,7 +46071,6 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       }
     }
     else if(key==='C'){ body.innerHTML = inst_tabC(f); setTimeout(inst_backfillWeather, 0); inst_bindAutoSave('C'); }
-    else if(key==='E'){ body.innerHTML = inst_tabE(f); inst_drawStats(f); inst_bindAutoSave('E'); }
     inst_updateTabBadges();
   }
 
@@ -47188,95 +47182,6 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     }
   }
 
-  /* ---------- 子标签 E：日统计-安装 ---------- */
-  function instStatCard(label,val){ return '<div class="inst-stat-card"><div class="inst-stat-val">'+prod_esc(val)+'</div><div class="inst-stat-label">'+prod_esc(label)+'</div></div>'; }
-  function inst_tabE(f){
-    var inst = f.installation || {}; inst.daily = inst.daily || {};
-    var d = prod_dmy(prod_val('ie_date')||INST_TABE_SELDATE||ymdToDmy(prod_today()));
-    var rec = inst.daily[d] || {};
-    var plan = inst.plan || {};
-    var totalPcs = +plan.totalPcs||0;
-    var cum = inst_cumPcs(f), cumH = inst_cumHouses(f);
-    var remain = Math.max(0, totalPcs - cum);
-    var rate = totalPcs>0 ? Math.round(cum/totalPcs*100) : 0;
-    var h = '<div class="prod-sec-title">'+it('inst_sec_stats')+'</div>';
-    h += '<div class="prod-form">'
-      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_date'),'ie_date',dmyToYmd(d),'INST_TABE_SELDATE=this.value', prod_today()) : '')
-      + (typeof prod_numFld==='function' ? prod_numFld(it('inst_lbl_pcs'),'ie_pcs',(rec.pcs!=null?rec.pcs:0)) : '')
-      + (typeof prod_numFld==='function' ? prod_numFld(it('inst_lbl_houses'),'ie_houses',(rec.houses!=null?rec.houses:0)) : '')
-      + '</div>';
-    h += '<div style="margin:8px 0 16px"><button class="prod-btn" type="button" onclick="inst_saveDaily()">'+it('inst_btn_add_daily')+'</button></div>';
-    h += '<div class="prod-sec-title">'+it('inst_summary')+'</div>';
-    h += '<div class="inst-stat-grid">'
-      + instStatCard(it('inst_stat_cum_pcs'), cum)
-      + instStatCard(it('inst_stat_cum_houses'), cumH);
-    if(totalPcs>0){
-      h += instStatCard(it('inst_lbl_total_pcs'), totalPcs)
-        + instStatCard(it('inst_stat_remain'), remain)
-        + instStatCard(it('inst_stat_rate'), rate+'%');
-    }
-    h += '</div>';
-    h += '<div class="prod-sec-title" style="margin-top:18px;">'+it('inst_chart_title')+'</div>';
-    h += '<div class="prod-eq-chart-box" style="flex:1 1 100%;max-width:none;height:340px;"><canvas id="instStatsChart"></canvas></div>';
-    h += '<div class="prod-sec-title" style="margin-top:18px;">'+it('inst_sec_daily_detail')+'</div>';
-    h += '<div class="prod-table-scroll"><table class="prod-table"><thead><tr>'
-      + '<th>'+pt('thr_no')+'</th><th>'+it('inst_lbl_date')+'</th><th>'+it('inst_lbl_pcs')+'</th><th>'+it('inst_lbl_houses')+'</th><th>'+it('inst_cum_pcs')+'</th><th>'+pt('op_actions')+'</th></tr></thead><tbody>';
-    var dates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(inst.daily||{}), true) : Object.keys(inst.daily||{});
-    var tc = 0;
-    dates.forEach(function(dd, idx){
-      var rr = inst.daily[dd]; tc += (+rr.pcs||0);
-      h += '<tr><td>'+(dates.length-idx)+'</td><td>'+ymdToDmy(dd)+'</td><td>'+ (+rr.pcs||0) +'</td><td>'+ (+rr.houses||0) +'</td><td>'+tc+'</td>'
-        + '<td><button class="prod-op" type="button" onclick="inst_delDaily(\''+dd+'\')">🗑️</button></td></tr>';
-    });
-    if(!dates.length){ h += '<tr><td colspan="6" style="text-align:center;color:#aaa">'+it('inst_nodata')+'</td></tr>'; }
-    h += '</tbody></table></div>';
-    return h;
-  }
-  function inst_saveDaily(){
-    var f = inst_get(INST_CUR); f.installation = f.installation || {}; var daily = f.installation.daily || {};
-    var d = prod_dmy(prod_val('ie_date')||ymdToDmy(prod_today()));
-    var pcs = parseInt((prod_val('ie_pcs')||'0').replace(/[^0-9]/g,'')||'0',10)||0;
-    var houses = parseInt((prod_val('ie_houses')||'0').replace(/[^0-9]/g,'')||'0',10)||0;
-    daily[d] = { pcs:pcs, houses:houses };
-    f.installation.daily = daily;
-    inst_save(f);
-    prod_toast(it('inst_saved'));
-    inst_renderTab('E');
-  }
-  function inst_delDaily(dd){
-    if(typeof confirm==='function' && !confirm(it('inst_confirm_del'))) return;
-    var f = inst_get(INST_CUR); var d = (f.installation && f.installation.daily) || {}; delete d[dd]; f.installation.daily = d;
-    inst_save(f); inst_renderTab('E');
-  }
-  function inst_drawStats(f){
-    if(INST_ACTIVE_TAB!=='E' || !f) return;
-    var inst = f.installation || {}; var daily = inst.daily || {};
-    var dates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(daily), false) : Object.keys(daily);
-    if(!dates.length) return;
-    var pcs=[], houses=[], cum=[], s=0;
-    dates.forEach(function(dd){ var v=+daily[dd].pcs||0; s+=v; pcs.push(v); houses.push(+daily[dd].houses||0); cum.push(s); });
-    if(typeof _ovLoadChartLib!=='function') return;
-    _ovLoadChartLib(function(){
-      try{
-        INST_CHARTS.forEach(function(c){ try{ c.destroy(); }catch(e){} });
-        INST_CHARTS = [];
-        var cv = inst_el('instStatsChart'); if(!cv) return;
-        INST_CHARTS.push(new Chart(cv.getContext('2d'), {
-          type:'bar',
-          data:{ labels: dates.map(ymdToDmy), datasets:[
-            { label:it('inst_chart_pcs'), data:pcs, backgroundColor:'#42A5F5', yAxisID:'yP' },
-            { label:it('inst_chart_houses'), data:houses, backgroundColor:'#66BB6A', yAxisID:'yH' },
-            { label:it('inst_chart_cum'), data:cum, type:'line', borderColor:'#E53935', backgroundColor:'#E53935', yAxisID:'yP', fill:false, tension:0.2 }
-          ]},
-          options:{ responsive:true, maintainAspectRatio:false, animation:false,
-            layout:{ padding:{ bottom:14 } },
-            scales:{ x:{ ticks:{ autoSkip:false, maxRotation:0 } },
-              yP:{ position:'left', beginAtZero:true, grace:'0%', title:{ display:true, text:it('inst_chart_pcs') }, ticks:{ precision:0 } },
-              yH:{ position:'right', beginAtZero:true, title:{ display:true, text:it('inst_chart_houses') }, grid:{ drawOnChartArea:false }, ticks:{ precision:0 } } } }
-        }));
-      }catch(e){ console.warn('[inst chart]', e); }
-    });
-  }
 
   /* ---------- 角标：待补录天数 ---------- */
   function inst_expectedMissing(obj){
@@ -47290,12 +47195,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     return Math.max(0, expected - Object.keys(actual).length);
   }
   function inst_tabCMissingCount(){ var f = inst_get(INST_CUR); return f ? inst_expectedMissing((f.installation && f.installation.workers)||{}) : 0; }
-  function inst_tabEMissingCount(){ var f = inst_get(INST_CUR); return f ? inst_expectedMissing((f.installation && f.installation.daily)||{}) : 0; }
   function inst_updateTabBadges(){
     var c = inst_tabCMissingCount(); var tC = document.querySelector('.prod-tab[data-key="C"]');
     if(tC){ var b = tC.querySelector('.prod-tab-badge'); if(c>0){ if(!b){ b=document.createElement('span'); b.className='prod-tab-badge'; tC.appendChild(b); } b.textContent=c; } else if(b){ b.remove(); } }
-    var e = inst_tabEMissingCount(); var tE = document.querySelector('.prod-tab[data-key="E"]');
-    if(tE){ var b2 = tE.querySelector('.prod-tab-badge'); if(e>0){ if(!b2){ b2=document.createElement('span'); b2.className='prod-tab-badge'; tE.appendChild(b2); } b2.textContent=e; } else if(b2){ b2.remove(); } }
   }
 
   /* 暴露到全局，供 switchView / 内联 onclick 调用 */
@@ -47309,8 +47211,6 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   window.inst_saveWorkers = inst_saveWorkers;
   window.inst_editWorkers = inst_editWorkers;
   window.inst_delWorkers = inst_delWorkers;
-  window.inst_saveDaily = inst_saveDaily;
-  window.inst_delDaily = inst_delDaily;
   window.inst_toggleBld = inst_toggleBld;
   window.inst_assignSelected = inst_assignSelected;
   window.inst_removeSelected = inst_removeSelected;
@@ -47353,9 +47253,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
               /* 只刷新标签页头，保留 iframe，避免甘特面板折叠/重载 */
               var tabsBox=inst_el('inst-tabs');
               if(tabsBox){
-                var cMiss=inst_tabCMissingCount(), eMiss=inst_tabEMissingCount(), h='';
+                var cMiss=inst_tabCMissingCount(), h='';
                 INST_TABS.forEach(function(t){
-                  var count=t[0]==='C'?cMiss:(t[0]==='E'?eMiss:0);
+                  var count=t[0]==='C'?cMiss:0;
                   var badge=(count>0)?'<span class="prod-tab-badge">'+count+'</span>':'';
                   h+='<div class="prod-tab'+(t[0]==='B'?' active':'')+'" data-key="'+t[0]+'" onclick="inst_renderTab(\''+t[0]+'\')">'+it(t[1])+badge+'</div>';
                 });
