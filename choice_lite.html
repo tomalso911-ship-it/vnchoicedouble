@@ -43848,6 +43848,13 @@ body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !imp
 /* ---------- 资源负载 ---------- */
 .loadgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
 .load{background:#fff;border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+/* 项目安装交付甘特图 */
+.delivery-gantt{padding:6px 0}
+.delivery-row{display:flex;align-items:center;gap:12px;font-size:12px;margin:6px 0}
+.delivery-label{flex:0 0 120px;color:#37474f;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.delivery-track{flex:1 1 auto;position:relative;height:18px;background:#eceff1;border-radius:4px;min-width:80px}
+.delivery-bar{position:absolute;top:0;height:100%;border-radius:4px;min-width:2px;opacity:.92}
+.delivery-date{flex:0 0 auto;color:#546e7a;font-size:11px;white-space:nowrap}
 .load .lh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .load .ln{font-size:12px;font-weight:600;color:#37474f}
 .load .lv{font-size:11px;color:var(--txt2)}
@@ -43961,6 +43968,14 @@ table.zt tr:hover td{background:#f7fbff}
         <div class="legend" id="legend"></div>
       </div>
     </div>
+
+    <!-- 项目安装交付甘特图 -->
+    <div class="card">
+      <h2 data-i18n="g_delivery_gantt">项目安装交付甘特图</h2>
+      <div class="card-body">
+        <div class="delivery-gantt" id="deliveryGanttBox"></div>
+      </div>
+    </div>
   </div>
 
   <!-- 日历弹出框（DD-MM-YYYY，标准设计） -->
@@ -44032,8 +44047,9 @@ var GANTT_I18N = {
     g_col_n:'列', g_unzoned:'未分区', g_bld_fmt:'房舍{n}',
     g_imp_norow:'没有解析出有效行（板数列必须是数字）', g_imp_ok:'已导入 <b>{n}</b> 栋房舍', g_imp_skip:'{n} 行板数无效已跳过',
     g_auto:'自动', g_csv_name:'房舍安装排程', g_imp_none:'— 无 —', g_ro_auto:'自动生成，不可编辑',
-    g_cards_toggle_title:'展开/收起（区汇总 + 小组负载）',
+    g_cards_toggle_title:'展开/收起（区汇总 + 小组负载 + 交付甘特图）',
     g_btn_excel:'打印EXCEL', g_btn_pdf:'打印PDF',
+    g_delivery_gantt:'项目安装交付甘特图', g_phase_contract:'合同签订', g_phase_prep:'建厂筹备期', g_phase_install:'安装期', g_phase_accept:'验收期',
     g_zt_zone:'分区', g_zt_team:'安装小组', g_zt_count:'房舍数', g_zt_panels:'总板数', g_zt_done:'已装',
     g_zt_start:'安装日期', g_zt_end:'完工', g_zt_days:'工期(天)', g_zt_ideal:'理论最少天数', g_zt_util:'利用率',
     g_ph_follow:'跟随项目', g_zone_start_tip:'留空=自动顺延（首区=项目开工日，其后各区=前一区完工日+1）',
@@ -44083,8 +44099,9 @@ var GANTT_I18N = {
     g_col_n:'col', g_unzoned:'Unzoned', g_bld_fmt:'House {n}',
     g_imp_norow:'No valid rows (panels must be numeric)', g_imp_ok:'Imported <b>{n}</b> houses', g_imp_skip:'{n} rows skipped (invalid panels)',
     g_auto:'Auto', g_csv_name:'House install schedule', g_imp_none:'— none —', g_ro_auto:'Auto-generated, read-only',
-    g_cards_toggle_title:'Expand/Collapse (Zone Summary + Team Load)',
+    g_cards_toggle_title:'Expand/Collapse (Zone Summary + Team Load + Delivery Gantt)',
     g_btn_excel:'Print Excel', g_btn_pdf:'Print PDF',
+    g_delivery_gantt:'Project Delivery Gantt', g_phase_contract:'Contract signing', g_phase_prep:'Factory prep period', g_phase_install:'Installation period', g_phase_accept:'Acceptance period',
     g_zt_zone:'Zone', g_zt_team:'Install team', g_zt_count:'Houses', g_zt_panels:'Total panels', g_zt_done:'Done',
     g_zt_start:'Installation Date', g_zt_end:'Done', g_zt_days:'Duration (days)', g_zt_ideal:'Min ideal days', g_zt_util:'Utilization',
     g_ph_follow:'Follow project', g_zone_start_tip:'Leave empty = auto: 1st zone = project start, later zones = prev zone end +1',
@@ -44134,8 +44151,9 @@ var GANTT_I18N = {
     g_col_n:'cột', g_unzoned:'Chưa phân vùng', g_bld_fmt:'Chuồng {n}',
     g_imp_norow:'Không có dòng hợp lệ (cột tấm phải là số)', g_imp_ok:'Đã nhập <b>{n}</b> chuồng', g_imp_skip:'{n} dòng bỏ qua (tấm không hợp lệ)',
     g_auto:'Tự động', g_csv_name:'Lịch lắp đặt chuồng', g_imp_none:'— không —', g_ro_auto:'Tự động tạo, không sửa được',
-    g_cards_toggle_title:'Mở rộng/Thu gọn (Tổng hợp vùng + Tải đội)',
+    g_cards_toggle_title:'Mở rộng/Thu gọn (Tổng hợp vùng + Tải đội + Gantt bàn giao)',
     g_btn_excel:'In Excel', g_btn_pdf:'In PDF',
+    g_delivery_gantt:'Gantt bàn giao lắp đặt dự án', g_phase_contract:'Ngày ký hợp đồng', g_phase_prep:'Giai đoạn chuẩn bị nhà máy', g_phase_install:'Giai đoạn lắp đặt', g_phase_accept:'Giai đoạn nghiệm thu',
     g_zt_zone:'Vùng', g_zt_team:'Đội lắp', g_zt_count:'Số chuồng', g_zt_panels:'Tổng tấm', g_zt_done:'Đã lắp',
     g_zt_start:'Ngày lắp đặt', g_zt_end:'Xong', g_zt_days:'Thời gian (ngày)', g_zt_ideal:'Số ngày lý thuyết', g_zt_util:'Tỷ lệ',
     g_ph_follow:'Theo dự án', g_zone_start_tip:'Để trống = tự động: vùng đầu = ngày khởi công dự án, vùng sau = vùng trước xong +1',
@@ -44294,7 +44312,7 @@ var COL_MIN=40, COL_MAX=420;
 function findCol(k){ var r=null; COLS.forEach(function(c){ if(c.k===k) r=c; }); return r; }
 function colW(k){ var c=findCol(k); return Math.max(COL_MIN,Math.min(COL_MAX,(cfg.colW||{})[k]||(c?c.w:80))); }
 
-function zoneOf(n){ var r=null; zones.forEach(function(z){ if(z.name===n) r=z; }); return r; }
+function zoneOf(n){ var r=null; zones.forEach(function(z){ if(z.key===n || z.name===n) r=z; }); return r; }
 function teamsOf(n){ var z=zoneOf(n); return z?Math.max(1,z.teams|0):1; }
 function zoneColor(n){ return ZONE_C[hash(n)%8]; }
 function teamColor(z,t){ var n=parseInt(t,10); if(isNaN(n)) n=0; n=((n%8)+8)%8; return TEAM_C[n]; }
@@ -44327,17 +44345,23 @@ function loadHouses(){
     var sp=rawName.split('#');
     var name1=sp[0]||rawName, name2=sp.slice(1).join('#');
     if(name2) name2='#'+name2;
-    return {id:'H'+(i+1), zone:String(h.zone||it('g_unzoned')), name:rawName, name1:name1, name2:name2,
+    var zkey=String(h.zoneKey!==undefined?h.zoneKey:(h.zone||it('g_unzoned')));
+    return {id:'H'+(i+1), zoneKey:zkey, zone:String(h.zone||it('g_unzoned')), name:rawName, name1:name1, name2:name2,
       panels:Math.max(0,Math.round(+h.panels||0)), done:Math.max(0,Math.round(+h.done||0)),
       days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bothTeams:false,bs:'',be:''};
   });
   // 区表：按出现顺序，默认 2 组（可在区汇总表里改）
   var seen={}; zones=[];
-  houses.forEach(function(h){ if(!seen[h.zone]){ seen[h.zone]=1; zones.push({name:h.zone,teams:2,start:''}); } });
+  houses.forEach(function(h){ if(!seen[h.zone]){ seen[h.zone]=1; zones.push({name:h.zone, key:h.zoneKey, teams:2, start:''}); } });
+  // 兼容旧本地缓存：折叠状态/小组数原先按语言相关区名存，迁移到稳定的 zoneKey
+  try{
+    cfg.collapsed=cfg.collapsed||{};
+    zones.forEach(function(z){ if(cfg.collapsed[z.name]) cfg.collapsed[z.key]=true; });
+  }catch(e){}
   try{
     var raw=localStorage.getItem(ganttStorageKey('house_zones_v1'));
     if(raw){ var oz=JSON.parse(raw)||[];
-      zones.forEach(function(z){ oz.forEach(function(o){ if(o.name===z.name) z.teams=Math.max(1,o.teams|0); }); }); }
+      zones.forEach(function(z){ oz.forEach(function(o){ if((o.key && o.key===z.key) || o.name===z.name) z.teams=Math.max(1,o.teams|0); }); }); }
   }catch(e){}
 }
 
@@ -44423,15 +44447,15 @@ function toggleBaseline(checked){
 /* =========================================================================
  * 4.5 区折叠状态
  * ======================================================================= */
-function isZoneCollapsed(zname){ return !!(cfg.collapsed||{})[zname]; }
-function toggleZone(zname, ev){
+function isZoneCollapsed(zkey){ return !!(cfg.collapsed||{})[zkey]; }
+function toggleZone(zkey, ev){
   if(ev && ev.stopPropagation) ev.stopPropagation();
   cfg.collapsed=cfg.collapsed||{};
-  cfg.collapsed[zname]=!cfg.collapsed[zname];
+  cfg.collapsed[zkey]=!cfg.collapsed[zkey];
   renderAll(); saveCfg();
 }
 function expandAllZones(){ cfg.collapsed={}; renderAll(); saveCfg(); }
-function collapseAllZones(){ cfg.collapsed={}; zones.forEach(function(z){ cfg.collapsed[z.name]=true; }); renderAll(); saveCfg(); }
+function collapseAllZones(){ cfg.collapsed={}; zones.forEach(function(z){ cfg.collapsed[z.key]=true; }); renderAll(); saveCfg(); }
 
 /* =========================================================================
  * 5. 行模型（甘特行）
@@ -44443,34 +44467,34 @@ function buildRows(){
     zones.forEach(function(z){
       var hs=houses.filter(function(h){ return h.zone===z.name; });
       if(!hs.length) return;
-      rows.push({kind:'zone',id:'Z:'+z.name,name:z.name+it('g_zone_summary'),zone:z.name,
+      rows.push({kind:'zone',id:'Z:'+z.key,name:z.name+it('g_zone_summary'),zone:z.name,zoneKey:z.key,
         start:z.start,end:z.end,days:diffDays(z.start,z.end)+1,
         panels:sum(hs,'panels'),done:sum(hs,'done')});
-      if(isZoneCollapsed(z.name)) return;
+      if(isZoneCollapsed(z.key)) return;
       for(var t=0;t<Math.max(1,z.teams|0);t++){
         var ths=hs.filter(function(h){ return !h.bothTeams && h.team===t; }).sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
-        rows.push({kind:'team',id:'T:'+z.name+':'+(t+1),name:z.name+' · '+teamLabel(t),zone:z.name,team:t,
+        rows.push({kind:'team',id:'T:'+z.key+':'+(t+1),name:z.name+' · '+teamLabel(t),zone:z.name,zoneKey:z.key,team:t,
           start:ths.length?ths[0].start:'',end:ths.length?ths[ths.length-1].end:'',
           panels:sum(ths,'panels'),done:sum(ths,'done'),houses:ths});
       }
       /* 全部组泳道：本区由 1组+2组…全部并行完成的房（放在各小组泳道最下方、里程碑之前） */
       var ah=hs.filter(function(h){ return h.bothTeams; }).sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
       if(ah.length){
-        rows.push({kind:'allgroup',id:'A:'+z.name,name:z.name+' · '+it('g_allgroup'),zone:z.name,team:-1,
+        rows.push({kind:'allgroup',id:'A:'+z.key,name:z.name+' · '+it('g_allgroup'),zone:z.name,zoneKey:z.key,team:-1,
           start:ah[0].start,end:ah[ah.length-1].end,
           panels:sum(ah,'panels'),done:sum(ah,'done'),houses:ah});
       }
       /* 区完工里程碑 */
-      rows.push({kind:'ms',id:'M:'+z.name,name:z.name+it('g_finish'),zone:z.name,start:z.end,end:z.end});
+      rows.push({kind:'ms',id:'M:'+z.key,name:z.name+it('g_finish'),zone:z.name,zoneKey:z.key,start:z.end,end:z.end});
     });
   }else{
     zones.forEach(function(z){
       var hs=houses.filter(function(h){ return h.zone===z.name; });
       if(!hs.length) return;
-      rows.push({kind:'zone',id:'Z:'+z.name,name:z.name+it('g_zone_summary'),zone:z.name,
+      rows.push({kind:'zone',id:'Z:'+z.key,name:z.name+it('g_zone_summary'),zone:z.name,zoneKey:z.key,
         start:z.start,end:z.end,days:diffDays(z.start,z.end)+1,
         panels:sum(hs,'panels'),done:sum(hs,'done')});
-      if(isZoneCollapsed(z.name)) return;
+      if(isZoneCollapsed(z.key)) return;
       /* 区内行序严格按「安装计划总览」小方格的实际排列（houses 输入顺序 = HOUSE_SOURCE 顺序）
          逐栋列出，不再按小组/开始时间重排，保证与安装总览次序一致。
          依赖线仅在相邻两栋同组时才连，避免跨组乱连。 */
@@ -44554,7 +44578,7 @@ function rowH(){ return cfg.barHeight+10; }
 function barColorOf(r){
   if(r&&(r.kind==='allgroup'||r.bothTeams||(r.house&&r.house.bothTeams))) return ALL_C;   /* 全部组 */
   if((r.kind==='house'||r.kind==='team')&&r.team!=null) return teamColor(r.zone,r.team);
-  return zoneColor(r.zone);
+  return zoneColor(r.zoneKey || r.zone);
 }
 function renderChart(){
   if(cfg.showBase && houses.length){
@@ -44656,14 +44680,14 @@ function renderChart(){
   rows.forEach(function(r,i){
     var top=i*rh+(rh-bh)/2;
     if(r.kind==='ms'){
-      var sz=Math.round(bh*0.8), col=zoneColor(r.zone);
+      var sz=Math.round(bh*0.8), col=zoneColor(r.zoneKey || r.zone);
       h+='<div class="bar ms" data-id="'+esc(r.id)+'" style="left:'+Math.round(S.x(r.start)+S.dayW/2-sz/2)
         +'px;top:'+Math.round(top+(bh-sz)/2)+'px;width:'+sz+'px;height:'+sz+'px;background-color:'+col+'"'
         +' data-tip="'+esc(r.name+' · '+dmy(r.start))+'" onmouseenter="igShowBarTip(event,this)" onmouseleave="igHideBarTip()"></div>';
       return;
     }
     if(r.kind==='zone'){
-      var x=S.x(r.start), w=Math.max(S.x(addDays(r.end,1))-x,3), col2=zoneColor(r.zone);
+      var x=S.x(r.start), w=Math.max(S.x(addDays(r.end,1))-x,3), col2=zoneColor(r.zoneKey || r.zone);
       var _zt=r.name+' | '+dmy(r.start)+' ~ '+dmy(r.end)+' | '+fmtNum(r.panels)+it('g_unit_pcs')+' | '+fmtNum(r.days||0)+it('g_unit_day');
       h+='<div class="bar sum" data-id="'+esc(r.id)+'" style="left:'+Math.round(x)+'px;top:'+Math.round(top+bh/2-4)
         +'px;width:'+Math.round(w)+'px;background-color:'+col2+'"'
@@ -44776,7 +44800,7 @@ function renderTable(){
     zones.forEach(function(z){
       var zs=houses.filter(function(x){return x.zone===z.name;});
       if(!zs.length) return;
-      var collapsed=isZoneCollapsed(z.name);
+      var collapsed=isZoneCollapsed(z.key);
       h+='<tr class="zrow'+(collapsed?' collapsed':'')+'">'+cellsZone(z,cols,collapsed)+'</tr>';
       if(collapsed) return;
       for(var t=0;t<Math.max(1,z.teams|0);t++){
@@ -44789,7 +44813,7 @@ function renderTable(){
     zones.forEach(function(z){
       var hs=houses.filter(function(h){ return h.zone===z.name; });
       if(!hs.length) return;
-      var collapsed=isZoneCollapsed(z.name);
+      var collapsed=isZoneCollapsed(z.key);
       h+='<tr class="zrow'+(collapsed?' collapsed':'')+'">'+cellsZone(z,cols,collapsed)+'</tr>';
       if(collapsed) return;
       /* 直接按 houses 输入顺序（= HOUSE_SOURCE = 安装总览排列）逐栋列出，不再按小组/开工日重排 */
@@ -44829,7 +44853,7 @@ function cellsZone(z, cols, collapsed){
   var pn=sum(hs,'panels'), dn=sum(hs,'done');
   var anyToday=hs.some(function(h){ return isTodayRange(h.start,h.end); });
   return rowCells({
-    zone:'<td><i class="collapse-btn" onclick="toggleZone(\''+esc(z.name)+'\',event)" title="'+esc(collapsed?it('g_expand'):it('g_collapse'))+'">'+(collapsed?'▶':'▼')+'</i>'+esc(z.name)+'</td>',
+    zone:'<td><i class="collapse-btn" onclick="toggleZone(\''+esc(z.key)+'\',event)" title="'+esc(collapsed?it('g_expand'):it('g_collapse'))+'">'+(collapsed?'▶':'▼')+'</i>'+esc(z.name)+'</td>',
     name:'<td>'+it('g_zone_summary')+'</td>',
     panels:'<td class="num">'+fmtNum(pn)+'</td>',
     done:'<td class="num">'+fmtNum(dn)+'</td>',
@@ -45035,11 +45059,11 @@ function renderZoneTbl(){
     var util=realW?Math.round(work/(realW*n)*100):0;
     h+='<tr><td><b>'+esc(z.name)+'</b></td>'
       +'<td><input type="number" min="1" max="12" value="'+n+'" style="width:56px;border:1px solid var(--bd);border-radius:4px;padding:2px 5px"'
-      +' onchange="setTeams(\''+esc(z.name)+'\',this.value)"></td>'
+      +' onchange="setTeams(\''+esc(z.key)+'\',this.value)"></td>'
       +'<td class="n">'+fmtNum(hs.length)+'</td><td class="n">'+fmtNum(tp)+'</td><td class="n">'+fmtNum(td)+'</td>'
       +'<td class="n"><input value="'+esc(z.userStart?dmy(z.userStart):dmy(z.start))+'" placeholder="'+it('g_ph_follow')+'"'
       +' style="width:84px;border:1px solid var(--bd);border-radius:4px;padding:2px 5px"'
-      +' onchange="setZoneStart(\''+esc(z.name)+'\',this.value)" title="'+it('g_zone_start_tip')+'"></td>'
+      +' onchange="setZoneStart(\''+esc(z.key)+'\',this.value)" title="'+it('g_zone_start_tip')+'"></td>'
       +'<td class="n">'+dmy(z.end)+'</td>'
       +'<td class="n"><b>'+fmtNum(real)+'</b></td><td class="n">'+fmtNum(ideal)+'</td>'
       +'<td class="n"><span style="color:'+(util>=85?'#2e7d32':(util>=65?'#f57c00':'#c62828'))+'"><b>'+util+'%</b></span></td></tr>';
@@ -45055,7 +45079,7 @@ function setZoneStart(zname,v){
 function setTeams(zname,v){
   var z=zoneOf(zname); if(!z) return;
   z.teams=Math.max(1,Math.min(12,parseInt(v,10)||1));
-  houses.forEach(function(h){ if(h.zone===zname&&h.lockTeam!=null&&h.lockTeam>=z.teams) h.lockTeam=null; });
+  houses.forEach(function(h){ if(h.zoneKey===z.key && h.lockTeam!=null && h.lockTeam>=z.teams) h.lockTeam=null; });
   try{ localStorage.setItem(ganttStorageKey('house_zones_v1'),JSON.stringify(zones)); }catch(e){}
   schedule(); renderAll(); saveCfg();
 }
@@ -45117,6 +45141,46 @@ function renderLoad(){
     +'<span><i style="background:#cbd5e0"></i>'+it('g_legend_base')+'</span>'
     +'<span><i style="background:#ffa726;transform:rotate(45deg)"></i>'+it('g_legend_milestone')+'</span>'
     +'<span style="color:#c62828">'+it('g_legend_lock')+'</span>';
+}
+
+/* 项目安装交付甘特图：合同签订 → 建厂筹备 → 安装期（按区） → 验收期（安装结束后10天） */
+function renderProjectDeliveryGantt(){
+  var box=document.getElementById('deliveryGanttBox'); if(!box) return;
+  var plan=(typeof GANTT_PLAN!=='undefined' && GANTT_PLAN) ? GANTT_PLAN : {};
+  var items=[];
+  var c=toYmd(plan.contract);
+  if(c) items.push({label:it('g_phase_contract'), start:c, end:c, color:'#78909c'});
+  var ps=toYmd(plan.prepStart), pe=toYmd(plan.prepEnd);
+  if(ps && pe) items.push({label:it('g_phase_prep'), start:ps, end:pe, color:'#ffa726'});
+  var installMin='', installMax='';
+  zones.forEach(function(z){ if(!z.start) return; if(!installMin || z.start<installMin) installMin=z.start; if(!installMax || z.end>installMax) installMax=z.end; });
+  if(installMin && installMax){
+    items.push({label:it('g_phase_install'), start:installMin, end:installMax, color:'#43a047', section:true});
+    zones.forEach(function(z){ if(!z.start) return; items.push({label:'  '+z.name, start:z.start, end:z.end, color:zoneColor(z.key || z.name)}); });
+  }
+  if(installMax){
+    var as=addDays(installMax,1), ae=addDays(installMax,10);
+    items.push({label:it('g_phase_accept'), start:as, end:ae, color:'#1e88e5'});
+  }
+  if(!items.length){ box.innerHTML=''; return; }
+  var minD=items[0].start, maxD=items[0].end;
+  items.forEach(function(itm){ if(itm.start<minD) minD=itm.start; if(itm.end>maxD) maxD=itm.end; });
+  var totalDays=Math.max(1, diffDays(minD,maxD)+1);
+  var h='<div class="delivery-gantt">';
+  items.forEach(function(itm){
+    var offset=diffDays(minD,itm.start);
+    var len=Math.max(1, diffDays(itm.start,itm.end)+1);
+    var left=(offset/totalDays*100).toFixed(2), wid=(len/totalDays*100).toFixed(2);
+    h+='<div class="delivery-row'+(itm.section?' section':'')+'">'
+      +'<div class="delivery-label">'+esc(itm.label)+'</div>'
+      +'<div class="delivery-track">'
+      +'<div class="delivery-bar" style="left:'+left+'%;width:'+wid+'%;background:'+itm.color+'"></div>'
+      +'</div>'
+      +'<div class="delivery-date">'+dmy(itm.start)+' ~ '+dmy(itm.end)+'</div>'
+      +'</div>';
+  });
+  h+='</div>';
+  box.innerHTML=h;
 }
 
 /* =========================================================================
@@ -45358,7 +45422,7 @@ function renderAll(){
   document.documentElement.style.setProperty('--head-h','48px');
   applyTblW();
   buildRows(); renderChart(); renderTable();
-  renderKPI(); renderZoneTbl(); renderLoad(); renderCfg(); syncScroll();
+  renderKPI(); renderZoneTbl(); renderLoad(); renderProjectDeliveryGantt(); renderCfg(); syncScroll();
   syncCfgOpen();
   applyCardsCollapsed();
   applyPlanFields();
@@ -45600,7 +45664,7 @@ localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI()
 /* 锁死：每次加载都强制按内容重算列宽并自适应右分隔线，绝不信任 localStorage 里可能污染的旧宽度 */
 colFitAll(); fitTblW(); initSplitter();
 window.addEventListener('resize', function(){ fitTblW(); });
-window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); colFitAll(); fitTblW(); };
+window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); };
 </script>
 </body>
   </template>
@@ -46124,8 +46188,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     return v;
   }
   /* 把当前项目数据注入甘特 iframe 并重建（进入 Tab B / 语言切换时调用）。
-     每次都用最新语言重新生成房舍与区域名，保证三语一致。 */
-  function inst_ganttInject(fr, f){
+     每次都用最新语言重新生成房舍与区域名，保证三语一致。
+     skipFit=true 时不再重算列宽/自适应分隔线，用于语言切换，避免界面格式抖动。 */
+  function inst_ganttInject(fr, f, skipFit){
     if(!fr || !f) return;
     try {
       var w = fr.contentWindow; if(!w) return;
@@ -46143,9 +46208,11 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       if(typeof w.loadCfg === 'function') w.loadCfg();
       if(typeof w.syncParamUI === 'function') w.syncParamUI();
       if(typeof w.rebuild === 'function') w.rebuild();
-      /* 注入新数据（含新语言房舍/区名）后按内容重算列宽并自动调整右分隔线 */
-      if(typeof w.colFitAll === 'function') w.colFitAll();
-      if(typeof w.fitTblW === 'function') w.fitTblW();
+      /* 首次进入 Tab B 时按内容重算列宽并自动调整右分隔线；语言切换时保持原格式 */
+      if(!skipFit){
+        if(typeof w.colFitAll === 'function') w.colFitAll();
+        if(typeof w.fitTblW === 'function') w.fitTblW();
+      }
     } catch(e){}
   }
   function inst_assignMap(f){ return (f.installation && f.installation.assign) || {}; }
@@ -46198,7 +46265,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       for(var sp in dm){ if(dm.hasOwnProperty(sp)) panels += (+dm[sp]||0); }
       panels = Math.max(0, Math.round(panels));
       var done = Math.max(0, Math.min(panels, Math.round(+installQtyMap[code+'|'+idx]||0)));
-      out.push({ zone: inst_zoneName(assign[k]), name: String(hname) + '#' + idx,
+      out.push({ zone: inst_zoneName(assign[k]), zoneKey: String(assign[k]), name: String(hname) + '#' + idx,
         panels: panels, done: done });
     });
     return out;
@@ -47196,7 +47263,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
               }
               fr.contentWindow.ganttSetLang(e.detail && e.detail.lang ? e.detail.lang : (window.CUR_LANG||'en'));
               /* 语言变了：用新语言重新生成房舍名/区名并重建（ganttSetLang 只重渲染旧数据，名称不会变） */
-              inst_ganttInject(fr, inst_get(INST_CUR));
+              inst_ganttInject(fr, inst_get(INST_CUR), true);
               return;
             }catch(err){ console.warn('[lang] gantt refresh failed:', err); }
           }
