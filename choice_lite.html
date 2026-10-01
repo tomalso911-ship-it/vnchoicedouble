@@ -46059,7 +46059,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       return;                                                     /* 等回填完成后再渲染 */
     }
     var f = inst_get(INST_CUR);
-    if(key==='A'){ body.innerHTML = inst_tabA(f); inst_calcPlan(); }
+    if(key==='A'){ body.innerHTML = inst_tabA(f); }
     else if(key==='B'){ body.innerHTML = inst_tabB(f);
       var fr=document.getElementById('instGanttFrame');
       var tpl=document.getElementById('instGanttTpl');
@@ -46076,74 +46076,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
 
   /* ---------- 子标签 A：安装计划总览 ---------- */
   function inst_tabA(f){
-    var inst = f.installation || {}; var plan = inst.plan || {};
-    var h = inst_renderVisual(f);
-    h += '<div class="prod-sec-title">'+it('inst_plan_title')+'</div>';
-    var dueDateVal = (f.profile && f.profile.dueDate) ? f.profile.dueDate : '';
-    /* ---------- #1：理论化安装计划 ---------- */
-    h += '<div class="prod-sub-sec-title">'+it('inst_sec_theory')+'</div>';
-    h += '<div class="prod-form">'
-      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_plan_start'),'ia_plan_start',plan.planStart||'','inst_calcPlan()',  '') : '')
-      + '<div class="prod-field"><label>'+it('inst_lbl_project_due')+'</label><input id="ia_project_due" value="'+prod_esc(dueDateVal)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_plan_end')+'</label><input id="ia_plan_end" value="'+prod_esc(ymdToDmy(plan.planEnd||''))+'" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_actual_end'),'ia_actual_end',plan.actualEnd||'','',  '') : '')
-      + '<div class="prod-field"><label>'+it('inst_lbl_teams')+'</label><select id="ia_teams">'
-      + [1,2,3,4,5,6,7,8].map(function(n){ var cur=parseInt(plan.teams,10)||1; return '<option value="'+n+'"'+(cur===n?' selected':'')+'>'+n+'</option>'; }).join('')
-      + '</select></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_ppt')+'</label><select id="ia_ppt">'
-      + [4,5,6,7].map(function(n){ var cur=parseInt(plan.ppt,10)||6; return '<option value="'+n+'"'+(cur===n?' selected':'')+'>'+n+'</option>'; }).join('')
-      + '</select></div>'
-      + (typeof prod_numFld==='function' ? prod_numFld(it('inst_lbl_ppt_pcs'),'ia_ppt_pcs',(plan.pptPcs!=null?plan.pptPcs:200)) : '')
-      + '<div class="prod-field"><label>'+it('inst_lbl_total_people')+'</label><input id="ia_total_people" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_total_pcs_day')+'</label><input id="ia_total_pcs_day" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_theory_days')+'</label><input id="ia_theory_days" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_spans_tet')+'</label><input id="ia_spans_tet" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_tet_days')+'</label><input id="ia_tet_days" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '</div>';
-    /* ---------- #2：基于实际生产量&房舍交付的计划 ---------- */
-    var profile = f.profile || {};
-    var lineCount = parseInt(String(profile.capacityNote||'').replace(/[^0-9]/g,''),10) || 1;
-    var shiftCount = parseInt(String(profile.shifts||'').replace(/[^0-9]/g,''),10) || 1;
-    var lineDisp = (typeof pt==='function' && lineCount>=1 && lineCount<=4) ? pt('opt_line_'+lineCount) : (lineCount+'条');
-    var shiftDisp = (typeof pt==='function' && shiftCount>=1 && shiftCount<=2) ? pt('opt_shift_'+shiftCount) : (shiftCount+'班/天');
-    /* 合同签订日期：与生产页 #pa_contract_date 完全同源 */
-    var contractDateDisp = inst_contractDateDisp();
-    var prepStartDisp = ymdToDmy(f.prepStart||'');
-    var prepEndDisp = ymdToDmy(f.prepEnd||'');
-    var startProdDisp = ymdToDmy(f.prepEnd || f.planStart || prod_today());
-    var totalPcs = inst_totalPcs(f);
-    h += '<div class="prod-sub-sec-title" style="color:#E53935;font-weight:700;background:#FFF9C4;border-radius:6px;padding:4px 10px;display:inline-block;">'+it('inst_sec_real')+'</div>';
-    h += '<div class="prod-form">'
-      + '<div class="prod-field"><label>'+it('inst_lbl_contract_date')+'</label><input id="ia_contract_date" class="prod-contract-disp" value="'+prod_esc(contractDateDisp)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_prep_start')+'</label><input id="ia_prep_start" value="'+prod_esc(prepStartDisp)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_prep_end')+'</label><input id="ia_prep_end" value="'+prod_esc(prepEndDisp)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_start_prod')+'</label><input id="ia_prod_start" value="'+prod_esc(startProdDisp)+'" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_prod_line')+'</label><input id="ia_prod_line" value="'+prod_esc(lineDisp)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_shift')+'</label><input id="ia_prod_shift" value="'+prod_esc(shiftDisp)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_total_pcs')+'</label><input id="ia_total_pcs" value="'+prod_esc(prod_fmtNum(totalPcs))+'" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + (typeof prod_numFld==='function' ? prod_numFld(it('inst_lbl_rate_per_line'),'ia_rate_per_line',(plan.realRatePerLine!=null?plan.realRatePerLine:160)).replace('class="prod-field"','class="prod-field inst-num-red"') : '')
-      + '<div class="prod-field"><label>'+it('inst_lbl_total_capacity')+'</label><input id="ia_total_capacity" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_prod_days')+'</label><input id="ia_prod_days" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_spans_tet')+'</label><input id="ia_spans_tet_real" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_tet_days')+'</label><input id="ia_tet_days_real" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_prod_end')+'</label><input id="ia_prod_end" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_install_start_date'),'ia_install_start_date',plan.installStartDate||'','inst_calcPlan()',  '','install-start') : '')
-      + '<div class="prod-field"><label>'+it('inst_lbl_prod_to_install_days')+'</label><input id="ia_prod_to_install_days" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_prod_during_install')+'</label><input id="ia_prod_during_install" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + (typeof prod_numFld==='function' ? prod_numFld(it('inst_lbl_install_rate_per_team'),'ia_install_rate_per_team',(plan.installRatePerTeam!=null?plan.installRatePerTeam:200)).replace('class="prod-field"','class="prod-field inst-num-red"') : '')
-      + '<div class="prod-field"><label>'+it('inst_lbl_install_teams')+'</label><select id="ia_install_teams">'
-        + [1,2,3,4,5,6].map(function(n){ var cur=parseInt(plan.installTeams,10)||2; return '<option value="'+n+'"'+(cur===n?' selected':'')+'>'+n+'</option>'; }).join('')
-        + '</select></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_total_install_rate')+'</label><input id="ia_total_install_rate" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_install_days_for_prod')+'</label><input id="ia_install_days_for_prod" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_install_end_date')+'</label><input id="ia_install_end_date" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_final_accept')+'</label><input id="ia_final_accept" readonly style="background:#f0f0f0;cursor:default"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_project_due')+'</label><input id="ia_project_due_real" value="'+prod_esc(dueDateVal)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
-      + '</div>';
-    h += '<div style="margin:8px 0 16px"><button class="prod-btn" type="button" onclick="inst_savePlan()">'+it('inst_save')+'</button></div>';
-    h += '<div class="prod-sub-sec-title">'+it('inst_lbl_gantt')+'</div>'
-      + '<div id="ia_gantt" class="inst-gantt"></div>';
-    return h;
+    return inst_renderVisual(f);
   }
   /* ============ 安装规划-可视化图 ============ */
   function inst_visualExcludeHouse(v){
