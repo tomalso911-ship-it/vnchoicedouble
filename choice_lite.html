@@ -43728,6 +43728,8 @@ textarea:focus{outline:none;border-color:var(--pri)}
 .tbl-wrap th.rs-on{background:#e3f2fd !important}
 .tbl-wrap td{height:var(--row-h);padding:0 6px;border-bottom:1px solid var(--bd2);
   white-space:nowrap;overflow:hidden;vertical-align:middle}
+.tbl-wrap th.twoline{white-space:pre-line;line-height:1.2;text-align:center}
+.tbl-wrap td.tc{text-align:center}
 .tbl-wrap tr:hover td{background:#f0f7ff}
 .tbl-wrap tr.sel td{background:#e3f2fd}
 .tbl-wrap tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--pri)}
@@ -44011,7 +44013,7 @@ var GANTT_I18N = {
     g_btn_imp:'粘贴 / 导入数据', g_btn_sample:'载入示例', g_btn_add:'+ 新增房舍', g_btn_csv:'导出 CSV',
     g_hint_edit:'直接改下表里的「板数 / 已装 / 小组」即可；改完自动重排',
     g_imp_ph:'从 Excel 直接复制粘贴（自动识别制表符/逗号），或粘贴 CSV / JSON\n\n示例：\n区\t房舍\t水泥板数\t已装\nA区\t1号舍\t2400\t600\nA区\t2号舍\t1800\t0',
-    g_col_zone:'区', g_col_name:'房舍', g_col_panels:'水泥板', g_col_done:'已装', g_col_prog:'进度%', g_col_days:'天数', g_col_team:'小组', g_col_start:'预计安装日期', g_col_end:'安装结束',
+    g_col_zone:'区', g_col_name:'房舍', g_col_panels:'水泥板', g_col_done:'已装', g_col_prog:'进度%', g_col_days:'天数', g_col_team:'小组', g_col_start:'预计安装日期', g_col_end:'安装结束', g_col_today:'今天\n安装？', g_yes:'是', g_no:'否',
     g_hdr:'首行为表头', g_btn_parse:'解析并替换', g_btn_cancel:'取消',
     g_splitter_title:'拖动调整宽度 · 双击适应列宽',
     g_zone_sum_h2:'分区汇总', g_load:'小组负载', g_load_tip:'利用率 = 作业天数 ÷ 该组占用跨度',
@@ -44062,7 +44064,7 @@ var GANTT_I18N = {
     g_btn_imp:'Paste / Import', g_btn_sample:'Load sample', g_btn_add:'+ Add house', g_btn_csv:'Export CSV',
     g_hint_edit:'Edit panels / done / team below; auto-reschedule',
     g_imp_ph:'Copy-paste from Excel (auto-detect tab/comma), or paste CSV / JSON\n\nExample:\nzone\thouse\tpanels\tdone\nA\t1\t2400\t600\nA\t2\t1800\t0',
-    g_col_zone:'Zone', g_col_name:'House', g_col_panels:'Panels', g_col_done:'Done', g_col_prog:'Progress%', g_col_days:'Days', g_col_team:'Team', g_col_start:'Expected install', g_col_end:'Install end',
+    g_col_zone:'Zone', g_col_name:'House', g_col_panels:'Panels', g_col_done:'Done', g_col_prog:'Progress%', g_col_days:'Days', g_col_team:'Team', g_col_start:'Expected install', g_col_end:'Install end', g_col_today:'Install\ntoday?', g_yes:'Yes', g_no:'No',
     g_hdr:'First row is header', g_btn_parse:'Parse & replace', g_btn_cancel:'Cancel',
     g_splitter_title:'Drag to resize · double-click to fit',
     g_zone_sum_h2:'Zone Summary', g_load:'Team Load', g_load_tip:'Utilization = workdays ÷ team span',
@@ -44113,7 +44115,7 @@ var GANTT_I18N = {
     g_btn_imp:'Dán / Nhập', g_btn_sample:'Tải mẫu', g_btn_add:'+ Thêm chuồng', g_btn_csv:'Xuất CSV',
     g_hint_edit:'Sửa số tấm / đã lắp / đội bên dưới; tự tính lại',
     g_imp_ph:'Copy-dán từ Excel (tự nhận tab/dấu phẩy), hoặc dán CSV / JSON\n\nVí dụ:\nvùng\tchuồng\ttấm\tdã lắp\nA\t1\t2400\t600\nA\t2\t1800\t0',
-    g_col_zone:'Vùng', g_col_name:'Chuồng', g_col_panels:'Tấm', g_col_done:'Đã lắp', g_col_prog:'Tiến độ%', g_col_days:'Ngày', g_col_team:'Đội', g_col_start:'Lắp dự kiến', g_col_end:'Kết thúc lắp',
+    g_col_zone:'Vùng', g_col_name:'Chuồng', g_col_panels:'Tấm', g_col_done:'Đã lắp', g_col_prog:'Tiến độ%', g_col_days:'Ngày', g_col_team:'Đội', g_col_start:'Lắp dự kiến', g_col_end:'Kết thúc lắp', g_col_today:'Lắp\nhôm nay?', g_yes:'Có', g_no:'Không',
     g_hdr:'Hàng đầu là tiêu đề', g_btn_parse:'Phân tích & thay', g_btn_cancel:'Hủy',
     g_splitter_title:'Kéo đổi rộng · nhấn đúp vừa cột',
     g_zone_sum_h2:'Tổng hợp vùng', g_load:'Tải đội', g_load_tip:'Tỷ lệ = ngày làm ÷ trải đội',
@@ -44270,7 +44272,7 @@ var zones=[];    // {name,teams,start}
 var cfg={};
 var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'serial',view:'house',
   color:'team',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},
-  visible:['zone','name','panels','done','prog','days','team','start','end'],
+  visible:['zone','name','panels','done','prog','days','team','start','end','today'],
   cfgOpen:false, cardsCollapsed:false,
   showWeekend:true,
   showToday:true,showGrid:true,showDeps:true,showBase:true,viewMode:'Week',colWidth:40,barHeight:22};
@@ -44284,7 +44286,8 @@ var COLS=[
   {k:'days',   w:52, n:it('g_col_days'),   e:'ro'},
   {k:'team',   w:76, n:it('g_col_team'),   e:'team'},
   {k:'start',  w:92, n:it('g_col_start'), e:'date'},
-  {k:'end',    w:92, n:it('g_col_end'),    e:'ro'}
+  {k:'end',    w:92, n:it('g_col_end'),    e:'ro'},
+  {k:'today',  w:64, n:it('g_col_today'),  e:'ro', align:'center', cls:'twoline'}
 ];
 var COL_MIN=40, COL_MAX=420;
 function findCol(k){ var r=null; COLS.forEach(function(c){ if(c.k===k) r=c; }); return r; }
@@ -44753,7 +44756,7 @@ function renderTable(){
   cols.forEach(function(c){ h+='<col data-k="'+c.k+'" style="width:'+colW(c.k)+'px">'; });
   h+='</colgroup><thead><tr>';
   cols.forEach(function(c){
-    h+='<th data-k="'+c.k+'" title="'+it('g_col_resize_tip')+'">'+esc(c.n)
+    h+='<th data-k="'+c.k+'"'+(c.cls?' class="'+c.cls+'"':'')+' title="'+it('g_col_resize_tip')+'">'+esc(c.n)
       +'<i class="rs" onmousedown="colResizeStart(event,this)" ondblclick="colAutoFit(\''+c.k+'\')"></i></th>';
   });
   h+='</tr></thead><tbody>';
@@ -44799,9 +44802,11 @@ function visibleCols(){
 function rowCells(map, cols){
   var s=''; cols.forEach(function(c){ s+=(map[c.k]!==undefined?map[c.k]:'<td></td>'); }); return s;
 }
+function isTodayRange(s,e){ return !!s && !!e && today()>=s && today()<=e; }
 function cellsZone(z, cols, collapsed){
   var hs=houses.filter(function(h){ return h.zone===z.name; });
   var pn=sum(hs,'panels'), dn=sum(hs,'done');
+  var anyToday=hs.some(function(h){ return isTodayRange(h.start,h.end); });
   return rowCells({
     zone:'<td><i class="collapse-btn" onclick="toggleZone(\''+esc(z.name)+'\',event)" title="'+esc(collapsed?it('g_expand'):it('g_collapse'))+'">'+(collapsed?'▶':'▼')+'</i>'+esc(z.name)+'</td>',
     name:'<td>'+it('g_zone_summary')+'</td>',
@@ -44811,13 +44816,15 @@ function cellsZone(z, cols, collapsed){
     days:'<td>'+fmtNum(z.days||0)+'</td>',
     team:'<td>'+fmtNum(Math.max(1,z.teams|0))+it('g_unit_group')+'</td>',
     start:'<td>'+dmy(z.start)+'</td>',
-    end:'<td>'+dmy(z.end)+'</td>'
+    end:'<td>'+dmy(z.end)+'</td>',
+    today:'<td class="tc">'+(anyToday?it('g_yes'):it('g_no'))+'</td>'
   }, cols);
 }
 function cellsTeam(z, t, cols){
   var ths=houses.filter(function(x){ return x.zone===z.name&&x.team===t; })
                 .sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
   var last=ths.length?ths[ths.length-1]:null;
+  var anyToday=ths.some(function(h){ return isTodayRange(h.start,h.end); });
   return rowCells({
     zone:'<td></td>',
     name:'<td>'+teamLabel(t)+'</td>',
@@ -44827,7 +44834,8 @@ function cellsTeam(z, t, cols){
     days:'<td>'+(ths.length?fmtNum(ths.length)+it('g_load_dong'):it('g_idle'))+'</td>',
     team:'<td></td>',
     start:'<td>'+(ths.length?dmy(ths[0].start):'—')+'</td>',
-    end:'<td>'+(last?dmy(last.end):'—')+'</td>'
+    end:'<td>'+(last?dmy(last.end):'—')+'</td>',
+    today:'<td class="tc">'+(ths.length?(anyToday?it('g_yes'):it('g_no')):'—')+'</td>'
   }, cols);
 }
 function cellsMs(z, cols, showZone){
@@ -44835,7 +44843,8 @@ function cellsMs(z, cols, showZone){
     zone:'<td>'+(showZone?esc(z.name):'')+'</td>',
     name:'<td>🏁'+it('g_finish')+'</td>',
     start:'<td>'+dmy(z.end)+'</td>',
-    end:'<td>'+dmy(z.end)+'</td>'
+    end:'<td>'+dmy(z.end)+'</td>',
+    today:'<td></td>'
   }, cols);
 }
 function cellsHouse(hh, cols){
@@ -44851,7 +44860,8 @@ function cellsHouse(hh, cols){
     team:'<td><select onchange="evTeam(\''+hh.id+'\',this.value);teamSelColor(this,\''+hh.id+'\')"'+(hh.bothTeams?' style="color:'+ALL_C+'"':((hh.lockTeam!=null||typeof hh.team==='number')?' style="color:'+teamColor(hh.zone,(hh.lockTeam!=null?hh.lockTeam:hh.team))+'"':''))+'>'+teamOpts(hh)+'</select></td>',
     start:'<td><input value="'+esc(dmy(hh.start))+'" onchange="evStart(\''+hh.id+'\',this.value)">'
       +(hh.lockStart?'<span class="lk" title="'+it('g_locked_tip')+'">🔒</span>':'')+'</td>',
-    end:'<td>'+dmy(hh.end)+'</td>'
+    end:'<td>'+dmy(hh.end)+'</td>',
+    today:'<td class="tc">'+(isTodayRange(hh.start,hh.end)?it('g_yes'):it('g_no'))+'</td>'
   }, cols);
 }
 function pctOf(r){ return r.panels?Math.round((r.done||0)/r.panels*100)+'%':'0%'; }
@@ -45292,7 +45302,7 @@ function renderCfg(){
   h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_cfg_fields')+'</div>';
   COLS.forEach(function(c){
     h+='<label><input type="checkbox" '+(cfg.visible.indexOf(c.k)>=0?'checked':'')
-      +' onchange="toggleCol(\''+c.k+'\',this.checked)"> '+esc(c.n)
+      +' onchange="toggleCol(\''+c.k+'\',this.checked)"> '+esc(String(c.n).replace(/\n/g,' '))
       +'<span class="cw">'+colW(c.k)+'</span></label>';
   });
   h+='<div class="cfg-btns"><button type="button" onclick="colFitAll()">'+it('g_btn_colfit')+'</button>'
@@ -45349,7 +45359,8 @@ function printExcel(){
     {n:it('g_col_days'),   v:function(h){ return fmtNum(h.days); }, num:1},
     {n:it('g_col_team'),   v:function(h){ return h.bothTeams?it('g_allgroup'):teamLabel(h.lockTeam!=null?h.lockTeam:(typeof h.team==='number'?h.team:0)); }},
     {n:it('g_col_start'),  v:function(h){ return dmy(h.start); }},
-    {n:it('g_col_end'),    v:function(h){ return dmy(h.end); }}
+    {n:it('g_col_end'),    v:function(h){ return dmy(h.end); }},
+    {n:it('g_col_today'),  v:function(h){ return isTodayRange(h.start,h.end)?it('g_yes'):it('g_no'); }}
   ];
   var N=cols.length;
   var gv=function(id){ var e=document.getElementById(id); return e&&e.value?e.value:''; };
