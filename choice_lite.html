@@ -44946,7 +44946,10 @@ function colAutoFit(k, quiet){
   var c=findCol(k); if(!c) return;
   var lines=(c.n||'').split(/\r?\n/);
   var mx=lines.reduce(function(acc,l){return Math.max(acc, measureText(l)+30);},0);
-  if(k==='name') houses.forEach(function(h){ var n1=h.name1||h.name||''; mx=Math.max(mx,measureText(n1)+22); if(h.name2) mx=Math.max(mx,measureText(h.name2)+22); });
+  if(k==='name'){
+    houses.forEach(function(h){ var n1=h.name1||h.name||''; mx=Math.max(mx,measureText(n1)+22); if(h.name2) mx=Math.max(mx,measureText(h.name2)+22); });
+    mx=Math.ceil(mx*0.5);
+  }
   if(k==='zone') houses.forEach(function(h){ mx=Math.max(mx,measureText(h.zone)+22); });
   if(k==='team') mx=Math.max(mx,measureText(it('g_team_fmt').replace('{n}',1))+40);
   if(k==='prog'||k==='days') mx=Math.max(mx, measureText('100%')+22);
