@@ -44279,7 +44279,7 @@ var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'serial',view:'house',
 
 var COLS=[
   {k:'zone',   w:72, n:it('g_col_zone'),     e:'text'},
-  {k:'name',   w:92, n:it('g_col_name'),   e:'text'},
+  {k:'name',   w:80, n:it('g_col_name'),   e:'text'},
   {k:'panels', w:76, n:it('g_col_panels'), e:'num', align:'right'},
   {k:'done',   w:72, n:it('g_col_done'),   e:'num', align:'right'},
   {k:'prog',   w:58, n:it('g_col_prog'),  e:'ro'},
@@ -44308,6 +44308,12 @@ function loadCfg(){
   /* 迁移：旧默认按分区 → 统一改为按小组着色（2026-09-30 小组配色蓝/红/深黄/紫） */
   if(c._ver===undefined||c._ver<2){ c.color='team'; c._ver=2; }
   if(!c.visible||!c.visible.length) c.visible=DEF.visible.slice();
+  /* 迁移：新增 today 列，旧默认（无 today）自动追加；自定义可见列不强制 */
+  if(c.visible && c.visible.length===9 && c.visible.indexOf('today')<0 && c.visible.indexOf('end')>=0){
+    c.visible.splice(c.visible.indexOf('end')+1,0,'today');
+  }
+  /* 房舍列历史宽度异常过大时收敛到正常范围 */
+  if(c.colW && c.colW.name && c.colW.name>100) c.colW.name=92;
   if(!c.start) c.start=(typeof GANTT_DEFAULT_START!=='undefined' && GANTT_DEFAULT_START) ? GANTT_DEFAULT_START : today();
   cfg=c;
 }
@@ -44550,6 +44556,11 @@ function barColorOf(r){
   return zoneColor(r.zone);
 }
 function renderChart(){
+  if(cfg.showBase && houses.length){
+    var need=false;
+    houses.forEach(function(h){ if(!h.bs){ h.bs=h.start; h.be=h.end; need=true; } });
+    if(need) saveCfg();
+  }
   buildScale();
   igHideBarTip();
   var inner=document.getElementById('chartInner'), rh=rowH(), bh=cfg.barHeight, h='';
