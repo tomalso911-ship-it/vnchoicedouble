@@ -44587,16 +44587,27 @@ function renderChart(){
      实现：把当前视图里带「组」的行按顺序取出，用一个状态机连接。 */
   if(cfg.showDeps){
     var paths='';
+    var mkColors={}, mkDefs='';
+    function markerFor(col){
+      if(!mkColors[col]){ var id='arw'+Object.keys(mkColors).length; mkColors[col]=id;
+        mkDefs+='<marker id="'+id+'" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="'+col+'"/></marker>'; }
+      return 'url(#'+mkColors[col]+')';
+    }
     function depPath(ri, ti, cat){
       var r=rows[ri], t=rows[ti];
       if(!r||!t||!r.end||!t.start) return;
+      /* 线的颜色跟随源组别的颜色（全部组=棕，其余=各组色） */
+      var col=ALL_C;
+      if(r.kind==='team') col=teamColor(r.zone, r.team);
+      else if(r.kind==='allgroup') col=ALL_C;
+      else if(r.kind==='house') col=(r.house&&r.house.bothTeams)?ALL_C:teamColor(r.zone, r.house.team);
       /* 分道布线：全部组 / 第2组 / 第1组 各走不同竖向通道，线的竖向段互不重叠、不交叉 */
       var off=(cat==='all')?14:((cat==='t1')?8:2);
       var y1=ri*rh+rh/2, y2=ti*rh+rh/2;
       var x1=S.x(r.end)+S.dayW, x2=S.x(t.start);
       var cx=x1+off;
       var d='M'+x1+' '+y1+' H'+cx+' V'+y2+' H'+(x2-1);
-      paths+='<path d="'+d+'" fill="none" stroke="#607d8b" stroke-width="1.5" marker-end="url(#arw)"/>';
+      paths+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="1.5" marker-end="'+markerFor(col)+'"/>';
     }
     /* 取出「组行」序列：泳道视图取 team/allgroup 行；房舍视图取每栋房舍行（按列表顺序） */
     var seq=[];
@@ -44623,8 +44634,7 @@ function renderChart(){
       }
     });
     h+='<svg class="deps" id="depSvg" width="'+S.width+'" height="'+S.rowsH+'">'
-      +'<defs><marker id="arw" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">'
-      +'<path d="M0,0 L7,3.5 L0,7 Z" fill="#607d8b"/></marker></defs>'+paths+'</svg>';
+      +'<defs>'+mkDefs+'</defs>'+paths+'</svg>';
   }
 
   /* 条 */
