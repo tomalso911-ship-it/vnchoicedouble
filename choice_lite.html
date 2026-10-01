@@ -44953,7 +44953,7 @@ function colAutoFit(k, quiet){
   var mx=lines.reduce(function(acc,l){return Math.max(acc, measureText(l)+30);},0);
   if(k==='name') houses.forEach(function(h){ var n1=h.name1||h.name||''; mx=Math.max(mx,measureText(n1)+22); if(h.name2) mx=Math.max(mx,measureText(h.name2)+22); });
   if(k==='zone') houses.forEach(function(h){ mx=Math.max(mx,measureText(h.zone)+22); });
-  if(k==='team') mx=Math.max(mx,measureText(it('g_team_fmt').replace('{n}',1))+40);
+  if(k==='team'){ mx=Math.max(mx,measureText(it('g_allgroup'))+42); houses.forEach(function(h){ var t=(h.lockTeam!=null)?h.lockTeam:((typeof h.team==='number')?h.team:0); mx=Math.max(mx,measureText(teamLabel(t))+42); }); }
   if(k==='prog'||k==='days') mx=Math.max(mx, measureText('100%')+22);
   cfg.colW=cfg.colW||{}; cfg.colW[k]=Math.max(COL_MIN,Math.min(COL_MAX,Math.ceil(mx)));
   if(!quiet){ saveCfg(); renderTable(); syncTableWidth(); renderCfg(); }
@@ -44968,7 +44968,10 @@ function fitColumnByText(k){
   if(k==='done') houses.forEach(function(h){ mx=Math.max(mx,measureText(fmtNum(h.done))+22); });
   if(k==='prog') houses.forEach(function(h){ var p=h.panels?Math.round((h.done||0)/h.panels*100):0; mx=Math.max(mx,measureText(p+'%')+22); });
   if(k==='days') houses.forEach(function(h){ mx=Math.max(mx,measureText(fmtNum(h.days))+22); });
-  if(k==='team') houses.forEach(function(h){ mx=Math.max(mx,measureText(teamLabel(h.lockTeam!=null?h.lockTeam:(typeof h.team==='number'?h.team:0)))+22); });
+  if(k==='team'){
+    houses.forEach(function(h){ var t=(h.lockTeam!=null)?h.lockTeam:((typeof h.team==='number')?h.team:0); mx=Math.max(mx,measureText(teamLabel(t))+42); });
+    mx=Math.max(mx, measureText(it('g_allgroup'))+42); /* 下拉含「全部组」选项，需预留箭头空间 */
+  }
   if(k==='start') houses.forEach(function(h){ mx=Math.max(mx,measureText(dmy(h.start))+22); });
   if(k==='end') houses.forEach(function(h){ mx=Math.max(mx,measureText(dmy(h.end))+22); });
   if(k==='today'){ mx=Math.max(mx, measureText(it('g_yes'))+22, measureText(it('g_no'))+22); }
@@ -45593,7 +45596,7 @@ document.addEventListener('click', function(e){
   cpCloseCalendar();
 });
 
-localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); if((cfg.fitVer||0)<6){ colFitAll(); fitTblW(); cfg.fitVer=6; saveCfg(); } initSplitter();
+localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); if((cfg.fitVer||0)<7){ colFitAll(); fitTblW(); cfg.fitVer=7; saveCfg(); } initSplitter();
 if((cfg.tableWidth||0) < tableContentWidth()+2){ fitTblW(); }
 window.addEventListener('resize', function(){ fitTblW(); });
 window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); colFitAll(); fitTblW(); };
