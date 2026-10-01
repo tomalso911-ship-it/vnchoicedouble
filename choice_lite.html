@@ -45596,8 +45596,9 @@ document.addEventListener('click', function(e){
   cpCloseCalendar();
 });
 
-localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll(); if((cfg.fitVer||0)<7){ colFitAll(); fitTblW(); cfg.fitVer=7; saveCfg(); } initSplitter();
-if((cfg.tableWidth||0) < tableContentWidth()+2){ fitTblW(); }
+localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll();
+/* 锁死：每次加载都强制按内容重算列宽并自适应右分隔线，绝不信任 localStorage 里可能污染的旧宽度 */
+colFitAll(); fitTblW(); initSplitter();
 window.addEventListener('resize', function(){ fitTblW(); });
 window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); colFitAll(); fitTblW(); };
 </script>
