@@ -10683,7 +10683,7 @@ function _ovLoadChartLib(cb){
         rows.sort(function(a,b){ var c=prod_outCompare(a,b,'date'); if(c!==0) return -c; return a._outIdx-b._outIdx; });
       }
       function _jsStr(s){ return "'"+String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+"'"; }
-      function _displayNo(i){ return i + 1; }
+      function _displayNo(i){ return rows.length - i; } /* 序号由大到小：最新记录 = 最大序号 */
       function _outTh(label, col){
         var cls='sortable';
         var icon='▼';
@@ -10874,7 +10874,7 @@ function _ovLoadChartLib(cb){
           var dateHtml = prod_esc(ymdToDmy(g.date));
           var subHtml = '<b>'+prod_fmtNum(g.subtotal)+'</b>';
           var span = g.items.length;
-          var serial = gi + 1; /* 序号与出库表一致：最新日期在最上，序号从 1 开始 */
+          var serial = groups.length - gi; /* 序号由大到小：与出库表一致，最新日期 = 最大序号 */
           g.items.forEach(function(r, ri){
             var destCell = prod_outDestCellHtml(r.destHouse, r.destBuildings, r.k);
             var zoneLabel = r.zone ? pt('out_area_label').replace('{0}', r.zone) : pt('out_area_empty');
