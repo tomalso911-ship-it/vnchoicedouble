@@ -3790,6 +3790,22 @@ function _ovLoadChartLib(cb){
       .prod-table.pe-fin thead .pe-col-blue{background:#cfe7fb;}
       .prod-table.pe-fin thead .pe-col-purple{background:#ead9f3;}
       .prod-table.pe-fin tfoot td{font-weight:700;background:#fff3e0;border-top:2px solid #333;}
+      /* 序号列稍微加宽，多级子序号（如 2.1）不换行 */
+      .prod-table.pe-fin .pe-col-no{width:52px;min-width:52px;white-space:nowrap;}
+      /* 项目用量分解表：网格线 */
+      .prod-table.prod-usage th, .prod-table.prod-usage td{border:1px solid #333;}
+      /* 按规格/栋舍 的材料用量表：网格线（红色加粗分组线由内联样式保留） */
+      .prod-table.prod-matusage th, .prod-table.prod-matusage td{border:1px solid #333;}
+      /* 按栋舍汇总生产计划表：网格线（红色加粗分组线由内联样式保留） */
+      .prod-table.prod-houseplan th, .prod-table.prod-houseplan td{border:1px solid #333;}
+      /* 成品库存表：规格行可展开猪舍明细 */
+      .prod-table.pe-fin tr.pe-fin-row{cursor:pointer;}
+      .prod-table.pe-fin tr.pe-fin-row:hover{background:#eaf3ff;}
+      .prod-table.pe-fin tr.pe-fin-expanded{background:#dbeafe;}
+      .prod-table.pe-fin .pe-fin-caret{display:inline-block;width:14px;color:#1f6feb;font-size:11px;}
+      .prod-table.pe-fin tr.pe-fin-subrow td{background:#fbfdff;border-top-color:#bbb;}
+      .prod-table.pe-fin tr.pe-fin-subrow .pe-fin-house{padding-left:20px;color:#33415c;font-weight:600;}
+      .prod-table.pe-fin tr.pe-fin-subrow .pe-fin-sub-idx{background:#fbfdff;}
       /* 删除确认气泡：经典红/灰按钮，紧贴触发按钮 */
       .prod-pop-confirm{position:fixed;z-index:1000;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.2);padding:14px 16px;font-size:13px;min-width:240px;max-width:420px;}
       .prod-pop-confirm .ppc-title{font-weight:700;margin-bottom:8px;color:#E53935;font-size:14px;}
@@ -4979,7 +4995,7 @@ function _ovLoadChartLib(cb){
         var c=_numCmp(a.ph,b.ph); if(c) return c; c=String(a.ph).localeCompare(String(b.ph),'zh'); return c?c:a.spec.localeCompare(b.spec,'zh');
       });
       var h='<div class="prod-sec-title" style="border-color:#6c757d">'+title+'</div>';
-      h+='<table class="prod-table"><thead><tr>';
+      h+='<table class="prod-table prod-matusage"><thead><tr>';
       h+= groupBy==='spec' ? '<th>'+pt('thr_no')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_house')+'</th>' : '<th>'+pt('thr_house')+'</th><th>'+pt('th_spec')+'</th>';
       h+='<th>'+pt('th_qty_whole')+'</th>';
       usedSizes.forEach(function(s){ h+='<th>'+pt('th_rebar')+' φ'+s+' ('+pt('unit_ton')+')</th>'; });
@@ -5000,9 +5016,9 @@ function _ovLoadChartLib(cb){
           if(_idx===0){
             if(groupBy==='spec'){
               h+='<td rowspan="'+_rs+'" class="merge-cell" style="text-align:center;vertical-align:middle">'+(runIdx+1)+'</td>';
-              h+='<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #000;vertical-align:middle">'+prod_esc(_run.key)+'</td>';
+              h+='<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #E53935;vertical-align:middle">'+prod_esc(_run.key)+'</td>';
             } else {
-              h+='<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #000;vertical-align:middle">'+prod_esc(prod_phName(_run.key))+'</td>';
+              h+='<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #E53935;vertical-align:middle">'+prod_esc(prod_phName(_run.key))+'</td>';
             }
           }
           h+= (groupBy==='spec') ? '<td>'+prod_esc(prod_phName(o.ph))+'</td>' : '<td>'+prod_esc(o.spec)+'</td>';
@@ -5011,7 +5027,7 @@ function _ovLoadChartLib(cb){
           h+='<td>'+fmt1Red(o.cement)+'</td><td>'+fmt1Red(o.sand)+prod_m3suf(o.sand,'sand')+'</td><td>'+fmt1Red(o.gravel)+prod_m3suf(o.gravel,'gravel')+'</td></tr>';
         });
         /* 小计行：最左列被合并单元格覆盖；黑线隔离下一组 */
-        h+='<tr style="border-bottom:2px solid #000;font-weight:700;background:#eef2f7">';
+        h+='<tr style="border-bottom:2px solid #E53935;font-weight:700;background:#eef2f7">';
         h+= '<td>'+pt('subtotal')+'</td>';
         h+='<td>'+prod_fmtNumRed(_sq)+'</td>';
         usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(_srebar[s])+'</td>'; });
@@ -5315,7 +5331,7 @@ function _ovLoadChartLib(cb){
       else if(key==='C'){ body.innerHTML = prod_tabC(f); prod_drawTrends(); PROD_LABOR_SORT = {col:null, dir:0}; }
       else if(key==='D'){ body.innerHTML = prod_tabD(f); prodReceiptRenderRows(); prod_receiptApplyHouse(); prod_updateHouseFilterTip(); prod_updateHousePreview(); }
       else if(key==='E'){ body.innerHTML = prod_tabE(f); prod_drawEStats(f); prod_drawLineCompare(); }
-      else if(key==='H'){ body.innerHTML = prod_tabH(f); prod_drawOutboundChart(f); }
+      else if(key==='H'){ body.innerHTML = prod_tabH(f); var _ft = body.querySelector('.prod-table.pe-fin'); if(_ft){ _ft.addEventListener('click', prod_finTableClick); } prod_drawOutboundChart(f); }
       else if(key==='F'){ body.innerHTML = prod_tabF(f); prod_drawEquipCharts(f); }
       else if(key==='G') body.innerHTML = prod_tabG(f);
       if('ABCDEFH'.indexOf(key) >= 0) prod_setupAllScrolls();
@@ -5774,7 +5790,7 @@ function _ovLoadChartLib(cb){
       if(!keys.length){
         h += '<div class="prod-empty">'+pt('empty_no_spec')+'</div>';
       } else {
-        h += '<table class="prod-table"><thead><tr><th class="pe-col-no">'+pt('thr_no')+'</th><th>'+pt('th_spec')+'</th>';
+        h += '<table class="prod-table prod-usage"><thead><tr><th class="pe-col-no">'+pt('thr_no')+'</th><th>'+pt('th_spec')+'</th>';
         mm.houseOrder.forEach(function(ph){ h += '<th>'+prod_esc(prod_phName(ph))+'</th>'; });
         h += '<th>'+pt('th_total')+'</th><th>'+pt('th_shared')+'</th></tr></thead><tbody>';
         keys.forEach(function(k, i){
@@ -5975,7 +5991,7 @@ function _ovLoadChartLib(cb){
         var _houseOrder = _houseSorted.slice().sort(function(a,b){ return (+_houseMinStart[a] - +_houseMinStart[b]) || a.localeCompare(b); });
         var prodOrder = {}; _houseOrder.forEach(function(ph, idx){ prodOrder[ph] = idx+1; });
         h += '<div class="prod-sec-title" style="border-color:#6c757d;margin-top:18px">'+pt('sec_house_sum')+'</div>';
-        h += '<div style="overflow-x:auto"><table class="prod-table" style="text-align:center"><thead><tr>'
+        h += '<div style="overflow-x:auto"><table class="prod-table prod-houseplan" style="text-align:center"><thead><tr>'
           + '<th>'+pt('thr_house2')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_qty_pcs')+'</th><th>'+pt('thr_start')+'</th><th>'+pt('thr_end')+'</th><th>'+pt('thr_prep')+'</th></tr></thead><tbody>';
         _houseSorted.forEach(function(ph){
           var segs = _byHouse[ph].slice().sort(function(a,b){ return +a.sDate - +b.sDate; });
@@ -5987,11 +6003,11 @@ function _ovLoadChartLib(cb){
             var redStart = (+s.sDate === +globalFirst) ? ' style="color:#d32f2f;font-weight:700"' : '';
             var redEnd = (+s.eDate === +globalLast) ? ' style="color:#d32f2f;font-weight:700"' : '';
             h += '<tr>';
-            if(_idx===0) h += '<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #000;vertical-align:middle">'+pfx+prod_esc(prod_phName(s.house))+' <span style="font-size:10px;color:#666">('+pt('th_prod_order')+': '+prodOrder[s.house]+')</span></td>';
+            if(_idx===0) h += '<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #E53935;vertical-align:middle">'+pfx+prod_esc(prod_phName(s.house))+' <span style="font-size:10px;color:#666">('+pt('th_prod_order')+': '+prodOrder[s.house]+')</span></td>';
             h += '<td>'+prod_esc(s.spec)+'</td><td>'+prod_fmtNum(s.qty)+'</td><td'+redStart+'>'+fmtFull(s.sDate)+'</td><td'+redEnd+'>'+fmtFull(s.eDate)+'</td><td style="color:#2e7d32;font-weight:600">'+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'</td></tr>';
           });
           /* 小计行：最左列被合并单元格覆盖；黑线隔离下一组 */
-          h += '<tr style="border-bottom:2px solid #000;font-weight:700;background:#eef2f7"><td>'+prod_esc(prod_phName(ph))+' '+pt('subtotal')+'</td><td colspan="4" style="text-align:left">'+prod_fmtNum(sub)+' '+pt('unit_pcs')+'</td></tr>';
+          h += '<tr style="border-bottom:2px solid #E53935;font-weight:700;background:#eef2f7"><td>'+prod_esc(prod_phName(ph))+' '+pt('subtotal')+'</td><td colspan="4" style="text-align:left">'+prod_fmtNum(sub)+' '+pt('unit_pcs')+'</td></tr>';
         });
         h += '</tbody></table></div>';
 
@@ -9432,7 +9448,7 @@ function _ovLoadChartLib(cb){
       var fn = f.finished||{}; var specs = Object.keys(fn);
       var hoDeliv = prod_houseOutBySpec(f);
       var totP = 0, totD = 0; specs.forEach(function(s){ totP += (+fn[s].produced||0); totD += (hoDeliv[s]||0); });
-      var mm = prod_slatsMatrix();
+      var mm = prod_slatsMatrix(); var hsp = prod_houseSpecProduced(f); var ho = f.houseOut||{};
       var totalDemand = Object.keys(mm.specs||{}).reduce(function(s,k){ return s + ((mm.specs[k]&&mm.specs[k].total)||0); },0);
       var needProd = Math.max(0, totalDemand - totP);
       var notOut = Math.max(0, totP - totD);
@@ -9455,7 +9471,33 @@ function _ovLoadChartLib(cb){
         var completionRatio = sd > 0 ? ((p / sd) * 100).toFixed(2) : '0.00';
         var outRate = p > 0 ? ((d / p) * 100).toFixed(2) : '0.00';
         var zc = function(v){ return v===0 ? ' class="pe-zero-red"' : ''; };
-        h += '<tr><td class="pe-col-no">'+(idx+1)+'</td><td>'+prod_esc(s)+'</td><td style="text-align:center">'+prod_fmtNum(sd)+'</td><td class="pe-col-blue" style="text-align:center"'+zc(p)+'>'+prod_fmtNum(p)+'</td><td class="pe-col-blue" style="text-align:center"'+zc(need)+'>'+prod_fmtNum(need)+'</td><td class="pe-col-blue" style="text-align:center">'+completionRatio+'%</td><td class="pe-col-purple" style="text-align:center"'+zc(d)+'>'+prod_fmtNum(d)+'</td><td class="pe-col-purple" style="text-align:center">'+outRate+'%</td><td style="text-align:center"'+zc(bal)+'><b>'+prod_fmtNum(bal)+'</b></td></tr>'; });
+        /* 预计算该规格按猪舍的明细（点击行直接插入；语言切换重渲染时按状态还原） */
+        var _sp = mm.specs[s] || {}; var _sph = _sp.houses || {};
+        var housesForSpec = mm.houseOrder.filter(function(h){ return h!=='—' && _sph[h]!=null; });
+        for(var hk in ho){ if(!ho.hasOwnProperty(hk)) continue; var parts = hk.split('|'); if(parts.length<2) continue; if(parts.slice(1).join('|') !== s) continue; if(parts[0]!=='—' && housesForSpec.indexOf(parts[0])===-1) housesForSpec.push(parts[0]); }
+        housesForSpec.sort(function(a,b){ return mm.houseOrder.indexOf(a) - mm.houseOrder.indexOf(b); });
+        var _houses = housesForSpec.map(function(h){
+          var hDemand = _sph[h] || 0;
+          var hProd = (hsp[h] && hsp[h][s]) || 0;
+          var hOut = 0; var rec = ho[h+'|'+s]; if(rec){ hOut = (+rec.out)||0; }
+          return { name:prod_phName(h), demand:hDemand, prod:hProd, need:Math.max(0,hDemand-hProd), comp:(hDemand>0?((hProd/hDemand)*100).toFixed(2):'0.00'), out:hOut, rate:(hProd>0?((hOut/hProd)*100).toFixed(2):'0.00'), bal:hProd-hOut };
+        });
+        PROD_FIN_DATA[idx] = _houses;
+        var isExp = !!PROD_FIN_EXPAND_SPECS[s];
+        var caret = '<span class="pe-fin-caret">'+(isExp?'▾':'▸')+'</span>';
+        h += '<tr class="pe-fin-row'+(isExp?' pe-fin-expanded':'')+'" data-idx="'+idx+'" data-spec="'+prod_esc(s)+'" onclick="prod_finClick(event,this)">'
+          + '<td class="pe-col-no">'+(idx+1)+'</td>'
+          + '<td>'+caret+prod_esc(s)+'</td>'
+          + '<td style="text-align:center">'+prod_fmtNum(sd)+'</td>'
+          + '<td class="pe-col-blue" style="text-align:center"'+zc(p)+'>'+prod_fmtNum(p)+'</td>'
+          + '<td class="pe-col-blue" style="text-align:center"'+zc(need)+'>'+prod_fmtNum(need)+'</td>'
+          + '<td class="pe-col-blue" style="text-align:center">'+completionRatio+'%</td>'
+          + '<td class="pe-col-purple" style="text-align:center"'+zc(d)+'>'+prod_fmtNum(d)+'</td>'
+          + '<td class="pe-col-purple" style="text-align:center">'+outRate+'%</td>'
+          + '<td style="text-align:center"'+zc(bal)+'><b>'+prod_fmtNum(bal)+'</b></td>'
+          + '</tr>';
+        if(isExp && _houses.length){ h += _houses.map(function(d,hi){ return prod_finSubRowHtml(d, (idx+1)+'.'+(hi+1)); }).join(''); }
+      });
       var subCompletionRatio = sumDemand > 0 ? ((sumProduced / sumDemand) * 100).toFixed(2) : '0.00';
       var subOutRate = sumProduced > 0 ? ((sumOut / sumProduced) * 100).toFixed(2) : '0.00';
       h += '</tbody><tfoot><tr><td class="pe-col-no"></td><td>'+pt('subtotal')+'</td><td style="text-align:center">'+prod_fmtNum(sumDemand)+'</td><td style="text-align:center">'+prod_fmtNum(sumProduced)+'</td><td style="text-align:center">'+prod_fmtNum(sumNeed)+'</td><td style="text-align:center">'+subCompletionRatio+'%</td><td style="text-align:center">'+prod_fmtNum(sumOut)+'</td><td style="text-align:center">'+subOutRate+'%</td><td style="text-align:center"><b>'+prod_fmtNum(sumBal)+'</b></td></tr></tfoot></table>';
@@ -9477,6 +9519,7 @@ function _ovLoadChartLib(cb){
     }
     /* 新表：生产库存及出库明细（按猪舍，直接展开；出库/待安装由出库记录自动生成，仅展示不可编辑；实际库存/实际出库数量自动算） */
     var PROD_HO_MAP = {}; var PROD_STOCKOUT_HIDEZERO = true; var PROD_STOCKOUT_DIRTY = false; var PROD_STOCKOUT_SORT = {dir:0};
+    var PROD_FIN_DATA = {}; var PROD_FIN_EXPAND_SPECS = {};
     function prod_stockOutSection(f){
       var mm = prod_slatsMatrix(); var hsp = prod_houseSpecProduced(f);
       var specKeys = Object.keys(mm.specs).sort(prod_specSortCmp);
@@ -9582,6 +9625,54 @@ function _ovLoadChartLib(cb){
     function prod_toggleStockOutHide(){
       PROD_STOCKOUT_HIDEZERO = !PROD_STOCKOUT_HIDEZERO;
       if(PROD_ACTIVE_TAB==='H') prod_renderTab('H');
+    }
+    /* 成品库存表：规格行展开/收起（直接操作 DOM，每次仅展开一个，默认收起） */
+    function prod_finSubRowHtml(d, no){
+      var zc = function(v){ return v===0 ? ' class="pe-zero-red"' : ''; };
+      return '<tr class="pe-fin-subrow">'
+        + '<td class="pe-col-no pe-fin-sub-idx">'+(no||'')+'</td>'
+        + '<td class="pe-fin-house">'+prod_esc(d.name)+'</td>'
+        + '<td style="text-align:center">'+prod_fmtNum(d.demand)+'</td>'
+        + '<td class="pe-col-blue" style="text-align:center"'+zc(d.prod)+'>'+prod_fmtNum(d.prod)+'</td>'
+        + '<td class="pe-col-blue" style="text-align:center"'+zc(d.need)+'>'+prod_fmtNum(d.need)+'</td>'
+        + '<td class="pe-col-blue" style="text-align:center">'+d.comp+'%</td>'
+        + '<td class="pe-col-purple" style="text-align:center"'+zc(d.out)+'>'+prod_fmtNum(d.out)+'</td>'
+        + '<td class="pe-col-purple" style="text-align:center">'+d.rate+'%</td>'
+        + '<td style="text-align:center"'+zc(d.bal)+'><b>'+prod_fmtNum(d.bal)+'</b></td>'
+        + '</tr>';
+    }
+    function prod_finCollapseRow(tr){
+      if(!tr) return;
+      tr.classList.remove('pe-fin-expanded');
+      var c = tr.querySelector('.pe-fin-caret'); if(c) c.textContent = '▸';
+      var tbody = tr.parentNode; if(!tbody) return;
+      var nx = tr.nextSibling;
+      while(nx && nx.nodeType===1 && nx.classList && nx.classList.contains('pe-fin-subrow')){
+        var nxt = nx.nextSibling; tbody.removeChild(nx); nx = nxt;
+      }
+    }
+    function prod_finClick(e, tr){
+      if(e){ if(e.__finHandled) return; e.__finHandled = true; }
+      if(!tr || !tr.classList || !tr.classList.contains('pe-fin-row')) return;
+      var tbody = tr.parentNode; if(!tbody) return;
+      var spec = tr.getAttribute('data-spec');
+      var wasExpanded = tr.classList.contains('pe-fin-expanded');
+      if(wasExpanded){ prod_finCollapseRow(tr); if(spec!=null) delete PROD_FIN_EXPAND_SPECS[spec]; return; }
+      tr.classList.add('pe-fin-expanded');
+      if(spec!=null) PROD_FIN_EXPAND_SPECS[spec] = 1;
+      var c = tr.querySelector('.pe-fin-caret'); if(c) c.textContent = '▾';
+      var idx = parseInt(tr.getAttribute('data-idx'), 10);
+      var data = (isNaN(idx) ? null : PROD_FIN_DATA[idx]) || [];
+      if(!data.length) return;
+      var html = data.map(function(d, hi){ return prod_finSubRowHtml(d, (idx+1)+'.'+(hi+1)); }).join('');
+      var tpl = document.createElement('template'); tpl.innerHTML = html;
+      var ref = tr.nextSibling;
+      while(tpl.content.firstChild){ tbody.insertBefore(tpl.content.firstChild, ref); }
+    }
+    /* 事件委托兜底：内联 onclick 与委托二选一生效（e.__finHandled 防重复） */
+    function prod_finTableClick(e){
+      var tr = (e.target && e.target.closest) ? e.target.closest('tr.pe-fin-row') : null;
+      if(tr) prod_finClick(e, tr);
     }
     /* ===== 操作列：出库 / 入库 图标（近似 SVG 内嵌） ===== */
     /* 出库（绿色：托盘 + 向上箭头）/ 入库（红色：托盘 + 向下箭头），颜色由父级 color 决定 */
