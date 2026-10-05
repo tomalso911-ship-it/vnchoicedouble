@@ -4609,6 +4609,19 @@ function _ovLoadChartLib(cb){
           }
           if(hoRec.outDaily) hoRec.outDaily = _normDaily(hoRec.outDaily);
           if(hoRec.inDaily) hoRec.inDaily = _normDaily(hoRec.inDaily);
+          /* 旧版 outDaily 存的是整数（只有数量），新版需要对象才能显示填表人/天气/区域/猪舍号。
+             在客户端先升级成对象，避免和服务端对象合并时被当成标量覆盖掉。 */
+          if(hoRec.outDaily && typeof hoRec.outDaily==='object'){
+            var _hoPrefix = hoKey.split('|')[0] || '';
+            var _hoSpec = hoKey.split('|').slice(1).join('|') || hoKey;
+            for(var _odk in hoRec.outDaily){ if(!hoRec.outDaily.hasOwnProperty(_odk)) continue;
+              var _odv = hoRec.outDaily[_odk];
+              if(_odv && typeof _odv==='object') continue;
+              var _qty = (+_odv)||0;
+              hoRec.outDaily[_odk] = { date:_odk, qty:_qty, recorder:'', weatherAm:null, weatherPm:null, destHouse:_hoPrefix, destBuildings:['1'], zone:'', lines:[{dest:'1', qty:_qty, seq:1, zone:''}] };
+            }
+            hoRec.out = Object.keys(hoRec.outDaily).reduce(function(s,k){ var v=hoRec.outDaily[k]; return s+(v&&typeof v==='object'?(v.qty||0):0); },0);
+          }
         }
       }
       return f;

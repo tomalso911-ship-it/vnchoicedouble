@@ -4469,6 +4469,101 @@ def _prod_factory_counts(f):
     return (out_daily, install_days, install_rows)
 
 
+def _normalize_out_daily(payload):
+    """把旧版整数 outDaily 升级成对象格式，并尽量从 payload.installation 补填表人/天气/区域/猪舍号，
+       防止旧页面把已补齐的字段又冲掉。"""
+    if not isinstance(payload, dict):
+        return
+    ho = payload.get("houseOut") or {}
+    if not isinstance(ho, dict):
+        return
+    inst = payload.get("installation") or {}
+    workers = inst.get("workers") or {}
+    assign = inst.get("assign") or {}
+
+    def _ymd_to_dmy(ymd):
+        try:
+            return datetime.datetime.strptime(ymd, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            return ""
+
+    def _weather_for(ymd):
+        dmy = _ymd_to_dmy(ymd)
+        w = workers.get(dmy)
+        if isinstance(w, dict):
+            return w.get("weatherAm"), w.get("weatherPm")
+        return None, None
+
+    def _recorder_for(ymd):
+        dmy = _ymd_to_dmy(ymd)
+        w = workers.get(dmy)
+        if isinstance(w, dict) and w.get("recorder"):
+            return w["recorder"]
+        return ""
+
+    for key, rec in ho.items():
+        if not isinstance(rec, dict):
+            continue
+        od = rec.get("outDaily") or {}
+        if not isinstance(od, dict):
+            continue
+        prefix = key.split("|")[0] if "|" in key else ""
+        spec = "|".join(key.split("|")[1:]) if "|" in key else key
+        changed = False
+        for day, val in list(od.items()):
+            if isinstance(val, dict):
+                continue
+            if not isinstance(val, (int, float)):
+                continue
+            am_wx, pm_wx = _weather_for(day)
+            recorder = _recorder_for(day)
+            dmy = _ymd_to_dmy(day)
+            # 尝试从安装数据找目标猪舍#栋号/区域
+            dest_house = prefix
+            dest_bldg = "1"
+            zone = ""
+            w = workers.get(dmy)
+            if isinstance(w, dict):
+                zt = w.get("zoneTeamWorkers") or {}
+                for z, teams in zt.items():
+                    if not isinstance(teams, list):
+                        continue
+                    for t in teams:
+                        if not isinstance(t, dict):
+                            continue
+                        ti = t.get("todayInstall") or {}
+                        if spec in ti:
+                            hs = str(t.get("house") or "")
+                            hp = hs.split("#")
+                            if hp[0]:
+                                dest_house = hp[0]
+                                dest_bldg = hp[1] if len(hp) > 1 else "1"
+                                zone = z
+                            break
+                    if zone:
+                        break
+            if not zone:
+                zone = assign.get(dest_house + "#" + dest_bldg) or ""
+            od[day] = {
+                "date": day,
+                "qty": val,
+                "recorder": recorder,
+                "weatherAm": am_wx,
+                "weatherPm": pm_wx,
+                "destHouse": dest_house,
+                "destBuildings": [dest_bldg],
+                "zone": zone,
+                "lines": [{"dest": dest_bldg, "qty": val, "seq": 1, "zone": zone}]
+            }
+            changed = True
+        if changed:
+            rec["outDaily"] = od
+            rec["out"] = sum(
+                (v.get("qty", 0) if isinstance(v, dict) else (float(v) if isinstance(v, (int, float)) else 0))
+                for v in od.values()
+            )
+
+
 @app.route("/api/prod-factory/<pid>", methods=["PUT"])
 def api_prod_factory_put(pid):
     data = request.get_json(force=True, silent=True) or {}
@@ -4478,6 +4573,7 @@ def api_prod_factory_put(pid):
     payload = data.get("data")
     if payload is None:
         return jsonify({"ok": False, "msg": "empty data"}), 400
+    _normalize_out_daily(payload)
     try:
         blob = json.dumps(payload, ensure_ascii=False)
     except Exception:
