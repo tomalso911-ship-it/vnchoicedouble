@@ -4794,6 +4794,15 @@ function _ovLoadChartLib(cb){
                  否则保留本地（避免用旧副本把刚录入的数据覆盖掉）。 */
               var sStamp = +((d.data && d.data.__savedAt)||0), lStamp = +((localF && localF.__savedAt)||0);
               merged = (sStamp > lStamp) ? prod_mergeFactory(d.data, localF) : prod_mergeFactory(localF, d.data);
+              /* ★ 服务器关键数据明显更多时，直接以服务器为准，避免旧本地快照把新恢复数据冲淡。 */
+              var sHo = Object.keys((d.data && d.data.houseOut)||{}).length;
+              var lHo = Object.keys((localF && localF.houseOut)||{}).length;
+              var sInst = Object.keys(((d.data && d.data.installation)||{}).workers||{}).length;
+              var lInst = Object.keys(((localF && localF.installation)||{}).workers||{}).length;
+              if((lHo > 0 && sHo > lHo * 1.3) || (lInst > 0 && sInst > lInst * 1.3)){
+                try{ console.warn('[prod_syncFromServer] server has significantly more data (houseOut:'+sHo+'>'+lHo+', installDays:'+sInst+'>'+lInst+'), using server as-is'); }catch(_){}
+                merged = d.data;
+              }
             }
             if(merged && (merged.id==null || merged.id==='')) merged.id = id;
             PROD_MEM[id] = merged;                     /* ★ 先写内存：即使 localStorage 不可用，界面也能读到最新数据 */
