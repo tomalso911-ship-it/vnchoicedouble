@@ -3724,6 +3724,13 @@ function _ovLoadChartLib(cb){
       .prod-out-records th .sort-ind{position:absolute;right:2px;top:50%;transform:translateY(-50%);font-size:10px;color:#999;line-height:1;}
       .prod-out-records th.sort-active .sort-ind{color:#E53935;font-weight:700;}
       .prod-out-records-title{margin-top:22px;}
+      /* 小计行：三张出库相关表格共用 */
+      .pe-subtotal-row{background:#e8f0fe !important;font-weight:700;border-top:2px solid #4a90e2;}
+      .pe-subtotal-row td{background:#e8f0fe !important;color:#1a237e;}
+      .pe-subtotal-row td b{font-size:12px;}
+      .prod-out-records tbody tr.pe-subtotal-row:hover td,
+      .prod-table.prod-stockout tbody tr.pe-subtotal-row:hover td,
+      .prod-table.prod-out-analysis tbody tr.pe-subtotal-row:hover td{background:#d2e3fc !important;}
       .prod-demand-panel{padding:2px 0 6px;}
       .prod-sub-title{font-size:13px;font-weight:600;color:#1f3a5f;margin:12px 0 4px;border-left:3px solid #E53935;padding-left:8px;}
       .pe-group-end td,td.pe-group-end{border-bottom:2px solid #333!important;}
@@ -10051,6 +10058,27 @@ function _ovLoadChartLib(cb){
             + '<td class="pe-op">'+opBtns+'</td>'
             + '</tr>';
         }).join('');
+        /* 小计行 */
+        var subTotalDemand = visHouse.reduce(function(s,r){ return s + r.demand; },0);
+        var subTotalProduced = visHouse.reduce(function(s,r){ return s + r.produced; },0);
+        var subTotalGap = visHouse.reduce(function(s,r){ return s + r.gap; },0);
+        var subTotalOut = visHouse.reduce(function(s,r){ var key=r.h+'|'+r.k; var rec=ho[key]||{out:0}; return s + ((r.produced===0)?0:(+rec.out||0)); },0);
+        var subTotalStock = subTotalProduced - subTotalOut;
+        var subCompRate = subTotalDemand > 0 ? Math.round(subTotalProduced / subTotalDemand * 100) : 0;
+        var subOutRate = subTotalProduced > 0 ? Math.round(subTotalOut / subTotalProduced * 100) : 0;
+        html += '<tr class="pe-subtotal-row">'
+          + '<td></td>'
+          + '<td><b>'+pt('subtotal')+'</b></td>'
+          + '<td></td>'
+          + '<td colspan="2" class="ho-calc"><b>'+prod_fmtNum(subTotalDemand)+'</b></td>'
+          + '<td class="ho-calc pe-col-blue"><b>'+prod_fmtNum(subTotalProduced)+'</b></td>'
+          + '<td class="ho-calc pe-col-blue"><b>'+prod_fmtNum(subTotalGap)+'</b></td>'
+          + '<td class="ho-calc pe-col-blue"><b>'+subCompRate+'%</b></td>'
+          + '<td class="ho-calc pe-col-purple"><b>'+prod_fmtNum(subTotalOut)+'</b></td>'
+          + '<td class="ho-calc pe-col-purple"><b>'+prod_fmtNum(subTotalStock)+'</b></td>'
+          + '<td class="ho-calc pe-col-purple"><b>'+subOutRate+'%</b></td>'
+          + '<td></td>'
+          + '</tr>';
       } else { html += '<tr><td colspan="12" class="prod-empty">'+pt('empty_no_spec')+'</td></tr>'; }
       html += '</tbody></table></div>';
       if(PROD_STOCKOUT_DIRTY){ PROD_STOCKOUT_DIRTY = false; f.houseOut = ho; prod_save(f); }
@@ -11063,6 +11091,18 @@ function _ovLoadChartLib(cb){
             + '<td class="pe-op-act"><button class="pe-op-ibtn pe-op-edit" type="button" data-tip="编辑" onclick="prod_outEditInline('+_jsStr(r.date)+','+_jsStr(r.h)+','+_jsStr(r.k)+')">'+PROD_OP_ICON_EDIT+'</button></td>'
           ;
         }).join('');
+        /* 小计行 */
+        var subQty = rows.reduce(function(s,r){ return s + (r.qty||0); },0);
+        var subInstalled = rows.reduce(function(s,r){ return s + (r.installedQty||0); },0);
+        html += '<tr class="pe-subtotal-row">'
+          + '<td></td>'
+          + '<td><b>'+pt('subtotal')+'</b></td>'
+          + '<td colspan="3"></td>'
+          + '<td class="ho-calc"><b>'+prod_fmtNum(subQty)+'</b></td>'
+          + '<td colspan="4"></td>'
+          + '<td class="ho-calc"><b>'+prod_fmtNum(subInstalled)+'</b></td>'
+          + '<td></td>'
+          + '</tr>';
       } else { html+='<tr><td colspan="12" class="prod-empty">'+pt('lbl_no_records')+'</td></tr>'; }
       html+='</tbody></table></div>';
       setTimeout(prodAutoBackfillOutWeather, 0);
@@ -11200,6 +11240,17 @@ function _ovLoadChartLib(cb){
               + '</tr>';
           });
         });
+        /* 小计行 */
+        var grandSubtotal = groups.reduce(function(s,g){ return s + g.subtotal; },0);
+        var grandQty = groups.reduce(function(s,g){ return s + g.items.reduce(function(ss,r){ return ss + (r.qty||0); },0); },0);
+        html += '<tr class="pe-subtotal-row">'
+          + '<td></td>'
+          + '<td><b>'+pt('subtotal')+'</b></td>'
+          + '<td colspan="2"></td>'
+          + '<td class="ho-calc"><b>'+prod_fmtNum(grandSubtotal)+'</b></td>'
+          + '<td class="ho-calc"><b>'+prod_fmtNum(grandQty)+'</b></td>'
+          + '<td colspan="4"></td>'
+          + '</tr>';
       } else { html += '<tr><td colspan="10" class="prod-empty">'+pt('lbl_no_records')+'</td></tr>'; }
       html += '</tbody></table></div>';
       return html;
