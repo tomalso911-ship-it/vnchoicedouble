@@ -3681,14 +3681,34 @@ function _ovLoadChartLib(cb){
       .prod-out-records tr.pe-op-editing td{background:#fffbe6;}
       /* 出库记录表 + 表格分析：表身最多显示 10 行，右侧垂直滚动，表头锁定 */
       .prod-out-records-scroll,.prod-analysis-scroll{position:relative;overflow-y:auto;overflow-x:hidden;background:#fff;border:1px solid #e6eaee;border-radius:6px;}
+      /* 出库记录表允许横向滚动，以便冻结首列（序号）/末列（操作） */
+      .prod-out-records-scroll{overflow-x:auto;}
       .prod-out-records-scroll thead th,.prod-analysis-scroll thead th{position:-webkit-sticky;position:sticky;top:0;z-index:5;background:#f3f6fa;box-shadow:inset 0 -1px 0 #e6eaee;}
       .prod-analysis-scroll thead th{background:#f7f9f4;box-shadow:inset 0 -1px 0 #eee;}
+      /* 冻结首列（序号）与末列（操作）：横向滚动时不动 */
+      .prod-out-records th.pe-col-no,.prod-out-records td.pe-col-no{position:-webkit-sticky;position:sticky;left:0;z-index:4;}
+      .prod-out-records th:last-child,.prod-out-records td:last-child{position:-webkit-sticky;position:sticky;right:0;z-index:4;}
+      .prod-out-records thead th.pe-col-no,.prod-out-records thead th:last-child{top:0;z-index:8;}
+      .prod-out-records tbody tr.pe-op-editing td.pe-col-no,
+      .prod-out-records tbody tr.pe-op-editing td:last-child{background:#fffbe6;z-index:6;}
+      .prod-out-records tbody tr.prod-out-editing-row > td.pe-col-no,
+      .prod-out-records tbody tr.prod-out-editing-row > td:last-child{background:#ffeb3b !important;}
+      /* 冻结列分隔阴影 */
+      .prod-out-records td.pe-col-no,.prod-out-records th.pe-col-no{box-shadow:2px 0 3px -1px rgba(0,0,0,.12);}
+      .prod-out-records td:last-child,.prod-out-records th:last-child{box-shadow:-2px 0 3px -1px rgba(0,0,0,.12);}
       .prod-out-records-scroll .prod-out-records,.prod-analysis-scroll .prod-out-analysis{margin-bottom:0;}
       .prod-analysis-scroll td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       .prod-out-records tbody tr{cursor:pointer;}
       .prod-out-records tbody tr:nth-child(odd){background:#fff;}
       .prod-out-records tbody tr:nth-child(even){background:#f0f7ff;}
       .prod-out-records tbody tr:hover{background:#d6e8ff;}
+      /* 冻结列必须自带背景，否则滚动时下方内容会从透明单元格透出 */
+      .prod-out-records tbody tr:nth-child(odd) td.pe-col-no,
+      .prod-out-records tbody tr:nth-child(odd) td:last-child{background:#fff;}
+      .prod-out-records tbody tr:nth-child(even) td.pe-col-no,
+      .prod-out-records tbody tr:nth-child(even) td:last-child{background:#f0f7ff;}
+      .prod-out-records tbody tr:hover td.pe-col-no,
+      .prod-out-records tbody tr:hover td:last-child{background:#d6e8ff;}
       .prod-out-records tbody tr.pe-op-editing,
       .prod-out-records tbody tr.pe-op-editing:hover{cursor:default;background:#fffbe6;}
       /* 点击「出库」进入编辑的那一行：醒目黄色 + 橙色描边，一眼可见 */
