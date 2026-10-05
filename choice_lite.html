@@ -8932,7 +8932,15 @@ function _ovLoadChartLib(cb){
         var producedArr = specKeys.map(function(k){ return (fin[k] && fin[k].produced)||0; });
         var prod = f.production || {};
         var prodNorm = {};
-        Object.keys(prod).forEach(function(k){ var dmy=prod_dmy(k); if(dmy) prodNorm[dmy]=prod[k]; });
+        /* ★ range 由 prod_eDateRange 生成，key 是 DD/MM/YYYY（斜杠）；
+           而 production 的 key 存的是 DD-MM-YYYY（横杠），prod_dmy 会原样保留横杠 → 两边 key 对不上，
+           导致每日产量求和恒为 0（表现为总产量 0片、占比 0.00%、平均日产 0，进而隐藏后面整段进度分析）。
+           这里统一转成 range 使用的斜杠格式。 */
+        Object.keys(prod).forEach(function(k){
+          var _y = dmyToYmd(k);
+          var _rk = _y ? ymdToDmy(_y) : (prod_dmy(k) || k);
+          if(_rk) prodNorm[_rk] = prod[k];
+        });
         var keys = Object.keys(prodNorm);
         var first = keys.length ? prod_sortDateKeys(keys, false)[0] : ymdToDmy(prod_today());
         var range = prod_eDateRange(first, ymdToDmy(prod_today()));
@@ -9145,7 +9153,12 @@ function _ovLoadChartLib(cb){
         if(!PROD_ECHARTS_RESIZED){ PROD_ECHARTS_RESIZED = true; window.addEventListener('resize', function(){ for(var id in PROD_ECHARTS){ if(PROD_ECHARTS[id]) PROD_ECHARTS[id].resize(); } }); }
         var prod = f.production || {};
         var prodNorm = {};
-        Object.keys(prod).forEach(function(k){ var dmy=prod_dmy(k); if(dmy) prodNorm[dmy]=prod[k]; });
+        /* 同 E 页：统一成 range 使用的 DD/MM/YYYY（斜杠）格式，避免 production 的 DD-MM-YYYY 对不上。 */
+        Object.keys(prod).forEach(function(k){
+          var _y = dmyToYmd(k);
+          var _rk = _y ? ymdToDmy(_y) : (prod_dmy(k) || k);
+          if(_rk) prodNorm[_rk] = prod[k];
+        });
         var keys = Object.keys(prodNorm);
         var first = keys.length ? prod_sortDateKeys(keys, false)[0] : ymdToDmy(prod_today());
         var range = prod_eDateRange(first, ymdToDmy(prod_today()));
