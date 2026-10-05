@@ -4389,6 +4389,38 @@ def _prod_factory_weight(f):
         pass
     return w
 
+def _prod_factory_counts(f):
+    """返回核心业务条目数：出库日明细总数、安装天数、安装记录行数。
+       用于识别"信息量不少但关键业务数据缺失"的旧快照覆盖。"""
+    out_daily = 0
+    install_days = 0
+    install_rows = 0
+    if not isinstance(f, dict):
+        return (out_daily, install_days, install_rows)
+    try:
+        ho = f.get('houseOut') or {}
+        for rec in ho.values():
+            if isinstance(rec, dict):
+                out_daily += len(rec.get('outDaily') or {})
+        inst = f.get('installation') or {}
+        ws = inst.get('workers') or {}
+        install_days = len(ws)
+        for dw in ws.values():
+            if not isinstance(dw, dict):
+                continue
+            zt = dw.get('zoneTeamWorkers') or {}
+            for teams in zt.values():
+                if not isinstance(teams, list):
+                    continue
+                for t in teams:
+                    if not isinstance(t, dict):
+                        continue
+                    install_rows += len(t.get('todayInstall') or {})
+    except Exception:
+        pass
+    return (out_daily, install_days, install_rows)
+
+
 @app.route("/api/prod-factory/<pid>", methods=["PUT"])
 def api_prod_factory_put(pid):
     data = request.get_json(force=True, silent=True) or {}
@@ -4411,16 +4443,51 @@ def api_prod_factory_put(pid):
             existing = json.loads(existing_row["data"])
             ew = _prod_factory_weight(existing)
             iw = _prod_factory_weight(payload)
+            ec = _prod_factory_counts(existing)
+            ic = _prod_factory_counts(payload)
+            # 任一核心指标低于阈值都视为回退
+            reject_reason = None
             if ew > 0 and iw < ew * 0.6:
-                print(f"[prod_factory PUT {pid}] rejected: server weight={ew}, incoming weight={iw}, requester={me}")
+                reject_reason = f"overall weight too low (server:{ew} vs incoming:{iw})"
+            elif ec[0] > 0 and ic[0] < ec[0] * 0.65:
+                reject_reason = f"出库日明细过少 (server:{ec[0]} vs incoming:{ic[0]})"
+            elif ec[1] > 0 and ic[1] < ec[1] * 0.65:
+                reject_reason = f"安装天数过少 (server:{ec[1]} vs incoming:{ic[1]})"
+            elif ec[2] > 0 and ic[2] < ec[2] * 0.65:
+                reject_reason = f"安装记录过少 (server:{ec[2]} vs incoming:{ic[2]})"
+            if reject_reason:
+                print(f"[prod_factory PUT {pid}] rejected: {reject_reason}, requester={me}")
                 conn.close()
-                return jsonify({"ok": False, "msg": f"服务器已有更完整的数据，请先刷新页面再保存 (server:{ew} vs incoming:{iw})"}), 409
+                return jsonify({"ok": False, "msg": "服务器已有更完整的数据，请先刷新页面再保存（" + reject_reason + "）"}), 409
         except Exception:
             pass
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
     try:
+        # 保存本次成功写入前的版本，便于回滚（只保留最近 10 个版本）
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS prod_factory_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id TEXT,
+                    data TEXT,
+                    updated_by TEXT,
+                    updated_at TEXT
+                )
+            """)
+            if existing_row and existing_row["data"]:
+                conn.execute(
+                    "INSERT INTO prod_factory_history (project_id, data, updated_by, updated_at) VALUES (?,?,?,?)",
+                    (str(pid), existing_row["data"], (existing and existing.get('__updatedBy')) or '', now)
+                )
+                conn.execute(
+                    "DELETE FROM prod_factory_history WHERE id NOT IN (SELECT id FROM prod_factory_history WHERE project_id=? ORDER BY updated_at DESC, id DESC LIMIT 10)",
+                    (str(pid),)
+                )
+        except Exception as he:
+            print(f"[prod_factory PUT {pid}] history backup warning: {he}")
         conn.execute("DELETE FROM prod_factory WHERE project_id=?", (str(pid),))
         conn.execute("INSERT INTO prod_factory (project_id, data, updated_by, updated_at) VALUES (?,?,?,?)",
-                     (str(pid), blob, me, time.strftime("%Y-%m-%d %H:%M:%S")))
+                     (str(pid), blob, me, now))
         conn.commit()
     except Exception as e:
         try:

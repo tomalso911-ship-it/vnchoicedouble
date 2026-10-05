@@ -4674,8 +4674,17 @@ function _ovLoadChartLib(cb){
       try {
         var _p = fetch('/api/prod-factory/'+encodeURIComponent(f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:f }) });
         /* 上传失败时至少给一次可见提示（原先完全静默，用户会以为"保存了"，但服务端其实没收到） */
-        return _p.then(function(r){ if(r && !r.ok) prod_serverWarn('HTTP '+r.status); return r; },
-                       function(e){ prod_serverWarn(e && (e.message||'network')); });
+        return _p.then(function(r){
+          if(r && !r.ok){
+            if(r.status === 409){
+              try{ prod_toast('服务器已有更新的完整数据，请刷新页面后再保存'); }catch(_){}
+              try{ console.warn('[prod_pushToServer] 409: 本地数据比服务器旧，已阻止覆盖'); }catch(_){}
+            } else {
+              prod_serverWarn('HTTP '+r.status);
+            }
+          }
+          return r;
+        }, function(e){ prod_serverWarn(e && (e.message||'network')); });
       } catch(e){ return Promise.resolve(); }
     }
     function prod_serverWarn(why){
