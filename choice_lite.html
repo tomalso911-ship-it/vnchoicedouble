@@ -7491,6 +7491,23 @@ function _ovLoadChartLib(cb){
         }
       }
     }
+    /* 悬停规格卡片时，仅把汇总行括号内「项目总需求」数字换成该规格的项目总需求；其余保持已选范围合计 */
+    function prod_specSummaryHover(summaryId, total, on){
+      var box = document.getElementById(summaryId); if(!box) return;
+      var span = (box.querySelector ? box.querySelector('.pe-sum-paren') : null); if(!span) return;
+      if(on){
+        if(span._def==null) span._def = span.innerHTML;
+        var def = span._def;
+        var oi = def.search(/[（(]/), ci = def.lastIndexOf('）'); if(ci<0) ci = def.lastIndexOf(')');
+        if(oi<0 || ci<0) return;
+        var open = def.charAt(oi), close = def.charAt(ci);
+        var us = def.lastIndexOf(' ', ci-1);
+        var unit = (us>=0) ? def.substring(us+1, ci) : '';
+        span.innerHTML = open + pt('lbl_spec_proj_total') + ' ' + prod_fmtNum(total) + (unit ? (' '+unit) : '') + close;
+      } else {
+        if(span._def!=null){ span.innerHTML = span._def; span._def = null; }
+      }
+    }
     function prod_receiptWarn(){
       var el = document.getElementById('prodReceiptWarn');
       if(!el){
