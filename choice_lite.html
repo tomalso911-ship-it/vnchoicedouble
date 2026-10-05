@@ -8937,13 +8937,35 @@ function _ovLoadChartLib(cb){
         var first = keys.length ? prod_sortDateKeys(keys, false)[0] : ymdToDmy(prod_today());
         var range = prod_eDateRange(first, ymdToDmy(prod_today()));
         var perSpecDay = {}; specKeys.forEach(function(k){ perSpecDay[k]=[]; });
+        /* ★ 天气来源：此图原来只读 f.production，本项目天气实际在安装模块与 outDaily 快照，导致温度/湿度线为空、
+           背景色带全灰（统计成"36天多云"）。这里统一多来源收集。 */
+        var workersNorm = {};
+        Object.keys(f.workers||{}).forEach(function(k){ var dm=prod_dmy(k); if(dm) workersNorm[dm]=f.workers[k]; });
+        var instWorkersNorm = {};
+        Object.keys((f.installation&&f.installation.workers)||{}).forEach(function(k){ var dm=prod_dmy(k); if(dm) instWorkersNorm[dm]=(f.installation.workers)[k]; });
+        var outWxByDay = {};
+        var hoAll = f.houseOut || {};
+        for(var hkx in hoAll){ if(!hoAll.hasOwnProperty(hkx)) continue; var odx=(hoAll[hkx]||{}).outDaily||{};
+          for(var dx in odx){ if(!odx.hasOwnProperty(dx)) continue; var dmx=ymdToDmy(dx); var ex=odx[dx];
+            if(!outWxByDay[dmx]) outWxByDay[dmx]={am:null,pm:null};
+            if(ex && ex.weatherAm && ex.weatherAm.v===2 && !outWxByDay[dmx].am) outWxByDay[dmx].am=ex.weatherAm;
+            if(ex && ex.weatherPm && ex.weatherPm.v===2 && !outWxByDay[dmx].pm) outWxByDay[dmx].pm=ex.weatherPm;
+          }
+        }
+        var _wxOf = function(d){
+          var pr=prodNorm[d]||{}, w=workersNorm[d]||{}, iw3=instWorkersNorm[d]||{}, ob=outWxByDay[d]||{};
+          var am=(pr.weatherAm&&pr.weatherAm.v===2?pr.weatherAm:null)||(w.weatherAm&&w.weatherAm.v===2?w.weatherAm:null)||(iw3.weatherAm&&iw3.weatherAm.v===2?iw3.weatherAm:null)||ob.am||null;
+          var pm=(pr.weatherPm&&pr.weatherPm.v===2?pr.weatherPm:null)||(w.weatherPm&&w.weatherPm.v===2?w.weatherPm:null)||(iw3.weatherPm&&iw3.weatherPm.v===2?iw3.weatherPm:null)||ob.pm||null;
+          if(!am || !pm){ var fb=prod_weatherForDate(d); if(!am&&fb) am=fb.am; if(!pm&&fb) pm=fb.pm; }
+          return {am:am, pm:pm};
+        };
         var totalDay = [], temps = [], hums = [];
         range.forEach(function(d){
           var rec = prodNorm[d]; var per={};
           if(rec){ for(var n in rec.lines){ var add={}; prod_lineAddQty(rec.lines[n], add); for(var k in add){ per[k]=(per[k]||0)+add[k]; } } }
           var dt=0; specKeys.forEach(function(k){ var v=per[k]||0; perSpecDay[k].push(v); dt+=v; });
           totalDay.push(dt);
-          var ta=rec&&rec.weatherAm, tp=rec&&rec.weatherPm;
+          var wx=_wxOf(d), ta=wx.am, tp=wx.pm;
           temps.push(prod_wxNum(ta&&ta.temp, tp&&tp.temp));
           hums.push(prod_wxNum(ta&&ta.hum, tp&&tp.hum));
         });
@@ -9001,9 +9023,9 @@ function _ovLoadChartLib(cb){
           series:lineSeries
         });
         var wxCatOfDay = range.map(function(d){
-          var rec = prodNorm[d];
-          var am = rec && rec.weatherAm && rec.weatherAm.code;
-          var pm = rec && rec.weatherPm && rec.weatherPm.code;
+          var wx = _wxOf(d);
+          var am = wx.am && wx.am.code;
+          var pm = wx.pm && wx.pm.code;
           var amCat = prod_wxCond(am), pmCat = prod_wxCond(pm);
           var cat = 'cloud';
           if(amCat === 'rain' || pmCat === 'rain') cat = 'rain';
@@ -9014,6 +9036,7 @@ function _ovLoadChartLib(cb){
         var wxColorOfDay = wxCatOfDay.map(function(c){ return c==='rain' ? 'rgba(64,140,255,.22)' : c==='cloud' ? 'rgba(150,160,175,.24)' : 'rgba(255,213,79,.32)'; });
         var wxIconOfDay = wxCatOfDay.map(function(c){ return c==='rain' ? '🌧️' : c==='cloud' ? '☁️' : '☀️'; });
         var N5 = function(p){ return p.dataIndex % 5 === 0 && p.value != null ? p.value : ''; };
+        var pcWxEl = prod_el('pcEWeather'); if(pcWxEl) pcWxEl.style.height = '360px';
         prod_eSet('pcEWeather', {
           animation:false,
           tooltip:{trigger:'axis', formatter:function(ps){
@@ -9025,9 +9048,9 @@ function _ovLoadChartLib(cb){
             return out.join('<br/>');
           }},
           legend:{data:[pt('lbl_total_prod'), pt('wx_temp')]},
-          grid:{left:70, right:95, top:70, bottom:78, containLabel:false},
-          xAxis:{type:'category', data:range, axisTick:{alignWithLabel:true}, axisLabel:{fontSize:10, lineHeight:15, hideOverlap:false, interval:0,
-            rich:{day:{fontSize:10,color:'#333',lineHeight:14}, sun:{fontSize:13,color:'#F9A825',lineHeight:15}, cloud:{fontSize:13,color:'#757575',lineHeight:15}, rain:{fontSize:13,color:'#1976D2',lineHeight:15}},
+          grid:{left:70, right:95, top:70, bottom:120, containLabel:false},
+          xAxis:{type:'category', data:range, axisTick:{alignWithLabel:true}, axisLabel:{fontSize:8, lineHeight:10, margin:8, hideOverlap:false, interval:0, rotate:50,
+            rich:{day:{fontSize:8,color:'#333',lineHeight:10}, sun:{fontSize:10,color:'#F9A825',lineHeight:11}, cloud:{fontSize:10,color:'#757575',lineHeight:11}, rain:{fontSize:10,color:'#1976D2',lineHeight:11}},
             formatter:function(val, idx){ var cat=wxCatOfDay[idx]||'cloud'; return '{day|'+(val?val.slice(0,5):'')+'}\n{'+cat+'|'+(wxIconOfDay[idx]||'')+'}'; }
           }, splitArea:{show:true, areaStyle:{color:wxColorOfDay}}},
           yAxis:[
