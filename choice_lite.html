@@ -8960,9 +8960,14 @@ function _ovLoadChartLib(cb){
           return {am:am, pm:pm};
         };
         var totalDay = [], temps = [], hums = [];
+        /* ★ 规格 key 归一化：production 里可能写 "1,550×600×70"，矩阵里可能是 "1550×600×70"（或 x 代替 ×），
+           直接按字符串比对会把每日产量全部算成 0（表现为总产量 0片、占比 0.00%、平均日产 0，进而隐藏后面整段进度分析）。 */
+        var _normSpec = function(s){ return String(s).replace(/[,，\s]/g,'').replace(/[xX＊*]/g,'×'); };
+        var _specByNorm = {}; specKeys.forEach(function(k){ _specByNorm[_normSpec(k)] = k; });
         range.forEach(function(d){
           var rec = prodNorm[d]; var per={};
-          if(rec){ for(var n in rec.lines){ var add={}; prod_lineAddQty(rec.lines[n], add); for(var k in add){ per[k]=(per[k]||0)+add[k]; } } }
+          if(rec){ for(var n in rec.lines){ var add={}; prod_lineAddQty(rec.lines[n], add);
+            for(var k in add){ if(!add.hasOwnProperty(k)) continue; var mk = _specByNorm[_normSpec(k)] || k; per[mk]=(per[mk]||0)+add[k]; } } }
           var dt=0; specKeys.forEach(function(k){ var v=per[k]||0; perSpecDay[k].push(v); dt+=v; });
           totalDay.push(dt);
           var wx=_wxOf(d), ta=wx.am, tp=wx.pm;
@@ -9042,26 +9047,28 @@ function _ovLoadChartLib(cb){
           tooltip:{trigger:'axis', formatter:function(ps){
             var out = [ps[0].axisValue];
             ps.forEach(function(p){
-              var unit = p.seriesName === pt('wx_temp') ? '°' : '';
+              var unit = p.seriesName === pt('wx_temp') ? '°' : (p.seriesName === pt('wx_hum') ? '%' : '');
               out.push(p.marker + p.seriesName + '：' + (p.value == null ? '—' : prod_fmtNum(p.value)) + unit);
             });
             return out.join('<br/>');
           }},
-          legend:{data:[pt('lbl_total_prod'), pt('wx_temp')]},
-          grid:{left:70, right:95, top:70, bottom:120, containLabel:false},
+          legend:{data:[pt('lbl_total_prod'), pt('wx_temp'), pt('wx_hum')]},
+          grid:{left:70, right:130, top:70, bottom:120, containLabel:false},
           xAxis:{type:'category', data:range, axisTick:{alignWithLabel:true}, axisLabel:{fontSize:8, lineHeight:10, margin:8, hideOverlap:false, interval:0, rotate:50,
             rich:{day:{fontSize:8,color:'#333',lineHeight:10}, sun:{fontSize:10,color:'#F9A825',lineHeight:11}, cloud:{fontSize:10,color:'#757575',lineHeight:11}, rain:{fontSize:10,color:'#1976D2',lineHeight:11}},
             formatter:function(val, idx){ var cat=wxCatOfDay[idx]||'cloud'; return '{day|'+(val?val.slice(0,5):'')+'}\n{'+cat+'|'+(wxIconOfDay[idx]||'')+'}'; }
           }, splitArea:{show:true, areaStyle:{color:wxColorOfDay}}},
           yAxis:[
             {type:'value', name:pt('lbl_total_prod'), nameTextStyle:{fontWeight:'bold'}, nameGap:34, position:'left', axisLine:{show:true, lineStyle:{color:'#2b7a3e'}}, axisLabel:{color:'#2b7a3e'}, splitLine:{show:false}},
-            {type:'value', name:pt('wx_temp')+' (°)', nameTextStyle:{fontWeight:'bold'}, nameGap:34, position:'right', axisLine:{show:true, lineStyle:{color:'#E53935'}}, axisLabel:{color:'#E53935'}, splitLine:{show:false}}
+            {type:'value', name:pt('wx_temp')+' (°)', nameTextStyle:{fontWeight:'bold'}, nameGap:34, position:'right', axisLine:{show:true, lineStyle:{color:'#E53935'}}, axisLabel:{color:'#E53935'}, splitLine:{show:false}},
+            {type:'value', name:pt('wx_hum')+' (%)', nameTextStyle:{fontWeight:'bold'}, nameGap:34, position:'right', offset:62, min:0, max:100, axisLine:{show:true, lineStyle:{color:'#1565C0'}}, axisLabel:{color:'#1565C0'}, splitLine:{show:false}}
           ],
           series:[
             {name:pt('lbl_total_prod'), type:'line', yAxisIndex:0, smooth:true, showSymbol:true, clip:false, z:3, lineStyle:{width:2.5, color:'#2b7a3e'}, itemStyle:{color:'#2b7a3e'}, data:totalDay, symbolSize:function(v,p){ return p.dataIndex % 5 === 0 ? 5 : 0; },
               label:{show:true, position:'bottom', distance:6, color:'#000', fontSize:10, fontWeight:'bold', backgroundColor:'rgba(255,255,255,0.9)', borderColor:'#2b7a3e', borderWidth:0.5, borderRadius:3, padding:[2,4], formatter:function(p){ var v=N5(p); return v==='' ? null : prod_fmtNum(v); }}},
             {name:pt('wx_temp'), type:'line', yAxisIndex:1, smooth:true, showSymbol:true, clip:false, z:4, lineStyle:{width:2, color:'#E53935'}, itemStyle:{color:'#E53935'}, data:temps, symbolSize:function(v,p){ return p.dataIndex % 5 === 0 ? 5 : 0; },
-              label:{show:true, position:'top', distance:6, color:'#000', fontSize:10, fontWeight:'bold', backgroundColor:'rgba(255,255,255,0.9)', borderColor:'#C62828', borderWidth:0.5, borderRadius:3, padding:[2,4], formatter:function(p){ var v=N5(p); return v==='' ? null : v+'°'; }}}
+              label:{show:true, position:'top', distance:6, color:'#000', fontSize:10, fontWeight:'bold', backgroundColor:'rgba(255,255,255,0.9)', borderColor:'#C62828', borderWidth:0.5, borderRadius:3, padding:[2,4], formatter:function(p){ var v=N5(p); return v==='' ? null : v+'°'; }}},
+            {name:pt('wx_hum'), type:'line', yAxisIndex:2, smooth:true, showSymbol:false, clip:false, z:2, lineStyle:{width:1.5, color:'#1565C0', type:'dashed'}, itemStyle:{color:'#1565C0'}, data:hums}
           ]
         });
         /* 天气 & 产量汇总（显示在图表底部） */
