@@ -10120,11 +10120,11 @@ function _ovLoadChartLib(cb){
             + '<td class="pe-op">'+opBtns+'</td>'
             + '</tr>';
         }).join('');
-        /* 小计行 */
-        var subTotalDemand = visHouse.reduce(function(s,r){ return s + r.demand; },0);
-        var subTotalProduced = visHouse.reduce(function(s,r){ return s + r.produced; },0);
-        var subTotalGap = visHouse.reduce(function(s,r){ return s + r.gap; },0);
-        var subTotalOut = visHouse.reduce(function(s,r){ var key=r.h+'|'+r.k; var rec=ho[key]||{out:0}; return s + ((r.produced===0)?0:(+rec.out||0)); },0);
+        /* 小计行：始终按全部数据（展开/恢复全部数据状态）汇总，避免隐藏“当前生产总量=0”行后小计被截断 */
+        var subTotalDemand = byHouse.reduce(function(s,r){ return s + r.demand; },0);
+        var subTotalProduced = byHouse.reduce(function(s,r){ return s + r.produced; },0);
+        var subTotalGap = byHouse.reduce(function(s,r){ return s + r.gap; },0);
+        var subTotalOut = byHouse.reduce(function(s,r){ var key=r.h+'|'+r.k; var rec=ho[key]||{out:0}; return s + ((r.produced===0)?0:(+rec.out||0)); },0);
         var subTotalStock = subTotalProduced - subTotalOut;
         var subCompRate = subTotalDemand > 0 ? Math.round(subTotalProduced / subTotalDemand * 100) : 0;
         var subOutRate = subTotalProduced > 0 ? Math.round(subTotalOut / subTotalProduced * 100) : 0;
