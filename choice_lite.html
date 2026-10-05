@@ -4634,11 +4634,43 @@ function _ovLoadChartLib(cb){
       PROD_LS_WARNED = true;
       try{ prod_toast('本地缓存写入失败（可能处于无痕模式或存储已满）：数据已保存到服务器，刷新后会重新拉取'); }catch(_){}
     }
+    /* 统计工厂数据的"信息量"：用于阻止「空壳」覆盖服务器上的真实数据。
+       背景：清站点数据/换 origin 后 localStorage 为空 → prod_get 返回空壳 →
+       任意一次自动保存都会把空壳 PUT 到服务器，导致服务端历史数据被清空（数据丢失）。 */
+    function prod_factoryWeight(f){
+      if(!f || typeof f!=='object') return 0;
+      var w = 0;
+      try{
+        var ho = f.houseOut||{}; for(var hk in ho){ if(!ho.hasOwnProperty(hk)) continue; var od=(ho[hk]&&ho[hk].outDaily)||{}; for(var dk in od){ if(od.hasOwnProperty(dk)) w++; } }
+        var inst = f.installation||{}; var ws = inst.workers||{};
+        for(var wk in ws){ if(!ws.hasOwnProperty(wk)) continue; var zt=(ws[wk]&&ws[wk].zoneTeamWorkers)||{};
+          for(var zn in zt){ if(!zt.hasOwnProperty(zn)) continue; (zt[zn]||[]).forEach(function(t){ if(!t) return; var ti=t.todayInstall||{}; for(var sp in ti){ if(ti.hasOwnProperty(sp)) w++; } if(t.house) w++; }); } }
+        if(Array.isArray(f.plan)) w += f.plan.length;
+        if(f.workers && typeof f.workers==='object') w += Object.keys(f.workers).length;
+        if(f.profile && typeof f.profile==='object' && Object.keys(f.profile).length) w++;
+        if(f.inventoryPlan && typeof f.inventoryPlan==='object' && Object.keys(f.inventoryPlan).length) w++;
+        if(f.planStart) w++;
+        if(f.prepStart) w++;
+        if(f.priorityHouse) w++;
+        if(f.production && typeof f.production==='object'){ for(var pk in f.production){ if(f.production.hasOwnProperty(pk)) w++; } }
+        var m = f.materials||{}; ['items','inbound','outbound','receipts'].forEach(function(k){ if(Array.isArray(m[k])) w += m[k].length; });
+        if(f.equipment){ if(Array.isArray(f.equipment.list)) w += f.equipment.list.length; if(Array.isArray(f.equipment.faults)) w += f.equipment.faults.length; }
+        if(Array.isArray(f.delivery)) w += f.delivery.length;
+        var fin = f.finished||{}; for(var fk in fin){ if(fin.hasOwnProperty(fk)) w++; }
+      }catch(e){ return w; }
+      return w;
+    }
     // 把现场工厂数据推送到服务端（全员共享）。失败静默（本地仍保留），返回 Promise。
     function prod_pushToServer(f){
       if(!f || !f.id) return Promise.resolve();
       var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : '';
       if(!me) return Promise.resolve();
+      /* ★ 安全闸：空壳绝不覆盖服务器。避免"清缓存/换 origin 后空壳把服务端真实数据清空"。 */
+      if(prod_factoryWeight(f) === 0){
+        try{ console.warn('[prod_pushToServer] 本地工厂为空，已阻止覆盖服务器数据（防止误清空）'); }catch(_){}
+        try{ prod_toast('检测到本地数据为空，已自动保护：不会覆盖服务器上的数据'); }catch(_){}
+        return Promise.resolve();
+      }
       try {
         var _p = fetch('/api/prod-factory/'+encodeURIComponent(f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:f }) });
         /* 上传失败时至少给一次可见提示（原先完全静默，用户会以为"保存了"，但服务端其实没收到） */
