@@ -3819,12 +3819,12 @@ function _ovLoadChartLib(cb){
       /* 历史生产表：极限压缩等宽固定布局，保证 13+ 规格列也能一行放完（无横向滚动） */
       .pe-hist{table-layout:fixed;width:100%;font-size:10px;}
       .pe-hist th,.pe-hist td{padding:1px 2px;vertical-align:middle;text-align:center;}
-      .pe-hist .pe-col-no{width:24px;}
+      .pe-hist .pe-col-no{width:34px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       .pe-hist .pe-col-date{width:56px;white-space:nowrap;}
       .pe-hist .pe-col-holiday{width:28px;}
       .pe-hist .pe-col-rec{max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
       .pe-hist .pe-col-wx-am,.pe-hist .pe-col-wx-pm{width:54px;font-size:8px;line-height:1.1;white-space:normal;word-break:break-word;}
-      .pe-hist .pe-col-total{width:34px;}
+      .pe-hist .pe-col-total{width:46px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       .pe-hist .pe-col-act{width:54px;white-space:nowrap;padding:1px 1px;}
       .pe-hist .pe-vth, .pe-stats .pe-vth{white-space:normal;height:auto;line-height:1.05;vertical-align:bottom;text-align:center;padding:1px 0;font-size:8.3px;letter-spacing:0;max-width:40px;word-break:break-word;}
       .pe-hist .pe-vth .v1, .pe-stats .pe-vth .v1{display:block;font-weight:700;}
@@ -3841,7 +3841,7 @@ function _ovLoadChartLib(cb){
       .pe-hist td{font-variant-numeric:tabular-nums;}
       .pe-hist .pe-zero{color:#cfd6dd;}
       .pe-hist .prod-op{font-size:10px;padding:0 1px;margin-right:0;}
-      .pe-hist-scroll{max-height:430px;overflow-y:auto;}
+      .pe-hist-scroll{max-height:560px;overflow-y:auto;}
       .pe-hist thead th{position:sticky;top:0;z-index:2;}
       /* 网格线：历史产出表 + 成品库存表 + 出库记录表 + 出库分析表 */
       .pe-hist th, .pe-hist td, .pe-fin th, .pe-fin td, .prod-out-records th, .prod-out-records td, .prod-out-analysis th, .prod-out-analysis td{border:1px solid #000;}
@@ -5592,7 +5592,7 @@ function _ovLoadChartLib(cb){
       prod_limitTableRows('.pe-line-detail-scroll', 10, '360px');
       prod_limitTableRows('.plc-scroll', 10, '360px');
       prod_limitTableRows('.pc-labor-scroll', 10, '400px');
-      prod_limitTableRows('.pe-hist-scroll', 10, '430px');
+      prod_limitTableRows('.pe-hist-scroll', 20, '560px');
       prod_limitTableRows('.rc-list-scroll', 10, '520px');
     }
     function prod_limitTableRows(selector, maxRows, limitHeight){
@@ -8723,6 +8723,45 @@ function _ovLoadChartLib(cb){
         }
       });
     }
+    /* 自动补抓 E 页全部历史产出记录缺失的天气（打开每日生产时自动跑） */
+    var PROD_WX_AUTO_BACKFILLING_E_ALL = false;
+    function prodAutoBackfillWeatherEAll(){
+      if(!PROD_CUR || PROD_ACTIVE_TAB!=='E' || PROD_WX_AUTO_BACKFILLING_E_ALL) return;
+      var prov = prodFactoryProvKey(); if(!prov) return;
+      var f = prod_get(PROD_CUR); if(!f || !f.production) return;
+      var today = prod_today();
+      var missing = [];
+      Object.keys(f.production).forEach(function(dd){
+        var ymd = dmyToYmd(dd);
+        if(!ymd || ymd >= today) return;
+        var rec = f.production[dd]; if(!rec) return;
+        if((!rec.weatherAm || rec.weatherAm.v!==2) || (!rec.weatherPm || rec.weatherPm.v!==2)) missing.push({dd:dd, ymd:ymd});
+      });
+      if(!missing.length) return;
+      missing.sort(function(a,b){ return a.ymd.localeCompare(b.ymd); });
+      var start = missing[0].ymd, end = missing[missing.length-1].ymd;
+      PROD_WX_AUTO_BACKFILLING_E_ALL = true;
+      prodLoadWeatherArchive(prov, start, end, function(hr){
+        PROD_WX_AUTO_BACKFILLING_E_ALL = false;
+        if(!hr) return;
+        var ch = false;
+        missing.forEach(function(m){
+          var rec = f.production[m.dd];
+          var am = prodWxFromHourly(hr, prodHourIdx(hr, m.ymd, '09'));
+          var pm = prodWxFromHourly(hr, prodHourIdx(hr, m.ymd, '14'));
+          if(am && (!rec.weatherAm || rec.weatherAm.v!==2)){ rec.weatherAm = am; ch = true; }
+          if(pm && (!rec.weatherPm || rec.weatherPm.v!==2)){ rec.weatherPm = pm; ch = true; }
+          if(am || pm){
+            f.workers = f.workers||{};
+            var w = (f.workers[m.dd] && typeof f.workers[m.dd]==='object') ? f.workers[m.dd] : {};
+            if(am && (!w.weatherAm || w.weatherAm.v!==2)){ w.weatherAm = am; ch = true; }
+            if(pm && (!w.weatherPm || w.weatherPm.v!==2)){ w.weatherPm = pm; ch = true; }
+            f.workers[m.dd] = w;
+          }
+        });
+        if(ch){ prod_save(f); if(PROD_ACTIVE_TAB==='E') prod_renderTab('E'); }
+      });
+    }
     function prod_tabE(f){
       var todayYmd = prod_today();
       var todayDmy = ymdToDmy(todayYmd);
@@ -8780,6 +8819,7 @@ function _ovLoadChartLib(cb){
       h += prod_dailyHistoryTable(f, specs);
       h += prod_eStatsSection(f);
       setTimeout(prodAutoBackfillWeatherE, 0);
+      setTimeout(prodAutoBackfillWeatherEAll, 0);
       return h;
     }
     /* ===== E 页「生产统计 & 曲线图」 ===== */
