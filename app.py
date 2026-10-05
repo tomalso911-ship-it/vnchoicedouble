@@ -7130,4 +7130,18 @@ if __name__ == "__main__":
             print("[INFO] 手机/PWA 访问（同一 WiFi）：http://%s:%d" % (_lan, PORT))
     except Exception:
         pass
+    # 后台定时整库快照：服务长时间运行、无人手动保存时，仍每 30 分钟留一份
+    try:
+        import threading as _threading
+        def _backup_loop():
+            while True:
+                time.sleep(1800)
+                try:
+                    _auto_backup_db("interval")
+                except Exception:
+                    pass
+        _threading.Thread(target=_backup_loop, daemon=True).start()
+        print("[INFO] 后台整库备份已启动（每 30 分钟一份，滚动保留最近 80 份）")
+    except Exception as _be:
+        print("[WARN] 后台备份线程启动失败：%s" % _be)
     app.run(host="0.0.0.0", port=PORT, debug=False, use_reloader=False, threaded=True)
