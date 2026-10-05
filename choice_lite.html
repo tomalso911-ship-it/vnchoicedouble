@@ -2784,6 +2784,11 @@ function _ovLoadChartLib(cb){
   #prod-detail .prod-due-stop,
   #prod-detail .pc-edit-banner,
   #prod-detail .badge{ border:1px solid #000 !important; }
+  /* 只保留输入框本身的黑色圆角外框，去掉字段块整体外框（人工/工厂概况/公共信息/设备配置） */
+  #prod-detail .pc-labor-form .prod-field,
+  #prod-detail .prod-form-nowrap .prod-field,
+  #prod-detail .pe-common-row .prod-field,
+  #prod-detail .pf-line-form .prod-field{ border:none !important; background:transparent !important; }
   </style>
 </head>
 
@@ -3732,7 +3737,7 @@ function _ovLoadChartLib(cb){
       .prod-out-records tr.pe-op-editing td:nth-child(10){overflow:visible;}
       .prod-out-records tr.pe-op-editing td{background:#fffbe6;}
       /* 出库记录表 + 表格分析：表身最多显示 10 行，右侧垂直滚动，表头锁定 */
-      .prod-out-records-scroll,.prod-analysis-scroll{position:relative;overflow-y:auto;overflow-x:hidden;background:#fff;border:1px solid #e6eaee;border-radius:6px;}
+      .prod-out-records-scroll,.prod-analysis-scroll{position:relative;overflow-y:auto;overflow-x:hidden;background:#fff;border:1px solid #000;border-radius:6px;}
       /* 出库记录表允许横向滚动，以便冻结首列（序号）/末列（操作） */
       .prod-out-records-scroll{overflow-x:auto;}
       .prod-out-records-scroll thead th,.prod-analysis-scroll thead th{position:-webkit-sticky !important;position:sticky !important;top:0 !important;z-index:5;background:#f3f6fa;box-shadow:inset 0 -1px 0 #e6eaee;}
@@ -3893,8 +3898,10 @@ function _ovLoadChartLib(cb){
       .pe-hist td{font-variant-numeric:tabular-nums;}
       .pe-hist .pe-zero{color:#cfd6dd;}
       .pe-hist .prod-op{font-size:10px;padding:0 1px;margin-right:0;}
-      .pe-hist-scroll{max-height:560px;overflow-y:auto;}
+      .pe-hist-scroll{max-height:560px;overflow-y:auto;border-top:1px solid #000;}
       .pe-hist thead th{position:sticky;top:0;z-index:2;}
+      .pe-hist tfoot{position:sticky;bottom:0;z-index:3;background:#f3f7f3;}
+      .pe-hist tfoot .pe-grand td{font-weight:700;border-top:2px solid #000;background:#f3f7f3;}
       /* 网格线：历史产出表 + 成品库存表 + 出库记录表 + 出库分析表 */
       .pe-hist th, .pe-hist td, .pe-fin th, .pe-fin td, .prod-out-records th, .prod-out-records td, .prod-out-analysis th, .prod-out-analysis td{border:1px solid #000;}
       /* 成品库存表：指定列淡蓝/淡紫背景 + 小计行 */
@@ -3959,8 +3966,7 @@ function _ovLoadChartLib(cb){
       .receipt-form{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;background:#f9fafb;border:1px solid #ececec;border-radius:12px;align-items:stretch;}
       .receipt-form .prod-field{background:#fff;border:1px solid #e8eaed;border-radius:10px;padding:8px 11px;gap:6px;margin:0;}
       .receipt-form .prod-field > label{font-weight:600;color:#2c3e50;font-size:13px;}
-      .receipt-form .prod-field.rc-left-top{grid-column:1;grid-row:1;}
-      .receipt-form .prod-field.rc-left-bottom{grid-column:1;grid-row:2;}
+      .receipt-form .prod-field.rc-left-top{grid-column:1;grid-row:1 / span 2;}
       .receipt-form .prod-field.rc-right{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;gap:10px;justify-content:flex-start;height:auto;}
       .receipt-form .rc-right-block{display:flex;flex-direction:column;gap:5px;}
       .receipt-form .chk-grp.chk-grid{display:flex;flex-wrap:wrap;gap:4px;}
@@ -5664,16 +5670,33 @@ function _ovLoadChartLib(cb){
     function prod_limitTableRows(selector, maxRows, limitHeight){
       var el = document.querySelector(selector);
       if(!el) return;
-      var rows = el.querySelectorAll('tbody tr');
-      if(!rows.length) return;
       maxRows = maxRows || 10;
+      var groupCells = el.querySelectorAll('tbody td.pe-group-cell[rowspan]');
+      var isGroup = groupCells.length > 0;
+      var rows = isGroup ? groupCells : el.querySelectorAll('tbody tr:not(.pe-subtotal-row)');
+      if(!rows.length) return;
       if(rows.length <= maxRows){
         el.style.maxHeight = 'none';
       } else if(limitHeight){
         el.style.maxHeight = limitHeight;
       } else {
-        var h = rows[0].offsetHeight || 28;
-        el.style.maxHeight = (maxRows * h) + 'px';
+        var headerTr = el.querySelector('thead tr');
+        var headerH = headerTr ? (headerTr.offsetHeight || 28) : 28;
+        var subTr = el.querySelector('tbody tr.pe-subtotal-row');
+        var subH = subTr ? (subTr.offsetHeight || 28) : 0;
+        if(isGroup){
+          var allTr = el.querySelectorAll('tbody tr:not(.pe-subtotal-row)');
+          var sumH = 0, g = 0;
+          for(var i=0;i<allTr.length;i++){
+            if(allTr[i].querySelector('td.pe-group-cell[rowspan]')) g++;
+            if(g > maxRows) break;
+            sumH += allTr[i].offsetHeight || 28;
+          }
+          el.style.maxHeight = (headerH + sumH + subH) + 'px';
+        } else {
+          var h = rows[0].offsetHeight || 28;
+          el.style.maxHeight = (headerH + maxRows * h + subH) + 'px';
+        }
       }
     }
     /* 项目交期（ymd）与“已到交期→停止计算”判定：今天到达或超过交期即停止 */
@@ -6998,14 +7021,7 @@ function _ovLoadChartLib(cb){
       var _mmR = prod_slatsMatrix(); PROD_RC_MATRIX = _mmR;
       h += '<div class="prod-form receipt-form">'
         + prod_dateFld(pt('lbl_arr_date'),'pd_arr_date',prod_today(),'',prod_today(),'rc-left-top','lbl_arr_date')
-        + '<div class="prod-field rc-left-bottom"><label data-i18n="lbl_floor_spec">'+pt('lbl_floor_spec')+'</label><div class="chk-grp chk-grid">'
-          + Object.keys(_mmR.specs).map(function(k){return '<label class="chk"><input type="checkbox" class="pd_floor" onclick="return prod_receiptFloorClick(event,this)" onchange="prod_receiptFloorChange(this)" value="'+prod_esc(k)+'"><span>'+prod_esc(k)+'</span></label>';}).join('')+'</div></div>'
         + '<div class="prod-field rc-right">'
-          + '<div class="rc-right-block"><label data-i18n="lbl_for_house2">'+pt('lbl_for_house2')+'</label><div class="chk-grp chk-grid">'
-            + _mmR.houseOrder.map(function(hh){return '<label class="chk"><input type="checkbox" class="pd_house" onchange="prod_receiptHouseChange()" value="'+prod_esc(hh)+'"><span>'+prod_esc(prod_phName(hh))+'</span></label>';}).join('')+'</div></div>'
-            + '<div class="rc-right-block"><label data-i18n="lbl_specs_qty">'+pt('lbl_specs_qty')+'</label><div class="pe-spec-legend">'+pt('pe_spec_legend')+'</div>'
-            + '<div class="pe-chips pe-specchips" id="pd_receipt_spec_chips"></div>'
-            + '<div class="pe-line-summary" id="pd_receipt_spec_summary"></div></div>'
             + '<div class="rc-right-block"><label data-i18n="lbl_photos">'+pt('lbl_photos')+'</label>'
             + '<input type="file" id="pd_photo" accept="image/*" multiple class="vis-hide" onchange="prodReceiptPhotoOnFile(this)">'
             + '<div class="photo-upload-row">'
@@ -8517,16 +8533,7 @@ function _ovLoadChartLib(cb){
         var qv=parseFloat(String(rw.qty).replace(/[^0-9.\-]/g,''))||0;
         if(!rw.material||!rw.spec||!qv||!pv){ prod_toast(pt('toast_line_req')||'请填全每行 材料/规格/数量/单价'); return; }
       }
-      var floors=[]; document.querySelectorAll('.pd_floor:checked').forEach(function(c){ floors.push(c.value); });
-      var houses=[]; document.querySelectorAll('.pd_house:checked').forEach(function(c){ houses.push(c.value); });
       var errEl=document.getElementById('pd_submit_err'); if(errEl) errEl.style.display='none';
-      if(!floors.length || !houses.length){
-        var L=(typeof CUR_LANG!=='undefined'&&CUR_LANG)?CUR_LANG:'zh';
-        var msg=PROD_RC_SUBMIT_ERR_I18N[L]||PROD_RC_SUBMIT_ERR_I18N.zh;
-        if(errEl){ errEl.textContent=msg; errEl.style.display='inline'; }
-        else { prod_toast(msg); }
-        return;
-      }
       prodModalConfirm(pt('submit_warn'), prodConfirmSubmitReceipt, 'submit_warn');
     }
     function prodConfirmSubmitReceipt(){
@@ -9038,7 +9045,6 @@ function _ovLoadChartLib(cb){
         + '</tr></thead>'
         + '<tbody>'+rowsHtml+'</tbody>' + footHtml + '</table></div>';
       h += '<div class="prod-canvas-card"><div class="prod-chart-title">'+pt('chart_bar')+'</div><div class="prod-chart-box" id="pcEBar"></div></div>';
-      h += '<div class="prod-canvas-card"><div class="prod-chart-title">'+pt('chart_prod_per_spec')+'</div><div class="prod-chart-box" id="pcELine"></div></div>';
       h += '<div class="prod-canvas-card"><div class="prod-chart-title">'+pt('chart_weather')+'</div><div class="prod-chart-box" id="pcEWeather"></div><div id="pcEWeatherSummary" style="margin-top:8px;font-size:12px;color:#555;line-height:1.6;"></div></div>';
       return h;
     }
@@ -9160,17 +9166,6 @@ function _ovLoadChartLib(cb){
             };
           }
         }
-        var lineSeries = specKeys.map(function(k){ return {name:k.replace(/×/g,'x'), type:'line', smooth:true, showSymbol:false, lineStyle:{width:1.4}, data:perSpecDay[k]}; });
-        var pcLineEl = prod_el('pcELine');
-        if(pcLineEl) pcLineEl.style.height = '320px';
-        prod_eSet('pcELine', {
-          animation:false, tooltip:{trigger:'axis'},
-          legend:{type:'scroll', orient:'horizontal', top:8, left:52, right:24, itemGap:4, itemWidth:10, itemHeight:10, textStyle:{fontSize:9, lineHeight:11}, formatter:function(name){ var p=String(name).split('x'); if(p.length<3) return name; return p[0]+'x'+p[1]+'\n'+p[2]; }},
-          grid:{left:52, right:30, top:55, bottom:40, containLabel:false},
-          xAxis:{type:'category', data:range, axisLabel:{fontSize:10, hideOverlap:true, formatter:function(val){ return val ? val.slice(0,5) : ''; }}},
-          yAxis:{type:'value', name:pt('unit_pcs'), nameGap:30, nameTextStyle:{fontWeight:'bold'}},
-          series:lineSeries
-        });
         var wxCatOfDay = range.map(function(d){
           var wx = _wxOf(d);
           var am = wx.am && wx.am.code;
@@ -9843,10 +9838,9 @@ function _ovLoadChartLib(cb){
           + '<button class="prod-op" onclick="prod_copyProductionRow(\''+prod_esc(d)+'\')">📋</button>'
           + '<button class="prod-op" aria-label="'+pt('op_del')+'" onclick="prod_delProductionRow(\''+prod_esc(d)+'\', this)">🗑️</button></td></tr>';
       });
-      h += '<tr class="pe-grand"><td colspan="6"><b>'+pt('thr_total_pcs')+'</b></td>';
+      h += '</tbody><tfoot><tr class="pe-grand"><td colspan="6"><b>'+pt('thr_total_pcs')+'</b></td>';
       disp.forEach(function(s){ h += '<td><b>'+prod_fmtNum(grand[s])+'</b></td>'; });
-      h += '<td><b>'+prod_fmtNum(grandTotal)+'</b></td><td></td></tr>';
-      h += '</tbody></table></div>';
+      h += '<td><b>'+prod_fmtNum(grandTotal)+'</b></td><td></td></tr></tfoot></table></div>';
       return h;
     }
     function prod_dateShort(d){ return ymdToDmy(d); }
@@ -14553,7 +14547,7 @@ var PROD_EQUIP_FAULT_KB = {
       var h = '';
       /* 1) 生产线 / 公用几台配置 */
       h += '<div class="prod-sec-title">'+pt('sec_line_config')+'</div>';
-      h += '<div class="prod-form">'
+      h += '<div class="prod-form pf-line-form">'
         + '<div class="prod-field"><label>'+pt('lbl_line')+'</label><input id="pf_line" value="'+prod_esc(lineVal)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;min-width:110px;"></div>'
         + '<div class="prod-field"><label>'+pt('lbl_shared_units')+'</label><div style="display:flex;align-items:center;gap:8px;"><select id="pf_shared_units"'+(sharedLocked?' disabled':'')+'>'
         + sharedOpts
