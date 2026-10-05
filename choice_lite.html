@@ -4705,6 +4705,16 @@ function _ovLoadChartLib(cb){
         if(!(k in o)||o[k]==null||o[k]==='') o[k]=local[k];
         else o[k]=prod_mergeKeepLocal(local[k], o[k]);
       }
+      /* ★ 出库记录的总数字段 out 必须由合并后的 outDaily 重新计算，
+         防止本地旧快照的 out（如 500）覆盖服务器已恢复的 out（如 1548）。 */
+      if(o && typeof o==='object' && o.outDaily && typeof o.outDaily==='object'){
+        var sum=0;
+        for(var dk in o.outDaily){ if(!o.outDaily.hasOwnProperty(dk)) continue;
+          var v=o.outDaily[dk];
+          sum += (v && typeof v==='object' ? (v.qty||0) : (parseFloat(v)||0));
+        }
+        o.out = sum;
+      }
       return o;
     }
     // 合并两个现场工厂对象：以服务端为准，但保留本地独有的收货单/入库/出库等记录，避免竞态丢失。

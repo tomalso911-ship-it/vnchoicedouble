@@ -4344,6 +4344,51 @@ def api_prod_factory_get(pid):
     return jsonify({"ok": True, "data": None})
 
 
+def _prod_factory_weight(f):
+    if not isinstance(f, dict): return 0
+    w = 0
+    try:
+        ho = f.get('houseOut') or {}
+        for rec in ho.values():
+            if isinstance(rec, dict):
+                od = rec.get('outDaily') or {}
+                w += len(od)
+        inst = f.get('installation') or {}
+        ws = inst.get('workers') or {}
+        for dw in ws.values():
+            if not isinstance(dw, dict): continue
+            zt = dw.get('zoneTeamWorkers') or {}
+            for teams in zt.values():
+                if not isinstance(teams, list): continue
+                for t in teams:
+                    if not isinstance(t, dict): continue
+                    ti = t.get('todayInstall') or {}
+                    w += len(ti)
+                    if t.get('house'): w += 1
+        if isinstance(f.get('plan'), list): w += len(f['plan'])
+        if isinstance(f.get('workers'), dict): w += len(f['workers'])
+        prof = f.get('profile')
+        if isinstance(prof, dict) and prof: w += 1
+        ip = f.get('inventoryPlan')
+        if isinstance(ip, dict) and ip: w += 1
+        if f.get('planStart'): w += 1
+        if f.get('prepStart'): w += 1
+        if f.get('priorityHouse'): w += 1
+        prod = f.get('production')
+        if isinstance(prod, dict): w += len(prod)
+        m = f.get('materials') or {}
+        for k in ['items','inbound','outbound','receipts']:
+            if isinstance(m.get(k), list): w += len(m[k])
+        eq = f.get('equipment')
+        if isinstance(eq, dict):
+            if isinstance(eq.get('list'), list): w += len(eq['list'])
+            if isinstance(eq.get('faults'), list): w += len(eq['faults'])
+        if isinstance(f.get('delivery'), list): w += len(f['delivery'])
+        w += len(f.get('finished') or {})
+    except Exception:
+        pass
+    return w
+
 @app.route("/api/prod-factory/<pid>", methods=["PUT"])
 def api_prod_factory_put(pid):
     data = request.get_json(force=True, silent=True) or {}
@@ -4358,6 +4403,20 @@ def api_prod_factory_put(pid):
     except Exception:
         return jsonify({"ok": False, "msg": "bad data"}), 400
     conn = get_db()
+    # ★ 服务端防回退闸：禁止用信息量比现有服务器数据少得多的快照覆盖。
+    # 背景：浏览器若打开着旧页面，本地只有 3 条出库，保存时会覆盖服务器已恢复的 8 条出库。
+    existing_row = conn.execute("SELECT data FROM prod_factory WHERE project_id=?", (str(pid),)).fetchone()
+    if existing_row and existing_row["data"]:
+        try:
+            existing = json.loads(existing_row["data"])
+            ew = _prod_factory_weight(existing)
+            iw = _prod_factory_weight(payload)
+            if ew > 0 and iw < ew * 0.6:
+                print(f"[prod_factory PUT {pid}] rejected: server weight={ew}, incoming weight={iw}, requester={me}")
+                conn.close()
+                return jsonify({"ok": False, "msg": f"服务器已有更完整的数据，请先刷新页面再保存 (server:{ew} vs incoming:{iw})"}), 409
+        except Exception:
+            pass
     try:
         conn.execute("DELETE FROM prod_factory WHERE project_id=?", (str(pid),))
         conn.execute("INSERT INTO prod_factory (project_id, data, updated_by, updated_at) VALUES (?,?,?,?)",
