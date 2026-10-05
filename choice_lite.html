@@ -10691,7 +10691,12 @@ function _ovLoadChartLib(cb){
          按出库日期从早到晚分配到每条出库记录，且单条记录不超过其出库量，
          避免出现“出库量 < 安装数量”的不可能情况。 */
       rows.forEach(function(r, idx){ r._seq = idx; r.installedQty = 0; });
-      if(typeof inst_bldgSpecInstalled === 'function'){
+      /* ★ 修复作用域 BUG：安装模块封装在独立 IIFE 中，inst_bldgSpecInstalled 并非全局函数，
+         此处 typeof 恒为 'undefined' → 整个分配逻辑被静默跳过，导致该列永远是 0。
+         改为：先取本作用域，再回退到安装模块显式导出到 window 的版本。 */
+      var _instBldgSpecInstalled = (typeof inst_bldgSpecInstalled === 'function') ? inst_bldgSpecInstalled
+        : ((typeof window !== 'undefined' && typeof window.inst_bldgSpecInstalled === 'function') ? window.inst_bldgSpecInstalled : null);
+      if(_instBldgSpecInstalled){
         var workers = (f.installation && f.installation.workers) || {};
         var groups = {};
         rows.forEach(function(r){
@@ -10706,7 +10711,7 @@ function _ovLoadChartLib(cb){
           var bSet = {};
           g.forEach(function(r){ (r.destBuildings && r.destBuildings.length ? r.destBuildings : ['1']).forEach(function(b){ bSet[b] = 1; }); });
           var totalInstalled = 0;
-          Object.keys(bSet).forEach(function(b){ totalInstalled += inst_bldgSpecInstalled(workers, house, b, spec); });
+          Object.keys(bSet).forEach(function(b){ totalInstalled += _instBldgSpecInstalled(workers, house, b, spec); });
           var order = g.slice().sort(function(a,b){
             if(a.date !== b.date) return a.date > b.date ? 1 : -1;
             return (a._seq||0) - (b._seq||0);
@@ -50428,6 +50433,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   window.inst_hideBldgTip = inst_hideBldgTip;
   window.inst_buildDemandMap = inst_buildDemandMap;
   window.inst_bldgShipped = inst_bldgShipped;
+  /* 导出「某猪舍某栋某规格实际安装量」，供生产端出库表「移至猪舍后 安装数量」取数使用 */
+  window.inst_bldgSpecInstalled = inst_bldgSpecInstalled;
+  window.inst_bldgSpecInstalledRec = inst_bldgSpecInstalledRec;
   window.inst_bldgTipHtml = inst_bldgTipHtml;
   window.inst_generateLayout = inst_generateLayout;
   window.inst_renderGenLayout = inst_renderGenLayout;
