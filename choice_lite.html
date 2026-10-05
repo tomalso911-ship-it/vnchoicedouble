@@ -9937,10 +9937,12 @@ function _ovLoadChartLib(cb){
         + '<tbody>'+body+'</tbody></table></div>';
     }
     function prod_tabH(f){
-      var fn = f.finished||{}; var specs = Object.keys(fn);
+      var fn = f.finished||{};
+      var mm = prod_slatsMatrix();
+      var specs = Object.keys(mm.specs||{}).concat(Object.keys(fn)).filter(function(s,i,a){ return a.indexOf(s)===i; }).sort(prod_specSortCmp);
       var hoDeliv = prod_houseOutBySpec(f);
-      var totP = 0, totD = 0; specs.forEach(function(s){ totP += (+fn[s].produced||0); totD += (hoDeliv[s]||0); });
-      var mm = prod_slatsMatrix(); var hsp = prod_houseSpecProduced(f); var ho = f.houseOut||{};
+      var totP = 0, totD = 0; specs.forEach(function(s){ totP += ((fn[s] && +fn[s].produced)||0); totD += (hoDeliv[s]||0); });
+      var hsp = prod_houseSpecProduced(f); var ho = f.houseOut||{};
       var totalDemand = Object.keys(mm.specs||{}).reduce(function(s,k){ return s + ((mm.specs[k]&&mm.specs[k].total)||0); },0);
       var needProd = Math.max(0, totalDemand - totP);
       var notOut = Math.max(0, totP - totD);
@@ -9957,7 +9959,7 @@ function _ovLoadChartLib(cb){
         + '</div>';
       h += '<table class="prod-table pe-fin"><thead><tr><th class="pe-col-no">'+pt('thr_no')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_total_demand')+'</th><th class="pe-col-blue">'+pt('thr_produced')+'</th><th class="pe-col-blue">'+pt('thr_need_prod')+'</th><th class="pe-col-blue pe-col-completion">'+pt('thr_prod_completion_ratio')+'</th><th class="pe-col-purple">'+pt('thr_out3')+'</th><th class="pe-col-purple">'+pt('thr_out_rate')+'</th><th>'+pt('thr_balance2')+'</th></tr></thead><tbody>';
       var sumDemand = 0, sumProduced = 0, sumNeed = 0, sumOut = 0, sumBal = 0;
-      specs.forEach(function(s, idx){ var r = fn[s]; var d = (hoDeliv[s]||0); var p = (+r.produced||0); var bal = p-d; var sd = (mm.specs[s] && mm.specs[s].total) || 0;
+      specs.forEach(function(s, idx){ var r = fn[s] || {produced:0,delivered:0}; var d = (hoDeliv[s]||0); var p = (+r.produced||0); var bal = p-d; var sd = (mm.specs[s] && mm.specs[s].total) || 0;
         var need = Math.max(0, sd - p);
         sumDemand += sd; sumProduced += p; sumNeed += need; sumOut += d; sumBal += bal;
         var completionRatio = sd > 0 ? ((p / sd) * 100).toFixed(2) : '0.00';
