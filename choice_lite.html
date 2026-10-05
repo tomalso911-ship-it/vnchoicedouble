@@ -45572,9 +45572,8 @@ table.zt tr:hover td{background:#f7fbff}
   .load .lbar i{ box-shadow:inset 0 0 0 1px #000; }
   .legend i,.cards-toggle{ border-color:#000 !important; }
   .cards-toggle{ color:#000 !important; }
-  /* 折叠按钮略缩小，并给分区列留最小宽度，避免右侧区名/编号被截断 */
-  .collapse-btn{ width:14px !important; height:14px !important; margin-right:4px !important; font-size:9px !important; }
-  .tbl-wrap col[data-k="zone"],.tbl-wrap th[data-k="zone"],.tbl-wrap td[data-k="zone"]{ min-width:82px !important; }
+  /* 折叠按钮缩小 50%，右侧文字留出空间 */
+  .collapse-btn{ width:8px !important; height:8px !important; margin-right:2px !important; border-radius:2px !important; font-size:6px !important; }
 </style>
 </head>
 <body>
@@ -45965,16 +45964,16 @@ var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'serial',view:'house',
   showToday:true,showGrid:true,showDeps:true,showBase:true,viewMode:'Week',colWidth:40,barHeight:22};
 
 var COLS=[
-  {k:'zone',   w:72, n:it('g_col_zone'),     e:'text'},
-  {k:'name',   w:80, n:it('g_col_name'),   e:'text'},
-  {k:'panels', w:76, n:it('g_col_panels'), e:'num', align:'right'},
-  {k:'done',   w:72, n:it('g_col_done'),   e:'ro', align:'right'},
-  {k:'prog',   w:58, n:it('g_col_prog'),  e:'ro'},
-  {k:'days',   w:52, n:it('g_col_days'),   e:'ro'},
-  {k:'team',   w:76, n:it('g_col_team'),   e:'team'},
-  {k:'start',  w:92, n:it('g_col_start'), e:'date'},
-  {k:'end',    w:92, n:it('g_col_end'),    e:'ro'},
-  {k:'today',  w:64, n:it('g_col_today'),  e:'ro', align:'center', cls:'twoline'}
+  {k:'zone',   w:44, n:it('g_col_zone'),     e:'text'},
+  {k:'name',   w:44, n:it('g_col_name'),   e:'text'},
+  {k:'panels', w:50, n:it('g_col_panels'), e:'num', align:'right'},
+  {k:'done',   w:44, n:it('g_col_done'),   e:'ro', align:'right'},
+  {k:'prog',   w:36, n:it('g_col_prog'),  e:'ro'},
+  {k:'days',   w:34, n:it('g_col_days'),   e:'ro'},
+  {k:'team',   w:44, n:it('g_col_team'),   e:'team'},
+  {k:'start',  w:68, n:it('g_col_start'), e:'date'},
+  {k:'end',    w:68, n:it('g_col_end'),    e:'ro'},
+  {k:'today',  w:34, n:it('g_col_today'),  e:'ro', align:'center', cls:'twoline'}
 ];
 var COL_MIN=40, COL_MAX=420;
 function findCol(k){ var r=null; COLS.forEach(function(c){ if(c.k===k) r=c; }); return r; }
@@ -46001,6 +46000,8 @@ function loadCfg(){
   }
   /* 房舍列历史宽度异常过大时收敛到正常范围 */
   if(c.colW && c.colW.name && c.colW.name>100) c.colW.name=92;
+  /* 迁移：列宽重置为更紧凑默认值，保证左侧表格所有列可见 */
+  if(c._ver===undefined||c._ver<3){ c._ver=3; c.colW={}; c.tableWidth=470; }
   if(!c.start) c.start=(typeof GANTT_DEFAULT_START!=='undefined' && GANTT_DEFAULT_START) ? GANTT_DEFAULT_START : today();
   cfg=c;
 }
