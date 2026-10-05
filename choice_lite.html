@@ -47503,8 +47503,34 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     if(inst_el('inst-list')) inst_el('inst-list').style.display = 'none';
     if(inst_el('inst-detail')) inst_el('inst-detail').style.display = 'block';
     inst_renderTabs(window.__INST_OPEN_TAB || 'A'); window.__INST_OPEN_TAB = null;
+    /* 优先走生产模块的同步（带合并） */
     if(typeof prod_syncFromServer==='function'){
-      prod_syncFromServer(id, function(){ if(INST_CUR===id) inst_renderTabs(INST_ACTIVE_TAB||'A'); });
+      try{ prod_syncFromServer(id, function(){ if(INST_CUR===id) inst_renderTabs(INST_ACTIVE_TAB||'A'); }); }catch(e){}
+    } else {
+      try{ console.warn('[inst_openProject] prod_syncFromServer 不可用，改用独立拉取'); }catch(_){}
+    }
+    /* ★ 独立拉取兜底：无论生产模块同步是否存在，都直接向服务器拉一次。
+       原因：安装模块与生产模块分属不同 <script>，曾出现跨作用域取不到 prod_* 导致同步被跳过，
+       打开安装页时只读到本机旧缓存（如只剩 1 天），看不到服务器上恢复的完整数据。 */
+    var _me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : '';
+    if(_me){
+      fetch('/api/prod-factory/'+encodeURIComponent(id)+'?me='+encodeURIComponent(_me))
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(dd){
+          if(!(dd && dd.ok && dd.data)) return;
+          var cur = null; try{ cur = JSON.parse(localStorage.getItem('prod_factory_'+id)||'null'); }catch(e){}
+          var _cnt = function(o){ return Object.keys(((o||{}).installation||{}).workers||{}).length; };
+          var sInst = _cnt(dd.data), lInst = _cnt(cur);
+          var sHo = Object.keys((dd.data.houseOut)||{}).length, lHo = Object.keys(((cur||{}).houseOut)||{}).length;
+          /* 服务器安装天数或出库规格明显更多 → 直接用服务器数据覆盖本机旧缓存 */
+          if(lInst === 0 || sInst > lInst || (lHo > 0 && sHo > lHo)){
+            try{ localStorage.setItem('prod_factory_'+id, JSON.stringify(dd.data)); }catch(e){}
+            try{ if(typeof PROD_MEM!=='undefined') PROD_MEM[id] = dd.data; }catch(e){}
+            try{ console.log('[inst_openProject] 已用服务器数据刷新本机缓存 houseOut='+sHo+' installDays='+sInst); }catch(_){}
+            if(INST_CUR===id) inst_renderTabs(INST_ACTIVE_TAB||'A');
+          }
+        })
+        .catch(function(){});
     }
   }
   function inst_back(){
