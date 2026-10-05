@@ -246,6 +246,54 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+# ===================== 自动备份（防数据丢失） =====================
+# 用 SQLite 在线备份 API 生成一致性快照，滚动保留最近 N 份。
+# 触发时机：服务启动、每次生产工厂保存后（节流）、手动点击。
+AUTO_BACKUP_DIR = os.path.join(BASE_DIR, "backups", "auto")
+_AUTO_BACKUP_STATE = {"ts": 0.0}
+
+
+def _auto_backup_db(reason="auto", keep=80, min_interval=0):
+    """生成 agi_pm.db 的一致性备份到 backups/auto/，返回备份文件路径（失败返回 None）。"""
+    try:
+        now = time.time()
+        if min_interval and (now - _AUTO_BACKUP_STATE["ts"]) < min_interval:
+            return None
+        os.makedirs(AUTO_BACKUP_DIR, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        safe = re.sub(r"[^0-9A-Za-z_\-]", "_", str(reason))[:40]
+        fn = os.path.join(AUTO_BACKUP_DIR, "agi_pm_%s_%s.db" % (stamp, safe))
+        src = sqlite3.connect(DB_PATH)
+        dst = sqlite3.connect(fn)
+        try:
+            with dst:
+                src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+        _AUTO_BACKUP_STATE["ts"] = now
+        # 滚动删除最旧的备份，避免无限增长
+        try:
+            files = [f for f in os.listdir(AUTO_BACKUP_DIR)
+                     if f.startswith("agi_pm_") and f.endswith(".db")]
+            files.sort(key=lambda x: os.path.getmtime(os.path.join(AUTO_BACKUP_DIR, x)))
+            for old in files[:-keep]:
+                try:
+                    os.remove(os.path.join(AUTO_BACKUP_DIR, old))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        print("[auto_backup] %s -> %s" % (reason, fn))
+        return fn
+    except Exception as e:
+        try:
+            print("[auto_backup] failed(%s): %s" % (reason, e))
+        except Exception:
+            pass
+        return None
+
+
 def row_to_dict(row):
     d = dict(row)
     for k, v in list(d.items()):
@@ -4497,7 +4545,122 @@ def api_prod_factory_put(pid):
         conn.close()
         return jsonify({"ok": False, "msg": str(e)}), 500
     conn.close()
+    _auto_backup_db("put_" + str(pid), min_interval=60)   # 每次保存后留一份整库快照（节流 60s）
     return jsonify({"ok": True})
+
+
+def _ensure_history_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS prod_factory_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT,
+            data TEXT,
+            updated_by TEXT,
+            updated_at TEXT
+        )
+    """)
+
+
+@app.route("/api/prod-factory/<pid>/history", methods=["GET"])
+def api_prod_factory_history(pid):
+    """列出某项目的历史版本（含关键条目数，便于判断哪个版本数据更全）。"""
+    me = (request.args.get("me") or "").strip()
+    if not me:
+        return jsonify({"ok": False, "msg": "未登录"}), 401
+    conn = get_db()
+    items = []
+    try:
+        _ensure_history_table(conn)
+        rows = conn.execute(
+            "SELECT id, data, updated_by, updated_at FROM prod_factory_history "
+            "WHERE project_id=? ORDER BY id DESC LIMIT 50", (str(pid),)
+        ).fetchall()
+        for r in rows:
+            try:
+                d = json.loads(r["data"])
+            except Exception:
+                d = {}
+            items.append({
+                "id": r["id"],
+                "updated_at": r["updated_at"],
+                "updated_by": r["updated_by"],
+                "houseOut": len((d.get("houseOut") or {})),
+                "installDays": len(((d.get("installation") or {}).get("workers") or {})),
+                "weight": _prod_factory_weight(d),
+            })
+    finally:
+        conn.close()
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/prod-factory/<pid>/restore", methods=["POST"])
+def api_prod_factory_restore(pid):
+    """把某个历史版本恢复为当前版本（恢复前先把当前版本也存一份，可再次反悔）。"""
+    body = request.get_json(force=True, silent=True) or {}
+    me = (body.get("requester") or "").strip()
+    if not me:
+        return jsonify({"ok": False, "msg": "未登录"}), 401
+    try:
+        hid = int(body.get("historyId"))
+    except Exception:
+        return jsonify({"ok": False, "msg": "缺少 historyId"}), 400
+    conn = get_db()
+    try:
+        _ensure_history_table(conn)
+        hrow = conn.execute(
+            "SELECT data FROM prod_factory_history WHERE id=? AND project_id=?",
+            (hid, str(pid))
+        ).fetchone()
+        if not hrow or not hrow["data"]:
+            conn.close()
+            return jsonify({"ok": False, "msg": "版本不存在"}), 404
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        cur = conn.execute("SELECT data FROM prod_factory WHERE project_id=?", (str(pid),)).fetchone()
+        if cur and cur["data"]:
+            _ensure_history_table(conn)
+            conn.execute(
+                "INSERT INTO prod_factory_history (project_id, data, updated_by, updated_at) VALUES (?,?,?,?)",
+                (str(pid), cur["data"], "before-restore", now)
+            )
+        conn.execute("DELETE FROM prod_factory WHERE project_id=?", (str(pid),))
+        conn.execute(
+            "INSERT INTO prod_factory (project_id, data, updated_by, updated_at) VALUES (?,?,?,?)",
+            (str(pid), hrow["data"], me + " (restore)", now)
+        )
+        conn.commit()
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        conn.close()
+        return jsonify({"ok": False, "msg": str(e)}), 500
+    conn.close()
+    _auto_backup_db("restore_" + str(pid))
+    return jsonify({"ok": True})
+
+
+@app.route("/api/db-backup-now", methods=["POST"])
+def api_db_backup_now():
+    """手动生成一份整库快照（仅 tom）。"""
+    body = request.get_json(force=True, silent=True) or {}
+    me = (body.get("requester") or "").strip().lower()
+    if me != "tom":
+        return jsonify({"ok": False, "msg": "仅 tom 可操作"}), 403
+    fn = _auto_backup_db("manual")
+    return jsonify({"ok": bool(fn), "file": os.path.basename(fn) if fn else None})
+
+
+@app.route("/api/db-backup", methods=["GET"])
+def api_db_backup():
+    """下载整库快照（仅 tom）。"""
+    me = (request.args.get("me") or "").strip().lower()
+    if me != "tom":
+        return jsonify({"ok": False, "msg": "仅 tom 可操作"}), 403
+    return send_from_directory(
+        os.path.dirname(DB_PATH), os.path.basename(DB_PATH), as_attachment=True,
+        download_name="agi_pm_%s.db" % time.strftime("%Y%m%d_%H%M%S")
+    )
 
 
 @app.route("/api/prod-kv/<path:key>", methods=["GET"])
@@ -6917,6 +7080,9 @@ if __name__ == "__main__":
     werkzeug_log.setLevel(logging.ERROR)
 
     PORT = 5050
+
+    # 每次启动先留一份整库快照（防数据丢失第一道保险）
+    _auto_backup_db("startup")
 
     def _port_in_use(port, host="127.0.0.1", timeout=0.5):
         """端口占用预检（Windows 安全版）。

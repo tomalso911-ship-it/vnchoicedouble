@@ -3334,6 +3334,7 @@ function _ovLoadChartLib(cb){
       <div id="prod-detail" style="display:none">
         <div class="prod-detail-head">
           <button class="prod-back" onclick="prod_back()" data-i18n="prod_back">← 返回列表</button>
+          <button class="prod-back" type="button" onclick="prod_protectOpen()" title="版本历史 / 备份 / 回滚">🛡 数据保护</button>
           <div class="prod-detail-title" id="prod-detail-title"></div>
         </div>
         <div class="prod-tabs" id="prod-tabs"></div>
@@ -4913,6 +4914,88 @@ function _ovLoadChartLib(cb){
       }
       prod_toast((pt('sync_all_done')||'已上传 {n} 个现场工厂到服务器').replace('{n}', n));
     }
+    /* ===================== 数据保护：版本历史 / 整库备份 / 一键回滚 ===================== */
+    function prod_protectPid(){ return PROD_CUR || window.__CUR_PROJECT_ID || ''; }
+    function prod_protectMe(){ return (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : ''; }
+    function prod_protectOpen(){
+      var pid = prod_protectPid(), me = prod_protectMe();
+      if(!pid){ prod_toast('请先打开一个项目'); return; }
+      if(!me){ prod_toast('未登录'); return; }
+      var old = document.getElementById('prodProtectModal');
+      if(old && old.parentNode) old.parentNode.removeChild(old);
+      var ov = document.createElement('div');
+      ov.id = 'prodProtectModal';
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;display:flex;align-items:center;justify-content:center;';
+      ov.innerHTML = '<div class="modal" style="width:760px;max-width:94vw;" data-mmax-btn="1">'
+        + '<div class="modal-header"><span class="pop-title-text">🛡 数据保护 · 版本历史</span>'
+        + '<span class="modal-actions">'
+        + '<button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest(\'.modal\'))" title="最大化">&#9633;</button>'
+        + '<button class="close" type="button" onclick="prod_protectClose()" title="关闭">&times;</button>'
+        + '</span></div>'
+        + '<div class="modal-body" style="max-height:72vh;overflow:auto;">'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">'
+        + '<button class="prod-btn mini" type="button" onclick="prod_protectBackupNow()">立即备份整库</button>'
+        + '<a class="prod-btn mini" href="/api/db-backup?me='+encodeURIComponent(me)+'" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;">下载整库备份</a>'
+        + '<button class="prod-btn mini" type="button" onclick="prod_protectReload()">刷新列表</button>'
+        + '</div>'
+        + '<div style="font-size:12px;color:#666;margin-bottom:8px;">每次保存服务器都会自动留一份历史版本。选中某版本点「↩」即可回滚（回滚前当前版本也会自动存一份，可再次回滚）。</div>'
+        + '<div id="prodProtectList">加载中…</div>'
+        + '</div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e){ if(e.target===ov) prod_protectClose(); });
+      prod_protectReload();
+    }
+    function prod_protectClose(){ var m=document.getElementById('prodProtectModal'); if(m && m.parentNode) m.parentNode.removeChild(m); }
+    function prod_protectReload(){
+      var pid = prod_protectPid(), me = prod_protectMe();
+      var box = document.getElementById('prodProtectList'); if(!box) return;
+      box.textContent = '加载中…';
+      fetch('/api/prod-factory/'+encodeURIComponent(pid)+'/history?me='+encodeURIComponent(me))
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(d){
+          if(!(d && d.ok)){ box.textContent = '读取失败'; return; }
+          if(!d.items || !d.items.length){ box.innerHTML = '<div style="color:#888;padding:8px 0;">暂无历史版本（该项目还没有在服务器上保存过）。</div>'; return; }
+          var h = '<table class="prod-table" style="width:100%;table-layout:fixed;">'
+            + '<thead><tr><th style="width:56px;">版本</th><th>时间</th><th style="width:76px;">出库规格</th><th style="width:70px;">安装天数</th><th style="width:70px;">数据量</th><th style="width:64px;">回滚</th></tr></thead><tbody>';
+          d.items.forEach(function(it){
+            h += '<tr>'
+              + '<td>#'+it.id+'</td>'
+              + '<td style="word-break:break-all;font-size:12px;">'+prod_esc(String(it.updated_at||''))+(it.updated_by?(' · '+prod_esc(String(it.updated_by))):'')+'</td>'
+              + '<td>'+it.houseOut+'</td>'
+              + '<td>'+it.installDays+'</td>'
+              + '<td>'+it.weight+'</td>'
+              + '<td><button class="prod-op" type="button" title="回滚到此版本" onclick="prod_protectRestore('+it.id+')">↩</button></td>'
+              + '</tr>';
+          });
+          h += '</tbody></table>';
+          box.innerHTML = h;
+        })
+        .catch(function(){ box.textContent = '读取失败（网络错误）'; });
+    }
+    function prod_protectBackupNow(){
+      var me = prod_protectMe();
+      fetch('/api/db-backup-now', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({requester:me})})
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(d){ prod_toast(d && d.ok ? ('已备份整库：'+d.file) : '备份失败'); })
+        .catch(function(){ prod_toast('备份失败（网络错误）'); });
+    }
+    function prod_protectRestore(hid){
+      var pid = prod_protectPid(), me = prod_protectMe();
+      if(!confirm('确定把该项目回滚到版本 #'+hid+' 吗？\n当前版本会自动存一份，之后还能再回滚。')) return;
+      fetch('/api/prod-factory/'+encodeURIComponent(pid)+'/restore', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({requester:me, historyId:hid})})
+        .then(function(r){ return r.ok ? r.json() : r.json().catch(function(){return null;}); })
+        .then(function(d){
+          if(d && d.ok){
+            try{ localStorage.removeItem(PROD_LS+pid); }catch(e){}
+            try{ if(typeof PROD_MEM!=='undefined') delete PROD_MEM[pid]; }catch(e){}
+            prod_toast('已回滚到版本 #'+hid+'，正在刷新…');
+            setTimeout(function(){ location.reload(); }, 700);
+          } else {
+            prod_toast((d && d.msg) ? d.msg : '回滚失败');
+          }
+        })
+        .catch(function(){ prod_toast('回滚失败（网络错误）'); });
+    }
     function prod_fld(label,id,val,cls){ return '<div class="prod-field'+(cls?' '+cls:'')+'"><label>'+label+'</label><input id="'+id+'" value="'+prod_esc(val)+'"></div>'; }
     function prod_numFld(label,id,val){ return '<div class="prod-field"><label>'+label+'</label><input id="'+id+'" inputmode="numeric" pattern="[0-9]*" value="'+prod_esc(val)+'" onfocus="this.select(); if(this.value===\'0\'){this.value=\'\';this.dataset.wasZero=\'1\'}" onblur="var v=this.value.replace(/[^0-9]/g,\'\'); if(v===\'\'){if(this.dataset.wasZero){this.value=\'0\';delete this.dataset.wasZero}}else{this.value=String(parseInt(v,10)||0); delete this.dataset.wasZero}"></div>'; }
     /* 取角色预填值：当天已保存 → 用保存值；否则用默认模板（可编辑，保存后即固化） */
@@ -5313,6 +5396,7 @@ function _ovLoadChartLib(cb){
       /* 打开项目详情前，把「现场工厂列表」记为上一页（跨模块跳转时不记，用户并没看到列表） */
       try{ if(!window.__VIEW_JUMPING) __pushViewHistory(); }catch(e){}
       PROD_CUR = id;
+      try{ window.__CUR_PROJECT_ID = id; }catch(e){}
       prodStartWeatherTimer();
       prod_el('prod-list').style.display = 'none';
       prod_el('prod-detail').style.display = 'block';
@@ -14441,6 +14525,7 @@ var PROD_EQUIP_FAULT_KB = {
       <div id="inst-detail" style="display:none">
         <div class="prod-detail-head">
           <button class="prod-back" type="button" onclick="inst_back()"><span id="inst-back-label">← 返回列表</span></button>
+          <button class="prod-back" type="button" onclick="prod_protectOpen()" title="版本历史 / 备份 / 回滚">🛡 数据保护</button>
           <div class="prod-detail-title" id="inst-detail-title"></div>
         </div>
       <div class="prod-tabs" id="inst-tabs"></div>
@@ -47495,6 +47580,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     /* 打开项目详情前，把「安装项目列表」记为上一页（跨模块跳转时不记） */
     try{ if(!window.__VIEW_JUMPING) __pushViewHistory(); }catch(e){}
     INST_CUR = id;
+    try{ window.__CUR_PROJECT_ID = id; }catch(e){}
     var p = inst_proj();
     var t = inst_el('inst-detail-title');
     if(t) t.textContent = (p ? (p.client||p.customer||p.name||'—') : '—') + it('inst_suffix');
