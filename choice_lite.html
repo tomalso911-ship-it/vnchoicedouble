@@ -5063,7 +5063,7 @@ function _ovLoadChartLib(cb){
       if(localF.plan && !out.plan) out.plan = localF.plan;
       /* ★ 安装/其它本地独有顶层字段：服务端旧快照通常不含这些（尤其 installation），
          若不在合并里保留，刷新/重新打开项目时就会被清空。这里一律深合并并保留本地。 */
-      ['installation','finished','houseOut','inventoryPlan','prepStart','prepEnd','planStart'].forEach(function(k){
+      ['installation','finished','houseOut','inventoryPlan','prepStart','prepEnd','planStart','__zonePhotos_kv'].forEach(function(k){
         if(localF[k]!=null) out[k]=prod_mergeKeepLocal(localF[k], out[k]);
       });
       return prod_normalizeDates(out);
@@ -50225,6 +50225,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       if(typeof prod_save==='function') prod_save(f);
     }
     inst_zonePhotoRender(zoneNum);
+    try{ inst_tabCUpdatePhotoCounts(); }catch(_){}
   }
   function inst_zonePhotoOnFile(input, zoneNum){
     var errEl = document.getElementById('ic_zphoto_err_'+zoneNum);
@@ -50244,6 +50245,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       var box = document.getElementById('ic_zphotos_'+zoneNum); if(box) box.value = JSON.stringify(_arr);
       inst_zonePhotoRender(zoneNum);
       inst_saveZonePhotosToKv(f);
+      /* 立即刷新历史表「照片」列计数，无需等保存/刷新 */
+      try{ inst_tabCUpdatePhotoCounts(); }catch(_){}
       /* 同时尝试写回工厂 JSON（兼容旧路径），但不再等待/阻塞 UI */
       try{
         f.installation = f.installation || {}; f.installation.workers = f.installation.workers || {};
@@ -50338,7 +50341,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       zp[zn2].forEach(function(p){ if(p && !seen[p]){ seen[p]=1; arr.push(p); } });
     }}
     var title = (pt('inst_lbl_photos_count')||'照片') + ' · ' + prod_esc(dmy) + (arr.length ? ' ('+arr.length+')' : '');
-    var html = '<div class="modal-overlay inst-photo-viewer-overlay" onclick="inst_closePhotoViewer(event)">'
+    var _oldOv = document.querySelector('.inst-photo-viewer-overlay'); if(_oldOv) _oldOv.remove();
+    var html = '<div class="modal-overlay show inst-photo-viewer-overlay" onclick="inst_closePhotoViewer(event)">'
       + '<div class="modal inst-photo-modal" style="width:760px;max-width:94vw;" onclick="event.stopPropagation()">'
       + '<div class="modal-header"><span class="pop-title-text">'+prod_esc(title)+'</span><span class="modal-actions"><button type="button" class="close" onclick="inst_closePhotoViewer()" title="'+prod_esc(pt('btn_close')||'关闭')+'">×</button></span></div>'
       + '<div class="modal-body inst-photo-viewer-body">';
