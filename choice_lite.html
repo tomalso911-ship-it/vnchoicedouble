@@ -3855,6 +3855,18 @@ function _ovLoadChartLib(cb){
       .pc-labor-hist .pc-zero{color:#e53935;font-weight:600;}
       /* 监控：该栋安装结束（已安装 ≥ 本栋需求）→ 猪舍名变红 */
       .pc-labor-hist .pc-house-done{color:#E53935;font-weight:700;}
+      /* 照片列：固定宽度，点击数字弹窗 */
+      .pc-labor-hist th.pc-col-photo,.pc-labor-hist td.pc-col-photo{width:52px;min-width:52px;max-width:52px;text-align:center;background:#fff;}
+      .pc-labor-hist td.pc-col-photo .inst-photo-count{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:13px;background:#E3F2FD;color:#1976D2;font-weight:700;font-size:13px;cursor:pointer;transition:background .2s,color .2s;padding:0 7px;}
+      .pc-labor-hist td.pc-col-photo .inst-photo-count:hover{background:#1976D2;color:#fff;}
+      .pc-labor-hist td.pc-col-photo .inst-photo-count:empty::before{content:'0';}
+      /* 照片查看弹窗 */
+      .inst-photo-viewer-body{padding:16px;background:#f7f9fb;}
+      .inst-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;}
+      .inst-photo-item{border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08);}
+      .inst-photo-item a{display:block;width:100%;height:180px;}
+      .inst-photo-item img{width:100%;height:100%;object-fit:cover;display:block;}
+      .inst-photo-empty{text-align:center;padding:40px 20px;color:#888;font-size:14px;}
       .pc-labor-hist td.pc-col-act{white-space:nowrap;}
       .pc-labor-hist td.pc-col-role,.pc-labor-hist td.pc-col-total{text-align:center;vertical-align:middle;}
       .pc-labor-hist .prod-op{font-size:12px;padding:1px 4px;margin-right:1px;}
@@ -47952,7 +47964,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_kpi_total_demand:'总需求数量', inst_kpi_total_demand_unit:'片', inst_kpi_produced:'累计生产入库', inst_kpi_produce_rate:'生产完成率', inst_kpi_need_produce:'仍需生产数量', inst_kpi_shipped:'累计出库', inst_kpi_ship_rate:'出库率', inst_kpi_not_shipped:'尚未出库数量', inst_kpi_installed:'已经安装', inst_kpi_not_installed:'尚未安装', inst_kpi_install_rate:'安装比率',
       inst_man:'人数', inst_hours:'工时', inst_sec_weather:'天气', inst_sec_labor_detail:'安装数量&人工明细',
       inst_copy_over_title:'复制后数量超过需求', inst_copy_over_msg:'复制后该规格的水泥板安装数量超过了实际需要的数量 {n} 片，请修改！', inst_copy_over_actual:'按实际需求修改', inst_copy_over_mine:'按我的想法修改', inst_copy_before_start:'复制日期不能早于安装开始日期',
-      inst_lbl_total_man:'总人力', inst_lbl_total_hours:'总工时',
+      inst_lbl_total_man:'总人力', inst_lbl_total_hours:'总工时', inst_lbl_photos_count:'照片', inst_lbl_photos_view:'查看照片',
       inst_role_reporter:'填表人', inst_role_leader:'安装负责人', inst_role_tractor:'拖拉机司机', inst_role_assistant:'跟车助理', inst_role_master:'安装师傅', inst_role_hauler:'运板员', inst_role_other:'其他人员',
       inst_lbl_house:'猪舍', inst_lbl_zone:'区域', inst_lbl_zone_short:'区域', inst_lbl_team:'小组', inst_lbl_install_qty:'安装数量', inst_lbl_day_subtotal:'日安装小计',
       inst_sec_stats:'当日录入', inst_btn_add_daily:'保存当日', inst_lbl_pcs:'当日安装片数', inst_lbl_houses:'当日完成房舍',
@@ -48061,7 +48073,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_kpi_total_demand:'Total Demand', inst_kpi_total_demand_unit:'pcs', inst_kpi_produced:'Cumulatively Produced', inst_kpi_produce_rate:'Production Completion Rate', inst_kpi_need_produce:'Still Need to Produce', inst_kpi_shipped:'Cumulatively Shipped', inst_kpi_ship_rate:'Shipment Rate', inst_kpi_not_shipped:'Not Yet Shipped', inst_kpi_installed:'Already Installed', inst_kpi_not_installed:'Not Yet Installed', inst_kpi_install_rate:'Install Ratio',
       inst_man:'Headcount', inst_hours:'Hours', inst_sec_weather:'Weather', inst_sec_labor_detail:'Install Qty & Labor Detail',
       inst_copy_over_title:'Quantity exceeds demand after copy', inst_copy_over_msg:'After copying, this slab spec installed quantity exceeds the actual required quantity by {n} pcs. Please modify!', inst_copy_over_actual:'Adjust to actual demand', inst_copy_over_mine:'Modify as I want', inst_copy_before_start:'Copy date cannot be earlier than the installation start date',
-      inst_lbl_total_man:'Total Man', inst_lbl_total_hours:'Total Hours',
+      inst_lbl_total_man:'Total Man', inst_lbl_total_hours:'Total Hours', inst_lbl_photos_count:'Photos', inst_lbl_photos_view:'View Photos',
       inst_role_reporter:'Recorder', inst_role_leader:'Leader', inst_role_tractor:'Tractor Driver', inst_role_assistant:'Truck Assistant', inst_role_master:'Installer', inst_role_hauler:'Slats Transporter', inst_role_other:'Others',
       inst_lbl_house:'House', inst_lbl_zone:'Zone', inst_lbl_zone_short:'Zone', inst_lbl_team:'Team', inst_lbl_install_qty:'Installed Qty', inst_lbl_day_subtotal:'Daily Installed<br>Subtotal',
       inst_sec_stats:'Daily Entry', inst_btn_add_daily:'Save Day', inst_btn_quick_ship:'Quick Ship', inst_lbl_pcs:'Pcs Installed', inst_lbl_houses:'Houses Done',
@@ -48170,7 +48182,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_kpi_total_demand:'Tổng nhu cầu', inst_kpi_total_demand_unit:'tấm', inst_kpi_produced:'Tổng đã sản xuất', inst_kpi_produce_rate:'Tỷ lệ hoàn thành SX', inst_kpi_need_produce:'Số lượng cần sản xuất', inst_kpi_shipped:'Tổng đã xuất kho', inst_kpi_ship_rate:'Tỷ lệ xuất kho', inst_kpi_not_shipped:'Số lượng chưa xuất', inst_kpi_installed:'Đã lắp đặt', inst_kpi_not_installed:'Chưa lắp đặt', inst_kpi_install_rate:'Tỷ lệ lắp đặt',
       inst_man:'Số người', inst_hours:'Giờ', inst_sec_weather:'Thời tiết', inst_sec_labor_detail:'Số lượng lắp & Chi tiết nhân công',
       inst_copy_over_title:'Số lượng vượt nhu cầu sau khi sao chép', inst_copy_over_msg:'Sau khi sao chép, số lượng tấm bê tông đã lắp của quy cách này vượt quá nhu cầu thực tế {n} tấm, vui lòng sửa!', inst_copy_over_actual:'Sửa theo nhu cầu thực tế', inst_copy_over_mine:'Sửa theo ý tôi', inst_copy_before_start:'Ngày sao chép không được sớm hơn ngày bắt đầu lắp đặt',
-      inst_lbl_total_man:'Tổng nhân', inst_lbl_total_hours:'Tổng giờ',
+      inst_lbl_total_man:'Tổng nhân', inst_lbl_total_hours:'Tổng giờ', inst_lbl_photos_count:'Ảnh', inst_lbl_photos_view:'Xem ảnh',
       inst_role_reporter:'Người ghi', inst_role_leader:'Chỉ huy', inst_role_tractor:'Lái kéo', inst_role_assistant:'Phụ xe', inst_role_master:'Thợ lắp', inst_role_hauler:'Chở tấm', inst_role_other:'Khác',
       inst_lbl_house:'Chuồng', inst_lbl_zone:'Khu vực', inst_lbl_zone_short:'KV', inst_lbl_team:'Đội', inst_lbl_install_qty:'SL lắp', inst_lbl_day_subtotal:'Tổng lắp<br>trong ngày',
       inst_sec_stats:'Nhập ngày', inst_btn_add_daily:'Lưu ngày', inst_btn_quick_ship:'Giao nhanh', inst_lbl_pcs:'Tấm lắp ngày', inst_lbl_houses:'Nhà xong ngày',
@@ -48402,7 +48414,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     else if(key==='C'){
       body.innerHTML = inst_tabC(f);
       /* 异步加载安装区域照片元数据（KV），加载完后刷新区域卡片里的照片显示 */
-      setTimeout(function(){ inst_loadZonePhotos(f, function(){ try{ inst_zoneCardsReRenderPhotos(); }catch(_){} }); }, 0);
+      setTimeout(function(){ inst_loadZonePhotos(f, function(){ try{ inst_zoneCardsReRenderPhotos(); }catch(_){} try{ inst_tabCUpdatePhotoCounts(); }catch(_){} }); }, 0);
       setTimeout(function(){ inst_backfillWeather(true); }, 0);
       /* 当天天气：与生产模块一致，自动抓取并写入上午/下午（网络返回后重试几次） */
       setTimeout(inst_captureTodayWeather, 0);
@@ -50251,12 +50263,77 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_zonePhotoRender(zn);
     }
   }
+  /* KV 加载完成后，同步刷新历史表格里的照片计数列 */
+  function inst_tabCUpdatePhotoCounts(){
+    var f = inst_get(INST_CUR); if(!f || !f.__zonePhotos_kv) return;
+    var table = document.querySelector('.pc-labor-hist'); if(!table) return;
+    var rows = table.querySelectorAll('tbody tr');
+    rows.forEach(function(tr){
+      var dateTd = tr.querySelector('td.pc-col-date'); if(!dateTd) return;
+      var dd = dmyToYmd(dateTd.textContent.trim()); if(!dd) return;
+      var photoTd = tr.querySelector('td.pc-col-photo'); if(!photoTd) return;
+      var cnt = inst_datePhotoCount(f, dd);
+      photoTd.innerHTML = '<span class="inst-photo-count" onclick="inst_openPhotoViewer(\''+dd+'\')" title="'+prod_esc(pt('inst_lbl_photos_view'))+'">'+cnt+'</span>';
+    });
+  }
   try{ window.inst_zonePhotoOnFile = inst_zonePhotoOnFile; }catch(_){}
   try{ window.inst_zonePhotoAdd = inst_zonePhotoAdd; }catch(_){}
   try{ window.inst_zonePhotoRemove = inst_zonePhotoRemove; }catch(_){}
   try{ window.inst_zonePhotoRender = inst_zonePhotoRender; }catch(_){}
   try{ window.inst_loadZonePhotos = inst_loadZonePhotos; }catch(_){}
   try{ window.inst_zoneCardsReRenderPhotos = inst_zoneCardsReRenderPhotos; }catch(_){}
+
+  /* 汇总某日期所有区域上传的照片数量（优先 KV，兼容旧工厂 JSON） */
+  function inst_datePhotoCount(f, dd){
+    var cnt = 0;
+    var kv = (f && f.__zonePhotos_kv && f.__zonePhotos_kv[dd]) || {};
+    for(var zn in kv){ if(kv.hasOwnProperty(zn) && Array.isArray(kv[zn])) cnt += kv[zn].length; }
+    if(cnt) return cnt;
+    var w = (f && f.installation && f.installation.workers && f.installation.workers[dd]) || {};
+    var zp = w.zonePhotos || {};
+    for(var zn2 in zp){ if(zp.hasOwnProperty(zn2) && Array.isArray(zp[zn2])) cnt += zp[zn2].length; }
+    return cnt;
+  }
+  /* 点击表格照片数字，弹出该日期全部照片 */
+  function inst_openPhotoViewer(dd){
+    var f = inst_get(INST_CUR); if(!f) return;
+    var dmy = ymdToDmy(dd);
+    var arr = [], seen = {};
+    var kv = (f.__zonePhotos_kv && f.__zonePhotos_kv[dd]) || {};
+    for(var zn in kv){ if(kv.hasOwnProperty(zn) && Array.isArray(kv[zn])){
+      kv[zn].forEach(function(p){ if(p && !seen[p]){ seen[p]=1; arr.push(p); } });
+    }}
+    var w = (f.installation && f.installation.workers && f.installation.workers[dd]) || {};
+    var zp = w.zonePhotos || {};
+    for(var zn2 in zp){ if(zp.hasOwnProperty(zn2) && Array.isArray(zp[zn2])){
+      zp[zn2].forEach(function(p){ if(p && !seen[p]){ seen[p]=1; arr.push(p); } });
+    }}
+    var title = (pt('inst_lbl_photos_count')||'照片') + ' · ' + prod_esc(dmy) + (arr.length ? ' ('+arr.length+')' : '');
+    var html = '<div class="modal-overlay inst-photo-viewer-overlay" onclick="inst_closePhotoViewer(event)">'
+      + '<div class="modal inst-photo-modal" style="width:760px;max-width:94vw;" onclick="event.stopPropagation()">'
+      + '<div class="modal-header"><span class="pop-title-text">'+prod_esc(title)+'</span><span class="modal-actions"><button type="button" class="close" onclick="inst_closePhotoViewer()" title="'+prod_esc(pt('btn_close')||'关闭')+'">×</button></span></div>'
+      + '<div class="modal-body inst-photo-viewer-body">';
+    if(!arr.length){
+      html += '<div class="inst-photo-empty">'+prod_esc(pt('inst_nodata')||'暂无数据')+'</div>';
+    } else {
+      html += '<div class="inst-photo-grid">';
+      arr.forEach(function(p){
+        html += '<div class="inst-photo-item"><a href="/uploads/'+prod_esc(p)+'" target="_blank"><img src="/uploads/'+prod_esc(p)+'" loading="lazy"></a></div>';
+      });
+      html += '</div>';
+    }
+    html += '</div></div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  }
+  function inst_closePhotoViewer(e){
+    if(e && e.target !== e.currentTarget && !e.target.classList.contains('close')) return;
+    var overlay = document.querySelector('.inst-photo-viewer-overlay');
+    if(overlay) overlay.remove();
+  }
+  try{ window.inst_datePhotoCount = inst_datePhotoCount; }catch(_){}
+  try{ window.inst_openPhotoViewer = inst_openPhotoViewer; }catch(_){}
+  try{ window.inst_closePhotoViewer = inst_closePhotoViewer; }catch(_){}
+  try{ window.inst_tabCUpdatePhotoCounts = inst_tabCUpdatePhotoCounts; }catch(_){}
 
   function inst_zoneCardHtml(f, d, zoneNum, idx, houses){
     var st = inst_zoneStats(f, zoneNum, houses);
@@ -50886,7 +50963,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       + '<th class="pc-col-no">'+pt('thr_no')+'</th><th class="pc-col-date">'+it('inst_lbl_date')+'</th><th>'+pt('wx_am')+'</th><th>'+pt('wx_pm')+'</th><th>'+it('inst_lbl_holiday')+'</th><th>'+it('inst_lbl_recorder')+'</th>'
       + '<th class="pc-col-zone pc-col-yellow pc-sortable" onclick="inst_sortLabor(\'zone\')">'+it('inst_lbl_zone_short')+inst_sortInd('zone')+'</th><th class="pc-col-yellow pc-sortable" onclick="inst_sortLabor(\'house\')">'+it('inst_lbl_house')+inst_sortInd('house')+'</th><th class="pc-col-yellow">'+it('inst_lbl_team')+'</th><th class="pc-col-yellow">'+it('inst_lbl_install_qty')+'</th><th class="pc-col-dsub pc-col-yellow">'+it('inst_lbl_day_subtotal')+'</th>';
     INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter' || rk[0]==='leader') return; h += '<th class="pc-col-blue">'+it(rk[1])+'</th>'; });
-    h += '<th class="pc-col-blue">'+it('inst_lbl_total_man')+'</th><th class="pc-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
+    h += '<th class="pc-col-blue">'+it('inst_lbl_total_man')+'</th><th class="pc-col-photo">'+it('inst_lbl_photos_count')+'</th><th class="pc-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
     var dates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(inst.workers||{}), true) : Object.keys(inst.workers||{});
     dates = dates.filter(function(dd){ var ww=inst.workers[dd]; return !(ww && ww._deleted); });
     var total = dates.length;
@@ -51029,6 +51106,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         rv.push(s.zone ? '<span class="pc-dsub-tip-trigger" onmouseenter="inst_showDsubTip(this)" onmouseleave="inst_dsubTipHideSoon()" data-dsub-tip=\''+prod_esc(JSON.stringify(dsubMap)).replace(/\'/g,'&#39;')+'\'><b>'+dsubVal+'</b></span>' : ''); rk2.push('dsub|'+s.zone);
         INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter'||rk[0]==='leader') return; var v=(+ww[rk[0]]||0); rv.push(String(v)); rk2.push('role|'+rk[0]+'|'+v); });
         rv.push('<b>'+sum+'</b>');            rk2.push('tot|'+sum);
+        var photoCnt = inst_datePhotoCount(f, dd);
+        rv.push('<span class="inst-photo-count" onclick="inst_openPhotoViewer(\''+dd+'\')" title="'+prod_esc(it('inst_lbl_photos_view'))+'">'+photoCnt+'</span>'); rk2.push('photo|'+dd);
         rv.push('<button class="prod-op" type="button" aria-label="'+pt('op_edit')+'" onclick="inst_editWorkers(\''+dd+'\')">✏️</button>'+'<button class="prod-op" type="button" onclick="inst_copyWorkers(\''+dd+'\')">📋</button>'+'<button class="prod-op" type="button" aria-label="'+pt('op_del')+'" onclick="inst_delWorkers(this,\''+dd+'\')">🗑️</button>'); rk2.push('act|'+dd);
         vals.push(rv); keys.push(rk2);
       });
@@ -51048,6 +51127,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
             if(c===6) clsArr.push('pc-col-zone');
             if(c===10) clsArr.push('pc-col-dsub');
             if(c===ncol-1) clsArr.push('pc-col-act');
+            if(c===11+instRoleN+1) clsArr.push('pc-col-photo');         /* 照片列 */
             if(c>=6 && c<=10) clsArr.push('pc-col-yellow');           /* 区域/猪舍/小组/安装数量/日安装小计 */
             if(c>=11 && c<=11+instRoleN) clsArr.push('pc-col-blue');  /* 各角色列 + 总人力 */
             if(c>=11 && c<11+instRoleN && vals[si][c]==='0') clsArr.push('pc-zero');
@@ -51074,6 +51154,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       h += '<td class="pc-col-blue'+(st===0?' pc-zero':'')+'"><b>'+prod_fmtNum(st)+'</b></td>';
     });
     h += '<td class="pc-col-blue'+(grandMan===0?' pc-zero':'')+'"><b>'+prod_fmtNum(grandMan)+'</b></td>'
+      + '<td class="pc-col-photo"></td>'
       + '<td class="pc-col-act"></td></tr></tfoot></table></div>';
     return h;
   }
