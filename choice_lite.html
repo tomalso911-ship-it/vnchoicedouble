@@ -4839,6 +4839,15 @@ function _ovLoadChartLib(cb){
           }
         }
       }
+      /* 安装区域照片：顶层日期键统一归一成 ymd（兼容旧版按 DD/MM/YYYY 存的键），避免 dmy/ymd 双键并存 */
+      if(f.__zonePhotos_kv && typeof f.__zonePhotos_kv==='object'){
+        var _npkv = {};
+        for(var _pk in f.__zonePhotos_kv){ if(!f.__zonePhotos_kv.hasOwnProperty(_pk)) continue;
+          var _pnk = (typeof inst_photoDateKey==='function') ? inst_photoDateKey(_pk) : _pk;
+          _npkv[_pnk] = f.__zonePhotos_kv[_pk];
+        }
+        f.__zonePhotos_kv = _npkv;
+      }
       return f;
     }
     function prod_save(f){
@@ -50137,16 +50146,28 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     return Array.isArray(zp) ? zp.slice() : [];
   }
   /* 从服务器 prod_kv 加载安装区域照片元数据并写入 f.__zonePhotos_kv（KV 为照片权威存储，始终加载并与内存中已有数据合并） */
+  /* 把照片 KV 数据里的顶层日期键统一归一成 ymd（兼容旧版本按 DD/MM/YYYY 存的键），同一日期的多个区域合并 */
+  function inst_normPhotoKv(data){
+    var o = {};
+    for(var k in data){ if(!data.hasOwnProperty(k)) continue;
+      var nk = inst_photoDateKey(k);
+      var src = data[k]; if(!src || typeof src!=='object') continue;
+      o[nk] = o[nk] || {};
+      for(var zn in src){ if(src.hasOwnProperty(zn)) o[nk][zn] = src[zn]; }
+    }
+    return o;
+  }
   function inst_loadZonePhotos(f, cb, force){
     if(!f || !f.id) return cb && cb();
     var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : (typeof prod_loginUser==='function'?prod_loginUser():'');
     fetch('/api/prod-kv/'+encodeURIComponent(INST_ZONE_PHOTO_KV_PREFIX+f.id)+'?me='+encodeURIComponent(me))
       .then(function(r){ return r.json().catch(function(){ return {}; }); })
       .then(function(j){
-        var data = (j && j.ok && j.data) ? j.data : {};
-        /* 合并：KV 优先，但保留内存/工厂 JSON 中 KV 缺失的日期，避免工厂 JSON 里已有的照片被清空 */
-        f.__zonePhotos_kv = f.__zonePhotos_kv || {};
-        for(var _k in data){ if(data.hasOwnProperty(_k) && !f.__zonePhotos_kv[_k]) f.__zonePhotos_kv[_k] = data[_k]; }
+        var data = inst_normPhotoKv((j && j.ok && j.data) ? j.data : {});
+        /* 内存中已有的照片也归一化，并与 KV 合并（同一日期 KV 优先，缺失的日期由内存补全） */
+        var mem = inst_normPhotoKv(f.__zonePhotos_kv || {});
+        for(var _k in data){ if(data.hasOwnProperty(_k) && !mem[_k]) mem[_k] = data[_k]; }
+        f.__zonePhotos_kv = mem;
         if(cb) cb();
       }).catch(function(){ if(cb) cb(); });
   }
