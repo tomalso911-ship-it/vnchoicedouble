@@ -5137,6 +5137,33 @@ function _ovLoadChartLib(cb){
       ['installation','finished','houseOut','inventoryPlan','prepStart','prepEnd','planStart','__zonePhotos_kv','__prodPhotos_kv'].forEach(function(k){
         if(localF[k]!=null) out[k]=prod_mergeKeepLocal(localF[k], out[k]);
       });
+      /* ★★ 每日生产 production / 人员快照 workers：按日期做「并集合并」。
+         背景（本次数据丢失根因）：这两个字段此前不在任何合并保护里，out 直接取服务端整包，
+         于是只要服务端快照比本地旧（例如服务端只有 23 天、本地已录入 10 月的日期），
+         刷新/重新打开项目时服务端旧数据就会整体覆盖本地，表现为「昨天录的数据突然没了」，
+         随后界面再保存一次，又把这份缺数据的版本推回服务端，变成永久性丢失。
+         这里改成：以新的一侧为基底，另一侧独有的日期补回来 → 两端数据都不会丢。
+         删除墓碑：任一端删除过的日期不会被并集复活（见 prod_delProductionRow）。 */
+      ['production','workers'].forEach(function(k){
+        var delKey = (k==='production') ? 'productionDeleted' : 'workersDeleted';
+        function mergeDateMap(baseM, otherM, tomb){
+          var res = (baseM && typeof baseM==='object') ? JSON.parse(JSON.stringify(baseM)) : {};
+          var om = (otherM && typeof otherM==='object') ? otherM : {};
+          for(var dk in om){ if(!om.hasOwnProperty(dk)) continue;
+            if(!(dk in res) || res[dk]==null) res[dk]=om[dk];
+          }
+          if(tomb){ for(var tk in tomb){ if(tomb.hasOwnProperty(tk) && tomb[tk]) delete res[tk]; } }
+          return res;
+        }
+        var tomb = {};
+        [localF, serverF].forEach(function(side){
+          var t = (side && side[delKey]) || {};
+          for(var dk in t){ if(t.hasOwnProperty(dk) && t[dk]) tomb[dk]=1; }
+        });
+        var mergedMap = mergeDateMap(out[k], localF[k], tomb);
+        if(Object.keys(mergedMap).length || out[k] || localF[k]) out[k] = mergedMap;
+        if(Object.keys(tomb).length) out[delKey] = tomb;
+      });
       return prod_normalizeDates(out);
     }
     // 打开项目时与服务端同步：服务端有数据则与本地合并（全员看到相同内容，且刚提交的数据不丢）；
@@ -5170,6 +5197,15 @@ function _ovLoadChartLib(cb){
               if((lHo > 0 && sHo > lHo * 1.3) || (lInst > 0 && sInst > lInst * 1.3)){
                 try{ console.warn('[prod_syncFromServer] server has significantly more data (houseOut:'+sHo+'>'+lHo+', installDays:'+sInst+'>'+lInst+'), using server as-is'); }catch(_){}
                 merged = d.data;
+                /* 即使整体以服务端为准，也必须保留本地独有的「每日生产 / 人员快照」日期，
+                   否则服务端快照里没有的那几天（例如昨天刚录入的）会被整体冲掉。 */
+                try{
+                  ['production','workers'].forEach(function(k){
+                    var lm_ = (localF && localF[k]) || {}, mm_ = merged[k] || {};
+                    for(var dk in lm_){ if(lm_.hasOwnProperty(dk) && !(dk in mm_)) mm_[dk]=lm_[dk]; }
+                    if(Object.keys(mm_).length) merged[k]=mm_;
+                  });
+                }catch(_){}
               }
             }
             if(merged && (merged.id==null || merged.id==='')) merged.id = id;
@@ -10357,13 +10393,11 @@ function _ovLoadChartLib(cb){
       f.finished = fn;
     }
     function prod_dailyHistoryTable(f, specs){
-      /* 自动删除所有早于「开始生产日期」的历史产出记录 */
+      /* [安全·不再静默删数据] 旧实现会把所有早于「开始生产日期」的历史产出 delete 掉并 prod_save
+         推送到服务端：一旦开始生产日期(prepEnd/planStart)变动，用户已录入的产出就会被永久删除。
+         这里改为只「不显示」早于开始日期的记录，绝不删除、绝不保存，数据始终留在库里。 */
       var start = prod_startProdYmd(f);
-      var allKeys = Object.keys(f.production||{});
-      var dirty = false;
-      allKeys.forEach(function(d){ if(dmyToYmd(d) < start){ delete f.production[d]; dirty = true; } });
-      if(dirty){ prod_recomputeFinished(f); prod_save(f); }
-      var dates = prod_sortDateKeys(Object.keys(f.production||{}), true);
+      var dates = prod_sortDateKeys(Object.keys(f.production||{}).filter(function(d){ return dmyToYmd(d) >= start; }), true);
       /* 先算每行与总计，便于“隐藏 0 值列” */
       var rows = dates.map(function(d){
         var rec=f.production[d]; var per={}; var dayTotal=0;
@@ -10440,6 +10474,9 @@ function _ovLoadChartLib(cb){
       var f=prod_get(PROD_CUR); if(!f || !f.production || !f.production[key]) return;
       prod_confirmPopover(btn, {title:pt('confirm_del_title'), msg:pt('confirm_del_msg'), ok:pt('btn_ok'), cancel:pt('btn_cancel')}, function(){
         delete f.production[key];
+        /* 删除墓碑：记录已删除的日期，避免服务端/本地另一端的旧快照在并集合并时把它复活 */
+        f.productionDeleted = f.productionDeleted || {};
+        f.productionDeleted[key] = 1;
         prod_recomputeFinished(f);
         prod_save(f);
         prod_renderTab('E');

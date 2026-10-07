@@ -4480,13 +4480,19 @@ def _prod_factory_weight(f):
     return w
 
 def _prod_factory_counts(f):
-    """返回核心业务条目数：出库日明细总数、安装天数、安装记录行数。
-       用于识别"信息量不少但关键业务数据缺失"的旧快照覆盖。"""
+    """返回核心业务条目数：出库日明细总数、安装天数、安装记录行数、每日生产天数、人员快照天数。
+       用于识别"信息量不少但关键业务数据缺失"的旧快照覆盖。
+
+       ★ 每日生产 production / 人员快照 workers 此前不在统计里：只要客户端快照带够安装/出库数据，
+       即使它的 production 少了好几天（旧快照），服务端也会照单全收 → 用户新录入的产出被整体覆盖丢失。
+       这里把这两项纳入统计，供 PUT 回退闸识别。"""
     out_daily = 0
     install_days = 0
     install_rows = 0
+    prod_days = 0
+    worker_days = 0
     if not isinstance(f, dict):
-        return (out_daily, install_days, install_rows)
+        return (out_daily, install_days, install_rows, prod_days, worker_days)
     try:
         ho = f.get('houseOut') or {}
         for rec in ho.values():
@@ -4509,21 +4515,63 @@ def _prod_factory_counts(f):
                     if not isinstance(t, dict):
                         continue
                     install_rows += len(t.get('todayInstall') or {})
+        # 每日生产：按日期计数（只统计真正有内容的记录）
+        pr = f.get('production')
+        if isinstance(pr, dict):
+            for rec in pr.values():
+                if isinstance(rec, dict):
+                    prod_days += 1
+        wk = f.get('workers')
+        if isinstance(wk, dict):
+            worker_days = len(wk)
     except Exception:
         pass
-    return (out_daily, install_days, install_rows)
+    return (out_daily, install_days, install_rows, prod_days, worker_days)
+
+
+def _merge_date_map(base, other):
+    """按日期键做并集合并：base 优先，other 独有的日期补回来（两端都不丢）。"""
+    res = copy.deepcopy(base) if isinstance(base, dict) else {}
+    if isinstance(other, dict):
+        for k, v in other.items():
+            if k not in res or res.get(k) is None:
+                res[k] = copy.deepcopy(v)
+    return res
 
 
 def _merge_factory_keep_install(payload, existing):
     """回退闸合并：以服务器现有完整数据(existing)为基底，保留用户本次的安装编辑(installation)，
     其余字段(出库/物料/设备等)一律采用服务器更完整的版本，从而避免“本地旧快照覆盖服务器新数据”，
-    同时保证用户的安装编辑能够落库。"""
+    同时保证用户的安装编辑能够落库。
+
+    ★ 每日生产 production / 人员快照 workers 同样按日期做并集：以服务器为基底，
+    把客户端独有的日期补上，避免用户刚录入的产出被服务器旧快照冲掉。"""
     out = copy.deepcopy(existing)
     pinst = payload.get("installation") if isinstance(payload.get("installation"), dict) else {}
     oinst = existing.get("installation") if isinstance(existing.get("installation"), dict) else {}
     merged_inst = dict(oinst)        # 服务器安装数据为基底
     merged_inst.update(pinst)        # 用户本次编辑/新增的安装日期优先
     out["installation"] = merged_inst
+    for key in ("production", "workers"):
+        try:
+            # 客户端本次编辑优先（与 installation 的处理保持一致），服务器独有的日期补回来
+            merged_map = _merge_date_map(payload.get(key), existing.get(key))
+            # 删除墓碑：任一端标记为删除的日期不再复活
+            tomb = {}
+            for side in (existing, payload):
+                t = side.get(key + "Deleted") if isinstance(side, dict) else None
+                if isinstance(t, dict):
+                    for dk, dv in t.items():
+                        if dv:
+                            tomb[dk] = 1
+            for dk in tomb:
+                merged_map.pop(dk, None)
+            if tomb:
+                out[key + "Deleted"] = tomb
+            if merged_map or existing.get(key) or payload.get(key):
+                out[key] = merged_map
+        except Exception:
+            pass
     return out
 
 
@@ -4637,6 +4685,25 @@ def api_prod_factory_put(pid):
     except Exception:
         return jsonify({"ok": False, "msg": "bad data"}), 400
     conn = get_db()
+    # ★★ 每日生产 / 人员快照「永不丢」兜底：无论回退闸是否触发，落库前都把服务器现有日期并集进来。
+    #    客户端本次编辑优先，服务器独有的日期补回来；只有客户端显式写入 Deleted 墓碑的日期才移除。
+    #    背景：曾出现用户昨天录入的产出被旧快照整体覆盖、再也找不回来的事故。
+    _pre_row = conn.execute("SELECT data FROM prod_factory WHERE project_id=?", (str(pid),)).fetchone()
+    if _pre_row and _pre_row["data"]:
+        try:
+            _pre = json.loads(_pre_row["data"])
+            for _key in ("production", "workers"):
+                _merged = _merge_date_map(payload.get(_key), _pre.get(_key))
+                _tomb = payload.get(_key + "Deleted")
+                if isinstance(_tomb, dict):
+                    for _dk, _dv in _tomb.items():
+                        if _dv:
+                            _merged.pop(_dk, None)
+                if _merged:
+                    payload[_key] = _merged
+                    blob = json.dumps(payload, ensure_ascii=False)
+        except Exception as _me:
+            print(f"[prod_factory PUT {pid}] production-merge guard warning: {_me}")
     # ★ 服务端防回退闸：禁止用信息量比现有服务器数据少得多的快照覆盖。
     # 背景：浏览器若打开着旧页面，本地只有 3 条出库，保存时会覆盖服务器已恢复的 8 条出库。
     existing_row = conn.execute("SELECT data FROM prod_factory WHERE project_id=?", (str(pid),)).fetchone()
@@ -4657,6 +4724,10 @@ def api_prod_factory_put(pid):
                 reject_reason = f"安装天数过少 (server:{ec[1]} vs incoming:{ic[1]})"
             elif ec[2] > 0 and ic[2] < ec[2] * 0.65:
                 reject_reason = f"安装记录过少 (server:{ec[2]} vs incoming:{ic[2]})"
+            elif ec[3] > 0 and ic[3] < ec[3] * 0.65:
+                reject_reason = f"每日生产天数过少 (server:{ec[3]} vs incoming:{ic[3]})"
+            elif ec[4] > 0 and ic[4] < ec[4] * 0.65:
+                reject_reason = f"人员快照天数过少 (server:{ec[4]} vs incoming:{ic[4]})"
             if reject_reason:
                 # 仅当安装数据本身没有显著丢失时才“合并后接受”：保留用户本次安装编辑，
                 # 并用服务器更完整的出库/物料等字段回填（避免本地旧快照覆盖服务器新数据）。
