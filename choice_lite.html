@@ -3885,6 +3885,14 @@ function _ovLoadChartLib(cb){
       .inst-kpi-card{flex:1;min-width:0;background:#fff;border:1px solid #000;border-radius:6px;padding:8px 6px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.05);}
       .inst-kpi-card.inst-kpi-blue{background:#e8f4fd;border-color:#000;}
       .inst-kpi-card.inst-kpi-green{background:#e8f5e9;border-color:#000;}
+      /* 天气卡片融入 KPI 条：一个 KPI 卡内左右并排上午/下午天气小卡 */
+      .inst-kpi-weather{padding:4px 6px;display:flex;flex-direction:column;min-width:130px;}
+      .inst-kpi-weather .inst-kpi-title{margin-bottom:4px;min-height:18px;}
+      .inst-kpi-weather-row{display:flex;gap:4px;flex:1;align-items:stretch;min-width:0;}
+      .inst-kpi-weather-row .prod-wx-card{min-width:0 !important;padding:4px 6px !important;border-radius:5px !important;font-size:10px !important;flex:1 1 0 !important;background:#f8fbff !important;}
+      .inst-kpi-weather-row .prod-wx-h{font-size:11px !important;margin-bottom:2px !important;}
+      .inst-kpi-weather-row .prod-wx-row{gap:3px !important;font-size:10px !important;padding:0 !important;}
+      .inst-kpi-weather-row .prod-wx-condico{font-size:12px !important;}
       .inst-kpi-title{font-size:10px;color:#666;line-height:1.25;margin-bottom:5px;min-height:28px;display:flex;align-items:center;justify-content:center;}
       .inst-kpi-value{font-size:16px;font-weight:700;color:#d32f2f;line-height:1.1;word-break:break-word;}
       .inst-kpi-sub{font-size:10px;color:#888;margin-top:3px;}
@@ -50598,6 +50606,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   /* 安装 Tab C 顶部 KPI 卡片条：总需求 / 已生产 / 待生产 / 已出库 / 待出库 / 已安装 / 未安装 / 安装率 */
   function inst_kpiBarHtml(f){
     var projDemand = 0, projProduced = 0, projShipped = 0, projInstalled = 0;
+    var _d = prod_dmy(prod_val('ic_date')||INST_TABC_SELDATE||ymdToDmy(prod_today()));
+    var wx = (typeof inst_weatherForDate==='function') ? inst_weatherForDate(_d) : {am:null,pm:null};
     try{
       var _ghAll = inst_buildGanttHouses(f) || [];
       _ghAll.forEach(function(hh){ projDemand += (+hh.panels||0); });
@@ -50625,6 +50635,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       + kc('inst-kpi-green', it('inst_kpi_installed'), projInstalled, unit)
       + kc('inst-kpi-green', it('inst_kpi_not_installed'), notInstalled, unit)
       + '<div class="inst-kpi-card inst-kpi-green"><div class="inst-kpi-title">'+it('inst_kpi_install_rate')+'</div><div class="inst-kpi-value inst-kpi-rate">'+installRate+'%</div></div>'
+      + '<div class="inst-kpi-card inst-kpi-weather"><div class="inst-kpi-title">'+it('inst_sec_weather')+'</div><div class="inst-kpi-weather-row">'+(typeof prod_wxCard==='function'?prod_wxCard('am','ic_wx_am',wx.am):'')+(typeof prod_wxCard==='function'?prod_wxCard('pm','ic_wx_pm',wx.pm):'')+'</div></div>'
     + '</div>';
   }
   /* 安装用工表「区域/猪舍」列排序：点击一次升序、再点降序、第三次恢复原始顺序 */
@@ -50673,9 +50684,6 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       + '<div class="prod-field inst-zone-field"><label>'+it('inst_lbl_today_zones')+'</label>'+(INST_TAB_C_EDIT_MODE?'<div class="inst-zone-selects" id="ic_zones_wrap"></div>':'<input id="ic_zones_readonly" value="'+prod_esc((w.zones||[]).filter(function(z){return z!==''&&z!=null;}).map(function(z){return it('inst_gantt_zone_name').replace('{0}', z);}).join('、')||'—')+'" readonly style="background:#f0f0f0;cursor:not-allowed;">')+'</div>'
       + '</div>';
     h += '<div id="ic_zone_cards" class="inst-zone-cards"></div>';
-    var wx = inst_weatherForDate(d);
-    h += '<div class="prod-sec-title" style="margin-top:18px;">'+it('inst_sec_weather')+'</div>';
-    h += '<div class="pc-weather-cards">'+(typeof prod_wxCard==='function'?prod_wxCard('am','ic_wx_am',wx.am):'')+(typeof prod_wxCard==='function'?prod_wxCard('pm','ic_wx_pm',wx.pm):'')+'</div>';
     h += '<div class="prod-sec-title" style="margin-top:24px;">'+it('inst_sec_labor_detail')+'</div>';
     h += '<div class="prod-table-scroll pc-labor-scroll"><table class="prod-table pc-labor-hist"><thead><tr>'
       + '<th class="pc-col-no">'+pt('thr_no')+'</th><th class="pc-col-date">'+it('inst_lbl_date')+'</th><th>'+pt('wx_am')+'</th><th>'+pt('wx_pm')+'</th><th>'+it('inst_lbl_holiday')+'</th><th>'+it('inst_lbl_recorder')+'</th>'
