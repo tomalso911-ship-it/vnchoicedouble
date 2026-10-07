@@ -4286,8 +4286,17 @@ function _ovLoadChartLib(cb){
       .pe-photo-section-title{font-size:12px;font-weight:600;color:#263238;}
       .pe-photo-section .photo-upload-row{align-items:center;}
       .pe-photo-section .photo-mock-name{max-width:120px;}
+      /* E 页公共信息最右侧「天气」框：行式格式（温度/天气/湿度/风力），与安装 KPI 天气卡同款 */
+      .pe-wx-box{flex:0 0 330px;min-width:300px;border:1px solid #000;border-radius:8px;padding:6px 10px 8px;background:#fff;display:flex;flex-direction:column;}
+      .pe-wx-box-title{text-align:center;font-weight:600;color:#2c3e50;margin-bottom:4px;font-size:13px;}
+      .pe-wx-box-row{display:flex;gap:8px;align-items:stretch;}
+      .pe-wx-box .prod-wx-card{font-size:12px;padding:6px 8px !important;background:#f8fbff !important;border-radius:6px !important;min-width:0 !important;}
+      .pe-wx-box .prod-wx-h{font-size:12px !important;margin-bottom:3px !important;}
+      .pe-wx-box .prod-wx-row{gap:6px !important;font-size:12px !important;padding:1px 0 !important;}
+      .pe-wx-box .prod-wx-k{white-space:nowrap;}
+      .pe-wx-box .prod-wx-v{white-space:nowrap;}
       .pe-card-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-      @media (max-width:900px){ .pe-common-row{flex-wrap:wrap;} .pe-col{flex:1 1 130px;} .pe-photo-section{flex:1 1 100%;min-width:0;} }
+      @media (max-width:900px){ .pe-common-row{flex-wrap:wrap;} .pe-col{flex:1 1 130px;} .pe-photo-section{flex:1 1 100%;min-width:0;} .pe-wx-box{flex:1 1 100%;min-width:0;} }
       /* 历史生产表「照片」列 */
       .pe-hist .pe-col-photo{min-width:55px;width:auto;max-width:80px;white-space:normal;font-size:11px;padding:4px 2px;}
       .pe-hist td.pe-col-photo .inst-photo-count{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:13px;background:#E3F2FD;color:#1976D2;font-weight:700;font-size:13px;cursor:pointer;transition:background .2s,color .2s;padding:0 7px;}
@@ -6604,12 +6613,12 @@ function _ovLoadChartLib(cb){
     function prod_savePriorityHouse(){ var f = prod_get(PROD_CUR); f.priorityHouse = prod_val('pg_priority'); prod_save(f); prod_renderTab('B'); prod_toast(pt('toast_priority')); }
     function prod_savePrep(){ var f = prod_get(PROD_CUR); f.prepStart = prod_val('pg_prep_start'); f.prepEnd = prod_val('pg_prep_end'); if(!f.prepEnd) f.prepEnd = ymdToDmy(f.planStart||prod_today()); prod_save(f); prod_renderTab('B'); }
     /* C 日记录：人工 / 天气（按日快照，只记数；天气自动抓取） */
-    function prod_wxCard(slot, id, wx){
+    function prod_wxCard(slot, id, wx, emptyText){
       var label = pt(slot==='am'?'wx_am':'wx_pm');
       if(!wx){
         return '<div class="prod-wx-card" id="'+id+'" style="border:1px solid #000;border-radius:8px;padding:10px 12px;min-width:140px;flex:1 1 0;background:#fafcff;">'
           + '<div class="prod-wx-h" style="display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:6px;color:#2c3e50;">'+label+'<span class="prod-wx-condico">'+prod_wxCondIco(wx)+'</span></div>'
-          + '<div class="prod-wx-empty" style="color:#aaa;font-size:13px;">'+pt('wx_notyet')+'</div></div>';
+          + '<div class="prod-wx-empty" style="color:#aaa;font-size:13px;">'+prod_esc(emptyText||pt('wx_notyet'))+'</div></div>';
       }
       var cond = (wx.code!=null) ? i18nVal(bdWxKey(wx.code),'—') : '';
       return '<div class="prod-wx-card" id="'+id+'" style="border:1px solid #000;border-radius:8px;padding:10px 12px;min-width:140px;flex:1 1 0;background:#fafcff;">'
@@ -9322,6 +9331,10 @@ function _ovLoadChartLib(cb){
             + '<span id="pe_photo_err" class="photo-err"></span>'
           + '</div>'
         : '';
+      /* 天气卡（与安装 Tab C KPI 同款行式格式：温度/天气/湿度/风力），置于公共信息最右侧 */
+      var wxAmDisp = prod_wxDisplay('am', PROD_PE_DRAFT.weatherAm, PROD_PE_DRAFT.date);
+      var wxPmDisp = prod_wxDisplay('pm', PROD_PE_DRAFT.weatherPm, PROD_PE_DRAFT.date);
+      var wxPmEmpty = (!wxPmDisp && PROD_PE_DRAFT.date && prod_ymd(PROD_PE_DRAFT.date)===prod_today() && new Date().getHours()<14) ? pt('wx_pending_pm') : pt('wx_notyet');
       var startProdEl = document.querySelector('#pa_start_prod');
       var startProdVal = (startProdEl && startProdEl.value) ? startProdEl.value : ymdToDmy((f && (f.prepEnd || f.planStart)) || prod_today());
       var mm = prod_slatsMatrix();
@@ -9362,14 +9375,19 @@ function _ovLoadChartLib(cb){
         +           '<option value="yes"'+((PROD_PE_DRAFT.holiday==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option></select></div>'
         :       '<div class="prod-field"><label>'+pt('lbl_holiday')+'</label><input id="pe_holiday" value="'+((PROD_PE_DRAFT.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>')
         +     '</div>'
-        +     prod_wxMiniCard('am','pe_wx_am',PROD_PE_DRAFT.weatherAm,PROD_PE_DRAFT.date)
-        +     prod_wxMiniCard('pm','pe_wx_pm',PROD_PE_DRAFT.weatherPm,PROD_PE_DRAFT.date)
         +     '<div class="pe-photo-section">'
         +       '<div class="pe-photo-section-title">'+prod_esc(pt('prod_lbl_upload_photos'))+'</div>'
         +       '<input type="file" id="pe_photo" accept="image/*" multiple class="vis-hide" onchange="prodProdPhotoOnFile(this)">'
         +       pePhotoUploadRow
         +       '<input type="hidden" id="pe_photos" value="[]">'
         +       '<div id="pe_photo_select" class="photo-select-box"></div>'
+        +     '</div>'
+        +     '<div class="pe-wx-box">'
+        +       '<div class="pe-wx-box-title">'+prod_esc(pt('sec_weather'))+'</div>'
+        +       '<div class="pe-wx-box-row">'
+        +         prod_wxCard('am','pe_wx_am', wxAmDisp)
+        +         prod_wxCard('pm','pe_wx_pm', wxPmDisp, wxPmEmpty)
+        +       '</div>'
         +     '</div>'
         +   '</div>'
         + '</div>'
