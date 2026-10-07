@@ -4765,6 +4765,34 @@ function _ovLoadChartLib(cb){
         }
         f.workers=nw;
       }
+      /* 安装工人记录 installation.workers：键统一归一成 DD/MM/YYYY，并合并同一日期的重复记录。
+         （旧版本按 YYYY-MM-DD 写回照片时，会在 workers 里多建一条「同日空记录」，
+          导致安装历史表出现两条相同日期的行。） */
+      if(f.installation && typeof f.installation==='object' &&
+         f.installation.workers && typeof f.installation.workers==='object'){
+        var iw = f.installation.workers, niw = {};
+        for(var iwk in iw){ if(!iw.hasOwnProperty(iwk)) continue;
+          var ink = norm(iwk); if(!ink) continue;
+          var irec = iw[iwk];
+          if(niw[ink] && irec && typeof irec==='object'){
+            var im = niw[ink];
+            for(var ifk in irec){ if(!irec.hasOwnProperty(ifk)) continue;
+              if(ifk === 'zonePhotos'){
+                im.zonePhotos = im.zonePhotos || {};
+                for(var ipz in irec.zonePhotos){ if(!irec.zonePhotos.hasOwnProperty(ipz)) continue;
+                  var ipa = im.zonePhotos[ipz] = im.zonePhotos[ipz] || [];
+                  (irec.zonePhotos[ipz]||[]).forEach(function(p){ if(p && ipa.indexOf(p)<0) ipa.push(p); });
+                }
+              } else if(!(ifk in im) || im[ifk]==null || im[ifk]===''){
+                im[ifk] = irec[ifk];
+              }
+            }
+          } else if(niw[ink]==null){
+            niw[ink] = irec;
+          }
+        }
+        f.installation.workers = niw;
+      }
       if(f.profile && f.profile.dueDate) f.profile.dueDate = norm(f.profile.dueDate);
       if(f.prepStart) f.prepStart = norm(f.prepStart);
       if(f.prepEnd) f.prepEnd = norm(f.prepEnd);
@@ -50120,18 +50148,14 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   }
   /* ===== 安装区域收货照片（参考原料库存收货照片逻辑） ===== */
   var INST_ZONE_PHOTO_KV_PREFIX = 'inst_zone_photos_';
-  /* 把任意日期表示(YYYY-MM-DD / DD/MM/YYYY / 输入框值)统一归一成 YYYY-MM-DD 的“照片键” */
+  /* 把任意日期表示(YYYY-MM-DD / DD/MM/YYYY / 输入框值)统一归一成 DD/MM/YYYY 的“照片键”。
+     ★ 关键：安装工人记录 installation.workers 的键就是 DD/MM/YYYY（与全站 norm() 一致）。
+     照片键必须与之一致，否则上传照片写回工厂 JSON 时会在 workers 里新建一条同日的空记录，
+     导致历史表出现两条相同日期的行。 */
   function inst_photoDateKey(d){
     if(!d) return '';
     d = (''+d).trim();
-    var p = d.split('/');
-    if(p.length === 3){
-      var y, m, day;
-      if(p[0].length === 4){ y=p[0]; m=p[1]; day=p[2]; }   /* YYYY/MM/DD -> ymd */
-      else { y=p[2]; m=p[1]; day=p[0]; }                    /* DD/MM/YYYY -> ymd */
-      if(y && m && day) return y+'-'+m+'-'+day;
-    }
-    return d; /* 已是 YYYY-MM-DD 或其它 */
+    return ymdToDmy(dmyToYmd(d)) || d;
   }
   function inst_zonePhotos(f, d, zoneNum){
     /* 优先从已加载的 KV 缓存读取，绕开工厂数据回退保护闸 */
