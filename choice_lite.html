@@ -7822,10 +7822,39 @@ function _ovLoadChartLib(cb){
     }
 
     /* ===== 安装区域收货照片（参考原料库存收货照片逻辑） ===== */
+    var INST_ZONE_PHOTO_KV_PREFIX = 'inst_zone_photos_';
     function inst_zonePhotos(f, d, zoneNum){
+      /* 优先从已加载的 KV 缓存读取，绕开工厂数据回退保护闸 */
+      var kv = (f && f.__zonePhotos_kv) || {};
+      if(kv[d] && kv[d][String(zoneNum)]){
+        var arr = kv[d][String(zoneNum)];
+        return Array.isArray(arr) ? arr.slice() : [];
+      }
+      /* 兼容：早期保存在工厂 JSON 里的数据 */
       var w = (f && f.installation && f.installation.workers && f.installation.workers[d]) || {};
       var zp = (w.zonePhotos || {})[String(zoneNum)] || [];
       return Array.isArray(zp) ? zp.slice() : [];
+    }
+    /* 从服务器 prod_kv 加载安装区域照片元数据并写入 f.__zonePhotos_kv */
+    function inst_loadZonePhotos(f, cb, force){
+      if(!f || !f.id) return cb && cb();
+      if(f.__zonePhotos_kv && !force) return cb && cb();
+      var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : (typeof prod_loginUser==='function'?prod_loginUser():'');
+      fetch('/api/prod-kv/'+encodeURIComponent(INST_ZONE_PHOTO_KV_PREFIX+f.id)+'?me='+encodeURIComponent(me))
+        .then(function(r){ return r.json().catch(function(){ return {}; }); })
+        .then(function(j){
+          var data = (j && j.ok && j.data) ? j.data : {};
+          f.__zonePhotos_kv = data;
+          if(cb) cb();
+        }).catch(function(){ if(cb) cb(); });
+    }
+    /* 把安装区域照片元数据保存到 prod_kv（文件名清单），不依赖工厂数据 PUT */
+    function inst_saveZonePhotosToKv(f, cb){
+      if(!f || !f.id) return cb && cb();
+      var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : (typeof prod_loginUser==='function'?prod_loginUser():'');
+      var data = f.__zonePhotos_kv || {};
+      fetch('/api/prod-kv/'+encodeURIComponent(INST_ZONE_PHOTO_KV_PREFIX+f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:data }) })
+        .then(function(){ if(cb) cb(); }).catch(function(){ if(cb) cb(); });
     }
     function inst_zonePhotoRender(zoneNum){
       var box = document.getElementById('ic_zphotos_'+zoneNum); if(!box) return;
@@ -7857,12 +7886,20 @@ function _ovLoadChartLib(cb){
       fetch('/api/inst-zone-photos/'+encodeURIComponent(fname)+'?me='+encodeURIComponent((typeof prod_loginUser==='function'?prod_loginUser():'')), { method:'DELETE' }).catch(function(){});
       var f = (typeof inst_get==='function') ? inst_get(INST_CUR) : null; if(f){
         var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
+        /* 从 KV 缓存删除 */
+        var kv = f.__zonePhotos_kv || {};
+        var kvArr = ((kv[d] || {})[String(zoneNum)]) || [];
+        if(Array.isArray(kvArr)){
+          for(var i=0;i<kvArr.length;i++){ if(kvArr[i]===fname){ kvArr.splice(i,1); break; } }
+        }
+        inst_saveZonePhotosToKv(f);
+        /* 兼容旧工厂 JSON */
         var w = (f.installation && f.installation.workers && f.installation.workers[d]) || {};
         var zp = (w.zonePhotos || {})[String(zoneNum)] || [];
         if(Array.isArray(zp)){
-          for(var i=0;i<zp.length;i++){ if(zp[i]===fname){ zp.splice(i,1); break; } }
+          for(var j=0;j<zp.length;j++){ if(zp[j]===fname){ zp.splice(j,1); break; } }
         }
-        prod_save(f);
+        if(typeof prod_save==='function') prod_save(f);
       }
       inst_zonePhotoRender(zoneNum);
     }
@@ -7873,8 +7910,28 @@ function _ovLoadChartLib(cb){
       var files = input.files; if(!files || !files.length){ input.value=''; return; }
       var pid = (typeof INST_CUR!=='undefined' && INST_CUR) || (typeof PROD_CUR!=='undefined' && PROD_CUR) || '';
       if(!pid){ showErr('no project'); input.value=''; return; }
+      var _f = (typeof inst_get==='function') ? inst_get(INST_CUR) : null; if(!_f){ showErr('no project data'); input.value=''; return; }
+      var _d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
       clearErr();
       var ZONE_MAX_PHOTO_BYTES = 50*1024;
+      function addAndRender(filename){
+        _f.__zonePhotos_kv = _f.__zonePhotos_kv || {};
+        _f.__zonePhotos_kv[_d] = _f.__zonePhotos_kv[_d] || {};
+        var _arr = _f.__zonePhotos_kv[_d][String(zoneNum)] = _f.__zonePhotos_kv[_d][String(zoneNum)] || [];
+        _arr.push(filename);
+        var box = document.getElementById('ic_zphotos_'+zoneNum); if(box) box.value = JSON.stringify(_arr);
+        inst_zonePhotoRender(zoneNum);
+        inst_saveZonePhotosToKv(_f);
+        /* 同时尝试写回工厂 JSON（兼容旧路径），但不再等待/阻塞 UI */
+        try{
+          _f.installation = _f.installation || {}; _f.installation.workers = _f.installation.workers || {};
+          var _w = _f.installation.workers[_d] = _f.installation.workers[_d] || {};
+          _w.zonePhotos = _w.zonePhotos || {};
+          var _arr2 = _w.zonePhotos[String(zoneNum)] = _w.zonePhotos[String(zoneNum)] || [];
+          _arr2.push(filename);
+          if(typeof prod_save==='function') prod_save(_f);
+        }catch(_){}
+      }
       Array.prototype.slice.call(files).forEach(function(f){
         var isImgType = !!(f.type && f.type.indexOf('image/') === 0);
         var extOk = /\.(jpe?g|png|gif|bmp|webp|heic|heif)$/i.test(f.name || '');
@@ -7885,16 +7942,8 @@ function _ovLoadChartLib(cb){
             .then(function(r){ return r.json().catch(function(){ return {}; }); })
             .then(function(res){
               input.value='';
-              if(res && res.ok){
-                var _f = (typeof inst_get==='function') ? inst_get(INST_CUR) : null; if(!_f) return;
-                var _d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
-                _f.installation = _f.installation || {}; _f.installation.workers = _f.installation.workers || {};
-                var _w = _f.installation.workers[_d] = _f.installation.workers[_d] || {};
-                _w.zonePhotos = _w.zonePhotos || {};
-                var _arr = _w.zonePhotos[String(zoneNum)] = _w.zonePhotos[String(zoneNum)] || [];
-                _arr.push(res.filename);
-                prod_save(_f).then(function(){ inst_zonePhotoRender(zoneNum); });
-              } else { showErr((res&&res.error)||'upload fail'); }
+              if(res && res.ok){ addAndRender(res.filename); }
+              else { showErr((res&&res.error)||'upload fail'); }
             }).catch(function(e){ input.value=''; showErr('upload fail:'+((e&&e.message)||e)); });
         }
         if(f.size > ZONE_MAX_PHOTO_BYTES){
@@ -7904,10 +7953,26 @@ function _ovLoadChartLib(cb){
         }
       });
     }
+    /* KV 加载完成后，把当前页面上所有区域卡片的隐藏输入和缩略图都刷新一次 */
+    function inst_zoneCardsReRenderPhotos(){
+      var f = (typeof inst_get==='function') ? inst_get(INST_CUR) : null; if(!f) return;
+      var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
+      var boxes = document.querySelectorAll('[id^="ic_zphotos_"]');
+      for(var i=0;i<boxes.length;i++){
+        var box = boxes[i];
+        var m = box.id.match(/^ic_zphotos_(.+)$/); if(!m) continue;
+        var zoneNum = m[1];
+        var arr = inst_zonePhotos(f, d, zoneNum);
+        box.value = JSON.stringify(arr);
+        inst_zonePhotoRender(zoneNum);
+      }
+    }
     try{ window.inst_zonePhotoOnFile = inst_zonePhotoOnFile; }catch(_){}
     try{ window.inst_zonePhotoAdd = inst_zonePhotoAdd; }catch(_){}
     try{ window.inst_zonePhotoRemove = inst_zonePhotoRemove; }catch(_){}
     try{ window.inst_zonePhotoRender = inst_zonePhotoRender; }catch(_){}
+    try{ window.inst_loadZonePhotos = inst_loadZonePhotos; }catch(_){}
+    try{ window.inst_zoneCardsReRenderPhotos = inst_zoneCardsReRenderPhotos; }catch(_){}
     /* ===== 收货明细（表格多行） ===== */
     var prodRcRows = [];
     var prodRcRowsByPid = {};
@@ -48488,6 +48553,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     }
     else if(key==='C'){
       body.innerHTML = inst_tabC(f);
+      /* 异步加载安装区域照片元数据（KV），加载完后刷新区域卡片里的照片显示 */
+      setTimeout(function(){ inst_loadZonePhotos(f, function(){ try{ inst_zoneCardsReRenderPhotos(); }catch(_){} }); }, 0);
       setTimeout(function(){ inst_backfillWeather(true); }, 0);
       /* 当天天气：与生产模块一致，自动抓取并写入上午/下午（网络返回后重试几次） */
       setTimeout(inst_captureTodayWeather, 0);
