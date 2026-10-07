@@ -4848,7 +4848,7 @@ function _ovLoadChartLib(cb){
       try{
         var ho = f.houseOut||{}; for(var hk in ho){ if(!ho.hasOwnProperty(hk)) continue; var od=(ho[hk]&&ho[hk].outDaily)||{}; for(var dk in od){ if(od.hasOwnProperty(dk)) w++; } }
         var inst = f.installation||{}; var ws = inst.workers||{};
-        for(var wk in ws){ if(!ws.hasOwnProperty(wk)) continue; var zt=(ws[wk]&&ws[wk].zoneTeamWorkers)||{};
+        for(var wk in ws){ if(!ws.hasOwnProperty(wk)) continue; if(ws[wk] && ws[wk]._deleted) continue; var zt=(ws[wk]&&ws[wk].zoneTeamWorkers)||{};
           for(var zn in zt){ if(!zt.hasOwnProperty(zn)) continue; (zt[zn]||[]).forEach(function(t){ if(!t) return; var ti=t.todayInstall||{}; for(var sp in ti){ if(ti.hasOwnProperty(sp)) w++; } if(t.house) w++; }); } }
         if(Array.isArray(f.plan)) w += f.plan.length;
         if(f.workers && typeof f.workers==='object') w += Object.keys(f.workers).length;
@@ -48555,10 +48555,10 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         });
       });
     }
-    var dates = Object.keys(ws).map(dayOf).filter(Boolean).sort();
+    var dates = Object.keys(ws).filter(function(k){ return !(ws[k] && ws[k]._deleted); }).map(dayOf).filter(Boolean).sort();
     for(var i = dates.length - 1; i >= 0; i--){
       var m = {};
-      Object.keys(ws).forEach(function(k){ if(dayOf(k) === dates[i]) collect(ws[k], m); });
+      Object.keys(ws).forEach(function(k){ if(dayOf(k) === dates[i] && !(ws[k] && ws[k]._deleted)) collect(ws[k], m); });
       if(Object.keys(m).length) return m;
     }
     return {};
@@ -49890,7 +49890,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var first = '';
     Object.keys(workers).forEach(function(date){
       var w = workers[date];
-      if(!w || !w.zoneTeamWorkers) return;
+      if(!w || w._deleted || !w.zoneTeamWorkers) return;
       var arr = w.zoneTeamWorkers[zn];
       if(arr && arr.length && arr.some(function(t){ return Object.keys(t||{}).some(function(k){ return (t[k]|0)>0; }); })){
         if(!first || date < first) first = date;
@@ -50776,6 +50776,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var f = inst_get(INST_CUR); if(!f) return false;
     var inst = f.installation || {};
     var w = (inst.workers && inst.workers[d]) || {};
+    if(w._deleted) return false;
     if(w.recorder || w.holiday) return true;
     if(w.zones && w.zones.length && w.zones.some(function(z){ return z!=='' && z!=null; })) return true;
     var ztw = w.zoneTeamWorkers || {};
@@ -50887,6 +50888,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter' || rk[0]==='leader') return; h += '<th class="pc-col-blue">'+it(rk[1])+'</th>'; });
     h += '<th class="pc-col-blue">'+it('inst_lbl_total_man')+'</th><th class="pc-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
     var dates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(inst.workers||{}), true) : Object.keys(inst.workers||{});
+    dates = dates.filter(function(dd){ var ww=inst.workers[dd]; return !(ww && ww._deleted); });
     var total = dates.length;
     var instRoleN = 0; INST_ROLES.forEach(function(rk){ if(rk[0]!=='reporter' && rk[0]!=='leader') instRoleN++; });
     /* 同列纵向合并：相邻相同值合并（rowspan）；每个日期独立成块，跨日期不合并 */
@@ -51263,6 +51265,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     if(!f) f = inst_get(INST_CUR); f.installation = f.installation || {}; var workers = f.installation.workers || {};
     var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
     var w = workers[d] || {};
+    /* 若重新保存被逻辑删除的日期，自动复活 */
+    if(w._deleted){ delete w._deleted; delete w.__deletedAt; }
     w.holiday = prod_val('ic_holiday');
     w.recorder = prod_val('ic_recorder') || (typeof prod_loginUser==='function'?prod_loginUser():'');
     var zones = inst_workerZones(w);
@@ -51345,7 +51349,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     workers[d] = w; f.installation.workers = workers;
     /* 根据所有日期的 todayInstall 重新生成 houseInstallQty，保证甘特图「已装」与录入数据严格对应（含历史数据回填） */
     hiq = f.installation.houseInstallQty = {};
-    for(var wk in workers){ if(!workers.hasOwnProperty(wk)) continue; var wd=workers[wk]; var ztw=(wd&&wd.zoneTeamWorkers)||{}; for(var znk in ztw){ if(!ztw.hasOwnProperty(znk)) continue; var arr=ztw[znk]||[]; arr.forEach(function(t){ var house=t&&t.house; if(!house) return; var k=hiqKey(house); if(!k) return; var tm=(t.todayInstall&&typeof t.todayInstall==='object')?t.todayInstall:{}; var tt=0; for(var sp in tm){ if(tm.hasOwnProperty(sp)) tt+=(+tm[sp]||0); } if(tt>0) hiq[k]=(hiq[k]||0)+tt; }); } }
+    for(var wk in workers){ if(!workers.hasOwnProperty(wk)) continue; var wd=workers[wk]; if(wd && wd._deleted) continue; var ztw=(wd&&wd.zoneTeamWorkers)||{}; for(var znk in ztw){ if(!ztw.hasOwnProperty(znk)) continue; var arr=ztw[znk]||[]; arr.forEach(function(t){ var house=t&&t.house; if(!house) return; var k=hiqKey(house); if(!k) return; var tm=(t.todayInstall&&typeof t.todayInstall==='object')?t.todayInstall:{}; var tt=0; for(var sp in tm){ if(tm.hasOwnProperty(sp)) tt+=(+tm[sp]||0); } if(tt>0) hiq[k]=(hiq[k]||0)+tt; }); } }
     var zoneFirstDates = f.installation.zoneFirstDates || {};
     zones.forEach(function(zn){
       if(zn==='' || zn==null) return;
@@ -51378,8 +51382,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var s = 0;
     var nsp = (typeof inst_specKeyNorm==='function') ? inst_specKeyNorm(sp) : String(sp||'');
     Object.keys(workers||{}).forEach(function(wk){
-      if(wk === excludeDmy) return;
-      var wd = workers[wk]; var z = (wd && wd.zoneTeamWorkers) || {};
+    if(wk === excludeDmy) return;
+    var wd = workers[wk]; if(wd && wd._deleted) return;
+    var z = (wd && wd.zoneTeamWorkers) || {};
       Object.keys(z).forEach(function(zn){
         (z[zn]||[]).forEach(function(t){
           if(!t || !t.house) return;
@@ -51670,7 +51675,12 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   });
   function inst_delWorkers(btn, dd){
     instShowDelConfirm(btn, dd, function(){
-      var f = inst_get(INST_CUR); var w = (f.installation && f.installation.workers) || {}; delete w[dd]; f.installation.workers = w;
+      var f = inst_get(INST_CUR); var w = (f.installation && f.installation.workers) || {};
+      var rec = w[dd] || {};
+      /* 逻辑删除：保留记录但标记 _deleted，避免触发服务端回退闸导致刷新后复活 */
+      rec._deleted = true;
+      rec.__deletedAt = Date.now();
+      w[dd] = rec; f.installation.workers = w;
       inst_save(f); inst_renderTab('C');
     });
   }
@@ -51684,7 +51694,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var missing = [];
     Object.keys(f.installation.workers).forEach(function(dd){
       var ymd = dmyToYmd(dd); if(!ymd || ymd >= today) return;
-      var w = f.installation.workers[dd]; if(!w) return;
+      var w = f.installation.workers[dd]; if(!w || w._deleted) return;
       if((!w.weatherAm || w.weatherAm.v!==2) || (!w.weatherPm || w.weatherPm.v!==2)) missing.push({dd:dd, ymd:ymd});
     });
     if(!missing.length) return;
@@ -51714,7 +51724,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var f = inst_get(INST_CUR); if(!f || !f.installation || !f.installation.workers) return 0;
     var workers = f.installation.workers, count = 0;
     for(var d in workers){ if(!workers.hasOwnProperty(d)) continue;
-      var w = workers[d]; if(!w || w.holiday === 'yes') continue;
+      var w = workers[d]; if(!w || w.holiday === 'yes' || w._deleted) continue;
       var allZero = true;
       INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter' || rk[0]==='leader') return; if((+w[rk[0]]||0) !== 0){ allZero = false; } });
       if(allZero) count++;

@@ -4446,6 +4446,7 @@ def _prod_factory_weight(f):
         ws = inst.get('workers') or {}
         for dw in ws.values():
             if not isinstance(dw, dict): continue
+            if dw.get('_deleted'): continue
             zt = dw.get('zoneTeamWorkers') or {}
             for teams in zt.values():
                 if not isinstance(teams, list): continue
@@ -4493,10 +4494,13 @@ def _prod_factory_counts(f):
                 out_daily += len(rec.get('outDaily') or {})
         inst = f.get('installation') or {}
         ws = inst.get('workers') or {}
-        install_days = len(ws)
+        install_days = 0
         for dw in ws.values():
             if not isinstance(dw, dict):
                 continue
+            if dw.get('_deleted'):
+                continue
+            install_days += 1
             zt = dw.get('zoneTeamWorkers') or {}
             for teams in zt.values():
                 if not isinstance(teams, list):
