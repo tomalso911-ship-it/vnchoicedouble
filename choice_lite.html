@@ -4863,6 +4863,29 @@ function _ovLoadChartLib(cb){
       /* ★ 若该项目正在与服务器同步（打开项目 / 409 自动恢复），先不推送：
          同步会合并服务器完整数据，完成后的重渲染会自动推送，避免用同步前的旧快照触发 409。 */
       try{ if(window.__PROD_SYNC_INFLIGHT && window.__PROD_SYNC_INFLIGHT[f.id]) return Promise.resolve(); }catch(_){}
+      /* ★ 首次同步完成前不推送：保证本地已合并服务器完整数据，避免用旧快照发出 409 请求。 */
+      try{ if(!(window.__PROD_SYNCED && window.__PROD_SYNCED[f.id])) return Promise.resolve(); }catch(_){}
+      /* ★ 客户端预检：本地信息量明显小于上次同步到的服务器信息量（<60%）时，
+         不发出必然被服务端 409 拒绝的请求，改为先同步，随后重渲染再保存。 */
+      try{
+        var _sw = (window.__PROD_SRV_W && window.__PROD_SRV_W[f.id]) || 0;
+        if(_sw > 0 && prod_factoryWeight(f) < _sw * 0.6){
+          try{ console.warn('[prod_pushToServer] 本地数据少于服务器（'+prod_factoryWeight(f)+'<'+_sw+'*0.6），先同步再保存'); }catch(_){}
+          if(typeof prod_syncFromServer==='function'){
+            prod_syncFromServer(f.id, function(){
+              try{
+                var instDetail = document.getElementById('inst-detail');
+                if(typeof INST_ACTIVE_TAB!=='undefined' && INST_ACTIVE_TAB && instDetail && instDetail.style.display !== 'none'){
+                  if(typeof inst_renderTabs==='function') inst_renderTabs(INST_ACTIVE_TAB);
+                } else if(typeof prod_renderTabs==='function' && typeof PROD_ACTIVE_TAB!=='undefined' && PROD_ACTIVE_TAB){
+                  prod_renderTabs(PROD_ACTIVE_TAB);
+                }
+              }catch(_){}
+            });
+          }
+          return Promise.resolve();
+        }
+      }catch(_){}
       try {
         var _p = fetch('/api/prod-factory/'+encodeURIComponent(f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:f }) });
         /* 上传失败时至少给一次可见提示（原先完全静默，用户会以为"保存了"，但服务端其实没收到） */
@@ -5002,6 +5025,9 @@ function _ovLoadChartLib(cb){
         .then(function(d){
           var hasLocal = false; try { hasLocal = !!localStorage.getItem(PROD_LS+id); } catch(e){}
           if(d && d.ok && d.data){
+            /* ★ 缓存服务器信息量：prod_pushToServer 用它做客户端预检，
+               本地明显少于服务器时先同步、不发出必然被 409 拒绝的请求。 */
+            try{ if(!window.__PROD_SRV_W) window.__PROD_SRV_W = {}; window.__PROD_SRV_W[id] = prod_factoryWeight(d.data); }catch(_){}
             var localF = PROD_MEM[id] || null;
             if(!localF && hasLocal){ try { localF = JSON.parse(localStorage.getItem(PROD_LS+id)); } catch(e){} }
             var merged = d.data;
@@ -5024,13 +5050,14 @@ function _ovLoadChartLib(cb){
             PROD_MEM[id] = merged;                     /* ★ 先写内存：即使 localStorage 不可用，界面也能读到最新数据 */
             try { localStorage.setItem(PROD_LS+id, JSON.stringify(merged)); } catch(e){ prod_localWriteWarn(e); }
           } else if(hasLocal){
-            /* 服务器无数据：本地作为种子上传，先解除 in-flight 标记再推送 */
+            /* 服务器无数据：本地作为种子上传，先解除 in-flight 标记并放行推送 */
             try{ if(window.__PROD_SYNC_INFLIGHT) delete window.__PROD_SYNC_INFLIGHT[id]; }catch(_){}
+            try{ if(!window.__PROD_SYNCED) window.__PROD_SYNCED = {}; window.__PROD_SYNCED[id] = true; }catch(_){}
             try { var f = JSON.parse(localStorage.getItem(PROD_LS+id)); if(f && f.id) prod_pushToServer(f); } catch(e){}
           }
         })
         .catch(function(){})
-        .then(function(){ try{ if(window.__PROD_SYNC_INFLIGHT) delete window.__PROD_SYNC_INFLIGHT[id]; }catch(_){} if(cb) cb(); });
+        .then(function(){ try{ if(window.__PROD_SYNC_INFLIGHT) delete window.__PROD_SYNC_INFLIGHT[id]; }catch(_){} try{ if(!window.__PROD_SYNCED) window.__PROD_SYNCED = {}; window.__PROD_SYNCED[id] = true; }catch(_){} if(cb) cb(); });
     }
     /* ===== ★ 本地缓存缺 installation 时自动从服务器回填 =====
        背景：prod_get() 只读 localStorage，而 localStorage 按 origin 隔离：
@@ -5124,7 +5151,7 @@ function _ovLoadChartLib(cb){
         var k = localStorage.key(i);
         if(!k) continue;
         if(k.indexOf(PROD_LS)===0){
-          try { var f = JSON.parse(localStorage.getItem(k)); if(f && f.id){ prod_pushToServer(f); n++; } } catch(e){}
+          try { var f = JSON.parse(localStorage.getItem(k)); if(f && f.id){ try{ if(!window.__PROD_SYNCED) window.__PROD_SYNCED={}; window.__PROD_SYNCED[f.id]=true; }catch(_){} prod_pushToServer(f); n++; } } catch(e){}
         } else if(k.indexOf('prod_specs_')===0){
           try { var a = JSON.parse(localStorage.getItem(k)); fetch('/api/prod-kv/'+encodeURIComponent(k), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:a }) }); } catch(e){}
         }
