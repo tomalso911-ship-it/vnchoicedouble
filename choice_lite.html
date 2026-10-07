@@ -3498,10 +3498,10 @@ function _ovLoadChartLib(cb){
       .inst-frappe .gantt-container{ min-width:100%; }
       .inst-fg-toolbar{display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap;}
       .inst-fg-hint{font-size:11px;color:#8a96a3;}
-      .inst-z1 .bar{fill:#E53935;} .inst-z1 .bar-progress{fill:#b71c1c;}
-      .inst-z2 .bar{fill:#FB8C00;} .inst-z2 .bar-progress{fill:#e65100;}
-      .inst-z3 .bar{fill:#B8860B;} .inst-z3 .bar-progress{fill:#8d6e00;}
-      .inst-z4 .bar{fill:#43A047;} .inst-z4 .bar-progress{fill:#2e7d32;}
+      .inst-z1 .bar{fill:#26a69a;} .inst-z1 .bar-progress{fill:#00695c;}
+      .inst-z2 .bar{fill:#ffa726;} .inst-z2 .bar-progress{fill:#ef6c00;}
+      .inst-z3 .bar{fill:#ef5350;} .inst-z3 .bar-progress{fill:#c62828;}
+      .inst-z4 .bar{fill:#66bb6a;} .inst-z4 .bar-progress{fill:#2e7d32;}
       .inst-z5 .bar{fill:#1E88E5;} .inst-z5 .bar-progress{fill:#1565c0;}
       .inst-z6 .bar{fill:#8E24AA;} .inst-z6 .bar-progress{fill:#6a1b9a;}
       .inst-z7 .bar{fill:#00897B;} .inst-z7 .bar-progress{fill:#00695c;}
@@ -3597,6 +3597,9 @@ function _ovLoadChartLib(cb){
       .prod-table td.pe-op{white-space:nowrap;width:74px;}
       /* 单个规格完成（总需求量=实际出库量 且 实际库存=0）：整行明亮黄色加粗 */
       .prod-table.prod-stockout tr.pe-row-done td{color:#1E90FF;font-weight:700;text-shadow:0 0 1px rgba(0,0,0,.35);}
+      /* 成品库存出库明细表：规格列单元格可点击，点击后展开下方成品库存表的同规格明细 */
+      .prod-table.prod-stockout td.pe-stockout-spec{cursor:pointer;color:#1f6feb;font-weight:500;}
+      .prod-table.prod-stockout td.pe-stockout-spec:hover{background:#eaf3ff;}
       /* 房舍名默认保持原色；即使所在行已完成，也只在该房舍全部规格完成时才变黄 */
       .prod-table.prod-stockout tr.pe-row-done td.pe-house-cell{color:#333;font-weight:400;text-shadow:none;}
       .prod-table.prod-stockout td.pe-house-cell.pe-house-done,
@@ -3846,8 +3849,9 @@ function _ovLoadChartLib(cb){
       .pc-labor-hist .pc-col-blue{background:#EFF6FF;}
       .pc-labor-hist th.pc-col-yellow{background:#FEF9C3;}
       .pc-labor-hist th.pc-col-blue{background:#DBEAFE;}
-      /* 网格线：黑色 */
-      .pc-labor-hist th, .pc-labor-hist td{border:1px solid #000;}
+      /* 网格线：黑色，强制完整 */
+      .pc-labor-hist{border-collapse:collapse !important;border-spacing:0 !important;}
+      .pc-labor-hist th, .pc-labor-hist td{border:1px solid #000 !important;}
       .pc-labor-hist .pc-zero{color:#e53935;font-weight:600;}
       /* 监控：该栋安装结束（已安装 ≥ 本栋需求）→ 猪舍名变红 */
       .pc-labor-hist .pc-house-done{color:#E53935;font-weight:700;}
@@ -3856,6 +3860,13 @@ function _ovLoadChartLib(cb){
       .pc-labor-hist .prod-op{font-size:12px;padding:1px 4px;margin-right:1px;}
       .pc-labor-scroll{max-height:400px;overflow-y:auto;overflow-x:auto;}
       .pc-labor-form input{text-align:center;}
+      .pc-labor-hist tfoot{position:sticky;bottom:0;z-index:11;}
+      .pc-labor-hist tfoot td{font-weight:700;border-top:2px solid #000;border-bottom:none;}
+      /* 生产用工表小计行：保留淡黄底 */
+      .pc-labor-hist tfoot.pc-labor-tfoot td{background:#fffbe6;}
+      /* 安装用工表小计行：参考 pe-subtotal-row 蓝底 + 深蓝字 */
+      .pc-labor-hist tfoot.pc-labor-subtotal td{background:#e8f0fe !important;color:#1a237e;border-top:2px solid #4a90e2;}
+      .pc-labor-hist tfoot.pc-labor-subtotal td b{font-size:12px;}
       .pc-labor-hist thead th{position:sticky;top:0;z-index:10;background:#f7f9f4;}
       .pc-labor-hist .pc-wx-cell{font-size:13px;line-height:1.2;text-align:center;vertical-align:middle;}
       .pc-labor-hist th.pc-sortable{cursor:pointer;user-select:none;}
@@ -3869,6 +3880,15 @@ function _ovLoadChartLib(cb){
       .inst-del-pop-ok:hover{background:#C62828;}
       .inst-del-pop-cancel{background:#e0e0e0;color:#333;}
       .inst-del-pop-cancel:hover{background:#d0d0d0;}
+      /* 安装 Tab C 顶部 KPI 卡片条：参考生产/出库模块的统计卡片 */
+      .inst-kpi-bar{display:flex;gap:8px;margin:10px 0;flex-wrap:nowrap;}
+      .inst-kpi-card{flex:1;min-width:0;background:#fff;border:1px solid #e3e6eb;border-radius:6px;padding:8px 6px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+      .inst-kpi-card.inst-kpi-blue{background:#e8f4fd;border-color:#bbdefb;}
+      .inst-kpi-card.inst-kpi-green{background:#e8f5e9;border-color:#c8e6c9;}
+      .inst-kpi-title{font-size:10px;color:#666;line-height:1.25;margin-bottom:5px;min-height:28px;display:flex;align-items:center;justify-content:center;}
+      .inst-kpi-value{font-size:16px;font-weight:700;color:#d32f2f;line-height:1.1;word-break:break-word;}
+      .inst-kpi-sub{font-size:10px;color:#888;margin-top:3px;}
+      .inst-kpi-rate{color:#1f6feb;font-weight:600;}
       .pc-sort-ind{display:inline-flex;flex-direction:column;line-height:0.78;margin-left:3px;vertical-align:middle;}
       .pc-sort-ind .up,.pc-sort-ind .dn{font-size:9px;color:#c4ccd4;font-style:normal;line-height:0.78;}
       .pc-sort-ind .up.on{color:#E53935;}
@@ -3926,6 +3946,8 @@ function _ovLoadChartLib(cb){
       .prod-table.pe-fin tr.pe-fin-expanded{background:#dbeafe;}
       .prod-table.pe-fin .pe-fin-caret{display:inline-block;width:14px;color:#1f6feb;font-size:11px;}
       .prod-table.pe-fin tr.pe-fin-subrow td{background:#fbfdff;border-top-color:#bbb;}
+      /* 点击库存/出库明细规格后：成品库存表展开行里对应猪舍子行高亮（淡黄），可累积多个 */
+      .prod-table.pe-fin tr.pe-fin-subrow.pe-fin-sub-jump td{background:#fff3bf !important;}
       .prod-table.pe-fin tr.pe-fin-subrow .pe-fin-house{padding-left:20px;color:#33415c;font-weight:600;}
       .prod-table.pe-fin tr.pe-fin-subrow .pe-fin-sub-idx{background:#fbfdff;}
       /* 删除确认气泡：经典红/灰按钮，紧贴触发按钮 */
@@ -4219,10 +4241,21 @@ function _ovLoadChartLib(cb){
       .pe-common-row .pe-col .pe-date-fld{flex:0 0 auto;width:100%;}
       .pe-common-row .pe-wx-mini{flex:0 0 140px;min-width:120px;align-self:stretch;height:auto;}
       .pe-card-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+      .pe-edit-hint, .inst-edit-hint{font-size:12px;color:#1E90FF;background:#eef6ff;border:1px dashed #1E90FF;border-radius:6px;padding:2px 8px;line-height:1.6;white-space:nowrap;}
       .pe-wx-mini{padding:6px 10px;gap:2px;}
       .pe-lines{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;}
       @media (max-width:640px){ .pe-lines{grid-template-columns:1fr;} }
       .pe-line{height:100%;box-sizing:border-box;}
+      /* 只读模式生产线卡片：更紧凑，无输入框 */
+      .pe-line.pe-readonly{background:#f9fafb;}
+      .pe-line.pe-readonly .pe-ro-block{margin-top:10px;font-size:13px;color:#333;}
+      .pe-line.pe-readonly .pe-ro-label{font-weight:600;color:#555;margin-right:6px;}
+      .pe-line.pe-readonly .pe-ro-table{width:100%;border-collapse:collapse;font-size:12px;border:1px solid #000;}
+      .pe-line.pe-readonly .pe-ro-table th,.pe-line.pe-readonly .pe-ro-table td{text-align:left;padding:6px 4px;border:1px solid #000;vertical-align:top;}
+      .pe-line.pe-readonly .pe-ro-table th{color:#888;font-weight:500;background:#f4f6f8;}
+      .pe-line.pe-readonly .pe-ro-table td.pe-ro-spec{white-space:nowrap;font-weight:500;}
+      .pe-line.pe-readonly .pe-ro-table td.pe-ro-detail{line-height:1.6;}
+      .pe-line.pe-readonly .pe-ro-table td.pe-ro-subtotal{text-align:right;font-weight:600;}
       .pe-wx-badge{position:relative;display:flex;flex-direction:column;justify-content:center;gap:1px;background:#fff;border:1px solid #e3e6eb;border-radius:10px;padding:8px 12px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.03);}
       .pe-wx-badge.empty{background:#fafbfc;border-style:dashed;color:#9aa3ad;}
       .pe-wx-badge:hover{border-color:#c9d4e3;}
@@ -4497,6 +4530,9 @@ function _ovLoadChartLib(cb){
       PROD_I18N.zh.btn_out_actual='按实际需要 {shortage} 片出库';
       PROD_I18N.en.btn_out_actual='Ship {shortage} pcs as needed';
       PROD_I18N.vi.btn_out_actual='Xuất đúng {shortage} tấm';
+      PROD_I18N.zh.pe_dblclick_hint='提示：双击空白处可收起录入框';
+      PROD_I18N.en.pe_dblclick_hint='Tip: double-click blank area to collapse the entry form';
+      PROD_I18N.vi.pe_dblclick_hint='Mẹo: nhấn đúp vùng trống để thu gọn ô nhập';
     }
     function pt(k){
       var lang = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
@@ -4661,7 +4697,7 @@ function _ovLoadChartLib(cb){
     }
     function prod_normalizeDates(f){
       if(!f) return f;
-      function norm(d){ return ymdToDmy(d) || d; }
+      function norm(d){ return ymdToDmy(dmyToYmd(d)) || d; }
       if(f.production && typeof f.production==='object'){
         var np={};
         for(var k in f.production){ if(!f.production.hasOwnProperty(k)) continue; var nk=norm(k); if(!nk) continue; var rec=f.production[k];
@@ -4720,6 +4756,34 @@ function _ovLoadChartLib(cb){
           }
           if(hoRec.outDaily) hoRec.outDaily = _normDaily(hoRec.outDaily);
           if(hoRec.inDaily) hoRec.inDaily = _normDaily(hoRec.inDaily);
+          /* [锁死] 数据兜底清洗：houseOut 累计出库量绝不能超过实际产量。
+             若旧数据/合并数据导致 out > produced，按日期从早到晚削减 outDaily（优先清洗旧残留数据），
+             保证「实际库存 = produced - out」永远不会为负。 */
+          var hspClean = prod_houseSpecProduced(f);
+          for(var _hok2 in f.houseOut){ if(!f.houseOut.hasOwnProperty(_hok2)) continue;
+            var _p2 = _hok2.split('|'); if(_p2.length<2) continue;
+            var _hh2 = _p2[0]; var _sk2 = _p2.slice(1).join('|');
+            var _produced2 = (hspClean[_hh2] && hspClean[_hh2][_sk2]) || 0;
+            var _rec2 = f.houseOut[_hok2]; if(!_rec2 || typeof _rec2!=='object') continue;
+            var _rawOut = (+_rec2.out)||0;
+            if(_rawOut > _produced2 && _produced2 >= 0){
+              var _over = _rawOut - _produced2;
+              var _keys = Object.keys(_rec2.outDaily || {}).sort();
+              for(var _ki=0; _ki<_keys.length && _over>0; _ki++){
+                var _dk = _keys[_ki]; var _od = _rec2.outDaily[_dk]; if(!_od || typeof _od!=='object') continue;
+                var _oq = (+_od.qty)||0; if(_oq<=0) continue;
+                var _cut = Math.min(_oq, _over);
+                _od.qty = _oq - _cut; _over -= _cut;
+                if(_od.lines && Array.isArray(_od.lines)){
+                  var _rem = _cut;
+                  _od.lines = _od.lines.map(function(L){ if(!L || _rem<=0) return L; var lq=(+L.qty)||0; var c2=Math.min(lq,_rem); _rem-=c2; return {seq:L.seq, qty:lq-c2, dest:L.dest, zone:L.zone}; }).filter(function(L){ return L && (L.qty||0)>0; });
+                  if(!_od.lines.length) delete _od.lines;
+                }
+                if(_od.qty <= 0) delete _rec2.outDaily[_dk];
+              }
+              _rec2.out = Object.keys(_rec2.outDaily || {}).reduce(function(s,k){ var v=_rec2.outDaily[k]; return s+(v&&typeof v==='object'?(v.qty||0):0); },0);
+            }
+          }
           /* 旧版 outDaily 存的是整数（只有数量），新版需要对象才能显示填表人/天气/区域/猪舍号。
              在客户端先升级成对象，避免和服务端对象合并时被当成标量覆盖掉。 */
           if(hoRec.outDaily && typeof hoRec.outDaily==='object'){
@@ -5643,7 +5707,7 @@ function _ovLoadChartLib(cb){
       else if(key==='E'){ body.innerHTML = prod_tabE(f); var _et = body.querySelector('.prod-table.pe-estats'); if(_et){ _et.addEventListener('click', prod_eStatsTableClick); } prod_drawEStats(f); prod_drawLineCompare();
         /* ★ 安装页「快速录入该舍生产数据」：渲染完自动选中线1 + 该猪舍并滚动定位 */
         if(window.__PROD_E_HOUSE_REQ){ var _erq = window.__PROD_E_HOUSE_REQ; window.__PROD_E_HOUSE_REQ = null; try{ prod_dailyApplyHouseReq(_erq.line, _erq.house); }catch(e){} } }
-      else if(key==='H'){ body.innerHTML = prod_tabH(f); var _ft = body.querySelector('.prod-table.pe-fin'); if(_ft){ _ft.addEventListener('click', prod_finTableClick); } prod_drawOutboundChart(f);
+      else if(key==='H'){ body.innerHTML = prod_tabH(f); var _ft = body.querySelector('.prod-table.pe-fin'); if(_ft){ _ft.addEventListener('click', prod_finTableClick); } prod_finApplyJumps(); prod_drawOutboundChart(f);
         /* ★ 安装页「快速录入出库数据」：定位并高亮该猪舍在库存/出库明细里的行 */
         if(window.__PROD_H_JUMP){ var _hj = window.__PROD_H_JUMP; window.__PROD_H_JUMP = null; try{ prod_stockoutJumpHouse(_hj.h); }catch(e){} } }
       else if(key==='F'){ body.innerHTML = prod_tabF(f); prod_drawEquipCharts(f); }
@@ -6428,8 +6492,20 @@ function _ovLoadChartLib(cb){
         +   '<div class="pe-wx-pop-row"><span>'+pt('wx_wind')+'</span><b>'+prod_wxWind(wx)+'</b></div>'
         + '</div></div>';
     }
+    function prod_wxDisplay(slot, wx, dateDmy){
+      if(!wx) return null;
+      /* [锁死] 今天未到对应时间点（上午 09:00 / 下午 14:00）前，不允许显示已保存的天气，
+         必须是到点自动抓取，避免“现在还没到下午两点却出现下午天气”的 bug。 */
+      if(dateDmy && prod_ymd(dateDmy)===prod_today()){
+        var hhNow = new Date().getHours();
+        if(slot==='am' && hhNow < 9) return null;
+        if(slot==='pm' && hhNow < 14) return null;
+      }
+      return wx;
+    }
     function prod_wxMiniCard(slot,id,wx,dateDmy){
       var label = pt(slot==='am'?'wx_am':'wx_pm');
+      wx = prod_wxDisplay(slot, wx, dateDmy);
       if(!wx){
         var pending = (slot==='pm' && dateDmy && prod_ymd(dateDmy)===prod_today() && new Date().getHours()<14);
         return '<div class="pe-wx-mini" id="'+id+'">'
@@ -6499,7 +6575,7 @@ function _ovLoadChartLib(cb){
     function prod_tabC(f){
       var d = prod_dmy(prod_val('pc_date')||PROD_TABC_SELDATE||ymdToDmy(prod_today()));
       var w = (f.workers && f.workers[d])||{};
-      var rec = (w.recorder && w.recorder!=='') ? w.recorder : prod_loginUser();
+      var rec = prod_loginUser();
       var cDue = prod_cDueYmd();
       var cStop = cDue ? (prod_today() >= cDue) : false;
       var banner = cStop ? '<div class="prod-due-stop">'+pt('msg_due_stop').replace('{date}', ymdToDmy(cDue))+'</div>' : '';
@@ -6515,7 +6591,7 @@ function _ovLoadChartLib(cb){
 +   '<option value="no"'+((w.holiday!=='yes')?' selected':'')+'>'+pt('opt_no')+'</option>'
 +   '<option value="yes"'+((w.holiday==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option>'
 + '</select></div>'
-+ '<div class="prod-field"><label>'+pt('lbl_recorder')+'</label><input id="pc_recorder" value="'+prod_esc(rec)+'" placeholder="'+prod_esc(pt('lbl_recorder')||'')+'"></div>'
++ '<div class="prod-field"><label>'+pt('lbl_recorder')+'</label><input id="pc_recorder" value="'+prod_esc(rec)+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
         +           prod_numFld(pt('prod_role_manager'),'pc_manager',prod_workerDefault('manager', w))+'</div>'
         +         '<div class="prod-role-grid">';
       PROD_WORKERS.slice(1).forEach(function(wk){ h += prod_numFld(pt('prod_role_'+wk[0]),'pc_'+wk[0],prod_workerDefault(wk[0], w)); });
@@ -6524,8 +6600,8 @@ function _ovLoadChartLib(cb){
         +     '<div class="pc-weather-side">'
         +       '<div class="prod-sec-title">'+pt('sec_weather')+'</div>'
         +       '<div class="pc-weather-cards">'
-        +         prod_wxCard('am','pc_wx_am',(w.weatherAm&&w.weatherAm.v===2)?w.weatherAm:null)
-        +         prod_wxCard('pm','pc_wx_pm',(w.weatherPm&&w.weatherPm.v===2)?w.weatherPm:null)
+        +         prod_wxCard('am','pc_wx_am',prod_wxDisplay('am',(w.weatherAm&&w.weatherAm.v===2)?w.weatherAm:null,d))
+        +         prod_wxCard('pm','pc_wx_pm',prod_wxDisplay('pm',(w.weatherPm&&w.weatherPm.v===2)?w.weatherPm:null,d))
         +       '</div>'
         +     '</div>'
         +   '</div>'
@@ -6544,19 +6620,26 @@ function _ovLoadChartLib(cb){
       var dates = prod_sortDateKeys(Object.keys(f.workers||{}), true);
       if(cDue) dates = dates.filter(function(dd){ return dmyToYmd(dd)<=cDue; });
       var pcTotalRows = dates.length;
+      var subTot = {}; PROD_WORKERS.forEach(function(k){ subTot[k[0]] = 0; });
+      var subTotTotal = 0;
       dates.forEach(function(dd, idx){ var ww = f.workers[dd]; var sum = 0;
-        PROD_WORKERS.forEach(function(k){ sum += (+ww[k[0]]||0); });
+        var recDisp = prod_esc(ww.recorder || prod_loginUser());
+        var isDefaultRecord = !ww.recorder && PROD_WORKERS.every(function(k){ return (+ww[k[0]]||0) === 0; });
         h += '<tr data-orig-idx="'+idx+'"><td class="pc-col-no">'+(pcTotalRows-idx)+'</td><td class="pc-col-date">'+ymdToDmy(dd)+'</td>'
           + '<td class="pc-col-wx pc-wx-cell">'+prod_wxCompact((ww.weatherAm&&ww.weatherAm.v===2)?ww.weatherAm:null)+'</td>'
           + '<td class="pc-col-wx pc-wx-cell">'+prod_wxCompact((ww.weatherPm&&ww.weatherPm.v===2)?ww.weatherPm:null)+'</td>'
           + '<td class="pc-col-holiday" data-sort-val="'+((ww.holiday==='yes')?'yes':'no')+'">'+((ww.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'</td>'
-          + '<td class="pc-col-rec">'+prod_esc(ww.recorder||'')+'</td>';
-        PROD_WORKERS.forEach(function(k){ var v = ww[k[0]]||0; h += '<td class="pc-col-role'+(v===0?' pc-zero':'')+'">'+v+'</td>'; });
+          + '<td class="pc-col-rec">'+recDisp+'</td>';
+        PROD_WORKERS.forEach(function(k){ var v = isDefaultRecord ? (PROD_WORKER_DEFAULTS[k[0]]||0) : prod_workerDefault(k[0], ww); sum += v; subTot[k[0]] += v; h += '<td class="pc-col-role'+(v===0?' pc-zero':'')+'">'+v+'</td>'; });
+        subTotTotal += sum;
         h += '<td class="pc-col-total'+(sum===0?' pc-zero':'')+'"><b>'+sum+'</b></td>'
           + '<td class="pc-col-act"><button class="prod-op" aria-label="'+pt('op_edit')+'" onclick="prod_editRow(\''+dd+'\')">✏️</button>'
           + '<button class="prod-op" onclick="prod_copyRow(\''+dd+'\')">📋</button>' + '<button class="prod-op" aria-label="'+pt('op_del')+'" onclick="prod_delWorkers(\''+dd+'\')">🗑️</button></td></tr>';
       });
-      h += '</tbody></table></div>';
+      h += '</tbody><tfoot class="pc-labor-tfoot"><tr>'
+        + '<td class="pc-col-no"></td><td class="pc-col-date"><b>'+pt('subtotal')+'</b></td><td class="pc-col-wx"></td><td class="pc-col-wx"></td><td class="pc-col-holiday"></td><td class="pc-col-rec"></td>';
+      PROD_WORKERS.forEach(function(k){ var st = subTot[k[0]]; h += '<td class="pc-col-role'+(st===0?' pc-zero':'')+'"><b>'+st.toLocaleString()+'</b></td>'; });
+      h += '<td class="pc-col-total'+(subTotTotal===0?' pc-zero':'')+'"><b>'+subTotTotal.toLocaleString()+'</b></td><td class="pc-col-act"></td></tr></tfoot></table></div>';
       h += prod_renderTrends(f);
       setTimeout(prodAutoBackfillWeather, 0);
       return h;
@@ -6778,8 +6861,8 @@ function _ovLoadChartLib(cb){
       var d = prod_dmy(prod_val('pc_date')||ymdToDmy(prod_today()));
       PROD_TABC_SELDATE = d;
       var w = (f.workers && f.workers[d])||{};
-      var am = document.getElementById('pc_wx_am'); if(am) am.outerHTML = prod_wxCard('am','pc_wx_am',(w.weatherAm&&w.weatherAm.v===2)?w.weatherAm:null);
-      var pm = document.getElementById('pc_wx_pm'); if(pm) pm.outerHTML = prod_wxCard('pm','pc_wx_pm',(w.weatherPm&&w.weatherPm.v===2)?w.weatherPm:null);
+      var am = document.getElementById('pc_wx_am'); if(am) am.outerHTML = prod_wxCard('am','pc_wx_am',prod_wxDisplay('am',(w.weatherAm&&w.weatherAm.v===2)?w.weatherAm:null,d));
+      var pm = document.getElementById('pc_wx_pm'); if(pm) pm.outerHTML = prod_wxCard('pm','pc_wx_pm',prod_wxDisplay('pm',(w.weatherPm&&w.weatherPm.v===2)?w.weatherPm:null,d));
     }
     function prod_saveWorkers(){
       var f = prod_get(PROD_CUR);
@@ -6787,7 +6870,7 @@ function _ovLoadChartLib(cb){
       f.workers = f.workers||{};
       var w = (f.workers[d] && typeof f.workers[d]==='object') ? f.workers[d] : {};
       PROD_WORKERS.forEach(function(k){ w[k[0]] = +prod_val('pc_'+k[0])||0; });
-      w.recorder = prod_val('pc_recorder') || prod_loginUser();
+      w.recorder = prod_loginUser();
       w.holiday = prod_val('pc_holiday') || 'no';
       f.workers[d] = w; prod_save(f); prod_renderTab('C');
       prodTryCaptureWeather(); // 保存后立刻尝试抓取当天天气
@@ -6855,8 +6938,8 @@ function _ovLoadChartLib(cb){
       var f = prod_get(PROD_CUR);
       var w = (f.workers && f.workers[d])||{};
       var el = prod_el('pc_date'); if(el){ el.value = d; PROD_TABC_SELDATE = d; }
-      PROD_WORKERS.forEach(function(k){ var e = prod_el('pc_'+k[0]); if(e) e.value = (w[k[0]]||0); });
-      var recEl = prod_el('pc_recorder'); if(recEl) recEl.value = (w.recorder && w.recorder!=='') ? w.recorder : prod_loginUser();
+      PROD_WORKERS.forEach(function(k){ var e = prod_el('pc_'+k[0]); if(e) e.value = prod_workerDefault(k[0], w); });
+      var recEl = prod_el('pc_recorder'); if(recEl) recEl.value = prod_loginUser();
       var he = prod_el('pc_holiday'); if(he){ he.value = (w.holiday==='yes' ? 'yes' : 'no'); prod_holidayColor(he); }
       prod_updateWeatherCards();
       var eb = prod_el('pcEditBanner');
@@ -6919,8 +7002,9 @@ function _ovLoadChartLib(cb){
         if(p){
           if(p.weatherAm && p.weatherAm.v!==2){ p.weatherAm = w.weatherAm || null; ch = true; }
           if(p.weatherPm && p.weatherPm.v!==2){ p.weatherPm = w.weatherPm || null; ch = true; }
-          if(w.weatherAm && !p.weatherAm){ p.weatherAm = w.weatherAm; ch = true; }
-          if(w.weatherPm && !p.weatherPm){ p.weatherPm = w.weatherPm; ch = true; }
+          /* [锁死] 仅到对应时间点后才把已保存天气回填到 production；否则“未到 14:00”会因旧/手动数据提前显示下午天气 */
+          if(hh>=9 && w.weatherAm && !p.weatherAm){ p.weatherAm = w.weatherAm; ch = true; }
+          if(hh>=14 && w.weatherPm && !p.weatherPm){ p.weatherPm = w.weatherPm; ch = true; }
         }
         f.workers[d]=w; prod_save(f); if(PROD_ACTIVE_TAB==='C') prod_renderTab('C');
       }
@@ -6929,8 +7013,9 @@ function _ovLoadChartLib(cb){
         /* 草稿里的旧版天气同样作废，未到时间不显示、到时间用小时预报覆盖 */
         if(PROD_PE_DRAFT.weatherAm && PROD_PE_DRAFT.weatherAm.v!==2){ PROD_PE_DRAFT.weatherAm = null; needE = true; }
         if(PROD_PE_DRAFT.weatherPm && PROD_PE_DRAFT.weatherPm.v!==2){ PROD_PE_DRAFT.weatherPm = null; needE = true; }
-        if(w.weatherAm && !PROD_PE_DRAFT.weatherAm){ PROD_PE_DRAFT.weatherAm = w.weatherAm; needE = true; }
-        if(w.weatherPm && !PROD_PE_DRAFT.weatherPm){ PROD_PE_DRAFT.weatherPm = w.weatherPm; needE = true; }
+        /* [锁死] 仅到对应时间点后才把已保存天气回填到 E 页草稿；9 点前/14 点前保持为空，等待到点自动抓取 */
+        if(hh>=9 && w.weatherAm && !PROD_PE_DRAFT.weatherAm){ PROD_PE_DRAFT.weatherAm = w.weatherAm; needE = true; }
+        if(hh>=14 && w.weatherPm && !PROD_PE_DRAFT.weatherPm){ PROD_PE_DRAFT.weatherPm = w.weatherPm; needE = true; }
         if(needE) prod_renderTab('E');
       }
       prodOpRefreshWeather();
@@ -8739,6 +8824,24 @@ function _ovLoadChartLib(cb){
       return arr;
     }
     var PROD_PE_DRAFT = null;
+    /* [锁死] E 页只读/编辑模式（2026-10-06 锁定，禁止修改）：PROD_PE_EDIT_MODE=true=编辑（显示输入框），
+       false=只读（已保存日期默认只读、不显示输入框）。任何重构不得移除这两条 edit-mode 切换函数，
+       也不得把“已保存日期”改回默认强制编辑。 */
+    var PROD_PE_EDIT_MODE = false;  /* true=编辑模式（显示输入框），false=只读模式（已保存日期默认只读） */
+    function prod_dailyEnterEditMode(){ PROD_PE_EDIT_MODE = true; prod_renderTab('E'); }
+    function prod_dailyExitEditMode(){ PROD_PE_EDIT_MODE = false; prod_renderTab('E'); }
+    /* [锁死] 双击 E 页卡片内的空白处（非交互元素），自动收起编辑回到只读，方便快速浏览。
+       （已由 click 改为 dblclick：单击不再收起，必须双击空白处）
+       禁止修改排除列表（input/select/textarea/button/label/option/a/.pe-chip/.cp-popup/.prod-holiday/.pe-card-actions），
+       也禁止在没有 .pe-card 或 PROD_PE_EDIT_MODE 为假时触发收起。 */
+    function prod_dailyMaybeCollapseEdit(e){
+      if(!PROD_PE_EDIT_MODE) return;
+      var t = e.target;
+      if(!t || !t.closest) return;
+      if(!t.closest('.pe-card')) return;
+      if(t.closest('input,select,textarea,button,label,option,a,.pe-chip,.cp-popup,.prod-holiday,.pe-card-actions')) return;
+      prod_dailyExitEditMode();
+    }
     function prod_dailyDraftFor(dmy){
       var key = prod_dmy(dmy);
       var f = prod_get(PROD_CUR);
@@ -8746,7 +8849,9 @@ function _ovLoadChartLib(cb){
       /* 只接受按小时抓取的天气（v:2）；旧的 current 数据一律忽略，避免上下午重复 */
       var recAm = (rec && rec.weatherAm && rec.weatherAm.v===2) ? rec.weatherAm : null;
       var recPm = (rec && rec.weatherPm && rec.weatherPm.v===2) ? rec.weatherPm : null;
-      var d = { _cur: PROD_CUR, date: key, holiday:(rec&&rec.holiday)?rec.holiday:'no', recorder: prod_loginUser(), weatherAm: recAm, weatherPm: recPm, lines:{} };
+      /* [锁死] _saved 标记：该日期是否已有保存记录。已保存 → 默认只读；未保存 → 默认编辑。
+         不得移除或反向（把已保存日期强行置为编辑）。 */
+      var d = { _cur: PROD_CUR, date: key, _saved: !!rec, holiday:(rec&&rec.holiday)?rec.holiday:'no', recorder: prod_loginUser(), weatherAm: recAm, weatherPm: recPm, lines:{} };
       var wrec = (f.workers && f.workers[key]) || null;
       if(wrec){
         if(!d.weatherAm && wrec.weatherAm && wrec.weatherAm.v===2) d.weatherAm = wrec.weatherAm;
@@ -8773,6 +8878,9 @@ function _ovLoadChartLib(cb){
         var el = prod_el('pe_date'); if(el) el.value = dd;
       }
       PROD_PE_DRAFT = prod_dailyDraftFor(dd);
+      /* [锁死] 切到新日期：若该日期已有保存数据则默认只读，否则进入编辑模式。
+         不得改为无条件进入编辑，也不得把已保存日期强行置为编辑。 */
+      PROD_PE_EDIT_MODE = !PROD_PE_DRAFT._saved;
       prod_renderTab('E');
     }
     /* 自动补抓 E 页当前日期（过去日期）缺失的天气，无需点按钮 */
@@ -8857,6 +8965,11 @@ function _ovLoadChartLib(cb){
       var todayDmy = ymdToDmy(todayYmd);
       if(!PROD_PE_DRAFT || PROD_PE_DRAFT._cur !== PROD_CUR){ PROD_PE_DRAFT = prod_dailyDraftFor(todayDmy); }
       if(PROD_PE_DRAFT.date === todayDmy && (!PROD_PE_DRAFT.weatherAm || !PROD_PE_DRAFT.weatherPm)){ prodTryCaptureWeather(); }
+      /* [锁死] 已保存的日期默认只读；无数据日期必须处于编辑模式。用户点“编辑”后保持编辑直到保存或切日期。
+         不得移除或反转此分支。 */
+      if(!PROD_PE_DRAFT._saved) PROD_PE_EDIT_MODE = true;
+      /* 绑定一次：编辑模式下点击卡片空白处自动收起（见 prod_dailyMaybeCollapseEdit 锁死说明） */
+      if(!window.__peCollapseBound){ document.addEventListener('dblclick', prod_dailyMaybeCollapseEdit); window.__peCollapseBound = true; }
       var N = prod_lineCount();
       var specs = prod_dailySpecs();
       var houses = prod_dailyHouses();
@@ -8877,21 +8990,30 @@ function _ovLoadChartLib(cb){
         +   '<div class="pe-daily-kpi"><span class="pe-daily-kpi-label">'+pt('kpi_total_produced')+'：</span><span class="pe-daily-kpi-value">'+prod_fmtNum(totalProduced)+'</span><span class="pe-daily-kpi-unit">'+pt('thr_pcs')+'</span></div>'
         +   '<div class="pe-daily-kpi"><span class="pe-daily-kpi-label">'+pt('kpi_completion_rate')+'：</span><span class="pe-daily-kpi-value">'+completion+'</span><span class="pe-daily-kpi-unit">%</span></div>'
         + '</div></div>';
+      /* [锁死] 公共信息卡：编辑模式显示“保存当日生产”按钮，只读模式显示“编辑”按钮；
+         只读时填报日期/春节为禁用输入框（不得改回可点击日历/可改下拉）。 */
       h += '<div class="pe-card pe-common">'
         + '<div class="pe-card-head"><div class="pe-card-title">'+pt('lbl_daily_common')+'</div>'
         +   '<div class="pe-card-actions"><div class="pe-daytotal">'+pt('thr_total_pcs')+'：<b id="pe_daytotal">'+prod_fmtNum(dayTotal)+'</b>'+pt('thr_pcs')+'</div>'
-        +   '<button class="prod-btn" type="button" onclick="prod_saveProduction()">'+pt('btn_save_prod')+'</button></div></div>'
+        +   (PROD_PE_EDIT_MODE
+        ?     '<button class="prod-btn" type="button" onclick="prod_saveProduction()">'+pt('btn_save_prod')+'</button>'
+              + '<span class="pe-edit-hint">'+pt('pe_dblclick_hint')+'</span>'
+        :     '<button class="prod-btn" type="button" onclick="prod_dailyEnterEditMode()">'+pt('op_edit')+'</button>')+'</div></div>'
         + '<div class="pe-common-body">'
         +   '<div class="pe-common-row">'
         +     '<div class="pe-col">'
         +       '<div class="prod-field"><label>'+pt('lbl_start_prod_date')+'</label><input id="pe_start_prod" value="'+prod_esc(startProdVal)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
-        +       prod_dateFld(pt('lbl_report_date'),'pe_date', PROD_PE_DRAFT.date, 'prod_dailyDateChange()', prod_today(),'pe-date-fld', null, prod_startProdYmd(f))
+        +       (PROD_PE_EDIT_MODE
+        ?       prod_dateFld(pt('lbl_report_date'),'pe_date', PROD_PE_DRAFT.date, 'prod_dailyDateChange()', prod_today(),'pe-date-fld', null, prod_startProdYmd(f))
+        :       '<div class="prod-field"><label>'+pt('lbl_report_date')+'</label><input id="pe_date" value="'+prod_esc(PROD_PE_DRAFT.date)+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>')
         +     '</div>'
         +     '<div class="pe-col">'
         +       '<div class="prod-field"><label>'+pt('lbl_recorder')+'</label><input id="pe_recorder" value="'+prod_esc(prod_loginUser())+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
-        +       '<div class="prod-field"><label>'+pt('lbl_holiday')+'</label><select id="pe_holiday" class="'+((PROD_PE_DRAFT.holiday==='yes')?'prod-holiday-yes':'')+'" onchange="prod_dailyCommonChange()">'
-        +         '<option value="no"'+((PROD_PE_DRAFT.holiday!=='yes')?' selected':'')+'>'+pt('opt_no')+'</option>'
-        +         '<option value="yes"'+((PROD_PE_DRAFT.holiday==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option></select></div>'
+        +       (PROD_PE_EDIT_MODE
+        ?       '<div class="prod-field"><label>'+pt('lbl_holiday')+'</label><select id="pe_holiday" class="'+((PROD_PE_DRAFT.holiday==='yes')?'prod-holiday-yes':'')+'" onchange="prod_dailyCommonChange()">'
+        +           '<option value="no"'+((PROD_PE_DRAFT.holiday!=='yes')?' selected':'')+'>'+pt('opt_no')+'</option>'
+        +           '<option value="yes"'+((PROD_PE_DRAFT.holiday==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option></select></div>'
+        :       '<div class="prod-field"><label>'+pt('lbl_holiday')+'</label><input id="pe_holiday" value="'+((PROD_PE_DRAFT.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>')
         +     '</div>'
         +     prod_wxMiniCard('am','pe_wx_am',PROD_PE_DRAFT.weatherAm,PROD_PE_DRAFT.date)
         +     prod_wxMiniCard('pm','pe_wx_pm',PROD_PE_DRAFT.weatherPm,PROD_PE_DRAFT.date)
@@ -8899,7 +9021,9 @@ function _ovLoadChartLib(cb){
         + '</div>'
         + '</div>';
       if(N<=0){ h += '<div class="prod-empty">'+pt('empty_no_lines')+'</div>'; }
-      else { h += '<div class="pe-lines">'; for(var n=1;n<=N;n++){ h += prod_dailyLineCard(n, specs, houses); } h += '</div>'; }
+      /* [锁死] 编辑模式渲染 prod_dailyLineCard（含输入框），只读模式渲染 prod_dailyLineReadOnlyCard（紧凑只显示）。
+         不得把只读分支改回显示输入框。 */
+      else { h += '<div class="pe-lines">'; for(var n=1;n<=N;n++){ h += (PROD_PE_EDIT_MODE ? prod_dailyLineCard(n, specs, houses) : prod_dailyLineReadOnlyCard(n, specs, houses)); } h += '</div>'; }
       /* 各条生产线对比分析：置于线1/线2 录入卡片下方、历史产出上方 */
       h += prod_tabALineCompare(f);
       if(noSpec){ h += '<div class="prod-empty">'+pt('empty_no_spec')+'</div>'; }
@@ -9382,6 +9506,32 @@ function _ovLoadChartLib(cb){
       h += '</div>';
       return h;
     }
+    /* [锁死] 只读卡片：只展示所选猪舍 + 规格/各猪舍产量/小计表格，不得出现可编辑输入框。 */
+    function prod_dailyLineReadOnlyCard(n, specs, houses){
+      var line = PROD_PE_DRAFT.lines[n] || {houses:[],qty:{}};
+      var h = '<div class="pe-card pe-line pe-readonly">';
+      h += '<div class="pe-card-head"><div class="pe-card-title pe-line-title">'+pt('prod_line_n').replace('{n}',n)+'</div>'
+         + '<div class="pe-line-total">'+prod_dailyLineTotalHtml(line, specs)+'</div></div>';
+      var selHouses = (line.houses||[]);
+      h += '<div class="pe-ro-block"><span class="pe-ro-label">'+pt('lbl_houses')+'：</span>'+(selHouses.length ? selHouses.map(function(hh){ return prod_esc(prod_phName(hh)); }).join('、') : '—')+'</div>';
+      var keys = Object.keys(line.qty||{});
+      h += '<div class="pe-ro-block">';
+      if(!keys.length){
+        h += '<span class="pe-hint">'+pt('empty_no_spec_sel')+'</span>';
+      } else {
+        h += '<table class="pe-ro-table"><thead><tr><th>'+pt('lbl_specs')+'</th><th>'+pt('lbl_houses')+'</th><th>'+pt('subtotal')+'</th></tr></thead><tbody>';
+        keys.forEach(function(s){
+          var detail = (line.qtyDetail && line.qtyDetail[s]) || {};
+          var rows = [];
+          selHouses.forEach(function(hh){ var q = +detail[hh]||0; if(q>0) rows.push(prod_esc(prod_phName(hh))+'：'+prod_fmtNum(q)); });
+          if(!rows.length) rows.push('—');
+          h += '<tr><td class="pe-ro-spec">'+prod_esc(s)+'</td><td class="pe-ro-detail">'+rows.join('<br>')+'</td><td class="pe-ro-subtotal">'+prod_fmtNum(line.qty[s]||0)+'</td></tr>';
+        });
+        h += '</tbody></table>';
+      }
+      h += '</div></div>';
+      return h;
+    }
     function prod_dailyHouseToggle(el, n){
       var line = PROD_PE_DRAFT.lines[n] || (PROD_PE_DRAFT.lines[n]={houses:[],qty:{}});
       var hh = el.getAttribute('data-house');
@@ -9417,6 +9567,10 @@ function _ovLoadChartLib(cb){
       }
       var chips=document.getElementById('pe_specchips_'+n); if(chips) chips.innerHTML=prod_dailySpecChipsHtml(n);
       var rows=document.getElementById('pe_specrows_'+n); if(rows) rows.innerHTML=prod_dailySpecRowsHtml(n);
+      /* ★ 重新同步该线全部猪舍胶囊状态，确保「胶囊高亮」与 line.houses 完全一致，
+         杜绝「胶囊未高亮却仍出现该猪舍输入框」的视觉错位 */
+      var hcs=document.querySelectorAll('.pe-chip[data-line="'+n+'"][data-house]');
+      hcs.forEach(function(el){ if(line.houses.indexOf(el.getAttribute('data-house'))>=0) el.classList.add('on'); else el.classList.remove('on'); });
       prod_dailyRefreshTotals();
     }
     /* 外部（安装页）跳入「每日生产」后：
@@ -9426,6 +9580,8 @@ function _ovLoadChartLib(cb){
     function prod_dailyApplyHouseReq(lineNo, houseCode){
       lineNo = Math.max(1, parseInt(lineNo,10)||1);
       if(!PROD_PE_DRAFT){ return; }
+      /* [锁死] 外部快速录入必须处于编辑模式，否则只读视图没有输入框元素 */
+      if(!PROD_PE_EDIT_MODE){ PROD_PE_EDIT_MODE = true; prod_renderTab('E'); }
       /* ★ 关键：prod_dailyDraftFor 只为「已保存过」的日期建 lines[n]，
          今天尚未保存时 lines[n] 是 undefined —— 必须就地创建，否则整段逻辑直接失效。 */
       if(!PROD_PE_DRAFT.lines) PROD_PE_DRAFT.lines = {};
@@ -9495,8 +9651,12 @@ function _ovLoadChartLib(cb){
       return map;
     }
     function prod_lineAvailSpecs(line){
-      var map = prod_houseSpecMap(); var set={}; var arr=[];
-      (line.houses||[]).forEach(function(hh){ (map[hh]||[]).forEach(function(s){ if(!set[s]){ set[s]=1; arr.push(s); } }); });
+      /* ★ 必须与 prod_dailySpecHouses 同源（都基于 prod_slatsMatrix），否则「可选规格」与「实际渲染的猪舍输入框」会不一致，
+         出现「取消某猪舍胶囊后其输入框仍在」的乱象。prod_houseSpecMap 会忽略合并空猪舍行，这里改走 slatsMatrix 保持一致。 */
+      var mm = prod_slatsMatrix(); var set={}; var arr=[];
+      (line.houses||[]).forEach(function(hh){
+        for(var s in mm.specs){ if(!mm.specs.hasOwnProperty(s)) continue; var d=(mm.specs[s].houses && mm.specs[s].houses[hh])||0; if(d>0 && !set[s]){ set[s]=1; arr.push(s); } }
+      });
       arr.sort(function(a,b){ var na=parseFloat(a), nb=parseFloat(b); if(!isNaN(na)&&!isNaN(nb)&&na!==nb) return na-nb; return a<b?-1:1; });
       return arr;
     }
@@ -9555,6 +9715,20 @@ function _ovLoadChartLib(cb){
       var src = PROD_PE_DRAFT.lines[1] || {houses:[],qty:{}};
       if(!src.houses || !src.houses.length) return;
       var line = PROD_PE_DRAFT.lines[n] || (PROD_PE_DRAFT.lines[n]={houses:[],qty:{}});
+      /* ★ 锁定：目标线只要已有数据（选了猪舍、或已录入任何数量），就不允许被线1覆盖，
+         直接跳转到该线并聚焦其第一个输入框。这是为了防止历史产出数据被误清。 */
+      var hasData = (line.houses && line.houses.length) || Object.keys(line.qty||{}).length || (line.qtyDetail && Object.keys(line.qtyDetail).length);
+      if(hasData){
+        var cs=document.querySelectorAll('.pe-chip[data-line="'+n+'"]');
+        var card = (cs.length && cs[0].closest) ? cs[0].closest('.pe-card') : null;
+        if(card){
+          try{ card.scrollIntoView({block:'center'}); }catch(e){}
+          card.classList.add('pe-card-flash');
+          setTimeout(function(){ card.classList.remove('pe-card-flash'); }, 1200);
+        }
+        setTimeout(function(){ var inp=document.querySelector('#pe_specrows_'+n+' input.pe-q'); if(inp) inp.focus(); }, 0);
+        return;
+      }
       line.houses = src.houses.slice();
       line.qty = {};
       line.qtyDetail = {};
@@ -9645,7 +9819,9 @@ function _ovLoadChartLib(cb){
         var specHouses = prod_dailySpecHouses(line, s);
         var detail = prod_dailyEnsureQtyDetail(line, s);
         if(specHouses.length <= 1){
-          var h = specHouses[0] || (line.houses||[])[0] || '';
+          var h = specHouses[0] || '';
+          /* 没有任何已选猪舍对该规格有需求时，不渲染任何输入框（避免幽灵输入框） */
+          if(!h) return '';
           var singleDemand = (+sp.houses[h]||0);
           var singleProduced = (hsp[h] && hsp[h][s]) || 0;
           var singleRemain = singleDemand - singleProduced;
@@ -9779,6 +9955,8 @@ function _ovLoadChartLib(cb){
       prod_recomputeFinished(f);
       prod_save(f);
       PROD_PE_DRAFT = prod_dailyDraftFor(d);
+      /* [锁死] 保存后必须回到只读模式 */
+      PROD_PE_EDIT_MODE = false;  /* 保存后回到只读模式 */
       prod_renderTab('E');
       prod_toast(pt('toast_prod_saved'));
     }
@@ -9843,7 +10021,7 @@ function _ovLoadChartLib(cb){
       h += '<td><b>'+prod_fmtNum(grandTotal)+'</b></td><td></td></tr></tfoot></table></div>';
       return h;
     }
-    function prod_dateShort(d){ return ymdToDmy(d); }
+    function prod_dateShort(d){ return ymdToDmy(dmyToYmd(d)); }
     function prod_specHouseMap(){
       var rows = prod_slatsRows(); var map={};
       rows.forEach(function(r){
@@ -9865,6 +10043,8 @@ function _ovLoadChartLib(cb){
     function prod_editProductionRow(d){
       var key = prod_dmy(d);
       PROD_PE_DRAFT = prod_dailyDraftFor(key);
+      /* [锁死] 从历史记录点“编辑”必须强制进入编辑模式 */
+      PROD_PE_EDIT_MODE = true;  /* 从历史记录点编辑进入编辑模式 */
       var el=prod_el('pe_date'); if(el) el.value = key;
       prod_renderTab('E');
     }
@@ -10051,7 +10231,7 @@ function _ovLoadChartLib(cb){
           var hDemand = _sph[h] || 0;
           var hProd = (hsp[h] && hsp[h][s]) || 0;
           var hOut = 0; var rec = ho[h+'|'+s]; if(rec){ hOut = (+rec.out)||0; }
-          return { name:prod_phName(h), demand:hDemand, prod:hProd, need:Math.max(0,hDemand-hProd), comp:(hDemand>0?((hProd/hDemand)*100).toFixed(2):'0.00'), out:hOut, rate:(hProd>0?((hOut/hProd)*100).toFixed(2):'0.00'), bal:hProd-hOut };
+          return { h:h, name:prod_phName(h), demand:hDemand, prod:hProd, need:Math.max(0,hDemand-hProd), comp:(hDemand>0?((hProd/hDemand)*100).toFixed(2):'0.00'), out:hOut, rate:(hProd>0?((hOut/hProd)*100).toFixed(2):'0.00'), bal:hProd-hOut };
         });
         PROD_FIN_DATA[idx] = _houses;
         var isExp = !!PROD_FIN_EXPAND_SPECS[s];
@@ -10090,7 +10270,7 @@ function _ovLoadChartLib(cb){
     }
     /* 新表：生产库存及出库明细（按猪舍，直接展开；出库/待安装由出库记录自动生成，仅展示不可编辑；实际库存/实际出库数量自动算） */
     var PROD_HO_MAP = {}; var PROD_STOCKOUT_HIDEZERO = true; var PROD_STOCKOUT_DIRTY = false; var PROD_STOCKOUT_SORT = {dir:0};
-    var PROD_FIN_DATA = {}; var PROD_FIN_EXPAND_SPECS = {};
+    var PROD_FIN_DATA = {}; var PROD_FIN_EXPAND_SPECS = {}; var PROD_FIN_JUMP_SET = {};
     function prod_stockOutSection(f){
       var mm = prod_slatsMatrix(); var hsp = prod_houseSpecProduced(f);
       var specKeys = Object.keys(mm.specs).sort(prod_specSortCmp);
@@ -10150,7 +10330,9 @@ function _ovLoadChartLib(cb){
           var key = r.h+'|'+r.k;
           var rec = ho[key] || {out:0, ret:0};
           var disabled = (r.produced === 0);
-          var out = disabled ? 0 : ((+rec.out)||0);
+          var rawOut = disabled ? 0 : ((+rec.out)||0);
+          /* [锁死] 渲染层兜底：出库量绝不允许超过生产总量，避免实际库存为负 */
+          var out = Math.min(rawOut, r.produced);
           var actualStock = r.produced - out;
           var prodCompletionRate = r.demand > 0 ? Math.round(r.produced / r.demand * 100) : 0;
           var outRate = r.produced > 0 ? Math.round(out / r.produced * 100) : 0;
@@ -10161,7 +10343,7 @@ function _ovLoadChartLib(cb){
           var hStat = houseStat[r.h] || {total:0, done:0};
           var houseDone = (hStat.total>0 && hStat.done===hStat.total);
           var houseCell = isFirst ? '<td class="pe-col-no pe-group-end" rowspan="'+houseSize[r.h]+'">'+r.seq+'</td><td class="pe-group-end pe-house-cell'+(houseDone?' pe-house-done':'')+'"'+(houseDone?' style="color:#1E90FF;font-weight:700;text-shadow:0 0 1px rgba(0,0,0,.35)"':'')+' data-house-cell="'+prod_esc(r.h)+'" rowspan="'+houseSize[r.h]+'">'+prod_esc(prod_phName(r.h))+'</td>' : '';
-          var specCell = '<td>'+fmtSpec(r.k)+'</td>';
+          var specCell = '<td class="pe-stockout-spec" onclick="prod_stockoutSpecClick(\''+prod_esc(r.k)+'\',\''+prod_esc(r.h)+'\')">'+fmtSpec(r.k)+'</td>';
           var demandSumCell = isFirst ? '<td class="ho-calc pe-demand-sum pe-group-end" rowspan="'+houseSize[r.h]+'"><b>'+prod_fmtNum(houseDemandSum[r.h])+'</b></td>' : '';
           var outCell = disabled
             ? '<td class="ho-disabled">0</td>'
@@ -10221,7 +10403,7 @@ function _ovLoadChartLib(cb){
     /* 成品库存表：规格行展开/收起（直接操作 DOM，每次仅展开一个，默认收起） */
     function prod_finSubRowHtml(d, no){
       var zc = function(v){ return v===0 ? ' class="pe-zero-red"' : ''; };
-      return '<tr class="pe-fin-subrow">'
+      return '<tr class="pe-fin-subrow" data-house="'+prod_esc(d.h||'')+'">'
         + '<td class="pe-col-no pe-fin-sub-idx">'+(no||'')+'</td>'
         + '<td class="pe-fin-house">'+prod_esc(d.name)+'</td>'
         + '<td style="text-align:center">'+prod_fmtNum(d.demand)+'</td>'
@@ -10260,11 +10442,38 @@ function _ovLoadChartLib(cb){
       var tpl = document.createElement('template'); tpl.innerHTML = html;
       var ref = tr.nextSibling;
       while(tpl.content.firstChild){ tbody.insertBefore(tpl.content.firstChild, ref); }
+      prod_finApplyJumps();
+    }
+    /* 按 PROD_FIN_JUMP_SET（累积）为成品库存表已展开的子行重新标注高亮（淡黄）。
+       注意：展开子行是 pe-fin-row 的“相邻兄弟”而非子元素，必须用兄弟遍历关联规格。 */
+    function prod_finApplyJumps(){
+      var rows = document.querySelectorAll('.prod-table.pe-fin tr.pe-fin-row');
+      [].forEach.call(rows, function(finRow){
+        var spec = finRow.getAttribute('data-spec');
+        var nx = finRow.nextSibling;
+        while(nx && nx.nodeType===1 && nx.classList && nx.classList.contains('pe-fin-subrow')){
+          var h = nx.getAttribute('data-house');
+          if(spec!=null && h!=null && PROD_FIN_JUMP_SET[spec+'|'+h]){ nx.classList.add('pe-fin-sub-jump'); }
+          else { nx.classList.remove('pe-fin-sub-jump'); }
+          nx = nx.nextSibling;
+        }
+      });
     }
     /* 事件委托兜底：内联 onclick 与委托二选一生效（e.__finHandled 防重复） */
     function prod_finTableClick(e){
       var tr = (e.target && e.target.closest) ? e.target.closest('tr.pe-fin-row') : null;
       if(tr) prod_finClick(e, tr);
+    }
+    /* 点击库存/出库明细表中的规格：自动展开下方成品库存表的同规格明细，并把对应猪舍子行加入累积高亮（淡黄），滚动定位 */
+    function prod_stockoutSpecClick(spec, house){
+      if(spec==null || spec==='') return;
+      var tr = document.querySelector('.prod-table.pe-fin tr.pe-fin-row[data-spec="'+prod_esc(spec)+'"]');
+      if(!tr) return;
+      if(!tr.classList.contains('pe-fin-expanded')){ prod_finClick(null, tr); }
+      /* 累积高亮：把 (规格|猪舍) 记入集合，应用时不清除其它已高亮行，可累积多个 */
+      if(house != null && house !== ''){ PROD_FIN_JUMP_SET[spec+'|'+house] = 1; }
+      prod_finApplyJumps();
+      try{ tr.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
     }
     /* 外部（安装页）跳入「入库与出库」后：滚动并高亮指定猪舍在库存/出库明细里的行 */
     function prod_stockoutJumpHouse(house){
@@ -10544,12 +10753,12 @@ function _ovLoadChartLib(cb){
       if(!destBuildings || !destBuildings.length){
         var label=prod_phName(destHouse);
         var tip=prod_outBldgTipHtml(destHouse, '1', label, currentSpec, hideBtns);
-        return '<span class="prod-out-dest" data-jump-house="'+prod_esc(destHouse)+'" data-jump-bldg="1" data-tip-html="'+prod_esc(tip)+'"'+noBtnAttr+' onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_bldgTipHideSoon()" onclick="prod_outJumpToAreaDist(event,this)">'+prod_esc(label)+'</span>';
+        return '<span class="prod-out-dest" data-jump-house="'+prod_esc(destHouse)+'" data-jump-bldg="1" data-tip-spec="'+prod_esc(currentSpec||'')+'" data-tip-html="'+prod_esc(tip)+'"'+noBtnAttr+' onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_bldgTipHideSoon()" onclick="prod_outJumpToAreaDist(event,this)">'+prod_esc(label)+'</span>';
       }
       return destBuildings.map(function(b){
-        var label=prod_phName(destHouse)+'#'+b;
-        var tip=prod_outBldgTipHtml(destHouse, b, label, currentSpec, hideBtns);
-        return '<span class="prod-out-dest" data-jump-house="'+prod_esc(destHouse)+'" data-jump-bldg="'+prod_esc(b)+'" data-tip-html="'+prod_esc(tip)+'"'+noBtnAttr+' onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_bldgTipHideSoon()" onclick="prod_outJumpToAreaDist(event,this)">'+prod_esc(label)+'</span>';
+      var label=prod_phName(destHouse)+'#'+b;
+      var tip=prod_outBldgTipHtml(destHouse, b, label, currentSpec, hideBtns);
+      return '<span class="prod-out-dest" data-jump-house="'+prod_esc(destHouse)+'" data-jump-bldg="'+prod_esc(b)+'" data-tip-spec="'+prod_esc(currentSpec||'')+'" data-tip-html="'+prod_esc(tip)+'"'+noBtnAttr+' onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_bldgTipHideSoon()" onclick="prod_outJumpToAreaDist(event,this)">'+prod_esc(label)+'</span>';
       }).join('<span style="color:#999">, </span>');
     }
     /* 点击表格分析「出库后移动至猪舍及猪舍编号」→ 直接打开区域分布弹窗，并用黑圈高亮对应房舍卡片 */
@@ -10885,7 +11094,9 @@ function _ovLoadChartLib(cb){
       /* 兼容旧数据：曾直接在明细表里填过 out，但无 outDaily，迁移成一条记录避免被清空 */
       if(isOut && !rec.outDaily && (+rec.out||0)){
         var md = dmyToYmd(rec.outDate) || prod_today();
-        rec.outDaily = {}; rec.outDaily[md] = { date:md, lines:[{seq:1, qty:(+rec.out||0), dest:''}], qty:(+rec.out||0), destHouse:map.h, destBuildings:[] };
+        /* [锁死] 旧数据迁移时也必须夹紧到实际产量，不能把超产量的脏 out 迁进来 */
+        var migQty = Math.min((+rec.out)||0, map.produced||0);
+        rec.outDaily = {}; rec.outDaily[md] = { date:md, lines:[{seq:1, qty:migQty, dest:''}], qty:migQty, destHouse:map.h, destBuildings:[] };
         f.houseOut[map.key]=rec; prod_save(f);
       }
       var defDate = isOut ? ((rec.outDaily && Object.keys(rec.outDaily)[0]) || rec.outDate || ymdToDmy(prod_today())) : (rec.retDate || ymdToDmy(prod_today()));
@@ -11001,13 +11212,18 @@ function _ovLoadChartLib(cb){
           var dest=L.dest||'';
           lines.push({seq:L.seq, qty:q, dest:dest}); total+=q;
         });
-        // [锁死] 先校验，超量时不保存、不弹提示、直接回到编辑框让用户修正
+        // [锁死] 先校验：该猪舍×规格所有日期累计出库量不得超过当前生产总量。
+        // 注意排除当前日期（它会被本次保存覆盖），避免编辑同一条日期时把旧值重复计入。
         var _opMap = PROD_HO_MAP[PROD_OP_IDX];
-        if(_opMap && total > (_opMap.produced||0)){
-          PROD_OP_EDIT_IDX = PROD_OP_LINES.length - 1;
-          var tb=document.getElementById('prodOpLines');
-          if(tb){ tb.innerHTML=prod_opRenderLinesHtml(); prod_opFocusQty(); }
-          return;
+        if(_opMap){
+          var sumOthers=0;
+          if(rec.outDaily){ for(var d in rec.outDaily){ if(!rec.outDaily.hasOwnProperty(d)) continue; if(d===dateYmd) continue; sumOthers+=(rec.outDaily[d].qty||0); } }
+          if(sumOthers + total > (_opMap.produced||0)){
+            PROD_OP_EDIT_IDX = PROD_OP_LINES.length - 1;
+            var tb=document.getElementById('prodOpLines');
+            if(tb){ tb.innerHTML=prod_opRenderLinesHtml(); prod_opFocusQty(); }
+            return;
+          }
         }
         var buildings=lines.filter(function(L){return L.dest;}).map(function(L){return L.dest;});
         rec.outDaily=rec.outDaily||{};
@@ -14865,6 +15081,14 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-zone-team-title{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#37474f;margin-bottom:6px;}
       .inst-zone-team-total{font-weight:400;color:#546e7a;white-space:nowrap;}
       .inst-zone-team-total b{color:#263238;font-weight:600;}
+      /* [锁死] 安装 Tab C 只读卡片样式：紧凑展示小组/猪舍/人工/安装量，不得出现输入框 */
+      .inst-zone-card-readonly .inst-zone-team-count{margin-left:auto;font-size:12px;font-weight:400;color:#546e7a;}
+      .inst-zone-card-readonly .inst-zone-team-readonly{margin-top:10px;padding:10px 0;border-top:1px dashed #e8edf1;}
+      .inst-zone-card-readonly .inst-zone-team-readonly:first-of-type{border-top:none;margin-top:8px;}
+      .inst-zone-card-readonly .inst-zone-team-readonly-alt{background:#fff0f3;border-radius:8px;padding:8px 10px;}
+      .inst-zone-card-readonly .inst-zone-team-ro-title{font-size:12px;font-weight:600;color:#37474f;margin-bottom:4px;}
+      .inst-zone-card-readonly .inst-zone-team-ro-roles,
+      .inst-zone-card-readonly .inst-zone-team-ro-install{font-size:12px;color:#546e7a;line-height:1.5;word-break:break-all;}
       .inst-zone-team-roles{display:flex;flex-wrap:wrap;gap:8px;}
       .inst-zone-team-role{display:flex;align-items:center;gap:6px;background:#fafcff;border:1px solid #eef1f4;border-radius:6px;padding:5px 8px;font-size:12px;}
       .inst-zone-team-role label{flex:1 1 auto;color:#455a64;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -46041,7 +46265,7 @@ var houses=[];   // {id,zone,name,panels,done,days,team,start,end,lockStart,lock
 var zones=[];    // {name,teams,start}
 var cfg={};
 var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'serial',view:'house',
-  color:'team',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},
+  color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},
   visible:['zone','name','panels','done','prog','days','team','start','end','today'],
   cfgOpen:false, cardsCollapsed:false,
   showWeekend:true,
@@ -46077,6 +46301,9 @@ function loadCfg(){
   if(raw){ try{ var o=JSON.parse(raw); for(var k2 in o) if(o[k2]!==undefined&&o[k2]!==null) c[k2]=o[k2]; }catch(e){} }
   /* 迁移：旧默认按分区 → 统一改为按小组着色（2026-09-30 小组配色蓝/红/深黄/紫） */
   if(c._ver===undefined||c._ver<2){ c.color='team'; c._ver=2; }
+  /* 迁移：按用户要求，1~4 区颜色与甘特图同步，默认恢复为按分区着色。
+     之前列宽迁移已把 _ver 升到 3，所以这里用 _ver<4 确保所有老配置都切回按分区 */
+  if(c._ver<4){ c.color='zone'; c._ver=4; }
   if(!c.visible||!c.visible.length) c.visible=DEF.visible.slice();
   /* 迁移：新增 today 列，旧默认（无 today）自动追加；自定义可见列不强制 */
   if(c.visible && c.visible.length===9 && c.visible.indexOf('today')<0 && c.visible.indexOf('end')>=0){
@@ -46085,7 +46312,7 @@ function loadCfg(){
   /* 房舍列历史宽度异常过大时收敛到正常范围 */
   if(c.colW && c.colW.name && c.colW.name>100) c.colW.name=92;
   /* 迁移：列宽重置为更紧凑默认值，保证左侧表格所有列可见 */
-  if(c._ver===undefined||c._ver<3){ c._ver=3; c.colW={}; c.tableWidth=470; }
+  if(c._ver===undefined||c._ver<4){ c._ver=4; c.colW={}; c.tableWidth=470; }
   if(!c.start) c.start=(typeof GANTT_DEFAULT_START!=='undefined' && GANTT_DEFAULT_START) ? GANTT_DEFAULT_START : today();
   cfg=c;
 }
@@ -46375,7 +46602,7 @@ function rowH(){ return cfg.barHeight+10; }
  * ======================================================================= */
 function barColorOf(r){
   if(r&&(r.kind==='allgroup'||r.bothTeams||(r.house&&r.house.bothTeams))) return ALL_C;   /* 全部组 */
-  if((r.kind==='house'||r.kind==='team')&&r.team!=null) return teamColor(r.zone,r.team);
+  if((r.kind==='house'||r.kind==='team')&&r.team!=null && cfg.color!=='zone') return teamColor(r.zone,r.team);
   return zoneColor(r.zoneKey || r.zone);
 }
 function renderChart(){
@@ -46435,7 +46662,9 @@ function renderChart(){
       if(!r||!t||!r.end||!t.start) return;
       /* 线的颜色跟随源组别的颜色（全部组=棕，其余=各组色） */
       var col=ALL_C;
-      if(r.kind==='team') col=teamColor(r.zone, r.team);
+      if(cfg.color==='zone'){
+        col=zoneColor(r.zoneKey || r.zone);
+      }else if(r.kind==='team') col=teamColor(r.zone, r.team);
       else if(r.kind==='allgroup') col=ALL_C;
       else if(r.kind==='house') col=(r.house&&r.house.bothTeams)?ALL_C:teamColor(r.zone, r.house.team);
       /* 分道布线：全部组 / 第2组 / 第1组 各走不同竖向通道，线的竖向段互不重叠、不交叉 */
@@ -46898,7 +47127,7 @@ function renderLoad(){
       var work=0; hs.forEach(function(x){ work+=x.days; });
       var span=hs.length?workDaysBetween(hs[0].start,hs[hs.length-1].end):0;
       var util=span?Math.round(work/span*100):0;
-      var col=teamColor(z.name,t);
+      var col=zoneColor(z.key || z.name);
       h+='<div class="load"><div class="lh"><span class="ln">'+esc(z.name)+' · '+teamLabel(t)+'</span>'
         +'<span class="lv">'+fmtNum(hs.length)+it('g_load_dong')+' · '+fmtNum(work)+it('g_load_workday')+' · '+it('g_load_util')+' <b>'+util+'%</b></span></div>'
         +'<div class="lbar">';
@@ -46940,9 +47169,8 @@ function renderLoad(){
       +warn.filter(Boolean).slice(0,8).map(function(x){ return '<li>'+esc(x)+'</li>'; }).join('')+'</ul></div>' : '';
   /* 图例 */
   var lg=document.getElementById('legend');
-  lg.innerHTML=cfg.color==='zone'
-    ? zones.map(function(z){ return '<span><i style="background:'+zoneColor(z.name)+'"></i>'+esc(z.name)+'</span>'; }).join('')
-    : '<span>'+it('g_legend_team')+'</span>';
+  /* 小组负载视图统一按分区着色，图例直接列出各区颜色 */
+  lg.innerHTML=zones.map(function(z){ return '<span><i style="background:'+zoneColor(z.key || z.name)+'"></i>'+esc(z.name)+'</span>'; }).join('');
   lg.innerHTML+='<span><i style="background:#eceff1"></i>'+it('g_legend_idle')+'</span>'
     +'<span><i style="background:#cbd5e0"></i>'+it('g_legend_base')+'</span>'
     +'<span><i style="background:#ffa726;transform:rotate(45deg)"></i>'+it('g_legend_milestone')+'</span>'
@@ -47504,7 +47732,12 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   var INST_CUR = null, INST_ACTIVE_TAB = 'A', INST_TABC_SELDATE = '';
   var INST_CHARTS = [];
   var INST_ZONE_MAX = 12;
-  var INST_ZONE_COLORS = ['#E53935','#FB8C00','#B8860B','#43A047','#1E88E5','#8E24AA','#00897B','#6D4C41','#3949AB','#D81B60','#5E35B1','#00ACC1'];
+  /* [锁死] 安装 Tab C 只读/编辑模式（2026-10-06）：true=编辑（显示输入框），false=只读（已保存日期默认折叠）。 */
+  var INST_TAB_C_EDIT_MODE = false;
+  var INST_TAB_C_COLLAPSE_BOUND = false;
+  var INST_LABOR_SORT = { col: null, dir: 1 }; /* 安装用工表排序状态：col='zone'/'house', dir=1升序/-1降序/0原始 */
+  var INST_TAB_C_EDIT_LAST_ENTER = 0;
+  var INST_ZONE_COLORS = ['#26a69a','#ffa726','#ef5350','#66bb6a','#1E88E5','#8E24AA','#00897B','#6D4C41','#3949AB','#D81B60','#5E35B1','#00ACC1'];
   var INST_GANTT = null, INST_GANTT_SEL = null;
   var INST_SEL = []; /* 当前选中的栋 key 列表（house#idx），仅界面态，不持久化 */
   var INST_GANTT_COLS = [
@@ -47612,6 +47845,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_lbl_install_start_date:'安装日期', inst_lbl_prod_to_install_days:'开始生产日至开始安装日的天数', inst_lbl_prod_during_install:'期间所生产数量', inst_lbl_install_rate_per_team:'安装数量/组/天', inst_lbl_install_teams:'安装小组', inst_lbl_total_install_rate:'安装数量/全部安装小组/天', inst_lbl_install_days_for_prod:'完成期间产量的安装天数', inst_lbl_install_end_date:'预计安装结束日', inst_lbl_final_accept:'最后验收日期（竣工日+10天）', inst_lbl_gantt:'甘特图',
       inst_save:'保存', inst_saved:'已保存', inst_progress:'安装进度',
       inst_sec_labor:'安装小组及人工', inst_btn_save_snap:'保存当日', inst_btn_inbound_install:'先入库-再安装', inst_lbl_no:'序号', inst_lbl_item:'事项', inst_lbl_date:'日期', inst_lbl_scale:'刻度', inst_opt_month:'月', inst_opt_week:'周', inst_opt_day:'天', inst_lbl_accept_period:'验收期', inst_lbl_holiday:'春节', inst_lbl_recorder:'填表人<br>负责人', inst_lbl_today_zones:'今日安装区域', inst_zone_placeholder:'选择区域', inst_zone_remove:'删除区域',
+      inst_kpi_total_demand:'总需求数量', inst_kpi_total_demand_unit:'片', inst_kpi_produced:'累计生产入库', inst_kpi_produce_rate:'生产完成率', inst_kpi_need_produce:'仍需生产数量', inst_kpi_shipped:'累计出库', inst_kpi_ship_rate:'出库率', inst_kpi_not_shipped:'尚未出库数量', inst_kpi_installed:'已经安装', inst_kpi_not_installed:'尚未安装', inst_kpi_install_rate:'安装比率',
       inst_man:'人数', inst_hours:'工时', inst_sec_weather:'天气', inst_sec_labor_detail:'安装数量&人工明细',
       inst_copy_over_title:'复制后数量超过需求', inst_copy_over_msg:'复制后该规格的水泥板安装数量超过了实际需要的数量 {n} 片，请修改！', inst_copy_over_actual:'按实际需求修改', inst_copy_over_mine:'按我的想法修改', inst_copy_before_start:'复制日期不能早于安装开始日期',
       inst_lbl_total_man:'总人力', inst_lbl_total_hours:'总工时',
@@ -47625,7 +47859,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_lbl_ship:'发货', inst_lbl_install:'安装',
       inst_status_not_install:'未安装', inst_status_installing:'安装中', inst_status_installed:'安装完成', inst_status_accepted:'验收完成',
       inst_lbl_spec:'规格', inst_bldg_gap:'缺口', inst_tip_house_install:'本猪舍安装', inst_tip_house_ship:'本猪舍发货', inst_tip_proj_prod:'整个项目生产', inst_tip_proj_ship:'整个项目发货', inst_tip_proj_install:'整个项目安装', inst_bldg_produced_short:'已生产', inst_btn_quick_prod:'快速录入该舍生产数据', inst_btn_quick_out:'快速录入出库数据', inst_btn_quick_install:'快速录入安装数据', inst_quick_install_no_zone:'该栋尚未归入区域，请先在「安装规划」里归入区域', inst_lbl_rec_prefix:'录入：',
-      inst_lbl_installed:'已安装', inst_lbl_uninstalled:'未安装',
+      inst_lbl_installed:'已安装', inst_lbl_uninstalled:'未安装', inst_lbl_ship_all_done:'发货全部完成', inst_lbl_prod_all_done:'生产全部完成', inst_lbl_install_all_done:'安装全部完成',
       inst_lbl_total_short:'总计', inst_lbl_shipped:'发货', inst_lbl_unshipped:'未发', inst_lbl_install_progress:'安装进度', inst_lbl_ship_ratio:'发货比例', inst_lbl_install_done_ratio:'安装完成比例',
       inst_lbl_house_demand:'本猪舍需求', inst_lbl_bldg_produced:'本猪舍已生产', inst_lbl_unproduced:'未生产', inst_lbl_prod_done_rate:'生产完成率', inst_lbl_proj_prod_demand:'总项目生产片/总需求', inst_lbl_proj_prod_rate:'总生产完成率', inst_lbl_bldg_installed2:'本猪舍已安装', inst_lbl_type_installed:'该类型猪舍已安装', inst_lbl_type_install_rate:'整体安装完成率',
       inst_zone_bldg:'几栋', inst_zone_total_pcs:'总水泥板', inst_zone_done:'已安装', inst_zone_remain:'剩余', inst_zone_progress:'进度', inst_zone_start:'开始安装', inst_zone_plan_end:'预计结束', inst_zone_likely_end:'预计实际结束', inst_zone_likely_end_tmpl:'按当前效率可能在 {0} 结束', inst_zone_completed:'已完成', inst_lbl_zone_teams:'几个小组在安装', inst_lbl_team_record:'区域{0}-小组{1}-人员&安装数量记录', inst_lbl_team_total:'总计人员', inst_unit_person:'名', inst_lbl_team_install_record:'区域{0}-小组{1}-安装数量记录', inst_lbl_today_install:'今天安装', inst_lbl_today_install_unit:'片',
@@ -47720,6 +47954,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_lbl_install_start_date:'Installation Date', inst_lbl_prod_to_install_days:'Days: production start → installation start', inst_lbl_prod_during_install:'Qty produced in period', inst_lbl_install_rate_per_team:'Pcs/day/team', inst_lbl_install_teams:'Installation teams', inst_lbl_total_install_rate:'Pcs/day all teams', inst_lbl_install_days_for_prod:'Days to install period output', inst_lbl_install_end_date:'Est. installation finish', inst_lbl_final_accept:'Final acceptance date (=finish+10d)', inst_lbl_gantt:'Gantt Chart',
       inst_save:'Save', inst_saved:'Saved', inst_progress:'Progress',
       inst_sec_labor:'Teams & Labor', inst_btn_save_snap:'Save Day', inst_btn_inbound_install:'Inbound → Install', inst_lbl_no:'No.', inst_lbl_item:'Item', inst_lbl_date:'Date', inst_lbl_scale:'Scale', inst_opt_month:'Month', inst_opt_week:'Week', inst_opt_day:'Day', inst_lbl_accept_period:'Acceptance', inst_lbl_holiday:'Tet Holiday', inst_lbl_recorder:'Recorder<br>Leader', inst_lbl_today_zones:"Today's Installation Zones", inst_zone_placeholder:'Select zone', inst_zone_remove:'Remove zone',
+      inst_kpi_total_demand:'Total Demand', inst_kpi_total_demand_unit:'pcs', inst_kpi_produced:'Cumulatively Produced', inst_kpi_produce_rate:'Production Completion Rate', inst_kpi_need_produce:'Still Need to Produce', inst_kpi_shipped:'Cumulatively Shipped', inst_kpi_ship_rate:'Shipment Rate', inst_kpi_not_shipped:'Not Yet Shipped', inst_kpi_installed:'Already Installed', inst_kpi_not_installed:'Not Yet Installed', inst_kpi_install_rate:'Install Ratio',
       inst_man:'Headcount', inst_hours:'Hours', inst_sec_weather:'Weather', inst_sec_labor_detail:'Install Qty & Labor Detail',
       inst_copy_over_title:'Quantity exceeds demand after copy', inst_copy_over_msg:'After copying, this slab spec installed quantity exceeds the actual required quantity by {n} pcs. Please modify!', inst_copy_over_actual:'Adjust to actual demand', inst_copy_over_mine:'Modify as I want', inst_copy_before_start:'Copy date cannot be earlier than the installation start date',
       inst_lbl_total_man:'Total Man', inst_lbl_total_hours:'Total Hours',
@@ -47733,7 +47968,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_lbl_ship:'Ship', inst_lbl_install:'Install',
       inst_status_not_install:'Not installed', inst_status_installing:'Installing', inst_status_installed:'Installed', inst_status_accepted:'Accepted',
       inst_lbl_spec:'Spec', inst_bldg_gap:'Gap', inst_tip_house_install:'House Installation', inst_tip_house_ship:'House Shipment', inst_tip_proj_prod:'Project Production', inst_tip_proj_ship:'Project Shipment', inst_tip_proj_install:'Project Installation', inst_bldg_produced_short:'Produced', inst_btn_quick_prod:'Quick production entry (this house)', inst_btn_quick_out:'Quick outbound entry', inst_btn_quick_install:'Quick installation entry', inst_quick_install_no_zone:'This building is not assigned to a zone yet. Please assign it in "Installation Plan" first.', inst_lbl_rec_prefix:'Enter: ',
-      inst_lbl_installed:'Installed', inst_lbl_uninstalled:'Not installed',
+      inst_lbl_installed:'Installed', inst_lbl_uninstalled:'Not installed', inst_lbl_ship_all_done:'All shipped', inst_lbl_prod_all_done:'All produced', inst_lbl_install_all_done:'All installed',
       inst_lbl_total_short:'Total', inst_lbl_shipped:'Shipped', inst_lbl_unshipped:'Unshipped', inst_lbl_install_progress:'Install progress', inst_lbl_ship_ratio:'Ship ratio', inst_lbl_install_done_ratio:'Install completion ratio',
       inst_lbl_house_demand:'House Demand', inst_lbl_bldg_produced:'House Produced', inst_lbl_unproduced:'Unproduced', inst_lbl_prod_done_rate:'Production Completion', inst_lbl_proj_prod_demand:'Project Produced / Demand', inst_lbl_proj_prod_rate:'Total Production Completion', inst_lbl_bldg_installed2:'House Installed', inst_lbl_type_installed:'House Type Installed', inst_lbl_type_install_rate:'Overall Install Completion',
       inst_zone_bldg:'Buildings', inst_zone_total_pcs:'Total panels', inst_zone_done:'Installed', inst_zone_remain:'Remaining', inst_zone_progress:'Progress', inst_zone_start:'Start install', inst_zone_plan_end:'Est. finish', inst_zone_likely_end:'Likely finish', inst_zone_likely_end_tmpl:'Likely to finish by {0} at current pace', inst_zone_completed:'Completed', inst_lbl_zone_teams:'Installation Teams', inst_lbl_team_record:'Zone {0} - Team {1} - Personnel & Installation Qty', inst_lbl_team_total:'Team Total', inst_unit_person:'', inst_lbl_team_install_record:'Zone {0} - Team {1} - Installation Qty', inst_lbl_today_install:'Today Install', inst_lbl_today_install_unit:'pcs',
@@ -47827,7 +48062,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_lbl_prod_line:'Dây chuyền SX', inst_lbl_shift:'Ca làm việc', inst_lbl_rate_per_line:'Sản lượng TB/ngày/dây', inst_lbl_total_capacity:'Năng suất mỗi ngày toàn bộ dây', inst_lbl_prod_days:'Số ngày hoàn thành sản xuất', inst_lbl_prod_end:'Ngày dự kiến hoàn thành SX',
       inst_lbl_install_start_date:'Ngày lắp đặt', inst_lbl_prod_to_install_days:'Số ngày: bắt đầu SX → bắt đầu lắp', inst_lbl_prod_during_install:'Sản lượng SX trong kỳ', inst_lbl_install_rate_per_team:'Tấm/ngày/đội', inst_lbl_install_teams:'Đội lắp đặt', inst_lbl_total_install_rate:'Tấm/ngày tất cả đội', inst_lbl_install_days_for_prod:'Số ngày lắp sản lượng kỳ', inst_lbl_install_end_date:'Ngày dự kiến hoàn thành lắp', inst_lbl_final_accept:'Ngày nghiệm thu cuối cùng (=hoàn thành+10 ngày)', inst_lbl_gantt:'Sơ đồ Gantt',
       inst_save:'Lưu', inst_saved:'Đã lưu', inst_progress:'Tiến độ',
-      inst_sec_labor:'Đội & Nhân công', inst_btn_save_snap:'Lưu ngày', inst_btn_inbound_install:'Nhập kho → Lắp', inst_lbl_no:'STT', inst_lbl_item:'Hạng mục', inst_lbl_date:'Ngày', inst_lbl_scale:'Thang', inst_opt_month:'Tháng', inst_opt_week:'Tuần', inst_opt_day:'Ngày', inst_lbl_accept_period:'Nghiệm thu', inst_lbl_holiday:'Tết', inst_lbl_recorder:'Người ghi<br>Chỉ huy', inst_lbl_today_zones:'Khu vực lắp đặt hôm nay', inst_zone_placeholder:'Chọn khu', inst_zone_remove:'Xóa khu',
+      inst_sec_labor:'Đội & Nhân công', inst_btn_save_snap:'Lưu ngày', inst_btn_inbound_install:'Nhập kho → Lắp', inst_lbl_no:'STT', inst_lbl_item:'Hạng mục', inst_lbl_date:'Ngày', inst_lbl_scale:'Thang', inst_opt_month:'Tháng', inst_opt_week:'Tuần', inst_opt_day:'Ngày', inst_lbl_accept_period:'Nghiệm thu', inst_lbl_holiday:'Tết', inst_lbl_recorder:'Người ghi<br>Chỉ huy', inst_lbl_today_zones:'Khu vực lắp đặt hôm nay', inst_zone_placeholder:'Chọn khu',       inst_zone_remove:'Xóa khu',
+      inst_kpi_total_demand:'Tổng nhu cầu', inst_kpi_total_demand_unit:'tấm', inst_kpi_produced:'Tổng đã sản xuất', inst_kpi_produce_rate:'Tỷ lệ hoàn thành SX', inst_kpi_need_produce:'Số lượng cần sản xuất', inst_kpi_shipped:'Tổng đã xuất kho', inst_kpi_ship_rate:'Tỷ lệ xuất kho', inst_kpi_not_shipped:'Số lượng chưa xuất', inst_kpi_installed:'Đã lắp đặt', inst_kpi_not_installed:'Chưa lắp đặt', inst_kpi_install_rate:'Tỷ lệ lắp đặt',
       inst_man:'Số người', inst_hours:'Giờ', inst_sec_weather:'Thời tiết', inst_sec_labor_detail:'Số lượng lắp & Chi tiết nhân công',
       inst_copy_over_title:'Số lượng vượt nhu cầu sau khi sao chép', inst_copy_over_msg:'Sau khi sao chép, số lượng tấm bê tông đã lắp của quy cách này vượt quá nhu cầu thực tế {n} tấm, vui lòng sửa!', inst_copy_over_actual:'Sửa theo nhu cầu thực tế', inst_copy_over_mine:'Sửa theo ý tôi', inst_copy_before_start:'Ngày sao chép không được sớm hơn ngày bắt đầu lắp đặt',
       inst_lbl_total_man:'Tổng nhân', inst_lbl_total_hours:'Tổng giờ',
@@ -47841,7 +48077,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_lbl_ship:'Gửi', inst_lbl_install:'Lắp',
       inst_status_not_install:'Chưa lắp', inst_status_installing:'Đang lắp', inst_status_installed:'Đã lắp', inst_status_accepted:'Đã nghiệm thu',
       inst_lbl_spec:'Quy cách', inst_bldg_gap:'Thiếu', inst_tip_house_install:'Lắp chuồng này', inst_tip_house_ship:'Gửi chuồng này', inst_tip_proj_prod:'SX toàn dự án', inst_tip_proj_ship:'Gửi toàn dự án', inst_tip_proj_install:'Lắp toàn dự án', inst_bldg_produced_short:'Đã SX', inst_btn_quick_prod:'Nhập nhanh sản xuất chuồng này', inst_btn_quick_out:'Nhập nhanh xuất kho', inst_btn_quick_install:'Nhập nhanh lắp đặt', inst_quick_install_no_zone:'Tòa này chưa được gán khu vực, vui lòng gán trong "Quy hoạch lắp đặt" trước.', inst_lbl_rec_prefix:'Nhập: ',
-      inst_lbl_installed:'Đã lắp', inst_lbl_uninstalled:'Chưa lắp',
+      inst_lbl_installed:'Đã lắp', inst_lbl_uninstalled:'Chưa lắp', inst_lbl_ship_all_done:'Đã giao xong', inst_lbl_prod_all_done:'Đã sản xuất xong', inst_lbl_install_all_done:'Đã lắp xong',
       inst_lbl_total_short:'Tổng', inst_lbl_shipped:'Đã giao', inst_lbl_unshipped:'Chưa giao', inst_lbl_install_progress:'Tiến độ lắp đặt', inst_lbl_ship_ratio:'Tỷ lệ giao', inst_lbl_install_done_ratio:'Tỷ lệ hoàn thành lắp đặt',
       inst_lbl_house_demand:'Nhu cầu chuồng', inst_lbl_bldg_produced:'Chuồng đã sản xuất', inst_lbl_unproduced:'Chưa sản xuất', inst_lbl_prod_done_rate:'Tỷ lệ sản xuất', inst_lbl_proj_prod_demand:'Sản xuất dự án / Tổng nhu cầu', inst_lbl_proj_prod_rate:'Tỷ lệ sản xuất tổng', inst_lbl_bldg_installed2:'Chuồng đã lắp', inst_lbl_type_installed:'Loại chuồng đã lắp', inst_lbl_type_install_rate:'Tỷ lệ lắp chung',
       inst_zone_bldg:'Số chuồng', inst_zone_total_pcs:'Tổng tấm', inst_zone_done:'Đã lắp', inst_zone_remain:'Còn lại', inst_zone_progress:'Tiến độ', inst_zone_start:'Bắt đầu lắp', inst_zone_plan_end:'Dự kiến xong', inst_zone_likely_end:'Có thể xong', inst_zone_likely_end_tmpl:'Với hiệu suất hiện tại có thể xong vào {0}', inst_zone_completed:'Hoàn thành', inst_lbl_zone_teams:'Số đội lắp đặt', inst_lbl_team_record:'Khu {0} - Đội {1} - Nhân sự & Số lượng lắp đặt', inst_lbl_team_total:'Tổng nhân sự', inst_unit_person:' ngườii', inst_lbl_team_install_record:'Khu {0} - Đội {1} - Số lượng lắp đặt', inst_lbl_today_install:'Lắp hôm nay', inst_lbl_today_install_unit:'tấm',
@@ -47851,6 +48087,10 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_gantt_summary_prod_to_accept:'Từ ngày bắt đầu sản xuất chính thức đến khi nghiệm thu toàn bộ kết thúc: {months} tháng, {days} ngày'
     }
   };
+  /* [锁死] 编辑态“双击空白处收起”的提示文案（三语），仅在编辑模式展示 */
+  INST_I18N.zh.inst_dblclick_hint='提示：双击空白处可收起录入框';
+  INST_I18N.en.inst_dblclick_hint='Tip: double-click blank area to collapse the entry form';
+  INST_I18N.vi.inst_dblclick_hint='Mẹo: nhấn đúp vùng trống để thu gọn ô nhập';
 
   function it(k){
     var lang = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
@@ -48693,8 +48933,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   }
   window.inst_bldgTipDragStart = inst_bldgTipDragStart;
   function inst_showBldgTip(el){
-    var key = '';
-    try{ var tg0 = inst_tipTarget(el); key = tg0 ? (tg0.code + '#' + tg0.idx) : ''; }catch(e){ key = ''; }
+    var tg0 = null;
+    try{ tg0 = inst_tipTarget(el); }catch(e){}
+    var key = tg0 ? (tg0.code + '#' + tg0.idx) : '';
     var html = inst_bldgTipHtmlLive(el);
     if(!html) html = el.getAttribute('data-tip-html');   /* 兜底：用渲染时烘焙的内容 */
     if(!html) return;
@@ -48713,6 +48954,19 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     INST_TIP_HOVER = false;
     if(INST_TIP_TIMER){ clearTimeout(INST_TIP_TIMER); INST_TIP_TIMER = null; }
     tip.innerHTML = html; tip.style.display = 'block';
+    /* 若触发元素携带规格，信息框出现后自动高亮对应规格（黄色），且不强制保持信息框显示 */
+    if(tg0 && tg0.spec){
+      try{
+        var autoSpec = String(tg0.spec);
+        var wantN = inst_specKeyNorm(autoSpec);
+        var nodes = tip.querySelectorAll('[data-tipspec]');
+        [].forEach.call(nodes, function(nd){
+          var v = nd.getAttribute('data-tipspec') || '';
+          if(v === autoSpec || inst_specKeyNorm(v) === wantN){ nd.classList.add('inst-bldg-tip-hl'); }
+          else { nd.classList.remove('inst-bldg-tip-hl'); }
+        });
+      }catch(e){}
+    }
     if(INST_TIP_POS){                                /* 已拖动过：保持用户摆放的位置 */
       tip.style.left = INST_TIP_POS.left + 'px'; tip.style.top = INST_TIP_POS.top + 'px';
       return;
@@ -49396,7 +49650,16 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
    *   6) 选项互斥（已选区域在其余框中禁用）；
    *   7) 渲染后强制回写 select.value，防止点 + 后已选区域被重置。
    * ============================================================ */
-  function inst_workerZones(w){ return (w && w.zones && w.zones.length) ? w.zones.slice() : ['']; }
+  function inst_workerZones(w){
+    if(w && w.zones && w.zones.length) return w.zones.slice();
+    /* [锁死] 兜底：若 zones 缺失但 zoneTeamWorkers 已有数据（旧数据/未触发选区），
+       用其键推导区域，避免区域卡片与输入框消失、保存时把人工记录清零。 */
+    if(w && w.zoneTeamWorkers){
+      var ks = Object.keys(w.zoneTeamWorkers).filter(function(k){ return (w.zoneTeamWorkers[k]||[]).length > 0; });
+      if(ks.length) return ks;
+    }
+    return [''];
+  }
   function inst_todayZonesDate(){ return prod_dmy(prod_val('ic_date')||INST_TABC_SELDATE||ymdToDmy(prod_today())); }
   function inst_renderZoneSelects(f, d){
     var wrap = document.getElementById('ic_zones_wrap'); if(!wrap) return;
@@ -49865,12 +50128,13 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         var itodayTotal = 0; for(var ttk in itodayMap){ itodayTotal += (+itodayMap[ttk]||0); }
         teamInstallHtml += '<div class="inst-team-install">';
         var ihsUnit = it('inst_lbl_today_install_unit');
+        function allDoneSpan2(txt){ return '<span style="color:#2e7d32;font-weight:700">'+txt+'</span>'; }
         var ihouseSummary = it('inst_lbl_total_short')+prod_fmtNum(itotalNeed)+ihsUnit
           + '，'+it('inst_lbl_shipped')+'：'+prod_fmtNum(ishippedTotal)+ihsUnit
-          + '、'+it('inst_lbl_unshipped')+prod_fmtNum(iunshipped)+ihsUnit
-          + '、'+it('inst_zone_remain')+prod_fmtNum(iunshipped)+ihsUnit
+          + '、'+(iunshipped===0 ? allDoneSpan2(it('inst_lbl_ship_all_done')) : it('inst_lbl_unshipped')+prod_fmtNum(iunshipped)+ihsUnit)
+          + '、'+(iunshipped===0 ? allDoneSpan2(it('inst_lbl_ship_all_done')) : it('inst_zone_remain')+prod_fmtNum(iunshipped)+ihsUnit)
           + '、'+it('inst_lbl_installed')+'：'+prod_fmtNum(iinstalledTotal)+ihsUnit
-          + '，'+it('inst_lbl_uninstalled')+'：'+prod_fmtNum(iuninstalled)+ihsUnit
+          + '，'+(iuninstalled===0 ? allDoneSpan2(it('inst_lbl_install_all_done')) : it('inst_lbl_uninstalled')+'：'+prod_fmtNum(iuninstalled)+ihsUnit)
           + '，'+it('inst_lbl_install_progress')+'：'+iinstallProgress+'%';
         teamInstallHtml += '<div class="inst-team-install-house"><span>'+it('inst_lbl_house')+'：</span><b>'+prod_esc(installHouse.name||savedHouse)+'</b><span class="inst-team-install-house-summary">'+ihouseSummary+'</span></div>';
         if(!ispecs.length){
@@ -49948,17 +50212,18 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
             var quickShipBtn = (houseProduced > 0)
               ? '<button type="button" class="inst-quick-ship-btn" onclick=\'inst_quickOutbound('+JSON.stringify(icode)+','+JSON.stringify(iidx)+','+JSON.stringify(sp)+','+spUnshipped+')\' title="'+prod_esc(it('inst_btn_quick_ship'))+'">'+it('inst_btn_quick_ship')+'</button>'
               : '';
+            function allDoneSpan(txt){ return '<span style="color:#2e7d32;font-weight:700">'+txt+'</span>'; }
             var _firstLine = it('inst_lbl_house_demand')+'：'+red0(need)+ihsUnit
               + '，'+it('inst_lbl_shipped')+'：'+red0(spShipped)+ihsUnit
-              + '，'+it('inst_lbl_unshipped')+'：'+red0(spUnshipped)+ihsUnit
+              + '，'+(spUnshipped===0 ? allDoneSpan(it('inst_lbl_ship_all_done')) : it('inst_lbl_unshipped')+'：'+red0(spUnshipped)+ihsUnit)
               + '，'+it('inst_lbl_ship_ratio')+'：'+red0pct(need>0 ? (spShipped/need*100) : 0);
             var _secondLine = it('inst_lbl_bldg_produced')+'：'+red0(bldgProduced)+ihsUnit
-              + '，'+it('inst_lbl_unproduced')+'：'+red0(bldgUnproduced)+ihsUnit
+              + '，'+(bldgUnproduced===0 ? allDoneSpan(it('inst_lbl_prod_all_done')) : it('inst_lbl_unproduced')+'：'+red0(bldgUnproduced)+ihsUnit)
               + '，'+it('inst_lbl_prod_done_rate')+'：'+red0pct(bldgProdRate);
             var _thirdLine = it('inst_lbl_proj_prod_demand')+'：'+red0(typeProduced)+'/'+red0(typeDemand)+ihsUnit
               + '，'+it('inst_lbl_proj_prod_rate')+'：'+red0pct(typeProdRate);
             var _fourthLine = it('inst_lbl_bldg_installed2')+'：'+red0(instP)+ihsUnit
-              + '，'+it('inst_lbl_uninstalled')+'：'+red0(remain)+ihsUnit
+              + '，'+(remain===0 ? allDoneSpan(it('inst_lbl_install_all_done')) : it('inst_lbl_uninstalled')+'：'+red0(remain)+ihsUnit)
               + '，'+it('inst_lbl_install_done_ratio')+'：'+red0pct(prog);
             var _fifthLine = it('inst_lbl_type_installed')+'：'+red0(typeStats.installed)+ihsUnit
               + '，'+it('inst_lbl_uninstalled')+'：'+red0(typeStats.uninstalled)+ihsUnit
@@ -50005,6 +50270,85 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     h += '</div>';
     return h;
   }
+  /* [锁死] 区域卡片只读渲染：保存后/只读模式使用，不得显示可编辑输入框。 */
+  function inst_zoneCardReadOnlyHtml(f, d, zoneNum, idx, houses){
+    var st = inst_zoneStats(f, zoneNum, houses);
+    var color = INST_ZONE_COLORS[(idx % INST_ZONE_COLORS.length)];
+    var w = ((f.installation && f.installation.workers && f.installation.workers[d]) || {});
+    var holidayYes = (w.holiday === 'yes');
+    var zWorkers = ((w.zoneTeamWorkers && w.zoneTeamWorkers[String(zoneNum)]) || []);
+    var zoneTeams = Math.max(1, +(w.zoneTeams && w.zoneTeams[String(zoneNum)]) || 2);
+    function houseNameOf(raw){
+      if(!raw) return '—';
+      var s = String(raw).trim();
+      for(var i=0;i<houses.length;i++){ if(houses[i] && houses[i].key===s) return houses[i].name; }
+      if(typeof prod_phName==='function'){
+        var parts = s.split('#');
+        var base = prod_phName(parts[0]||'');
+        if(base) return base + (parts[1] ? '#' + parts[1] : '');
+      }
+      return s;
+    }
+    var h = '<div class="inst-zone-card inst-zone-card-readonly">';
+    h += '<div class="inst-zone-card-header"><span class="inst-zone-dot" style="background:'+color+'"></span><span>'+it('inst_gantt_zone_name').replace('{0}', zoneNum)+'</span><span class="inst-zone-team-count">'+it('inst_lbl_zone_teams')+'：'+zoneTeams+'</span></div>';
+    h += '<div class="inst-zone-stats">';
+    h += '<div class="inst-zone-stat inst-zone-stat-v"><div class="inst-stat-col"><label>'+it('inst_lbl_bldg_count')+'</label><b>'+st.bldg+' '+it('inst_unit_bldg')+'</b></div></div>';
+    h += '<div class="inst-zone-stat inst-zone-stat-v"><div class="inst-stat-col"><label>'+it('inst_lbl_total_qty')+'</label><b>'+prod_fmtNum(st.total)+'</b></div></div>';
+    h += '<div class="inst-zone-stat">'+
+      '<div class="inst-stat-row"><label>'+it('inst_lbl_theory_install')+'</label><b>'+prod_fmtNum(st.theoryDone)+'</b></div>'+
+      '<div class="inst-stat-row"><label>'+it('inst_lbl_actual_install')+'</label><b>'+prod_fmtNum(st.done)+'</b></div>'+
+      '</div>';
+    h += '<div class="inst-zone-stat">'+
+      '<div class="inst-stat-row"><label>'+it('inst_lbl_theory_remain')+'</label><b>'+prod_fmtNum(st.theoryRemaining)+'</b></div>'+
+      '<div class="inst-stat-row"><label>'+it('inst_lbl_actual_remain')+'</label><b>'+prod_fmtNum(st.remaining)+'</b></div>'+
+      '</div>';
+    h += '<div class="inst-zone-stat">'+
+      '<div class="inst-stat-row"><label>'+it('inst_lbl_theory_progress')+'</label><b>'+st.theoryProgress+'%</b></div>'+
+      '<div class="inst-stat-row"><label>'+it('inst_lbl_actual_progress')+'</label><b>'+st.progress+'%</b></div>'+
+      '</div>';
+    h += '</div>';
+    for(var ti=0; ti<zWorkers.length; ti++){
+      var teamObj = zWorkers[ti] || {};
+      var houseName = houseNameOf(teamObj.house);
+      var teamTotal = 0;
+      var roleParts = [];
+      INST_ROLES.forEach(function(rk){
+        if(rk[0]==='reporter' || rk[0]==='leader') return;
+        var val = holidayYes ? 0 : inst_teamVal(teamObj, rk[0]);
+        teamTotal += val;
+        if(val > 0) roleParts.push(it(rk[1])+'：'+val);
+      });
+      var todayMap = teamObj.todayInstall || {};
+      var todayTotal = 0;
+      var specParts = [];
+      for(var sp in todayMap){ if(todayMap.hasOwnProperty(sp)){ var v = +todayMap[sp]||0; todayTotal += v; if(v>0) specParts.push(prod_esc(sp)+'：'+prod_fmtNum(v)); } }
+      h += '<div class="inst-zone-team-readonly'+(ti%2===1?' inst-zone-team-readonly-alt':'')+'">';
+      h += '<div class="inst-zone-team-ro-title">'+it('inst_lbl_team_record').replace('{0}', zoneNum).replace('{1}', ti+1)+' · '+it('inst_lbl_house')+'：'+houseName+' · '+it('inst_lbl_total_man')+'：'+teamTotal+'</div>';
+      if(roleParts.length) h += '<div class="inst-zone-team-ro-roles">'+roleParts.join('、')+'</div>';
+      if(specParts.length) h += '<div class="inst-zone-team-ro-install">'+it('inst_lbl_today_install')+'：'+prod_fmtNum(todayTotal)+' '+it('inst_lbl_today_install_unit')+' ('+specParts.join('、')+')</div>';
+      h += '</div>';
+    }
+    var totalRoles = {};
+    INST_ROLES.forEach(function(rk){ if(rk[0]!=='reporter' && rk[0]!=='leader') totalRoles[rk[0]] = 0; });
+    for(var tj=0; tj<zoneTeams; tj++){
+      var teamObj = zWorkers[tj] || {};
+      INST_ROLES.forEach(function(rk){
+        if(rk[0]==='reporter' || rk[0]==='leader') return;
+        totalRoles[rk[0]] += holidayYes ? 0 : inst_teamVal(teamObj, rk[0]);
+      });
+    }
+    var roleParts = [];
+    var totalPeople = 0;
+    INST_ROLES.forEach(function(rk){
+      if(rk[0]==='reporter' || rk[0]==='leader') return;
+      roleParts.push(it(rk[1]) + '：' + totalRoles[rk[0]] + it('inst_lbl_zone_summary_role_unit'));
+      totalPeople += totalRoles[rk[0]];
+    });
+    h += '<div class="inst-zone-summary"><b>' + it('inst_lbl_zone_summary_prefix').replace('{0}', zoneNum).replace('{1}', zoneTeams) + '</b>'
+      + it('inst_lbl_zone_summary_total') + roleParts.join(it('inst_lbl_zone_summary_sep')) + '</div>';
+    h += '</div>';
+    return h;
+  }
   function inst_renderZoneCards(f, d){
     var wrap = document.getElementById('ic_zone_cards'); if(!wrap) return;
     var inst = f.installation || {};
@@ -50014,7 +50358,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var houses = [];
     try{ houses = inst_buildGanttHouses(f) || []; }catch(e){ houses = []; }
     var h = '';
-    zones.forEach(function(z, i){ h += inst_zoneCardHtml(f, d, +z, i, houses); });
+    zones.forEach(function(z, i){ h += (INST_TAB_C_EDIT_MODE ? inst_zoneCardHtml(f, d, +z, i, houses) : inst_zoneCardReadOnlyHtml(f, d, +z, i, houses)); });
     h += '<div class="inst-zone-card" id="ic_progress_analysis_card">' +
       '<div class="inst-zone-card-header"><span>'+it('inst_lbl_progress_analysis')+'</span></div>' +
       '<div class="inst-analysis-body" id="ic_progress_analysis_body"></div>' +
@@ -50118,6 +50462,92 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   }
   window.inst_showDsubTip = inst_showDsubTip;
   window.inst_dsubTipHideSoon = inst_dsubTipHideSoon;
+  /* [锁死][禁止修改] 安装 Tab C 只读/编辑模式切换（2026-10-06）：
+     编辑模式显示全部输入框；只读模式折叠为紧凑只读卡片。
+     点击编辑按钮进入编辑；保存后/双击卡片外空白处自动收起回只读。
+     （空白收起已由 click 改为 dblclick：必须双击空白处才收起，单击不再触发）
+     任何重构不得移除/弱化以下任一条：已保存日期默认只读、进入编辑才出现输入框、
+     保存后必须回到只读、编辑态双击空白（排除输入控件/带 onclick 元素、且 600ms 宽限期内不触发）自动收起。 */
+  function inst_tabCEnterEditMode(){ INST_TAB_C_EDIT_MODE = true; INST_TAB_C_EDIT_LAST_ENTER = Date.now(); inst_renderTab('C'); }
+  function inst_tabCExitEditMode(){ INST_TAB_C_EDIT_MODE = false; inst_renderTab('C'); }
+  /* [锁死][禁止修改] 编辑态双击空白自动收起：排除输入控件/带 onclick 元素，且进入编辑后 600ms 内不触发，避免“点编辑那一下”被误判为空白点击。 */
+  function inst_tabCMaybeCollapseEdit(e){
+    if(!INST_TAB_C_EDIT_MODE) return;
+    /* 进入编辑后的极短宽限期内不响应收起，避免“点击编辑”这一下本身被判定为空白点击而立即收起 */
+    if(Date.now() - (INST_TAB_C_EDIT_LAST_ENTER||0) < 600) return;
+    var t = e.target;
+    if(!t || !t.closest) return;
+    if(t.closest('[onclick]')) return;
+    if(!t.closest('.inst-zone-card, .inst-labor-form')) return;
+    if(t.closest('input,select,textarea,button,label,option,a,.inst-zone-selects,.inst-del-pop,.inst-dsub-tip,.cp-popup,.cp-date-input-wrapper')) return;
+    inst_tabCExitEditMode();
+  }
+  function inst_dateHasWorkersData(d){
+    var f = inst_get(INST_CUR); if(!f) return false;
+    var inst = f.installation || {};
+    var w = (inst.workers && inst.workers[d]) || {};
+    if(w.recorder || w.holiday) return true;
+    if(w.zones && w.zones.length && w.zones.some(function(z){ return z!=='' && z!=null; })) return true;
+    var ztw = w.zoneTeamWorkers || {};
+    for(var zn in ztw){ if(!ztw.hasOwnProperty(zn)) continue; var arr=ztw[zn]||[]; for(var i=0;i<arr.length;i++){ var t=arr[i]; if(!t) continue; if(t.house) return true; for(var rk=0;rk<INST_ROLES.length;rk++){ var r=INST_ROLES[rk]; if(r[0]==='reporter' || r[0]==='leader') continue; if((t[r[0]]|0)>0) return true; } var tm=t.todayInstall||{}; for(var sp in tm){ if(tm.hasOwnProperty(sp) && (+tm[sp]||0)>0) return true; } } }
+    return false;
+  }
+  /* [锁死] 切换日期时按新日期是否有保存数据决定默认只读/编辑模式。 */
+  function inst_tabCDateChange(){
+    var el = document.getElementById('ic_date');
+    INST_TABC_SELDATE = el ? el.value : '';
+    var d = prod_dmy(INST_TABC_SELDATE || ymdToDmy(prod_today()));
+    INST_TAB_C_EDIT_MODE = !inst_dateHasWorkersData(d);
+    if(INST_TAB_C_EDIT_MODE) INST_TAB_C_EDIT_LAST_ENTER = Date.now();
+    inst_renderTab('C');
+  }
+  window.inst_tabCEnterEditMode = inst_tabCEnterEditMode;
+  window.inst_tabCExitEditMode = inst_tabCExitEditMode;
+  window.inst_tabCDateChange = inst_tabCDateChange;
+  window.inst_sortLabor = inst_sortLabor;
+  /* 安装 Tab C 顶部 KPI 卡片条：总需求 / 已生产 / 待生产 / 已出库 / 待出库 / 已安装 / 未安装 / 安装率 */
+  function inst_kpiBarHtml(f){
+    var projDemand = 0, projProduced = 0, projShipped = 0, projInstalled = 0;
+    try{
+      var _ghAll = inst_buildGanttHouses(f) || [];
+      _ghAll.forEach(function(hh){ projDemand += (+hh.panels||0); });
+    }catch(e){}
+    var _fn = (f && f.finished) || {};
+    for(var _sp in _fn){ if(_fn.hasOwnProperty(_sp)) projProduced += (+((_fn[_sp]&&_fn[_sp].produced)||0)); }
+    var _hoAll = (f && f.houseOut) || {};
+    for(var _hk in _hoAll){ if(_hoAll.hasOwnProperty(_hk)) projShipped += (+((_hoAll[_hk]&&_hoAll[_hk].out)||0)); }
+    var _hiqAll = (f && f.installation && f.installation.houseInstallQty) || {};
+    for(var _hq in _hiqAll){ if(_hiqAll.hasOwnProperty(_hq)) projInstalled += (+_hiqAll[_hq]||0); }
+    var needProduce = Math.max(0, projDemand - projProduced);
+    var notShipped = Math.max(0, projDemand - projShipped);
+    var notInstalled = Math.max(0, projDemand - projInstalled);
+    var produceRate = projDemand > 0 ? (projProduced / projDemand * 100).toFixed(2) : '0.00';
+    var shipRate = projDemand > 0 ? (projShipped / projDemand * 100).toFixed(2) : '0.00';
+    var installRate = projDemand > 0 ? (projInstalled / projDemand * 100).toFixed(2) : '0.00';
+    var unit = it('inst_kpi_total_demand_unit');
+    function kc(cls, title, val, sub){ return '<div class="inst-kpi-card '+cls+'"><div class="inst-kpi-title">'+title+'</div><div class="inst-kpi-value">'+prod_fmtNum(val)+'</div>'+(sub?'<div class="inst-kpi-sub">'+sub+'</div>':'')+'</div>'; }
+    return '<div class="inst-kpi-bar">'
+      + kc('inst-kpi-blue', it('inst_kpi_total_demand'), projDemand, unit)
+      + '<div class="inst-kpi-card inst-kpi-blue"><div class="inst-kpi-title">'+it('inst_kpi_produced')+'<br>'+it('inst_kpi_produce_rate')+'</div><div class="inst-kpi-value">'+prod_fmtNum(projProduced)+'</div><div class="inst-kpi-sub inst-kpi-rate">'+produceRate+'%</div></div>'
+      + kc('inst-kpi-blue', it('inst_kpi_need_produce'), needProduce, unit)
+      + '<div class="inst-kpi-card inst-kpi-blue"><div class="inst-kpi-title">'+it('inst_kpi_shipped')+'<br>'+it('inst_kpi_ship_rate')+'</div><div class="inst-kpi-value">'+prod_fmtNum(projShipped)+'</div><div class="inst-kpi-sub inst-kpi-rate">'+shipRate+'%</div></div>'
+      + kc('inst-kpi-blue', it('inst_kpi_not_shipped'), notShipped, unit)
+      + kc('inst-kpi-green', it('inst_kpi_installed'), projInstalled, unit)
+      + kc('inst-kpi-green', it('inst_kpi_not_installed'), notInstalled, unit)
+      + '<div class="inst-kpi-card inst-kpi-green"><div class="inst-kpi-title">'+it('inst_kpi_install_rate')+'</div><div class="inst-kpi-value inst-kpi-rate">'+installRate+'%</div></div>'
+    + '</div>';
+  }
+  /* 安装用工表「区域/猪舍」列排序：点击一次升序、再点降序、第三次恢复原始顺序 */
+  function inst_sortLabor(col){
+    if(INST_LABOR_SORT.col !== col){ INST_LABOR_SORT.col = col; INST_LABOR_SORT.dir = 1; }
+    else { INST_LABOR_SORT.dir = INST_LABOR_SORT.dir===1 ? -1 : (INST_LABOR_SORT.dir===-1 ? 0 : 1); }
+    inst_renderTab('C');
+  }
+  function inst_sortInd(col){
+    var upOn = INST_LABOR_SORT.col===col && INST_LABOR_SORT.dir===1 ? ' on' : '';
+    var dnOn = INST_LABOR_SORT.col===col && INST_LABOR_SORT.dir===-1 ? ' on' : '';
+    return '<span class="pc-sort-ind"><i class="up'+upOn+'">▲</i><i class="dn'+dnOn+'">▼</i></span>';
+  }
   function inst_tabC(f){
     var inst = f.installation || {}; inst.workers = inst.workers || {};
     var d = prod_dmy(prod_val('ic_date')||INST_TABC_SELDATE||ymdToDmy(prod_today()));
@@ -50125,20 +50555,32 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var allDates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(inst.workers||{}), false) : Object.keys(inst.workers||{});
     var latest = (allDates.length) ? inst.workers[allDates[allDates.length-1]] : null;
     var rec = (w.recorder && w.recorder!=='') ? w.recorder : (typeof prod_loginUser==='function'?prod_loginUser():'');
-    var h = '<div class="prod-sec-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+it('inst_sec_labor')
+    /* [锁死][禁止修改] 已保存日期默认只读；无数据日期进入编辑。用户点“编辑”后保持编辑直到保存或切日期。
+       只读分支（INST_TAB_C_EDIT_MODE 为假）绝对不得渲染可编辑 select/input/textarea（区域卡片用只读版），否则会破坏“收起=只读”的核心不变量。 */
+    if(!INST_TAB_C_EDIT_MODE && !inst_dateHasWorkersData(d)) INST_TAB_C_EDIT_MODE = true;
+    if(!INST_TAB_C_COLLAPSE_BOUND){ document.addEventListener('dblclick', inst_tabCMaybeCollapseEdit); INST_TAB_C_COLLAPSE_BOUND = true; }
+    var h = inst_kpiBarHtml(f);
+    h += '<div class="prod-sec-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+it('inst_sec_labor')
       + '<span style="display:inline-flex;align-items:center;gap:8px;">'
       + '<button class="prod-btn mini" style="background:#1E90FF;border:1px solid #000;" type="button" onclick="inst_gotoStockOut()">'+it('inst_btn_inbound_install')+'</button>'
-      + '<button class="prod-btn mini" style="border:1px solid #000;" type="button" onclick="inst_saveWorkers()">'+it('inst_btn_save_snap')+'</button>'
+      + (INST_TAB_C_EDIT_MODE
+        ? '<button class="prod-btn mini" style="border:1px solid #000;" type="button" onclick="inst_saveWorkersExplicit()">'+it('inst_btn_save_snap')+'</button>'
+          + '<span class="inst-edit-hint">'+it('inst_dblclick_hint')+'</span>'
+        : '<button class="prod-btn mini" style="border:1px solid #000;" type="button" onclick="inst_tabCEnterEditMode()">'+pt('op_edit')+'</button>')
       + '</span></div>';
-    h += '<div class="prod-form inst-labor-form">'
-      + (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_date'),'ic_date',dmyToYmd(d),'INST_TABC_SELDATE=this.value', prod_today()) : '')
+    h += '<div class="prod-form inst-labor-form'+(INST_TAB_C_EDIT_MODE?' inst-labor-edit':' inst-labor-readonly')+'">'
+      + (INST_TAB_C_EDIT_MODE
+        ? (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_date'),'ic_date',dmyToYmd(d),'inst_tabCDateChange()', prod_today()) : '')
+        : '<div class="prod-field"><label>'+it('inst_lbl_date')+'</label><input id="ic_date" value="'+prod_esc(d)+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>')
       + '<div class="prod-field"><label>'+it('inst_lbl_install_start_date')+'</label><input id="ic_install_start" value="'+prod_esc(inst_getInstallStart())+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
-      + '<div class="prod-field"><label>'+it('inst_lbl_holiday')+'</label><select id="ic_holiday" class="'+(((w.holiday||(latest?latest.holiday:''))==='yes')?'holiday-yes-txt':'')+'" onchange="inst_holidayChange(this)">'
-        + '<option value="no"'+(((w.holiday||(latest?latest.holiday:''))!=='yes')?' selected':'')+'>'+pt('opt_no')+'</option>'
-        + '<option value="yes"'+(((w.holiday||(latest?latest.holiday:''))==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option>'
-        + '</select></div>'
+      + (INST_TAB_C_EDIT_MODE
+        ? '<div class="prod-field"><label>'+it('inst_lbl_holiday')+'</label><select id="ic_holiday" class="'+(((w.holiday||(latest?latest.holiday:''))==='yes')?'holiday-yes-txt':'')+'" onchange="inst_holidayChange(this)">'
+          + '<option value="no"'+(((w.holiday||(latest?latest.holiday:''))!=='yes')?' selected':'')+'>'+pt('opt_no')+'</option>'
+          + '<option value="yes"'+(((w.holiday||(latest?latest.holiday:''))==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option>'
+          + '</select></div>'
+        : '<div class="prod-field"><label>'+it('inst_lbl_holiday')+'</label><input id="ic_holiday" value="'+prod_esc((w.holiday||(latest?latest.holiday:''))==='yes'?pt('opt_yes'):pt('opt_no'))+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>')
       + '<div class="prod-field"><label>'+it('inst_lbl_recorder')+'</label><input id="ic_recorder" value="'+prod_esc(rec)+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
-      + '<div class="prod-field inst-zone-field"><label>'+it('inst_lbl_today_zones')+'</label><div class="inst-zone-selects" id="ic_zones_wrap"></div></div>'
+      + '<div class="prod-field inst-zone-field"><label>'+it('inst_lbl_today_zones')+'</label>'+(INST_TAB_C_EDIT_MODE?'<div class="inst-zone-selects" id="ic_zones_wrap"></div>':'<input id="ic_zones_readonly" value="'+prod_esc((w.zones||[]).filter(function(z){return z!==''&&z!=null;}).map(function(z){return it('inst_gantt_zone_name').replace('{0}', z);}).join('、')||'—')+'" readonly style="background:#f0f0f0;cursor:not-allowed;">')+'</div>'
       + '</div>';
     h += '<div id="ic_zone_cards" class="inst-zone-cards"></div>';
     var wx = inst_weatherForDate(d);
@@ -50147,7 +50589,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     h += '<div class="prod-sec-title" style="margin-top:24px;">'+it('inst_sec_labor_detail')+'</div>';
     h += '<div class="prod-table-scroll pc-labor-scroll"><table class="prod-table pc-labor-hist"><thead><tr>'
       + '<th class="pc-col-no">'+pt('thr_no')+'</th><th class="pc-col-date">'+it('inst_lbl_date')+'</th><th>'+pt('wx_am')+'</th><th>'+pt('wx_pm')+'</th><th>'+it('inst_lbl_holiday')+'</th><th>'+it('inst_lbl_recorder')+'</th>'
-      + '<th class="pc-col-zone pc-col-yellow">'+it('inst_lbl_zone_short')+'</th><th class="pc-col-yellow">'+it('inst_lbl_house')+'</th><th class="pc-col-yellow">'+it('inst_lbl_team')+'</th><th class="pc-col-yellow">'+it('inst_lbl_install_qty')+'</th><th class="pc-col-dsub pc-col-yellow">'+it('inst_lbl_day_subtotal')+'</th>';
+      + '<th class="pc-col-zone pc-col-yellow pc-sortable" onclick="inst_sortLabor(\'zone\')">'+it('inst_lbl_zone_short')+inst_sortInd('zone')+'</th><th class="pc-col-yellow pc-sortable" onclick="inst_sortLabor(\'house\')">'+it('inst_lbl_house')+inst_sortInd('house')+'</th><th class="pc-col-yellow">'+it('inst_lbl_team')+'</th><th class="pc-col-yellow">'+it('inst_lbl_install_qty')+'</th><th class="pc-col-dsub pc-col-yellow">'+it('inst_lbl_day_subtotal')+'</th>';
     INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter' || rk[0]==='leader') return; h += '<th class="pc-col-blue">'+it(rk[1])+'</th>'; });
     h += '<th class="pc-col-blue">'+it('inst_lbl_total_man')+'</th><th class="pc-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
     var dates = (typeof prod_sortDateKeys==='function') ? prod_sortDateKeys(Object.keys(inst.workers||{}), true) : Object.keys(inst.workers||{});
@@ -50190,6 +50632,11 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       }
       return s;
     }
+    /* 历史记录底部「小计」累加器：按日期汇总安装数量、各角色人数、总人力 */
+    var grandInstall = 0, grandMan = 0, grandRoles = {};
+    INST_ROLES.forEach(function(rk){ if(rk[0]!=='reporter' && rk[0]!=='leader') grandRoles[rk[0]] = 0; });
+    /* 1. 先构建每个日期块对象 */
+    var blocks = [];
     dates.forEach(function(dd, idx){
       var ww = inst.workers[dd];
       var sum = 0;
@@ -50218,12 +50665,16 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       /* 过滤无意义行：未选猪舍、安装数量为 0 且当天总人力也为 0 */
       sub = sub.filter(function(s){ return s.hasOwnHouse || s.qty>0 || sum>0; });
       if(sub.length === 0){ sub.push({ zone:'', houseKey:'', houseName:'', hasOwnHouse:false, team:'', qty:0 }); }
-      var no = total - idx, dmy = ymdToDmy(dd);
-      var wxAm = (typeof prod_wxCompact==='function') ? prod_wxCompact((ww.weatherAm&&ww.weatherAm.v===2)?ww.weatherAm:null) : '—';
-      var wxPm = (typeof prod_wxCompact==='function') ? prod_wxCompact((ww.weatherPm&&ww.weatherPm.v===2)?ww.weatherPm:null) : '—';
-      var holidayTxt = (ww.holiday==='yes') ? pt('opt_yes') : pt('opt_no');
-      var recorderTxt = prod_esc(ww.recorder||'');
-      var vals = [], keys = [];
+      /* 「区域/猪舍」列排序：点击一次升序、再点降序、第三次恢复原始顺序；仅在当前日期块内排序，保持日期分组不变 */
+      if(INST_LABOR_SORT.col && INST_LABOR_SORT.dir !== 0){
+        sub.sort(function(a,b){
+          var av, bv;
+          if(INST_LABOR_SORT.col === 'zone'){ av = String(a.zone); bv = String(b.zone); }
+          else { av = String(a.houseName || a.houseKey); bv = String(b.houseName || b.houseKey); }
+          var r = String(av).localeCompare(String(bv), undefined, {numeric:true});
+          return INST_LABOR_SORT.dir === 1 ? r : -r;
+        });
+      }
       /* 日安装小计：该日期内、同一区域下所有小组/猪舍/规格的安装数量之和（合并逻辑与“区域”列一致） */
       var zoneSub = {};
       sub.forEach(function(s){ if(s.zone){ zoneSub[s.zone] = (zoneSub[s.zone]||0) + (+s.qty||0); } });
@@ -50238,6 +50689,33 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
           for(var sp in tm){ if(tm.hasOwnProperty(sp)){ zoneSpecSub[zn] = zoneSpecSub[zn] || {}; zoneSpecSub[zn][sp] = (zoneSpecSub[zn][sp]||0) + (+tm[sp]||0); } }
         });
       });
+      blocks.push({ dd:dd, idx:idx, ww:ww, sum:sum, sub:sub, zoneSub:zoneSub, zoneSpecSub:zoneSpecSub });
+    });
+    /* 2. 若正在按区域/猪舍排序，则按每个日期块首行的区域/猪舍重新排列日期块顺序，让排序在多日期时也能看到效果 */
+    if(INST_LABOR_SORT.col && INST_LABOR_SORT.dir !== 0){
+      blocks.sort(function(a,b){
+        var av, bv;
+        var as = a.sub[0] || {}, bs = b.sub[0] || {};
+        if(INST_LABOR_SORT.col === 'zone'){ av = String(as.zone); bv = String(bs.zone); }
+        else { av = String(as.houseName || as.houseKey); bv = String(bs.houseName || bs.houseKey); }
+        var r = String(av).localeCompare(String(bv), undefined, {numeric:true});
+        return INST_LABOR_SORT.dir === 1 ? r : -r;
+      });
+    }
+    /* 3. 按最终顺序渲染各日期块，并累加总计 */
+    blocks.forEach(function(block, bidx){
+      var dd = block.dd, idx = block.idx, ww = block.ww, sum = block.sum, sub = block.sub;
+      var zoneSub = block.zoneSub, zoneSpecSub = block.zoneSpecSub;
+      var no = total - bidx, dmy = ymdToDmy(dd);
+      var wxAm = (typeof prod_wxCompact==='function') ? prod_wxCompact((ww.weatherAm&&ww.weatherAm.v===2)?ww.weatherAm:null) : '—';
+      var wxPm = (typeof prod_wxCompact==='function') ? prod_wxCompact((ww.weatherPm&&ww.weatherPm.v===2)?ww.weatherPm:null) : '—';
+      var holidayTxt = (ww.holiday==='yes') ? pt('opt_yes') : pt('opt_no');
+      var recorderTxt = prod_esc(ww.recorder||'');
+      var vals = [], keys = [];
+      /* 累加本日小计到总计（避免按子行重复累加，按日期汇一次） */
+      for(var _zn in zoneSub){ if(zoneSub.hasOwnProperty(_zn)) grandInstall += (+zoneSub[_zn]||0); }
+      grandMan += (+sum||0);
+      INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter' || rk[0]==='leader') return; grandRoles[rk[0]] += (+ww[rk[0]]||0); });
       sub.forEach(function(s){
         var rv = [], rk2 = [];
         rv.push(String(no));                  rk2.push('no|'+no);
@@ -50285,7 +50763,22 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         h += parts.join('');
       });
     });
-    h += '</tbody></table></div>';
+    h += '</tbody>';
+    /* 表内小计行：参考生产模块 pc-labor-tfoot / pe-subtotal-row 的处理，
+       使用 tfoot 并跟随表格滚动到底部后吸底，始终可见。 */
+    h += '<tfoot class="pc-labor-subtotal"><tr>'
+      + '<td class="pc-col-no"></td>'
+      + '<td class="pc-col-date"><b>'+(pt('subtotal')||'小计')+'</b></td>'
+      + '<td></td><td></td><td></td><td></td>' /* 上午天气、下午天气、春节、记录人 */
+      + '<td class="pc-col-yellow"></td><td class="pc-col-yellow"></td><td class="pc-col-yellow"></td><td class="pc-col-yellow"></td>' /* 区域、猪舍、小组、安装数量 */
+      + '<td class="pc-col-dsub pc-col-yellow"><b>'+prod_fmtNum(grandInstall)+'</b></td>';
+    INST_ROLES.forEach(function(rk){
+      if(rk[0]==='reporter' || rk[0]==='leader') return;
+      var st = grandRoles[rk[0]] || 0;
+      h += '<td class="pc-col-blue'+(st===0?' pc-zero':'')+'"><b>'+prod_fmtNum(st)+'</b></td>';
+    });
+    h += '<td class="pc-col-blue'+(grandMan===0?' pc-zero':'')+'"><b>'+prod_fmtNum(grandMan)+'</b></td>'
+      + '<td class="pc-col-act"></td></tr></tfoot></table></div>';
     return h;
   }
   /* 春节下拉切换：
@@ -50385,9 +50878,14 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     }catch(e){}
   }
   window.inst_quickOutboundHouse = inst_quickOutboundHouse;
-  /* 3) 整个项目安装 → 安装 Tab C：定位该栋所属区域的小组，聚焦「今天安装」录入框 */
+  /* [锁死][禁止修改] 3) 整个项目安装 → 安装 Tab C：定位该栋所属区域的小组，聚焦「今天安装」录入框。
+     必须先 switchView('install') + inst_openProject 真正跳转到安装管理并打开项目，
+     否则 inst_renderTab('C') 在非安装视图里是空操作（既不切视图也不渲染，表现为“点了没反应”）。
+     外部快速录入必须进入编辑模式（否则只读视图没有输入框），且默认只展开一个安装小组，日期为当日。 */
   function inst_quickInstallEntry(code, iidx, spec){
-    var f = inst_get(INST_CUR); if(!f) return;
+    var pid = (typeof INST_CUR!=='undefined' && INST_CUR) ? INST_CUR
+            : (typeof PROD_CUR!=='undefined' ? PROD_CUR : null);
+    var f = pid ? inst_get(pid) : null; if(!f || !pid) return;
     try{ inst_hideBldgTip(); }catch(e){}
     var key = String(code||'')+'#'+String(iidx||'1');
     var assign = {};
@@ -50395,7 +50893,6 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var zone = +assign[key] || 0;
     if(zone <= 0){ try{ prod_toast(it('inst_quick_install_no_zone')); }catch(e){} return; }
     try{ INST_TABC_SELDATE = ymdToDmy(prod_today()); }catch(e){}
-    try{ var _dEl = document.getElementById('ic_date'); if(_dEl) _dEl.value = ymdToDmy(prod_today()); }catch(e){}
     f.installation = f.installation || {};
     var workers = f.installation.workers = f.installation.workers || {};
     var d = prod_dmy(ymdToDmy(prod_today()));
@@ -50408,17 +50905,25 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         if(w.zones.map(String).indexOf(String(zone)) < 0) w.zones.push(zone);
       }
     }catch(e){}
+    /* 默认只展开一个安装小组（未设置过时才写 1，避免覆盖已有数据） */
+    w.zoneTeams = w.zoneTeams || {};
+    if(w.zoneTeams[String(zone)] == null) w.zoneTeams[String(zone)] = 1;
     var ztw = w.zoneTeamWorkers = w.zoneTeamWorkers || {};
     var arr = ztw[String(zone)] = ztw[String(zone)] || [];
-    var teams = Math.max(1, +(((w.zoneTeams||{})[String(zone)])||1) || 1);
-    var slot = -1;
-    for(var ti=0; ti<teams; ti++){ if(!((arr[ti]||{}).house)){ slot = ti; break; } }
-    if(slot < 0){ for(var tj=0; tj<teams; tj++){ if(String((arr[tj]||{}).house||'')===key){ slot = tj; break; } } }
-    if(slot < 0) slot = 0;
+    var slot = 0;
     arr[slot] = arr[slot] || {};
     arr[slot].house = key;
+    /* 外部快速录入必须进入编辑模式，否则只读视图看不到输入框 */
+    INST_TAB_C_EDIT_MODE = true;
+    INST_TAB_C_EDIT_LAST_ENTER = Date.now();
+    /* ★ 先落库预填数据，再跳转：保证 inst_openProject 的同步/异步合并能读到，预填不被服务器覆盖 */
     try{ inst_save(f); }catch(e){}
-    inst_renderTab('C');
+    /* ★ 真正跳转：落到安装管理 → 打开同一项目 → 直接停在 C 标签 */
+    try{ window.__VIEW_JUMPING = 1; }catch(e){}
+    window.__INST_OPEN_TAB = 'C';
+    try{ if(typeof switchView==='function') switchView('install'); }catch(e){}
+    try{ if(typeof inst_openProject==='function') inst_openProject(pid); }catch(e){}
+    try{ setTimeout(function(){ window.__VIEW_JUMPING = 0; }, 0); }catch(e){}
     /* 指定了规格：聚焦该规格对应的「今天安装」输入框（规格下标与渲染顺序一致） */
     var _si = 0;
     if(spec){
@@ -50434,7 +50939,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
           inp.focus(); try{ inp.select(); }catch(e){}
         }
       }catch(e){}
-    }, 160);
+    }, 220);
   }
   window.inst_quickInstallEntry = inst_quickInstallEntry;
   var INST_SAVE_TIMER = null;
@@ -50453,6 +50958,14 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     }catch(e){ /* 甘特同步失败不能影响主流程（数据已先落盘） */ }
   }
   function inst_saveWorkers(silent, f){
+    /* [锁死] 只读模式或非 C 标签下没有有效输入框，禁止读取空表单覆盖已保存数据。 */
+    if(!INST_TAB_C_EDIT_MODE || INST_ACTIVE_TAB !== 'C') return;
+    /* [锁死] 防御：编辑态下若实际并未渲染可编辑表单（#ic_zones_wrap 不存在），
+       说明当前是只读态异常，禁止读取空表单把已保存的人工记录清零。 */
+    if(INST_TAB_C_EDIT_MODE && !document.getElementById('ic_zones_wrap')) return;
+    /* [锁死] 防御：编辑态但页面上没有任何可编辑区域小组输入框（区域卡片未渲染），
+       禁止读取空表单把已保存的人工记录清零。 */
+    if(INST_TAB_C_EDIT_MODE && !document.querySelector('#ic_zone_cards .inst-zone-card input')) return;
     if(!f) f = inst_get(INST_CUR); f.installation = f.installation || {}; var workers = f.installation.workers || {};
     var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
     var w = workers[d] || {};
@@ -50533,6 +51046,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     });
     w.zoneTeams = zoneTeams;
     w.zoneTeamWorkers = zoneTeamWorkers;
+    /* [锁死] zone 列表必须随保存写回，否则区域卡片/输入框会消失，下一次保存会把人工记录清零 */
+    w.zones = zones.filter(function(z){ return z!=='' && z!=null; });
     workers[d] = w; f.installation.workers = workers;
     /* 根据所有日期的 todayInstall 重新生成 houseInstallQty，保证甘特图「已装」与录入数据严格对应（含历史数据回填） */
     hiq = f.installation.houseInstallQty = {};
@@ -50549,7 +51064,17 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     inst_syncGantt();
     if(!silent){ inst_renderTab('C'); }
   }
-  function inst_editWorkers(dd){ INST_TABC_SELDATE = dd; var el = inst_el('ic_date'); if(el){ el.value = ymdToDmy(dd); } inst_renderTab('C'); }
+  /* [锁死] 显式点击“保存当日”后必须回到只读模式并重新渲染。 */
+  /* [锁死][禁止修改] 显式“保存当日”：先保存，再强制切回只读（INST_TAB_C_EDIT_MODE=false），绝不能保存到只读切换缺失。 */
+  function inst_saveWorkersExplicit(){
+    var f = inst_get(INST_CUR); if(!f) return;
+    inst_saveWorkers(true, f);
+    INST_TAB_C_EDIT_MODE = false;
+    inst_renderTab('C');
+  }
+  /* [锁死] 历史记录/只读视图点“编辑”必须进入编辑模式。 */
+  function inst_editWorkers(dd){ INST_TABC_SELDATE = dd; INST_TAB_C_EDIT_MODE = true; INST_TAB_C_EDIT_LAST_ENTER = Date.now(); var el = inst_el('ic_date'); if(el){ el.value = ymdToDmy(dd); } inst_renderTab('C'); }
+  window.inst_saveWorkersExplicit = inst_saveWorkersExplicit;
   /* ===== 复制安装数据：数量监控（不能超过该栋该规格的实际需求） ===== */
   /* 汇总某猪舍某栋某规格在所有日期（排除 excludeDmy）的实际安装数量 */
   /* 汇总某猪舍某栋某规格在所有日期（排除 excludeDmy）的实际安装数量。
@@ -50890,18 +51415,18 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   }
 
 
-  /* ---------- 角标：待补录天数 ---------- */
-  function inst_expectedMissing(obj){
-    var dates = Object.keys(obj||{}).map(function(d){ return dmyToYmd(d); }).filter(function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(d); });
-    if(!dates.length) return 0;
-    dates.sort(); var first = dates[0]; var today = prod_today();
-    if(first > today) return 0;
-    var a = new Date(first+'T00:00:00'), b = new Date(today+'T00:00:00');
-    var expected = Math.floor((b - a)/(1000*60*60*24)) + 1;
-    var actual = {}; dates.forEach(function(d){ if(d>=first && d<=today) actual[d]=1; });
-    return Math.max(0, expected - Object.keys(actual).length);
+  /* ---------- 角标：非春节且所有工种人数均为 0 的记录天数 ---------- */
+  function inst_tabCMissingCount(){
+    var f = inst_get(INST_CUR); if(!f || !f.installation || !f.installation.workers) return 0;
+    var workers = f.installation.workers, count = 0;
+    for(var d in workers){ if(!workers.hasOwnProperty(d)) continue;
+      var w = workers[d]; if(!w || w.holiday === 'yes') continue;
+      var allZero = true;
+      INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter' || rk[0]==='leader') return; if((+w[rk[0]]||0) !== 0){ allZero = false; } });
+      if(allZero) count++;
+    }
+    return count;
   }
-  function inst_tabCMissingCount(){ var f = inst_get(INST_CUR); return f ? inst_expectedMissing((f.installation && f.installation.workers)||{}) : 0; }
   function inst_updateTabBadges(){
     var c = inst_tabCMissingCount(); var tC = document.querySelector('.prod-tab[data-key="C"]');
     if(tC){ var b = tC.querySelector('.prod-tab-badge'); if(c>0){ if(!b){ b=document.createElement('span'); b.className='prod-tab-badge'; tC.appendChild(b); } b.textContent=c; } else if(b){ b.remove(); } }
