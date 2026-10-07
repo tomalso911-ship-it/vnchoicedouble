@@ -4514,6 +4514,19 @@ def _prod_factory_counts(f):
     return (out_daily, install_days, install_rows)
 
 
+def _merge_factory_keep_install(payload, existing):
+    """回退闸合并：以服务器现有完整数据(existing)为基底，保留用户本次的安装编辑(installation)，
+    其余字段(出库/物料/设备等)一律采用服务器更完整的版本，从而避免“本地旧快照覆盖服务器新数据”，
+    同时保证用户的安装编辑能够落库。"""
+    out = copy.deepcopy(existing)
+    pinst = payload.get("installation") if isinstance(payload.get("installation"), dict) else {}
+    oinst = existing.get("installation") if isinstance(existing.get("installation"), dict) else {}
+    merged_inst = dict(oinst)        # 服务器安装数据为基底
+    merged_inst.update(pinst)        # 用户本次编辑/新增的安装日期优先
+    out["installation"] = merged_inst
+    return out
+
+
 def _normalize_out_daily(payload):
     """把旧版整数 outDaily 升级成对象格式，并尽量从 payload.installation 补填表人/天气/区域/猪舍号，
        防止旧页面把已补齐的字段又冲掉。"""
@@ -4645,20 +4658,30 @@ def api_prod_factory_put(pid):
             elif ec[2] > 0 and ic[2] < ec[2] * 0.65:
                 reject_reason = f"安装记录过少 (server:{ec[2]} vs incoming:{ic[2]})"
             if reject_reason:
-                # ★ 不再返回 409（会在前端控制台报红、并反复弹出「正在自动同步」提示）。
-                # 保留服务器更完整的版本，并把该版本原样回传前端；
-                # 前端据此把服务器数据合并进本地并重渲染，从而消除红报与反复提示，且不丢任何数据。
-                print(f"[prod_factory PUT {pid}] stale-blocked(keep server): {reject_reason}, requester={me}")
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-                return jsonify({
-                    "ok": True,
-                    "stale": True,
-                    "msg": "服务器数据更完整，已保留服务器版本",
-                    "data": existing,
-                })
+                # 仅当安装数据本身没有显著丢失时才“合并后接受”：保留用户本次安装编辑，
+                # 并用服务器更完整的出库/物料等字段回填（避免本地旧快照覆盖服务器新数据）。
+                # 若安装天数/记录数显著减少，则视为真正的旧快照回退，保留服务器版本。
+                install_safe = (ic[1] >= ec[1] * 0.65) and (ic[2] >= ec[2] * 0.65)
+                if install_safe:
+                    try:
+                        payload = _merge_factory_keep_install(payload, existing)
+                    except Exception:
+                        payload = existing
+                    print(f"[prod_factory PUT {pid}] stale-merge(keep install edit, backfill server): {reject_reason}, requester={me}")
+                    # 继续往下保存合并后的 payload
+                else:
+                    # ★ 真正的旧快照回退：保留服务器更完整的版本，原样回传前端合并，不丢任何数据。
+                    print(f"[prod_factory PUT {pid}] stale-blocked(keep server): {reject_reason}, requester={me}")
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    return jsonify({
+                        "ok": True,
+                        "stale": True,
+                        "msg": "服务器数据更完整，已保留服务器版本",
+                        "data": existing,
+                    })
         except Exception:
             pass
     now = time.strftime("%Y-%m-%d %H:%M:%S")

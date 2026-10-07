@@ -4714,8 +4714,20 @@ function _ovLoadChartLib(cb){
           var f=JSON.parse(s);
           if(f && (f.id==null || f.id==='')) f.id = id;   /* ★ 补齐 id：否则后续保存会写到 prod_factory_undefined，刷新即"丢数据" */
           var mem = PROD_MEM[id];
-          /* 本地存储写入失败时，内存副本才是最新的：谁的时间戳新就用谁，避免界面回退成旧数据 */
-          if(mem && (+(mem.__savedAt||0) > +(f.__savedAt||0))) return prod_normalizeDates(mem);
+          if(mem){
+            /* 优先选择“数据更完整”的副本（出库/安装天数更多），其次才看时间戳。
+               避免旧快照(localStorage 时间戳更新但数据更少)覆盖内存里更完整的副本，
+               否则会不断把不完整的副本回写服务器、触发回退闸导致保存失败。 */
+            var fHo = (f.houseOut && typeof f.houseOut==='object') ? Object.keys(f.houseOut).length : 0;
+            var mHo = (mem.houseOut && typeof mem.houseOut==='object') ? Object.keys(mem.houseOut).length : 0;
+            var fInst = (f.installation && f.installation.workers) ? Object.keys(f.installation.workers).length : 0;
+            var mInst = (mem.installation && mem.installation.workers) ? Object.keys(mem.installation.workers).length : 0;
+            var fAt = +(f.__savedAt||0), mAt = +(mem.__savedAt||0);
+            var memMoreComplete = (mHo > fHo + 1) || (mInst > fInst + 1) || ((mHo>=fHo && mInst>=fInst) && mAt > fAt);
+            if(memMoreComplete) return prod_normalizeDates(mem);
+            PROD_MEM[id] = f;
+            return prod_normalizeDates(f);
+          }
           PROD_MEM[id] = f;
           return prod_normalizeDates(f);
         }
@@ -4893,27 +4905,6 @@ function _ovLoadChartLib(cb){
       try{ if(window.__PROD_SYNC_INFLIGHT && window.__PROD_SYNC_INFLIGHT[f.id]) return Promise.resolve(); }catch(_){}
       /* ★ 首次同步完成前不推送：保证本地已合并服务器完整数据，避免用旧快照发出 409 请求。 */
       try{ if(!(window.__PROD_SYNCED && window.__PROD_SYNCED[f.id])) return Promise.resolve(); }catch(_){}
-      /* ★ 客户端预检：本地信息量明显小于上次同步到的服务器信息量（<60%）时，
-         不发出必然被服务端 409 拒绝的请求，改为先同步，随后重渲染再保存。 */
-      try{
-        var _sw = (window.__PROD_SRV_W && window.__PROD_SRV_W[f.id]) || 0;
-        if(_sw > 0 && prod_factoryWeight(f) < _sw * 0.6){
-          try{ console.warn('[prod_pushToServer] 本地数据少于服务器（'+prod_factoryWeight(f)+'<'+_sw+'*0.6），先同步再保存'); }catch(_){}
-          if(typeof prod_syncFromServer==='function'){
-            prod_syncFromServer(f.id, function(){
-              try{
-                var instDetail = document.getElementById('inst-detail');
-                if(typeof INST_ACTIVE_TAB!=='undefined' && INST_ACTIVE_TAB && instDetail && instDetail.style.display !== 'none'){
-                  if(typeof inst_renderTabs==='function') inst_renderTabs(INST_ACTIVE_TAB);
-                } else if(typeof prod_renderTabs==='function' && typeof PROD_ACTIVE_TAB!=='undefined' && PROD_ACTIVE_TAB){
-                  prod_renderTabs(PROD_ACTIVE_TAB);
-                }
-              }catch(_){}
-            });
-          }
-          return Promise.resolve();
-        }
-      }catch(_){}
       try {
         var _p = fetch('/api/prod-factory/'+encodeURIComponent(f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:f }) });
         /* 上传失败时至少给一次可见提示（原先完全静默，用户会以为"保存了"，但服务端其实没收到） */
