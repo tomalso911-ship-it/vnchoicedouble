@@ -48206,6 +48206,13 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     return { view:'install', detail:shown, instId:INST_CUR, instTab:INST_ACTIVE_TAB };
   };
 
+  /* 切到 Tab C 时默认进入编辑模式，保证「今日安装区域」下拉框与区域卡片输入框始终可见；
+     用户仍可双击空白处收起为只读快照。 */
+  function inst_gotoTab(k){
+    if(k==='C'){ INST_TAB_C_EDIT_MODE = true; INST_TAB_C_EDIT_LAST_ENTER = Date.now(); }
+    inst_renderTab(k);
+  }
+  window.inst_gotoTab = inst_gotoTab;
   function inst_renderTabs(active){
     INST_ACTIVE_TAB = active;
     var box = inst_el('inst-tabs'); if(!box) return;
@@ -48214,7 +48221,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     INST_TABS.forEach(function(t){
       var count = t[0]==='C' ? cMiss : 0;
       var badge = (count>0) ? '<span class="prod-tab-badge">'+count+'</span>' : '';
-      h += '<div class="prod-tab'+(t[0]===active?' active':'')+'" data-key="'+t[0]+'" onclick="inst_renderTab(\''+t[0]+'\')">'+it(t[1])+badge+'</div>';
+      h += '<div class="prod-tab'+(t[0]===active?' active':'')+'" data-key="'+t[0]+'" onclick="inst_gotoTab(\''+t[0]+'\')">'+it(t[1])+badge+'</div>';
     });
     box.innerHTML = h;
     inst_renderTab(active);
@@ -51502,7 +51509,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
                 INST_TABS.forEach(function(t){
                   var count=t[0]==='C'?cMiss:0;
                   var badge=(count>0)?'<span class="prod-tab-badge">'+count+'</span>':'';
-                  h+='<div class="prod-tab'+(t[0]==='B'?' active':'')+'" data-key="'+t[0]+'" onclick="inst_renderTab(\''+t[0]+'\')">'+it(t[1])+badge+'</div>';
+                  h+='<div class="prod-tab'+(t[0]==='B'?' active':'')+'" data-key="'+t[0]+'" onclick="inst_gotoTab(\''+t[0]+'\')">'+it(t[1])+badge+'</div>';
                 });
                 tabsBox.innerHTML=h;
               }
