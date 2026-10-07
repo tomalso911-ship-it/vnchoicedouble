@@ -3882,9 +3882,9 @@ function _ovLoadChartLib(cb){
       .inst-del-pop-cancel:hover{background:#d0d0d0;}
       /* 安装 Tab C 顶部 KPI 卡片条：参考生产/出库模块的统计卡片 */
       .inst-kpi-bar{display:flex;gap:8px;margin:10px 0;flex-wrap:nowrap;}
-      .inst-kpi-card{flex:1;min-width:0;background:#fff;border:1px solid #000;border-radius:6px;padding:8px 6px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.05);}
-      .inst-kpi-card.inst-kpi-blue{background:#e8f4fd;border-color:#000;}
-      .inst-kpi-card.inst-kpi-green{background:#e8f5e9;border-color:#000;}
+      .inst-kpi-card{flex:1;min-width:0;background:#fff;border:1px solid #e3e6eb;border-radius:6px;padding:8px 6px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+      .inst-kpi-card.inst-kpi-blue{background:#e8f4fd;border-color:#bbdefb;}
+      .inst-kpi-card.inst-kpi-green{background:#e8f5e9;border-color:#c8e6c9;}
       .inst-kpi-title{font-size:10px;color:#666;line-height:1.25;margin-bottom:5px;min-height:28px;display:flex;align-items:center;justify-content:center;}
       .inst-kpi-value{font-size:16px;font-weight:700;color:#d32f2f;line-height:1.1;word-break:break-word;}
       .inst-kpi-sub{font-size:10px;color:#888;margin-top:3px;}
@@ -15047,13 +15047,6 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-zone-selects{display:flex;flex-wrap:nowrap;gap:5px;align-items:center;}
       .inst-zone-row{display:flex;align-items:center;gap:4px;flex:0 1 auto;min-width:0;}
       .inst-zone-select{min-width:62px;max-width:120px;flex:1 1 auto;padding:4px 6px;border:1px solid #ccc;border-radius:8px;font-size:13px;background:#FFD400;}
-      /* 天气卡片融入顶部表单行 */
-      .prod-form.inst-labor-form > .inst-weather-field{flex:0 0 auto !important;min-width:0 !important;align-self:stretch;}
-      .inst-weather-field > label{white-space:nowrap;}
-      .inst-weather-cards{display:flex;gap:5px;flex-wrap:nowrap;align-items:stretch;}
-      .inst-weather-cards .prod-wx-card{min-width:110px !important;padding:5px 7px !important;}
-      .inst-weather-cards .prod-wx-h{font-size:11px !important;margin-bottom:2px !important;}
-      .inst-weather-cards .prod-wx-row{gap:6px !important;font-size:11px !important;padding:1px 0 !important;}
       .inst-zone-add{padding:2px 8px;font-size:14px;line-height:1;flex:0 0 auto;}
       .inst-zone-remove{padding:2px 8px;font-size:16px;line-height:1;flex:0 0 auto;color:#fff !important;font-weight:700;}
       .inst-zone-remove[disabled]{opacity:.4;cursor:not-allowed;}
@@ -50572,7 +50565,6 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
           + '<span class="inst-edit-hint">'+it('inst_dblclick_hint')+'</span>'
         : '<button class="prod-btn mini" style="border:1px solid #000;" type="button" onclick="inst_tabCEnterEditMode()">'+pt('op_edit')+'</button>')
       + '</span></div>';
-    var wx = inst_weatherForDate(d);
     h += '<div class="prod-form inst-labor-form'+(INST_TAB_C_EDIT_MODE?' inst-labor-edit':' inst-labor-readonly')+'">'
       + (INST_TAB_C_EDIT_MODE
         ? (typeof prod_dateFld==='function' ? prod_dateFld(it('inst_lbl_date'),'ic_date',dmyToYmd(d),'inst_tabCDateChange()', prod_today()) : '')
@@ -50586,9 +50578,11 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         : '<div class="prod-field"><label>'+it('inst_lbl_holiday')+'</label><input id="ic_holiday" value="'+prod_esc((w.holiday||(latest?latest.holiday:''))==='yes'?pt('opt_yes'):pt('opt_no'))+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>')
       + '<div class="prod-field"><label>'+it('inst_lbl_recorder')+'</label><input id="ic_recorder" value="'+prod_esc(rec)+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
       + '<div class="prod-field inst-zone-field"><label>'+it('inst_lbl_today_zones')+'</label>'+(INST_TAB_C_EDIT_MODE?'<div class="inst-zone-selects" id="ic_zones_wrap"></div>':'<input id="ic_zones_readonly" value="'+prod_esc((w.zones||[]).filter(function(z){return z!==''&&z!=null;}).map(function(z){return it('inst_gantt_zone_name').replace('{0}', z);}).join('、')||'—')+'" readonly style="background:#f0f0f0;cursor:not-allowed;">')+'</div>'
-      + '<div class="prod-field inst-weather-field"><label>'+it('inst_sec_weather')+'</label><div class="inst-weather-cards">'+(typeof prod_wxCard==='function'?prod_wxCard('am','ic_wx_am',wx.am):'')+(typeof prod_wxCard==='function'?prod_wxCard('pm','ic_wx_pm',wx.pm):'')+'</div></div>'
       + '</div>';
     h += '<div id="ic_zone_cards" class="inst-zone-cards"></div>';
+    var wx = inst_weatherForDate(d);
+    h += '<div class="prod-sec-title" style="margin-top:18px;">'+it('inst_sec_weather')+'</div>';
+    h += '<div class="pc-weather-cards">'+(typeof prod_wxCard==='function'?prod_wxCard('am','ic_wx_am',wx.am):'')+(typeof prod_wxCard==='function'?prod_wxCard('pm','ic_wx_pm',wx.pm):'')+'</div>';
     h += '<div class="prod-sec-title" style="margin-top:24px;">'+it('inst_sec_labor_detail')+'</div>';
     h += '<div class="prod-table-scroll pc-labor-scroll"><table class="prod-table pc-labor-hist"><thead><tr>'
       + '<th class="pc-col-no">'+pt('thr_no')+'</th><th class="pc-col-date">'+it('inst_lbl_date')+'</th><th>'+pt('wx_am')+'</th><th>'+pt('wx_pm')+'</th><th>'+it('inst_lbl_holiday')+'</th><th>'+it('inst_lbl_recorder')+'</th>'
