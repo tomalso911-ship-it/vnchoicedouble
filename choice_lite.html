@@ -3885,14 +3885,19 @@ function _ovLoadChartLib(cb){
       .inst-kpi-card{flex:1;min-width:0;background:#fff;border:1px solid #000;border-radius:6px;padding:8px 6px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.05);}
       .inst-kpi-card.inst-kpi-blue{background:#e8f4fd;border-color:#000;}
       .inst-kpi-card.inst-kpi-green{background:#e8f5e9;border-color:#000;}
-      /* 天气卡片融入 KPI 条：一个 KPI 卡内左右并排上午/下午天气小卡 */
-      .inst-kpi-weather{padding:4px 6px;display:flex;flex-direction:column;min-width:130px;}
+      /* 天气卡片融入 KPI 条：一个 KPI 卡内左右并排上午/下午天气小卡；天气卡占 1.5 份更宽 */
+      .inst-kpi-card.inst-kpi-weather{flex:1.5;min-width:220px;padding:4px 6px;display:flex;flex-direction:column;}
       .inst-kpi-weather .inst-kpi-title{margin-bottom:4px;min-height:18px;}
-      .inst-kpi-weather-row{display:flex;gap:4px;flex:1;align-items:stretch;min-width:0;}
-      .inst-kpi-weather-row .prod-wx-card{min-width:0 !important;padding:4px 6px !important;border-radius:5px !important;font-size:10px !important;flex:1 1 0 !important;background:#f8fbff !important;}
-      .inst-kpi-weather-row .prod-wx-h{font-size:11px !important;margin-bottom:2px !important;}
-      .inst-kpi-weather-row .prod-wx-row{gap:3px !important;font-size:10px !important;padding:0 !important;}
-      .inst-kpi-weather-row .prod-wx-condico{font-size:12px !important;}
+      .inst-kpi-weather-row{display:flex;gap:8px;flex:1;align-items:stretch;min-width:0;}
+      .inst-kpi-weather-row .prod-wx-card{min-width:0 !important;padding:6px 8px !important;border-radius:5px !important;font-size:11px !important;flex:1 1 0 !important;background:#f8fbff !important;}
+      .inst-kpi-weather-row .prod-wx-h{font-size:12px !important;margin-bottom:2px !important;}
+      .inst-kpi-weather-row .prod-wx-row{gap:4px !important;font-size:11px !important;padding:0 !important;}
+      .inst-kpi-weather-row .prod-wx-condico{font-size:14px !important;}
+      /* 多指标 KPI 卡：一张卡内主值 + 两个子指标 */
+      .inst-kpi-metrics{display:flex;justify-content:center;gap:8px;margin-top:4px;flex-wrap:wrap;}
+      .inst-kpi-metric{display:flex;flex-direction:column;align-items:center;font-size:10px;line-height:1.2;min-width:0;}
+      .inst-kpi-mk{color:#888;font-size:9px;margin-bottom:1px;white-space:nowrap;}
+      .inst-kpi-mv{font-weight:600;color:#333;white-space:nowrap;}
       .inst-kpi-title{font-size:10px;color:#666;line-height:1.25;margin-bottom:5px;min-height:28px;display:flex;align-items:center;justify-content:center;}
       .inst-kpi-value{font-size:16px;font-weight:700;color:#d32f2f;line-height:1.1;word-break:break-word;}
       .inst-kpi-sub{font-size:10px;color:#888;margin-top:3px;}
@@ -50603,7 +50608,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   window.inst_tabCExitEditMode = inst_tabCExitEditMode;
   window.inst_tabCDateChange = inst_tabCDateChange;
   window.inst_sortLabor = inst_sortLabor;
-  /* 安装 Tab C 顶部 KPI 卡片条：总需求 / 已生产 / 待生产 / 已出库 / 待出库 / 已安装 / 未安装 / 安装率 */
+  /* 安装 Tab C 顶部 KPI 卡片条：总需求 / 生产进度(完成率+仍需) / 出库进度(出库率+尚未出库) / 安装进度(安装率+尚未安装) / 天气 */
   function inst_kpiBarHtml(f){
     var projDemand = 0, projProduced = 0, projShipped = 0, projInstalled = 0;
     var _d = prod_dmy(prod_val('ic_date')||INST_TABC_SELDATE||ymdToDmy(prod_today()));
@@ -50626,15 +50631,19 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var installRate = projDemand > 0 ? (projInstalled / projDemand * 100).toFixed(2) : '0.00';
     var unit = it('inst_kpi_total_demand_unit');
     function kc(cls, title, val, sub){ return '<div class="inst-kpi-card '+cls+'"><div class="inst-kpi-title">'+title+'</div><div class="inst-kpi-value">'+prod_fmtNum(val)+'</div>'+(sub?'<div class="inst-kpi-sub">'+sub+'</div>':'')+'</div>'; }
+    function km(cls, title, val, mets){ return '<div class="inst-kpi-card '+cls+'"><div class="inst-kpi-title">'+title+'</div><div class="inst-kpi-value">'+prod_fmtNum(val)+'</div>'+(mets?'<div class="inst-kpi-metrics">'+mets+'</div>':'')+'</div>'; }
+    function mki(label, val, rate){ return '<div class="inst-kpi-metric"><span class="inst-kpi-mk">'+label+'</span><span class="inst-kpi-mv'+(rate?' inst-kpi-rate':'')+'">'+val+'</span></div>'; }
     return '<div class="inst-kpi-bar">'
       + kc('inst-kpi-blue', it('inst_kpi_total_demand'), projDemand, unit)
-      + '<div class="inst-kpi-card inst-kpi-blue"><div class="inst-kpi-title">'+it('inst_kpi_produced')+'<br>'+it('inst_kpi_produce_rate')+'</div><div class="inst-kpi-value">'+prod_fmtNum(projProduced)+'</div><div class="inst-kpi-sub inst-kpi-rate">'+produceRate+'%</div></div>'
-      + kc('inst-kpi-blue', it('inst_kpi_need_produce'), needProduce, unit)
-      + '<div class="inst-kpi-card inst-kpi-blue"><div class="inst-kpi-title">'+it('inst_kpi_shipped')+'<br>'+it('inst_kpi_ship_rate')+'</div><div class="inst-kpi-value">'+prod_fmtNum(projShipped)+'</div><div class="inst-kpi-sub inst-kpi-rate">'+shipRate+'%</div></div>'
-      + kc('inst-kpi-blue', it('inst_kpi_not_shipped'), notShipped, unit)
-      + kc('inst-kpi-green', it('inst_kpi_installed'), projInstalled, unit)
-      + kc('inst-kpi-green', it('inst_kpi_not_installed'), notInstalled, unit)
-      + '<div class="inst-kpi-card inst-kpi-green"><div class="inst-kpi-title">'+it('inst_kpi_install_rate')+'</div><div class="inst-kpi-value inst-kpi-rate">'+installRate+'%</div></div>'
+      + km('inst-kpi-blue', it('inst_kpi_produced'), projProduced,
+          mki(it('inst_kpi_produce_rate'), produceRate+'%', true)
+        + mki(it('inst_kpi_need_produce'), prod_fmtNum(needProduce), false))
+      + km('inst-kpi-blue', it('inst_kpi_shipped'), projShipped,
+          mki(it('inst_kpi_ship_rate'), shipRate+'%', true)
+        + mki(it('inst_kpi_not_shipped'), prod_fmtNum(notShipped), false))
+      + km('inst-kpi-green', it('inst_kpi_installed'), projInstalled,
+          mki(it('inst_kpi_install_rate'), installRate+'%', true)
+        + mki(it('inst_kpi_not_installed'), prod_fmtNum(notInstalled), false))
       + '<div class="inst-kpi-card inst-kpi-weather"><div class="inst-kpi-title">'+it('inst_sec_weather')+'</div><div class="inst-kpi-weather-row">'+(typeof prod_wxCard==='function'?prod_wxCard('am','ic_wx_am',wx.am):'')+(typeof prod_wxCard==='function'?prod_wxCard('pm','ic_wx_pm',wx.pm):'')+'</div></div>'
     + '</div>';
   }
