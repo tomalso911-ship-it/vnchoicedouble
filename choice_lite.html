@@ -3899,16 +3899,13 @@ function _ovLoadChartLib(cb){
       .inst-del-pop-cancel{background:#e0e0e0;color:#333;}
       .inst-del-pop-cancel:hover{background:#d0d0d0;}
       /* 安装 Tab C 顶部 KPI 卡片条：参考生产/出库模块的统计卡片 */
-      /* 安装 KPI 顶部区：左侧 2×2 统计卡，右侧天气+最新照片 */
-      .inst-kpi-bar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-auto-rows:1fr;gap:10px;margin:10px 0;align-items:stretch;}
-      .inst-kpi-left{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:8px;}
-      .inst-kpi-right{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0;height:100%;}
-      .inst-kpi-card{min-width:0;background:#fff;border:1px solid #000;border-radius:6px;padding:8px 6px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+      .inst-kpi-bar{display:flex;gap:8px;margin:10px 0;flex-wrap:nowrap;}
+      .inst-kpi-card{flex:0.8;min-width:0;background:#fff;border:1px solid #000;border-radius:6px;padding:8px 6px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.05);}
       .inst-kpi-card:not(.inst-kpi-weather){display:flex;flex-direction:column;justify-content:center;align-items:center;}
       .inst-kpi-card.inst-kpi-blue{background:#e8f4fd;border-color:#000;}
       .inst-kpi-card.inst-kpi-green{background:#e8f5e9;border-color:#000;}
-      /* 天气卡片：紧凑高度，放在右侧上方 */
-      .inst-kpi-card.inst-kpi-weather{flex:0 0 auto;padding:4px 6px;display:flex;flex-direction:column;}
+      /* 天气卡片融入 KPI 条：统计卡收窄、天气卡拉宽，保证越南语等长标签一行显示 */
+      .inst-kpi-card.inst-kpi-weather{flex:2.2;min-width:260px;padding:4px 6px;display:flex;flex-direction:column;}
       .inst-kpi-weather .inst-kpi-title{margin-bottom:4px;min-height:18px;}
       .inst-kpi-weather-row{display:flex;gap:8px;flex:1;align-items:stretch;min-width:0;}
       .inst-kpi-weather-row .prod-wx-card{min-width:0 !important;padding:6px 8px !important;border-radius:5px !important;font-size:12px !important;flex:1 1 0 !important;background:#f8fbff !important;white-space:nowrap !important;}
@@ -3926,16 +3923,6 @@ function _ovLoadChartLib(cb){
       .inst-kpi-value{font-size:18px;font-weight:700;color:#d32f2f;line-height:1.1;word-break:break-word;}
       .inst-kpi-sub{font-size:11px;color:#888;margin-top:3px;}
       .inst-kpi-rate{color:#1f6feb;font-weight:600;}
-      /* 右侧「最新照片」展示框 */
-      .inst-kpi-photo-box{flex:1 1 auto;min-height:180px;background:#fff;border:1px solid #000;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 1px 2px rgba(0,0,0,.05);}
-      .inst-kpi-photo-main{flex:1 1 auto;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;background:#f5f5f5;}
-      .inst-kpi-photo-main img{max-width:100%;max-height:100%;object-fit:contain;display:block;}
-      .inst-kpi-photo-empty{color:#888;font-size:14px;padding:20px;text-align:center;}
-      .inst-kpi-photo-info{flex:0 0 auto;padding:6px 10px;border-top:1px solid #eee;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:#555;background:#fff;}
-      .inst-kpi-photo-nav{display:inline-flex;gap:8px;}
-      .inst-kpi-photo-navbtn{width:28px;height:28px;border:1px solid #ccc;border-radius:4px;background:#fff;color:#333;font-size:18px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
-      .inst-kpi-photo-navbtn:hover{background:#f0f0f0;border-color:#999;}
-      .inst-kpi-photo-navbtn:disabled{visibility:hidden;cursor:default;}
       .pc-sort-ind{display:inline-flex;flex-direction:column;line-height:0.78;margin-left:3px;vertical-align:middle;}
       .pc-sort-ind .up,.pc-sort-ind .dn{font-size:9px;color:#c4ccd4;font-style:normal;line-height:0.78;}
       .pc-sort-ind .up.on{color:#E53935;}
@@ -48460,9 +48447,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     }
     else if(key==='C'){
       body.innerHTML = inst_tabC(f);
-      try{ inst_kpiPhotoRender(); }catch(_){}
       /* 异步加载安装区域照片元数据（KV），加载完后刷新区域卡片里的照片显示 */
-      setTimeout(function(){ inst_loadZonePhotos(f, function(){ try{ inst_zoneCardsReRenderPhotos(); }catch(_){} try{ inst_tabCUpdatePhotoCounts(); }catch(_){} try{ inst_kpiPhotoRender(); }catch(_){} }); }, 0);
+      setTimeout(function(){ inst_loadZonePhotos(f, function(){ try{ inst_zoneCardsReRenderPhotos(); }catch(_){} try{ inst_tabCUpdatePhotoCounts(); }catch(_){} }); }, 0);
       setTimeout(function(){ inst_backfillWeather(true); }, 0);
       /* 当天天气：与生产模块一致，自动抓取并写入上午/下午（网络返回后重试几次） */
       setTimeout(inst_captureTodayWeather, 0);
@@ -50270,7 +50256,6 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     }
     inst_zonePhotoRender(zoneNum);
     try{ inst_tabCUpdatePhotoCounts(); }catch(_){}
-    try{ INST_KPI_PHOTO_IDX = 0; inst_kpiPhotoRender(); }catch(_){}
   }
   function inst_zonePhotoOnFile(input, zoneNum){
     var errEl = document.getElementById('ic_zphoto_err_'+zoneNum);
@@ -50290,9 +50275,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       var box = document.getElementById('ic_zphotos_'+zoneNum); if(box) box.value = JSON.stringify(_arr);
       inst_zonePhotoRender(zoneNum);
       inst_saveZonePhotosToKv(f);
-      /* 立即刷新历史表「照片」列计数和 KPI 最新照片框，无需等保存/刷新 */
+      /* 立即刷新历史表「照片」列计数，无需等保存/刷新 */
       try{ inst_tabCUpdatePhotoCounts(); }catch(_){}
-      try{ INST_KPI_PHOTO_IDX = 0; inst_kpiPhotoRender(); }catch(_){}
       /* 同时尝试写回工厂 JSON（兼容旧路径），但不再等待/阻塞 UI */
       try{
         f.installation = f.installation || {}; f.installation.workers = f.installation.workers || {};
@@ -50420,9 +50404,6 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   try{ window.inst_openPhotoViewer = inst_openPhotoViewer; }catch(_){}
   try{ window.inst_closePhotoViewer = inst_closePhotoViewer; }catch(_){}
   try{ window.inst_tabCUpdatePhotoCounts = inst_tabCUpdatePhotoCounts; }catch(_){}
-  try{ window.inst_kpiPhotoRender = inst_kpiPhotoRender; }catch(_){}
-  try{ window.inst_kpiPhotoPrev = inst_kpiPhotoPrev; }catch(_){}
-  try{ window.inst_kpiPhotoNext = inst_kpiPhotoNext; }catch(_){}
 
   function inst_zoneCardHtml(f, d, zoneNum, idx, houses){
     var st = inst_zoneStats(f, zoneNum, houses);
@@ -50967,87 +50948,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   window.inst_tabCExitEditMode = inst_tabCExitEditMode;
   window.inst_tabCDateChange = inst_tabCDateChange;
   window.inst_sortLabor = inst_sortLabor;
-  /* 安装 Tab C 右侧「最新照片」展示：收集全部照片，按日期降序，默认显示最新一张 */
-  var INST_KPI_PHOTO_IDX = 0;
-  var INST_KPI_PHOTO_LIST = [];
-  function inst_houseDisplayName(f, raw){
-    if(!raw) return '';
-    var s = String(raw).trim();
-    try{
-      var houses = inst_buildGanttHouses(f) || [];
-      for(var i=0;i<houses.length;i++){ if(houses[i] && (houses[i].key===s || houses[i].name===s)) return houses[i].name; }
-    }catch(e){}
-    if(typeof prod_phName==='function'){
-      var parts = s.split('#');
-      var base = prod_phName(parts[0]||'');
-      if(base) return base + (parts[1] ? '#' + parts[1] : '');
-    }
-    return s;
-  }
-  function inst_kpiPhotoHouse(f, dmyDate, zoneNum){
-    var w = (f && f.installation && f.installation.workers && f.installation.workers[dmyDate]) || {};
-    var ztw = (w.zoneTeamWorkers && w.zoneTeamWorkers[String(zoneNum)]) || [];
-    for(var i=0;i<ztw.length;i++){ if(ztw[i] && ztw[i].house) return ztw[i].house; }
-    return '';
-  }
-  function inst_kpiPhotoList(f){
-    var list = [];
-    if(!f) return list;
-    var kv = f.__zonePhotos_kv || {};
-    for(var d in kv){
-      if(!kv.hasOwnProperty(d)) continue;
-      var zones = kv[d]; if(!zones || typeof zones!=='object') continue;
-      for(var zn in zones){
-        if(!zones.hasOwnProperty(zn)) continue;
-        var arr = zones[zn]; if(!Array.isArray(arr)) continue;
-        arr.forEach(function(p){
-          if(!p) return;
-          list.push({date:d, zoneNum:zn, house:inst_kpiPhotoHouse(f,d,zn), filename:p});
-        });
-      }
-    }
-    list.sort(function(a,b){
-      var pa = parseYmd(dmyToYmd(b.date)), pb = parseYmd(dmyToYmd(a.date));
-      var ta = pa ? pa.getTime() : 0, tb = pb ? pb.getTime() : 0;
-      if(ta !== tb) return ta - tb; // 日期降序
-      // 同一日期按 KV 内部顺序：区域号数字升序，文件名保持原序
-      return (+a.zoneNum||0) - (+b.zoneNum||0);
-    });
-    return list;
-  }
-  function inst_kpiPhotoRender(){
-    var f = inst_get(INST_CUR); if(!f) return;
-    var list = INST_KPI_PHOTO_LIST = inst_kpiPhotoList(f);
-    var idx = INST_KPI_PHOTO_IDX || 0;
-    if(idx >= list.length) idx = 0; if(idx < 0) idx = 0;
-    INST_KPI_PHOTO_IDX = idx;
-    var main = document.getElementById('ic_kpi_photo_main');
-    var meta = document.getElementById('ic_kpi_photo_meta');
-    var prev = document.getElementById('ic_kpi_photo_prev');
-    var next = document.getElementById('ic_kpi_photo_next');
-    if(!main) return;
-    if(!list.length){
-      main.innerHTML = '<div class="inst-kpi-photo-empty">'+prod_esc(it('inst_nodata')||'暂无数据')+'</div>';
-      if(meta) meta.innerHTML = '';
-      if(prev) prev.disabled = true;
-      if(next) next.disabled = true;
-      return;
-    }
-    var item = list[idx];
-    main.innerHTML = '<img src="/uploads/'+prod_esc(item.filename)+'" alt="'+prod_esc(item.filename)+'">';
-    if(meta){
-      meta.innerHTML = prod_esc(ymdToDmy(item.date)) + ' / ' + prod_esc(it('inst_gantt_zone_name').replace('{0}', item.zoneNum)) + (item.house ? ' / ' + prod_esc(inst_houseDisplayName(f, item.house)) : '');
-    }
-    if(prev) prev.disabled = idx <= 0;
-    if(next) next.disabled = idx >= list.length - 1;
-  }
-  function inst_kpiPhotoPrev(){
-    if(INST_KPI_PHOTO_IDX > 0){ INST_KPI_PHOTO_IDX--; inst_kpiPhotoRender(); }
-  }
-  function inst_kpiPhotoNext(){
-    if(INST_KPI_PHOTO_IDX < INST_KPI_PHOTO_LIST.length - 1){ INST_KPI_PHOTO_IDX++; inst_kpiPhotoRender(); }
-  }
-  /* 安装 Tab C 顶部 KPI 卡片条：总需求 / 生产进度(完成率+仍需) / 出库进度(出库率+尚未出库) / 安装进度(安装率+尚未安装) / 天气 / 最新照片 */
+  /* 安装 Tab C 顶部 KPI 卡片条：总需求 / 生产进度(完成率+仍需) / 出库进度(出库率+尚未出库) / 安装进度(安装率+尚未安装) / 天气 */
   function inst_kpiBarHtml(f){
     var projDemand = 0, projProduced = 0, projShipped = 0, projInstalled = 0;
     var _d = prod_dmy(prod_val('ic_date')||INST_TABC_SELDATE||ymdToDmy(prod_today()));
@@ -51073,31 +50974,17 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     function km(cls, title, val, mets){ return '<div class="inst-kpi-card '+cls+'"><div class="inst-kpi-title">'+title+'</div><div class="inst-kpi-value">'+prod_fmtNum(val)+'</div>'+(mets?'<div class="inst-kpi-metrics">'+mets+'</div>':'')+'</div>'; }
     function mki(label, val, rate){ return '<div class="inst-kpi-metric"><span class="inst-kpi-mk">'+label+'</span><span class="inst-kpi-mv'+(rate?' inst-kpi-rate':'')+'">'+val+'</span></div>'; }
     return '<div class="inst-kpi-bar">'
-      + '<div class="inst-kpi-left">'
-        + kc('inst-kpi-blue', it('inst_kpi_total_demand'), projDemand, unit)
-        + km('inst-kpi-blue', it('inst_kpi_produced'), projProduced,
-            mki(it('inst_kpi_produce_rate'), produceRate+'%', true)
-          + mki(it('inst_kpi_need_produce'), prod_fmtNum(needProduce), false))
-        + km('inst-kpi-blue', it('inst_kpi_shipped'), projShipped,
-            mki(it('inst_kpi_ship_rate'), shipRate+'%', true)
-          + mki(it('inst_kpi_not_shipped'), prod_fmtNum(notShipped), false))
-        + km('inst-kpi-green', it('inst_kpi_installed'), projInstalled,
-            mki(it('inst_kpi_install_rate'), installRate+'%', true)
-          + mki(it('inst_kpi_not_installed'), prod_fmtNum(notInstalled), false))
-      + '</div>'
-      + '<div class="inst-kpi-right">'
-        + '<div class="inst-kpi-card inst-kpi-weather"><div class="inst-kpi-title">'+it('inst_sec_weather')+'</div><div class="inst-kpi-weather-row">'+(typeof prod_wxCard==='function'?prod_wxCard('am','ic_wx_am',wx.am):'')+(typeof prod_wxCard==='function'?prod_wxCard('pm','ic_wx_pm',wx.pm):'')+'</div></div>'
-        + '<div class="inst-kpi-photo-box" id="ic_kpi_photo_box">'
-          + '<div class="inst-kpi-photo-main" id="ic_kpi_photo_main"><div class="inst-kpi-photo-empty">'+prod_esc(it('inst_nodata')||'暂无数据')+'</div></div>'
-          + '<div class="inst-kpi-photo-info">'
-            + '<span id="ic_kpi_photo_meta"></span>'
-            + '<span class="inst-kpi-photo-nav">'
-              + '<button id="ic_kpi_photo_prev" class="inst-kpi-photo-navbtn" type="button" onclick="inst_kpiPhotoPrev()" title="'+prod_esc(it('inst_lbl_photos_view')||'上一张')+'">\u2039</button>'
-              + '<button id="ic_kpi_photo_next" class="inst-kpi-photo-navbtn" type="button" onclick="inst_kpiPhotoNext()" title="'+prod_esc(it('inst_lbl_photos_view')||'下一张')+'">\u203a</button>'
-            + '</span>'
-          + '</div>'
-        + '</div>'
-      + '</div>'
+      + kc('inst-kpi-blue', it('inst_kpi_total_demand'), projDemand, unit)
+      + km('inst-kpi-blue', it('inst_kpi_produced'), projProduced,
+          mki(it('inst_kpi_produce_rate'), produceRate+'%', true)
+        + mki(it('inst_kpi_need_produce'), prod_fmtNum(needProduce), false))
+      + km('inst-kpi-blue', it('inst_kpi_shipped'), projShipped,
+          mki(it('inst_kpi_ship_rate'), shipRate+'%', true)
+        + mki(it('inst_kpi_not_shipped'), prod_fmtNum(notShipped), false))
+      + km('inst-kpi-green', it('inst_kpi_installed'), projInstalled,
+          mki(it('inst_kpi_install_rate'), installRate+'%', true)
+        + mki(it('inst_kpi_not_installed'), prod_fmtNum(notInstalled), false))
+      + '<div class="inst-kpi-card inst-kpi-weather"><div class="inst-kpi-title">'+it('inst_sec_weather')+'</div><div class="inst-kpi-weather-row">'+(typeof prod_wxCard==='function'?prod_wxCard('am','ic_wx_am',wx.am):'')+(typeof prod_wxCard==='function'?prod_wxCard('pm','ic_wx_pm',wx.pm):'')+'</div></div>'
     + '</div>';
   }
   /* 安装用工表「区域/猪舍」列排序：点击一次升序、再点降序、第三次恢复原始顺序 */
