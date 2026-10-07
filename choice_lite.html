@@ -7821,158 +7821,6 @@ function _ovLoadChartLib(cb){
       prod_renderReceiptPhotos();
     }
 
-    /* ===== 安装区域收货照片（参考原料库存收货照片逻辑） ===== */
-    var INST_ZONE_PHOTO_KV_PREFIX = 'inst_zone_photos_';
-    function inst_zonePhotos(f, d, zoneNum){
-      /* 优先从已加载的 KV 缓存读取，绕开工厂数据回退保护闸 */
-      var kv = (f && f.__zonePhotos_kv) || {};
-      if(kv[d] && kv[d][String(zoneNum)]){
-        var arr = kv[d][String(zoneNum)];
-        return Array.isArray(arr) ? arr.slice() : [];
-      }
-      /* 兼容：早期保存在工厂 JSON 里的数据 */
-      var w = (f && f.installation && f.installation.workers && f.installation.workers[d]) || {};
-      var zp = (w.zonePhotos || {})[String(zoneNum)] || [];
-      return Array.isArray(zp) ? zp.slice() : [];
-    }
-    /* 从服务器 prod_kv 加载安装区域照片元数据并写入 f.__zonePhotos_kv */
-    function inst_loadZonePhotos(f, cb, force){
-      if(!f || !f.id) return cb && cb();
-      if(f.__zonePhotos_kv && !force) return cb && cb();
-      var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : (typeof prod_loginUser==='function'?prod_loginUser():'');
-      fetch('/api/prod-kv/'+encodeURIComponent(INST_ZONE_PHOTO_KV_PREFIX+f.id)+'?me='+encodeURIComponent(me))
-        .then(function(r){ return r.json().catch(function(){ return {}; }); })
-        .then(function(j){
-          var data = (j && j.ok && j.data) ? j.data : {};
-          f.__zonePhotos_kv = data;
-          if(cb) cb();
-        }).catch(function(){ if(cb) cb(); });
-    }
-    /* 把安装区域照片元数据保存到 prod_kv（文件名清单），不依赖工厂数据 PUT */
-    function inst_saveZonePhotosToKv(f, cb){
-      if(!f || !f.id) return cb && cb();
-      var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : (typeof prod_loginUser==='function'?prod_loginUser():'');
-      var data = f.__zonePhotos_kv || {};
-      fetch('/api/prod-kv/'+encodeURIComponent(INST_ZONE_PHOTO_KV_PREFIX+f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:data }) })
-        .then(function(){ if(cb) cb(); }).catch(function(){ if(cb) cb(); });
-    }
-    function inst_zonePhotoRender(zoneNum){
-      var box = document.getElementById('ic_zphotos_'+zoneNum); if(!box) return;
-      var arr=[]; try{ arr = JSON.parse(box.value||'[]'); }catch(e){}
-      var nm = document.getElementById('ic_zphoto_name_'+zoneNum);
-      if(nm){ nm.textContent = arr.length ? (arr.length===1 ? arr[0] : arr.length + ' ' + (pt('lbl_photos')||'photos')) : prod_esc(pt('lbl_no_photos_chosen')); }
-      var sel = document.getElementById('ic_zphoto_select_'+zoneNum); if(sel){
-        if(!arr.length){ sel.innerHTML = ''; }
-        else {
-          sel.innerHTML = arr.map(function(p,i){
-            return '<a href="/uploads/'+prod_esc(p)+'" target="_blank" class="photo-thumb-item" title="'+prod_esc(p)+'">'
-              + '<img src="/uploads/'+prod_esc(p)+'">'
-              + '<button type="button" class="photo-thumb-del" onclick="event.preventDefault();event.stopPropagation();inst_zonePhotoRemove(\''+zoneNum+'\','+i+')" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
-              + '</a>';
-          }).join('')
-          + '<button type="button" class="photo-thumb-add" onclick="inst_zonePhotoAdd(\''+zoneNum+'\')" title="'+prod_esc(pt('btn_add_photo'))+'">+</button>';
-        }
-      }
-    }
-    function inst_zonePhotoAdd(zoneNum){
-      var inp = document.getElementById('ic_zphoto_'+zoneNum); if(inp) inp.click();
-    }
-    function inst_zonePhotoRemove(zoneNum, idx){
-      var box = document.getElementById('ic_zphotos_'+zoneNum); if(!box) return;
-      var arr=[]; try{ arr=JSON.parse(box.value||'[]'); }catch(e){}
-      if(idx<0 || idx>=arr.length) return;
-      var fname = arr[idx];
-      arr.splice(idx,1); box.value=JSON.stringify(arr);
-      fetch('/api/inst-zone-photos/'+encodeURIComponent(fname)+'?me='+encodeURIComponent((typeof prod_loginUser==='function'?prod_loginUser():'')), { method:'DELETE' }).catch(function(){});
-      var f = (typeof inst_get==='function') ? inst_get(INST_CUR) : null; if(f){
-        var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
-        /* 从 KV 缓存删除 */
-        var kv = f.__zonePhotos_kv || {};
-        var kvArr = ((kv[d] || {})[String(zoneNum)]) || [];
-        if(Array.isArray(kvArr)){
-          for(var i=0;i<kvArr.length;i++){ if(kvArr[i]===fname){ kvArr.splice(i,1); break; } }
-        }
-        inst_saveZonePhotosToKv(f);
-        /* 兼容旧工厂 JSON */
-        var w = (f.installation && f.installation.workers && f.installation.workers[d]) || {};
-        var zp = (w.zonePhotos || {})[String(zoneNum)] || [];
-        if(Array.isArray(zp)){
-          for(var j=0;j<zp.length;j++){ if(zp[j]===fname){ zp.splice(j,1); break; } }
-        }
-        if(typeof prod_save==='function') prod_save(f);
-      }
-      inst_zonePhotoRender(zoneNum);
-    }
-    function inst_zonePhotoOnFile(input, zoneNum){
-      var errEl = document.getElementById('ic_zphoto_err_'+zoneNum);
-      function showErr(msg){ if(errEl){ errEl.textContent = msg; errEl.style.display = 'inline-block'; } }
-      function clearErr(){ if(errEl){ errEl.textContent = ''; errEl.style.display = 'none'; } }
-      var files = input.files; if(!files || !files.length){ input.value=''; return; }
-      var pid = (typeof INST_CUR!=='undefined' && INST_CUR) || (typeof PROD_CUR!=='undefined' && PROD_CUR) || '';
-      if(!pid){ showErr('no project'); input.value=''; return; }
-      var _f = (typeof inst_get==='function') ? inst_get(INST_CUR) : null; if(!_f){ showErr('no project data'); input.value=''; return; }
-      var _d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
-      clearErr();
-      var ZONE_MAX_PHOTO_BYTES = 50*1024;
-      function addAndRender(filename){
-        _f.__zonePhotos_kv = _f.__zonePhotos_kv || {};
-        _f.__zonePhotos_kv[_d] = _f.__zonePhotos_kv[_d] || {};
-        var _arr = _f.__zonePhotos_kv[_d][String(zoneNum)] = _f.__zonePhotos_kv[_d][String(zoneNum)] || [];
-        _arr.push(filename);
-        var box = document.getElementById('ic_zphotos_'+zoneNum); if(box) box.value = JSON.stringify(_arr);
-        inst_zonePhotoRender(zoneNum);
-        inst_saveZonePhotosToKv(_f);
-        /* 同时尝试写回工厂 JSON（兼容旧路径），但不再等待/阻塞 UI */
-        try{
-          _f.installation = _f.installation || {}; _f.installation.workers = _f.installation.workers || {};
-          var _w = _f.installation.workers[_d] = _f.installation.workers[_d] || {};
-          _w.zonePhotos = _w.zonePhotos || {};
-          var _arr2 = _w.zonePhotos[String(zoneNum)] = _w.zonePhotos[String(zoneNum)] || [];
-          _arr2.push(filename);
-          if(typeof prod_save==='function') prod_save(_f);
-        }catch(_){}
-      }
-      Array.prototype.slice.call(files).forEach(function(f){
-        var isImgType = !!(f.type && f.type.indexOf('image/') === 0);
-        var extOk = /\.(jpe?g|png|gif|bmp|webp|heic|heif)$/i.test(f.name || '');
-        if(!isImgType || !extOk){ showErr(pt('err_photo_type')); input.value=''; return; }
-        function doUpload(file){
-          var fd = new FormData(); fd.append('file', file);
-          fetch('/api/won-projects/'+pid+'/inst-zone-photos', { method:'POST', body: fd })
-            .then(function(r){ return r.json().catch(function(){ return {}; }); })
-            .then(function(res){
-              input.value='';
-              if(res && res.ok){ addAndRender(res.filename); }
-              else { showErr((res&&res.error)||'upload fail'); }
-            }).catch(function(e){ input.value=''; showErr('upload fail:'+((e&&e.message)||e)); });
-        }
-        if(f.size > ZONE_MAX_PHOTO_BYTES){
-          prodReceiptPhotoResize(f, doUpload, ZONE_MAX_PHOTO_BYTES);
-        } else {
-          doUpload(f);
-        }
-      });
-    }
-    /* KV 加载完成后，把当前页面上所有区域卡片的隐藏输入和缩略图都刷新一次 */
-    function inst_zoneCardsReRenderPhotos(){
-      var f = (typeof inst_get==='function') ? inst_get(INST_CUR) : null; if(!f) return;
-      var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
-      var boxes = document.querySelectorAll('[id^="ic_zphotos_"]');
-      for(var i=0;i<boxes.length;i++){
-        var box = boxes[i];
-        var m = box.id.match(/^ic_zphotos_(.+)$/); if(!m) continue;
-        var zoneNum = m[1];
-        var arr = inst_zonePhotos(f, d, zoneNum);
-        box.value = JSON.stringify(arr);
-        inst_zonePhotoRender(zoneNum);
-      }
-    }
-    try{ window.inst_zonePhotoOnFile = inst_zonePhotoOnFile; }catch(_){}
-    try{ window.inst_zonePhotoAdd = inst_zonePhotoAdd; }catch(_){}
-    try{ window.inst_zonePhotoRemove = inst_zonePhotoRemove; }catch(_){}
-    try{ window.inst_zonePhotoRender = inst_zonePhotoRender; }catch(_){}
-    try{ window.inst_loadZonePhotos = inst_loadZonePhotos; }catch(_){}
-    try{ window.inst_zoneCardsReRenderPhotos = inst_zoneCardsReRenderPhotos; }catch(_){}
     /* ===== 收货明细（表格多行） ===== */
     var prodRcRows = [];
     var prodRcRowsByPid = {};
@@ -50258,6 +50106,158 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     }
     return { bldg:bldg, total:total, done:done, remaining:remaining, progress:progress, start:startYmd, planEnd:planEnd, likelyEnd:likelyEnd, dailyRate:dailyRate, theoryDone:theoryDone, theoryRemaining:theoryRemaining, theoryProgress:theoryProgress };
   }
+  /* ===== 安装区域收货照片（参考原料库存收货照片逻辑） ===== */
+  var INST_ZONE_PHOTO_KV_PREFIX = 'inst_zone_photos_';
+  function inst_zonePhotos(f, d, zoneNum){
+    /* 优先从已加载的 KV 缓存读取，绕开工厂数据回退保护闸 */
+    var kv = (f && f.__zonePhotos_kv) || {};
+    if(kv[d] && kv[d][String(zoneNum)]){
+      var arr = kv[d][String(zoneNum)];
+      return Array.isArray(arr) ? arr.slice() : [];
+    }
+    /* 兼容：早期保存在工厂 JSON 里的数据 */
+    var w = (f && f.installation && f.installation.workers && f.installation.workers[d]) || {};
+    var zp = (w.zonePhotos || {})[String(zoneNum)] || [];
+    return Array.isArray(zp) ? zp.slice() : [];
+  }
+  /* 从服务器 prod_kv 加载安装区域照片元数据并写入 f.__zonePhotos_kv */
+  function inst_loadZonePhotos(f, cb, force){
+    if(!f || !f.id) return cb && cb();
+    if(f.__zonePhotos_kv && !force) return cb && cb();
+    var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : (typeof prod_loginUser==='function'?prod_loginUser():'');
+    fetch('/api/prod-kv/'+encodeURIComponent(INST_ZONE_PHOTO_KV_PREFIX+f.id)+'?me='+encodeURIComponent(me))
+      .then(function(r){ return r.json().catch(function(){ return {}; }); })
+      .then(function(j){
+        var data = (j && j.ok && j.data) ? j.data : {};
+        f.__zonePhotos_kv = data;
+        if(cb) cb();
+      }).catch(function(){ if(cb) cb(); });
+  }
+  /* 把安装区域照片元数据保存到 prod_kv（文件名清单），不依赖工厂数据 PUT */
+  function inst_saveZonePhotosToKv(f, cb){
+    if(!f || !f.id) return cb && cb();
+    var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : (typeof prod_loginUser==='function'?prod_loginUser():'');
+    var data = f.__zonePhotos_kv || {};
+    fetch('/api/prod-kv/'+encodeURIComponent(INST_ZONE_PHOTO_KV_PREFIX+f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:data }) })
+      .then(function(){ if(cb) cb(); }).catch(function(){ if(cb) cb(); });
+  }
+  function inst_zonePhotoRender(zoneNum){
+    var box = document.getElementById('ic_zphotos_'+zoneNum); if(!box) return;
+    var arr=[]; try{ arr = JSON.parse(box.value||'[]'); }catch(e){}
+    var nm = document.getElementById('ic_zphoto_name_'+zoneNum);
+    if(nm){ nm.textContent = arr.length ? (arr.length===1 ? arr[0] : arr.length + ' ' + (pt('lbl_photos')||'photos')) : prod_esc(pt('lbl_no_photos_chosen')); }
+    var sel = document.getElementById('ic_zphoto_select_'+zoneNum); if(sel){
+      if(!arr.length){ sel.innerHTML = ''; }
+      else {
+        sel.innerHTML = arr.map(function(p,i){
+          return '<a href="/uploads/'+prod_esc(p)+'" target="_blank" class="photo-thumb-item" title="'+prod_esc(p)+'">'
+            + '<img src="/uploads/'+prod_esc(p)+'">'
+            + '<button type="button" class="photo-thumb-del" onclick="event.preventDefault();event.stopPropagation();inst_zonePhotoRemove(\''+zoneNum+'\','+i+')" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
+            + '</a>';
+        }).join('')
+        + '<button type="button" class="photo-thumb-add" onclick="inst_zonePhotoAdd(\''+zoneNum+'\')" title="'+prod_esc(pt('btn_add_photo'))+'">+</button>';
+      }
+    }
+  }
+  function inst_zonePhotoAdd(zoneNum){
+    var inp = document.getElementById('ic_zphoto_'+zoneNum); if(inp) inp.click();
+  }
+  function inst_zonePhotoRemove(zoneNum, idx){
+    var box = document.getElementById('ic_zphotos_'+zoneNum); if(!box) return;
+    var arr=[]; try{ arr=JSON.parse(box.value||'[]'); }catch(e){}
+    if(idx<0 || idx>=arr.length) return;
+    var fname = arr[idx];
+    arr.splice(idx,1); box.value=JSON.stringify(arr);
+    fetch('/api/inst-zone-photos/'+encodeURIComponent(fname)+'?me='+encodeURIComponent((typeof prod_loginUser==='function'?prod_loginUser():'')), { method:'DELETE' }).catch(function(){});
+    var f = inst_get(INST_CUR); if(f){
+      var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
+      /* 从 KV 缓存删除 */
+      var kv = f.__zonePhotos_kv || {};
+      var kvArr = ((kv[d] || {})[String(zoneNum)]) || [];
+      if(Array.isArray(kvArr)){
+        for(var i=0;i<kvArr.length;i++){ if(kvArr[i]===fname){ kvArr.splice(i,1); break; } }
+      }
+      inst_saveZonePhotosToKv(f);
+      /* 兼容旧工厂 JSON */
+      var w = (f.installation && f.installation.workers && f.installation.workers[d]) || {};
+      var zp = (w.zonePhotos || {})[String(zoneNum)] || [];
+      if(Array.isArray(zp)){
+        for(var j=0;j<zp.length;j++){ if(zp[j]===fname){ zp.splice(j,1); break; } }
+      }
+      if(typeof prod_save==='function') prod_save(f);
+    }
+    inst_zonePhotoRender(zoneNum);
+  }
+  function inst_zonePhotoOnFile(input, zoneNum){
+    var errEl = document.getElementById('ic_zphoto_err_'+zoneNum);
+    function showErr(msg){ if(errEl){ errEl.textContent = msg; errEl.style.display = 'inline-block'; } }
+    function clearErr(){ if(errEl){ errEl.textContent = ''; errEl.style.display = 'none'; } }
+    var files = input.files; if(!files || !files.length){ input.value=''; return; }
+    var f = inst_get(INST_CUR); if(!f || !f.id){ showErr('no project'); input.value=''; return; }
+    var pid = f.id;
+    var _d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
+    clearErr();
+    var ZONE_MAX_PHOTO_BYTES = 50*1024;
+    function addAndRender(filename){
+      f.__zonePhotos_kv = f.__zonePhotos_kv || {};
+      f.__zonePhotos_kv[_d] = f.__zonePhotos_kv[_d] || {};
+      var _arr = f.__zonePhotos_kv[_d][String(zoneNum)] = f.__zonePhotos_kv[_d][String(zoneNum)] || [];
+      _arr.push(filename);
+      var box = document.getElementById('ic_zphotos_'+zoneNum); if(box) box.value = JSON.stringify(_arr);
+      inst_zonePhotoRender(zoneNum);
+      inst_saveZonePhotosToKv(f);
+      /* 同时尝试写回工厂 JSON（兼容旧路径），但不再等待/阻塞 UI */
+      try{
+        f.installation = f.installation || {}; f.installation.workers = f.installation.workers || {};
+        var _w = f.installation.workers[_d] = f.installation.workers[_d] || {};
+        _w.zonePhotos = _w.zonePhotos || {};
+        var _arr2 = _w.zonePhotos[String(zoneNum)] = _w.zonePhotos[String(zoneNum)] || [];
+        _arr2.push(filename);
+        if(typeof prod_save==='function') prod_save(f);
+      }catch(_){}
+    }
+    Array.prototype.slice.call(files).forEach(function(file){
+      var isImgType = !!(file.type && file.type.indexOf('image/') === 0);
+      var extOk = /\.(jpe?g|png|gif|bmp|webp|heic|heif)$/i.test(file.name || '');
+      if(!isImgType || !extOk){ showErr(pt('err_photo_type')); input.value=''; return; }
+      function doUpload(blob){
+        var fd = new FormData(); fd.append('file', blob);
+        fetch('/api/won-projects/'+pid+'/inst-zone-photos', { method:'POST', body: fd })
+          .then(function(r){ return r.json().catch(function(){ return {}; }); })
+          .then(function(res){
+            input.value='';
+            if(res && res.ok){ addAndRender(res.filename); }
+            else { showErr((res&&res.error)||'upload fail'); }
+          }).catch(function(e){ input.value=''; showErr('upload fail:'+((e&&e.message)||e)); });
+      }
+      if(file.size > ZONE_MAX_PHOTO_BYTES){
+        prodReceiptPhotoResize(file, doUpload, ZONE_MAX_PHOTO_BYTES);
+      } else {
+        doUpload(file);
+      }
+    });
+  }
+  /* KV 加载完成后，把当前页面上所有区域卡片的隐藏输入和缩略图都刷新一次 */
+  function inst_zoneCardsReRenderPhotos(){
+    var f = inst_get(INST_CUR); if(!f) return;
+    var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
+    var boxes = document.querySelectorAll('[id^="ic_zphotos_"]');
+    for(var i=0;i<boxes.length;i++){
+      var box = boxes[i];
+      var m = box.id.match(/^ic_zphotos_(.+)$/); if(!m) continue;
+      var zn = m[1];
+      var arr = inst_zonePhotos(f, d, zn);
+      box.value = JSON.stringify(arr);
+      inst_zonePhotoRender(zn);
+    }
+  }
+  try{ window.inst_zonePhotoOnFile = inst_zonePhotoOnFile; }catch(_){}
+  try{ window.inst_zonePhotoAdd = inst_zonePhotoAdd; }catch(_){}
+  try{ window.inst_zonePhotoRemove = inst_zonePhotoRemove; }catch(_){}
+  try{ window.inst_zonePhotoRender = inst_zonePhotoRender; }catch(_){}
+  try{ window.inst_loadZonePhotos = inst_loadZonePhotos; }catch(_){}
+  try{ window.inst_zoneCardsReRenderPhotos = inst_zoneCardsReRenderPhotos; }catch(_){}
+
   function inst_zoneCardHtml(f, d, zoneNum, idx, houses){
     var st = inst_zoneStats(f, zoneNum, houses);
     var color = INST_ZONE_COLORS[(idx % INST_ZONE_COLORS.length)];
