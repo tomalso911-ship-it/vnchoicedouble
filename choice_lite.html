@@ -4890,6 +4890,33 @@ function _ovLoadChartLib(cb){
         var _p = fetch('/api/prod-factory/'+encodeURIComponent(f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:f }) });
         /* 上传失败时至少给一次可见提示（原先完全静默，用户会以为"保存了"，但服务端其实没收到） */
         return _p.then(function(r){
+          /* ★ 服务器判定本次快照为回退：已保留服务器更完整的版本并原样回传（HTTP 200 + stale）。
+             这里把服务器版本合并回本地并重渲染，消除控制台红报与反复提示，且不丢本地新增。 */
+          if(r && r.ok){
+            return r.clone().json().then(function(j){
+              if(j && j.stale && j.data){
+                try{ console.warn('[prod_pushToServer] 服务器数据更完整，已用服务器版本合并回本地'); }catch(_){}
+                try{
+                  var _local = (typeof PROD_MEM!=='undefined' && PROD_MEM[f.id]) || null;
+                  if(!_local){ try{ _local = JSON.parse(localStorage.getItem(PROD_LS+f.id)); }catch(_){ _local = null; } }
+                  var _merged = (typeof prod_mergeFactory==='function') ? prod_mergeFactory(_local, j.data) : j.data;
+                  if(_merged && (_merged.id==null || _merged.id==='')) _merged.id = f.id;
+                  PROD_MEM[f.id] = _merged;
+                  try{ localStorage.setItem(PROD_LS+f.id, JSON.stringify(_merged)); }catch(_){}
+                }catch(_){}
+                try{
+                  var _instDetail = document.getElementById('inst-detail');
+                  if(typeof INST_ACTIVE_TAB!=='undefined' && INST_ACTIVE_TAB && _instDetail && _instDetail.style.display !== 'none'){
+                    if(typeof inst_renderTabs==='function') inst_renderTabs(INST_ACTIVE_TAB);
+                  } else if(typeof prod_renderTabs==='function' && typeof PROD_ACTIVE_TAB!=='undefined' && PROD_ACTIVE_TAB){
+                    var _prodList = document.getElementById('prod-list');
+                    if(!_prodList || _prodList.style.display === 'none') prod_renderTabs(PROD_ACTIVE_TAB);
+                  }
+                }catch(_){}
+              }
+              return r;
+            }).catch(function(){ return r; });
+          }
           if(r && !r.ok){
             if(r.status === 409){
               try{ console.warn('[prod_pushToServer] 409: 本地数据比服务器旧，已阻止覆盖，正在自动同步服务器数据'); }catch(_){}

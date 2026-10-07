@@ -4600,9 +4600,20 @@ def api_prod_factory_put(pid):
             elif ec[2] > 0 and ic[2] < ec[2] * 0.65:
                 reject_reason = f"安装记录过少 (server:{ec[2]} vs incoming:{ic[2]})"
             if reject_reason:
-                print(f"[prod_factory PUT {pid}] rejected: {reject_reason}, requester={me}")
-                conn.close()
-                return jsonify({"ok": False, "msg": "服务器已有更完整的数据，请先刷新页面再保存（" + reject_reason + "）"}), 409
+                # ★ 不再返回 409（会在前端控制台报红、并反复弹出「正在自动同步」提示）。
+                # 保留服务器更完整的版本，并把该版本原样回传前端；
+                # 前端据此把服务器数据合并进本地并重渲染，从而消除红报与反复提示，且不丢任何数据。
+                print(f"[prod_factory PUT {pid}] stale-blocked(keep server): {reject_reason}, requester={me}")
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                return jsonify({
+                    "ok": True,
+                    "stale": True,
+                    "msg": "服务器数据更完整，已保留服务器版本",
+                    "data": existing,
+                })
         except Exception:
             pass
     now = time.strftime("%Y-%m-%d %H:%M:%S")
