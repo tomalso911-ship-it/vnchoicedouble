@@ -51318,8 +51318,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
           {type:'value',name:cumulLabel,axisLabel:{fontSize:11}}
         ],
         series:[
-          {name:daySubLabel, type:'bar', data:data.daily, itemStyle:{color:'#42A5F5'}, barWidth:'50%'},
-          {name:cumulLabel, type:'line', yAxisIndex:1, data:data.cumulative, smooth:true, areaStyle:{color:'rgba(239,83,80,0.15)'}, lineStyle:{color:'#EF5350',width:2}, symbol:'circle', symbolSize:6, itemStyle:{color:'#EF5350'}}
+          {name:daySubLabel, type:'bar', data:data.daily, itemStyle:{color:'#42A5F5'}, barWidth:'50%', label:{show:true, position:'top', fontSize:10, color:'#1565C0', formatter:function(p){ return p.value>0?prod_fmtNum(p.value):''; }}},
+          {name:cumulLabel, type:'line', yAxisIndex:1, data:data.cumulative, smooth:true, areaStyle:{color:'rgba(239,83,80,0.15)'}, lineStyle:{color:'#EF5350',width:2}, symbol:'circle', symbolSize:6, itemStyle:{color:'#EF5350'}, label:{show:true, position:'top', fontSize:10, color:'#C62828', formatter:function(p){ return prod_fmtNum(p.value); }}}
         ]
       });
       /* 图 2：总人力（折线）+ 各角色堆叠面积 */
@@ -51333,7 +51333,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         xAxis:{type:'category',data:data.dates,axisLabel:{rotate:45,fontSize:11,hideOverlap:true,formatter:function(v){ return String(v).split('/').slice(0,2).join('/'); }}},
         yAxis:{type:'value',name:it('inst_lbl_total_man'),axisLabel:{fontSize:11}},
         series:[
-          {name:it('inst_lbl_total_man'), type:'line', data:data.totalMan, smooth:true, lineStyle:{color:'#263238',width:3}, symbol:'circle', symbolSize:6, itemStyle:{color:'#263238'}, z:10}
+          {name:it('inst_lbl_total_man'), type:'line', data:data.totalMan, smooth:true, lineStyle:{color:'#263238',width:3}, symbol:'circle', symbolSize:6, itemStyle:{color:'#263238'}, z:10, label:{show:true, position:'top', fontSize:10, color:'#263238', formatter:function(p){ return p.value>0?prod_fmtNum(p.value):''; }}}
         ].concat(roleSeries)
       });
     }).catch(function(e){ console.error('[inst charts]', e); });
