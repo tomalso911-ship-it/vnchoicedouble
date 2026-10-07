@@ -50367,9 +50367,14 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     if(plannedTeams < 1) plannedTeams = 1;
     var ztRaw = (w.zoneTeams && w.zoneTeams[String(zoneNum)]);
     var zoneTeams = (ztRaw !== undefined && ztRaw !== null && ztRaw !== '') ? Math.max(0, +ztRaw) : plannedTeams;
-    if(zoneTeams > plannedTeams) zoneTeams = plannedTeams;
+    /* ★ 根因修复：编辑态必须和实际已保存的小组数据一一对应。
+       若 zoneTeamWorkers 里已有 2 条记录，但 zoneTeams 保存为 1（例如甘特计划只有 1 组、
+       或通过快速录入/复制产生了更多小组），必须把小组数扩展为 max(已保存值, 实际数据条数)，
+       否则编辑时只渲染 1 个小组，另一个小组的数据在保存时会被静默丢弃。 */
+    zoneTeams = Math.max(zoneTeams, zWorkers.length, 1);
+    var teamMax = Math.max(plannedTeams, zoneTeams);
     var teamOpts = '';
-    for(var t=1; t<=plannedTeams; t++){
+    for(var t=1; t<=teamMax; t++){
       teamOpts += '<option value="'+t+'"'+(t===+zoneTeams?' selected':'')+'>'+t+'</option>';
     }
     var teamHtml = '<span class="inst-zone-team"><label>'+it('inst_lbl_zone_teams')+'</label><select id="ic_zt_'+zoneNum+'" onchange="inst_saveWorkers()">'+teamOpts+'</select></span>';
@@ -50637,7 +50642,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var w = ((f.installation && f.installation.workers && f.installation.workers[d]) || {});
     var holidayYes = (w.holiday === 'yes');
     var zWorkers = ((w.zoneTeamWorkers && w.zoneTeamWorkers[String(zoneNum)]) || []);
-    var zoneTeams = Math.max(1, +(w.zoneTeams && w.zoneTeams[String(zoneNum)]) || 2);
+    var zoneTeams = Math.max(1, +(w.zoneTeams && w.zoneTeams[String(zoneNum)]) || 2, zWorkers.length);
     function houseNameOf(raw){
       if(!raw) return '—';
       var s = String(raw).trim();
