@@ -4860,6 +4860,9 @@ function _ovLoadChartLib(cb){
         try{ prod_toast('检测到本地数据为空，已自动保护：不会覆盖服务器上的数据'); }catch(_){}
         return Promise.resolve();
       }
+      /* ★ 若该项目正在与服务器同步（打开项目 / 409 自动恢复），先不推送：
+         同步会合并服务器完整数据，完成后的重渲染会自动推送，避免用同步前的旧快照触发 409。 */
+      try{ if(window.__PROD_SYNC_INFLIGHT && window.__PROD_SYNC_INFLIGHT[f.id]) return Promise.resolve(); }catch(_){}
       try {
         var _p = fetch('/api/prod-factory/'+encodeURIComponent(f.id), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:f }) });
         /* 上传失败时至少给一次可见提示（原先完全静默，用户会以为"保存了"，但服务端其实没收到） */
@@ -4992,6 +4995,8 @@ function _ovLoadChartLib(cb){
     function prod_syncFromServer(id, cb){
       var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : '';
       if(!me){ if(cb) cb(); return; }
+      /* ★ 标记同步进行中：期间 prod_pushToServer 会跳过推送，避免用同步前的旧快照触发 409。 */
+      try{ if(!window.__PROD_SYNC_INFLIGHT) window.__PROD_SYNC_INFLIGHT = {}; window.__PROD_SYNC_INFLIGHT[id] = true; }catch(_){}
       fetch('/api/prod-factory/'+encodeURIComponent(id)+'?me='+encodeURIComponent(me))
         .then(function(r){ return r.ok ? r.json() : null; })
         .then(function(d){
@@ -5019,11 +5024,13 @@ function _ovLoadChartLib(cb){
             PROD_MEM[id] = merged;                     /* ★ 先写内存：即使 localStorage 不可用，界面也能读到最新数据 */
             try { localStorage.setItem(PROD_LS+id, JSON.stringify(merged)); } catch(e){ prod_localWriteWarn(e); }
           } else if(hasLocal){
+            /* 服务器无数据：本地作为种子上传，先解除 in-flight 标记再推送 */
+            try{ if(window.__PROD_SYNC_INFLIGHT) delete window.__PROD_SYNC_INFLIGHT[id]; }catch(_){}
             try { var f = JSON.parse(localStorage.getItem(PROD_LS+id)); if(f && f.id) prod_pushToServer(f); } catch(e){}
           }
         })
         .catch(function(){})
-        .then(function(){ if(cb) cb(); });
+        .then(function(){ try{ if(window.__PROD_SYNC_INFLIGHT) delete window.__PROD_SYNC_INFLIGHT[id]; }catch(_){} if(cb) cb(); });
     }
     /* ===== ★ 本地缓存缺 installation 时自动从服务器回填 =====
        背景：prod_get() 只读 localStorage，而 localStorage 按 origin 隔离：
