@@ -3355,6 +3355,47 @@ def upload_prod_receipt_photo(pid):
     return jsonify({"ok": True, "filename": fname, "url": "/uploads/" + fname})
 
 
+# 安装区域收货照片上传（与原料库存收货照片机制一致，保存为 inzone_ 前缀）
+@app.route("/api/won-projects/<int:pid>/inst-zone-photos", methods=["POST"])
+def upload_inst_zone_photo(pid):
+    if "file" not in request.files:
+        return jsonify({"error": "no file"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"error": "empty filename"}), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in ALLOWED_EXT:
+        return jsonify({"error": "ext not allowed"}), 400
+    conn = get_db()
+    row = conn.execute("SELECT id FROM won_projects WHERE id=?", (pid,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    stamp = time.strftime("%Y%m%d%H%M%S")
+    rand = os.urandom(3).hex()
+    fname = "inzone_%d_%s_%s%s" % (pid, stamp, rand, ext)
+    f.save(os.path.join(UPLOAD_DIR, fname))
+    return jsonify({"ok": True, "filename": fname, "url": "/uploads/" + fname})
+
+
+# 删除安装区域收货照片文件（仅 tom/cuong/james 可操作；前端逐张调用）
+@app.route("/api/inst-zone-photos/<path:filename>", methods=["DELETE"])
+def delete_inst_zone_photo(filename):
+    filename = os.path.basename(filename)
+    me = (request.args.get("me") or "").strip()
+    if me not in ("tom", "cuong", "james"):
+        return jsonify({"ok": False, "error": "no permission"}), 403
+    if not filename.startswith("inzone_"):
+        return jsonify({"ok": False, "error": "not a zone photo"}), 400
+    path = os.path.join(UPLOAD_DIR, filename)
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 # 删除收货单照片文件（仅 tom/cuong/james 可操作；删除收货单时前端逐张调用）
 @app.route("/api/prod-receipt-photos/<path:filename>", methods=["DELETE"])
 def delete_prod_receipt_photo(filename):

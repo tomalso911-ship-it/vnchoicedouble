@@ -7724,8 +7724,8 @@ function _ovLoadChartLib(cb){
 
 
     /* 收货确认：照片上传（服务器，与合同附件机制一致） */
-    function prodReceiptPhotoResize(file, cb){
-      var maxBytes = 120*1024;
+    function prodReceiptPhotoResize(file, cb, maxBytes){
+      maxBytes = maxBytes || 120*1024;
       var img = new Image();
       var url = URL.createObjectURL(file);
       img.onload = function(){
@@ -7820,6 +7820,94 @@ function _ovLoadChartLib(cb){
       if(idx>=0 && idx<arr.length){ arr.splice(idx,1); box.value=JSON.stringify(arr); }
       prod_renderReceiptPhotos();
     }
+
+    /* ===== 安装区域收货照片（参考原料库存收货照片逻辑） ===== */
+    function inst_zonePhotos(f, d, zoneNum){
+      var w = (f && f.installation && f.installation.workers && f.installation.workers[d]) || {};
+      var zp = (w.zonePhotos || {})[String(zoneNum)] || [];
+      return Array.isArray(zp) ? zp.slice() : [];
+    }
+    function inst_zonePhotoRender(zoneNum){
+      var box = document.getElementById('ic_zphotos_'+zoneNum); if(!box) return;
+      var arr=[]; try{ arr = JSON.parse(box.value||'[]'); }catch(e){}
+      var nm = document.getElementById('ic_zphoto_name_'+zoneNum);
+      if(nm){ nm.textContent = arr.length ? (arr.length===1 ? arr[0] : arr.length + ' ' + (pt('lbl_photos')||'photos')) : prod_esc(pt('lbl_no_photos_chosen')); }
+      var sel = document.getElementById('ic_zphoto_select_'+zoneNum); if(sel){
+        if(!arr.length){ sel.innerHTML = ''; }
+        else {
+          sel.innerHTML = arr.map(function(p,i){
+            return '<a href="/uploads/'+prod_esc(p)+'" target="_blank" class="photo-thumb-item" title="'+prod_esc(p)+'">'
+              + '<img src="/uploads/'+prod_esc(p)+'">'
+              + '<button type="button" class="photo-thumb-del" onclick="event.preventDefault();event.stopPropagation();inst_zonePhotoRemove(\''+zoneNum+'\','+i+')" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
+              + '</a>';
+          }).join('')
+          + '<button type="button" class="photo-thumb-add" onclick="inst_zonePhotoAdd(\''+zoneNum+'\')" title="'+prod_esc(pt('btn_add_photo'))+'">+</button>';
+        }
+      }
+    }
+    function inst_zonePhotoAdd(zoneNum){
+      var inp = document.getElementById('ic_zphoto_'+zoneNum); if(inp) inp.click();
+    }
+    function inst_zonePhotoRemove(zoneNum, idx){
+      var box = document.getElementById('ic_zphotos_'+zoneNum); if(!box) return;
+      var arr=[]; try{ arr=JSON.parse(box.value||'[]'); }catch(e){}
+      if(idx<0 || idx>=arr.length) return;
+      var fname = arr[idx];
+      arr.splice(idx,1); box.value=JSON.stringify(arr);
+      fetch('/api/inst-zone-photos/'+encodeURIComponent(fname)+'?me='+encodeURIComponent((typeof prod_loginUser==='function'?prod_loginUser():'')), { method:'DELETE' }).catch(function(){});
+      var f = (typeof inst_get==='function') ? inst_get(INST_CUR) : null; if(f){
+        var d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
+        var w = (f.installation && f.installation.workers && f.installation.workers[d]) || {};
+        var zp = (w.zonePhotos || {})[String(zoneNum)] || [];
+        if(Array.isArray(zp)){
+          for(var i=0;i<zp.length;i++){ if(zp[i]===fname){ zp.splice(i,1); break; } }
+        }
+        prod_save(f);
+      }
+      inst_zonePhotoRender(zoneNum);
+    }
+    function inst_zonePhotoOnFile(input, zoneNum){
+      var errEl = document.getElementById('ic_zphoto_err_'+zoneNum);
+      function showErr(msg){ if(errEl){ errEl.textContent = msg; errEl.style.display = 'inline-block'; } }
+      function clearErr(){ if(errEl){ errEl.textContent = ''; errEl.style.display = 'none'; } }
+      var files = input.files; if(!files || !files.length){ input.value=''; return; }
+      var pid = (typeof INST_CUR!=='undefined' && INST_CUR) || (typeof PROD_CUR!=='undefined' && PROD_CUR) || '';
+      if(!pid){ showErr('no project'); input.value=''; return; }
+      clearErr();
+      var ZONE_MAX_PHOTO_BYTES = 50*1024;
+      Array.prototype.slice.call(files).forEach(function(f){
+        var isImgType = !!(f.type && f.type.indexOf('image/') === 0);
+        var extOk = /\.(jpe?g|png|gif|bmp|webp|heic|heif)$/i.test(f.name || '');
+        if(!isImgType || !extOk){ showErr(pt('err_photo_type')); input.value=''; return; }
+        function doUpload(file){
+          var fd = new FormData(); fd.append('file', file);
+          fetch('/api/won-projects/'+pid+'/inst-zone-photos', { method:'POST', body: fd })
+            .then(function(r){ return r.json().catch(function(){ return {}; }); })
+            .then(function(res){
+              input.value='';
+              if(res && res.ok){
+                var _f = (typeof inst_get==='function') ? inst_get(INST_CUR) : null; if(!_f) return;
+                var _d = prod_dmy(prod_val('ic_date')||ymdToDmy(prod_today()));
+                _f.installation = _f.installation || {}; _f.installation.workers = _f.installation.workers || {};
+                var _w = _f.installation.workers[_d] = _f.installation.workers[_d] || {};
+                _w.zonePhotos = _w.zonePhotos || {};
+                var _arr = _w.zonePhotos[String(zoneNum)] = _w.zonePhotos[String(zoneNum)] || [];
+                _arr.push(res.filename);
+                prod_save(_f).then(function(){ inst_zonePhotoRender(zoneNum); });
+              } else { showErr((res&&res.error)||'upload fail'); }
+            }).catch(function(e){ input.value=''; showErr('upload fail:'+((e&&e.message)||e)); });
+        }
+        if(f.size > ZONE_MAX_PHOTO_BYTES){
+          prodReceiptPhotoResize(f, doUpload, ZONE_MAX_PHOTO_BYTES);
+        } else {
+          doUpload(f);
+        }
+      });
+    }
+    try{ window.inst_zonePhotoOnFile = inst_zonePhotoOnFile; }catch(_){}
+    try{ window.inst_zonePhotoAdd = inst_zonePhotoAdd; }catch(_){}
+    try{ window.inst_zonePhotoRemove = inst_zonePhotoRemove; }catch(_){}
+    try{ window.inst_zonePhotoRender = inst_zonePhotoRender; }catch(_){}
     /* ===== 收货明细（表格多行） ===== */
     var prodRcRows = [];
     var prodRcRowsByPid = {};
@@ -15157,11 +15245,15 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-zone-team select{min-width:52px;padding:4px 6px;border:1px solid #ef5350;border-radius:6px;background:#ffe066;font-weight:700;color:#8a4b00;font-size:13px;}
       .inst-zone-team select:hover,.inst-zone-team select:focus{border-color:#d32f2f;box-shadow:0 0 0 2px rgba(239,83,80,.15);outline:none;}
       .inst-zone-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
-      .inst-zone-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 10px;font-size:12px;color:#546e7a;margin-bottom:6px;}
+      .inst-zone-stats{display:grid;grid-template-columns:repeat(5, 1fr);gap:6px 10px;font-size:12px;color:#546e7a;margin-bottom:6px;}
+      .inst-zone-stats.inst-zone-stats-row2{grid-template-columns:repeat(3, 1fr);}
       .inst-zone-stat{display:flex;flex-direction:column;justify-content:center;gap:4px;background:#f7f9fb;border-radius:6px;padding:5px 8px;min-width:0;}
-      .inst-zone-stat.inst-zone-stat-wide{grid-column:span 2;min-width:300px;}
+      .inst-zone-stat.inst-zone-stat-wide{grid-column:span 1;}
       .inst-zone-stat.inst-zone-stat-wide .inst-stat-row label{white-space:nowrap;}
       .inst-zone-stat-v{gap:2px;}
+      .inst-zone-stat-photo{justify-content:flex-start;align-items:stretch;}
+      .inst-zone-stat-photo > label{font-weight:500;color:#263238;margin-bottom:2px;}
+      .inst-zone-stat-photo .photo-select-box{max-height:120px;}
       .inst-stat-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
       .inst-stat-row.inst-wrap-label{align-items:flex-start;}
       .inst-stat-row.inst-wrap-label label{white-space:normal;line-height:1.25;}
@@ -50140,6 +50232,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var firstRecordDate = inst_zoneFirstRecordDate(f, zoneNum);
     var h = '<div class="inst-zone-card">';
     h += '<div class="inst-zone-card-header"><span class="inst-zone-dot" style="background:'+color+'"></span><span>'+it('inst_gantt_zone_name').replace('{0}', zoneNum)+'</span>'+teamHtml+'</div>';
+    var zonePhotos = inst_zonePhotos(f, d, zoneNum);
     h += '<div class="inst-zone-stats">';
     h += '<div class="inst-zone-stat inst-zone-stat-v"><div class="inst-stat-col"><label>'+it('inst_lbl_bldg_count')+'</label><b>'+st.bldg+' '+it('inst_unit_bldg')+'</b></div></div>';
     h += '<div class="inst-zone-stat inst-zone-stat-v"><div class="inst-stat-col"><label>'+it('inst_lbl_total_qty')+'</label><b>'+prod_fmtNum(st.total)+'</b></div></div>';
@@ -50155,13 +50248,29 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       '<div class="inst-stat-row"><label>'+it('inst_lbl_theory_progress')+'</label><b>'+st.theoryProgress+'%</b></div>'+
       '<div class="inst-stat-row"><label>'+it('inst_lbl_actual_progress')+'</label><b>'+st.progress+'%</b></div>'+
       '</div>';
+    h += '</div>';
+    /* 第二行：开始日期 / 结束日期 / 收货照片 */
+    h += '<div class="inst-zone-stats inst-zone-stats-row2">';
     h += '<div class="inst-zone-stat inst-zone-stat-v"><div class="inst-stat-col"><label>'+it('inst_lbl_zone_start_date')+'</label><b>'+(firstRecordDate?ymdToDmy(firstRecordDate):'—')+'</b></div></div>';
-    /* 这两个日期合并到一个块里：上下两行，日期靠右；英文标签很长，单独加宽避免折行 */
     h += '<div class="inst-zone-stat inst-zone-stat-wide">'
       + '<div class="inst-stat-row"><label>'+it('inst_lbl_zone_plan_end_date')+'</label><b>'+(st.planEnd?ymdToDmy(st.planEnd):'—')+'</b></div>'
       + '<div class="inst-stat-row"><label>'+it('inst_lbl_zone_likely_end_date')+'</label><b>'+(st.likelyEnd?ymdToDmy(st.likelyEnd):'—')+'</b></div>'
       + '</div>';
+    h += '<div class="inst-zone-stat inst-zone-stat-photo">'
+      + '<label>'+pt('lbl_photos')+'</label>'
+      + '<input type="file" id="ic_zphoto_'+zoneNum+'" accept="image/*" multiple class="vis-hide" onchange="inst_zonePhotoOnFile(this,\''+zoneNum+'\')">'
+      + '<div class="photo-upload-row">'
+        + '<div class="photo-upload-mock" onclick="document.getElementById(\'ic_zphoto_'+zoneNum+'\').click()">'
+          + '<button type="button" class="photo-mock-btn" onclick="event.stopPropagation();document.getElementById(\'ic_zphoto_'+zoneNum+'\').click()">'+pt('btn_choose_photos')+'</button>'
+          + '<span id="ic_zphoto_name_'+zoneNum+'" class="photo-mock-name">'+prod_esc(pt('lbl_no_photos_chosen'))+'</span>'
+        + '</div>'
+        + '<span id="ic_zphoto_err_'+zoneNum+'" class="photo-err"></span>'
+      + '</div>'
+      + '<input type="hidden" id="ic_zphotos_'+zoneNum+'" value="'+prod_esc(JSON.stringify(zonePhotos))+'">'
+      + '<div id="ic_zphoto_select_'+zoneNum+'" class="photo-select-box"></div>'
+      + '</div>';
     h += '</div>';
+    setTimeout(function(){ inst_zonePhotoRender(String(zoneNum)); }, 0);
     var zoneHouses = (houses||[]).filter(function(hh){ return String(hh.zoneKey)===String(zoneNum); })
                                  .sort(function(a,b){ var an=String(a.name||''), bn=String(b.name||''); return an<bn?-1:(an>bn?1:0); })
                                  .filter(function(hh){
@@ -50379,6 +50488,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   /* [锁死] 区域卡片只读渲染：保存后/只读模式使用，不得显示可编辑输入框。 */
   function inst_zoneCardReadOnlyHtml(f, d, zoneNum, idx, houses){
     var st = inst_zoneStats(f, zoneNum, houses);
+    var firstRecordDate = inst_zoneFirstRecordDate(f, zoneNum);
     var color = INST_ZONE_COLORS[(idx % INST_ZONE_COLORS.length)];
     var w = ((f.installation && f.installation.workers && f.installation.workers[d]) || {});
     var holidayYes = (w.holiday === 'yes');
@@ -50412,6 +50522,13 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       '<div class="inst-stat-row"><label>'+it('inst_lbl_theory_progress')+'</label><b>'+st.theoryProgress+'%</b></div>'+
       '<div class="inst-stat-row"><label>'+it('inst_lbl_actual_progress')+'</label><b>'+st.progress+'%</b></div>'+
       '</div>';
+    h += '</div>';
+    h += '<div class="inst-zone-stats inst-zone-stats-row2">';
+    h += '<div class="inst-zone-stat inst-zone-stat-v"><div class="inst-stat-col"><label>'+it('inst_lbl_zone_start_date')+'</label><b>'+(firstRecordDate?ymdToDmy(firstRecordDate):'—')+'</b></div></div>';
+    h += '<div class="inst-zone-stat inst-zone-stat-wide">'
+      + '<div class="inst-stat-row"><label>'+it('inst_lbl_zone_plan_end_date')+'</label><b>'+(st.planEnd?ymdToDmy(st.planEnd):'—')+'</b></div>'
+      + '<div class="inst-stat-row"><label>'+it('inst_lbl_zone_likely_end_date')+'</label><b>'+(st.likelyEnd?ymdToDmy(st.likelyEnd):'—')+'</b></div>'
+      + '</div>';
     h += '</div>';
     for(var ti=0; ti<zWorkers.length; ti++){
       var teamObj = zWorkers[ti] || {};
