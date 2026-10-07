@@ -4866,8 +4866,30 @@ function _ovLoadChartLib(cb){
         return _p.then(function(r){
           if(r && !r.ok){
             if(r.status === 409){
-              try{ prod_toast('服务器已有更新的完整数据，请刷新页面后再保存'); }catch(_){}
-              try{ console.warn('[prod_pushToServer] 409: 本地数据比服务器旧，已阻止覆盖'); }catch(_){}
+              try{ console.warn('[prod_pushToServer] 409: 本地数据比服务器旧，已阻止覆盖，正在自动同步服务器数据'); }catch(_){}
+              try{ prod_toast('服务器已有更新的完整数据，正在自动同步…'); }catch(_){}
+              /* ★ 自动恢复：以服务器为准重新同步一次，避免本地一直停留在旧快照、反复收到 409。
+                 服务器数据更完整，合并会保留本地独有记录（如刚录入的小组/猪舍），不会丢本地新增。 */
+              try{
+                var _ts409 = Date.now();
+                /* 10 秒节流 + 并发保护：即使同步后再次 409 也不会形成紧密循环 */
+                if(!window.__PROD_409_SYNCING && (!window.__PROD_409_SYNC_TS || (_ts409 - window.__PROD_409_SYNC_TS) > 10000)){
+                  window.__PROD_409_SYNCING = true; window.__PROD_409_SYNC_TS = _ts409;
+                  prod_syncFromServer(f.id, function(){
+                    window.__PROD_409_SYNCING = false;
+                    try{
+                      /* 同步完成后刷新当前视图，让界面立即显示服务器数据 */
+                      var instDetail = document.getElementById('inst-detail');
+                      if(typeof INST_ACTIVE_TAB!=='undefined' && INST_ACTIVE_TAB && instDetail && instDetail.style.display !== 'none'){
+                        if(typeof inst_renderTabs==='function') inst_renderTabs(INST_ACTIVE_TAB);
+                      } else if(typeof prod_renderTabs==='function' && typeof PROD_ACTIVE_TAB!=='undefined' && PROD_ACTIVE_TAB){
+                        var prodList = document.getElementById('prod-list');
+                        if(!prodList || prodList.style.display === 'none') prod_renderTabs(PROD_ACTIVE_TAB);
+                      }
+                    }catch(_){}
+                  });
+                }
+              }catch(_){}
             } else {
               prod_serverWarn('HTTP '+r.status);
             }
