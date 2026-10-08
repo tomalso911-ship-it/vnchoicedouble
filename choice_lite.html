@@ -46945,27 +46945,18 @@ function schedule(){
       if(h.lockDays) h.days=Math.max(1,(+h.lockDays|0));
       else h.days = h.bothTeams ? Math.max(1,Math.ceil(h.panels/(n*Math.max(1,cfg.cap)))) : houseDays(h);
       var _isDone = ((+h.panels||0)>0 && (+h.done||0)>=(+h.panels||0));
-      /* ★★ 条形实际跨度（2026-10 规则）★★
-         未完成（含已开工未完成）的栋：只按「剩余数量 ÷ 日产能」折算 ——
-           剩余天数 = ceil((需求 − 已装) ÷ 日产能)，已装越多条越短；
-           例如 #2 已装 300 / 需求 1096 → 剩 796 ÷ 200 = 4 天。
-         已完成的栋：保持名义天数（历史占用不变）。 */
-      var _span;
-      if(_isDone){
-        _span = h.days;
-      } else if(h.lockDays){
-        _span = Math.max(1,(+h.lockDays|0));
-      } else {
-        var _rem = Math.max(0, (+h.panels||0) - (+h.done||0));
-        var _cap = Math.max(1, cfg.cap) * (h.bothTeams ? n : 1);
-        _span = Math.max(1, Math.ceil(_rem / _cap));
-      }
+      /* ★★ 条形跨度 = 名义天数（该是多少天就是多少天）★★
+         不按"剩余数量"缩水：剩余工作量只决定"还要做多久"，条形本身永远是这栋该有的工期。
+         条形**起点**用真实开工日（可能早于链位），**终点**用"轮到它时的理论结束日"，
+         于是中间所有耽误（被调去装别的栋／过节／下雨停工）都会体现在条形的长度里。 */
+      var _span = h.days;
       h.barDays = _span;
       /* 开始日优先级：
          ① 已完成 → 保持其（历史）日期，不参与顺延；
-         ② 手改锁定(lockStart) / 已开工未完成且真实开工日**晚于**链位 → 取真实开工日；
-         ③ 其余 → 接「上一行结束的次日」（串行：必须等上一行装完；真实开工日比链位早的一律忽略，
-            因为它本来就得等前面的栋装完才能装）；并把停工日累计天数整体顺延一次。 */
+         ② 手改锁定(lockStart) / 已开工未完成 → 取真实开工日；
+         ③ 其余 → 接「上一行结束的次日」（串行：必须等上一行装完）；并把停工日累计天数整体顺延一次。
+         ★ 排程基准 base（=它"轮到"的日期，不会早于上一行结束次日）与条形起点 s 分开：
+           已开工的栋 s=真实开工日（可早于 base），所以条形会跨过"中间去装别的栋"的那段。 */
       var s, base;
       if(_isDone){
         base = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
@@ -46973,10 +46964,7 @@ function schedule(){
       } else if(!h.lockStart && h.actualStart){
         var _as = nextWork(h.actualStart);
         base = (_as > cursor) ? _as : nextWork(cursor);   /* 排程基准：不早于上一行结束次日 */
-        /* ★★ 条形**起点** = 真实开工日 ★★
-           即使它早于链位（=这栋已开工但没装完，我们被调去装别的栋了），条形也从那天开始画，
-           于是这条 bar 会"变长"，把中间去装别的栋的那段时间整段包进来 ——
-           它的**终点**仍按"等前面装完后的剩余天数"算，所以看起来是跨过去的。 */
+        /* 条形起点 = 真实开工日（即使早于链位也照用：这栋确实已开工，只是没装完就被调走了） */
         s = (_as < base) ? _as : base;
       } else if(h.lockStart){
         base = nextWork(h.lockStart);
