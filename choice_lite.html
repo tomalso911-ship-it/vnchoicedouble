@@ -46940,38 +46940,47 @@ function schedule(){
       else if(h.lockTeam!=null && h.lockTeam>=0) k=(h.lockTeam|0)%n;
       else { k=rrn%n; rrn++; }
       h.team=k;
-      /* 天数：手动「拉伸条形」设定的天数优先（lockDays）；否则 全部组=ceil(板数/(n×产能))，普通=ceil(板数/产能) */
+      /* 天数（名义值：用于表格「天数」列与条形标签）：
+         手动「拉伸」设定的天数优先；否则 全部组=ceil(板数/(n×产能))，普通=ceil(板数/产能) */
       if(h.lockDays) h.days=Math.max(1,(+h.lockDays|0));
       else h.days = h.bothTeams ? Math.max(1,Math.ceil(h.panels/(n*Math.max(1,cfg.cap)))) : houseDays(h);
-      /* 开始日优先级（「安装进程管理分析」自动校正版）：
-         ① 已完成安装的栋 → 保持其（历史）日期，不参与任何顺延；
-         ② 已开工未完成的栋 → 理论开工日 = 实际开工日（actualStart，来自实际录入）；
-         ③ 手改锁定 → lockStart；
-         ④ 其余未开工的栋 → 接「上一行结束次日」，并把停工日累计天数整体顺延一次。
-         结束 = 开始起占用 h.days 个工作日的最后一天。 */
       var _isDone = ((+h.panels||0)>0 && (+h.done||0)>=(+h.panels||0));
-      h.stretchDays = 0;
+      /* ★★ 条形实际跨度（2026-10 规则）★★
+         未完成（含已开工未完成）的栋：只按「剩余数量 ÷ 日产能」折算 ——
+           剩余天数 = ceil((需求 − 已装) ÷ 日产能)，已装越多条越短；
+           例如 #2 已装 300 / 需求 1096 → 剩 796 ÷ 200 = 4 天。
+         已完成的栋：保持名义天数（历史占用不变）。 */
+      var _span;
+      if(_isDone){
+        _span = h.days;
+      } else if(h.lockDays){
+        _span = Math.max(1,(+h.lockDays|0));
+      } else {
+        var _rem = Math.max(0, (+h.panels||0) - (+h.done||0));
+        var _cap = Math.max(1, cfg.cap) * (h.bothTeams ? n : 1);
+        _span = Math.max(1, Math.ceil(_rem / _cap));
+      }
+      h.barDays = _span;
+      /* 开始日优先级：
+         ① 已完成 → 保持其（历史）日期，不参与顺延；
+         ② 手改锁定(lockStart) / 已开工未完成且真实开工日**晚于**链位 → 取真实开工日；
+         ③ 其余 → 接「上一行结束的次日」（串行：必须等上一行装完；真实开工日比链位早的一律忽略，
+            因为它本来就得等前面的栋装完才能装）；并把停工日累计天数整体顺延一次。 */
       var s;
       if(_isDone){
         s = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
-      } else if(h.actualStart){
-        /* 已开工未完成：★ 以「真实开工日」为准（不往后钳制，允许与相邻行重叠 ——
-           现实里这栋还没装完，我们就去装别的栋了）。
-           若它相对「理论基线」迟到 N 天，则把条形右端再向右**拉升 N 天**，
-           让"晚了几天"在条形上直接看得见（下游行从拉升后的结束日继续）。 */
-        s = nextWork(h.actualStart);
-        var _N = h.baseStart ? diffDays(h.baseStart, s) : 0;
-        if(_N > 0) h.stretchDays = _N;
+      } else if(!h.lockStart && h.actualStart){
+        var _as = nextWork(h.actualStart);
+        s = (_as > cursor) ? _as : nextWork(cursor);
       } else if(h.lockStart){
         s = nextWork(h.lockStart);
       } else {
         if(gSlipLeft){ cursor = nextWork(addDays(cursor, gSlipLeft)); gSlipLeft = 0; }
         s = nextWork(cursor);
       }
-      var e = addWork(s,h.days);
-      if(h.stretchDays) e = addDays(e, h.stretchDays);   /* 右端向右拉升 N 天 */
+      var e = addWork(s,_span);
       h.start=s; h.end=e;
-      /* 游标只前进不后退：真实开工日可能早于链位，不能让后面的行被"拉回去" */
+      /* 游标只前进不后退 */
       var _next = nextAfter(e);
       if(_next > cursor) cursor = _next;
     });
@@ -46992,7 +47001,7 @@ function schedule(){
     localStorage.setItem(ganttStorageKey('house_plan_v1'), JSON.stringify(houses.map(function(h){
       return { zoneKey:String(h.zoneKey), key:String(h.key||''), name:String(h.name||''), panels:(+h.panels||0),
         start:h.start||'', end:h.end||'', days:(+h.days||0), team:(h.team==null?0:h.team),
-        baseStart:h.baseStart||'', baseEnd:h.baseEnd||'', stretchDays:(+h.stretchDays||0) };   /* 理论基线（纯链）+ 延误拉升天数，供 Tab C 分析 */
+        baseStart:h.baseStart||'', baseEnd:h.baseEnd||'', barDays:(+h.barDays||0) };   /* 理论基线（纯链）+ 条形实际跨度，供 Tab C 分析 */
     })));
   }catch(e){}
 }
@@ -49056,7 +49065,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
             var gh = (w.houses||[]).map(function(h){ return {
               zoneKey:String(h.zoneKey), key:String(h.key||''), name:String(h.name||''), panels:(+h.panels||0),
               start:h.start||'', end:h.end||'', days:(+h.days||0), team:(h.team==null?0:h.team),
-              baseStart:h.baseStart||'', baseEnd:h.baseEnd||'', stretchDays:(+h.stretchDays||0) }; });
+              baseStart:h.baseStart||'', baseEnd:h.baseEnd||'', barDays:(+h.barDays||0) }; });
             var pk = 'gantt_'+String(INST_CUR)+'_';
             if(gz.length) localStorage.setItem(pk+'zone_plan_v1', JSON.stringify(gz));
             if(gh.length) localStorage.setItem(pk+'house_plan_v1', JSON.stringify(gh));
