@@ -46222,6 +46222,12 @@ body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !imp
 .bar:hover{box-shadow:0 1px 2px rgba(0,0,0,.12),inset 0 -7px 0 -4px rgba(255,255,255,.55)}
 .bar.sum{border-radius:2px;height:9px !important;z-index:2}
 .bar.sum::before{content:none}
+/* 条形右侧拉伸手柄：拖动 → 调整该栋天数（安装工期），并让下方顺延 */
+.bar-rs{position:absolute;right:0;top:0;bottom:0;width:10px;z-index:6;cursor:ew-resize;touch-action:none}
+.bar-rs::before{content:'';position:absolute;right:3px;top:22%;bottom:22%;width:2px;border-radius:1px;
+  background:rgba(255,255,255,.85);opacity:.5}
+.bar:hover .bar-rs::before{opacity:1}
+.bar.out .bar-rs::before{background:rgba(0,0,0,.35)}
 .bar.sum::after{content:none}
 .bar.ms{border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
   box-shadow:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.28))}
@@ -46453,7 +46459,7 @@ var GANTT_I18N = {
     g_btn_imp:'粘贴 / 导入数据', g_btn_sample:'载入示例', g_btn_add:'+ 新增房舍', g_btn_csv:'导出 CSV',
     g_hint_edit:'直接改下表里的「板数 / 小组」即可；改完自动重排（已装根据实际安装自动读取，不可编辑）',
     g_imp_ph:'从 Excel 直接复制粘贴（自动识别制表符/逗号），或粘贴 CSV / JSON\n\n示例：\n区\t房舍\t水泥板数\t已装\nA区\t1号舍\t2400\t600\nA区\t2号舍\t1800\t0',
-    g_col_zone:'区', g_col_name:'房舍', g_col_panels:'水泥板', g_col_done:'已装', g_col_prog:'进度%', g_col_days:'天数', g_col_team:'小组', g_col_start:'安装日期', g_col_end:'安装结束', g_col_today:'今天\n安装？', g_yes:'是', g_no:'否',
+    g_col_zone:'区', g_col_name:'房舍', g_col_panels:'水泥板', g_col_done:'已装', g_col_prog:'进度%', g_col_days:'天数', g_col_team:'小组', g_col_start:'安装日期', g_col_end:'安装结束', g_col_today:'今天\n安装？', g_yes:'是', g_no:'否', g_rs_days_tip:'拖动右边缘调整该栋天数（下方会顺延）',
     g_hdr:'首行为表头', g_btn_parse:'解析并替换', g_btn_cancel:'取消',
     g_splitter_title:'拖动调整宽度 · 双击适应列宽',
     g_zone_sum_h2:'分区汇总', g_load:'小组负载', g_load_tip:'利用率 = 作业天数 ÷ 该组占用跨度',
@@ -46504,7 +46510,7 @@ var GANTT_I18N = {
     g_btn_imp:'Paste / Import', g_btn_sample:'Load sample', g_btn_add:'+ Add house', g_btn_csv:'Export CSV',
     g_hint_edit:'Edit panels / team below; auto-reschedule (Done is auto-read from actual installation, read-only)',
     g_imp_ph:'Copy-paste from Excel (auto-detect tab/comma), or paste CSV / JSON\n\nExample:\nzone\thouse\tpanels\tdone\nA\t1\t2400\t600\nA\t2\t1800\t0',
-    g_col_zone:'Zone', g_col_name:'House', g_col_panels:'Panels', g_col_done:'Done', g_col_prog:'Progress%', g_col_days:'Days', g_col_team:'Team', g_col_start:'Install Date', g_col_end:'Install end', g_col_today:'Install\ntoday?', g_yes:'Yes', g_no:'No',
+    g_col_zone:'Zone', g_col_name:'House', g_col_panels:'Panels', g_col_done:'Done', g_col_prog:'Progress%', g_col_days:'Days', g_col_team:'Team', g_col_start:'Install Date', g_col_end:'Install end', g_col_today:'Install\ntoday?', g_yes:'Yes', g_no:'No', g_rs_days_tip:'Drag the right edge to change this house\u2019s days (later rows shift)',
     g_hdr:'First row is header', g_btn_parse:'Parse & replace', g_btn_cancel:'Cancel',
     g_splitter_title:'Drag to resize · double-click to fit',
     g_zone_sum_h2:'Zone Summary', g_load:'Team Load', g_load_tip:'Utilization = workdays ÷ team span',
@@ -46555,7 +46561,7 @@ var GANTT_I18N = {
     g_btn_imp:'Dán / Nhập', g_btn_sample:'Tải mẫu', g_btn_add:'+ Thêm chuồng', g_btn_csv:'Xuất CSV',
     g_hint_edit:'Sửa số tấm / đội bên dưới; tự tính lại（Đã lắp tự động lấy từ số lượng lắp đặt thực tế, không sửa được）',
     g_imp_ph:'Copy-dán từ Excel (tự nhận tab/dấu phẩy), hoặc dán CSV / JSON\n\nVí dụ:\nvùng\tchuồng\ttấm\tdã lắp\nA\t1\t2400\t600\nA\t2\t1800\t0',
-    g_col_zone:'Vùng', g_col_name:'Chuồng', g_col_panels:'Tấm', g_col_done:'Đã lắp', g_col_prog:'Tiến độ%', g_col_days:'Ngày', g_col_team:'Đội', g_col_start:'Ngày lắp đặt', g_col_end:'Kết thúc lắp', g_col_today:'Lắp\nhôm nay?', g_yes:'Có', g_no:'Không',
+    g_col_zone:'Vùng', g_col_name:'Chuồng', g_col_panels:'Tấm', g_col_done:'Đã lắp', g_col_prog:'Tiến độ%', g_col_days:'Ngày', g_col_team:'Đội', g_col_start:'Ngày lắp đặt', g_col_end:'Kết thúc lắp', g_col_today:'Lắp\nhôm nay?', g_yes:'Có', g_no:'Không', g_rs_days_tip:'Kéo cạnh phải để đổi số ngày (các dòng sau dịch theo)',
     g_hdr:'Hàng đầu là tiêu đề', g_btn_parse:'Phân tích & thay', g_btn_cancel:'Hủy',
     g_splitter_title:'Kéo đổi rộng · nhấn đúp vừa cột',
     g_zone_sum_h2:'Tổng hợp vùng', g_load:'Tải đội', g_load_tip:'Tỷ lệ = ngày làm ÷ trải đội',
@@ -46776,7 +46782,7 @@ function loadHouses(){
     return {id:'H'+(i+1), zoneKey:zkey, zone:String(h.zone||it('g_unzoned')), name:rawName, name1:name1, name2:name2,
       panels:Math.max(0,Math.round(+h.panels||0)), done:Math.max(0,Math.round(+h.done||0)),
       todayQty:Math.max(0,Math.round(+h.todayQty||0)),
-      days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bothTeams:false,bs:'',be:''};
+      days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bothTeams:false,lockDays:0,bs:'',be:''};
   });
   // 区表：按出现顺序，默认 1 组（可在区汇总表里改）
   var seen={}; zones=[];
@@ -46809,6 +46815,7 @@ function loadHouses(){
           if(o.lockStart) h.lockStart = toYmd(o.lockStart) || o.lockStart;
           if(o.lockTeam!=null && o.lockTeam!=='') h.lockTeam = +o.lockTeam;
           if(o.bothTeams) h.bothTeams = true;
+          if(o.lockDays) h.lockDays = Math.max(1, +o.lockDays|0);
         });
       });
     }
@@ -46817,9 +46824,9 @@ function loadHouses(){
 /* 落盘用户手改的逐栋锁定（安装日期锁定 / 手选小组 / 全组） */
 function saveHouseLocks(){
   try{
-    var arr = houses.filter(function(h){ return (h.lockStart && h.lockStart!=='') || h.lockTeam!=null || h.bothTeams; })
+    var arr = houses.filter(function(h){ return (h.lockStart && h.lockStart!=='') || h.lockTeam!=null || h.bothTeams || h.lockDays; })
       .map(function(h){ return { zoneKey:String(h.zoneKey), name:String(h.name||''),
-        lockStart:h.lockStart||'', lockTeam:(h.lockTeam==null?null:h.lockTeam), bothTeams:!!h.bothTeams }; });
+        lockStart:h.lockStart||'', lockTeam:(h.lockTeam==null?null:h.lockTeam), bothTeams:!!h.bothTeams, lockDays:(+h.lockDays||0) }; });
     localStorage.setItem(ganttStorageKey('house_locks_v1'), JSON.stringify(arr));
   }catch(e){}
 }
@@ -46887,8 +46894,9 @@ function schedule(){
       else if(h.lockTeam!=null && h.lockTeam>=0) k=(h.lockTeam|0)%n;
       else { k=rrn%n; rrn++; }
       h.team=k;
-      /* 天数：全部组=ceil(板数/(n×产能))；否则=ceil(板数/产能) */
-      h.days = h.bothTeams ? Math.max(1,Math.ceil(h.panels/(n*Math.max(1,cfg.cap)))) : houseDays(h);
+      /* 天数：手动「拉伸条形」设定的天数优先（lockDays）；否则 全部组=ceil(板数/(n×产能))，普通=ceil(板数/产能) */
+      if(h.lockDays) h.days=Math.max(1,(+h.lockDays|0));
+      else h.days = h.bothTeams ? Math.max(1,Math.ceil(h.panels/(n*Math.max(1,cfg.cap)))) : houseDays(h);
       /* 开始：手改锁定优先；否则接「上一行结束的次日」；结束=开始起占用 h.days 个工作日的最后一天 */
       var s = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
       var e = addWork(s,h.days);
@@ -47236,6 +47244,10 @@ function setBarBody(el,r,x,w,col,pct){
     });
   }
   h+='<div class="bar-progress" style="width:100%;'+bgForProgress(col,pct)+'"></div>';
+  /* 右侧拉伸手柄：仅房舍行 → 拖动改「天数」并让下方顺延 */
+  if(r.kind==='house'){
+    h+='<div class="bar-rs" title="'+esc(it('g_rs_days_tip'))+'" onmousedown="resizeStart(event,this)" ontouchstart="resizeStart(event,this)"></div>';
+  }
   el.innerHTML=h;
 }
 function tipOf(r){
@@ -47690,7 +47702,10 @@ function dragStart(e,el){
   if(e.type==='touchstart'&&e.touches.length>1) return;
   igHideBarTip();
   drag={h:h,x0:ptX(e)+(document.getElementById('chartWrap').scrollLeft||0),moved:false,
-        touch:e.type.indexOf('touch')===0};
+        touch:e.type.indexOf('touch')===0,
+        /* ★ 固定基准日：拖动过程中 h.start 会被改写，若每次都拿「已改写的 h.start」再加累计位移，
+           就会一次次叠加 → 条形飞快乱串。这里在按下瞬间记死基准，之后只用 基准 + 位移。 */
+        baseStart:(h.lockStart||h.start)};
   e.preventDefault();
   var mv=drag.touch?'touchmove':'mousemove', up=drag.touch?'touchend':'mouseup';
   document.addEventListener(mv,dragMove,{passive:false});
@@ -47702,7 +47717,7 @@ function applyDrag(x){
   var cw=document.getElementById('chartWrap');
   var dx=(x+(cw?cw.scrollLeft:0))-drag.x0;
   if(Math.abs(dx)>2) drag.moved=true;
-  var target=addDays(drag.h.lockStart||drag.h.start, Math.round(dx/S.dayW));
+  var target=addDays(drag.baseStart, Math.round(dx/S.dayW));
   drag.h.start=nextWork(target);
   drag.h.end=addWork(drag.h.start,drag.h.days);
   updateRowsAfterDrag();
@@ -47751,6 +47766,57 @@ function dragEnd(){
   document.removeEventListener('touchend',dragEnd);
   document.removeEventListener('touchcancel',dragEnd);
 }
+/* =========================================================================
+ * 10.5 条形右侧拉伸 → 调整该栋「天数」(= 安装工期)，并让下方行顺延
+ * ======================================================================= */
+var resize=null;
+function resizeStart(e,el){
+  var bar=(el.closest?el.closest('.bar'):null); if(!bar) return;
+  var id=bar.getAttribute('data-id'), h=byId(id); if(!h) return;
+  if(e.type==='touchstart'&&e.touches.length>1) return;
+  igHideBarTip();
+  resize={h:h, x0:ptX(e), baseW:Math.max(1,+h.days||1), moved:false,
+          touch:e.type.indexOf('touch')===0};
+  /* 关键：阻止冒泡到 .bar 的 onmousedown（否则会同时触发「拖动移动」） */
+  if(e.stopPropagation) e.stopPropagation();
+  if(e.preventDefault) e.preventDefault();
+  var mv=resize.touch?'touchmove':'mousemove', up=resize.touch?'touchend':'mouseup';
+  document.addEventListener(mv,resizeMove,{passive:false});
+  document.addEventListener(up,resizeEnd);
+  document.addEventListener('touchcancel',resizeEnd);
+}
+function resizeMove(e){
+  if(!resize) return;
+  if(e.cancelable) e.preventDefault();
+  var dx=ptX(e)-resize.x0;
+  if(Math.abs(dx)>2) resize.moved=true;
+  var dw=Math.max(1, Math.round((resize.baseW*S.dayW + dx)/S.dayW));
+  resize.h.days=dw;
+  resize.h.end=addWork(resize.h.start, dw);
+  /* 实时只更新本条宽度与文案（结束时再统一重排 → 下方顺延） */
+  var el=document.querySelector('#chartInner .bar[data-id="'+cssEsc(resize.h.id)+'"]');
+  if(el){
+    var w=Math.max(Math.round(S.dayW*(diffDays(resize.h.start,resize.h.end)+1)),4);
+    el.style.width=w+'px';
+    el.setAttribute('data-lbl', resize.h.name+' '+fmtNum(dw)+it('g_unit_day'));
+    if(w<48) el.classList.add('out'); else el.classList.remove('out');
+  }
+}
+function resizeEnd(){
+  if(resize){
+    if(resize.moved){
+      resize.h.lockDays=Math.max(1,(+resize.h.days||1));   /* 手拉天数 = 覆盖产能推算，并落盘 */
+      saveHouseLocks();
+    }
+    schedule(); renderAll(); saveCfg();
+  }
+  resize=null;
+  document.removeEventListener('mousemove',resizeMove);
+  document.removeEventListener('mouseup',resizeEnd);
+  document.removeEventListener('touchmove',resizeMove);
+  document.removeEventListener('touchend',resizeEnd);
+  document.removeEventListener('touchcancel',resizeEnd);
+}
 function updateBar(i){
   var r=rows[i]; if(!r) return;
   var el=document.querySelector('#chartInner .bar[data-id="'+cssEsc(r.id)+'"]'); if(!el) return;
@@ -47790,9 +47856,12 @@ function initSplitter(){
 function syncScroll(){
   var a=document.getElementById('tblWrap'), b=document.getElementById('chartWrap');
   if(!a||!b||a.__sync) return; a.__sync=1; var lock=false, src=null;
+  /* ★ 只同步「垂直」滚动（左右两栏行要横向对齐）。
+     不要同步 scrollLeft：左表列宽与右图时间轴宽度无关，一侧滚不到该位置会被夹断，
+     反过来又按夹断后的值把另一侧拉回，表现为「上滑垂直滚动时横向跳回最左」。 */
   function link(p,q){ p.addEventListener('scroll',function(){
     if(lock||src===p) return; lock=true; src=p;
-    q.scrollTop=p.scrollTop; q.scrollLeft=p.scrollLeft;
+    if(q.scrollTop!==p.scrollTop) q.scrollTop=p.scrollTop;
     requestAnimationFrame(function(){ lock=false; src=null; }); }); }
   link(a,b); link(b,a);
 }
