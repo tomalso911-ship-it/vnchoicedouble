@@ -2391,18 +2391,22 @@ function _ovLoadChartLib(cb){
 .bd-progress-fill { height:100%; background:linear-gradient(90deg,#00e5ff,#39e6ff); border-radius:4px; }
 .bd-progress-txt { display:block; font-size:10px; color:#39e6ff; margin-top:2px; text-align:right; }
 /* 轮播：纯 CSS 横向滚动，滚动时不再产生网络请求 */
-.bd-carousel { width:100%; height:100%; min-height:0; overflow:hidden; position:relative; }
-.bd-carousel-track { display:flex; gap:10px; width:max-content; animation:bdScrollX 40s linear infinite; }
+.bd-carousel { width:100%; height:100%; min-height:0; overflow:hidden; position:relative; display:flex; }
+.bd-carousel-track { display:flex; gap:10px; width:max-content; height:100%; animation:bdScrollX 40s linear infinite; align-items:stretch; }
 .bd-carousel:hover .bd-carousel-track { animation-play-state:paused; }
 @keyframes bdScrollX { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-.bd-carousel-card { flex:0 0 auto; width:150px; height:calc(100% - 4px); background:rgba(255,255,255,0.06); border:1px solid rgba(57,230,255,0.25); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; transition:transform .2s, border-color .2s; }
+.bd-carousel-card { flex:0 0 auto; width:180px; height:calc(100% - 4px); background:rgba(255,255,255,0.06); border:1px solid rgba(57,230,255,0.25); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; transition:transform .2s, border-color .2s; }
 .bd-carousel-card:hover { transform:translateY(-2px); border-color:rgba(57,230,255,0.7); }
-.bd-photo-wrap { flex:1 1 0; min-height:0; display:flex; align-items:center; justify-content:center; background:#061a45; overflow:hidden; }
-.bd-photo-wrap img { max-width:100%; max-height:100%; object-fit:cover; display:block; }
-.bd-card-name { font-size:11px; color:#eceff2; padding:6px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; }
-.bd-worker-num { font-size:44px; font-weight:800; color:#39e6ff; text-align:center; padding-top:20px; line-height:1; }
-.bd-worker-label { font-size:11px; color:#aab4c0; text-align:center; margin-top:4px; }
-.bd-worker-card .bd-card-name { margin-top:auto; padding-bottom:14px; }
+/* 照片卡片：图片填满整个卡片，项目名悬浮在底部 */
+.bd-photo-card { position:relative; }
+.bd-photo-wrap { position:absolute; inset:0; background:#061a45; overflow:hidden; }
+.bd-photo-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
+.bd-photo-card .bd-card-name { position:absolute; left:0; right:0; bottom:0; padding:8px; font-size:11px; color:#fff; background:rgba(0,10,30,0.65); text-shadow:0 1px 2px rgba(0,0,0,.6); }
+/* 人数卡片：数字/标签居中，项目名沉底，不留大片空白 */
+.bd-worker-card { justify-content:center; align-items:center; text-align:center; width:210px; }
+.bd-worker-num { font-size:56px; font-weight:800; color:#39e6ff; line-height:1; margin-top:8px; }
+.bd-worker-label { font-size:11px; color:#aab4c0; margin-top:6px; line-height:1.25; padding:0 8px; }
+.bd-worker-card .bd-card-name { width:100%; margin-top:auto; padding:8px 6px 12px; font-size:11px; color:#eceff2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; background:rgba(255,255,255,0.04); }
 @media (max-width:900px){ .bd-total,.bd-clock,.bd-map,.bd-cal,.bd-fx,.bd-ph{ grid-column:span 12; } .bd-kpi-body{ grid-template-columns:repeat(3,1fr); } .bd-row3{ grid-template-columns:1fr; } .bd-row3 .bd-map{ min-height:320px; } }
   .dash-page .page-header { margin-bottom:18px; }
   .dash-page .page-header h2 { font-size:20px; color:#E53935; margin:0; font-weight:700; }
@@ -37329,8 +37333,8 @@ function loadDashboard(force) {
   var base = (typeof crmApiBase === 'function') ? crmApiBase() : API_BASE;
   fetch(base + '/api/dashboard-stats', { credentials:'include', headers:(typeof authHeaders==='function'?authHeaders():{}) })
     .then(function(r){ return r.json(); })
-    .then(function(d){ boardRenderTotal(d && d.ok ? d : null); })
-    .catch(function(){ boardRenderTotal(null); });
+    .then(function(d){ window.__lastDashStats = (d && d.ok) ? d : null; boardRenderTotal(window.__lastDashStats); })
+    .catch(function(){ window.__lastDashStats = null; boardRenderTotal(null); });
   boardLoadAll(sec);
   boardStartClock();
   boardRenderCalendar(sec, new Date().getFullYear(), new Date().getMonth());
@@ -37372,18 +37376,34 @@ function renderBoardShell() {
   + '</div>';
 }
 
-// 总数 / 建成 → 签约(WON)；在建 → 潜在(CRM 进行中)。口径待用户最终确认，如需改用
-// CRM「建设情况」阶段（土地/许可/设计/招标…）划分，改这里即可。
+// 总数：项目总数 = 签约(WON)+潜在(CRM)；
+// 建成/在建：在拿到项目明细后，按「安装是否完工」重新统计（安装完成率>=100%才算建成）。
 function boardRenderTotal(stats) {
   var body = document.getElementById('bdTotalBody'); if (!body) return;
+  if(Array.isArray(stats)) return boardRenderTotalFromProjects(stats);
   var crm=(stats&&stats.crm)||{}, won=(stats&&stats.won)||{};
   var doing = crm.count||0, done = won.count||0, total = doing + done;
-  var cells = [
+  boardRenderTotalCells(total, done, doing);
+}
+function boardRenderTotalFromProjects(list){
+  var stats = (typeof window !== 'undefined' && window.__lastDashStats) ? window.__lastDashStats : {};
+  var crmCount = (stats.crm && stats.crm.count) || 0;
+  var wonTotal = (list||[]).length;
+  var total = wonTotal + crmCount, done = 0;
+  (list||[]).forEach(function(p){
+    var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
+    var pr = (typeof inst_projectProgress === 'function') ? inst_projectProgress(f) : { demand:0, installed:0 };
+    if(pr.demand > 0 && pr.installed >= pr.demand) done++;
+  });
+  boardRenderTotalCells(total, done, total - done);
+}
+function boardRenderTotalCells(total, done, doing){
+  var body = document.getElementById('bdTotalBody'); if (!body) return;
+  body.innerHTML = [
     { t: i18nVal('bd_total_all','项目总数'), v: fmtNum(total) },
     { t: i18nVal('bd_total_done','建成项目'), v: fmtNum(done) },
     { t: i18nVal('bd_total_doing','在建项目'), v: fmtNum(doing) }
-  ];
-  body.innerHTML = cells.map(function(c){ return '<div class="bd-kpi-cell"><div class="bd-kpi-v">'+c.v+'</div><div class="bd-kpi-t">'+c.t+'</div></div>'; }).join('');
+  ].map(function(c){ return '<div class="bd-kpi-cell"><div class="bd-kpi-v">'+c.v+'</div><div class="bd-kpi-t">'+c.t+'</div></div>'; }).join('');
 }
 
 function boardLoadAll(sec) {
@@ -37404,6 +37424,7 @@ function boardLoadAll(sec) {
       boardLoadWeather(Object.keys(agg));
       /* ★ 同步每个项目的工厂数据后，再渲染依赖生产/安装明细的卡片 */
       boardSyncFactories(list, function(){
+        boardRenderTotal(list);   // 按安装完成率重新统计建成/在建
         boardRenderTop10(list);
         boardRenderInstallProg(list);
         boardRenderSitePhotos(list);
@@ -37446,8 +37467,7 @@ function boardRenderTop10(list) {
     var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
     var pr = (typeof inst_projectProgress === 'function') ? inst_projectProgress(f) : { demand:0, produced:0, prodRate:0 };
     return { p:p, name: bdProjName(p), rate: pr.prodRate, demand: pr.demand, produced: pr.produced };
-  }).filter(function(r){ return r.demand > 0; })
-    .sort(function(a,b){ return b.rate - a.rate; }).slice(0,10);
+  }).sort(function(a,b){ return b.rate - a.rate; }).slice(0,10);
   if (!rows.length) { body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
   body.innerHTML = bdProgHead('bd_t10_prog') + rows.map(function(r,i){ return bdProgRow(r,i); }).join('');
 }
@@ -37458,8 +37478,7 @@ function boardRenderInstallProg(list) {
     var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
     var pr = (typeof inst_projectProgress === 'function') ? inst_projectProgress(f) : { demand:0, installed:0, instRate:0 };
     return { p:p, name: bdProjName(p), rate: pr.instRate, demand: pr.demand, installed: pr.installed };
-  }).filter(function(r){ return r.demand > 0; })
-    .sort(function(a,b){ return b.rate - a.rate; }).slice(0,10);
+  }).sort(function(a,b){ return b.rate - a.rate; }).slice(0,10);
   if (!rows.length) { body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
   body.innerHTML = bdProgHead('bd_t10_prog2') + rows.map(function(r,i){ return bdProgRow(r,i); }).join('');
 }
