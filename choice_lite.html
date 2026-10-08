@@ -37403,7 +37403,7 @@ function boardRenderTotalFromProjects(list){
   var total = wonTotal + crmCount, done = 0;
   (list||[]).forEach(function(p){
     var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
-    var pr = (typeof inst_projectProgress === 'function') ? inst_projectProgress(f) : { demand:0, installed:0 };
+    var pr = (typeof boardProjectProgress === 'function') ? boardProjectProgress(f) : { demand:0, installed:0 };
     if(pr.demand > 0 && pr.installed >= pr.demand) done++;
   });
   boardRenderTotalCells(total, done, total - done);
@@ -37415,6 +37415,16 @@ function boardRenderTotalCells(total, done, doing){
     { t: i18nVal('bd_total_done','建成项目'), v: fmtNum(done) },
     { t: i18nVal('bd_total_doing','在建项目'), v: fmtNum(doing) }
   ].map(function(c){ return '<div class="bd-kpi-cell"><div class="bd-kpi-v">'+c.v+'</div><div class="bd-kpi-t">'+c.t+'</div></div>'; }).join('');
+}
+
+// 看板进度缓存：同一工厂版本只算一次，避免 total/top10/install 重复调用 inst_projectProgress
+window.__bdProjProgressCache = {};
+function boardProjectProgress(f){
+  if(!f || !f.id) return { demand:0, produced:0, installed:0, prodRate:0, instRate:0 };
+  var key = f.id + ':' + (f.__savedAt || 0);
+  var c = window.__bdProjProgressCache;
+  if(!c[key]) c[key] = inst_projectProgress(f);
+  return c[key];
 }
 
 function boardLoadAll(sec) {
@@ -37433,8 +37443,14 @@ function boardLoadAll(sec) {
       });
       boardRenderMap(mapBody, agg);
       boardLoadWeather(Object.keys(agg));
-      /* ★ 同步每个项目的工厂数据后，再渲染依赖生产/安装明细的卡片 */
+      // 先用本地缓存数据立即渲染进度卡，避免白等同步
+      window.__bdProjProgressCache = {};
+      boardRenderTotal(list);
+      boardRenderTop10(list);
+      boardRenderInstallProg(list);
+      /* ★ 同步每个项目的工厂数据后，再刷新依赖生产/安装明细的卡片 */
       boardSyncFactories(list, function(){
+        window.__bdProjProgressCache = {};
         boardRenderTotal(list);   // 按安装完成率重新统计建成/在建
         boardRenderTop10(list);
         boardRenderInstallProg(list);
@@ -37476,7 +37492,7 @@ function boardRenderTop10(list) {
   var body = document.getElementById('bdTop10Body'); if (!body) return;
   var rows = (list||[]).map(function(p){
     var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
-    var pr = (typeof inst_projectProgress === 'function') ? inst_projectProgress(f) : { demand:0, produced:0, prodRate:0 };
+    var pr = (typeof boardProjectProgress === 'function') ? boardProjectProgress(f) : { demand:0, produced:0, prodRate:0 };
     return { p:p, name: bdProjName(p), rate: pr.prodRate, demand: pr.demand, produced: pr.produced };
   }).sort(function(a,b){ return b.rate - a.rate; }).slice(0,10);
   if (!rows.length) { body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
@@ -37487,7 +37503,7 @@ function boardRenderInstallProg(list) {
   var body = document.querySelector('#bdProdProg .bd-ph-body'); if (!body) return;
   var rows = (list||[]).map(function(p){
     var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
-    var pr = (typeof inst_projectProgress === 'function') ? inst_projectProgress(f) : { demand:0, installed:0, instRate:0 };
+    var pr = (typeof boardProjectProgress === 'function') ? boardProjectProgress(f) : { demand:0, installed:0, instRate:0 };
     return { p:p, name: bdProjName(p), rate: pr.instRate, demand: pr.demand, installed: pr.installed };
   }).sort(function(a,b){ return b.rate - a.rate; }).slice(0,10);
   if (!rows.length) { body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
@@ -37700,10 +37716,11 @@ function boardLoadWeather(provNames) {
   var lngs = items.map(function(p) { return p.lng; }).join(',');
   var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lats + '&longitude=' + lngs +
             '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code' +
-            '&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code' +
             '&timezone=Asia%2FHo_Chi_Minh';
-  fetch(url)
-    .then(function(r) { return r.json(); })
+  var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var to = ctrl ? setTimeout(function(){ ctrl.abort(); }, 8000) : null;
+  fetch(url, ctrl ? {signal: ctrl.signal} : {})
+    .then(function(r) { if(to) clearTimeout(to); return r.json(); })
     .then(function(d) {
       var arr = Array.isArray(d) ? d : [d];
       var cache = {};
@@ -37711,7 +37728,7 @@ function boardLoadWeather(provNames) {
       __bdWxCache = cache; __bdWxAt = Date.now();
       boardRenderWx(el, items);
     })
-    .catch(function() { el.innerHTML = '<span class="bd-loading">' + i18nVal('bd_wx_offline', '天气需联网获取') + '</span>'; });
+    .catch(function() { if(to) clearTimeout(to); el.innerHTML = '<span class="bd-loading">' + i18nVal('bd_wx_offline', '天气需联网获取') + '</span>'; });
 }
 function bdWxKey(code) {
   if (code == null) return 'bd_wx_na';
