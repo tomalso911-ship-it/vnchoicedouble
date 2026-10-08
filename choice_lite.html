@@ -49266,22 +49266,21 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       + tipRow(it('inst_bldg_produced_short'), projProduced)
       + tipRow(it('inst_lbl_unproduced'), Math.max(0, projDemand - projProduced))
       + (function(){
+          /* 只显示当前房舍相关的规格（与本猪舍发货区一致），避免信息过多撑大弹窗 */
           var out='', seen={};
-          function addPS(spec){
-            var n=inst_specKeyNorm(spec); if(seen[n]) return; seen[n]=1;
+          specs.forEach(function(s){
+            var n=inst_specKeyNorm(s.spec); if(seen[n]) return; seen[n]=1;
             var st=_projSpecStat[n]||{produced:0, shipped:0};
             var remain=Math.max(0, st.produced - st.shipped);
             var isCurrent=currentSpec && inst_specKeyNorm(currentSpec)===n;
             var warnClass=isCurrent?' warn':'';
-            out += '<div class="inst-bldg-tip-spec'+warnClass+'"'+_hl(spec)+'>'
-              + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+prod_esc(spec)+'</div>'
+            out += '<div class="inst-bldg-tip-spec'+warnClass+'"'+_hl(s.spec)+'>'
+              + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+prod_esc(s.spec)+'</div>'
               + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_produced_short')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(st.produced)+'</span></div>'
               + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_shipped')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(st.shipped)+'</span></div>'
               + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_lbl_remaining')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(remain)+'</span></div>'
               + '</div>';
-          }
-          specs.forEach(function(s){ addPS(s.spec); });
-          for(var _n in _projSpecStat){ if(_projSpecStat.hasOwnProperty(_n)) addPS(_projSpecStat[_n].spec); }
+          });
           return out;
         })();
     var projShipRows = '<div class="inst-bldg-tip-h">'+prod_esc(it('inst_tip_proj_ship'))+'</div>'
