@@ -46098,8 +46098,7 @@ textarea:focus{outline:none;border-color:var(--pri)}
 .layout{display:flex;border:1px solid var(--bd);border-radius:10px;overflow:hidden;
   background:var(--card);height:560px;position:relative;margin-top:12px}
 .tbl-wrap{width:var(--tbl-w,470px);flex:0 0 auto;overflow:auto;background:#fafbfc;
-  border-right:1px solid var(--bd);scrollbar-width:thin;
-  -webkit-font-smoothing:antialiased;will-change:scroll-position}
+  border-right:1px solid var(--bd);scrollbar-width:thin}
 .tbl-wrap::-webkit-scrollbar{width:0;height:9px}
 .tbl-wrap::-webkit-scrollbar-track{background:#f0f2f5}
 .tbl-wrap::-webkit-scrollbar-thumb{background:#c4cdd4;border-radius:5px}
@@ -46178,7 +46177,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !imp
 .cfg-hint{font-size:10px;color:var(--txt3);margin-top:7px;line-height:1.5}
 
 /* ---------- 甘特 ---------- */
-.chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff;will-change:scroll-position}
+.chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff}
 .ci{position:relative}
 .thead{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--bd);height:var(--head-h)}
 .tu{display:flex;height:24px;border-bottom:1px solid var(--bd2)}
@@ -47865,10 +47864,15 @@ function syncScroll(){
   /* ★ 只同步「垂直」滚动（左右两栏行要横向对齐）。
      不要同步 scrollLeft：左表列宽与右图时间轴宽度无关，一侧滚不到该位置会被夹断，
      反过来又按夹断后的值把另一侧拉回，表现为「上滑垂直滚动时横向跳回最左」。 */
+  /* ★ 写入另一栏延后到下一帧（rAF），且读取的是「当前最新」滚动位置：
+     避免在 scroll 事件里同步写滚动位置造成的强制同步布局 + 内容抖动/重影。 */
   function link(p,q){ p.addEventListener('scroll',function(){
     if(lock||src===p) return; lock=true; src=p;
-    if(q.scrollTop!==p.scrollTop) q.scrollTop=p.scrollTop;
-    requestAnimationFrame(function(){ lock=false; src=null; }); }); }
+    requestAnimationFrame(function(){
+      var t=p.scrollTop;
+      if(q.scrollTop!==t) q.scrollTop=t;
+      lock=false; src=null;
+    }); }, {passive:true}); }
   link(a,b); link(b,a);
 }
 
