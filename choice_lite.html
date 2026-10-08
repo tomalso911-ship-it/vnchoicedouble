@@ -2386,6 +2386,23 @@ function _ovLoadChartLib(cb){
 .bd-t10-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .bd-t10-amt { text-align:right; }
 .bd-t10-prog { text-align:center; color:#aab4c0; font-size:11px; }
+/* 进度条（生产/安装进度 TOP10） */
+.bd-progress-bar { height:8px; background:rgba(255,255,255,0.15); border-radius:4px; overflow:hidden; position:relative; }
+.bd-progress-fill { height:100%; background:linear-gradient(90deg,#00e5ff,#39e6ff); border-radius:4px; }
+.bd-progress-txt { display:block; font-size:10px; color:#39e6ff; margin-top:2px; text-align:right; }
+/* 轮播：纯 CSS 横向滚动，滚动时不再产生网络请求 */
+.bd-carousel { width:100%; height:100%; min-height:0; overflow:hidden; position:relative; }
+.bd-carousel-track { display:flex; gap:10px; width:max-content; animation:bdScrollX 40s linear infinite; }
+.bd-carousel:hover .bd-carousel-track { animation-play-state:paused; }
+@keyframes bdScrollX { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+.bd-carousel-card { flex:0 0 auto; width:150px; height:calc(100% - 4px); background:rgba(255,255,255,0.06); border:1px solid rgba(57,230,255,0.25); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; transition:transform .2s, border-color .2s; }
+.bd-carousel-card:hover { transform:translateY(-2px); border-color:rgba(57,230,255,0.7); }
+.bd-photo-wrap { flex:1 1 0; min-height:0; display:flex; align-items:center; justify-content:center; background:#061a45; overflow:hidden; }
+.bd-photo-wrap img { max-width:100%; max-height:100%; object-fit:cover; display:block; }
+.bd-card-name { font-size:11px; color:#eceff2; padding:6px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; }
+.bd-worker-num { font-size:44px; font-weight:800; color:#39e6ff; text-align:center; padding-top:20px; line-height:1; }
+.bd-worker-label { font-size:11px; color:#aab4c0; text-align:center; margin-top:4px; }
+.bd-worker-card .bd-card-name { margin-top:auto; padding-bottom:14px; }
 @media (max-width:900px){ .bd-total,.bd-clock,.bd-map,.bd-cal,.bd-fx,.bd-ph{ grid-column:span 12; } .bd-kpi-body{ grid-template-columns:repeat(3,1fr); } .bd-row3{ grid-template-columns:1fr; } .bd-row3 .bd-map{ min-height:320px; } }
   .dash-page .page-header { margin-bottom:18px; }
   .dash-page .page-header h2 { font-size:20px; color:#E53935; margin:0; font-weight:700; }
@@ -18331,12 +18348,12 @@ var I18N = {
  bd_map_title:"项目分布地图（越南）", bd_cal_title:"日历（中越法定假日）", bd_cal_today:"回到当天",
  bd_mon:"一", bd_tue:"二", bd_wed:"三", bd_thu:"四", bd_fri:"五", bd_sat:"六", bd_sun:"日",
  bd_hol_vn:"越南", bd_hol_cn:"中国",
- bd_top10_title:"项目进度", bd_t10_name:"项目", bd_t10_amt:"合同金额(VND)", bd_t10_prog:"进度",
+ bd_top10_title:"生产进度", bd_t10_name:"项目", bd_t10_amt:"合同金额(VND)", bd_t10_prog:"生产进度", bd_t10_prog2:"安装进度",
  bd_no_data:"暂无数据", bd_pending_short:"待接入", bd_pending:"（待接入：数据模块未就绪）",
- bd_prog_title:"项目进度 / 生产进度", bd_photo_title:"现场图片", bd_worker_title:"施工人数", bd_prod_title:"生产数据",
+ bd_prog_title:"项目进度 / 生产进度", bd_photo_title:"现场图片", bd_worker_title:"安装人数", bd_prod_title:"生产人数",
  bd_fx_title:"汇率", bd_fx_cny_vnd:"人民币 → 越南盾", bd_fx_usd_vnd:"美元 → 越南盾", bd_fx_usd_cny:"美元 → 人民币", bd_fx_range:"区间",
  bd_clock_title:"日期 · 时间 · 天气", bd_wx_clear:"晴", bd_wx_cloudy:"多云", bd_wx_fog:"雾", bd_wx_rain:"雨", bd_wx_snow:"雪", bd_wx_shower:"阵雨", bd_wx_storm:"雷暴", bd_wx_na:"—", bd_wx_offline:"天气需联网获取", bd_wx_hum:"湿度", bd_wx_wind:"风力", bd_wx_wind_unit:"级",
- bd_next_holiday:"下一个大假", bd_hol_days:"天", bd_hol_legend:"假日图例", bd_prodprog_title:"生产进度",
+ bd_next_holiday:"下一个大假", bd_hol_days:"天", bd_hol_legend:"假日图例", bd_prodprog_title:"安装进度",
  bd_mat_rebar:"钢筋价格曲线", bd_mat_cement:"水泥价格曲线", bd_mat_sand:"黄砂价格曲线", bd_mat_gravel:"石子价格曲线", bd_src_live:"实时", bd_src_demo:"示例", dash_crm_rate_rmb:"RMB-VND 汇率走势", dash_crm_rate_usd:"USD-VND 汇率走势",
              dash_won_section:"签约项目", dash_won_bu_bar:"各BU累计销售 vs 当年", dash_won_bu_pie_all:"各BU历年销售占比",
              dash_won_bu_pie_year:"各BU当年销售占比", dash_won_contract:"各年设备合同金额/实付/尚未支付",
@@ -19100,12 +19117,12 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
  bd_map_title:"Project Map (Vietnam)", bd_cal_title:"Calendar (CN/VN Public Holidays)", bd_cal_today:"Today",
  bd_mon:"Mon", bd_tue:"Tue", bd_wed:"Wed", bd_thu:"Thu", bd_fri:"Fri", bd_sat:"Sat", bd_sun:"Sun",
  bd_hol_vn:"Vietnam", bd_hol_cn:"China",
- bd_top10_title:"Project Progress", bd_t10_name:"Project", bd_t10_amt:"Contract Amount (VND)", bd_t10_prog:"Progress",
+ bd_top10_title:"Production Progress", bd_t10_name:"Project", bd_t10_amt:"Contract Amount (VND)", bd_t10_prog:"Production Progress", bd_t10_prog2:"Installation Progress",
  bd_no_data:"No data", bd_pending_short:"Pending", bd_pending:"(Pending: data module not ready)",
- bd_prog_title:"Project Progress / Production Progress", bd_photo_title:"Site Photos", bd_worker_title:"Site Workers", bd_prod_title:"Production Data",
+ bd_prog_title:"Project Progress / Production Progress", bd_photo_title:"Site Photos", bd_worker_title:"Installation Workers", bd_prod_title:"Production Workers",
  bd_fx_title:"Exchange Rates", bd_fx_cny_vnd:"CNY → VND", bd_fx_usd_vnd:"USD → VND", bd_fx_usd_cny:"USD → CNY", bd_fx_range:"Range",
  bd_clock_title:"Date · Time · Weather", bd_wx_clear:"Clear", bd_wx_cloudy:"Cloudy", bd_wx_fog:"Fog", bd_wx_rain:"Rain", bd_wx_snow:"Snow", bd_wx_shower:"Showers", bd_wx_storm:"Thunderstorm", bd_wx_na:"—", bd_wx_offline:"Weather needs internet", bd_wx_hum:"Humidity", bd_wx_wind:"Wind", bd_wx_wind_unit:"lvl",
- bd_next_holiday:"Next Holiday", bd_hol_days:"d", bd_hol_legend:"Holidays", bd_prodprog_title:"Production Progress",
+ bd_next_holiday:"Next Holiday", bd_hol_days:"d", bd_hol_legend:"Holidays", bd_prodprog_title:"Installation Progress",
  bd_mat_rebar:"Rebar Price Trend", bd_mat_cement:"Cement Price Trend", bd_mat_sand:"Sand Price Trend", bd_mat_gravel:"Gravel Price Trend", bd_src_live:"Live", bd_src_demo:"Demo", dash_crm_rate_rmb:"RMB-VND Rate Trend", dash_crm_rate_usd:"USD-VND Rate Trend",
              dash_won_section:"Signed Projects", dash_won_bu_bar:"BU Cumulative vs Current Year", dash_won_bu_pie_all:"BU Historical Sales Share",
              dash_won_bu_pie_year:"BU Current Year Sales Share", dash_won_contract:"Annual Contract Amount/Paid/Unpaid",
@@ -19872,12 +19889,12 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
  bd_map_title:"Bản đồ dự án (Việt Nam)", bd_cal_title:"Lịch (Ngày lễ VN & TQ)", bd_cal_today:"Hôm nay",
  bd_mon:"T2", bd_tue:"T3", bd_wed:"T4", bd_thu:"T5", bd_fri:"T6", bd_sat:"T7", bd_sun:"CN",
  bd_hol_vn:"Việt Nam", bd_hol_cn:"Trung Quốc",
- bd_top10_title:"Tiến độ dự án", bd_t10_name:"Dự án", bd_t10_amt:"Giá trị HĐ (VND)", bd_t10_prog:"Tiến độ",
+ bd_top10_title:"Tiến độ sản xuất", bd_t10_name:"Dự án", bd_t10_amt:"Giá trị HĐ (VND)", bd_t10_prog:"Tiến độ sản xuất", bd_t10_prog2:"Tiến độ lắp đặt",
  bd_no_data:"Không có dữ liệu", bd_pending_short:"Chờ tích hợp", bd_pending:"(Chờ tích hợp: mô-đun dữ liệu chưa sẵn sàng)",
- bd_prog_title:"Tiến độ dự án / Tiến độ sản xuất", bd_photo_title:"Hình ảnh công trường", bd_worker_title:"Số nhân công", bd_prod_title:"Dữ liệu sản xuất",
+ bd_prog_title:"Tiến độ dự án / Tiến độ sản xuất", bd_photo_title:"Hình ảnh công trường", bd_worker_title:"Số người lắp đặt", bd_prod_title:"Số người sản xuất",
  bd_fx_title:"Tỷ giá hối đoái", bd_fx_cny_vnd:"CNY → VND", bd_fx_usd_vnd:"USD → VND", bd_fx_usd_cny:"USD → CNY", bd_fx_range:"Khoảng",
  bd_clock_title:"Ngày · Giờ · Thời tiết", bd_wx_clear:"Trời quang", bd_wx_cloudy:"Nhiều mây", bd_wx_fog:"Sương mù", bd_wx_rain:"Mưa", bd_wx_snow:"Tuyết", bd_wx_shower:"Mưa rào", bd_wx_storm:"Dông", bd_wx_na:"—", bd_wx_offline:"Thời tiết cần kết nối mạng", bd_wx_hum:"Độ ẩm", bd_wx_wind:"Gió", bd_wx_wind_unit:"cấp",
- bd_next_holiday:"Kỳ nghỉ lớn tới", bd_hol_days:"ngày", bd_hol_legend:"Chú thích ngày lễ", bd_prodprog_title:"Tiến độ sản xuất",
+ bd_next_holiday:"Kỳ nghỉ lớn tới", bd_hol_days:"ngày", bd_hol_legend:"Chú thích ngày lễ", bd_prodprog_title:"Tiến độ lắp đặt",
  bd_mat_rebar:"Đường giá thép", bd_mat_cement:"Đường giá xi măng", bd_mat_sand:"Đường giá cát vàng", bd_mat_gravel:"Đường giá đá dăm", bd_src_live:"Thực", bd_src_demo:"Mẫu", dash_crm_rate_rmb:"Xu hướng RMB-VND", dash_crm_rate_usd:"Xu hướng USD-VND",
              dash_won_section:"Dự án đã ký", dash_won_bu_bar:"BU Tích lũy vs Năm nay", dash_won_bu_pie_all:"Tỷ lệ BU các năm",
              dash_won_bu_pie_year:"Tỷ lệ BU năm nay", dash_won_contract:"Hợp đồng/Thanh toán/Chưa thanh toán theo năm",
@@ -37314,7 +37331,7 @@ function loadDashboard(force) {
     .then(function(r){ return r.json(); })
     .then(function(d){ boardRenderTotal(d && d.ok ? d : null); })
     .catch(function(){ boardRenderTotal(null); });
-  boardLoadProjects(sec);
+  boardLoadAll(sec);
   boardStartClock();
   boardRenderCalendar(sec, new Date().getFullYear(), new Date().getMonth());
   boardLoadFx(sec);
@@ -37369,7 +37386,7 @@ function boardRenderTotal(stats) {
   body.innerHTML = cells.map(function(c){ return '<div class="bd-kpi-cell"><div class="bd-kpi-v">'+c.v+'</div><div class="bd-kpi-t">'+c.t+'</div></div>'; }).join('');
 }
 
-function boardLoadProjects(sec) {
+function boardLoadAll(sec) {
   var mapBody = document.getElementById('bdMapBody'); if (!mapBody) return;
   var base = (typeof crmApiBase==='function')?crmApiBase():API_BASE;
   fetch(base + '/api/won-projects', { credentials:'include', headers:(typeof authHeaders==='function'?authHeaders():{}) })
@@ -37384,27 +37401,183 @@ function boardLoadProjects(sec) {
         agg[key] = (agg[key]||0)+1;
       });
       boardRenderMap(mapBody, agg);
-      boardRenderTop10(list);
       boardLoadWeather(Object.keys(agg));
+      /* ★ 同步每个项目的工厂数据后，再渲染依赖生产/安装明细的卡片 */
+      boardSyncFactories(list, function(){
+        boardRenderTop10(list);
+        boardRenderInstallProg(list);
+        boardRenderSitePhotos(list);
+        boardRenderInstallWorkers(list);
+        boardRenderProdWorkers(list);
+      });
     })
     .catch(function(e){ mapBody.innerHTML='<span class="bd-err">'+e+'</span>'; });
 }
+function boardSyncFactories(list, cb){
+  if(!list || !list.length){ if(cb) cb(); return; }
+  var pending = list.length;
+  list.forEach(function(p){
+    if(typeof prod_syncFromServer === 'function'){
+      prod_syncFromServer(p.id, function(){ if(--pending===0 && cb) cb(); });
+    } else {
+      if(--pending===0 && cb) cb();
+    }
+  });
+}
 
-// TOP10 进度：当前按合同金额(VND)降序取前 10；进度% 口径给出后改为按进度排序并显示进度条。
+// ===== 看板：生产/安装进度 + 现场照片/人数轮播（2026-10-08）=====
+function bdProjName(p){ return p.customer || p.contract_no || ('#'+p.id); }
+function bdProgHead(colKey){
+  return '<div class="bd-t10-head"><span>#</span><span>'+i18nVal('bd_t10_name','项目')+'</span><span>'+i18nVal(colKey,'进度')+'</span></div>';
+}
+function bdProgRow(r, i){
+  var pct = Math.min(100, Math.max(0, r.rate));
+  return '<div class="bd-t10-row"><span class="bd-t10-rank">'+(i+1)+'</span>'
+    + '<span class="bd-t10-name" title="'+escBd(r.name)+'">'+escBd(r.name)+'</span>'
+    + '<span class="bd-t10-prog">'
+      + '<div class="bd-progress-bar"><div class="bd-progress-fill" style="width:'+pct+'%"></div></div>'
+      + '<span class="bd-progress-txt">'+r.rate.toFixed(1)+'%</span>'
+    + '</span></div>';
+}
+// 第一张：生产进度 TOP10（按生产完成率排序，进度=已生产/总需求）
 function boardRenderTop10(list) {
   var body = document.getElementById('bdTop10Body'); if (!body) return;
   var rows = (list||[]).map(function(p){
-    var amt = (p.total_ei_vnd != null) ? Number(p.total_ei_vnd) : Number(p.equip_vnd||0);
-    return { p: p, amt: amt };
-  }).sort(function(a,b){ return b.amt - a.amt; }).slice(0,10);
+    var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
+    var pr = (typeof inst_projectProgress === 'function') ? inst_projectProgress(f) : { demand:0, produced:0, prodRate:0 };
+    return { p:p, name: bdProjName(p), rate: pr.prodRate, demand: pr.demand, produced: pr.produced };
+  }).filter(function(r){ return r.demand > 0; })
+    .sort(function(a,b){ return b.rate - a.rate; }).slice(0,10);
   if (!rows.length) { body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
-  // ★ 合同金额属敏感数据，看板一律不展示；金额仅用于内部排序
-  var html = '<div class="bd-t10-head"><span>#</span><span>'+i18nVal('bd_t10_name','项目')+'</span><span>'+i18nVal('bd_t10_prog','生产进度')+'</span></div>';
-  rows.forEach(function(r, i){
-    var name = r.p.customer || r.p.contract_no || ('#'+r.p.id);
-    html += '<div class="bd-t10-row"><span class="bd-t10-rank">'+(i+1)+'</span><span class="bd-t10-name">'+escBd(name)+'</span><span class="bd-t10-prog">'+i18nVal('bd_pending_short','待接入')+'</span></div>';
+  body.innerHTML = bdProgHead('bd_t10_prog') + rows.map(function(r,i){ return bdProgRow(r,i); }).join('');
+}
+// 第二张：安装进度 TOP10（按安装完成率排序，进度=已安装/总需求）
+function boardRenderInstallProg(list) {
+  var body = document.querySelector('#bdProdProg .bd-ph-body'); if (!body) return;
+  var rows = (list||[]).map(function(p){
+    var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
+    var pr = (typeof inst_projectProgress === 'function') ? inst_projectProgress(f) : { demand:0, installed:0, instRate:0 };
+    return { p:p, name: bdProjName(p), rate: pr.instRate, demand: pr.demand, installed: pr.installed };
+  }).filter(function(r){ return r.demand > 0; })
+    .sort(function(a,b){ return b.rate - a.rate; }).slice(0,10);
+  if (!rows.length) { body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
+  body.innerHTML = bdProgHead('bd_t10_prog2') + rows.map(function(r,i){ return bdProgRow(r,i); }).join('');
+}
+// 第三张：现场图片轮播（每项目取最新上传的一张安装照片为代表，CSS 滚动无额外流量）
+function boardRenderSitePhotos(list){
+  var body = document.querySelector('#bdPhotos .bd-ph-body'); if(!body) return;
+  body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_pending_short','待接入')+'</div>';
+  var fns = [];
+  (list||[]).forEach(function(p){
+    fns.push(function(done){
+      var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
+      if(!f){ done(); return; }
+      if(typeof inst_loadZonePhotos === 'function') inst_loadZonePhotos(f, function(){ done(); }, true);
+      else done();
+    });
   });
-  body.innerHTML = html;
+  var idx = 0;
+  function next(){ if(idx >= fns.length){ render(); return; } fns[idx++](next); }
+  if(!fns.length){ render(); return; }
+  next();
+  function render(){
+    var items = [];
+    (list||[]).forEach(function(p){
+      var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
+      var ph = bdLatestInstallPhoto(f);
+      if(ph) items.push({ pid:p.id, name: bdProjName(p), url: ph.url, date: ph.date, zone: ph.zone });
+    });
+    if(!items.length){ body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
+    var cards = items.map(bdPhotoCard).join('');
+    body.innerHTML = '<div class="bd-carousel"><div class="bd-carousel-track">'+cards+cards+'</div></div>';
+  }
+}
+function bdLatestInstallPhoto(f){
+  try{
+    var kv = f && f.__zonePhotos_kv; if(!kv) return null;
+    var dates = Object.keys(kv).sort().reverse();
+    for(var i=0;i<dates.length;i++){
+      var day = kv[dates[i]]; if(!day) continue;
+      var zones = Object.keys(day).sort();
+      for(var j=0;j<zones.length;j++){
+        var arr = day[zones[j]]; if(arr && arr.length) return { url:'/uploads/'+arr[arr.length-1], date:dates[i], zone:zones[j] };
+      }
+    }
+  }catch(e){}
+  return null;
+}
+function bdPhotoCard(it){
+  return '<div class="bd-carousel-card bd-photo-card" onclick="bdOpenInstallPhoto(\''+it.pid+'\',\''+escBd(it.date)+'\',\''+escBd(it.zone)+'\')">'
+    + '<div class="bd-photo-wrap"><img src="'+escBd(it.url)+'" loading="lazy" alt=""></div>'
+    + '<div class="bd-card-name">'+escBd(it.name)+'</div></div>';
+}
+// 第四张：安装人数轮播（每项目最新有数据的安装日总人工）
+function boardRenderInstallWorkers(list){
+  var body = document.querySelector('#bdWorkers .bd-sq-body'); if(!body) return;
+  var items = [];
+  (list||[]).forEach(function(p){
+    var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
+    var w = (typeof inst_totalWorkers === 'function') ? inst_totalWorkers(f) : { total:0, date:'' };
+    if(w.total > 0) items.push({ pid:p.id, name: bdProjName(p), total: w.total, date: w.date });
+  });
+  if(!items.length){ body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
+  var cards = items.map(function(it){ return bdWorkerCard(it, 'bd_worker_title', 'onclick="bdOpenInstallProject(\''+it.pid+'\',\''+escBd(it.date)+'\')"'); }).join('');
+  body.innerHTML = '<div class="bd-carousel"><div class="bd-carousel-track">'+cards+cards+'</div></div>';
+}
+// 第五张：生产人数轮播（每项目最新有数据的生产日总人工）
+function boardRenderProdWorkers(list){
+  var body = document.querySelector('#bdProd .bd-sq-body'); if(!body) return;
+  var items = [];
+  (list||[]).forEach(function(p){
+    var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
+    var w = (typeof prod_totalWorkers === 'function') ? prod_totalWorkers(f) : { total:0, date:'' };
+    if(w.total > 0) items.push({ pid:p.id, name: bdProjName(p), total: w.total, date: w.date });
+  });
+  if(!items.length){ body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
+  var cards = items.map(function(it){ return bdWorkerCard(it, 'bd_prod_title', 'onclick="bdOpenProductionProject(\''+it.pid+'\')"'); }).join('');
+  body.innerHTML = '<div class="bd-carousel"><div class="bd-carousel-track">'+cards+cards+'</div></div>';
+}
+function bdWorkerCard(it, labelKey, onclickAttr){
+  return '<div class="bd-carousel-card bd-worker-card" '+onclickAttr+'>'
+    + '<div class="bd-worker-num">'+it.total+'</div>'
+    + '<div class="bd-worker-label">'+i18nVal(labelKey,'人数')+'</div>'
+    + '<div class="bd-card-name">'+escBd(it.name)+'</div></div>';
+}
+function prod_totalWorkers(f){
+  var total = 0, date = '';
+  try{
+    var ws = (f && f.workers) || {};
+    var dates = (typeof prod_sortDateKeys === 'function') ? prod_sortDateKeys(Object.keys(ws), false) : Object.keys(ws);
+    for(var i = dates.length - 1; i >= 0; i--){
+      var ww = ws[dates[i]]; if(!ww || ww._deleted) continue;
+      var sum = 0;
+      PROD_WORKERS.forEach(function(rk){ sum += (+ww[rk[0]]||0); });
+      if(sum > 0){ total = sum; date = dates[i]; break; }
+    }
+  }catch(e){}
+  return { total: total, date: date };
+}
+// 点击：安装照片（或安装人数）→ 跳转安装模块对应日期（Tab C 人工/天气/安装量）
+function bdOpenInstallPhoto(pid, date, zone){
+  try{ window.__VIEW_JUMPING = true; }catch(e){}
+  if(typeof inst_setTabCDate === 'function') inst_setTabCDate(date);
+  if(typeof switchView === 'function') switchView('install');
+  if(typeof inst_openProject === 'function') inst_openProject(pid);
+  setTimeout(function(){ try{ window.__VIEW_JUMPING = false; }catch(e){} }, 140);
+}
+function bdOpenInstallProject(pid, date){
+  try{ window.__VIEW_JUMPING = true; }catch(e){}
+  if(typeof inst_setTabCDate === 'function') inst_setTabCDate(date);
+  if(typeof switchView === 'function') switchView('install');
+  if(typeof inst_openProject === 'function') inst_openProject(pid);
+  setTimeout(function(){ try{ window.__VIEW_JUMPING = false; }catch(e){} }, 140);
+}
+function bdOpenProductionProject(pid){
+  try{ window.__VIEW_JUMPING = true; }catch(e){}
+  if(typeof switchView === 'function') switchView('production');
+  if(typeof prod_open === 'function') prod_open(pid);
+  if(typeof prod_renderTab === 'function') prod_renderTab('C');
+  setTimeout(function(){ try{ window.__VIEW_JUMPING = false; }catch(e){} }, 140);
 }
 function escBd(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
@@ -52929,10 +53102,54 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     if(tC){ var b = tC.querySelector('.prod-tab-badge'); if(c>0){ if(!b){ b=document.createElement('span'); b.className='prod-tab-badge'; tC.appendChild(b); } b.textContent=c; } else if(b){ b.remove(); } }
   }
 
+  /* ★ 看板聚合用：把指定项目的生产/安装进度一次性算出来
+     （临时把 INST_CUR/PROD_CUR 切到 f.id，算完还原，避免串到其它项目） */
+  function inst_projectProgress(f){
+    var savedCur = INST_CUR, savedProd = (typeof PROD_CUR!=='undefined') ? PROD_CUR : undefined;
+    try{
+      INST_CUR = (f && f.id) || INST_CUR;
+      if(typeof PROD_CUR!=='undefined') PROD_CUR = INST_CUR;
+      var gh = inst_buildGanttHouses(f) || [];
+      var demand = 0, installed = 0;
+      gh.forEach(function(h){ demand += (+h.panels||0); installed += (+h.done||0); });
+      var produced = 0; var fn = (f && f.finished) || {};
+      for(var sp in fn){ if(fn.hasOwnProperty(sp)) produced += (+((fn[sp]&&fn[sp].produced)||0)); }
+      return {
+        demand: demand, installed: installed, produced: produced,
+        prodRate: demand > 0 ? produced/demand*100 : 0,
+        instRate: demand > 0 ? installed/demand*100 : 0
+      };
+    } finally {
+      INST_CUR = savedCur;
+      if(typeof PROD_CUR!=='undefined') PROD_CUR = savedProd;
+    }
+  }
+  /* 看板聚合用：取该项目最新一条有数据的安装日记录的总人工（report/leader 不计） */
+  function inst_totalWorkers(f){
+    var total = 0, date = '';
+    try{
+      var ws = ((f && f.installation) || {}).workers || {};
+      var dates = (typeof prod_sortDateKeys === 'function') ? prod_sortDateKeys(Object.keys(ws), false) : Object.keys(ws);
+      for(var i = dates.length - 1; i >= 0; i--){
+        var ww = ws[dates[i]]; if(!ww || ww._deleted) continue;
+        var sum = 0;
+        INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter' || rk[0]==='leader') return; sum += (+ww[rk[0]]||0); });
+        if(sum > 0){ total = sum; date = dates[i]; break; }
+      }
+    }catch(e){}
+    return { total: total, date: date };
+  }
+  function inst_setTabCDate(dmy){ INST_TABC_SELDATE = dmy; }
+
   /* 暴露到全局，供 switchView / 内联 onclick 调用 */
   window.inst_renderProduction = inst_renderProduction;
   window.inst_openProject = inst_openProject;
   window.inst_back = inst_back;
+  window.inst_projectProgress = inst_projectProgress;
+  window.inst_totalWorkers = inst_totalWorkers;
+  window.inst_setTabCDate = inst_setTabCDate;
+  window.inst_buildGanttHouses = inst_buildGanttHouses;
+  window.inst_loadZonePhotos = inst_loadZonePhotos;
   window.inst_renderTabs = inst_renderTabs;
   window.inst_renderTab = inst_renderTab;
   window.inst_calcPlan = inst_calcPlan;
