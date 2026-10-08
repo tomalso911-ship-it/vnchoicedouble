@@ -48574,7 +48574,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_lbl_total_short:'Total', inst_lbl_shipped:'Shipped', inst_lbl_unshipped:'Unshipped', inst_lbl_install_progress:'Install progress', inst_lbl_ship_ratio:'Ship ratio', inst_lbl_install_done_ratio:'Install completion ratio',
       inst_lbl_house_demand:'House Demand', inst_lbl_bldg_produced:'House Produced', inst_lbl_unproduced:'Unproduced', inst_lbl_prod_done_rate:'Production Completion', inst_lbl_proj_prod_demand:'Project Produced / Demand', inst_lbl_proj_prod_rate:'Total Production Completion', inst_lbl_bldg_installed2:'House Installed', inst_lbl_type_installed:'House Type Installed', inst_lbl_type_install_rate:'Overall Install Completion',
       inst_zone_bldg:'Buildings', inst_zone_total_pcs:'Total panels', inst_zone_done:'Installed', inst_zone_remain:'Remaining', inst_zone_progress:'Progress', inst_zone_start:'Start install', inst_zone_plan_end:'Est. finish', inst_zone_likely_end:'Likely finish', inst_zone_likely_end_tmpl:'Likely to finish by {0} at current pace', inst_zone_completed:'Completed', inst_lbl_zone_teams:'Installation Teams', inst_lbl_team_record:'Zone {0} - Team {1} - Personnel & Installation Qty', inst_lbl_team_total:'Team Total', inst_unit_person:'', inst_lbl_team_install_record:'Zone {0} - Team {1} - Installation Qty', inst_lbl_today_install:'Today Install', inst_lbl_today_install_unit:'pcs',
-      inst_lbl_zone_summary_prefix:'Zone {0}, {1} teams. ', inst_lbl_zone_summary_total:'Total: ', inst_lbl_zone_summary_sep:', ', inst_lbl_zone_summary_role_unit:'', inst_lbl_zone_summary_all:'All personnel: {0}', inst_lbl_bldg_count:'Buildings: ', inst_lbl_total_qty:'Total Qty: ', inst_lbl_theory_actual_install:'Theoretical/Actual Installed: ', inst_lbl_theory_actual_remain:'Theoretical/Actual Remaining: ', inst_lbl_theory_actual_progress:'Theoretical/Actual Progress: ', inst_lbl_zone_start_date:'Zone Start Date: ', inst_lbl_zone_plan_end_date:'Zone Planned End: ', inst_lbl_zone_likely_end_date:'Est. Completion (Actual Efficiency): ', inst_lbl_theory_install:'Theory Installed: ', inst_lbl_actual_install:'Actual Installed: ', inst_lbl_theory_remain:'Theory Remaining: ', inst_lbl_actual_remain:'Actual Remaining: ', inst_lbl_theory_progress:'Theory Progress: ', inst_lbl_actual_progress:'Actual Progress: ', inst_lbl_progress_analysis:'Installation Progress Management Analysis', inst_ana_zones:'Houses completed by zone', inst_ana_zone_item:'{0}: {1}/{2} houses done', inst_ana_theory_today:'Houses planned for today', inst_ana_actual_today:'Houses actually installed today', inst_ana_plan_range:' (planned {0} ~ {1})', inst_ana_delta_title:'Actual start vs planned start', inst_ana_delta_ahead:'{0} day(s) ahead of plan', inst_ana_delta_late:'{0} day(s) behind plan', inst_ana_on_time:'on time', inst_ana_none:'none', inst_ana_join:'; ', inst_ana_colon:': ',
+      inst_lbl_zone_summary_prefix:'Zone {0}, {1} teams. ', inst_lbl_zone_summary_total:'Total: ', inst_lbl_zone_summary_sep:', ', inst_lbl_zone_summary_role_unit:'', inst_lbl_zone_summary_all:'All personnel: {0}', inst_lbl_bldg_count:'Buildings: ', inst_lbl_total_qty:'Total Qty: ', inst_lbl_theory_actual_install:'Theoretical/Actual Installed: ', inst_lbl_theory_actual_remain:'Theoretical/Actual Remaining: ', inst_lbl_theory_actual_progress:'Theoretical/Actual Progress: ', inst_lbl_zone_start_date:'Zone Start Date: ', inst_lbl_zone_plan_end_date:'Zone Planned End: ', inst_lbl_zone_likely_end_date:'Est. Completion (Actual Efficiency): ', inst_lbl_theory_install:'Theory Installed: ', inst_lbl_actual_install:'Actual Installed: ', inst_lbl_theory_remain:'Theory Remaining: ', inst_lbl_actual_remain:'Actual Remaining: ', inst_lbl_theory_progress:'Theory Progress: ', inst_lbl_actual_progress:'Actual Progress: ', inst_lbl_progress_analysis:'Installation Progress Management Analysis', inst_ana_zones:'Houses completed by zone', inst_ana_zone_item:'{0}: {1}/{2} houses done', inst_ana_theory_today:'Houses planned for today', inst_ana_actual_today:'Houses actually installed today', inst_ana_plan_range:' (planned {0} ~ {1})', inst_ana_delta_title:'Actual start vs planned start', inst_ana_delta_ahead:'{0} day ahead of schedule|{0} days ahead of schedule', inst_ana_delta_late:'{0} day behind schedule|{0} days behind schedule', inst_ana_on_time:'on schedule', inst_ana_none:'none', inst_ana_join:'; ', inst_ana_colon:': ',
       inst_sec_all_zones_summary:'Daily All-Zones Installation Personnel Final Statistics', inst_summary_all_zones_desc:'Today installed in {0} {1} ({2}), total {3} {4} ({5}), total personnel configuration: {6}, total personnel: {7}.', inst_summary_zone_unit:'zone(s)', inst_summary_house_unit:'houses', inst_summary_list_sep:', ', inst_summary_role_unit:'', inst_summary_none:'none',
       inst_gantt_summary_contract_to_accept:'From contract signing to final acceptance completion: {months} months, {days} days',
       inst_gantt_summary_prod_to_accept:'From official production start to final acceptance completion: {months} months, {days} days'
@@ -51442,6 +51442,12 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     if(!a||!b) return 0;
     return Math.round((Date.parse(b+'T00:00:00Z') - Date.parse(a+'T00:00:00Z'))/86400000);
   }
+  /* 复数选择：英/越等文案用 '单数|复数' 表示；没有 '|' 的语言（中/越）恒取前半段 */
+  function inst_anaPick(tpl, n){
+    var parts = String(tpl==null?'':tpl).split('|');
+    if(parts.length < 2) return parts[0] || '';
+    return (n === 1 ? parts[0] : parts[1]) || '';
+  }
   function inst_anaAddDays(y,n){
     var p=String(y||'').split('-'); if(p.length<3) return '';
     var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
@@ -51592,8 +51598,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       var txt = it('inst_ana_on_time');
       if(p && p.start && ast){
         var dd = inst_anaDiffDays(p.start, ast);
-        if(dd > 0) txt = it('inst_ana_delta_late').replace('{0}', dd);
-        else if(dd < 0) txt = it('inst_ana_delta_ahead').replace('{0}', Math.abs(dd));
+        var ad = Math.abs(dd);
+        if(dd > 0) txt = inst_anaPick(it('inst_ana_delta_late'), ad).replace('{0}', ad);
+        else if(dd < 0) txt = inst_anaPick(it('inst_ana_delta_ahead'), ad).replace('{0}', ad);
       }
       return '<div class="inst-ana-li">'+prod_esc(a.name)+it('inst_ana_colon')+txt+'</div>';
     }).join('') : it('inst_ana_none');
