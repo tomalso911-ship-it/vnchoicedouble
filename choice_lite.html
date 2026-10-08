@@ -46823,6 +46823,22 @@ function saveHouseLocks(){
     localStorage.setItem(ganttStorageKey('house_locks_v1'), JSON.stringify(arr));
   }catch(e){}
 }
+/* ★★ 一次性清除旧的手动锚点（2026-10 排程改版）★★
+   排程已改为「整区从上到下逐行 + 串行跨区联动」的纯自动链；
+   旧逻辑（改日期不顺延）下用户逐行手改产生的「逐栋日期锁定 house_locks_v1」
+   和「区开工日 house_zones_v1.userStart」会把自动链顶歪（出现空档/回跳），
+   这里按项目一次性清空它们，恢复成完全连续的自上而下链。
+   保留「小组数」与「手选小组/全部组」，只清除日期锚点。清除后新的手动改日期照常生效并让下方顺延。 */
+function ganttResetManualAnchors(){
+  var FLAG='manual_anchor_reset_v1';
+  try{ if(localStorage.getItem(ganttStorageKey(FLAG))) return; localStorage.setItem(ganttStorageKey(FLAG),'1'); }catch(e){ return; }
+  try{
+    houses.forEach(function(h){ h.lockStart=''; });
+    zones.forEach(function(z){ z.userStart=''; });
+    if(typeof saveHouseLocks==='function') saveHouseLocks();                 /* 重写：抹掉日期锁定，保留小组选择 */
+    localStorage.setItem(ganttStorageKey('house_zones_v1'), JSON.stringify(zones)); /* 重写：抹掉区开工日，保留小组数 */
+  }catch(e){}
+}
 
 /* =========================================================================
  * 4. 排程核心
@@ -48041,7 +48057,7 @@ function toggleCards(){
   saveCfg();
   applyCardsCollapsed();
 }
-function rebuild(){ loadHouses(); schedule(); renderAll(); }
+function rebuild(){ loadHouses(); if(typeof ganttResetManualAnchors==='function') ganttResetManualAnchors(); schedule(); renderAll(); }
 
 window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
 
