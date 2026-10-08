@@ -3481,7 +3481,7 @@ function _ovLoadChartLib(cb){
       .wl-cal-sel{background:#E53935;color:#fff;font-weight:700;}
       .wl-cal-dot{position:absolute;right:6px;bottom:5px;width:6px;height:6px;border-radius:50%;background:#E53935;}
       .wl-cal-sel .wl-cal-dot{background:#fff;}
-      .wl-cal-compact .wl-cal{width:480px;max-width:100%;padding:10px 14px;box-shadow:none;border-color:#e8edf2;}
+      .wl-cal-compact .wl-cal{width:430px;max-width:100%;padding:10px 14px;box-shadow:none;border-color:#e8edf2;}
       .wl-cal-compact .wl-cal-cell{padding:6px 0;font-size:12.5px;border-radius:6px;}
       .wl-cal-compact .wl-cal-wk{font-size:11.5px;padding:3px 0;}
       .wl-cal-compact .wl-cal-head{margin-bottom:5px;}
@@ -3489,7 +3489,9 @@ function _ovLoadChartLib(cb){
       .wl-cal-compact .wl-cal-nav{width:24px;height:24px;font-size:14px;border-radius:6px;}
       /* 报表 */
       .wl-report-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
-      .wl-report-top-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+      .wl-report-top-row{display:flex;align-items:stretch;gap:14px;flex-wrap:wrap;}
+      .wl-report-left-col{flex:1 1 auto;min-width:260px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;}
+      .wl-report-left-col .wl-rep-nav-group{align-self:flex-start;}
       .wl-report-title{font-size:20px;font-weight:800;color:#1a2b3c;letter-spacing:-0.3px;}
       .wl-rep-nav-group{display:inline-flex;align-items:center;gap:8px;background:#f4f6f9;border:1px solid #e3e9ef;border-radius:10px;padding:4px;}
       .wl-rep-nav{width:32px;height:32px;border:1px solid #e6c200;background:#ffd700;color:#333;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;}
@@ -3522,7 +3524,7 @@ function _ovLoadChartLib(cb){
       .wl-wx-cards-compact .wl-wx-title{font-size:11.5px;}
       .wl-wx-cards-compact .wl-wx-ico{font-size:16px;}
       .wl-wx-cards-compact .wl-wx-row{font-size:11px;line-height:1.5;}
-      .wl-cal-compact{flex:1 1 480px;max-width:480px;}
+      .wl-cal-compact{flex:0 0 auto;}
       /* 趋势 */
       .wl-trend-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
       .wl-trend-sum-item{flex:1 1 120px;background:#fff;border:1px solid #e3e9ef;border-radius:10px;padding:8px 12px;text-align:center;}
@@ -3541,11 +3543,11 @@ function _ovLoadChartLib(cb){
     var WL_CHARTS = [];
     var WL_I18N = {
       zh: { wl_title:'工作日志', wl_back:'← 返回列表', wl_tab_daily_report:'每日记录报告', wl_tab_my_work:'我的工作', wl_empty_list:'暂无签约项目', wl_placeholder:'内容开发中，敬请期待',
-        wl_rep_no_data:'该日暂无记录', wl_weather:'天气', wl_am:'上午', wl_pm:'下午', wl_workers:'生产工人数', wl_lines:'生产线数', wl_production:'生产数据', wl_spec:'规格', wl_qty:'数量', wl_share:'占比', wl_total:'合计', wl_procurement:'采购数据', wl_material:'材料', wl_amount:'金额', wl_fault:'故障与维修数据', wl_fault_none:'当日无故障', wl_fault_count:'故障数', wl_reason:'故障原因', wl_down:'停机', wl_repair:'修复', wl_install:'安装数据', wl_installed:'已安装', wl_demand:'需求', wl_inst_rate:'安装完成率', wl_eta:'预计完工', wl_prev:'上一天', wl_next:'下一天', wl_today:'今天', wl_trends:'趋势', wl_chart_prod:'每日产量', wl_chart_labor:'每日生产工人数量', wl_chart_inst:'每日安装工人数量', wl_no_chart:'数据不足，无法绘图', wx_temp:'温度', wx_wind:'风力' },
+        wl_rep_no_data:'该日暂无记录', wl_weather:'天气', wl_am:'上午', wl_pm:'下午', wl_workers:'生产工人数', wl_lines:'生产线数', wl_production:'生产数据', wl_spec:'规格', wl_qty:'数量', wl_share:'占比', wl_total:'合计', wl_procurement:'采购数据', wl_material:'材料', wl_amount:'金额', wl_fault:'故障与维修数据', wl_fault_none:'当日无故障', wl_fault_count:'故障数', wl_reason:'故障原因', wl_down:'停机', wl_repair:'修复', wl_install:'安装数据', wl_installed:'已安装', wl_demand:'需求', wl_inst_rate:'安装完成率', wl_eta:'预计完工', wl_prev:'上一天', wl_next:'下一天', wl_today:'今天', wl_trends:'趋势', wl_chart_prod:'每日产量', wl_chart_labor:'每日生产工人数量', wl_chart_inst:'每日安装工人数量', wl_no_chart:'数据不足，无法绘图', wx_temp:'温度', wx_hum:'湿度', wx_wind:'风力', wx_am_label:'上午天气', wx_pm_label:'下午天气', wl_weekdays:'周日,周一,周二,周三,周四,周五,周六', wl_week_min:'一,二,三,四,五,六,日' },
       en: { wl_title:'Work Log', wl_back:'← Back to list', wl_tab_daily_report:'Daily Record Report', wl_tab_my_work:'My Work', wl_empty_list:'No signed projects', wl_placeholder:'Under development, stay tuned',
-        wl_rep_no_data:'No record for this day', wl_weather:'Weather', wl_am:'AM', wl_pm:'PM', wl_workers:'Production workers', wl_lines:'Production lines', wl_production:'Production', wl_spec:'Spec', wl_qty:'Qty', wl_share:'Share', wl_total:'Total', wl_procurement:'Procurement', wl_material:'Material', wl_amount:'Amount', wl_fault:'Fault & Maintenance', wl_fault_none:'No fault today', wl_fault_count:'Faults', wl_reason:'Reason', wl_down:'Down', wl_repair:'Repair', wl_install:'Installation', wl_installed:'Installed', wl_demand:'Demand', wl_inst_rate:'Install rate', wl_eta:'ETA', wl_prev:'Prev day', wl_next:'Next day', wl_today:'Today', wl_trends:'Trends', wl_chart_prod:'Daily output', wl_chart_labor:'Daily production workers', wl_chart_inst:'Daily install workers', wl_no_chart:'Not enough data to chart', wx_temp:'Temp', wx_wind:'Wind' },
+        wl_rep_no_data:'No record for this day', wl_weather:'Weather', wl_am:'AM', wl_pm:'PM', wl_workers:'Production workers', wl_lines:'Production lines', wl_production:'Production', wl_spec:'Spec', wl_qty:'Qty', wl_share:'Share', wl_total:'Total', wl_procurement:'Procurement', wl_material:'Material', wl_amount:'Amount', wl_fault:'Fault & Maintenance', wl_fault_none:'No fault today', wl_fault_count:'Faults', wl_reason:'Reason', wl_down:'Down', wl_repair:'Repair', wl_install:'Installation', wl_installed:'Installed', wl_demand:'Demand', wl_inst_rate:'Install rate', wl_eta:'ETA', wl_prev:'Prev day', wl_next:'Next day', wl_today:'Today', wl_trends:'Trends', wl_chart_prod:'Daily output', wl_chart_labor:'Daily production workers', wl_chart_inst:'Daily install workers', wl_no_chart:'Not enough data to chart', wx_temp:'Temp', wx_hum:'Humidity', wx_wind:'Wind', wx_am_label:'AM Weather', wx_pm_label:'PM Weather', wl_weekdays:'Sun,Mon,Tue,Wed,Thu,Fri,Sat', wl_week_min:'Mon,Tue,Wed,Thu,Fri,Sat,Sun' },
       vi: { wl_title:'Nhật ký công việc', wl_back:'← Quay lại danh sách', wl_tab_daily_report:'Báo cáo ghi chép hàng ngày', wl_tab_my_work:'Công việc của tôi', wl_empty_list:'Chưa có dự án ký kết', wl_placeholder:'Đang phát triển, vui lòng chờ',
-        wl_rep_no_data:'Không có ghi chép ngày này', wl_weather:'Thời tiết', wl_am:'Sáng', wl_pm:'Chiều', wl_workers:'Công nhân sản xuất', wl_lines:'Số dây chuyền', wl_production:'Sản xuất', wl_spec:'Quy cách', wl_qty:'Số lượng', wl_share:'Tỉ lệ', wl_total:'Tổng', wl_procurement:'Mua hàng', wl_material:'Vật liệu', wl_amount:'Tiền', wl_fault:'Lỗi & Bảo trì', wl_fault_none:'Hôm nay không lỗi', wl_fault_count:'Số lỗi', wl_reason:'Nguyên nhân', wl_down:'Dừng', wl_repair:'Sửa', wl_install:'Lắp đặt', wl_installed:'Đã lắp', wl_demand:'Nhu cầu', wl_inst_rate:'Tỉ lệ lắp', wl_eta:'Dự kiến xong', wl_prev:'Ngày trước', wl_next:'Ngày sau', wl_today:'Hôm nay', wl_trends:'Xu hướng', wl_chart_prod:'Sản lượng ngày', wl_chart_labor:'Số công nhân SX/ngày', wl_chart_inst:'Số công nhân lắp/ngày', wl_no_chart:'Không đủ dữ liệu', wx_temp:'Nhiệt độ', wx_wind:'Gió' }
+        wl_rep_no_data:'Không có ghi chép ngày này', wl_weather:'Thời tiết', wl_am:'Sáng', wl_pm:'Chiều', wl_workers:'Công nhân sản xuất', wl_lines:'Số dây chuyền', wl_production:'Sản xuất', wl_spec:'Quy cách', wl_qty:'Số lượng', wl_share:'Tỉ lệ', wl_total:'Tổng', wl_procurement:'Mua hàng', wl_material:'Vật liệu', wl_amount:'Tiền', wl_fault:'Lỗi & Bảo trì', wl_fault_none:'Hôm nay không lỗi', wl_fault_count:'Số lỗi', wl_reason:'Nguyên nhân', wl_down:'Dừng', wl_repair:'Sửa', wl_install:'Lắp đặt', wl_installed:'Đã lắp', wl_demand:'Nhu cầu', wl_inst_rate:'Tỉ lệ lắp', wl_eta:'Dự kiến xong', wl_prev:'Ngày trước', wl_next:'Ngày sau', wl_today:'Hôm nay', wl_trends:'Xu hướng', wl_chart_prod:'Sản lượng ngày', wl_chart_labor:'Số công nhân SX/ngày', wl_chart_inst:'Số công nhân lắp/ngày', wl_no_chart:'Không đủ dữ liệu', wx_temp:'Nhiệt độ', wx_hum:'Độ ẩm', wx_wind:'Gió', wx_am_label:'Thời tiết sáng', wx_pm_label:'Thời tiết chiều', wl_weekdays:'CN,Thứ 2,Thứ 3,Thứ 4,Thứ 5,Thứ 6,Thứ 7', wl_week_min:'T2,T3,T4,T5,T6,T7,CN' }
     };
     function wl_i18n(k, def){
       try { var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh'; var m = WL_I18N[L] || WL_I18N['zh']; var v = m[k]; if (v !== undefined && v !== null) return v; } catch(e){}
@@ -3588,6 +3590,7 @@ function _ovLoadChartLib(cb){
       WL_CHARTS = [];
       document.getElementById('wl-list').style.display = 'none';
       document.getElementById('wl-detail').style.display = 'block';
+      var backBtn = document.querySelector('#wl-detail .wl-back'); if(backBtn) backBtn.textContent = wl_i18n('wl_back');
       document.getElementById('wl-detail-title').textContent = wl_name(p);
       wl_renderTabs(WL_ACTIVE_TAB || 'daily');
     }
@@ -3615,8 +3618,14 @@ function _ovLoadChartLib(cb){
       return p[0]+'/'+p[1]+'/'+p[2];                              // DD-MM-YYYY / DD/MM/YYYY → DD/MM/YYYY
     }
     function wl_esc(s){ s = String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    var WL_WX_CODES = {
+      zh:{0:'晴',1:'晴间多云',2:'局部多云',3:'阴',45:'雾',48:'雾凇',51:'毛毛雨',53:'小雨',55:'中雨',56:'冻雨',57:'冻雨',61:'小雨',63:'中雨',65:'大雨',66:'冻雨',67:'冻雨',71:'小雪',73:'中雪',75:'大雪',77:'雪粒',80:'阵雨',81:'阵雨',82:'强阵雨',85:'阵雪',86:'阵雪',95:'雷暴',96:'雷暴伴冰雹',99:'雷暴伴冰雹'},
+      en:{0:'Clear',1:'Partly cloudy',2:'Cloudy',3:'Overcast',45:'Fog',48:'Rime',51:'Drizzle',53:'Light rain',55:'Moderate rain',56:'Freezing rain',57:'Freezing rain',61:'Light rain',63:'Moderate rain',65:'Heavy rain',66:'Freezing rain',67:'Freezing rain',71:'Light snow',73:'Moderate snow',75:'Heavy snow',77:'Snow grains',80:'Showers',81:'Showers',82:'Heavy showers',85:'Snow showers',86:'Snow showers',95:'Thunderstorm',96:'Thunderstorm w/ hail',99:'Thunderstorm w/ hail'},
+      vi:{0:'Nắng',1:'Nắng có mây',2:'Nhiều mây',3:'Âm u',45:'Sương mù',48:'Băng giá',51:'Mưa phùn',53:'Mưa nhỏ',55:'Mưa vừa',56:'Mưa băng giá',57:'Mưa băng giá',61:'Mưa nhỏ',63:'Mưa vừa',65:'Mưa to',66:'Mưa băng giá',67:'Mưa băng giá',71:'Tuyết nhỏ',73:'Tuyết vừa',75:'Tuyết dày',77:'Hạt tuyết',80:'Mưa rào',81:'Mưa rào',82:'Mưa rào mạnh',85:'Mưa tuyết',86:'Mưa tuyết',95:'Dông',96:'Dông kèm mưa đá',99:'Dông kèm mưa đá'}
+    };
     function wl_wxCode(v){
-      var m={0:'晴',1:'晴间多云',2:'局部多云',3:'阴',45:'雾',48:'雾凇',51:'毛毛雨',53:'小雨',55:'中雨',56:'冻雨',57:'冻雨',61:'小雨',63:'中雨',65:'大雨',66:'冻雨',67:'冻雨',71:'小雪',73:'中雪',75:'大雪',77:'雪粒',80:'阵雨',81:'阵雨',82:'强阵雨',85:'阵雪',86:'阵雪',95:'雷暴',96:'雷暴伴冰雹',99:'雷暴伴冰雹'};
+      var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh';
+      var m = WL_WX_CODES[L] || WL_WX_CODES['zh'];
       return m[+v] || (wl_i18n('wl_weather')+':'+v);
     }
     function wl_fmt(n){ n = +n; if(isNaN(n)) return String(n); return n.toLocaleString('en-US'); }
@@ -3631,7 +3640,7 @@ function _ovLoadChartLib(cb){
       return s;
     }
     function wl_wxCard(slot, wx){
-      var label = slot==='am' ? wl_i18n('wl_am')+wl_i18n('wl_weather') : wl_i18n('wl_pm')+wl_i18n('wl_weather');
+      var label = slot==='am' ? wl_i18n('wx_am_label','上午天气') : wl_i18n('wx_pm_label','下午天气');
       var ico = wx ? wl_wxIcon(wx.code!=null?wx.code:wx.v) : '⛅';
       var cond = wl_wxCond(wx);
       var temp = (wx&&wx.temp!=null) ? (String(wx.temp).includes('°')?wx.temp:wx.temp+'°C') : '—';
@@ -3725,7 +3734,7 @@ function _ovLoadChartLib(cb){
         var dot = has[dmy] ? '<span class="wl-cal-dot"></span>' : '';
         cells += '<div class="'+cls+'" data-dmy="'+dmy+'" onclick="wl_pickDate(\''+dmy+'\')">'+d+dot+'</div>';
       }
-      var wk=['一','二','三','四','五','六','日'];
+      var wk = String(wl_i18n('wl_week_min','一,二,三,四,五,六,日')).split(',');
       var head = wk.map(function(w){ return '<div class="wl-cal-wk">'+w+'</div>'; }).join('');
       var title = ym.y+'-'+((ym.m+1<10?'0':'')+(ym.m+1));
       return '<div class="wl-cal">'
@@ -3788,7 +3797,6 @@ function _ovLoadChartLib(cb){
       var box = document.getElementById('wl-report'); if(!box) return;
       var date = WL_CUR_DATE;
       var dt = new Date(dmyToYmd(date));
-      var wd = ['日','一','二','三','四','五','六'][dt.getDay()];
       var w = f.workers && f.workers[date];
       var rec = f.production && f.production[date];
       var produced={}, lines=0;
@@ -3811,17 +3819,20 @@ function _ovLoadChartLib(cb){
 
       var h='';
       h += '<div class="wl-report-card">';
-      // 表头：标题 + 日期导航按钮（作为卡片表头）
+      // 表头：标题
       h += '<div class="wl-report-header">'
         + '<div class="wl-report-title">'+wl_i18n('wl_tab_daily_report')+'</div>'
+        + '</div>';
+      // 第二行：上午天气 + 下午天气（下方日期导航）+ 加宽日历
+      var weekday = String(wl_i18n('wl_weekdays','周日,周一,周二,周三,周四,周五,周六').split(',')[dt.getDay()]||'');
+      h += '<div class="wl-report-top-row">'
+        + '<div class="wl-report-left-col">'
+        + '<div class="wl-wx-cards wl-wx-cards-compact">'+wl_wxCard('am', wxAm)+wl_wxCard('pm', wxPm)+'</div>'
         + '<div class="wl-rep-nav-group">'
         + '<button type="button" class="wl-rep-nav" onclick="wl_repStep(-1)" title="'+wl_i18n('wl_prev')+'">‹</button>'
-        + '<div class="wl-rep-date">'+dmyToYmd(date)+' · 周'+wd+'</div>'
+        + '<div class="wl-rep-date">'+dmyToYmd(date)+' · '+weekday+'</div>'
         + '<button type="button" class="wl-rep-nav" onclick="wl_repStep(1)" title="'+wl_i18n('wl_next')+'">›</button>'
-        + '</div></div>';
-      // 第二行：上午天气 + 下午天气 + 加宽日历
-      h += '<div class="wl-report-top-row">'
-        + '<div class="wl-wx-cards wl-wx-cards-compact">'+wl_wxCard('am', wxAm)+wl_wxCard('pm', wxPm)+'</div>'
+        + '</div></div>'
         + '<div class="wl-cal-compact">'+wl_calHtml(f, dates)+'</div>'
         + '</div>';
 
@@ -3890,6 +3901,7 @@ function _ovLoadChartLib(cb){
     try {
       window.addEventListener('app:langchange', function(){
         if(window.currentView !== 'worklog') return;
+        var backBtn = document.querySelector('#wl-detail .wl-back'); if(backBtn) backBtn.textContent = wl_i18n('wl_back');
         wl_renderList();
         if(WL_CUR) wl_renderTabs(WL_ACTIVE_TAB);
       });
