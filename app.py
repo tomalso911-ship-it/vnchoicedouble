@@ -19,6 +19,7 @@ import time
 import shutil
 from datetime import datetime, timedelta
 import re
+import copy
 from flask import Flask, request, jsonify, send_from_directory, Response, redirect
 from flask_cors import CORS
 
@@ -4685,13 +4686,16 @@ def api_prod_factory_put(pid):
     except Exception:
         return jsonify({"ok": False, "msg": "bad data"}), 400
     conn = get_db()
-    # ★★ 每日生产 / 人员快照「永不丢」兜底：无论回退闸是否触发，落库前都把服务器现有日期并集进来。
-    #    客户端本次编辑优先，服务器独有的日期补回来；只有客户端显式写入 Deleted 墓碑的日期才移除。
-    #    背景：曾出现用户昨天录入的产出被旧快照整体覆盖、再也找不回来的事故。
+    # ★★「永不丢」兜底（覆盖所有按日期键的业务数据）：无论回退闸是否触发，落库前都把服务器
+    #    现有日期并集进来。客户端本次编辑优先（base），服务器独有的日期补回来；只有客户端显式
+    #    写入 Deleted 墓碑的日期才移除。涵盖 production / workers / houseOut.outDaily / installation.workers。
+    #    背景：10-07 16:01 一次旧快照 PUT 把 37 天生产整体覆盖成 23 天；20:05 又把出库日明细 12→6。
     _pre_row = conn.execute("SELECT data FROM prod_factory WHERE project_id=?", (str(pid),)).fetchone()
     if _pre_row and _pre_row["data"]:
         try:
             _pre = json.loads(_pre_row["data"])
+            _dirty = False
+            # 顶层按日期键的集合
             for _key in ("production", "workers"):
                 _merged = _merge_date_map(payload.get(_key), _pre.get(_key))
                 _tomb = payload.get(_key + "Deleted")
@@ -4699,11 +4703,41 @@ def api_prod_factory_put(pid):
                     for _dk, _dv in _tomb.items():
                         if _dv:
                             _merged.pop(_dk, None)
-                if _merged:
+                if _merged and _merged != payload.get(_key):
                     payload[_key] = _merged
-                    blob = json.dumps(payload, ensure_ascii=False)
+                    _dirty = True
+            # 出库日明细：houseOut[house].outDaily 按日期并集
+            _ho = payload.get("houseOut") or {}
+            _ho_pre = _pre.get("houseOut") or {}
+            if isinstance(_ho, dict):
+                for _h, _rec in _ho.items():
+                    if not isinstance(_rec, dict):
+                        continue
+                    _od = _rec.get("outDaily") or {}
+                    _od_pre = ((_ho_pre.get(_h) or {}).get("outDaily") or {})
+                    _merged_od = _merge_date_map(_od, _od_pre)
+                    if _merged_od and _merged_od != _od:
+                        _rec["outDaily"] = _merged_od
+                        _dirty = True
+            # 安装每日记录：installation.workers 按日期并集（保留服务器侧 _deleted 逻辑删除）
+            _inst = payload.get("installation") or {}
+            _inst_pre = _pre.get("installation") or {}
+            _iw = _inst.get("workers") if isinstance(_inst, dict) else None
+            _iw_pre = _inst_pre.get("workers") if isinstance(_inst_pre, dict) else None
+            if isinstance(_iw, dict):
+                _merged_iw = _merge_date_map(_iw, _iw_pre)
+                if isinstance(_iw_pre, dict):
+                    for _dk, _dv in _iw_pre.items():
+                        if isinstance(_dv, dict) and _dv.get("_deleted") and _dk not in _merged_iw:
+                            _merged_iw[_dk] = _dv
+                if _merged_iw != _iw:
+                    _inst["workers"] = _merged_iw
+                    payload["installation"] = _inst
+                    _dirty = True
+            if _dirty:
+                blob = json.dumps(payload, ensure_ascii=False)
         except Exception as _me:
-            print(f"[prod_factory PUT {pid}] production-merge guard warning: {_me}")
+            print(f"[prod_factory PUT {pid}] data-merge guard warning: {_me}")
     # ★ 服务端防回退闸：禁止用信息量比现有服务器数据少得多的快照覆盖。
     # 背景：浏览器若打开着旧页面，本地只有 3 条出库，保存时会覆盖服务器已恢复的 8 条出库。
     existing_row = conn.execute("SELECT data FROM prod_factory WHERE project_id=?", (str(pid),)).fetchone()
