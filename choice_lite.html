@@ -46830,8 +46830,13 @@ function saveHouseLocks(){
    这里按项目一次性清空它们，恢复成完全连续的自上而下链。
    保留「小组数」与「手选小组/全部组」，只清除日期锚点。清除后新的手动改日期照常生效并让下方顺延。 */
 function ganttResetManualAnchors(){
-  var FLAG='manual_anchor_reset_v1';
-  try{ if(localStorage.getItem(ganttStorageKey(FLAG))) return; localStorage.setItem(ganttStorageKey(FLAG),'1'); }catch(e){ return; }
+  var FLAG='manual_anchor_reset_v2';
+  try{ if(localStorage.getItem(ganttStorageKey(FLAG))) return; }catch(e){ return; }
+  /* ★ 必须等「真数据」注入后再清并打标记：
+     甘特可能在服务器数据到达前被先注入一次（HOUSE_SOURCE 为空/示例），
+     若此时就打标记，真数据到达后便不再清锚点，旧的「区开工日/逐栋锁定」会残留。 */
+  if(!HOUSE_SOURCE || !houses || !houses.length) return;
+  try{ localStorage.setItem(ganttStorageKey(FLAG),'1'); }catch(e){ return; }
   try{
     houses.forEach(function(h){ h.lockStart=''; });
     zones.forEach(function(z){ z.userStart=''; });
@@ -46853,13 +46858,16 @@ function schedule(){
   var projStart=nextWork(toYmd(cfg.start)||today());
   var prevEnd=null;
   zones.forEach(function(z){
-    /* userStart = 用户显式指定的区开工日，优先级最高（可编辑覆盖默认值）。
-       未指定时：串行模式下第 2 区起 = 前一区完工日+1；否则 = 项目开工日。
-       不要把排程算出的 z.start 当用户输入，否则串行切回并行会残留旧日期 */
+    /* 区开工日：
+       - 串行模式：区与区必须联动 → 忽略「区开工日」，一律 上一区完工日+1（首区=项目开工日）。
+         否则残留/手填的区开工日会把链切断（出现下一区早于上一区完工的重叠）。
+       - 并行模式：各区互不干扰 → 可用「区开工日」覆盖，否则=项目开工日。 */
     var base;
-    if(z.userStart) base = nextWork(toYmd(z.userStart));
-    else if(cfg.zmode==='serial' && prevEnd) base = nextWork(nextAfter(prevEnd));
-    else base = projStart;
+    if(cfg.zmode==='serial'){
+      base = prevEnd ? nextWork(nextAfter(prevEnd)) : projStart;
+    } else {
+      base = z.userStart ? nextWork(toYmd(z.userStart)) : projStart;
+    }
     z.start = base;
     var hs=houses.filter(function(h){ return h.zone===z.name; });
     if(!hs.length){ z.end=''; z.days=0; return; }
