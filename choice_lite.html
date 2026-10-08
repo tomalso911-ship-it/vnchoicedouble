@@ -11738,26 +11738,15 @@ function _ovLoadChartLib(cb){
       if(PROD_OUT_EDIT && PROD_OUT_EDIT.isNew){
         var newDateYmd = PROD_OUT_EDIT.date || ymdToDmy(prod_today());
         var newDestHouse=PROD_OUT_EDIT.h, newBldg=(prod_buildingCountForHouse(PROD_OUT_EDIT.h)>0)?'1':'', newZone='';
-        /* 新增行默认目标：只考虑与来源猪舍同类型的猪舍，避免默认跨类型出库 */
-        var srcType=prod_phName(PROD_OUT_EDIT.h);
-        var areas=(prod_outAreaDemand(PROD_OUT_EDIT.k)||[]);
-        var matrix=prod_slatsMatrix();
-        var specData=matrix.specs[PROD_OUT_EDIT.k];
-        if(specData && areas.length){
-          var houses=Object.keys(specData.houses||{});
-          for(var ai=0;ai<areas.length;ai++){
-            var area=areas[ai], found=false;
-            for(var hi=0;hi<houses.length;hi++){
-              var hh=houses[hi]; if(!prod_specHasDemandForHouse(hh, PROD_OUT_EDIT.k)) continue;
-              if(prod_phName(hh)!==srcType) continue;
-              var bc=prod_buildingCountForHouse(hh)||0;
-              for(var bi=1;bi<=bc;bi++){
-                if(String(prod_bldgToZone(hh,bi))===String(area)){ newDestHouse=hh; newBldg=String(bi); newZone=String(area); found=true; break; }
-              }
-              if(found) break;
-            }
-            if(found) break;
-          }
+        /* 新增行默认目标：与来源猪舍同类型，按「区域分布圆形编号」排序后的第一个未安装完成（非红色）房舍；
+           直接复用 prod_outDestItems（已是圆形编号顺序），与下拉菜单默认停留逻辑完全一致（红 → 其下方第一个黑色）。 */
+        var _spec=PROD_OUT_EDIT.k;
+        var _items=prod_outDestItems(_spec, '', '', PROD_OUT_EDIT.h);
+        var _def=_items.filter(function(it){ return !it.red; })[0] || _items[0];
+        if(_def){
+          var _p=prod_parseBldgVal(_def.val);
+          newDestHouse=_p.h; newBldg=String(_p.b);
+          newZone=(_def.inArea!=null && _def.inArea!=='') ? String(_def.inArea) : prod_bldgToZone(_p.h,_p.b);
         }
         var _q=(PROD_OUT_EDIT && PROD_OUT_EDIT.qty) ? (+PROD_OUT_EDIT.qty||0) : 0;
         var _dh=(PROD_OUT_EDIT && PROD_OUT_EDIT.destHouse) ? PROD_OUT_EDIT.destHouse : newDestHouse;
