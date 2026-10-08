@@ -2404,6 +2404,7 @@ function _ovLoadChartLib(cb){
 .bd-photo-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
 .bd-photo-card .bd-card-name { position:absolute; left:0; right:0; bottom:0; padding:8px; font-size:11px; color:#fff; background:rgba(0,10,30,0.65); text-shadow:0 1px 2px rgba(0,0,0,.6); }
 .bd-photo-card .bd-photo-meta { color:#9fe9ff; font-weight:600; }
+.bd-photo-carousel .bd-photo-wrap img { object-fit:contain; }
 /* 人数卡片：数字/标签居中，项目名沉底，不留大片空白 */
 .bd-worker-card { justify-content:center; align-items:center; text-align:center; width:210px; }
 .bd-worker-num { font-size:56px; font-weight:800; color:#39e6ff; line-height:1; margin-top:8px; }
@@ -36958,6 +36959,8 @@ function __pushViewHistory(targetView){
     if(last && __viewStateKey(last) === __viewStateKey(cur)) return;
     hist.push(cur);
     if(hist.length > 30) hist.shift();
+    // 同步压一条浏览器历史，使浏览器/手机返回键能拦截并强制回到上一页
+    try{ if(history && history.pushState) history.pushState({ agipmGuard:1, from:'switchView' }, '', location.href); }catch(e){}
   }catch(e){}
 }
 function __restoreViewState(snap){
@@ -37604,7 +37607,6 @@ function bdOpenInstallPhoto(pid, date, zone){
   if(typeof inst_setTabCDate === 'function') inst_setTabCDate(date);
   if(typeof switchView === 'function') switchView('install');
   if(typeof inst_openProject === 'function') inst_openProject(pid);
-  bdPushBackState();
   // 打开后强制进入编辑模式并选中对应栋号，使「上传照片」入口直接可见
   setTimeout(function(){
     try{ if(typeof inst_gotoTab === 'function') inst_gotoTab('C'); }catch(e){}
@@ -37620,7 +37622,6 @@ function bdOpenInstallProject(pid, date){
   if(typeof inst_setTabCDate === 'function') inst_setTabCDate(date);
   if(typeof switchView === 'function') switchView('install');
   if(typeof inst_openProject === 'function') inst_openProject(pid);
-  bdPushBackState();
   setTimeout(function(){ try{ window.__VIEW_JUMPING = false; }catch(e){} }, 140);
 }
 function bdOpenProductionProject(pid){
@@ -37628,14 +37629,9 @@ function bdOpenProductionProject(pid){
   if(typeof switchView === 'function') switchView('production');
   if(typeof prod_open === 'function') prod_open(pid);
   if(typeof prod_renderTab === 'function') prod_renderTab('C');
-  bdPushBackState();
   setTimeout(function(){ try{ window.__VIEW_JUMPING = false; }catch(e){} }, 140);
 }
 function escBd(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-// 看板跳转时压入一条浏览器历史，使「浏览器/手机返回键」能 popstate 回到看板
-function bdPushBackState(){
-  try{ if(history && history.pushState) history.pushState({ agipmGuard:1, board:1 }, '', location.href); }catch(e){}
-}
 
 // ===== 日期 / 实时时间 / 天气（Open-Meteo 免费无 key，按项目省份坐标取当前天气） =====
 var __bdClockTimer = null;
