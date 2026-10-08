@@ -46781,9 +46781,9 @@ function loadHouses(){
       todayQty:Math.max(0,Math.round(+h.todayQty||0)),
       days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bothTeams:false,bs:'',be:''};
   });
-  // 区表：按出现顺序，默认 2 组（可在区汇总表里改）
+  // 区表：按出现顺序，默认 1 组（可在区汇总表里改）
   var seen={}; zones=[];
-  houses.forEach(function(h){ if(!seen[h.zone]){ seen[h.zone]=1; zones.push({name:h.zone, key:h.zoneKey, teams:2, start:''}); } });
+  houses.forEach(function(h){ if(!seen[h.zone]){ seen[h.zone]=1; zones.push({name:h.zone, key:h.zoneKey, teams:1, start:''}); } });
   // 兼容旧本地缓存：折叠状态/小组数原先按语言相关区名存，迁移到稳定的 zoneKey
   try{
     cfg.collapsed=cfg.collapsed||{};
@@ -50733,7 +50733,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var w = ((f.installation && f.installation.workers && f.installation.workers[d]) || {});
     var holidayYes = (w.holiday === 'yes');
     var zWorkers = ((w.zoneTeamWorkers && w.zoneTeamWorkers[String(zoneNum)]) || []);
-    var plannedTeams = 2; /* 甘特区汇总默认 2 组 */
+    var plannedTeams = 1; /* 甘特区汇总默认 1 组 */
     try{
       var cached = (window.__instZoneTeams && window.__instZoneTeams[String(zoneNum)]);
       if(cached){
@@ -50750,7 +50750,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
             var row = fr.contentWindow.document.querySelector(rowSel);
             if(row){
               var inp = row.querySelector('td:nth-child(2) > input[type=number]');
-              if(inp) plannedTeams = parseInt(inp.value, 10) || 2;
+              if(inp) plannedTeams = parseInt(inp.value, 10) || 1;
             }
           }
         }
@@ -50836,14 +50836,23 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         + '<span class="inst-zone-team-total">'+it('inst_lbl_team_total')+'：<b>'+teamTotal+'</b>'+it('inst_unit_person')+'</span></div>';
       h += '<div class="inst-zone-team-roles">';
       /* 猪舍下拉：value 用稳定的语言无关 key（原始编号），显示文字做翻译；
-         兼容旧数据：已保存值是旧语言翻译名时也能回显 */
+         兼容旧数据：已保存值是旧语言翻译名时也能回显。
+         已安装完成（实际安装量 ≥ 需求量）的栋标红，与出库下拉一致。 */
       var savedHouse = teamObj.house || '';
       var houseOpts = '<option value=""'+(savedHouse?'':' selected')+'>—</option>';
+      var _houseDemandMap = inst_demandMapSafe();
       zoneHouses.forEach(function(hh, hidx){
         var key = prod_esc(hh.key!=null?hh.key:('House '+(hidx+1)));
         var nm = prod_esc(hh.name!=null?hh.name:('House '+(hidx+1)));
         var sel = (hh.key===savedHouse) || (nm===savedHouse);
-        houseOpts += '<option value="'+key+'"'+(sel?' selected':'')+'>'+nm+'</option>';
+        var _hp = String(hh.key||'').split('#');
+        var _hcode = _hp[0]||'', _hidx = _hp[1]||'1';
+        var _hdm = _houseDemandMap[_hcode] || {};
+        var _hneed = 0; for(var _spk in _hdm){ if(_hdm.hasOwnProperty(_spk)) _hneed += (+_hdm[_spk]||0); }
+        var _hinstall = ((f && f.installation && f.installation.houseInstallQty) || {})[_hcode+'|'+_hidx] || 0;
+        var _hstatus = ((f && f.installation && f.installation.houseStatus) || {})[_hcode+'|'+_hidx] || '';
+        var _red = (_hneed > 0 && (_hinstall >= _hneed || _hstatus === 'installed' || _hstatus === 'accepted')) ? ' style="color:#E53935"' : '';
+        houseOpts += '<option value="'+key+'"'+(sel?' selected':'')+_red+'>'+nm+'</option>';
       });
       h += '<div class="inst-zone-team-role inst-zone-team-role-house"><label>'+it('inst_lbl_house')+'</label>'
         + '<select id="ic_zt_'+zoneNum+'_'+ti+'_house" onchange="inst_saveWorkers()"'+(zoneHouses.length?'':' disabled')+'>'+houseOpts+'</select></div>';
@@ -51034,7 +51043,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var w = ((f.installation && f.installation.workers && f.installation.workers[d]) || {});
     var holidayYes = (w.holiday === 'yes');
     var zWorkers = ((w.zoneTeamWorkers && w.zoneTeamWorkers[String(zoneNum)]) || []);
-    var zoneTeams = Math.max(1, +(w.zoneTeams && w.zoneTeams[String(zoneNum)]) || 2, zWorkers.length);
+    var zoneTeams = Math.max(1, +(w.zoneTeams && w.zoneTeams[String(zoneNum)]) || 1, zWorkers.length);
     function houseNameOf(raw){
       if(!raw) return '—';
       var s = String(raw).trim();
