@@ -51396,16 +51396,42 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var p = s.split('#'); return (p[0]||'')+'#'+(p[1]||'1');
   }
   /* 甘特理论计划：name → {start,end,days}（来自 gantt_<id>_house_plan_v1，由甘特排程写入） */
-  function inst_anaPlanMap(){
-    var byKey = {}, byName = {};
+  /* 旧计划文件只存了「显示名」（随语言变），切到英文/越南文就匹配不上。
+     这里做三级解析拿到「与语言无关」的 key：① 已存 key ② 按当前语言的显示名匹配
+     ③ 按「区号 + #栋号」匹配（名字后缀，跨语言通用）。解析成功后会把 key 回写计划文件。 */
+  function inst_anaResolveKey(p, H){
+    if(p && p.key) return inst_anaKey(p.key);
+    if(!p || !H || !H.length) return '';
+    var nm = String(p.name || '');
+    for(var i=0;i<H.length;i++){ if(String(H[i].name) === nm) return inst_anaKey(H[i].key); }
+    var m = /#\s*([^#\s]+)\s*$/.exec(nm);
+    if(m && p.zoneKey !== undefined && p.zoneKey !== null){
+      for(var j=0;j<H.length;j++){
+        if(String(H[j].zoneKey) !== String(p.zoneKey)) continue;
+        var parts = inst_anaKey(H[j].key).split('#');
+        if(String(parts[1]||'') === String(m[1])) return inst_anaKey(H[j].key);
+      }
+    }
+    return '';
+  }
+  function inst_anaPlanMap(houses){
+    var byKey = {}, byName = {}, changed = false;
+    var H = houses || [];
+    var key = 'gantt_'+String(INST_CUR)+'_house_plan_v1';
     try{
-      var raw = localStorage.getItem('gantt_'+String(INST_CUR)+'_house_plan_v1');
+      var raw = localStorage.getItem(key);
       if(raw){
-        (JSON.parse(raw)||[]).forEach(function(p){
+        var arr = JSON.parse(raw) || [];
+        arr.forEach(function(p){
           if(!p) return;
-          if(p.key) byKey[inst_anaKey(p.key)] = p;
-          if(p.name) byName[String(p.name)] = p;     /* 兼容旧数据（只存了 name，切语言后可能失效） */
+          var k = inst_anaResolveKey(p, H);
+          if(k){
+            byKey[k] = p;
+            if(!p.key){ p.key = k; changed = true; }   /* 补回 key 并落盘，之后不再依赖语言 */
+          }
+          if(p.name) byName[String(p.name)] = p;
         });
+        if(changed){ try{ localStorage.setItem(key, JSON.stringify(arr)); }catch(e){} }
       }
     }catch(e){}
     return { byKey: byKey, byName: byName };
@@ -51551,7 +51577,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       .replace('{7}', totalPeople);
     /* ===== ① 各区完成栋数 ② 今日理论安装猪舍 ③ 今日实际安装猪舍(含理论起止) ④ 实际 vs 理论 偏差 ===== */
     var dYmd = (typeof dmyToYmd==='function') ? dmyToYmd(d) : '';
-    var planMap = inst_anaPlanMap();
+    var planMap = inst_anaPlanMap(houses);
     var planOf = function(nm, key){ return inst_anaPlanOf(planMap, nm, key); };
     var fmtD = function(y){ return (typeof ymdToDmy==='function') ? ymdToDmy(y||'') : (y||''); };
     /* ① 各区：已完成（已装 ≥ 需求）栋数 / 总栋数 */
