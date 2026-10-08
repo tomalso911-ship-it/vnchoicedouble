@@ -6904,7 +6904,12 @@ function _ovLoadChartLib(cb){
         return h;
       }
       /* 人工数量曲线 */
-      h += '<div class="prod-canvas-card"><div class="prod-sec-title" style="margin:0 0 6px;border-color:#E53935">'+pt('trend_labor')+'</div>';
+      /* 标题带项目名：XXXX项目-人工数量曲线（项目名取自 globalWonData，与页面标题同源） */
+      var _laborPN = (function(){
+        var p0 = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==PROD_CUR; }) : null;
+        return p0 ? (p0.client||p0.customer||p0.name||'') : '';
+      })();
+      h += '<div class="prod-canvas-card"><div class="prod-sec-title" style="margin:0 0 6px;border-color:#E53935">'+prod_esc(ui_projTitle(_laborPN, pt('trend_labor')))+'</div>';
       h += '<div class="prod-role-toggles">';
       h += '<label style="font-weight:600;color:#E53935"><input type="checkbox" checked disabled>'+pt('trend_total')+'</label>';
       PROD_WORKERS.forEach(function(wk){ var on = PROD_TREND_ROLES[wk[0]]?' checked':''; h += '<label><input type="checkbox"'+on+' onchange="prod_toggleTrendRole(\''+wk[0]+'\',this.checked)">'+pt('prod_role_'+wk[0])+'</label>'; });
@@ -7009,7 +7014,7 @@ function _ovLoadChartLib(cb){
       var wrap = card.parentNode; var W = wrap.clientWidth - 24; if(W<200) W = 220;
       var g = prod_canvasCtx('pcLaborChart', W, 240); if(!g) return;
       var ctx = g.ctx; var n = d.dates.length; if(!n){ return; }
-      var pl=40, pr=12, ptp=12, pb=28; if(n===1){ pr=12; }
+      var pl=40, pr=12, ptp=18, pb=28; if(n===1){ pr=12; }   /* ptp 留出点数标注高度 */
       var plotW = W-pl-pr, plotH = 240-ptp-pb;
       card._geom = {pl:pl, plotW:plotW, n:n}; card._type='labor';
       var all = []; for(var i=0;i<n;i++){ if(d.laborTotal[i]!=null) all.push(d.laborTotal[i]); PROD_WORKERS.forEach(function(k){ var v=d.laborByRole[k[0]][i]; if(PROD_TREND_ROLES[k[0]] && v!=null) all.push(v); }); }
@@ -7028,6 +7033,18 @@ function _ovLoadChartLib(cb){
       };
       drawLine(d.laborTotal, '#E53935', 2.4, false);
       PROD_WORKERS.forEach(function(k){ if(PROD_TREND_ROLES[k[0]]){ drawLine(d.laborByRole[k[0]], prod_roleColor(k[0]), 1.4, true); } });
+      /* ★ 把每条曲线每个点的数值直接标出来（总人数在下、分类在上，字号随点数自适应） */
+      try{
+        ctx.textAlign='center'; ctx.textBaseline='bottom';
+        ctx.font = (n>30 ? '8px' : (n>18 ? '9px' : '10px')) + ' sans-serif';
+        var _lbl = function(arr, color, dy){
+          ctx.fillStyle = color;
+          for(var i=0;i<n;i++){ var v=arr[i]; if(v==null) continue; ctx.fillText(String(Math.round(v)), X(i), Y(v)-3-(dy||0)); }
+        };
+        /* 先画分类（抬高 11px 避免与总人数重叠），最后画总人数保证在最上层 */
+        PROD_WORKERS.forEach(function(k){ if(PROD_TREND_ROLES[k[0]]) _lbl(d.laborByRole[k[0]], prod_roleColor(k[0]), 11); });
+        _lbl(d.laborTotal, '#E53935', 0);
+      }catch(e){}
     }
     function prod_drawWeatherChart(d){
       var card = prod_el('pcWeatherChart'); if(!card) return;
@@ -20239,6 +20256,20 @@ function TBuildProxy(lang) {
 }
 // 注：T() 已在 7390 行直接定义为调用 TBuildProxy(CUR_LANG)，调用方一律拿到合并后的代理对象
 function el(id) { return document.getElementById(id); }
+
+/* ===== 标题「项目名」前缀（2026-10-08）=====
+   让各处的图表/分区标题显示成「XXXX项目-标题」：
+     中文 = 「XXXX项目-标题」 / English = 「XXXX Project · 标题」 / Tiếng Việt = 「XXXX · 标题」
+   没有项目名时原样返回标题（不会出现「项目-」这种半截标题）。
+   甘特 iframe（独立文档）通过 window.parent.ui_projTitle 复用同一套规则。 */
+function ui_projTitle(name, title){
+  title = (title==null) ? '' : String(title);
+  name  = (name==null)  ? '' : String(name);
+  if(!name) return title;
+  var lg = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
+  var sep = (lg==='zh') ? '项目-' : (lg==='vi' ? ' · ' : ' Project · ');
+  return name + sep + title;
+}
 
 // ★ 统一刷新指定容器内的 data-i18n / data-i18n-attr（弹窗专用兜底）
 function sweepI18n(root) {
@@ -46644,7 +46675,15 @@ var GANTT_I18N = {
 function curLang(){ return (window.parent&&window.parent.CUR_LANG)?window.parent.CUR_LANG:'zh'; }
 function it(k){ var l=curLang(), d=GANTT_I18N[l]; if(d&&d[k]!==undefined) return d[k]; var z=GANTT_I18N.zh[k]; return z!==undefined?z:k; }
 function localize(root){ root=root||document; var i;
-  var list=root.querySelectorAll('[data-i18n]'); for(i=0;i<list.length;i++){ list[i].textContent=it(list[i].getAttribute('data-i18n')); }
+  var list=root.querySelectorAll('[data-i18n]');
+  for(i=0;i<list.length;i++){
+    var k0=list[i].getAttribute('data-i18n'); var v0=it(k0);
+    /* 主标题带项目名：XXXX项目-房舍水泥板安装排程（项目名由父页注入 window.INST_PROJ_NAME） */
+    if(k0==='g_title'){
+      try{ if(window.parent && typeof window.parent.ui_projTitle==='function') v0 = window.parent.ui_projTitle(window.INST_PROJ_NAME||'', v0); }catch(e){}
+    }
+    list[i].textContent=v0;
+  }
   var al=root.querySelectorAll('[data-i18n-ph]'); for(i=0;i<al.length;i++){ al[i].setAttribute('placeholder', it(al[i].getAttribute('data-i18n-ph'))); }
   var tl=root.querySelectorAll('[data-i18n-title]'); for(i=0;i<tl.length;i++){ tl[i].setAttribute('title', it(tl[i].getAttribute('data-i18n-title'))); }
 }
@@ -48526,7 +48565,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_copy_over_title:'复制后数量超过需求', inst_copy_over_msg:'复制后该规格的水泥板安装数量超过了实际需要的数量 {n} 片，请修改！', inst_copy_over_actual:'按实际需求修改', inst_copy_over_mine:'按我的想法修改', inst_copy_before_start:'复制日期不能早于安装开始日期',
       inst_lbl_total_man:'总人力', inst_lbl_total_hours:'总工时', inst_lbl_photos_count:'照片', inst_lbl_photos_view:'查看照片',
       inst_role_reporter:'填表人', inst_role_leader:'安装负责人', inst_role_tractor:'拖拉机司机', inst_role_assistant:'跟车助理', inst_role_master:'安装师傅', inst_role_hauler:'运板员', inst_role_other:'其他人员',
-      inst_lbl_house:'猪舍', inst_lbl_zone:'区域', inst_lbl_zone_short:'区域', inst_lbl_team:'小组', inst_lbl_install_qty:'安装数量', inst_lbl_day_subtotal:'日安装小计', inst_lbl_cumulative:'累计安装量', inst_chart_install_title:'安装数量 & 累计安装趋势', inst_chart_labor_title:'人工投入趋势', inst_chart_labor_title_proj:'{0}项目-人工投入趋势', inst_lbl_zone_photos:'安装照片',
+      inst_lbl_house:'猪舍', inst_lbl_zone:'区域', inst_lbl_zone_short:'区域', inst_lbl_team:'小组', inst_lbl_install_qty:'安装数量', inst_lbl_day_subtotal:'日安装小计', inst_lbl_cumulative:'累计安装量', inst_chart_install_title:'安装数量 & 累计安装趋势', inst_chart_labor_title:'人工投入趋势', inst_lbl_zone_photos:'安装照片',
       inst_sec_stats:'当日录入', inst_btn_add_daily:'保存当日', inst_lbl_pcs:'当日安装片数', inst_lbl_houses:'当日完成房舍',
       inst_summary:'累计统计', inst_stat_cum_pcs:'累计片数', inst_stat_cum_houses:'累计房舍', inst_stat_remain:'剩余片数', inst_stat_rate:'完成率',
       inst_chart_title:'安装趋势图', inst_chart_pcs:'当日片数', inst_chart_cum:'累计片数', inst_chart_houses:'当日房舍',
@@ -48635,7 +48674,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_copy_over_title:'Quantity exceeds demand after copy', inst_copy_over_msg:'After copying, this slab spec installed quantity exceeds the actual required quantity by {n} pcs. Please modify!', inst_copy_over_actual:'Adjust to actual demand', inst_copy_over_mine:'Modify as I want', inst_copy_before_start:'Copy date cannot be earlier than the installation start date',
       inst_lbl_total_man:'Total Man', inst_lbl_total_hours:'Total Hours', inst_lbl_photos_count:'Photos', inst_lbl_photos_view:'View Photos',
       inst_role_reporter:'Recorder', inst_role_leader:'Leader', inst_role_tractor:'Tractor Driver', inst_role_assistant:'Truck Assistant', inst_role_master:'Installer', inst_role_hauler:'Slats Transporter', inst_role_other:'Others',
-      inst_lbl_house:'House', inst_lbl_zone:'Zone', inst_lbl_zone_short:'Zone', inst_lbl_team:'Team', inst_lbl_install_qty:'Installed Qty', inst_lbl_day_subtotal:'Daily Installed<br>Subtotal', inst_lbl_cumulative:'Cumulative Installed', inst_chart_install_title:'Installation Qty & Cumulative Trend', inst_chart_labor_title:'Manpower Trend', inst_chart_labor_title_proj:'{0} Project · Manpower Trend', inst_lbl_zone_photos:'Installation Photos',
+      inst_lbl_house:'House', inst_lbl_zone:'Zone', inst_lbl_zone_short:'Zone', inst_lbl_team:'Team', inst_lbl_install_qty:'Installed Qty', inst_lbl_day_subtotal:'Daily Installed<br>Subtotal', inst_lbl_cumulative:'Cumulative Installed', inst_chart_install_title:'Installation Qty & Cumulative Trend', inst_chart_labor_title:'Manpower Trend', inst_lbl_zone_photos:'Installation Photos',
       inst_sec_stats:'Daily Entry', inst_btn_add_daily:'Save Day', inst_btn_quick_ship:'Quick Ship', inst_lbl_pcs:'Pcs Installed', inst_lbl_houses:'Houses Done',
       inst_summary:'Summary', inst_stat_cum_pcs:'Cum. Pcs', inst_stat_cum_houses:'Cum. Houses', inst_stat_remain:'Remaining', inst_stat_rate:'Completion',
       inst_chart_title:'Installation Trend', inst_chart_pcs:'Daily Pcs', inst_chart_cum:'Cumulative', inst_chart_houses:'Daily Houses',
@@ -48744,7 +48783,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_copy_over_title:'Số lượng vượt nhu cầu sau khi sao chép', inst_copy_over_msg:'Sau khi sao chép, số lượng tấm bê tông đã lắp của quy cách này vượt quá nhu cầu thực tế {n} tấm, vui lòng sửa!', inst_copy_over_actual:'Sửa theo nhu cầu thực tế', inst_copy_over_mine:'Sửa theo ý tôi', inst_copy_before_start:'Ngày sao chép không được sớm hơn ngày bắt đầu lắp đặt',
       inst_lbl_total_man:'Tổng nhân', inst_lbl_total_hours:'Tổng giờ', inst_lbl_photos_count:'Ảnh', inst_lbl_photos_view:'Xem ảnh',
       inst_role_reporter:'Người ghi', inst_role_leader:'Chỉ huy', inst_role_tractor:'Lái kéo', inst_role_assistant:'Phụ xe', inst_role_master:'Thợ lắp', inst_role_hauler:'Chở tấm', inst_role_other:'Khác',
-      inst_lbl_house:'Chuồng', inst_lbl_zone:'Khu vực', inst_lbl_zone_short:'KV', inst_lbl_team:'Đội', inst_lbl_install_qty:'SL lắp', inst_lbl_day_subtotal:'Tổng lắp<br>trong ngày', inst_lbl_cumulative:'Tích lũy lắp', inst_chart_install_title:'SL lắp & xu hướng tích lũy', inst_chart_labor_title:'Xu hướng nhân lực', inst_chart_labor_title_proj:'{0} · Xu hướng nhân lực', inst_lbl_zone_photos:'Ảnh lắp đặt',
+      inst_lbl_house:'Chuồng', inst_lbl_zone:'Khu vực', inst_lbl_zone_short:'KV', inst_lbl_team:'Đội', inst_lbl_install_qty:'SL lắp', inst_lbl_day_subtotal:'Tổng lắp<br>trong ngày', inst_lbl_cumulative:'Tích lũy lắp', inst_chart_install_title:'SL lắp & xu hướng tích lũy', inst_chart_labor_title:'Xu hướng nhân lực', inst_lbl_zone_photos:'Ảnh lắp đặt',
       inst_sec_stats:'Nhập ngày', inst_btn_add_daily:'Lưu ngày', inst_btn_quick_ship:'Giao nhanh', inst_lbl_pcs:'Tấm lắp ngày', inst_lbl_houses:'Nhà xong ngày',
       inst_summary:'Tổng kết', inst_stat_cum_pcs:'Tích lũy tấm', inst_stat_cum_houses:'Tích lũy nhà', inst_stat_remain:'Còn lại', inst_stat_rate:'Tỷ lệ',
       inst_chart_title:'Xu hướng lắp đặt', inst_chart_pcs:'Tấm/ngày', inst_chart_cum:'Tích lũy', inst_chart_houses:'Nhà/ngày',
@@ -49057,6 +49096,17 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       var defStart = (typeof prod_startProdYmd==='function') ? prod_startProdYmd(f) : '';
       var _dmy = function(x){ return (typeof ymdToDmy==='function') ? ymdToDmy(x||'') : (x||''); };
       w.GANTT_PROJECT_ID = String(INST_CUR);
+      /* ★ 甘特主标题 = 「XXXX项目-房舍水泥板安装排程」：先注入项目名（模板 localize 会用它），
+         再直接把 h1 文本刷一遍，保证语言切换/重排后标题始终带项目名。 */
+      try{
+        var _gpj = inst_proj();
+        w.INST_PROJ_NAME = _gpj ? (_gpj.client||_gpj.customer||_gpj.name||'') : '';
+        var _h1 = w.document ? w.document.querySelector('.hdr h1') : null;
+        if(_h1){
+          var _base = (typeof w.it === 'function') ? w.it('g_title') : (_h1.textContent||'');
+          _h1.textContent = (typeof ui_projTitle === 'function') ? ui_projTitle(w.INST_PROJ_NAME, _base) : _base;
+        }
+      }catch(e){}
       w.GANTT_DEFAULT_START = defStart || '';
       w.GANTT_PLAN = {
         contract: inst_contractDateDisp(),
@@ -51912,7 +51962,10 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       + '<div class="prod-field inst-zone-field"><label>'+it('inst_lbl_today_zones')+'</label>'+(INST_TAB_C_EDIT_MODE?'<div class="inst-zone-selects" id="ic_zones_wrap"></div>':'<input id="ic_zones_readonly" value="'+prod_esc((w.zones||[]).filter(function(z){return z!==''&&z!=null;}).map(function(z){return it('inst_gantt_zone_name').replace('{0}', z);}).join('、')||'—')+'" readonly style="background:#f0f0f0;cursor:not-allowed;">')+'</div>'
       + '</div>';
     h += '<div id="ic_zone_cards" class="inst-zone-cards"></div>';
-    h += '<div class="prod-sec-title" style="margin-top:24px;">'+it('inst_sec_labor_detail')+'</div>';
+    /* 分区标题带项目名：XXXX项目-安装数量&人工明细 */
+    h += '<div class="prod-sec-title" style="margin-top:24px;">'
+      + prod_esc(ui_projTitle((function(){ var p=inst_proj(); return p ? (p.client||p.customer||p.name||'') : ''; })(), it('inst_sec_labor_detail')))
+      + '</div>';
     h += '<div class="prod-table-scroll pc-labor-scroll"><table class="prod-table pc-labor-hist"><thead><tr>'
       + '<th class="pc-col-no">'+pt('thr_no')+'</th><th class="pc-col-date">'+it('inst_lbl_date')+'</th><th>'+pt('wx_am')+'</th><th>'+pt('wx_pm')+'</th><th>'+it('inst_lbl_holiday')+'</th><th>'+it('inst_lbl_recorder')+'</th>'
       + '<th class="pc-col-zone pc-col-yellow pc-sortable" onclick="inst_sortLabor(\'zone\')">'+it('inst_lbl_zone_short')+inst_sortInd('zone')+'</th><th class="pc-col-yellow pc-sortable" onclick="inst_sortLabor(\'house\')">'+it('inst_lbl_house')+inst_sortInd('house')+'</th><th class="pc-col-yellow">'+it('inst_lbl_team')+'</th><th class="pc-col-yellow">'+it('inst_lbl_install_qty')+'</th><th class="pc-col-dsub pc-col-yellow">'+it('inst_lbl_day_subtotal')+'</th>';
@@ -52114,7 +52167,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       + '<td class="pc-col-act"></td></tr></tfoot></table></div>'
       + '<div class="inst-charts-wrap">'
       + '<div class="inst-chart-box"><div class="inst-chart-title">'+prod_esc(it('inst_chart_install_title'))+'</div><div class="inst-chart-canvas" id="ic_chart_install_canvas"></div></div>'
-      + '<div class="inst-chart-box"><div class="inst-chart-title">'+prod_esc(_projName ? it('inst_chart_labor_title_proj').replace('{0}', _projName) : it('inst_chart_labor_title'))+'</div><div class="inst-chart-canvas" id="ic_chart_labor_canvas"></div></div>'
+      + '<div class="inst-chart-box"><div class="inst-chart-title">'+prod_esc(ui_projTitle(_projName, it('inst_chart_labor_title')))+'</div><div class="inst-chart-canvas" id="ic_chart_labor_canvas"></div></div>'
       + '</div>';
     return h;
   }
