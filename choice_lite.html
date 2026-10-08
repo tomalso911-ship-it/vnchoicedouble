@@ -3429,12 +3429,10 @@ function _ovLoadChartLib(cb){
     </div>
   </section>
 
-  <!-- 工作日志（占位） -->
+  <!-- 工作日志：复用生产管理模块（同一份工厂数据 + 同样的 A–G 标签），
+       仅把生产管理的 .prod-wrap 搬到此视图，做到「第三个入口指向同一份数据」 -->
   <section class="view" id="view-worklog">
-    <div class="approvals-page">
-      <div class="page-header"><h2>工作日志</h2></div>
-      <p>工作日志模块开发中，敬请期待。</p>
-    </div>
+    <div id="worklog-host"></div>
   </section>
 
   <!-- 生产管理（现场工厂子系统） -->
@@ -37012,7 +37010,38 @@ function gotoPrevView(){
 }
 window.gotoPrevView = gotoPrevView;
 
+/* ===== 工作日志：生产管理模块的第三个入口（共用同一份工厂数据 + 同样的 A–G 标签） =====
+   实现方式：把生产管理的 .prod-wrap（含 #prod-list / #prod-detail 及其全部子节点）整体
+   在 #view-production 与 #view-worklog 之间搬移，从而零复制复用生产管理的全部逻辑与样式。 */
+var WORKLOG_MODE = false;
+var __worklogOrigTitle = null;
+function worklog_attach(){
+  if (WORKLOG_MODE) return;
+  var wrap = document.querySelector('#view-production .prod-wrap');
+  var host = document.getElementById('worklog-host');
+  if (!wrap || !host) return;
+  var h2 = wrap.querySelector('#prod-list .page-header h2');
+  if (h2 && __worklogOrigTitle === null) __worklogOrigTitle = h2.textContent;
+  host.appendChild(wrap);
+  if (h2) h2.textContent = (TVL('worklog') || '工作日志');
+  WORKLOG_MODE = true;
+}
+function worklog_detach(){
+  if (!WORKLOG_MODE) return;
+  var wrap = document.querySelector('#worklog-host .prod-wrap') || document.querySelector('#view-production .prod-wrap');
+  var host = document.getElementById('view-production');
+  if (wrap && host) host.insertBefore(wrap, host.firstChild);
+  var h2 = wrap.querySelector('#prod-list .page-header h2');
+  if (h2 && __worklogOrigTitle !== null) h2.textContent = __worklogOrigTitle;
+  WORKLOG_MODE = false;
+}
+/* 取三语文案（无则回退 key），用于工作日志标题 */
+function TVL(k){ try { var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh'; var m = (typeof I18N !== 'undefined' && I18N[L]) ? I18N[L] : {}; return m[k]; } catch(e){ return null; } }
+
 function switchView(name) {
+  /* 工作日志 = 生产管理模块的第三个入口：复用同一份 .prod-wrap 与全部逻辑/数据。
+     离开工作日志（切到其它视图）时，先把 .prod-wrap 搬回生产管理视图，避免两个视图争用同一棵 DOM。 */
+  try { if (window.WORKLOG_MODE && name !== 'worklog') worklog_detach(); } catch (e) {}
   /* 离开当前页面前，把「当前页面」记入返回历史 */
   try { __pushViewHistory(name); } catch (e) {}
   // 手动切换顶部标签时清除「返回来源」记录（跨模块跳转期间由 __VIEW_JUMPING 豁免）
@@ -37104,6 +37133,27 @@ function switchView(name) {
       })();
     } else {
       inst_renderProduction();
+    }
+  }
+  // 进入工作日志视图：复用生产管理模块（同一份工厂数据 + 同样的 A–G 标签），把 .prod-wrap 搬入此视图
+  if (name === 'worklog' && typeof prod_renderProduction === 'function') {
+    worklog_attach();
+    // 自动把本机本地数据迁移到服务端（与生产管理一致），全员共享
+    if (typeof prod_autoSyncAll === 'function') { try { prod_autoSyncAll(); } catch(e){} }
+    if ((typeof globalWonData === 'undefined' || !globalWonData.length) && typeof loadWon === 'function') {
+      loadWon();
+      (function _waitWonDataWL(){
+        _waitWonDataWL._tries = (_waitWonDataWL._tries || 0) + 1;
+        var _has = (typeof globalWonData !== 'undefined' && globalWonData && globalWonData.length);
+        if (_has || _waitWonDataWL._tries > 33 || window.currentView !== 'worklog') {
+          if (window.currentView === 'worklog') prod_renderProduction();
+          _waitWonDataWL._tries = 0;
+          return;
+        }
+        setTimeout(_waitWonDataWL, 300);
+      })();
+    } else {
+      prod_renderProduction();
     }
   }
   // 进入 CRM 潜在项目视图时确保数据已渲染（100% 复刻 WON 分支结构）
