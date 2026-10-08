@@ -2402,6 +2402,7 @@ function _ovLoadChartLib(cb){
 .bd-photo-wrap { position:absolute; inset:0; background:#061a45; overflow:hidden; }
 .bd-photo-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
 .bd-photo-card .bd-card-name { position:absolute; left:0; right:0; bottom:0; padding:8px; font-size:11px; color:#fff; background:rgba(0,10,30,0.65); text-shadow:0 1px 2px rgba(0,0,0,.6); }
+.bd-photo-card .bd-photo-meta { color:#9fe9ff; font-weight:600; }
 /* 人数卡片：数字/标签居中，项目名沉底，不留大片空白 */
 .bd-worker-card { justify-content:center; align-items:center; text-align:center; width:210px; }
 .bd-worker-num { font-size:56px; font-weight:800; color:#39e6ff; line-height:1; margin-top:8px; }
@@ -37500,35 +37501,38 @@ function boardRenderSitePhotos(list){
   if(!fns.length){ render(); return; }
   next();
   function render(){
-    var items = [];
-    (list||[]).forEach(function(p){
-      var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
-      var ph = bdLatestInstallPhoto(f);
-      if(ph) items.push({ pid:p.id, name: bdProjName(p), url: ph.url, date: ph.date, zone: ph.zone });
-    });
+    var items = bdAllInstallPhotos(list);
     if(!items.length){ body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
+    // 限制最多 60 张，避免 DOM 过大；滚动时浏览器再按需加载（loading="lazy"），不额外占流量
+    if(items.length > 60) items = items.slice(0,60);
     var cards = items.map(bdPhotoCard).join('');
     body.innerHTML = '<div class="bd-carousel"><div class="bd-carousel-track">'+cards+cards+'</div></div>';
   }
 }
-function bdLatestInstallPhoto(f){
-  try{
-    var kv = f && f.__zonePhotos_kv; if(!kv) return null;
+// 收集所有项目的全部安装照片（每张照片一张卡片，按日期倒序），点击进入对应上传入口
+function bdAllInstallPhotos(list){
+  var out = [];
+  (list||[]).forEach(function(p){
+    var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
+    if(!f) return;
+    var kv = f.__zonePhotos_kv; if(!kv) return;
     var dates = Object.keys(kv).sort().reverse();
-    for(var i=0;i<dates.length;i++){
-      var day = kv[dates[i]]; if(!day) continue;
-      var zones = Object.keys(day).sort();
-      for(var j=0;j<zones.length;j++){
-        var arr = day[zones[j]]; if(arr && arr.length) return { url:'/uploads/'+arr[arr.length-1], date:dates[i], zone:zones[j] };
-      }
-    }
-  }catch(e){}
-  return null;
+    dates.forEach(function(d){
+      var day = kv[d]; if(!day) return;
+      Object.keys(day).sort().forEach(function(z){
+        var arr = day[z]; if(!arr || !arr.length) return;
+        arr.forEach(function(fn){
+          out.push({ pid:p.id, name: bdProjName(p), date:d, zone:z, url:'/uploads/'+fn });
+        });
+      });
+    });
+  });
+  return out;
 }
 function bdPhotoCard(it){
   return '<div class="bd-carousel-card bd-photo-card" onclick="bdOpenInstallPhoto(\''+it.pid+'\',\''+escBd(it.date)+'\',\''+escBd(it.zone)+'\')">'
     + '<div class="bd-photo-wrap"><img src="'+escBd(it.url)+'" loading="lazy" alt=""></div>'
-    + '<div class="bd-card-name">'+escBd(it.name)+'</div></div>';
+    + '<div class="bd-card-name">'+escBd(it.name)+' <span class="bd-photo-meta">'+escBd(it.date)+' · '+escBd(it.zone)+'</span></div></div>';
 }
 // 第四张：安装人数轮播（每项目最新有数据的安装日总人工）
 function boardRenderInstallWorkers(list){
@@ -37576,19 +37580,30 @@ function prod_totalWorkers(f){
   }catch(e){}
   return { total: total, date: date };
 }
-// 点击：安装照片（或安装人数）→ 跳转安装模块对应日期（Tab C 人工/天气/安装量）
+// 点击：安装照片 → 直接进入该照片的上传入口（安装模块 Tab C，定位到对应日期/栋号，编辑模式）
 function bdOpenInstallPhoto(pid, date, zone){
   try{ window.__VIEW_JUMPING = true; }catch(e){}
+  window.__INST_OPEN_TAB = 'C';
   if(typeof inst_setTabCDate === 'function') inst_setTabCDate(date);
   if(typeof switchView === 'function') switchView('install');
   if(typeof inst_openProject === 'function') inst_openProject(pid);
-  setTimeout(function(){ try{ window.__VIEW_JUMPING = false; }catch(e){} }, 140);
+  bdPushBackState();
+  // 打开后强制进入编辑模式并选中对应栋号，使「上传照片」入口直接可见
+  setTimeout(function(){
+    try{ if(typeof inst_gotoTab === 'function') inst_gotoTab('C'); }catch(e){}
+    try{ if(zone && typeof inst_zoneChange === 'function') inst_zoneChange(0, zone); }catch(e){}
+  }, 220);
+  setTimeout(function(){
+    try{ if(zone && typeof inst_zoneChange === 'function') inst_zoneChange(0, zone); }catch(e){}
+    try{ window.__VIEW_JUMPING = false; }catch(e){}
+  }, 700);
 }
 function bdOpenInstallProject(pid, date){
   try{ window.__VIEW_JUMPING = true; }catch(e){}
   if(typeof inst_setTabCDate === 'function') inst_setTabCDate(date);
   if(typeof switchView === 'function') switchView('install');
   if(typeof inst_openProject === 'function') inst_openProject(pid);
+  bdPushBackState();
   setTimeout(function(){ try{ window.__VIEW_JUMPING = false; }catch(e){} }, 140);
 }
 function bdOpenProductionProject(pid){
@@ -37596,9 +37611,14 @@ function bdOpenProductionProject(pid){
   if(typeof switchView === 'function') switchView('production');
   if(typeof prod_open === 'function') prod_open(pid);
   if(typeof prod_renderTab === 'function') prod_renderTab('C');
+  bdPushBackState();
   setTimeout(function(){ try{ window.__VIEW_JUMPING = false; }catch(e){} }, 140);
 }
 function escBd(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+// 看板跳转时压入一条浏览器历史，使「浏览器/手机返回键」能 popstate 回到看板
+function bdPushBackState(){
+  try{ if(history && history.pushState) history.pushState({ agipmGuard:1, board:1 }, '', location.href); }catch(e){}
+}
 
 // ===== 日期 / 实时时间 / 天气（Open-Meteo 免费无 key，按项目省份坐标取当前天气） =====
 var __bdClockTimer = null;
@@ -45999,7 +46019,7 @@ function _doExportOverviewPDF(){
   // 因此这里用轻量轮询持续同步，覆盖所有状态变化路径。
   function vaultCanGoBackInternal(){
     try {
-      function vis(id){ var e = document.getElementById(id); return !!(e && e.classList && !e.classList.contains('hidden')); }
+      function vis(id){ var e = document.getElementById(id); return !!(e && e.classList && e.classList.contains('show')); }
       if (vis('crmModal')) return true;        // CRM 编辑弹窗
     } catch (e) {}
     return false;
@@ -46039,12 +46059,14 @@ function _doExportOverviewPDF(){
   // ===== 系统返回键路由（APK 注入）：私密空间子目录/预览/选弹窗/会话退出，优先内部消费 =====
   // 返回 true = 网页已消费返回动作，原生不再处理
   window.__handleBack = function(){
-    try {
-      var cm = document.getElementById('crmModal');
-      if (cm && cm.classList && !cm.classList.contains('hidden')) {
-        if (typeof window.closeCrmModal === 'function') { window.closeCrmModal(); return true; }
-      }
-    } catch (err) { return false; }
+  try {
+    var cm = document.getElementById('crmModal');
+    if (cm && cm.classList && cm.classList.contains('show')) {
+      if (typeof window.closeCrmModal === 'function') { window.closeCrmModal(); return true; }
+    }
+  } catch (err) { return false; }
+  // ★ 强制命令：浏览器/手机返回键必须回到上一个页面（如看板）。优先走内部视图历史回退
+    try { if (typeof gotoPrevView === 'function' && gotoPrevView()) return true; } catch (e) {}
     return false;
   };
 
@@ -46083,14 +46105,14 @@ function _doExportOverviewPDF(){
       } catch (e) {}
       return false;
     }
-    _webBackLast = now;
-    // 单击 → 内部回退；没有可退的层级时提示"再按一次退出到登录页"
+    // 单击 → 内部回退（如回到看板）；已内部消费则不再启动退出计时
     var consumed = false;
     try { consumed = !!(window.__handleBack && window.__handleBack()); } catch (e) { consumed = false; }
-    if (!consumed) {
-      try { showToast(__webBackTip()); } catch (e) {}
-    }
-    return consumed;
+    if (consumed) return true;
+    // 没有可退的内部层级，才开始"再按一次退出到登录页"的计时
+    _webBackLast = now;
+    try { showToast(__webBackTip()); } catch (e) {}
+    return false;
   };
   function __webBackTip(){
     try {
