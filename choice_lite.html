@@ -46830,8 +46830,8 @@ function saveHouseLocks(){
 /* =========================================================================
  * 4. 排程核心
  *    规则：日产能固定 → 天数 = ceil(板数/产能)
- *          一组独占一栋 → 组内严格串行，本栋完成「次日」才开下一栋
- *          区内专属     → 小组只在自己区内流转
+ *          整区「从上到下逐行」严格串行 → 本行结束「次日」才开下一行
+ *          区之间：串行模式=上一区完工次日开下一区；并行模式=各区同项目开工日
  * ======================================================================= */
 function houseDays(h){ return Math.max(1,Math.ceil(h.panels/Math.max(1,cfg.cap))); }
 
@@ -46851,39 +46851,28 @@ function schedule(){
     var hs=houses.filter(function(h){ return h.zone===z.name; });
     if(!hs.length){ z.end=''; z.days=0; return; }
 
-    /* 分配顺序 */
-    var order=hs.slice();
-    if(cfg.strat==='lpt') order.sort(function(a,b){ return b.panels-a.panels || a.name.localeCompare(b.name,'zh'); });
-
-    var n=Math.max(1,z.teams|0), free=[];
-    for(var i=0;i<n;i++) free[i]=z.start;
-    /* 默认（未手选小组）按「房舍列表顺序」第1组、第2组…交替分配，直到本区排完 */
-    var rrMap={}, rrn=0;
-    hs.forEach(function(h){ if(!h.bothTeams && h.lockTeam==null){ rrMap[h.id]=rrn++; } });
-
-    order.forEach(function(h){
-      /* 全部组：1组+2组…全部并行 → 产能 n×cap，且独占全部 n 个组
-         开始取各组最晚空闲（含锁定开始日），完工后把全部组推进到其结束次日 */
-      if(h.bothTeams){
-        h.days=Math.max(1,Math.ceil(h.panels/(n*Math.max(1,cfg.cap))));
-        var s=h.lockStart?nextWork(h.lockStart):nextWork(free[0]);
-        for(var bi=1;bi<n;bi++){ if(free[bi]>s) s=nextWork(free[bi]); }
-        var e=addWork(s,h.days);
-        h.start=s; h.end=e; h.team=0;
-        for(var bj=0;bj<n;bj++){ free[bj]=nextAfter(e); }
-        return;
-      }
-      h.days=houseDays(h);
-      /* 选组：锁定优先，否则选最早空闲的组（并列取组号小的）
-         注意：free 里存的是 'YYYY-MM-DD' 字符串，定宽格式下字典序 == 时间序，
-         不能用 free[j] < Infinity 这种写法（字符串转数字得 NaN，比较恒 false） */
-      var k=0;
-      if(h.lockTeam!=null&&h.lockTeam<n&&h.lockTeam>=0) k=h.lockTeam|0;
-      else{ k=(rrMap[h.id]||0)%n; }
-      var s=h.lockStart?nextWork(h.lockStart):nextWork(free[k]);
-      var e=addWork(s,h.days);
-      h.start=s; h.end=e; h.team=k;
-      free[k]=nextAfter(e);
+    /* ★★ 排程规则（2026-10 重做）★★
+       整区「从上到下逐行」严格串行：单一游标 cursor，一行排完 = 其「结束次日」才轮到下一行；
+       小组仅用于显示/配色，不再产生并行（即便某区设了多个小组，日期仍逐行串联）。
+       「全部组」只按 n 组并行产能折算该栋天数，不改变串联顺序。
+       手改开始日 / 拖动进度条 → lockStart 钉住该行，其后所有行（串行模式下含后续区）
+       按同一规则顺延。 */
+    var n=Math.max(1,z.teams|0);
+    var cursor=base, rrn=0;
+    hs.forEach(function(h){
+      /* 小组标签：手选优先 → 否则按行序在 1..n 组之间轮转；全部组固定标第 1 组 */
+      var k;
+      if(h.bothTeams) k=0;
+      else if(h.lockTeam!=null && h.lockTeam>=0) k=(h.lockTeam|0)%n;
+      else { k=rrn%n; rrn++; }
+      h.team=k;
+      /* 天数：全部组=ceil(板数/(n×产能))；否则=ceil(板数/产能) */
+      h.days = h.bothTeams ? Math.max(1,Math.ceil(h.panels/(n*Math.max(1,cfg.cap)))) : houseDays(h);
+      /* 开始：手改锁定优先；否则接「上一行结束的次日」；结束=开始起占用 h.days 个工作日的最后一天 */
+      var s = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
+      var e = addWork(s,h.days);
+      h.start=s; h.end=e;
+      cursor = nextAfter(e);
     });
 
     var mn='',mx='';
@@ -47731,7 +47720,7 @@ function dragEnd(){
   if(edgeRAF){ cancelAnimationFrame(edgeRAF); edgeRAF=null; }
   var svg=document.getElementById('depSvg'); if(svg) svg.classList.remove('dragging');
   if(drag){
-    if(drag.moved){ drag.h.lockStart=drag.h.start; }   /* 拖过 = 锁定开工日 */
+    if(drag.moved){ drag.h.lockStart=drag.h.start; saveHouseLocks(); }   /* 拖过 = 锁定开工日（并落盘，刷新后仍生效） */
     schedule(); renderAll(); saveCfg();
   }
   drag=null;
