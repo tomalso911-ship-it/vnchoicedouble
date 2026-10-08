@@ -2399,14 +2399,15 @@ function _ovLoadChartLib(cb){
 .bd-carousel-card:hover { transform:translateY(-2px); border-color:rgba(57,230,255,0.7); }
 /* 照片卡片：图片填满整个卡片，项目名悬浮在底部 */
 .bd-photo-card { position:relative; flex:0 0 calc(100% - 10px) !important; width:calc(100% - 10px) !important; }
-.bd-photo-carousel .bd-carousel-track { width:100%; gap:10px; animation:none; }
+.bd-photo-carousel .bd-carousel-track { width:100%; gap:10px; animation:none; transition:transform .4s ease; will-change:transform; }
+.bd-photo-frame { position:relative; width:100%; height:100%; overflow:hidden; }
 .bd-photo-wrap { position:absolute; inset:0; background:#061a45; overflow:hidden; }
 .bd-photo-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
 .bd-photo-card .bd-card-name { position:absolute; left:0; right:0; bottom:0; padding:8px; font-size:11px; color:#fff; background:rgba(0,10,30,0.65); text-shadow:0 1px 2px rgba(0,0,0,.6); }
 .bd-photo-card .bd-photo-meta { color:#9fe9ff; font-weight:600; }
 .bd-photo-carousel .bd-photo-wrap img { object-fit:contain; }
 /* 照片左右切换按钮 */
-.bd-photo-nav { position:absolute; top:50%; transform:translateY(-50%); z-index:6; width:34px; height:50px; border:1px solid rgba(255,255,255,0.55); background:rgba(0,10,30,0.55); color:#fff; font-size:20px; line-height:1; cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center; opacity:0.95; box-shadow:0 2px 8px rgba(0,0,0,0.4); transition:background .2s, transform .1s; }
+.bd-photo-nav { position:absolute; top:50%; margin-top:-25px; z-index:6; width:34px; height:50px; border:1px solid rgba(255,255,255,0.55); background:rgba(0,10,30,0.55); color:#fff; font-size:20px; line-height:1; cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center; opacity:0.95; box-shadow:0 2px 8px rgba(0,0,0,0.4); transition:background .2s; }
 .bd-photo-nav:hover { background:rgba(57,230,255,0.6); border-color:rgba(255,255,255,0.9); }
 .bd-photo-prev { left:6px; }
 .bd-photo-next { right:6px; }
@@ -37517,16 +37518,17 @@ function boardRenderSitePhotos(list){
     var cards = items.map(bdPhotoCard).join('');
     // 一次只展示一张照片，带左右按钮可手动切换，JS 自动一张张轮播
     body.innerHTML = '<div class="bd-carousel bd-photo-carousel" id="bdPhotoCarousel">'
+      + '<div class="bd-photo-frame">'
       + '<button type="button" class="bd-photo-nav bd-photo-prev" onclick="boardPhotoPrev()" aria-label="Prev">&#10094;</button>'
       + '<button type="button" class="bd-photo-nav bd-photo-next" onclick="boardPhotoNext()" aria-label="Next">&#10095;</button>'
-      + '<div class="bd-carousel-track">'+cards+'</div></div>';
+      + '<div class="bd-carousel-track">'+cards+'</div></div></div>';
     boardStartPhotoCarousel();
   }
 }
 // 照片轮播：一张张自动左右滚动，不复制整组
 function boardStartPhotoCarousel(){
-  var box = document.getElementById('bdPhotoCarousel'); if(!box) return;
-  var track = box.querySelector('.bd-carousel-track'); if(!track) return;
+  var frame = document.querySelector('#bdPhotoCarousel .bd-photo-frame'); if(!frame) return;
+  var track = frame.querySelector('.bd-carousel-track'); if(!track) return;
   var n = track.children.length; if(n <= 1) return;
   window.__bdPhotoN = n;
   if(typeof window.__bdPhotoIdx !== 'number') window.__bdPhotoIdx = 0;
@@ -37542,8 +37544,9 @@ function boardPhotoAdvance(){
   boardPhotoScroll();
 }
 function boardPhotoScroll(){
-  var box = document.getElementById('bdPhotoCarousel'); if(!box) return;
-  box.scrollTo({ left: window.__bdPhotoIdx * box.clientWidth, behavior: 'smooth' });
+  var frame = document.querySelector('#bdPhotoCarousel .bd-photo-frame'); if(!frame) return;
+  var track = frame.querySelector('.bd-carousel-track'); if(!track) return;
+  track.style.transform = 'translateX(-' + (window.__bdPhotoIdx * frame.clientWidth) + 'px)';
 }
 function boardPhotoPrev(){
   window.__bdPhotoIdx = Math.max(0, (window.__bdPhotoIdx || 0) - 1);
