@@ -3533,6 +3533,10 @@ function _ovLoadChartLib(cb){
       wl_renderTab(active);
     }
     function wl_renderTab(key){
+      WL_ACTIVE_TAB = key;
+      var box = document.getElementById('wl-tabs'); if(box){
+        Array.prototype.forEach.call(box.querySelectorAll('.wl-tab'), function(t){ t.classList.toggle('active', t.getAttribute('data-key') === key); });
+      }
       var body = document.getElementById('wl-tab-body'); if(!body) return;
       var title = key==='daily' ? wl_i18n('wl_tab_daily_report') : wl_i18n('wl_tab_my_work');
       body.innerHTML = '<div class="wl-placeholder"><div><strong>'+title+'</strong><br>'+wl_i18n('wl_placeholder')+'</div></div>';
