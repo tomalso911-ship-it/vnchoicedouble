@@ -11159,6 +11159,12 @@ function _ovLoadChartLib(cb){
       }
       var items = zone ? all.filter(function(it){ return String(it.inArea)===String(zone) || it.val===selVal; }) : all;
       if(!items.length) items = all;
+      /* 按猪舍#栋号数字排序（如 #1,#2,#3,...,#17,#18,#20），便于选择；不按字符串字典序（避免 #17 排在 #2 前面） */
+      items.sort(function(a,b){
+        var an = parseInt(((a.val||'').split('#')[1]||'0'),10) || 0;
+        var bn = parseInt(((b.val||'').split('#')[1]||'0'),10) || 0;
+        return an - bn;
+      });
       return items;
     }
     /* hideBtns=true：悬停信息框只显示数据，不显示任何「快速录入 / 录入：<规格>」按钮
