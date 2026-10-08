@@ -46885,6 +46885,31 @@ function schedule(){
   /* 停工日(0 安装日)累计数：由父页传入（window.INST_ZERO_DAYS）。
      对「未完成」的栋只在第一次遇到"未开工"的行时整体顺延一次（相当于计划整体后移 N 天）。 */
   var gSlipLeft=Math.max(0, +window.INST_ZERO_DAYS||0);
+
+  /* ===== ① 理论基线（纯串行链，先算）=====
+     不含「实际开工日」锚定、不含停工日顺延、不含手改锁定 —— 即"原始理论计划"。
+     用途：(a)「安装进程管理分析」的理论起止 / 今日理论安装猪舍 / 实际开始 vs 理论开始；
+           (b) 计算某栋"迟到几天"→ 把它的条形右端向右拉升同样的天数。 */
+  try{
+    var bPrev=null;
+    zones.forEach(function(z){
+      var b0 = (cfg.zmode==='serial')
+        ? (bPrev ? nextWork(nextAfter(bPrev)) : projStart)
+        : (z.userStart ? nextWork(toYmd(z.userStart)) : projStart);
+      var c2=b0;
+      var nn=Math.max(1, z.teams|0);
+      houses.filter(function(h){ return h.zone===z.name; }).forEach(function(h){
+        var d = h.lockDays ? Math.max(1,(+h.lockDays|0))
+                           : (h.bothTeams ? Math.max(1,Math.ceil(h.panels/(nn*Math.max(1,cfg.cap)))) : houseDays(h));
+        var st=nextWork(c2), en=addWork(st,d);
+        h.baseStart=st; h.baseEnd=en;
+        c2=nextAfter(en);
+      });
+      var hsB=houses.filter(function(h){ return h.zone===z.name; });
+      if(hsB.length) bPrev=hsB[hsB.length-1].baseEnd;
+    });
+  }catch(e){}
+
   zones.forEach(function(z){
     /* 区开工日：
        - 串行模式：区与区必须联动 → 忽略「区开工日」，一律 上一区完工日+1（首区=项目开工日）。
@@ -46925,16 +46950,18 @@ function schedule(){
          ④ 其余未开工的栋 → 接「上一行结束次日」，并把停工日累计天数整体顺延一次。
          结束 = 开始起占用 h.days 个工作日的最后一天。 */
       var _isDone = ((+h.panels||0)>0 && (+h.done||0)>=(+h.panels||0));
+      h.stretchDays = 0;
       var s;
       if(_isDone){
         s = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
       } else if(h.actualStart){
-        /* 已开工未完成：理论开工日 = 实际开工日；但**串行优先** ——
-           不得早于「上一行结束的次日」，否则会出现日期倒退/两行重叠
-           （实际录入顺序与计划顺序不一致时会发生）。 */
-        var _as = nextWork(h.actualStart);
-        if(_as < cursor) _as = nextWork(cursor);
-        s = _as;
+        /* 已开工未完成：★ 以「真实开工日」为准（不往后钳制，允许与相邻行重叠 ——
+           现实里这栋还没装完，我们就去装别的栋了）。
+           若它相对「理论基线」迟到 N 天，则把条形右端再向右**拉升 N 天**，
+           让"晚了几天"在条形上直接看得见（下游行从拉升后的结束日继续）。 */
+        s = nextWork(h.actualStart);
+        var _N = h.baseStart ? diffDays(h.baseStart, s) : 0;
+        if(_N > 0) h.stretchDays = _N;
       } else if(h.lockStart){
         s = nextWork(h.lockStart);
       } else {
@@ -46942,8 +46969,11 @@ function schedule(){
         s = nextWork(cursor);
       }
       var e = addWork(s,h.days);
+      if(h.stretchDays) e = addDays(e, h.stretchDays);   /* 右端向右拉升 N 天 */
       h.start=s; h.end=e;
-      cursor = nextAfter(e);
+      /* 游标只前进不后退：真实开工日可能早于链位，不能让后面的行被"拉回去" */
+      var _next = nextAfter(e);
+      if(_next > cursor) cursor = _next;
     });
 
     var mn='',mx='';
@@ -46951,27 +46981,6 @@ function schedule(){
     z.start=mn; z.end=mx; z.days=diffDays(mn,mx)+1;
     prevEnd=mx;
   });
-  /* ===== 理论基线（纯串行链）=====
-     不含「实际开工日」锚定、不含停工日顺延、不含手改锁定 —— 就是"原始理论计划"。
-     用途：「安装进程管理分析」的「理论起止 / 今日理论安装猪舍 / 实际开始 vs 理论开始」
-     需要一个不被"实际校正"污染的基准；否则实际开工日一被采纳，偏差会立刻归零。 */
-  try{
-    var bPrev=null;
-    zones.forEach(function(z){
-      var b0 = (cfg.zmode==='serial')
-        ? (bPrev ? nextWork(nextAfter(bPrev)) : projStart)
-        : (z.userStart ? nextWork(toYmd(z.userStart)) : projStart);
-      var c2=b0;
-      var hs=houses.filter(function(h){ return h.zone===z.name; });
-      hs.forEach(function(h){
-        var st=nextWork(c2);
-        var en=addWork(st,h.days);
-        h.baseStart=st; h.baseEnd=en;
-        c2=nextAfter(en);
-      });
-      if(hs.length) bPrev=hs[hs.length-1].baseEnd;
-    });
-  }catch(e){}
   /* 把每个区的规划开始/结束/天数落盘，供「安装进度」Tab C 在没打开甘特时也能取到理论值 */
   try{
     localStorage.setItem(ganttStorageKey('zone_plan_v1'), JSON.stringify(zones.map(function(z){
@@ -46983,7 +46992,7 @@ function schedule(){
     localStorage.setItem(ganttStorageKey('house_plan_v1'), JSON.stringify(houses.map(function(h){
       return { zoneKey:String(h.zoneKey), key:String(h.key||''), name:String(h.name||''), panels:(+h.panels||0),
         start:h.start||'', end:h.end||'', days:(+h.days||0), team:(h.team==null?0:h.team),
-        baseStart:h.baseStart||'', baseEnd:h.baseEnd||'' };   /* 理论基线（纯链），供 Tab C 分析 */
+        baseStart:h.baseStart||'', baseEnd:h.baseEnd||'', stretchDays:(+h.stretchDays||0) };   /* 理论基线（纯链）+ 延误拉升天数，供 Tab C 分析 */
     })));
   }catch(e){}
 }
@@ -48231,7 +48240,7 @@ function toggleCards(){
 /* 版本标记：用于确认浏览器是否已加载「最新」甘特脚本。
    排查“改了没生效”时，在控制台执行：
    document.getElementById('instGanttFrame').contentWindow.__ganttBuild   */
-window.__ganttBuild='gantt-r11-20261008';
+window.__ganttBuild='gantt-r12-20261008';
 function rebuild(){ loadHouses(); if(typeof ganttResetManualAnchors==='function') ganttResetManualAnchors(); schedule(); renderAll(); }
 
 window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
@@ -49047,7 +49056,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
             var gh = (w.houses||[]).map(function(h){ return {
               zoneKey:String(h.zoneKey), key:String(h.key||''), name:String(h.name||''), panels:(+h.panels||0),
               start:h.start||'', end:h.end||'', days:(+h.days||0), team:(h.team==null?0:h.team),
-              baseStart:h.baseStart||'', baseEnd:h.baseEnd||'' }; });
+              baseStart:h.baseStart||'', baseEnd:h.baseEnd||'', stretchDays:(+h.stretchDays||0) }; });
             var pk = 'gantt_'+String(INST_CUR)+'_';
             if(gz.length) localStorage.setItem(pk+'zone_plan_v1', JSON.stringify(gz));
             if(gh.length) localStorage.setItem(pk+'house_plan_v1', JSON.stringify(gh));
