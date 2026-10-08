@@ -46437,7 +46437,6 @@ var GANTT_I18N = {
     g_lbl_cap:'日安装(片/组/天)', g_lbl_start:'安装日期', g_lbl_cal:'工作日历',
     g_lbl_contract:'合同签订日期', g_lbl_prep:'建厂筹备至试运营', g_lbl_prep_end:'试运营结束（开始生产）', g_lbl_prod_start:'开始生产日期', g_lbl_install_end:'安装结束日', g_lbl_due:'项目交期', g_lbl_install_days:'总安装天数',
     g_cal_natural:'自然日（天天作业）', g_cal_week:'跳过周六日', g_cal_work:'周末+停工日',
-    g_lbl_strat:'区内房舍分配', g_strat_lpt:'大栋优先（LPT）', g_strat_greedy:'按清单顺序，谁空谁接',
     g_lbl_zmode:'区与区之间', g_zmode_parallel:'同时开工', g_zmode_serial:'串行（前区完工才开下一区）',
     g_lbl_view:'甘特行视图', g_view_house:'按房舍（每栋一行）', g_view_team:'按小组泳道',
     g_lbl_color:'配色依据', g_color_zone:'按分区', g_color_team:'按小组',
@@ -46489,7 +46488,6 @@ var GANTT_I18N = {
     g_lbl_cap:'Daily install (pcs/team/day)', g_lbl_start:'Installation Date', g_lbl_cal:'Work calendar',
     g_lbl_contract:'Contract date', g_lbl_prep:'Factory prep & trial run', g_lbl_prep_end:'Trial run end (prod start)', g_lbl_prod_start:'Production start date', g_lbl_install_end:'Installation end', g_lbl_due:'Project due date', g_lbl_install_days:'Total install days',
     g_cal_natural:'Natural days (work daily)', g_cal_week:'Skip Sat & Sun', g_cal_work:'Weekends + off-days',
-    g_lbl_strat:'House assignment in zone', g_strat_lpt:'Largest first (LPT)', g_strat_greedy:'By list order, first free',
     g_lbl_zmode:'Between zones', g_zmode_parallel:'Parallel', g_zmode_serial:'Serial (next after prev)',
     g_lbl_view:'Gantt row view', g_view_house:'By house (one row each)', g_view_team:'By team lane',
     g_lbl_color:'Color by', g_color_zone:'By zone', g_color_team:'By team',
@@ -46541,7 +46539,6 @@ var GANTT_I18N = {
     g_lbl_cap:'Lắp/ngày (viên/đội/ngày)', g_lbl_start:'Ngày lắp đặt', g_lbl_cal:'Lịch làm việc',
     g_lbl_contract:'Ngày ký hợp đồng', g_lbl_prep:'Chuẩn bị nhà máy & chạy thử', g_lbl_prep_end:'Kết thúc chạy thử (bắt đầu SX)', g_lbl_prod_start:'Ngày bắt đầu sản xuất', g_lbl_install_end:'Ngày kết thúc lắp đặt', g_lbl_due:'Ngày bàn giao dự án', g_lbl_install_days:'Tổng số ngày lắp đặt',
     g_cal_natural:'Ngày tự nhiên (làm hàng ngày)', g_cal_week:'Bỏ T7 & CN', g_cal_work:'Cuối tuần + ngày nghỉ',
-    g_lbl_strat:'Phân bổ chuồng trong vùng', g_strat_lpt:'Ưu tiên lớn (LPT)', g_strat_greedy:'Theo thứ tự, đội rảnh nhận',
     g_lbl_zmode:'Giữa các vùng', g_zmode_parallel:'Cùng lúc', g_zmode_serial:'Nối tiếp (xong vùng trước mới tới sau)',
     g_lbl_view:'Kiểu hàng Gantt', g_view_house:'Theo chuồng (mỗi chuồng 1 hàng)', g_view_team:'Theo làn đội',
     g_lbl_color:'Tô màu theo', g_color_zone:'Theo vùng', g_color_team:'Theo đội',
@@ -46714,7 +46711,7 @@ var ALL_C='#795548';
 var houses=[];   // {id,zone,name,panels,done,days,team,start,end,lockStart,lockTeam,bs,be}
 var zones=[];    // {name,teams,start}
 var cfg={};
-var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'serial',view:'house',
+var DEF={cap:200,start:'',cal:'natural',zmode:'serial',view:'house',
   color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},collapsed:{},
   visible:['zone','name','panels','done','prog','days','team','start','end','today'],
   cfgOpen:false, cardsCollapsed:false,
@@ -47791,7 +47788,7 @@ function syncParamUI(){
 }
 function recompute(){ readParams(); schedule(); renderAll(); saveCfg(); }
 /* ---------- 显示设置面板 ---------- */
-var CFG_SCHED_KEYS={cap:1,start:1,cal:1,strat:1,zmode:1,holidays:1};
+var CFG_SCHED_KEYS={cap:1,start:1,cal:1,zmode:1,holidays:1};
 function setCfg(k,v){
   if(k==='cap') cfg.cap=Math.max(1,parseInt(v,10)||200);
   else if(k==='start') cfg.start=toYmd(v)||cfg.start||today();
@@ -47860,10 +47857,6 @@ function renderCfg(){
   /* 排程参数（原顶部下拉已并入此处，基线控制已并入「可视化」复选框） */
   h+='<div class="cfg-sec"><div class="cfg-t">'+it('g_params')+'</div>';
 
-  h+='<label>'+it('g_lbl_strat')+' <select onchange="setCfg(\'strat\',this.value)">';
-  [['lpt','g_strat_lpt'],['greedy','g_strat_greedy']].forEach(function(o){
-    h+='<option value="'+o[0]+'"'+(cfg.strat===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
-  }); h+='</select></label>';
   h+='<label>'+it('g_lbl_zmode')+' <select onchange="setCfg(\'zmode\',this.value)">';
   [['parallel','g_zmode_parallel'],['serial','g_zmode_serial']].forEach(function(o){
     h+='<option value="'+o[0]+'"'+(cfg.zmode===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
