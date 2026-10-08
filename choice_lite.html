@@ -49694,7 +49694,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         var shipSt = inst_bldgShipStatus(demand, shipped);
         var installSt = inst_bldgInstallStatus(f, code, idx);
         var totalNeed = 0; for(var spec in demand){ totalNeed += (demand[spec]||0); }
-        var installQty = ((f && f.installation && f.installation.houseInstallQty) || {})[code+'|'+idx] || 0;
+        /* ★ 已安装取「逐规格实际录入之和」（与明细卡片/甘特同源），不用可能滞后的 houseInstallQty */
+        var installQty = 0; for(var _sp in demand){ if(demand.hasOwnProperty(_sp)) installQty += Math.min((+demand[_sp]||0), inst_bldgSpecInstalledRec(f, code, idx, _sp)); }
         installQty = Math.max(0, Math.min(totalNeed, installQty));
         var shipProg = (shipSt.has && shipSt.totalNeed>0) ? Math.min(100, Math.round(shipSt.totalShipped/shipSt.totalNeed*100)) : 0;
         var installProg;
@@ -49723,7 +49724,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         var shipped2 = inst_bldgShipped(f, code2, idx2);
         var bldgNeed = 0; for(var sp in demand2){ bldgNeed += (demand2[sp]||0); }
         var bldgShipped = 0; for(var sp2 in shipped2){ bldgShipped += (shipped2[sp2]||0); }
-        var bldgInstall = ((f && f.installation && f.installation.houseInstallQty) || {})[code2+'|'+idx2] || 0;
+        var bldgInstall = 0; for(var _sp2 in demand2){ if(demand2.hasOwnProperty(_sp2)) bldgInstall += Math.min((+demand2[_sp2]||0), inst_bldgSpecInstalledRec(f, code2, idx2, _sp2)); }
         bldgInstall = Math.max(0, Math.min(bldgNeed, bldgInstall));
         zoneTotalNeed += bldgNeed;
         zoneTotalShipped += bldgShipped;
@@ -49766,7 +49767,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         var installSt = inst_bldgInstallStatus(f, code, idx);
         var tipHtml = inst_bldgTipHtml(f, code, idx, demand, shipped, label);
         var totalNeed = 0; for(var spec in demand){ totalNeed += (demand[spec]||0); }
-        var installQty = ((f && f.installation && f.installation.houseInstallQty) || {})[code+'|'+idx] || 0;
+        /* ★ 已安装取「逐规格实际录入之和」（与明细卡片/甘特同源），不用可能滞后的 houseInstallQty */
+        var installQty = 0; for(var _sp in demand){ if(demand.hasOwnProperty(_sp)) installQty += Math.min((+demand[_sp]||0), inst_bldgSpecInstalledRec(f, code, idx, _sp)); }
         installQty = Math.max(0, Math.min(totalNeed, installQty));
         var shipProg = (shipSt.has && shipSt.totalNeed>0) ? Math.min(100, Math.round(shipSt.totalShipped/shipSt.totalNeed*100)) : 0;
         var installProg;
