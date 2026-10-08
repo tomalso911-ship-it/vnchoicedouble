@@ -3429,10 +3429,123 @@ function _ovLoadChartLib(cb){
     </div>
   </section>
 
-  <!-- 工作日志：复用生产管理模块（同一份工厂数据 + 同样的 A–G 标签），
-       仅把生产管理的 .prod-wrap 搬到此视图，做到「第三个入口指向同一份数据」 -->
+  <!-- ===================== 工作日志（独立模块，只保留两个标签） ===================== -->
   <section class="view" id="view-worklog">
-    <div id="worklog-host"></div>
+    <div class="wl-wrap" id="wl-wrap">
+      <div id="wl-list">
+        <div class="page-header">
+          <h2 data-i18n="wl_title">工作日志</h2>
+        </div>
+        <div id="wl-cards" class="wl-cards"></div>
+      </div>
+      <div id="wl-detail" style="display:none">
+        <div class="wl-detail-head">
+          <button class="wl-back" type="button" onclick="wl_back()" data-i18n="wl_back">← 返回列表</button>
+          <div class="wl-detail-title" id="wl-detail-title"></div>
+        </div>
+        <div class="wl-tabs" id="wl-tabs"></div>
+        <div class="wl-tab-body" id="wl-tab-body"></div>
+      </div>
+    </div>
+    <style>
+      .wl-wrap{max-width:1120px;margin:0 auto;padding:8px 12px 40px;}
+      .wl-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:14px;}
+      .wl-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:.15s;}
+      .wl-card:hover{background:#fff0f5;box-shadow:0 4px 14px rgba(0,0,0,.12);transform:translateY(-2px);}
+      .wl-card .wl-title{font-weight:700;font-size:15px;margin-bottom:6px;}
+      .wl-card .wl-row{font-size:13px;color:#444;margin:3px 0;}
+      .wl-card .wl-chip{display:inline-block;background:#E7F2D4;color:#3a6b1e;border-radius:20px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0;}
+      .wl-detail-head{display:flex;align-items:center;gap:12px;margin:4px 0 10px;}
+      .wl-back{border:1px solid #e6c200;background:#ffd700;color:#333;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;}
+      .wl-back:hover{background:#ffdf33;}
+      .wl-detail-title{font-weight:700;font-size:16px;}
+      .wl-tabs{display:flex;flex-wrap:nowrap;gap:4px;border-bottom:2px solid #E7F2D4;padding-bottom:6px;margin-bottom:12px;overflow-x:auto;white-space:nowrap;-ms-overflow-style:none;scrollbar-width:none;}
+      .wl-tabs::-webkit-scrollbar{display:none;}
+      .wl-tab{flex:0 0 auto;white-space:nowrap;padding:6px 10px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;background:#f4f6f2;color:#444;}
+      .wl-tab.active{background:#E53935;color:#fff;font-weight:600;}
+      .wl-tab-body{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;min-height:400px;}
+      .wl-empty{text-align:center;color:#888;padding:40px 20px;}
+      .wl-placeholder{display:flex;align-items:center;justify-content:center;min-height:300px;color:#666;font-size:14px;background:#f9f9f9;border-radius:10px;}
+    </style>
+    <script>
+    var WL_CUR = null;
+    var WL_ACTIVE_TAB = 'daily';
+    var WL_I18N = {
+      zh: { wl_title:'工作日志', wl_back:'← 返回列表', wl_tab_daily_report:'每日记录报告', wl_tab_my_work:'我的工作', wl_empty_list:'暂无签约项目', wl_placeholder:'内容开发中，敬请期待' },
+      en: { wl_title:'Work Log', wl_back:'← Back to list', wl_tab_daily_report:'Daily Record Report', wl_tab_my_work:'My Work', wl_empty_list:'No signed projects', wl_placeholder:'Under development, stay tuned' },
+      vi: { wl_title:'Nhật ký công việc', wl_back:'← Quay lại danh sách', wl_tab_daily_report:'Báo cáo ghi chép hàng ngày', wl_tab_my_work:'Công việc của tôi', wl_empty_list:'Chưa có dự án ký kết', wl_placeholder:'Đang phát triển, vui lòng chờ' }
+    };
+    function wl_i18n(k, def){
+      try { var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh'; var m = WL_I18N[L] || WL_I18N['zh']; var v = m[k]; if (v !== undefined && v !== null) return v; } catch(e){}
+      return def || k;
+    }
+    function wl_name(p){ return p ? (p.client || p.customer || p.name || p.projectName || p.project_name || '—') : '—'; }
+    function wl_statusChip(p){
+      var s = (p && (p.status || p.projectStatus || p.project_status)) || '';
+      var cls = 'wl-chip';
+      var map = {
+        '建成':'建成', 'Completed':'Completed', 'Hoàn thành':'Hoàn thành',
+        '在建':'在建', 'In Progress':'In Progress', 'Đang thi công':'Đang thi công',
+        '待排产':'待排产', 'Pending':'Pending', 'Chờ xếp lịch':'Chờ xếp lịch'
+      };
+      var txt = map[s] || s || wl_i18n('bd_total_all','项目');
+      return '<span class="'+cls+'">'+txt+'</span>';
+    }
+    function wl_renderList(){
+      var box = document.getElementById('wl-cards'); if(!box) return;
+      var list = (typeof globalWonData !== 'undefined' && globalWonData) ? globalWonData : [];
+      if(!list.length){ box.innerHTML = '<div class="wl-empty">'+wl_i18n('wl_empty_list')+'</div>'; return; }
+      var h = '';
+      list.forEach(function(p){
+        h += '<div class="wl-card" onclick="wl_open(\'' + String(p.id||'').replace(/'/g,"\\'") + '\')">'
+          + '<div class="wl-title">' + wl_name(p) + '</div>'
+          + '<div class="wl-row">' + wl_statusChip(p) + '</div>'
+          + '<div class="wl-row">' + ((p.province||'') + (p.city ? ' · '+p.city : '')) + '</div>'
+          + '</div>';
+      });
+      box.innerHTML = h;
+      var h2 = document.querySelector('#wl-list .page-header h2'); if(h2) h2.textContent = wl_i18n('wl_title');
+    }
+    function wl_open(id){
+      var list = (typeof globalWonData !== 'undefined' && globalWonData) ? globalWonData : [];
+      var p = list.find(function(x){ return String(x.id||'') === String(id||''); });
+      if(!p) return;
+      WL_CUR = p;
+      document.getElementById('wl-list').style.display = 'none';
+      document.getElementById('wl-detail').style.display = 'block';
+      document.getElementById('wl-detail-title').textContent = wl_name(p);
+      wl_renderTabs(WL_ACTIVE_TAB || 'daily');
+    }
+    function wl_back(){
+      WL_CUR = null;
+      document.getElementById('wl-detail').style.display = 'none';
+      document.getElementById('wl-list').style.display = 'block';
+      wl_renderList();
+    }
+    function wl_renderTabs(active){
+      WL_ACTIVE_TAB = active;
+      var box = document.getElementById('wl-tabs'); if(!box) return;
+      var tabs = [
+        { key:'daily', label: wl_i18n('wl_tab_daily_report') },
+        { key:'mywork', label: wl_i18n('wl_tab_my_work') }
+      ];
+      box.innerHTML = tabs.map(function(t){ return '<div class="wl-tab '+(t.key===active?'active':'')+'" data-key="'+t.key+'" onclick="wl_renderTab(\''+t.key+'\')">'+t.label+'</div>'; }).join('');
+      wl_renderTab(active);
+    }
+    function wl_renderTab(key){
+      var body = document.getElementById('wl-tab-body'); if(!body) return;
+      var title = key==='daily' ? wl_i18n('wl_tab_daily_report') : wl_i18n('wl_tab_my_work');
+      body.innerHTML = '<div class="wl-placeholder"><div><strong>'+title+'</strong><br>'+wl_i18n('wl_placeholder')+'</div></div>';
+    }
+    // 语言切换后，若当前在工作日志，刷新列表与标签文案
+    try {
+      window.addEventListener('app:langchange', function(){
+        if(window.currentView !== 'worklog') return;
+        wl_renderList();
+        if(WL_CUR) wl_renderTabs(WL_ACTIVE_TAB);
+      });
+    } catch(e){}
+    </script>
   </section>
 
   <!-- 生产管理（现场工厂子系统） -->
@@ -37010,38 +37123,7 @@ function gotoPrevView(){
 }
 window.gotoPrevView = gotoPrevView;
 
-/* ===== 工作日志：生产管理模块的第三个入口（共用同一份工厂数据 + 同样的 A–G 标签） =====
-   实现方式：把生产管理的 .prod-wrap（含 #prod-list / #prod-detail 及其全部子节点）整体
-   在 #view-production 与 #view-worklog 之间搬移，从而零复制复用生产管理的全部逻辑与样式。 */
-var WORKLOG_MODE = false;
-var __worklogOrigTitle = null;
-function worklog_attach(){
-  if (WORKLOG_MODE) return;
-  var wrap = document.querySelector('#view-production .prod-wrap');
-  var host = document.getElementById('worklog-host');
-  if (!wrap || !host) return;
-  var h2 = wrap.querySelector('#prod-list .page-header h2');
-  if (h2 && __worklogOrigTitle === null) __worklogOrigTitle = h2.textContent;
-  host.appendChild(wrap);
-  if (h2) h2.textContent = (TVL('worklog') || '工作日志');
-  WORKLOG_MODE = true;
-}
-function worklog_detach(){
-  if (!WORKLOG_MODE) return;
-  var wrap = document.querySelector('#worklog-host .prod-wrap') || document.querySelector('#view-production .prod-wrap');
-  var host = document.getElementById('view-production');
-  if (wrap && host) host.insertBefore(wrap, host.firstChild);
-  var h2 = wrap.querySelector('#prod-list .page-header h2');
-  if (h2 && __worklogOrigTitle !== null) h2.textContent = __worklogOrigTitle;
-  WORKLOG_MODE = false;
-}
-/* 取三语文案（无则回退 key），用于工作日志标题 */
-function TVL(k){ try { var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh'; var m = (typeof I18N !== 'undefined' && I18N[L]) ? I18N[L] : {}; return m[k]; } catch(e){ return null; } }
-
 function switchView(name) {
-  /* 工作日志 = 生产管理模块的第三个入口：复用同一份 .prod-wrap 与全部逻辑/数据。
-     离开工作日志（切到其它视图）时，先把 .prod-wrap 搬回生产管理视图，避免两个视图争用同一棵 DOM。 */
-  try { if (window.WORKLOG_MODE && name !== 'worklog') worklog_detach(); } catch (e) {}
   /* 离开当前页面前，把「当前页面」记入返回历史 */
   try { __pushViewHistory(name); } catch (e) {}
   // 手动切换顶部标签时清除「返回来源」记录（跨模块跳转期间由 __VIEW_JUMPING 豁免）
@@ -37135,25 +37217,22 @@ function switchView(name) {
       inst_renderProduction();
     }
   }
-  // 进入工作日志视图：复用生产管理模块（同一份工厂数据 + 同样的 A–G 标签），把 .prod-wrap 搬入此视图
-  if (name === 'worklog' && typeof prod_renderProduction === 'function') {
-    worklog_attach();
-    // 自动把本机本地数据迁移到服务端（与生产管理一致），全员共享
-    if (typeof prod_autoSyncAll === 'function') { try { prod_autoSyncAll(); } catch(e){} }
+  // 进入工作日志视图：独立模块，只保留「每日记录报告」「我的工作」两个标签
+  if (name === 'worklog' && typeof wl_renderList === 'function') {
     if ((typeof globalWonData === 'undefined' || !globalWonData.length) && typeof loadWon === 'function') {
       loadWon();
       (function _waitWonDataWL(){
         _waitWonDataWL._tries = (_waitWonDataWL._tries || 0) + 1;
         var _has = (typeof globalWonData !== 'undefined' && globalWonData && globalWonData.length);
         if (_has || _waitWonDataWL._tries > 33 || window.currentView !== 'worklog') {
-          if (window.currentView === 'worklog') prod_renderProduction();
+          if (window.currentView === 'worklog') wl_renderList();
           _waitWonDataWL._tries = 0;
           return;
         }
         setTimeout(_waitWonDataWL, 300);
       })();
     } else {
-      prod_renderProduction();
+      wl_renderList();
     }
   }
   // 进入 CRM 潜在项目视图时确保数据已渲染（100% 复刻 WON 分支结构）
