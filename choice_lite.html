@@ -46929,7 +46929,12 @@ function schedule(){
       if(_isDone){
         s = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
       } else if(h.actualStart){
-        s = nextWork(h.actualStart);
+        /* 已开工未完成：理论开工日 = 实际开工日；但**串行优先** ——
+           不得早于「上一行结束的次日」，否则会出现日期倒退/两行重叠
+           （实际录入顺序与计划顺序不一致时会发生）。 */
+        var _as = nextWork(h.actualStart);
+        if(_as < cursor) _as = nextWork(cursor);
+        s = _as;
       } else if(h.lockStart){
         s = nextWork(h.lockStart);
       } else {
@@ -46946,6 +46951,27 @@ function schedule(){
     z.start=mn; z.end=mx; z.days=diffDays(mn,mx)+1;
     prevEnd=mx;
   });
+  /* ===== 理论基线（纯串行链）=====
+     不含「实际开工日」锚定、不含停工日顺延、不含手改锁定 —— 就是"原始理论计划"。
+     用途：「安装进程管理分析」的「理论起止 / 今日理论安装猪舍 / 实际开始 vs 理论开始」
+     需要一个不被"实际校正"污染的基准；否则实际开工日一被采纳，偏差会立刻归零。 */
+  try{
+    var bPrev=null;
+    zones.forEach(function(z){
+      var b0 = (cfg.zmode==='serial')
+        ? (bPrev ? nextWork(nextAfter(bPrev)) : projStart)
+        : (z.userStart ? nextWork(toYmd(z.userStart)) : projStart);
+      var c2=b0;
+      var hs=houses.filter(function(h){ return h.zone===z.name; });
+      hs.forEach(function(h){
+        var st=nextWork(c2);
+        var en=addWork(st,h.days);
+        h.baseStart=st; h.baseEnd=en;
+        c2=nextAfter(en);
+      });
+      if(hs.length) bPrev=hs[hs.length-1].baseEnd;
+    });
+  }catch(e){}
   /* 把每个区的规划开始/结束/天数落盘，供「安装进度」Tab C 在没打开甘特时也能取到理论值 */
   try{
     localStorage.setItem(ganttStorageKey('zone_plan_v1'), JSON.stringify(zones.map(function(z){
@@ -46956,7 +46982,8 @@ function schedule(){
        与甘特里看得见的逐栋排程完全一致（哪些栋已完成、哪些还在装一目了然）。 */
     localStorage.setItem(ganttStorageKey('house_plan_v1'), JSON.stringify(houses.map(function(h){
       return { zoneKey:String(h.zoneKey), key:String(h.key||''), name:String(h.name||''), panels:(+h.panels||0),
-        start:h.start||'', end:h.end||'', days:(+h.days||0), team:(h.team==null?0:h.team) };
+        start:h.start||'', end:h.end||'', days:(+h.days||0), team:(h.team==null?0:h.team),
+        baseStart:h.baseStart||'', baseEnd:h.baseEnd||'' };   /* 理论基线（纯链），供 Tab C 分析 */
     })));
   }catch(e){}
 }
@@ -49019,7 +49046,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
             var gz = (w.zones||[]).map(function(z){ return { key:String(z.key), start:z.start||'', end:z.end||'', days:(+z.days||0) }; });
             var gh = (w.houses||[]).map(function(h){ return {
               zoneKey:String(h.zoneKey), key:String(h.key||''), name:String(h.name||''), panels:(+h.panels||0),
-              start:h.start||'', end:h.end||'', days:(+h.days||0), team:(h.team==null?0:h.team) }; });
+              start:h.start||'', end:h.end||'', days:(+h.days||0), team:(h.team==null?0:h.team),
+              baseStart:h.baseStart||'', baseEnd:h.baseEnd||'' }; });
             var pk = 'gantt_'+String(INST_CUR)+'_';
             if(gz.length) localStorage.setItem(pk+'zone_plan_v1', JSON.stringify(gz));
             if(gh.length) localStorage.setItem(pk+'house_plan_v1', JSON.stringify(gh));
@@ -51579,6 +51607,13 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var dYmd = (typeof dmyToYmd==='function') ? dmyToYmd(d) : '';
     var planMap = inst_anaPlanMap(houses);
     var planOf = function(nm, key){ return inst_anaPlanOf(planMap, nm, key); };
+    /* 「理论」= 纯链基线（baseStart/baseEnd）；没有基线时退回当前计划（start/end） */
+    var theoRange = function(p){
+      if(!p) return null;
+      var s = p.baseStart || p.start, e = p.baseEnd || p.end;
+      if(!s || !e) return null;
+      return { s: s, e: e };
+    };
     var fmtD = function(y){ return (typeof ymdToDmy==='function') ? ymdToDmy(y||'') : (y||''); };
     /* ① 各区：已完成（已装 ≥ 需求）栋数 / 总栋数 */
     var zoneKeys = [];
@@ -51593,8 +51628,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     /* ② 今日理论安装猪舍：理论计划区间覆盖今天的栋 */
     var theoToday = [];
     houses.forEach(function(h){
-      var p = planOf(h.name, h.key); if(!p || !p.start || !p.end) return;
-      if(dYmd && p.start <= dYmd && dYmd <= p.end) theoToday.push(h.name);
+      var r = theoRange(planOf(h.name, h.key)); if(!r) return;
+      if(dYmd && r.s <= dYmd && dYmd <= r.e) theoToday.push(h.name);
     });
     /* ③ 今日实际安装猪舍（当日录入 todayInstall 合计 > 0），并附理论起止 */
     var actualToday = [];     /* [{name, key}] */
@@ -51613,17 +51648,17 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       });
     });
     var actualHtml = actualToday.length ? actualToday.map(function(a){
-      var p = planOf(a.name, a.key);
-      var rng = (p && p.start && p.end) ? it('inst_ana_plan_range').replace('{0}', fmtD(p.start)).replace('{1}', fmtD(p.end)) : '';
+      var r = theoRange(planOf(a.name, a.key));
+      var rng = r ? it('inst_ana_plan_range').replace('{0}', fmtD(r.s)).replace('{1}', fmtD(r.e)) : '';
       return '<div class="inst-ana-li">'+prod_esc(a.name)+rng+'</div>';
     }).join('') : it('inst_ana_none');
-    /* ④ 实际开始日期 vs 理论开始日期：负=提前，正=晚 */
+    /* ④ 实际开始日期 vs 理论开始日期：负=提前，正=晚（对比「理论基线」） */
     var deltaHtml = actualToday.length ? actualToday.map(function(a){
-      var p = planOf(a.name, a.key);
+      var r = theoRange(planOf(a.name, a.key));
       var ast = a.key ? inst_anaActualStart(f, a.key) : '';
       var txt = it('inst_ana_on_time');
-      if(p && p.start && ast){
-        var dd = inst_anaDiffDays(p.start, ast);
+      if(r && ast){
+        var dd = inst_anaDiffDays(r.s, ast);
         var ad = Math.abs(dd);
         if(dd > 0) txt = inst_anaPick(it('inst_ana_delta_late'), ad).replace('{0}', ad);
         else if(dd < 0) txt = inst_anaPick(it('inst_ana_delta_ahead'), ad).replace('{0}', ad);
