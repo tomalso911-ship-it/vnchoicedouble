@@ -3491,7 +3491,7 @@ function _ovLoadChartLib(cb){
       .wl-report-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
       .wl-report-top-row{display:flex;align-items:stretch;gap:14px;flex-wrap:wrap;}
       .wl-report-left-col{flex:1 1 auto;min-width:260px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;}
-      .wl-report-left-col .wl-rep-nav-group{align-self:flex-start;}
+      .wl-report-left-col .wl-rep-nav-group{align-self:stretch;display:flex;justify-content:space-between;}
       .wl-report-title{font-size:20px;font-weight:800;color:#1a2b3c;letter-spacing:-0.3px;}
       .wl-rep-nav-group{display:inline-flex;align-items:center;gap:8px;background:#f4f6f9;border:1px solid #e3e9ef;border-radius:10px;padding:4px;}
       .wl-rep-nav{width:32px;height:32px;border:1px solid #e6c200;background:#ffd700;color:#333;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;}
@@ -3518,12 +3518,12 @@ function _ovLoadChartLib(cb){
       .wl-wx-ico{font-size:26px;}
       .wl-wx-row{display:flex;justify-content:space-between;font-size:13px;color:#4a6572;}
       .wl-wx-row b{font-weight:700;color:#1a2b3c;}
-      .wl-wx-cards-compact{flex:1 1 auto;display:flex;gap:10px;min-width:260px;}
-      .wl-wx-cards-compact .wl-wx-card{flex:1 1 0;min-width:130px;padding:6px 10px;gap:2px;border-radius:10px;}
-      .wl-wx-cards-compact .wl-wx-head{margin-bottom:2px;}
-      .wl-wx-cards-compact .wl-wx-title{font-size:11.5px;}
-      .wl-wx-cards-compact .wl-wx-ico{font-size:16px;}
-      .wl-wx-cards-compact .wl-wx-row{font-size:11px;line-height:1.5;}
+      .wl-wx-one{display:flex;background:linear-gradient(135deg,#f0f7ff,#e6f3ff);border:1px solid #d6e8f7;border-radius:12px;overflow:hidden;}
+      .wl-wx-half{flex:1 1 0;min-width:0;padding:7px 12px;display:flex;flex-direction:column;gap:2px;}
+      .wl-wx-half + .wl-wx-half{border-left:1px solid rgba(140,190,225,.45);}
+      .wl-wx-half .wl-wx-title{font-size:11.5px;}
+      .wl-wx-half .wl-wx-ico{font-size:16px;}
+      .wl-wx-half .wl-wx-row{font-size:11px;line-height:1.5;}
       .wl-cal-compact{flex:0 0 auto;}
       /* 趋势 */
       .wl-trend-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
@@ -3639,19 +3639,24 @@ function _ovLoadChartLib(cb){
       var s=String(wx.wind); if(/\d/.test(s)) return s.replace(/^.*?\d+.*?$/, function(m){ var d=m.match(/\d+/)[0]; return d+'级'; });
       return s;
     }
-    function wl_wxCard(slot, wx){
+    function wl_wxHalf(slot, wx){
       var label = slot==='am' ? wl_i18n('wx_am_label','上午天气') : wl_i18n('wx_pm_label','下午天气');
       var ico = wx ? wl_wxIcon(wx.code!=null?wx.code:wx.v) : '⛅';
       var cond = wl_wxCond(wx);
       var temp = (wx&&wx.temp!=null) ? (String(wx.temp).includes('°')?wx.temp:wx.temp+'°C') : '—';
       var hum  = (wx&&wx.hum!=null) ? (String(wx.hum).includes('%')?wx.hum:wx.hum+'%') : '—';
       var wind = wl_wxWind(wx);
-      return '<div class="wl-wx-card">'
+      return '<div class="wl-wx-half">'
         + '<div class="wl-wx-head"><div class="wl-wx-title">'+label+'</div><div class="wl-wx-ico">'+ico+'</div></div>'
         + '<div class="wl-wx-row"><span>'+wl_i18n('wx_temp','温度')+'</span><b>'+temp+'</b></div>'
         + '<div class="wl-wx-row"><span>'+wl_i18n('wl_weather')+'</span><b>'+cond+'</b></div>'
         + '<div class="wl-wx-row"><span>'+wl_i18n('wx_hum','湿度')+'</span><b>'+hum+'</b></div>'
         + '<div class="wl-wx-row"><span>'+wl_i18n('wx_wind','风力')+'</span><b>'+wind+'</b></div>'
+        + '</div>';
+    }
+    function wl_wxCardMerged(wxAm, wxPm){
+      return '<div class="wl-wx-one">'
+        + wl_wxHalf('am', wxAm) + wl_wxHalf('pm', wxPm)
         + '</div>';
     }
     function wl_dayProdTotal(rr){
@@ -3823,11 +3828,11 @@ function _ovLoadChartLib(cb){
       h += '<div class="wl-report-header">'
         + '<div class="wl-report-title">'+wl_i18n('wl_tab_daily_report')+'</div>'
         + '</div>';
-      // 第二行：上午天气 + 下午天气（下方日期导航）+ 加宽日历
+      // 第二行：合并天气卡（左右分栏，下方日期导航，两者等宽对齐）+ 加宽日历
       var weekday = String(wl_i18n('wl_weekdays','周日,周一,周二,周三,周四,周五,周六').split(',')[dt.getDay()]||'');
       h += '<div class="wl-report-top-row">'
         + '<div class="wl-report-left-col">'
-        + '<div class="wl-wx-cards wl-wx-cards-compact">'+wl_wxCard('am', wxAm)+wl_wxCard('pm', wxPm)+'</div>'
+        + wl_wxCardMerged(wxAm, wxPm)
         + '<div class="wl-rep-nav-group">'
         + '<button type="button" class="wl-rep-nav" onclick="wl_repStep(-1)" title="'+wl_i18n('wl_prev')+'">‹</button>'
         + '<div class="wl-rep-date">'+dmyToYmd(date)+' · '+weekday+'</div>'
