@@ -3488,10 +3488,8 @@ function _ovLoadChartLib(cb){
       .wl-cal-compact .wl-cal-title{font-size:13px;}
       .wl-cal-compact .wl-cal-nav{width:22px;height:22px;font-size:13px;border-radius:6px;}
       /* 报表 */
-      .wl-report-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
-      .wl-report-header-left{flex:1 1 auto;min-width:220px;}
-      .wl-report-header-right{flex:1 1 auto;min-width:280px;display:flex;justify-content:flex-end;}
-      .wl-report-cal-wx-row{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+      .wl-report-header{display:flex;align-items:stretch;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
+      .wl-report-header-left{flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;}
       .wl-report-title{font-size:20px;font-weight:800;color:#1a2b3c;margin-bottom:10px;letter-spacing:-0.3px;}
       .wl-rep-nav-group{display:inline-flex;align-items:center;gap:8px;background:#f4f6f9;border:1px solid #e3e9ef;border-radius:10px;padding:4px;}
       .wl-rep-nav{width:32px;height:32px;border:1px solid #e6c200;background:#ffd700;color:#333;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;}
@@ -3518,10 +3516,12 @@ function _ovLoadChartLib(cb){
       .wl-wx-ico{font-size:26px;}
       .wl-wx-row{display:flex;justify-content:space-between;font-size:13px;color:#4a6572;}
       .wl-wx-row b{font-weight:700;color:#1a2b3c;}
-      .wl-wx-cards-compact .wl-wx-card{flex:1 1 140px;min-width:130px;padding:8px 10px;gap:4px;border-radius:10px;}
+      .wl-wx-cards-compact{flex:1 1 auto;display:flex;gap:10px;min-width:280px;}
+      .wl-wx-cards-compact .wl-wx-card{flex:1 1 0;min-width:130px;padding:7px 10px;gap:3px;border-radius:10px;}
       .wl-wx-cards-compact .wl-wx-title{font-size:12px;}
-      .wl-wx-cards-compact .wl-wx-ico{font-size:20px;}
-      .wl-wx-cards-compact .wl-wx-row{font-size:12px;}
+      .wl-wx-cards-compact .wl-wx-ico{font-size:18px;}
+      .wl-wx-cards-compact .wl-wx-row{font-size:11.5px;}
+      .wl-cal-compact{flex:0 0 auto;}
       /* 趋势 */
       .wl-trend-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
       .wl-trend-sum-item{flex:1 1 120px;background:#fff;border:1px solid #e3e9ef;border-radius:10px;padding:8px 12px;text-align:center;}
@@ -3650,16 +3650,28 @@ function _ovLoadChartLib(cb){
         var L=rr.lines[n]; if(!L) return;
         if(L.qty){ Object.keys(L.qty).forEach(function(s){ pt+=(+L.qty[s]||0); }); }
         else if(L.matrix){ Object.keys(L.matrix).forEach(function(hh){ Object.keys(L.matrix[hh]).forEach(function(s){ pt+=(+L.matrix[hh][s]||0); }); }); }
+        else if(L.qtyDetail){ Object.keys(L.qtyDetail).forEach(function(s){ var d=L.qtyDetail[s]; if(d&&typeof d==='object'){ Object.keys(d).forEach(function(h){ pt+=(+d[h]||0); }); } }); }
       });
       return pt;
     }
     function wl_dayLaborTotal(ww){
       var lt=0; if(!ww) return 0; PROD_WORKERS.forEach(function(k){ lt+=(+ww[k[0]]||0); }); return lt;
     }
+    var WL_INST_ROLES = ['tractor','assistant','master','hauler','other'];
     function wl_dayInstTotal(iw){
-      /* 只统计实际安装工人角色，避免误把 todayInstall 数量/其它对象字段算入 */
-      var it=0; if(!iw || typeof iw!=='object') return 0;
-      ['tractor','assistant','master','hauler','other','leader'].forEach(function(rk){ it+=(+iw[rk]||0); });
+      /* 安装工人 = 各区域各小组角色人数之和（+安装负责人）；
+         旧数据无 zoneTeamWorkers 时回退用顶层角色汇总。绝不累加 todayInstall 等数量字段 */
+      var it=0; if(!iw || typeof iw!=='object' || iw._deleted) return 0;
+      var ztw = iw.zoneTeamWorkers;
+      var hasTeams = ztw && Object.keys(ztw).some(function(k){ return (ztw[k]||[]).length > 0; });
+      if(hasTeams){
+        Object.keys(ztw).forEach(function(zn){
+          (ztw[zn]||[]).forEach(function(t){ if(!t) return; WL_INST_ROLES.forEach(function(rk){ it+=(+t[rk]||0); }); });
+        });
+      } else {
+        WL_INST_ROLES.forEach(function(rk){ it+=(+iw[rk]||0); });
+      }
+      it += (+iw.leader||0);
       return it;
     }
     function wl_factory(){ return (WL_CUR && typeof prod_get==='function') ? prod_get(WL_CUR.id) : null; }
@@ -3724,18 +3736,16 @@ function _ovLoadChartLib(cb){
     }
     function wl_trendsHtml(f, dates){
       if(dates.length<2) return '<div class="wl-sec" style="margin-top:14px"><div class="wl-sec-title">'+wl_i18n('wl_trends')+'</div><div class="wl-sec-body"><div class="wl-muted">'+wl_i18n('wl_no_chart')+'</div></div></div>';
-      var totP=0, totL=0, totI=0;
-      dates.forEach(function(d){
-        var pt = wl_dayProdTotal(f.production && f.production[d]);
-        var lt = wl_dayLaborTotal(f.workers && f.workers[d]);
-        var it = wl_dayInstTotal(f.installation && f.installation.workers && f.installation.workers[d]);
-        totP+=pt; totL+=lt; totI+=it;
-      });
+      /* 汇总卡片显示“当前选中日期”的当日实际值（与报告日期一致），曲线图才是全时间线 */
+      var sd = WL_CUR_DATE;
+      var dayP = wl_dayProdTotal(f.production && f.production[sd]);
+      var dayL = wl_dayLaborTotal(f.workers && f.workers[sd]);
+      var dayI = wl_dayInstTotal(f.installation && f.installation.workers && f.installation.workers[sd]);
       return '<div class="wl-sec" style="margin-top:14px"><div class="wl-sec-title">'+wl_i18n('wl_trends')+'</div>'
         + '<div class="wl-trend-summary">'
-        + '<div class="wl-trend-sum-item"><span>'+wl_i18n('wl_chart_prod')+'</span><b>'+wl_fmt(totP)+'</b></div>'
-        + '<div class="wl-trend-sum-item"><span>'+wl_i18n('wl_chart_labor')+'</span><b>'+wl_fmt(totL)+'</b></div>'
-        + '<div class="wl-trend-sum-item"><span>'+wl_i18n('wl_chart_inst')+'</span><b>'+wl_fmt(totI)+'</b></div>'
+        + '<div class="wl-trend-sum-item"><span>'+wl_i18n('wl_chart_prod')+'</span><b>'+wl_fmt(dayP)+'</b></div>'
+        + '<div class="wl-trend-sum-item"><span>'+wl_i18n('wl_chart_labor')+'</span><b>'+wl_fmt(dayL)+'</b></div>'
+        + '<div class="wl-trend-sum-item"><span>'+wl_i18n('wl_chart_inst')+'</span><b>'+wl_fmt(dayI)+'</b></div>'
         + '</div>'
         + '<div class="wl-charts">'
         + '<div class="wl-chart-box"><div class="wl-chart-title">'+wl_i18n('wl_chart_prod')+'</div><canvas id="wlChartProd"></canvas></div>'
@@ -3787,6 +3797,7 @@ function _ovLoadChartLib(cb){
           var L=rec.lines[n]; if(!L) return;
           if(L.qty){ Object.keys(L.qty).forEach(function(s){ produced[s]=(+produced[s]||0)+(+L.qty[s]||0); }); }
           else if(L.matrix){ Object.keys(L.matrix).forEach(function(hh){ Object.keys(L.matrix[hh]).forEach(function(s){ produced[s]=(+produced[s]||0)+(+L.matrix[hh][s]||0); }); }); }
+          else if(L.qtyDetail){ Object.keys(L.qtyDetail).forEach(function(s){ var d=L.qtyDetail[s]; if(d&&typeof d==='object'){ Object.keys(d).forEach(function(h){ produced[s]=(+produced[s]||0)+(+d[h]||0); }); } }); }
         });
       }
       var prodTotal=0; Object.keys(produced).forEach(function(s){ prodTotal+=produced[s]; });
@@ -3799,7 +3810,7 @@ function _ovLoadChartLib(cb){
 
       var h='';
       h += '<div class="wl-report-card">';
-      // 报告头：左侧标题/日期导航，右侧天气+日历融为一行
+      // 报告头：标题/日期导航 + 上午天气 + 下午天气 + 日历，全部一行
       h += '<div class="wl-report-header">'
         + '<div class="wl-report-header-left">'
         + '<div class="wl-report-title">'+wl_i18n('wl_tab_daily_report')+'</div>'
@@ -3808,11 +3819,9 @@ function _ovLoadChartLib(cb){
         + '<div class="wl-rep-date">'+dmyToYmd(date)+' · 周'+wd+'</div>'
         + '<button type="button" class="wl-rep-nav" onclick="wl_repStep(1)" title="'+wl_i18n('wl_next')+'">›</button>'
         + '</div></div>'
-        + '<div class="wl-report-header-right">'
-        + '<div class="wl-report-cal-wx-row">'
         + '<div class="wl-wx-cards wl-wx-cards-compact">'+wl_wxCard('am', wxAm)+wl_wxCard('pm', wxPm)+'</div>'
         + '<div class="wl-cal-compact">'+wl_calHtml(f, dates)+'</div>'
-        + '</div></div></div>';
+        + '</div>';
 
       // 采购
       h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_procurement')+'</div><div class="wl-sec-body">';
