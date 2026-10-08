@@ -48173,7 +48173,7 @@ function toggleCards(){
 /* 版本标记：用于确认浏览器是否已加载「最新」甘特脚本。
    排查“改了没生效”时，在控制台执行：
    document.getElementById('instGanttFrame').contentWindow.__ganttBuild   */
-window.__ganttBuild='gantt-r7-20261008';
+window.__ganttBuild='gantt-r8-20261008';
 function rebuild(){ loadHouses(); if(typeof ganttResetManualAnchors==='function') ganttResetManualAnchors(); schedule(); renderAll(); }
 
 window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
@@ -48675,7 +48675,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     f.installation = f.installation || {plan:{},workers:{},daily:{}};
     return f;
   }
-  function inst_save(f){ if(typeof prod_save==='function'){ try{ prod_save(f); }catch(e){} } }
+  function inst_save(f){ if(typeof prod_save==='function'){ try{ prod_save(f); }catch(e){} } try{ if(typeof inst_refreshGanttLive==='function') inst_refreshGanttLive(f); }catch(e){} }
   function inst_proj(){ return (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==INST_CUR; }) : null; }
   function inst_provKey(){
     var p = inst_proj(); return p ? (p.province||p.region||'') : '';
@@ -48994,6 +48994,56 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         }
       }catch(e){}
     } catch(e){}
+    /* 记录当前数据指纹并开启「甘特实时刷新」轮询 */
+    try{ window.__instGanttLiveSig = inst_ganttLiveSig(f); inst_ganttLiveStart(); }catch(e){}
+  }
+  /* ===== 甘特实时刷新 =====
+     安装明细（Tab C）一录入/保存，或本地数据被其它标签页改动，就立即把最新数据推给甘特
+     并重排（保留滚动位置），不必等切页签或刷新页面。 */
+  function inst_ganttLiveSig(f){
+    try{
+      return JSON.stringify(inst_buildGanttHouses(f).map(function(h){
+        return [h.key, h.panels, h.done, h.todayQty];
+      }));
+    }catch(e){ return ''; }
+  }
+  function inst_ganttApplyLive(fr, f){
+    try{
+      var w = fr && fr.contentWindow; if(!w) return false;
+      var d = w.document;
+      var t = d.getElementById('tblWrap'), c = d.getElementById('chartWrap');
+      var st = t ? t.scrollTop : 0, sl = t ? t.scrollLeft : 0, ct = c ? c.scrollTop : 0;
+      w.HOUSE_SOURCE = inst_buildGanttHouses(f);
+      if(typeof w.rebuild === 'function') w.rebuild();
+      try{ if(t){ t.scrollTop = st; t.scrollLeft = sl; } if(c) c.scrollTop = ct; }catch(e){}
+      return true;
+    }catch(e){ return false; }
+  }
+  function inst_refreshGanttLive(f){
+    var fr = document.getElementById('instGanttFrame');
+    if(!fr || !fr.contentWindow) return;
+    if(!f) f = inst_get(INST_CUR);
+    if(!f) return;
+    if(inst_ganttApplyLive(fr, f)){ try{ window.__instGanttLiveSig = inst_ganttLiveSig(f); }catch(e){} }
+  }
+  var INST_GANTT_LIVE_TIMER = null;
+  function inst_ganttLiveTick(){
+    var fr = document.getElementById('instGanttFrame');
+    if(!fr || !fr.contentWindow){                       /* 甘特不在页面上 → 停表 */
+      if(INST_GANTT_LIVE_TIMER){ clearInterval(INST_GANTT_LIVE_TIMER); INST_GANTT_LIVE_TIMER = null; }
+      return;
+    }
+    try{
+      var f = inst_get(INST_CUR); if(!f) return;
+      var sig = inst_ganttLiveSig(f);
+      if(sig && sig !== window.__instGanttLiveSig){
+        if(inst_ganttApplyLive(fr, f)) window.__instGanttLiveSig = sig;
+      }
+    }catch(e){}
+  }
+  function inst_ganttLiveStart(){
+    if(INST_GANTT_LIVE_TIMER) return;
+    INST_GANTT_LIVE_TIMER = setInterval(inst_ganttLiveTick, 3000);
   }
   function inst_assignMap(f){ return (f.installation && f.installation.assign) || {}; }
   /* 区域显示名（三语）：zh=1区 / en=Zone 1 / vi=Khu 1 */
