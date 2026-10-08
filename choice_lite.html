@@ -11223,8 +11223,11 @@ function _ovLoadChartLib(cb){
     function prod_outDestOptions(spec, selVal, zone, srcHouse){
       var items=prod_outDestItems(spec, selVal, zone, srcHouse);
       if(!items.length) return '<option value="">'+prod_esc(pt('out_area_empty'))+'</option>';
+      /* 当前值无效时，默认选中第一个非红色（未安装完成）房舍，避免默认停在已完成的房舍上 */
+      var hasSel = items.some(function(it){ return it.val===selVal; });
+      var defVal = hasSel ? selVal : (items.filter(function(it){ return !it.red; })[0] || items[0]).val;
       return items.map(function(it){
-        return '<option value="'+prod_esc(it.val)+'"'+(it.val===selVal?' selected':'')+(it.red?' style="color:#E53935"':'')+'>'+prod_esc(it.txt)+'</option>';
+        return '<option value="'+prod_esc(it.val)+'"'+(it.val===defVal?' selected':'')+(it.red?' style="color:#E53935"':'')+'>'+prod_esc(it.txt)+'</option>';
       }).join('');
     }
     function prod_outDestSelectHtml(spec, selVal, zone, srcHouse){
@@ -11232,8 +11235,9 @@ function _ovLoadChartLib(cb){
       var curLabel=pt('out_area_empty'), curVal=selVal, curTip='';
       if(items.length){
         var cur=items.filter(function(it){ return it.val===selVal; })[0];
-        if(!cur){ cur=items[0]; curVal=cur.val; }
-        if(cur){ curLabel=cur.txt; curTip=cur.tip; }
+        /* 没有明确选中值时，默认停在第一个未安装完成的房舍（红色下方第一个黑色），便于快速选择 */
+        if(!cur){ cur=items.filter(function(it){ return !it.red; })[0] || items[0]; }
+        if(cur){ curVal=cur.val; curLabel=cur.txt; curTip=cur.tip; }
       }
       var list=items.map(function(it){
         return '<div class="out-edit-dest-item'+(it.val===curVal?' selected':'')+(it.red?' red':'')+'" data-val="'+prod_esc(it.val)+'" data-tip-spec="'+prod_esc(spec)+'" data-tip-html="'+prod_esc(it.tip)+'" onmouseenter="inst_showBldgTip(this)" onmouseleave="inst_bldgTipHideSoon()" onclick="prod_outDestItemClick(this)">'+prod_esc(it.txt)+'</div>';
@@ -11293,11 +11297,16 @@ function _ovLoadChartLib(cb){
       destWrap.outerHTML=prod_outDestSelectHtml(spec, curDest, zone, srcHouse);
       destInput=document.getElementById('out_edit_dest');
       if(destInput && !destInput.value){
-        var firstItem=document.querySelector('.out-edit-dest-item[data-val]');
+        /* 区域切换后也没有明确目标时，默认选中第一个未安装完成（非红色）房舍 */
+        var firstItem=document.querySelector('.out-edit-dest-item[data-val]:not(.red)')
+          || document.querySelector('.out-edit-dest-item[data-val]');
         if(firstItem){
           destInput.value=firstItem.getAttribute('data-val');
           var trig=document.querySelector('.out-edit-dest-trigger');
-          if(trig) trig.textContent=firstItem.textContent;
+          if(trig){
+            trig.textContent=firstItem.textContent;
+            trig.setAttribute('data-val', firstItem.getAttribute('data-val')||'');
+          }
         }
       }
       prod_outDestChanged();
