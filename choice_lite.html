@@ -47881,10 +47881,19 @@ function syncScroll(){
      不要同步 scrollLeft：左表列宽与右图时间轴宽度无关，一侧滚不到该位置会被夹断，
      反过来又按夹断后的值把另一侧拉回，表现为「上滑垂直滚动时横向跳回最左」。
      ★ 同帧写入（不做 rAF 延迟）：两侧严格同帧对齐，避免“一栏慢一帧”造成的错位/晃动。 */
-  var SNAP = (ganttFlag('gint')==='1');   /* 诊断：把滚动位置吸附到整数像素（消除小数偏移导致的文字重栅格化） */
+  /* 诊断：#gint=1 → 把滚动位置吸附到「整数设备像素」。
+     Windows 缩放(125%/150%)/浏览器页面缩放下，合成层若按小数设备像素平移，
+     滚动时文字会被重采样 → 发虚/重影/闪。吸附到 1/dpr 的整数倍即可对齐设备像素。 */
+  var SNAP = (ganttFlag('gint')==='1');
+  function snapEl(el){
+    var dpr = window.devicePixelRatio || 1;
+    var t = el.scrollTop;
+    var nt = Math.round(t*dpr)/dpr;
+    if(Math.abs(nt-t) > 0.001) el.scrollTop = nt;
+  }
   function link(p,q){ p.addEventListener('scroll',function(){
     if(lock||src===p) return;
-    if(SNAP){ var r=Math.round(p.scrollTop); if(r!==p.scrollTop) p.scrollTop=r; }
+    if(SNAP) snapEl(p);
     lock=true; src=p;
     var t=p.scrollTop;
     if(q.scrollTop!==t) q.scrollTop=t;
@@ -48164,7 +48173,7 @@ function toggleCards(){
 /* 版本标记：用于确认浏览器是否已加载「最新」甘特脚本。
    排查“改了没生效”时，在控制台执行：
    document.getElementById('instGanttFrame').contentWindow.__ganttBuild   */
-window.__ganttBuild='gantt-r6-20261008';
+window.__ganttBuild='gantt-r7-20261008';
 function rebuild(){ loadHouses(); if(typeof ganttResetManualAnchors==='function') ganttResetManualAnchors(); schedule(); renderAll(); }
 
 window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
