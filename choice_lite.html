@@ -3466,14 +3466,57 @@ function _ovLoadChartLib(cb){
       .wl-tab-body{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;min-height:400px;}
       .wl-empty{text-align:center;color:#888;padding:40px 20px;}
       .wl-placeholder{display:flex;align-items:center;justify-content:center;min-height:300px;color:#666;font-size:14px;background:#f9f9f9;border-radius:10px;}
+      /* 日历 */
+      .wl-daily{display:flex;flex-direction:column;gap:16px;}
+      .wl-cal{max-width:360px;background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+      .wl-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+      .wl-cal-title{font-weight:700;font-size:15px;}
+      .wl-cal-nav{width:30px;height:30px;border:1px solid #e6c200;background:#ffd700;color:#333;border-radius:8px;cursor:pointer;font-size:16px;line-height:1;}
+      .wl-cal-nav:hover{background:#ffdf33;}
+      .wl-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+      .wl-cal-week .wl-cal-wk{text-align:center;font-size:12px;color:#888;padding:4px 0;}
+      .wl-cal-cell{position:relative;text-align:center;padding:8px 0;font-size:13px;border-radius:8px;cursor:pointer;background:#fafafa;color:#333;}
+      .wl-cal-cell:hover{background:#fff0f5;}
+      .wl-cal-empty{background:transparent;cursor:default;}
+      .wl-cal-today{outline:2px solid #1E88E5;}
+      .wl-cal-sel{background:#E53935;color:#fff;font-weight:700;}
+      .wl-cal-dot{position:absolute;right:6px;bottom:5px;width:6px;height:6px;border-radius:50%;background:#E53935;}
+      .wl-cal-sel .wl-cal-dot{background:#fff;}
+      /* 报表 */
+      .wl-rep-head{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+      .wl-rep-nav{width:32px;height:32px;border:1px solid #e6c200;background:#ffd700;color:#333;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;}
+      .wl-rep-nav:hover{background:#ffdf33;}
+      .wl-rep-date{font-weight:700;font-size:16px;}
+      .wl-report-card{background:#fff;border:1px solid #e5e8ec;border-radius:14px;padding:18px 20px;box-shadow:0 2px 10px rgba(0,0,0,.06);max-width:760px;}
+      .wl-sec{margin-bottom:16px;}
+      .wl-sec-title{font-weight:700;font-size:14px;color:#263238;border-left:4px solid #E53935;padding-left:8px;margin-bottom:8px;}
+      .wl-sec-body{font-size:13px;color:#37474f;line-height:1.7;}
+      .wl-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+      .wl-kpi{background:#f3f6f9;border:1px solid #e3e9ef;border-radius:10px;padding:6px 12px;font-size:13px;color:#455a64;}
+      .wl-kpi b{color:#1a2b3c;font-size:15px;margin-right:4px;}
+      .wl-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+      .wl-tbl th,.wl-tbl td{border:1px solid #eee;padding:6px 10px;text-align:left;}
+      .wl-tbl th{background:#f4f6f2;color:#444;font-weight:600;}
+      .wl-row2{margin:4px 0;}
+      .wl-muted{color:#9aa5b1;font-size:13px;}
+      .wl-charts{display:flex;flex-wrap:wrap;gap:14px;}
+      .wl-chart-box{flex:1 1 220px;min-width:200px;max-width:340px;height:220px;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;}
+      .wl-chart-title{text-align:center;font-size:13px;font-weight:700;color:#263238;margin-bottom:6px;}
+      .wl-chart-box canvas{flex:1 1 auto;min-height:0;width:100%;}
     </style>
     <script>
     var WL_CUR = null;
     var WL_ACTIVE_TAB = 'daily';
+    var WL_CUR_DATE = null;   // 当前报告日期（DD-MM-YYYY）
+    var WL_CAL_MONTH = null;  // 日历当前月份 {y, m}
+    var WL_CHARTS = [];
     var WL_I18N = {
-      zh: { wl_title:'工作日志', wl_back:'← 返回列表', wl_tab_daily_report:'每日记录报告', wl_tab_my_work:'我的工作', wl_empty_list:'暂无签约项目', wl_placeholder:'内容开发中，敬请期待' },
-      en: { wl_title:'Work Log', wl_back:'← Back to list', wl_tab_daily_report:'Daily Record Report', wl_tab_my_work:'My Work', wl_empty_list:'No signed projects', wl_placeholder:'Under development, stay tuned' },
-      vi: { wl_title:'Nhật ký công việc', wl_back:'← Quay lại danh sách', wl_tab_daily_report:'Báo cáo ghi chép hàng ngày', wl_tab_my_work:'Công việc của tôi', wl_empty_list:'Chưa có dự án ký kết', wl_placeholder:'Đang phát triển, vui lòng chờ' }
+      zh: { wl_title:'工作日志', wl_back:'← 返回列表', wl_tab_daily_report:'每日记录报告', wl_tab_my_work:'我的工作', wl_empty_list:'暂无签约项目', wl_placeholder:'内容开发中，敬请期待',
+        wl_rep_no_data:'该日暂无记录', wl_weather:'天气', wl_am:'上午', wl_pm:'下午', wl_workers:'生产工人数', wl_lines:'生产线数', wl_production:'生产数据', wl_spec:'规格', wl_qty:'数量', wl_share:'占比', wl_total:'合计', wl_procurement:'采购数据', wl_material:'材料', wl_amount:'金额', wl_fault:'故障与维修数据', wl_fault_none:'当日无故障', wl_fault_count:'故障数', wl_reason:'故障原因', wl_down:'停机', wl_repair:'修复', wl_install:'安装数据', wl_installed:'已安装', wl_demand:'需求', wl_inst_rate:'安装完成率', wl_eta:'预计完工', wl_prev:'上一天', wl_next:'下一天', wl_today:'今天', wl_trends:'趋势', wl_chart_prod:'每日产量', wl_chart_labor:'每日人工', wl_chart_inst:'每日安装人工', wl_no_chart:'数据不足，无法绘图' },
+      en: { wl_title:'Work Log', wl_back:'← Back to list', wl_tab_daily_report:'Daily Record Report', wl_tab_my_work:'My Work', wl_empty_list:'No signed projects', wl_placeholder:'Under development, stay tuned',
+        wl_rep_no_data:'No record for this day', wl_weather:'Weather', wl_am:'AM', wl_pm:'PM', wl_workers:'Production workers', wl_lines:'Production lines', wl_production:'Production', wl_spec:'Spec', wl_qty:'Qty', wl_share:'Share', wl_total:'Total', wl_procurement:'Procurement', wl_material:'Material', wl_amount:'Amount', wl_fault:'Fault & Maintenance', wl_fault_none:'No fault today', wl_fault_count:'Faults', wl_reason:'Reason', wl_down:'Down', wl_repair:'Repair', wl_install:'Installation', wl_installed:'Installed', wl_demand:'Demand', wl_inst_rate:'Install rate', wl_eta:'ETA', wl_prev:'Prev day', wl_next:'Next day', wl_today:'Today', wl_trends:'Trends', wl_chart_prod:'Daily output', wl_chart_labor:'Daily labor', wl_chart_inst:'Daily install labor', wl_no_chart:'Not enough data to chart' },
+      vi: { wl_title:'Nhật ký công việc', wl_back:'← Quay lại danh sách', wl_tab_daily_report:'Báo cáo ghi chép hàng ngày', wl_tab_my_work:'Công việc của tôi', wl_empty_list:'Chưa có dự án ký kết', wl_placeholder:'Đang phát triển, vui lòng chờ',
+        wl_rep_no_data:'Không có ghi chép ngày này', wl_weather:'Thời tiết', wl_am:'Sáng', wl_pm:'Chiều', wl_workers:'Công nhân sản xuất', wl_lines:'Số dây chuyền', wl_production:'Sản xuất', wl_spec:'Quy cách', wl_qty:'Số lượng', wl_share:'Tỉ lệ', wl_total:'Tổng', wl_procurement:'Mua hàng', wl_material:'Vật liệu', wl_amount:'Tiền', wl_fault:'Lỗi & Bảo trì', wl_fault_none:'Hôm nay không lỗi', wl_fault_count:'Số lỗi', wl_reason:'Nguyên nhân', wl_down:'Dừng', wl_repair:'Sửa', wl_install:'Lắp đặt', wl_installed:'Đã lắp', wl_demand:'Nhu cầu', wl_inst_rate:'Tỉ lệ lắp', wl_eta:'Dự kiến xong', wl_prev:'Ngày trước', wl_next:'Ngày sau', wl_today:'Hôm nay', wl_trends:'Xu hướng', wl_chart_prod:'Sản lượng ngày', wl_chart_labor:'Nhân công ngày', wl_chart_inst:'Nhân công lắp ngày', wl_no_chart:'Không đủ dữ liệu' }
     };
     function wl_i18n(k, def){
       try { var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh'; var m = WL_I18N[L] || WL_I18N['zh']; var v = m[k]; if (v !== undefined && v !== null) return v; } catch(e){}
@@ -3511,6 +3554,9 @@ function _ovLoadChartLib(cb){
       var p = list.find(function(x){ return String(x.id||'') === String(id||''); });
       if(!p) return;
       WL_CUR = p;
+      WL_CUR_DATE = null;
+      WL_CAL_MONTH = null;
+      WL_CHARTS = [];
       document.getElementById('wl-list').style.display = 'none';
       document.getElementById('wl-detail').style.display = 'block';
       document.getElementById('wl-detail-title').textContent = wl_name(p);
@@ -3532,14 +3578,204 @@ function _ovLoadChartLib(cb){
       box.innerHTML = tabs.map(function(t){ return '<div class="wl-tab '+(t.key===active?'active':'')+'" data-key="'+t.key+'" onclick="wl_renderTab(\''+t.key+'\')">'+t.label+'</div>'; }).join('');
       wl_renderTab(active);
     }
+    function wl_normDate(d){
+      if(!d) return '';
+      var p = String(d).split(/[-/.]/);
+      if(p.length!==3) return '';
+      if(p[0].length===4) return p[2]+'/'+p[1]+'/'+p[0];           // YYYY-MM-DD → DD/MM/YYYY
+      return p[0]+'/'+p[1]+'/'+p[2];                              // DD-MM-YYYY / DD/MM/YYYY → DD/MM/YYYY
+    }
+    function wl_esc(s){ s = String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function wl_wxCode(v){
+      var m={0:'晴',1:'晴间多云',2:'局部多云',3:'阴',45:'雾',48:'雾凇',51:'毛毛雨',53:'小雨',55:'中雨',56:'冻雨',57:'冻雨',61:'小雨',63:'中雨',65:'大雨',66:'冻雨',67:'冻雨',71:'小雪',73:'中雪',75:'大雪',77:'雪粒',80:'阵雨',81:'阵雨',82:'强阵雨',85:'阵雪',86:'阵雪',95:'雷暴',96:'雷暴伴冰雹',99:'雷暴伴冰雹'};
+      return m[+v] || (wl_i18n('wl_weather')+':'+v);
+    }
+    function wl_factory(){ return (WL_CUR && typeof prod_get==='function') ? prod_get(WL_CUR.id) : null; }
+    function wl_reportDates(f){
+      var set={};
+      if(f){
+        if(f.workers) Object.keys(f.workers).forEach(function(k){ set[wl_normDate(k)]=1; });
+        if(f.production) Object.keys(f.production).forEach(function(k){ set[wl_normDate(k)]=1; });
+        if(f.materials&&f.materials.receipts) f.materials.receipts.forEach(function(r){ if(r&&r.date) set[wl_normDate(r.date)]=1; });
+        if(f.equipment&&f.equipment.faults) f.equipment.faults.forEach(function(r){ if(r&&r.date) set[wl_normDate(r.date)]=1; });
+        if(f.installation&&f.installation.workers) Object.keys(f.installation.workers).forEach(function(k){ set[wl_normDate(k)]=1; });
+      }
+      return Object.keys(set).filter(function(k){ return /^\d{2}[/-]\d{2}[/-]\d{4}$/.test(k); }).sort(function(a,b){ return dmyToYmd(a) < dmyToYmd(b) ? 1 : -1; });
+    }
+    function wl_calShift(dir){
+      if(!WL_CAL_MONTH) return;
+      var m = WL_CAL_MONTH.m + dir; var y = WL_CAL_MONTH.y;
+      if(m<0){ m=11; y--; } if(m>11){ m=0; y++; }
+      WL_CAL_MONTH = { y:y, m:m };
+      wl_renderDaily();
+    }
+    function wl_pickDate(dmy){
+      WL_CUR_DATE = dmy;
+      var p = dmy.split('/'); WL_CAL_MONTH = { y:+p[2], m:+p[1]-1 };
+      wl_renderDaily();
+    }
+    function wl_repStep(dir){
+      var f = wl_factory(); if(!f) return;
+      var dates = wl_reportDates(f); if(!dates.length) return;
+      var idx = dates.indexOf(WL_CUR_DATE);
+      if(idx<0){ WL_CUR_DATE = dates[0]; }
+      else { var ni = idx - dir; if(ni<0) ni=0; if(ni>=dates.length) ni=dates.length-1; WL_CUR_DATE = dates[ni]; }
+      wl_renderDaily();
+    }
+    function wl_calHtml(f, dates){
+      var ym = WL_CAL_MONTH;
+      var daysInMonth = new Date(ym.y, ym.m+1, 0).getDate();
+      var startDay = new Date(ym.y, ym.m, 1).getDay();
+      var lead = (startDay+6)%7;
+      var todayDmy = ymdToDmy(prod_today());
+      var has = {}; dates.forEach(function(d){ has[d]=1; });
+      var cells='';
+      for(var i=0;i<lead;i++) cells += '<div class="wl-cal-cell wl-cal-empty"></div>';
+      for(var d=1; d<=daysInMonth; d++){
+        var dd=(d<10?'0':'')+d; var dm=(ym.m+1<10?'0':'')+(ym.m+1);
+        var dmy = dd+'/'+dm+'/'+ym.y;
+        var cls='wl-cal-cell';
+        if(dmy===todayDmy) cls+=' wl-cal-today';
+        if(dmy===WL_CUR_DATE) cls+=' wl-cal-sel';
+        var dot = has[dmy] ? '<span class="wl-cal-dot"></span>' : '';
+        cells += '<div class="'+cls+'" data-dmy="'+dmy+'" onclick="wl_pickDate(\''+dmy+'\')">'+d+dot+'</div>';
+      }
+      var wk=['一','二','三','四','五','六','日'];
+      var head = wk.map(function(w){ return '<div class="wl-cal-wk">'+w+'</div>'; }).join('');
+      var title = ym.y+'-'+((ym.m+1<10?'0':'')+(ym.m+1));
+      return '<div class="wl-cal">'
+        + '<div class="wl-cal-head"><button type="button" class="wl-cal-nav" onclick="wl_calShift(-1)">‹</button>'
+        + '<div class="wl-cal-title">'+title+'</div>'
+        + '<button type="button" class="wl-cal-nav" onclick="wl_calShift(1)">›</button></div>'
+        + '<div class="wl-cal-grid wl-cal-week">'+head+'</div>'
+        + '<div class="wl-cal-grid">'+cells+'</div></div>';
+    }
+    function wl_trendsHtml(f, dates){
+      if(dates.length<2) return '<div class="wl-sec" style="margin-top:14px"><div class="wl-sec-title">'+wl_i18n('wl_trends')+'</div><div class="wl-sec-body"><div class="wl-muted">'+wl_i18n('wl_no_chart')+'</div></div></div>';
+      return '<div class="wl-sec" style="margin-top:14px"><div class="wl-sec-title">'+wl_i18n('wl_trends')+'</div>'
+        + '<div class="wl-charts">'
+        + '<div class="wl-chart-box"><div class="wl-chart-title">'+wl_i18n('wl_chart_prod')+'</div><canvas id="wlChartProd"></canvas></div>'
+        + '<div class="wl-chart-box"><div class="wl-chart-title">'+wl_i18n('wl_chart_labor')+'</div><canvas id="wlChartLabor"></canvas></div>'
+        + '<div class="wl-chart-box"><div class="wl-chart-title">'+wl_i18n('wl_chart_inst')+'</div><canvas id="wlChartInst"></canvas></div>'
+        + '</div></div>';
+    }
+    function wl_renderCharts(f, dates){
+      if(typeof Chart === 'undefined') return;
+      var asc = dates.slice().reverse();
+      var prodS=[], laborS=[], instS=[];
+      asc.forEach(function(d){
+        var ww=f.workers&&f.workers[d]; var lt=0; if(ww){ PROD_WORKERS.forEach(function(k){ lt+=(+ww[k[0]]||0); }); }
+        var rr=f.production&&f.production[d]; var pt=0; if(rr&&rr.lines){ Object.keys(rr.lines).forEach(function(n){ var L=rr.lines[n]; if(L.matrix){ Object.keys(L.matrix).forEach(function(hh){ Object.keys(L.matrix[hh]).forEach(function(s){ pt+=(+L.matrix[hh][s]||0); }); }); } }); }
+        var iw=f.installation&&f.installation.workers&&f.installation.workers[d]; var it=0; if(iw&&typeof iw==='object'){ Object.keys(iw).forEach(function(k){ var v=+iw[k]; if(!isNaN(v)) it+=v; }); }
+        prodS.push(pt); laborS.push(lt); instS.push(it);
+      });
+      var labels = asc.map(function(d){ return d.substring(3,5)+'/'+d.substring(0,2); });
+      function mk(id, data, color){
+        var cv=document.getElementById(id); if(!cv) return;
+        WL_CHARTS.push(new Chart(cv.getContext('2d'), { type:'line', data:{ labels:labels, datasets:[{ label:'', data:data, borderColor:color, backgroundColor:color, fill:false, tension:0.3, pointRadius:2 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{ maxRotation:0, autoSkip:true } } } } }));
+      }
+      mk('wlChartProd', prodS, '#E53935');
+      mk('wlChartLabor', laborS, '#1E88E5');
+      mk('wlChartInst', instS, '#43A047');
+    }
+    function wl_renderDaily(){
+      var body = document.getElementById('wl-tab-body'); if(!body) return;
+      var f = wl_factory();
+      if(!f){ body.innerHTML='<div class="wl-empty">'+wl_i18n('wl_rep_no_data')+'</div>'; return; }
+      var dates = wl_reportDates(f);
+      if(!WL_CUR_DATE){ WL_CUR_DATE = dates.length ? dates[0] : ymdToDmy(prod_today()); }
+      if(!WL_CAL_MONTH){ var p=WL_CUR_DATE.split('/'); WL_CAL_MONTH={ y:+p[2], m:+p[1]-1 }; }
+      WL_CHARTS = [];
+      body.innerHTML = '<div class="wl-daily">'+wl_calHtml(f, dates)+'<div id="wl-report"></div></div>';
+      wl_renderReport(f);
+    }
+    function wl_renderReport(f){
+      var box = document.getElementById('wl-report'); if(!box) return;
+      var dates = wl_reportDates(f);
+      var date = WL_CUR_DATE;
+      var dt = new Date(dmyToYmd(date));
+      var wd = ['日','一','二','三','四','五','六'][dt.getDay()];
+      var w = f.workers && f.workers[date];
+      var rec = f.production && f.production[date];
+      var produced={}, lines=0;
+      if(rec && rec.lines){
+        Object.keys(rec.lines).forEach(function(n){
+          lines++;
+          var L=rec.lines[n]; if(!L.matrix) return;
+          Object.keys(L.matrix).forEach(function(hh){ Object.keys(L.matrix[hh]).forEach(function(s){ produced[s]=(+produced[s]||0)+(+L.matrix[hh][s]||0); }); });
+        });
+      }
+      var prodTotal=0; Object.keys(produced).forEach(function(s){ prodTotal+=produced[s]; });
+      var workersTotal=0; if(w){ PROD_WORKERS.forEach(function(k){ workersTotal+=(+w[k[0]]||0); }); }
+      var wxAm = (w&&w.weatherAm&&w.weatherAm.v!=null)?wl_wxCode(w.weatherAm.v):'—';
+      var wxPm = (w&&w.weatherPm&&w.weatherPm.v!=null)?wl_wxCode(w.weatherPm.v):'—';
+      var faults=(f.equipment&&f.equipment.faults||[]).filter(function(x){ return wl_normDate(x.date)===date; });
+      var rcpts=(f.materials&&f.materials.receipts||[]).filter(function(r){ return wl_normDate(r.date)===date; });
+      var ip=(typeof inst_projectProgress==='function')?inst_projectProgress(f):{demand:0,produced:0,installed:0,prodRate:0,instRate:0};
+
+      var h='';
+      h += '<div class="wl-rep-head">'
+        + '<button type="button" class="wl-rep-nav" onclick="wl_repStep(-1)" title="'+wl_i18n('wl_prev')+'">‹</button>'
+        + '<div class="wl-rep-date">'+dmyToYmd(date)+' · 周'+wd+'</div>'
+        + '<button type="button" class="wl-rep-nav" onclick="wl_repStep(1)" title="'+wl_i18n('wl_next')+'">›</button></div>';
+      h += '<div class="wl-report-card">';
+      // 天气
+      h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_weather')+'</div>'
+        + '<div class="wl-sec-body">'+wl_i18n('wl_am')+': '+wxAm+' ｜ '+wl_i18n('wl_pm')+': '+wxPm+'</div></div>';
+      // 采购
+      h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_procurement')+'</div><div class="wl-sec-body">';
+      if(!rcpts.length){ h += '<div class="wl-muted">—</div>'; }
+      else {
+        rcpts.forEach(function(r){
+          var mats=[]; if(r.rows&&r.rows.length){ r.rows.forEach(function(rr){ var q=(rr.qty_whole||rr.qty_unit||''); mats.push((rr.material||wl_i18n('wl_material'))+(q!==''?' ×'+q:'')); }); }
+          var amt=(r.amount||r.money||r.total||'');
+          h += '<div class="wl-row2">'+ (mats.length?mats.join('；'):wl_i18n('wl_material')) + (amt!==''?' ｜ '+wl_i18n('wl_amount')+': '+amt:'') +'</div>';
+        });
+      }
+      h += '</div></div>';
+      // 生产
+      h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_production')+'</div><div class="wl-sec-body">';
+      h += '<div class="wl-kpis"><div class="wl-kpi"><b>'+lines+'</b>'+wl_i18n('wl_lines')+'</div>'
+        + '<div class="wl-kpi"><b>'+workersTotal+'</b>'+wl_i18n('wl_workers')+'</div>'
+        + '<div class="wl-kpi"><b>'+prodTotal+'</b>'+wl_i18n('wl_total')+'</div></div>';
+      if(prodTotal>0){
+        h += '<table class="wl-tbl"><thead><tr><th>'+wl_i18n('wl_spec')+'</th><th>'+wl_i18n('wl_qty')+'</th><th>'+wl_i18n('wl_share')+'</th></tr></thead><tbody>';
+        Object.keys(produced).forEach(function(s){
+          var q=produced[s]; var pct = prodTotal? (q/prodTotal*100).toFixed(1)+'%':'0%';
+          h += '<tr><td>'+wl_esc(s)+'</td><td>'+q+'</td><td>'+pct+'</td></tr>';
+        });
+        h += '</tbody></table>';
+      } else { h += '<div class="wl-muted">—</div>'; }
+      h += '</div></div>';
+      // 故障
+      h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_fault')+'</div><div class="wl-sec-body">';
+      if(!faults.length){ h += '<div class="wl-muted">'+wl_i18n('wl_fault_none')+'</div>'; }
+      else {
+        h += '<div class="wl-kpis"><div class="wl-kpi"><b>'+faults.length+'</b>'+wl_i18n('wl_fault_count')+'</div></div>';
+        faults.forEach(function(x){ h += '<div class="wl-row2">'+wl_i18n('wl_reason')+': '+(x.reason||'—')+' ｜ '+wl_i18n('wl_down')+': '+(x.down||'—')+' ｜ '+wl_i18n('wl_repair')+': '+(x.repair||'—')+'</div>'; });
+      }
+      h += '</div></div>';
+      // 安装
+      h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_install')+'</div><div class="wl-sec-body">';
+      h += '<div class="wl-kpis">'
+        + '<div class="wl-kpi"><b>'+((+ip.installed)||0)+'</b>'+wl_i18n('wl_installed')+'</div>'
+        + '<div class="wl-kpi"><b>'+((+ip.demand)||0)+'</b>'+wl_i18n('wl_demand')+'</div>'
+        + '<div class="wl-kpi"><b>'+((+ip.instRate)||0).toFixed(1)+'%</b>'+wl_i18n('wl_inst_rate')+'</div></div>';
+      h += '<div class="wl-muted">'+wl_i18n('wl_eta')+': '+(ip.demand&&ip.instRate&&ip.instRate<100?wl_i18n('wl_install')+'…':'—')+'</div>';
+      h += '</div></div>';
+      h += '</div>';
+      h += wl_trendsHtml(f, dates);
+      box.innerHTML = h;
+      wl_renderCharts(f, dates);
+    }
     function wl_renderTab(key){
       WL_ACTIVE_TAB = key;
       var box = document.getElementById('wl-tabs'); if(box){
         Array.prototype.forEach.call(box.querySelectorAll('.wl-tab'), function(t){ t.classList.toggle('active', t.getAttribute('data-key') === key); });
       }
       var body = document.getElementById('wl-tab-body'); if(!body) return;
-      var title = key==='daily' ? wl_i18n('wl_tab_daily_report') : wl_i18n('wl_tab_my_work');
-      body.innerHTML = '<div class="wl-placeholder"><div><strong>'+title+'</strong><br>'+wl_i18n('wl_placeholder')+'</div></div>';
+      if(key==='daily') wl_renderDaily();
+      else { var title = wl_i18n('wl_tab_my_work'); body.innerHTML = '<div class="wl-placeholder"><div><strong>'+title+'</strong><br>'+wl_i18n('wl_placeholder')+'</div></div>'; }
     }
     // 语言切换后，若当前在工作日志，刷新列表与标签文案
     try {
