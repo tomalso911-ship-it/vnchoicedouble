@@ -50849,7 +50849,10 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         var _hcode = _hp[0]||'', _hidx = _hp[1]||'1';
         var _hdm = _houseDemandMap[_hcode] || {};
         var _hneed = 0; for(var _spk in _hdm){ if(_hdm.hasOwnProperty(_spk)) _hneed += (+_hdm[_spk]||0); }
-        var _hinstall = ((f && f.installation && f.installation.houseInstallQty) || {})[_hcode+'|'+_hidx] || 0;
+        /* 已安装量：与房舍悬停 tooltip「本猪舍安装」同源——逐规格汇总 todayInstall 记录，
+           而非依赖 houseInstallQty 聚合（该字段在部分数据下可能未同步）。 */
+        var _hinstall = 0;
+        for(var _spk2 in _hdm){ if(_hdm.hasOwnProperty(_spk2)) _hinstall += inst_bldgSpecInstalledRec(f, _hcode, _hidx, _spk2); }
         var _hstatus = ((f && f.installation && f.installation.houseStatus) || {})[_hcode+'|'+_hidx] || '';
         var _red = (_hneed > 0 && (_hinstall >= _hneed || _hstatus === 'installed' || _hstatus === 'accepted')) ? ' style="color:#E53935"' : '';
         houseOpts += '<option value="'+key+'"'+(sel?' selected':'')+_red+'>'+nm+'</option>';
