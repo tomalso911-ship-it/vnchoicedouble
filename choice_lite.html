@@ -11159,8 +11159,26 @@ function _ovLoadChartLib(cb){
       }
       var items = zone ? all.filter(function(it){ return String(it.inArea)===String(zone) || it.val===selVal; }) : all;
       if(!items.length) items = all;
-      /* 按猪舍#栋号数字排序（如 #1,#2,#3,...,#17,#18,#20），便于选择；不按字符串字典序（避免 #17 排在 #2 前面） */
+      /* 按「区域分布卡片左下角圆形编号」的自然顺序排列（与安装区布局完全一致）。
+         圆形编号由 installation.order（用户自定义拖拽顺序，优先） + 按区域分组的默认顺序决定；
+         直接读 installation 数据计算，避免依赖安装模块 IIFE 内未暴露的辅助函数。 */
+      var ord = (function(){
+        var fi = prod_get(PROD_CUR) || {}; var inst = fi.installation || {};
+        var assign = inst.assign || {};
+        var zc = inst.zoneCount || 0;
+        for(var kk in assign){ var zz = +assign[kk]; if(zz > zc) zc = zz; }
+        var userOrder = (Array.isArray(inst.order) ? inst.order : []).filter(function(k){ return assign[k] !== undefined; });
+        var seen = {}; userOrder.forEach(function(k){ seen[k] = 1; });
+        var byZone = {};
+        for(var k in assign){ if(!seen[k]){ var z = +assign[k] || 0; (byZone[z] || (byZone[z] = [])).push(k); } }
+        var seq = userOrder.slice();
+        for(var z=1; z<=zc; z++){ (byZone[z] || []).forEach(function(k){ seq.push(k); }); }
+        return seq;
+      })();
       items.sort(function(a,b){
+        var ia = ord.indexOf(a.val); if(ia<0) ia = 1e9;
+        var ib = ord.indexOf(b.val); if(ib<0) ib = 1e9;
+        if(ia !== ib) return ia - ib;
         var an = parseInt(((a.val||'').split('#')[1]||'0'),10) || 0;
         var bn = parseInt(((b.val||'').split('#')[1]||'0'),10) || 0;
         return an - bn;
