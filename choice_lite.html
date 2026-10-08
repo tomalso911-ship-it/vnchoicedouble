@@ -46095,10 +46095,15 @@ textarea:focus{outline:none;border-color:var(--pri)}
 .chip.ok b{color:#1b5e20}
 
 /* ---------- 布局 ---------- */
-.layout{display:flex;border:1px solid var(--bd);border-radius:10px;overflow:hidden;
+/* ★ 去掉圆角裁剪：Chrome 里「border-radius + overflow:hidden 包住可滚动子元素」
+   会在滚动时产生内容重绘/重影（文字发虚、闪烁）。保留 overflow:hidden 用于裁剪右侧设置面板。 */
+.layout{display:flex;border:1px solid var(--bd);overflow:hidden;
   background:var(--card);height:560px;position:relative;margin-top:12px}
+/* 版本标记（仅用于确认浏览器加载的是哪一版甘特脚本；打印时隐藏） */
+.gantt-build-tag{text-align:right;font-size:10px;color:#b0bec5;padding:3px 8px 0}
+@media print{.gantt-build-tag{display:none !important}}
 .tbl-wrap{width:var(--tbl-w,470px);flex:0 0 auto;overflow:auto;background:#fafbfc;
-  border-right:1px solid var(--bd);scrollbar-width:thin}
+  border-right:1px solid var(--bd);scrollbar-width:thin;overflow-anchor:none}
 .tbl-wrap::-webkit-scrollbar{width:0;height:9px}
 .tbl-wrap::-webkit-scrollbar-track{background:#f0f2f5}
 .tbl-wrap::-webkit-scrollbar-thumb{background:#c4cdd4;border-radius:5px}
@@ -46107,7 +46112,7 @@ textarea:focus{outline:none;border-color:var(--pri)}
    （sticky 本身即为定位元素，.rs 绝对定位相对它即可） */
 .tbl-wrap th{position:sticky;top:0;z-index:3;background:#f4f6f8;color:#455a64;font-weight:600;
   height:var(--head-h);padding:0 8px;text-align:left;border-bottom:1px solid var(--bd);
-  white-space:nowrap;vertical-align:middle;background-clip:padding-box}
+  white-space:nowrap;vertical-align:middle}
 .tbl-wrap th .rs{position:absolute;right:0;top:0;bottom:0;width:8px;cursor:col-resize;z-index:4}
 .tbl-wrap th .rs::after{content:'';position:absolute;right:3px;top:6px;bottom:6px;width:1px;background:#cfd8dc}
 .tbl-wrap th .rs:hover::after{right:2px;width:3px;background:var(--pri);top:2px;bottom:2px}
@@ -46177,7 +46182,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !imp
 .cfg-hint{font-size:10px;color:var(--txt3);margin-top:7px;line-height:1.5}
 
 /* ---------- 甘特 ---------- */
-.chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff}
+.chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff;overflow-anchor:none}
 .ci{position:relative}
 .thead{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--bd);height:var(--head-h)}
 .tu{display:flex;height:24px;border-bottom:1px solid var(--bd2)}
@@ -46382,6 +46387,7 @@ table.zt tr:hover td{background:#f7fbff}
     <div class="chart-wrap" id="chartWrap"><div class="ci" id="chartInner"></div></div>
     <div class="cfg" id="cfgPanel"></div>
   </div>
+  <div class="gantt-build-tag" id="ganttBuildTag"></div>
 
   <!-- 区汇总 + 小组负载（右上角 +/− 一起展开/收起） -->
   <div class="cards-wrap" id="cardsWrap">
@@ -48147,7 +48153,7 @@ function toggleCards(){
 /* 版本标记：用于确认浏览器是否已加载「最新」甘特脚本。
    排查“改了没生效”时，在控制台执行：
    document.getElementById('instGanttFrame').contentWindow.__ganttBuild   */
-window.__ganttBuild='gantt-r4-20261008';
+window.__ganttBuild='gantt-r5-20261008-scrollfix';
 function rebuild(){ loadHouses(); if(typeof ganttResetManualAnchors==='function') ganttResetManualAnchors(); schedule(); renderAll(); }
 
 window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
@@ -48234,6 +48240,12 @@ document.addEventListener('click', function(e){
 });
 
 localize(); document.title=it('g_title'); loadCfg(); loadHouses(); syncParamUI(); schedule(); renderAll();
+/* 版本标记：显示甘特脚本版本 + 父页 ?v=（便于确认浏览器是否已加载最新副本） */
+try{
+  var _bt=document.getElementById('ganttBuildTag');
+  if(_bt){ var _pv=''; try{ _pv=(window.parent&&window.parent.location&&window.parent.location.search)||''; }catch(e){}
+    _bt.textContent='build '+window.__ganttBuild+(_pv?('  ·  '+_pv.replace(/^\?/,'')):''); }
+}catch(e){}
 /* 锁死：每次加载都强制按内容重算列宽并自适应右分隔线，绝不信任 localStorage 里可能污染的旧宽度 */
 colFitAll(); fitTblW(); initSplitter();
 window.addEventListener('resize', function(){ fitTblW(); });
