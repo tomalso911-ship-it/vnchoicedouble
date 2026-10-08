@@ -48813,6 +48813,10 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       return;                                                     /* 等回填完成后再渲染 */
     }
     var f = inst_get(INST_CUR);
+    /* ★ 渲染前用「实际录入」重算逐栋已安装聚合 houseInstallQty，
+       保证甘特 / 明细 / 总览的所有「已安装」与录入数据一致，
+       修复「明细已显示安装完成、甘特/表头却只有 82%」的错位。 */
+    try{ if(f && typeof inst_recomputeHiq==='function') inst_recomputeHiq(f); }catch(e){}
     if(key==='A'){ body.innerHTML = inst_tabA(f); }
     else if(key==='B'){ body.innerHTML = inst_tabB(f);
       var fr=document.getElementById('instGanttFrame');
@@ -49031,7 +49035,13 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
          不再按「已发货」封顶 —— 发货若没按栋登记，会把已录入的安装显示成 0。 */
       var shippedMap = inst_bldgShipped(f, code, idx) || {};
       var shippedTotal = 0; for(var ssk in shippedMap){ shippedTotal += (+shippedMap[ssk]||0); }
-      var done = Math.max(0, Math.min(panels, Math.round(+installQtyMap[code+'|'+idx]||0)));
+      /* ★ 已装口径（2026-10 修正）：= 逐规格「实际录入」之和（与明细卡片 / 悬停 tooltip 完全同源），
+         每个规格按本栋该规格需求封顶，再按本栋总需求 panels 封顶。
+         不再用 houseInstallQty —— 该聚合值可能滞后/口径不一致，
+         会出现「明细已显示安装完成、甘特却只有 82%」的错位。 */
+      var _recSum = 0;
+      for(var _sp in dm){ if(dm.hasOwnProperty(_sp)) _recSum += Math.min((+dm[_sp]||0), inst_bldgSpecInstalledRec(f, code, idx, _sp)); }
+      var done = panels>0 ? Math.max(0, Math.min(panels, Math.round(_recSum))) : Math.max(0, Math.round(_recSum));
       out.push({ key: k, zone: inst_zoneName(assign[k]), zoneKey: String(assign[k]), name: String(hname) + '#' + idx,
         panels: panels, done: done, todayQty: Math.max(0, Math.round(+todayQtyMap[k]||0)) });
     });
@@ -49265,21 +49275,22 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var totalNeed = 0, totalShipped = 0;
     for(var spec in demand){ var need = demand[spec]||0; totalNeed += need; var sh = shipped[spec]||0; totalShipped += sh; specs.push({spec:spec, need:need, shipped:sh}); }
     for(var s2 in shipped){ if(!demand || demand[s2]===undefined){ totalShipped += (shipped[s2]||0); specs.push({spec:s2, need:0, shipped:(shipped[s2]||0)}); } }
-    var installQty = ((f && f.installation && f.installation.houseInstallQty) || {})[code+'|'+idx] || 0;
+    /* ★ 与逐规格卡片同源：本猪舍已安装 = 各规格「实际录入」按各自需求封顶后求和（再按总需求封顶） */
+    var installQty = 0;
+    specs.forEach(function(s){ var r = inst_bldgSpecInstalledRec(f, code, idx, s.spec); installQty += ((+s.need||0) > 0 ? Math.min((+s.need||0), r) : r); });
     installQty = Math.max(0, Math.min(totalNeed, installQty));
     var uninstalledQty = Math.max(0, totalNeed - installQty);
     /* ==== 整个项目口径：需求 / 生产 / 发货 / 安装 ==== */
     var projDemand = 0, projProduced = 0, projShipped = 0, projInstalled = 0;
     try{
       var _ghAll = inst_buildGanttHouses(f) || [];
-      _ghAll.forEach(function(hh){ projDemand += (+hh.panels||0); });
+      /* 项目已安装 = 各栋「已装」之和（已装取逐规格录入口径，与甘特/明细一致） */
+      _ghAll.forEach(function(hh){ projDemand += (+hh.panels||0); projInstalled += (+hh.done||0); });
     }catch(e){}
     var _fn = (f && f.finished) || {};
     for(var _sp in _fn){ if(_fn.hasOwnProperty(_sp)) projProduced += (+((_fn[_sp]&&_fn[_sp].produced)||0)); }
     var _hoAll = (f && f.houseOut) || {};
     for(var _hk in _hoAll){ if(_hoAll.hasOwnProperty(_hk)) projShipped += (+((_hoAll[_hk]&&_hoAll[_hk].out)||0)); }
-    var _hiqAll = (f && f.installation && f.installation.houseInstallQty) || {};
-    for(var _hq in _hiqAll){ if(_hiqAll.hasOwnProperty(_hq)) projInstalled += (+_hiqAll[_hq]||0); }
     /* ==== 整个项目口径：按规格汇总 已生产 / 已发货 / 剩余（可再发） ==== */
     var _projSpecStat = {};
     for(var _fps in _fn){ if(_fn.hasOwnProperty(_fps)){ var _pn=inst_specKeyNorm(_fps); _projSpecStat[_pn]={spec:_fps, produced:(+((_fn[_fps]&&_fn[_fps].produced)||0)), shipped:0}; } }
@@ -51370,14 +51381,13 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var wx = (typeof inst_weatherForDate==='function') ? inst_weatherForDate(_d) : {am:null,pm:null};
     try{
       var _ghAll = inst_buildGanttHouses(f) || [];
-      _ghAll.forEach(function(hh){ projDemand += (+hh.panels||0); });
+      /* 项目已安装 = 各栋「已装」之和（已装取逐规格录入口径，与甘特/明细一致） */
+      _ghAll.forEach(function(hh){ projDemand += (+hh.panels||0); projInstalled += (+hh.done||0); });
     }catch(e){}
     var _fn = (f && f.finished) || {};
     for(var _sp in _fn){ if(_fn.hasOwnProperty(_sp)) projProduced += (+((_fn[_sp]&&_fn[_sp].produced)||0)); }
     var _hoAll = (f && f.houseOut) || {};
     for(var _hk in _hoAll){ if(_hoAll.hasOwnProperty(_hk)) projShipped += (+((_hoAll[_hk]&&_hoAll[_hk].out)||0)); }
-    var _hiqAll = (f && f.installation && f.installation.houseInstallQty) || {};
-    for(var _hq in _hiqAll){ if(_hiqAll.hasOwnProperty(_hq)) projInstalled += (+_hiqAll[_hq]||0); }
     var needProduce = Math.max(0, projDemand - projProduced);
     var notShipped = Math.max(0, projDemand - projShipped);
     var notInstalled = Math.max(0, projDemand - projInstalled);
@@ -51960,7 +51970,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var zoneTeams = w.zoneTeams || {};
     var zoneTeamWorkers = w.zoneTeamWorkers || {};
     var hiq = f.installation.houseInstallQty = f.installation.houseInstallQty || {};
-    function hiqKey(house){ return house ? String(house).replace('#','|') : ''; }
+    /* 与 inst_bldgSpecInstalledRec 同口径：缺栋号按 #1；只用首个 # 切「类型|栋号」 */
+    function hiqKey(house){ var s=(house==null?'':String(house)).trim(); if(!s) return ''; var p=s.split('#'); return (p[0]||'')+'|'+(p[1]||'1'); }
     zones.forEach(function(zn){
       if(zn==='' || zn==null) return;
       var teamCount = parseInt((prod_val('ic_zt_'+zn)||'1').replace(/[^0-9]/g,'')||'1',10)||1;
@@ -52171,8 +52182,10 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     f.installation = f.installation || {};
     var hiq = f.installation.houseInstallQty = {};
     var workers = f.installation.workers || {};
-    function hiqKey(house){ return house ? String(house).replace('#','|') : ''; }
+    /* 与 inst_bldgSpecInstalledRec 同口径：缺栋号按 #1；只用首个 # 切「类型|栋号」 */
+    function hiqKey(house){ var s=(house==null?'':String(house)).trim(); if(!s) return ''; var p=s.split('#'); return (p[0]||'')+'|'+(p[1]||'1'); }
     for(var wk in workers){ if(!workers.hasOwnProperty(wk)) continue;
+      if(workers[wk] && workers[wk]._deleted) continue;   /* 与 inst_saveWorkers 同口径：跳过逻辑删除的日期 */
       var ztw = (workers[wk] && workers[wk].zoneTeamWorkers) || {};
       for(var znk in ztw){ if(!ztw.hasOwnProperty(znk)) continue;
         (ztw[znk]||[]).forEach(function(t){
