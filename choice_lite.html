@@ -47864,21 +47864,32 @@ function initSplitter(){
     document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); });
   sp.addEventListener('dblclick',fitTblW);
 }
+/* 读取诊断开关：父页 URL 的 ? 或 # 上的参数（# 会跨 302 跳转保留，无需服务端配合）
+   例：/lite#gsync=0  → 关闭左右联动滚动（用于对比“抖动是否来自联动同步”） */
+function ganttFlag(name, def){
+  var s='';
+  try{ var L=window.parent&&window.parent.location; if(L) s=String(L.search||'')+'&'+String(L.hash||''); }catch(e){}
+  var m=new RegExp('[?&#]'+name+'=([^&#]*)').exec(s);
+  return m?decodeURIComponent(m[1]):(def===undefined?'':def);
+}
 function syncScroll(){
   var a=document.getElementById('tblWrap'), b=document.getElementById('chartWrap');
-  if(!a||!b||a.__sync) return; a.__sync=1; var lock=false, src=null;
+  if(!a||!b||a.__sync) return; a.__sync=1;
+  if(ganttFlag('gsync')==='0') return;   /* 诊断：关闭联动 */
+  var lock=false, src=null;
   /* ★ 只同步「垂直」滚动（左右两栏行要横向对齐）。
      不要同步 scrollLeft：左表列宽与右图时间轴宽度无关，一侧滚不到该位置会被夹断，
-     反过来又按夹断后的值把另一侧拉回，表现为「上滑垂直滚动时横向跳回最左」。 */
-  /* ★ 写入另一栏延后到下一帧（rAF），且读取的是「当前最新」滚动位置：
-     避免在 scroll 事件里同步写滚动位置造成的强制同步布局 + 内容抖动/重影。 */
+     反过来又按夹断后的值把另一侧拉回，表现为「上滑垂直滚动时横向跳回最左」。
+     ★ 同帧写入（不做 rAF 延迟）：两侧严格同帧对齐，避免“一栏慢一帧”造成的错位/晃动。 */
+  var SNAP = (ganttFlag('gint')==='1');   /* 诊断：把滚动位置吸附到整数像素（消除小数偏移导致的文字重栅格化） */
   function link(p,q){ p.addEventListener('scroll',function(){
-    if(lock||src===p) return; lock=true; src=p;
-    requestAnimationFrame(function(){
-      var t=p.scrollTop;
-      if(q.scrollTop!==t) q.scrollTop=t;
-      lock=false; src=null;
-    }); }, {passive:true}); }
+    if(lock||src===p) return;
+    if(SNAP){ var r=Math.round(p.scrollTop); if(r!==p.scrollTop) p.scrollTop=r; }
+    lock=true; src=p;
+    var t=p.scrollTop;
+    if(q.scrollTop!==t) q.scrollTop=t;
+    requestAnimationFrame(function(){ lock=false; src=null; });
+  }, {passive:true}); }
   link(a,b); link(b,a);
 }
 
@@ -48153,7 +48164,7 @@ function toggleCards(){
 /* 版本标记：用于确认浏览器是否已加载「最新」甘特脚本。
    排查“改了没生效”时，在控制台执行：
    document.getElementById('instGanttFrame').contentWindow.__ganttBuild   */
-window.__ganttBuild='gantt-r5-20261008-scrollfix';
+window.__ganttBuild='gantt-r6-20261008';
 function rebuild(){ loadHouses(); if(typeof ganttResetManualAnchors==='function') ganttResetManualAnchors(); schedule(); renderAll(); }
 
 window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
