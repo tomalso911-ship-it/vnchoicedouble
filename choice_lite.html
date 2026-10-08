@@ -2398,7 +2398,8 @@ function _ovLoadChartLib(cb){
 .bd-carousel-card { flex:0 0 auto; width:180px; height:calc(100% - 4px); background:rgba(255,255,255,0.06); border:1px solid rgba(57,230,255,0.25); border-radius:10px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; transition:transform .2s, border-color .2s; }
 .bd-carousel-card:hover { transform:translateY(-2px); border-color:rgba(57,230,255,0.7); }
 /* 照片卡片：图片填满整个卡片，项目名悬浮在底部 */
-.bd-photo-card { position:relative; }
+.bd-photo-card { position:relative; flex:0 0 calc(100% - 10px) !important; width:calc(100% - 10px) !important; }
+.bd-photo-carousel .bd-carousel-track { width:100%; gap:10px; animation:none; }
 .bd-photo-wrap { position:absolute; inset:0; background:#061a45; overflow:hidden; }
 .bd-photo-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
 .bd-photo-card .bd-card-name { position:absolute; left:0; right:0; bottom:0; padding:8px; font-size:11px; color:#fff; background:rgba(0,10,30,0.65); text-shadow:0 1px 2px rgba(0,0,0,.6); }
@@ -37506,8 +37507,24 @@ function boardRenderSitePhotos(list){
     // 限制最多 60 张，避免 DOM 过大；滚动时浏览器再按需加载（loading="lazy"），不额外占流量
     if(items.length > 60) items = items.slice(0,60);
     var cards = items.map(bdPhotoCard).join('');
-    body.innerHTML = '<div class="bd-carousel"><div class="bd-carousel-track">'+cards+cards+'</div></div>';
+    // 一次只展示一张照片，用 JS 自动一张张轮播，不再整组复制造成"叠在一起"
+    body.innerHTML = '<div class="bd-carousel bd-photo-carousel" id="bdPhotoCarousel"><div class="bd-carousel-track">'+cards+'</div></div>';
+    boardStartPhotoCarousel();
   }
+}
+// 照片轮播：一张张自动左右滚动，不复制整组
+function boardStartPhotoCarousel(){
+  var box = document.getElementById('bdPhotoCarousel'); if(!box) return;
+  var track = box.querySelector('.bd-carousel-track'); if(!track) return;
+  var n = track.children.length; if(n <= 1) return;
+  var i = 0, dir = 1;
+  if(window.__bdPhotoTimer){ clearInterval(window.__bdPhotoTimer); window.__bdPhotoTimer = null; }
+  window.__bdPhotoTimer = setInterval(function(){
+    i += dir;
+    if(i >= n - 1){ i = n - 1; dir = -1; }
+    if(i <= 0){ i = 0; dir = 1; }
+    box.scrollTo({ left: i * box.clientWidth, behavior: 'smooth' });
+  }, 4000);
 }
 // 收集所有项目的全部安装照片（每张照片一张卡片，按日期倒序），点击进入对应上传入口
 function bdAllInstallPhotos(list){
