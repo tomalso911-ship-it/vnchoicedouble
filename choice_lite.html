@@ -46966,19 +46966,27 @@ function schedule(){
          ② 手改锁定(lockStart) / 已开工未完成且真实开工日**晚于**链位 → 取真实开工日；
          ③ 其余 → 接「上一行结束的次日」（串行：必须等上一行装完；真实开工日比链位早的一律忽略，
             因为它本来就得等前面的栋装完才能装）；并把停工日累计天数整体顺延一次。 */
-      var s;
+      var s, base;
       if(_isDone){
-        s = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
+        base = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
+        s = base;
       } else if(!h.lockStart && h.actualStart){
         var _as = nextWork(h.actualStart);
-        s = (_as > cursor) ? _as : nextWork(cursor);
+        base = (_as > cursor) ? _as : nextWork(cursor);   /* 排程基准：不早于上一行结束次日 */
+        /* ★★ 条形**起点** = 真实开工日 ★★
+           即使它早于链位（=这栋已开工但没装完，我们被调去装别的栋了），条形也从那天开始画，
+           于是这条 bar 会"变长"，把中间去装别的栋的那段时间整段包进来 ——
+           它的**终点**仍按"等前面装完后的剩余天数"算，所以看起来是跨过去的。 */
+        s = (_as < base) ? _as : base;
       } else if(h.lockStart){
-        s = nextWork(h.lockStart);
+        base = nextWork(h.lockStart);
+        s = base;
       } else {
         if(gSlipLeft){ cursor = nextWork(addDays(cursor, gSlipLeft)); gSlipLeft = 0; }
-        s = nextWork(cursor);
+        base = nextWork(cursor);
+        s = base;
       }
-      var e = addWork(s,_span);
+      var e = addWork(base,_span);
       h.start=s; h.end=e;
       /* 游标只前进不后退 */
       var _next = nextAfter(e);
