@@ -46122,6 +46122,8 @@ textarea:focus{outline:none;border-color:var(--pri)}
 .tbl-wrap th.twoline{white-space:pre-line;line-height:1.2;text-align:center}
 .tbl-wrap td.tc{text-align:center}
 .tbl-wrap td .ans-yes{color:#E53935;font-weight:600}
+/* 「今天安装 = 是」的房舍行 → 整行淡黄底（自动监测标记） */
+.tbl-wrap tr.today-installing td{background:#FFF9C4}
 .tbl-wrap tr:hover td{background:#f0f7ff}
 .tbl-wrap tr.sel td{background:#e3f2fd}
 .tbl-wrap tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--pri)}
@@ -47325,7 +47327,9 @@ function renderTable(){
       if(collapsed) return;
       /* 直接按 houses 输入顺序（= HOUSE_SOURCE = 安装总览排列）逐栋列出，不再按小组/开工日重排 */
       hs.forEach(function(hh){
-        h+='<tr data-id="'+esc(hh.id)+'" onclick="selRow(this)">'+cellsHouse(hh,cols)+'</tr>';
+        /* 「今天安装=是」→ 整行淡黄底，便于一眼看出今天在装的栋 */
+        var _rowCls = isInstallingToday(hh) ? ' class="today-installing"' : '';
+        h+='<tr data-id="'+esc(hh.id)+'"'+_rowCls+' onclick="selRow(this)">'+cellsHouse(hh,cols)+'</tr>';
       });
       h+='<tr class="msrow">'+cellsMs(z,cols,true)+'</tr>';
     });
@@ -48173,7 +48177,7 @@ function toggleCards(){
 /* 版本标记：用于确认浏览器是否已加载「最新」甘特脚本。
    排查“改了没生效”时，在控制台执行：
    document.getElementById('instGanttFrame').contentWindow.__ganttBuild   */
-window.__ganttBuild='gantt-r8-20261008';
+window.__ganttBuild='gantt-r9-20261008';
 function rebuild(){ loadHouses(); if(typeof ganttResetManualAnchors==='function') ganttResetManualAnchors(); schedule(); renderAll(); }
 
 window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
