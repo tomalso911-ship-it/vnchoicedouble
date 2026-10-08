@@ -2405,6 +2405,11 @@ function _ovLoadChartLib(cb){
 .bd-photo-card .bd-card-name { position:absolute; left:0; right:0; bottom:0; padding:8px; font-size:11px; color:#fff; background:rgba(0,10,30,0.65); text-shadow:0 1px 2px rgba(0,0,0,.6); }
 .bd-photo-card .bd-photo-meta { color:#9fe9ff; font-weight:600; }
 .bd-photo-carousel .bd-photo-wrap img { object-fit:contain; }
+/* 照片左右切换按钮 */
+.bd-photo-nav { position:absolute; top:50%; transform:translateY(-50%); z-index:5; width:30px; height:46px; border:none; background:rgba(0,10,30,0.55); color:#fff; font-size:18px; line-height:1; cursor:pointer; border-radius:6px; display:flex; align-items:center; justify-content:center; opacity:0.65; transition:opacity .2s, background .2s; }
+.bd-photo-nav:hover { opacity:1; background:rgba(57,230,255,0.45); }
+.bd-photo-prev { left:4px; }
+.bd-photo-next { right:4px; }
 /* 人数卡片：数字/标签居中，项目名沉底，不留大片空白 */
 .bd-worker-card { justify-content:center; align-items:center; text-align:center; width:210px; }
 .bd-worker-num { font-size:56px; font-weight:800; color:#39e6ff; line-height:1; margin-top:8px; }
@@ -37510,8 +37515,11 @@ function boardRenderSitePhotos(list){
     // 限制最多 60 张，避免 DOM 过大；滚动时浏览器再按需加载（loading="lazy"），不额外占流量
     if(items.length > 60) items = items.slice(0,60);
     var cards = items.map(bdPhotoCard).join('');
-    // 一次只展示一张照片，用 JS 自动一张张轮播，不再整组复制造成"叠在一起"
-    body.innerHTML = '<div class="bd-carousel bd-photo-carousel" id="bdPhotoCarousel"><div class="bd-carousel-track">'+cards+'</div></div>';
+    // 一次只展示一张照片，带左右按钮可手动切换，JS 自动一张张轮播
+    body.innerHTML = '<div class="bd-carousel bd-photo-carousel" id="bdPhotoCarousel">'
+      + '<button type="button" class="bd-photo-nav bd-photo-prev" onclick="boardPhotoPrev()" aria-label="Prev">&#10094;</button>'
+      + '<button type="button" class="bd-photo-nav bd-photo-next" onclick="boardPhotoNext()" aria-label="Next">&#10095;</button>'
+      + '<div class="bd-carousel-track">'+cards+'</div></div>';
     boardStartPhotoCarousel();
   }
 }
@@ -37520,14 +37528,35 @@ function boardStartPhotoCarousel(){
   var box = document.getElementById('bdPhotoCarousel'); if(!box) return;
   var track = box.querySelector('.bd-carousel-track'); if(!track) return;
   var n = track.children.length; if(n <= 1) return;
-  var i = 0, dir = 1;
+  window.__bdPhotoN = n;
+  if(typeof window.__bdPhotoIdx !== 'number') window.__bdPhotoIdx = 0;
+  if(typeof window.__bdPhotoDir !== 'number') window.__bdPhotoDir = 1;
   if(window.__bdPhotoTimer){ clearInterval(window.__bdPhotoTimer); window.__bdPhotoTimer = null; }
-  window.__bdPhotoTimer = setInterval(function(){
-    i += dir;
-    if(i >= n - 1){ i = n - 1; dir = -1; }
-    if(i <= 0){ i = 0; dir = 1; }
-    box.scrollTo({ left: i * box.clientWidth, behavior: 'smooth' });
-  }, 4000);
+  window.__bdPhotoTimer = setInterval(function(){ boardPhotoAdvance(); }, 4000);
+}
+function boardPhotoAdvance(){
+  var n = window.__bdPhotoN || 0; if(!n) return;
+  window.__bdPhotoIdx += window.__bdPhotoDir;
+  if(window.__bdPhotoIdx >= n - 1){ window.__bdPhotoIdx = n - 1; window.__bdPhotoDir = -1; }
+  if(window.__bdPhotoIdx <= 0){ window.__bdPhotoIdx = 0; window.__bdPhotoDir = 1; }
+  boardPhotoScroll();
+}
+function boardPhotoScroll(){
+  var box = document.getElementById('bdPhotoCarousel'); if(!box) return;
+  box.scrollTo({ left: window.__bdPhotoIdx * box.clientWidth, behavior: 'smooth' });
+}
+function boardPhotoPrev(){
+  window.__bdPhotoIdx = Math.max(0, (window.__bdPhotoIdx || 0) - 1);
+  window.__bdPhotoDir = -1;
+  boardPhotoScroll();
+  boardStartPhotoCarousel();
+}
+function boardPhotoNext(){
+  var n = window.__bdPhotoN || 0;
+  window.__bdPhotoIdx = Math.min(n - 1, (window.__bdPhotoIdx || 0) + 1);
+  window.__bdPhotoDir = 1;
+  boardPhotoScroll();
+  boardStartPhotoCarousel();
 }
 // 收集所有项目的全部安装照片（每张照片一张卡片，按日期倒序），点击进入对应上传入口
 function bdAllInstallPhotos(list){
