@@ -46799,7 +46799,8 @@ function loadHouses(){
     return {id:'H'+(i+1), zoneKey:zkey, zone:String(h.zone||it('g_unzoned')), name:rawName, name1:name1, name2:name2,
       panels:Math.max(0,Math.round(+h.panels||0)), done:Math.max(0,Math.round(+h.done||0)),
       todayQty:Math.max(0,Math.round(+h.todayQty||0)),
-      days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bothTeams:false,lockDays:0,bs:'',be:''};
+      days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bothTeams:false,lockDays:0,bs:'',be:'',
+      actualStart:String(h.actualStart||''), completed:!!h.completed};
   });
   // 区表：按出现顺序，默认 1 组（可在区汇总表里改）
   var seen={}; zones=[];
@@ -46881,6 +46882,9 @@ function schedule(){
   parseHolidays();
   var projStart=nextWork(toYmd(cfg.start)||today());
   var prevEnd=null;
+  /* 停工日(0 安装日)累计数：由父页传入（window.INST_ZERO_DAYS）。
+     对「未完成」的栋只在第一次遇到"未开工"的行时整体顺延一次（相当于计划整体后移 N 天）。 */
+  var gSlipLeft=Math.max(0, +window.INST_ZERO_DAYS||0);
   zones.forEach(function(z){
     /* 区开工日：
        - 串行模式：区与区必须联动 → 忽略「区开工日」，一律 上一区完工日+1（首区=项目开工日）。
@@ -46914,8 +46918,24 @@ function schedule(){
       /* 天数：手动「拉伸条形」设定的天数优先（lockDays）；否则 全部组=ceil(板数/(n×产能))，普通=ceil(板数/产能) */
       if(h.lockDays) h.days=Math.max(1,(+h.lockDays|0));
       else h.days = h.bothTeams ? Math.max(1,Math.ceil(h.panels/(n*Math.max(1,cfg.cap)))) : houseDays(h);
-      /* 开始：手改锁定优先；否则接「上一行结束的次日」；结束=开始起占用 h.days 个工作日的最后一天 */
-      var s = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
+      /* 开始日优先级（「安装进程管理分析」自动校正版）：
+         ① 已完成安装的栋 → 保持其（历史）日期，不参与任何顺延；
+         ② 已开工未完成的栋 → 理论开工日 = 实际开工日（actualStart，来自实际录入）；
+         ③ 手改锁定 → lockStart；
+         ④ 其余未开工的栋 → 接「上一行结束次日」，并把停工日累计天数整体顺延一次。
+         结束 = 开始起占用 h.days 个工作日的最后一天。 */
+      var _isDone = ((+h.panels||0)>0 && (+h.done||0)>=(+h.panels||0));
+      var s;
+      if(_isDone){
+        s = h.lockStart ? nextWork(h.lockStart) : nextWork(cursor);
+      } else if(h.actualStart){
+        s = nextWork(h.actualStart);
+      } else if(h.lockStart){
+        s = nextWork(h.lockStart);
+      } else {
+        if(gSlipLeft){ cursor = nextWork(addDays(cursor, gSlipLeft)); gSlipLeft = 0; }
+        s = nextWork(cursor);
+      }
       var e = addWork(s,h.days);
       h.start=s; h.end=e;
       cursor = nextAfter(e);
@@ -48184,7 +48204,7 @@ function toggleCards(){
 /* 版本标记：用于确认浏览器是否已加载「最新」甘特脚本。
    排查“改了没生效”时，在控制台执行：
    document.getElementById('instGanttFrame').contentWindow.__ganttBuild   */
-window.__ganttBuild='gantt-r9-20261008';
+window.__ganttBuild='gantt-r10-20261008';
 function rebuild(){ loadHouses(); if(typeof ganttResetManualAnchors==='function') ganttResetManualAnchors(); schedule(); renderAll(); }
 
 window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
@@ -48971,6 +48991,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         due: _dmy((f.profile && f.profile.dueDate) || ((typeof prod_dueDateFromData==='function') ? prod_dueDateFromData() : '') || '')
       };
       w.HOUSE_SOURCE = inst_buildGanttHouses(f);
+      /* 停工日（0 安装日）数：甘特排程据此对"未完成"的栋整体顺延 */
+      try{ w.INST_ZERO_DAYS = inst_anaZeroDayCount(f); }catch(e){}
       if(typeof w.loadCfg === 'function') w.loadCfg();
       if(typeof w.syncParamUI === 'function') w.syncParamUI();
       if(typeof w.rebuild === 'function') w.rebuild();
@@ -49025,6 +49047,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       var t = d.getElementById('tblWrap'), c = d.getElementById('chartWrap');
       var st = t ? t.scrollTop : 0, sl = t ? t.scrollLeft : 0, ct = c ? c.scrollTop : 0;
       w.HOUSE_SOURCE = inst_buildGanttHouses(f);
+      try{ w.INST_ZERO_DAYS = inst_anaZeroDayCount(f); }catch(e){}
       if(typeof w.rebuild === 'function') w.rebuild();
       try{ if(t){ t.scrollTop = st; t.scrollLeft = sl; } if(c) c.scrollTop = ct; }catch(e){}
       return true;
@@ -49124,6 +49147,31 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     }
     var installQtyMap = (f && f.installation && f.installation.houseInstallQty) || {};
     var todayQtyMap = inst_houseTodayQtyMap(f);
+    /* ★ 逐栋「实际开工日」= 该栋第一次有安装录入（todayInstall>0）的日期（ymd）。
+       用于「安装进程管理分析」的自动校正：已开工未完成的栋，其开工日以实际为准。 */
+    var firstInstallMap = (function(){
+      var m = {}, ws = (f && f.installation && f.installation.workers) || {};
+      for(var dk in ws){
+        if(!ws.hasOwnProperty(dk)) continue;
+        var wd = ws[dk]; if(wd && wd._deleted) continue;
+        var y = (typeof dmyToYmd==='function') ? dmyToYmd(dk) : '';
+        if(!y) continue;
+        var ztw = (wd && wd.zoneTeamWorkers) || {};
+        for(var zn in ztw){
+          if(!ztw.hasOwnProperty(zn)) continue;
+          (ztw[zn]||[]).forEach(function(t){
+            if(!t || !t.house) return;
+            var ti = t.todayInstall || {}, s = 0;
+            for(var sp in ti){ if(ti.hasOwnProperty(sp)) s += (+ti[sp]||0); }
+            if(s <= 0) return;
+            var kk = String(t.house).replace('#','|');
+            if(!kk) return;
+            if(!m[kk] || y < m[kk]) m[kk] = y;
+          });
+        }
+      }
+      return m;
+    })();
     var out = [];
     keys.forEach(function(k){
       var parts = k.split('#');
@@ -49146,7 +49194,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       for(var _sp in dm){ if(dm.hasOwnProperty(_sp)) _recSum += Math.min((+dm[_sp]||0), inst_bldgSpecInstalledRec(f, code, idx, _sp)); }
       var done = panels>0 ? Math.max(0, Math.min(panels, Math.round(_recSum))) : Math.max(0, Math.round(_recSum));
       out.push({ key: k, zone: inst_zoneName(assign[k]), zoneKey: String(assign[k]), name: String(hname) + '#' + idx,
-        panels: panels, done: done, todayQty: Math.max(0, Math.round(+todayQtyMap[k]||0)) });
+        panels: panels, done: done, todayQty: Math.max(0, Math.round(+todayQtyMap[k]||0)),
+        actualStart: firstInstallMap[String(k).replace('#','|')] || '',
+        completed: (panels>0 && done>=panels) });
     });
     return out;
   }
@@ -51379,6 +51429,56 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     if(!a||!b) return 0;
     return Math.round((Date.parse(b+'T00:00:00Z') - Date.parse(a+'T00:00:00Z'))/86400000);
   }
+  function inst_anaAddDays(y,n){
+    var p=String(y||'').split('-'); if(p.length<3) return '';
+    var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+    if(isNaN(d.getTime())) return '';
+    d.setUTCDate(d.getUTCDate()+(+n||0));
+    return d.toISOString().slice(0,10);
+  }
+  /* 春节（越南 Tet）日期集合（ymd），用于排除春节停工 */
+  function inst_anaTetYmdSet(){
+    var set={};
+    try{
+      var list=(typeof BOARD_HOLIDAYS!=='undefined' && BOARD_HOLIDAYS) ? BOARD_HOLIDAYS : [];
+      list.forEach(function(h){
+        if(!h || h.zh!=='春节' || !h.vn) return;
+        var y=(typeof prod_ymd==='function') ? prod_ymd(h.from) : (h.from||'');
+        y=String(y||'').slice(0,10);
+        if(!y) return;
+        for(var i=-7;i<=10;i++){ var d=inst_anaAddDays(y,i); if(d) set[d]=1; }
+      });
+    }catch(e){}
+    return set;
+  }
+  /* 「0 安装日」(停工日) 数量：当天有人工（各区域小组录入人数>0）、安装数量=0、非春节、且不晚于今天。
+     每遇到一个，未完成的栋整体顺延 1 天。 */
+  function inst_anaZeroDayCount(f){
+    var ws=(f && f.installation && f.installation.workers) || {};
+    var tet=inst_anaTetYmdSet();
+    var todayY=(typeof prod_today==='function') ? prod_today() : '';
+    var n=0;
+    for(var dk in ws){
+      if(!ws.hasOwnProperty(dk)) continue;
+      var wd=ws[dk]; if(wd && wd._deleted) continue;
+      var y=(typeof dmyToYmd==='function') ? dmyToYmd(dk) : '';
+      if(!y || tet[y]) continue;
+      if(todayY && y>todayY) continue;
+      var man=0, qty=0;
+      var ztw=(wd && wd.zoneTeamWorkers) || {};
+      for(var zn in ztw){
+        if(!ztw.hasOwnProperty(zn)) continue;
+        (ztw[zn]||[]).forEach(function(t){
+          if(!t) return;
+          INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter'||rk[0]==='leader') return; man += (+t[rk[0]]||0); });
+          var ti=(t.todayInstall && typeof t.todayInstall==='object') ? t.todayInstall : {};
+          for(var sp in ti){ if(ti.hasOwnProperty(sp)) qty += (+ti[sp]||0); }
+        });
+      }
+      if(man>0 && qty===0) n++;
+    }
+    return n;
+  }
   function inst_renderAllZonesSummary(f, d){
     var wrap = document.getElementById('ic_progress_analysis_body'); if(!wrap) return;
     var inst = f.installation || {};
@@ -52154,6 +52254,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       var f = inst_get(INST_CUR); if(!f) return;
       var w = fr.contentWindow;
       w.HOUSE_SOURCE = inst_buildGanttHouses(f);
+      try{ w.INST_ZERO_DAYS = inst_anaZeroDayCount(f); }catch(e){}
       if(typeof w.rebuild === 'function') w.rebuild();
     }catch(e){ /* 甘特同步失败不能影响主流程（数据已先落盘） */ }
   }
