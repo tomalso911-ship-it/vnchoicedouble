@@ -48762,6 +48762,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       inst_renderZoneCards(f, cDate);
       inst_observeZoneSelects();
       try{ inst_saveWorkers(true); }catch(e){}
+      /* 明细表：≤10 行不出现滚动条，>10 行固定高度出滚动条（表头固定） */
+      try{ inst_limitLaborScroll(); setTimeout(inst_limitLaborScroll, 0); }catch(e){}
     }
     inst_updateTabBadges();
   }
@@ -51331,6 +51333,24 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var upOn = INST_LABOR_SORT.col===col && INST_LABOR_SORT.dir===1 ? ' on' : '';
     var dnOn = INST_LABOR_SORT.col===col && INST_LABOR_SORT.dir===-1 ? ' on' : '';
     return '<span class="pc-sort-ind"><i class="up'+upOn+'">▲</i><i class="dn'+dnOn+'">▼</i></span>';
+  }
+  /* 安装「安装数量&人工明细」表：固定表头（thead sticky），
+     仅当数据行 > 10 行时出现垂直滚动条；≤10 行不限制高度、不出现滚动条。
+     高度 = 表头 + 10 行 + 小计行，保证第 11 行才触发滚动。 */
+  function inst_limitLaborScroll(){
+    var wrap = document.querySelector('#inst-tab-body .pc-labor-scroll');
+    if(!wrap) return;
+    var tbl = wrap.querySelector('table.pc-labor-hist');
+    if(!tbl){ wrap.style.maxHeight = 'none'; return; }
+    var rows = tbl.querySelectorAll('tbody tr');
+    var maxRows = 10;
+    if(!rows.length || rows.length <= maxRows){ wrap.style.maxHeight = 'none'; return; }
+    var thead = tbl.querySelector('thead');
+    var tfoot = tbl.querySelector('tfoot');
+    var headH = thead ? thead.offsetHeight : 0;
+    var footH = tfoot ? tfoot.offsetHeight : 0;
+    var rowH = rows[0].offsetHeight || 26;
+    wrap.style.maxHeight = (headH + maxRows * rowH + footH) + 'px';
   }
   function inst_tabC(f){
     var inst = f.installation || {}; inst.workers = inst.workers || {};
