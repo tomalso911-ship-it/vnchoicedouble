@@ -4001,7 +4001,7 @@ var WL_FLOW_IMG = {
     }
     function wl_gotoProcurement(){ wl_gotoProdTab('D'); }
     function wl_gotoProduction(){ wl_gotoProdTab('E'); }
-    function wl_gotoFinished(){ wl_gotoProdTab('G'); }
+    function wl_gotoFinished(){ wl_gotoProdTab('H'); }
     function wl_gotoWarehouse(){ wl_gotoProdTab('H'); }
     function wl_gotoMaintenance(){ wl_gotoProdTab('F'); }
     function wl_gotoInstall(){
@@ -6577,7 +6577,6 @@ var WL_FLOW_IMG = {
         /* ★ 安装页「快速录入出库数据」：定位并高亮该猪舍在库存/出库明细里的行 */
         if(window.__PROD_H_JUMP){ var _hj = window.__PROD_H_JUMP; window.__PROD_H_JUMP = null; try{ prod_stockoutJumpHouse(_hj.h); }catch(e){} } }
       else if(key==='F'){ body.innerHTML = prod_tabF(f); prod_drawEquipCharts(f); }
-      else if(key==='G') body.innerHTML = prod_tabG(f);
       if('ABCDEFH'.indexOf(key) >= 0) prod_setupAllScrolls();
       prod_updateTabBadges();
       if(key==='H' && PROD_OUT_EDIT){
@@ -15898,29 +15897,7 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function prod_addEquip(){ var f = prod_get(PROD_CUR); f.equipment = f.equipment||{list:[],faults:[]}; f.equipment.list.push({name:prod_val('pf_name'),grade:prod_val('pf_grade'),maint:prod_val('pf_maint')}); prod_save(f); prod_renderTab('F'); }
     function prod_addFault(){ var f = prod_get(PROD_CUR); f.equipment = f.equipment||{list:[],faults:[]}; f.equipment.faults.push({date:prod_val('pf_fdate'),equip:prod_val('pf_fequip'),down:prod_val('pf_fdown'),reason:prod_val('pf_freason'),repair:prod_val('pf_frepair')}); prod_save(f); prod_renderTab('F'); }
-    /* G 交付（出库，过账成品库存+成本） */
-    function prod_tabG(f){
-      var fn = f.finished||{}; var specs = Object.keys(fn);
-      var opts = ''; specs.forEach(function(s){ opts += '<option value="'+prod_esc(s)+'">'+prod_esc(s)+'</option>'; });
-      var h = '<div class="prod-sec-title">'+pt('sec_delivery')+'</div>'
-        + '<div class="prod-form">'+prod_dateFld(pt('lbl_date'),'pg_date',prod_today(),'',prod_today())
-        + '<div class="prod-field"><label>'+pt('lbl_spec2')+'</label><select id="pg_spec">'+opts+'</select></div>'
-        + prod_numFld(pt('thr_qty3'),'pg_qty')+prod_fld(pt('lbl_client'),'pg_client')+prod_fld(pt('lbl_note'),'pg_note')
-        + '<button class="prod-btn" onclick="prod_addDelivery()">'+pt('btn_deliver')+'</button></div>';
-      h += '<table class="prod-table"><thead><tr><th>'+pt('thr_date')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_qty2')+'</th><th>'+pt('thr_client2')+'</th></tr></thead><tbody>';
-      (f.delivery||[]).slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).forEach(function(r){ h += '<tr><td>'+prod_esc(ymdToDmy(r.date))+'</td><td>'+prod_esc(r.spec)+'</td><td>'+prod_esc(r.qty)+'</td><td>'+prod_esc(r.client)+'</td></tr>'; });
-      h += '</tbody></table>';
-      if(!specs.length) h += '<div class="prod-empty">'+pt('empty_delivery')+'</div>';
-      return h;
-    }
-    function prod_addDelivery(){
-      var f = prod_get(PROD_CUR); var spec = prod_val('pg_spec'); var q = +prod_val('pg_qty')||0;
-      if(!spec || !q){ prod_toast(pt('toast_deliver_req')); return; }
-      f.finished = f.finished||{}; f.finished[spec] = f.finished[spec]||{produced:0,delivered:0};
-      f.finished[spec].delivered = (+f.finished[spec].delivered||0) + q;
-      f.delivery = f.delivery||[]; f.delivery.push({date:prod_val('pg_date'),spec:spec,qty:q,client:prod_val('pg_client'),note:prod_val('pg_note')});
-      prod_save(f); prod_renderTab('G'); prod_toast(pt('toast_delivered'));
-    }
+
     /* 工作日志索引钩子：将来工作日志只调用此函数取核心指标，不重复存 */
     function prod_generateWorklogSummary(id, date){
       var f = prod_get(id); var w = (f.workers && f.workers[date]) ? f.workers[date] : {};
