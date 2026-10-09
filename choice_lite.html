@@ -3153,16 +3153,18 @@ function _ovLoadChartLib(cb){
     <h1 class="login-title">CHOICE SLATS VIET NAM</h1>
     <p class="login-sub" data-i18n="login_sub">Sign in to your account</p>
 
-    <div class="login-field">
-      <label data-i18n="login_lbl_user">Username</label>
-      <input id="loginUser" type="text" data-i18n-attr="placeholder:login_ph_user" placeholder="Enter username" autocomplete="off"
-        autocapitalize="none" autocorrect="off" spellcheck="false"
-        style="text-transform:lowercase;" oninput="loginUserToLower()">
-    </div>
-    <div class="login-field">
-      <label data-i18n="login_lbl_pwd">Password</label>
-      <input id="loginPwd" type="password" data-i18n-attr="placeholder:login_ph_pwd" placeholder="Enter password" autocomplete="off">
-    </div>
+    <form id="loginForm" onsubmit="return false;" style="margin:0;">
+      <div class="login-field">
+        <label data-i18n="login_lbl_user">Username</label>
+        <input id="loginUser" type="text" data-i18n-attr="placeholder:login_ph_user" placeholder="Enter username" autocomplete="off"
+          autocapitalize="none" autocorrect="off" spellcheck="false"
+          style="text-transform:lowercase;" oninput="loginUserToLower()">
+      </div>
+      <div class="login-field">
+        <label data-i18n="login_lbl_pwd">Password</label>
+        <input id="loginPwd" type="password" data-i18n-attr="placeholder:login_ph_pwd" placeholder="Enter password" autocomplete="off">
+      </div>
+    </form>
     <label class="login-remember" for="loginRemember">
       <input type="checkbox" id="loginRemember" checked />
       <span data-i18n="login_remember">Remember me</span>
@@ -23141,11 +23143,14 @@ function setLangDebug(lang) {
   // 全部推到下一帧批量执行，避免连续同步重渲染阻塞首屏反馈。
   var lightSteps = ['applyTopbarLang', 'applyEmptyLang', 'applyUsersLang', 'applyApprovalsLang', 'applyCommissionLang', 'applyDashUpdateLang', 'applyDashboardChartTitles', 'applyLangRefreshers', 'applyCleanD1Lang', 'applyProductionLang', 'applyTriLangPopoverLang'];
   var heavySteps = ['applyWonLang', 'applyCrmLang', 'applyLostLang'];
-  console.warn('[lang] setLangDebug(' + lang + ') lightSteps start');
+  // 诊断日志默认静默：需要排查时在 Console 执行 window.LANG_DEBUG = true 再切语言。
+  // 精简版(/lite)不含看板更新/腾讯云/CRM/LOST 等模块，其 apply*Lang 不存在属正常，不应刷警告。
+  var _langLog = function(){ if(!window.LANG_DEBUG) return; try { console.log.apply(console, arguments); } catch(e){} };
+  _langLog('[lang] setLangDebug(' + lang + ') start');
   for (var i = 0; i < lightSteps.length; i++) {
     try {
       if (typeof window[lightSteps[i]] === 'function') window[lightSteps[i]]();
-      else console.warn('[lang] MISSING:', lightSteps[i]);
+      else _langLog('[lang] optional light step not present:', lightSteps[i]);
     } catch (e) {
       console.warn('[lang] ' + lightSteps[i] + ' failed:', e);
     }
@@ -23169,17 +23174,17 @@ function setLangDebug(lang) {
   for (var j = 0; j < heavySteps.length; j++) {
     try {
       var _fn = heavySteps[j];
-      if (typeof window[_fn] !== 'function') { console.warn('[lang] MISSING heavy:', _fn); continue; }
+      if (typeof window[_fn] !== 'function') { _langLog('[lang] optional heavy step not present:', _fn); continue; }
       var _vt = _fn === 'applyWonLang' ? 'won' : _fn === 'applyCrmLang' ? 'crm' : _fn === 'applyLostLang' ? 'lost' : null;
       // 非当前激活表格：只打轻标，切过去时再按新语言用缓存重渲染（绝不 fetch、不读其它标签的行）
       if (_vt && _vt !== _activeTable) {
         window._viewLangStale = window._viewLangStale || {};
         window._viewLangStale[_vt] = true;
-        console.warn('[lang] heavy skip (not active view): ' + _fn + ' -> marked stale');
+        _langLog('[lang] heavy skip (not active view): ' + _fn + ' -> marked stale');
         continue;
       }
       window[_fn]();
-      console.warn('[lang] heavy done:', _fn);
+      _langLog('[lang] heavy done:', _fn);
     } catch (e) {
       console.warn('[lang] ' + heavySteps[j] + ' failed:', e);
     }
