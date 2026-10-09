@@ -3761,6 +3761,14 @@ def serve_vault():
 def serve_lost_table():
     return send_from_directory(BASE_DIR, "lost_table.js", mimetype="application/javascript")
 
+@app.route("/flow_svg/<fn>")
+def serve_flow_svg(fn):
+    import werkzeug.utils as _wu
+    fn = _wu.secure_filename(fn)
+    if not fn.endswith(".svg"):
+        return ("", 404)
+    return send_from_directory(os.path.join(BASE_DIR, "flow_svg"), fn, mimetype="image/svg+xml")
+
 @app.route("/vn_provinces.js")
 def serve_vn_provinces():
     return send_from_directory(BASE_DIR, "vn_provinces.js", mimetype="application/javascript")

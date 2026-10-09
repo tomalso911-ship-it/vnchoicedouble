@@ -3466,6 +3466,13 @@ function _ovLoadChartLib(cb){
       .wl-tab-body{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;min-height:400px;}
       .wl-empty{text-align:center;color:#888;padding:40px 20px;}
       .wl-placeholder{display:flex;align-items:center;justify-content:center;min-height:300px;color:#666;font-size:14px;background:#f9f9f9;border-radius:10px;}
+      .wl-flow-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;padding:8px 4px;}
+      .wl-flow-card{position:relative;background:#fff;border:1px solid #dfe6ee;border-radius:14px;padding:18px 14px 14px;text-align:center;cursor:pointer;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.05);border-top:4px solid #b0bec5;}
+      .wl-flow-card:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,.12);}
+      .wl-flow-num{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:26px;height:26px;border-radius:50%;color:#fff;font-size:12px;font-weight:700;line-height:26px;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,.15);}
+      .wl-flow-svg{width:108px;height:108px;margin:6px auto 10px;display:block;}
+      .wl-flow-title{font-size:15px;font-weight:700;color:#263238;margin-bottom:4px;}
+      .wl-flow-sub{font-size:12px;color:#607d8b;line-height:1.4;}
       /* 日历 */
       .wl-cal{max-width:360px;background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
       .wl-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
@@ -3544,11 +3551,11 @@ function _ovLoadChartLib(cb){
     var WL_CHARTS = [];
     var WL_I18N = {
       zh: { wl_title:'工作日志', wl_back:'← 返回列表', wl_tab_daily_report:'每日记录报告', wl_tab_my_work:'我的工作', wl_empty_list:'暂无签约项目', wl_placeholder:'内容开发中，敬请期待',
-        wl_rep_no_data:'该日暂无记录', wl_weather:'天气', wl_am:'上午', wl_pm:'下午', wl_workers:'生产工人数', wl_lines:'生产线数', wl_production:'生产数据', wl_spec:'规格', wl_qty:'数量', wl_share:'占比', wl_total:'合计', wl_procurement:'采购数据', wl_material:'材料', wl_amount:'金额', wl_fault:'故障与维修数据', wl_fault_none:'当日无故障', wl_fault_count:'故障数', wl_reason:'故障原因', wl_down:'停机', wl_repair:'修复', wl_install:'安装数据', wl_installed:'已安装', wl_today_install:'今日安装', wl_demand:'需求', wl_inst_rate:'安装完成率', wl_eta:'预计完工', wl_prev:'上一天', wl_next:'下一天', wl_today:'今天', wl_trends:'趋势', wl_chart_prod:'每日产量', wl_chart_labor:'每日生产工人数量', wl_chart_inst:'每日安装工人数量', wl_no_chart:'数据不足，无法绘图', wx_temp:'温度', wx_hum:'湿度', wx_wind:'风力', wx_am_label:'上午天气', wx_pm_label:'下午天气', wl_weekdays:'周日,周一,周二,周三,周四,周五,周六', wl_week_min:'一,二,三,四,五,六,日', card_contract:'合同', card_spec:'规格', card_status:'状态：', card_due:'交期：', card_output:'累计产出', card_delivered:'已交付' },
+        wl_rep_no_data:'该日暂无记录', wl_weather:'天气', wl_am:'上午', wl_pm:'下午', wl_workers:'生产工人数', wl_lines:'生产线数', wl_production:'生产数据', wl_spec:'规格', wl_qty:'数量', wl_share:'占比', wl_total:'合计', wl_procurement:'采购数据', wl_material:'材料', wl_amount:'金额', wl_fault:'故障与维修数据', wl_fault_none:'当日无故障', wl_fault_count:'故障数', wl_reason:'故障原因', wl_down:'停机', wl_repair:'修复', wl_install:'安装数据', wl_installed:'已安装', wl_today_install:'今日安装', wl_demand:'需求', wl_inst_rate:'安装完成率', wl_eta:'预计完工', wl_prev:'上一天', wl_next:'下一天', wl_today:'今天', wl_trends:'趋势', wl_chart_prod:'每日产量', wl_chart_labor:'每日生产工人数量', wl_chart_inst:'每日安装工人数量', wl_no_chart:'数据不足，无法绘图', wx_temp:'温度', wx_hum:'湿度', wx_wind:'风力', wx_am_label:'上午天气', wx_pm_label:'下午天气', wl_weekdays:'周日,周一,周二,周三,周四,周五,周六', wl_week_min:'一,二,三,四,五,六,日', card_contract:'合同', card_spec:'规格', card_status:'状态：', card_due:'交期：', card_output:'累计产出', card_delivered:'已交付', flow_procurement:'采购', flow_sub_procurement:'砂石水泥原料进场', flow_production:'生产', flow_sub_production:'搅拌浇筑振捣养护', flow_finished:'成品', flow_sub_finished:'构件脱模质检合格', flow_warehouse:'入库/出库', flow_sub_warehouse:'堆场收发与台账', flow_install:'安装', flow_sub_install:'吊装就位与验收', flow_maintenance:'设备维修', flow_sub_maintenance:'设备保养与故障维修' },
       en: { wl_title:'Work Log', wl_back:'← Back to list', wl_tab_daily_report:'Daily Record Report', wl_tab_my_work:'My Work', wl_empty_list:'No signed projects', wl_placeholder:'Under development, stay tuned',
-        wl_rep_no_data:'No record for this day', wl_weather:'Weather', wl_am:'AM', wl_pm:'PM', wl_workers:'Production workers', wl_lines:'Production lines', wl_production:'Production', wl_spec:'Spec', wl_qty:'Qty', wl_share:'Share', wl_total:'Total', wl_procurement:'Procurement', wl_material:'Material', wl_amount:'Amount', wl_fault:'Fault & Maintenance', wl_fault_none:'No fault today', wl_fault_count:'Faults', wl_reason:'Reason', wl_down:'Down', wl_repair:'Repair', wl_install:'Installation', wl_installed:'Installed', wl_today_install:'Installed today', wl_demand:'Demand', wl_inst_rate:'Install rate', wl_eta:'ETA', wl_prev:'Prev day', wl_next:'Next day', wl_today:'Today', wl_trends:'Trends', wl_chart_prod:'Daily output', wl_chart_labor:'Daily production workers', wl_chart_inst:'Daily install workers', wl_no_chart:'Not enough data to chart', wx_temp:'Temp', wx_hum:'Humidity', wx_wind:'Wind', wx_am_label:'AM Weather', wx_pm_label:'PM Weather', wl_weekdays:'Sun,Mon,Tue,Wed,Thu,Fri,Sat', wl_week_min:'Mon,Tue,Wed,Thu,Fri,Sat,Sun', card_contract:'Contract', card_spec:'Spec', card_status:'Status: ', card_due:'Due: ', card_output:'Cumulative output', card_delivered:'Delivered' },
+        wl_rep_no_data:'No record for this day', wl_weather:'Weather', wl_am:'AM', wl_pm:'PM', wl_workers:'Production workers', wl_lines:'Production lines', wl_production:'Production', wl_spec:'Spec', wl_qty:'Qty', wl_share:'Share', wl_total:'Total', wl_procurement:'Procurement', wl_material:'Material', wl_amount:'Amount', wl_fault:'Fault & Maintenance', wl_fault_none:'No fault today', wl_fault_count:'Faults', wl_reason:'Reason', wl_down:'Down', wl_repair:'Repair', wl_install:'Installation', wl_installed:'Installed', wl_today_install:'Installed today', wl_demand:'Demand', wl_inst_rate:'Install rate', wl_eta:'ETA', wl_prev:'Prev day', wl_next:'Next day', wl_today:'Today', wl_trends:'Trends', wl_chart_prod:'Daily output', wl_chart_labor:'Daily production workers', wl_chart_inst:'Daily install workers', wl_no_chart:'Not enough data to chart', wx_temp:'Temp', wx_hum:'Humidity', wx_wind:'Wind', wx_am_label:'AM Weather', wx_pm_label:'PM Weather', wl_weekdays:'Sun,Mon,Tue,Wed,Thu,Fri,Sat', wl_week_min:'Mon,Tue,Wed,Thu,Fri,Sat,Sun', card_contract:'Contract', card_spec:'Spec', card_status:'Status: ', card_due:'Due: ', card_output:'Cumulative output', card_delivered:'Delivered', flow_procurement:'Procurement', flow_sub_procurement:'Raw materials inbound', flow_production:'Production', flow_sub_production:'Mix, pour, vibrate, cure', flow_finished:'Finished Goods', flow_sub_finished:'QC passed, ready for delivery', flow_warehouse:'Inbound/Outbound', flow_sub_warehouse:'Yard receipt/issue & ledger', flow_install:'Installation', flow_sub_install:'Hoist into place & acceptance', flow_maintenance:'Equipment Maintenance', flow_sub_maintenance:'Upkeep & fault repair' },
       vi: { wl_title:'Nhật ký công việc', wl_back:'← Quay lại danh sách', wl_tab_daily_report:'Báo cáo ghi chép hàng ngày', wl_tab_my_work:'Công việc của tôi', wl_empty_list:'Chưa có dự án ký kết', wl_placeholder:'Đang phát triển, vui lòng chờ',
-        wl_rep_no_data:'Không có ghi chép ngày này', wl_weather:'Thời tiết', wl_am:'Sáng', wl_pm:'Chiều', wl_workers:'Công nhân sản xuất', wl_lines:'Số dây chuyền', wl_production:'Sản xuất', wl_spec:'Quy cách', wl_qty:'Số lượng', wl_share:'Tỉ lệ', wl_total:'Tổng', wl_procurement:'Mua hàng', wl_material:'Vật liệu', wl_amount:'Tiền', wl_fault:'Lỗi & Bảo trì', wl_fault_none:'Hôm nay không lỗi', wl_fault_count:'Số lỗi', wl_reason:'Nguyên nhân', wl_down:'Dừng', wl_repair:'Sửa', wl_install:'Lắp đặt', wl_installed:'Đã lắp', wl_today_install:'Lắp hôm nay', wl_demand:'Nhu cầu', wl_inst_rate:'Tỉ lệ lắp', wl_eta:'Dự kiến xong', wl_prev:'Ngày trước', wl_next:'Ngày sau', wl_today:'Hôm nay', wl_trends:'Xu hướng', wl_chart_prod:'Sản lượng ngày', wl_chart_labor:'Số công nhân SX/ngày', wl_chart_inst:'Số công nhân lắp/ngày', wl_no_chart:'Không đủ dữ liệu', wx_temp:'Nhiệt độ', wx_hum:'Độ ẩm', wx_wind:'Gió', wx_am_label:'Thời tiết sáng', wx_pm_label:'Thời tiết chiều', wl_weekdays:'CN,Thứ 2,Thứ 3,Thứ 4,Thứ 5,Thứ 6,Thứ 7', wl_week_min:'T2,T3,T4,T5,T6,T7,CN', card_contract:'Hợp đồng', card_spec:'Quy cách', card_status:'Trạng thái: ', card_due:'Hạn: ', card_output:'Sản lượng lũy kế', card_delivered:'Đã giao' }
+        wl_rep_no_data:'Không có ghi chép ngày này', wl_weather:'Thời tiết', wl_am:'Sáng', wl_pm:'Chiều', wl_workers:'Công nhân sản xuất', wl_lines:'Số dây chuyền', wl_production:'Sản xuất', wl_spec:'Quy cách', wl_qty:'Số lượng', wl_share:'Tỉ lệ', wl_total:'Tổng', wl_procurement:'Mua hàng', wl_material:'Vật liệu', wl_amount:'Tiền', wl_fault:'Lỗi & Bảo trì', wl_fault_none:'Hôm nay không lỗi', wl_fault_count:'Số lỗi', wl_reason:'Nguyên nhân', wl_down:'Dừng', wl_repair:'Sửa', wl_install:'Lắp đặt', wl_installed:'Đã lắp', wl_today_install:'Lắp hôm nay', wl_demand:'Nhu cầu', wl_inst_rate:'Tỉ lệ lắp', wl_eta:'Dự kiến xong', wl_prev:'Ngày trước', wl_next:'Ngày sau', wl_today:'Hôm nay', wl_trends:'Xu hướng', wl_chart_prod:'Sản lượng ngày', wl_chart_labor:'Số công nhân SX/ngày', wl_chart_inst:'Số công nhân lắp/ngày', wl_no_chart:'Không đủ dữ liệu', wx_temp:'Nhiệt độ', wx_hum:'Độ ẩm', wx_wind:'Gió', wx_am_label:'Thời tiết sáng', wx_pm_label:'Thời tiết chiều', wl_weekdays:'CN,Thứ 2,Thứ 3,Thứ 4,Thứ 5,Thứ 6,Thứ 7', wl_week_min:'T2,T3,T4,T5,T6,T7,CN', card_contract:'Hợp đồng', card_spec:'Quy cách', card_status:'Trạng thái: ', card_due:'Hạn: ', card_output:'Sản lượng lũy kế', card_delivered:'Đã giao', flow_procurement:'Mua hàng', flow_sub_procurement:'Nguyên liệu xi măng, cát đá nhập', flow_production:'Sản xuất', flow_sub_production:'Trộn, đổ, rung, dưỡng hộ', flow_finished:'Thành phẩm', flow_sub_finished:'Kiểm tra chất lượng đạt', flow_warehouse:'Nhập/Xuất kho', flow_sub_warehouse:'Nhận/trả bãi & sổ sách', flow_install:'Lắp đặt', flow_sub_install:'Cẩu lắp và nghiệm thu', flow_maintenance:'Bảo trì thiết bị', flow_sub_maintenance:'Bảo dưỡng & sửa chữa' }
     };
     function wl_i18n(k, def){
       try { var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh'; var m = WL_I18N[L] || WL_I18N['zh']; var v = m[k]; if (v !== undefined && v !== null) return v; } catch(e){}
@@ -3948,7 +3955,55 @@ function _ovLoadChartLib(cb){
       }
       var body = document.getElementById('wl-tab-body'); if(!body) return;
       if(key==='daily') wl_renderDaily();
-      else { var title = wl_i18n('wl_tab_my_work'); body.innerHTML = '<div class="wl-placeholder"><div><strong>'+title+'</strong><br>'+wl_i18n('wl_placeholder')+'</div></div>'; }
+      else wl_renderMywork();
+    }
+    function wl_renderMywork(){
+      var body = document.getElementById('wl-tab-body'); if(!body) return;
+      if(!WL_CUR){ body.innerHTML = '<div class="wl-empty">'+wl_i18n('wl_empty_list')+'</div>'; return; }
+      var steps = [
+        {key:'procurement', svg:'01_purchase.svg',    color:'#2196F3', goto:'wl_gotoProcurement()'},
+        {key:'production',  svg:'02_production.svg',  color:'#FF9800', goto:'wl_gotoProduction()'},
+        {key:'finished',    svg:'03_finished.svg',    color:'#4CAF50', goto:'wl_gotoFinished()'},
+        {key:'warehouse',   svg:'04_warehouse.svg',   color:'#9C27B0', goto:'wl_gotoWarehouse()'},
+        {key:'install',     svg:'05_installation.svg',color:'#009688', goto:'wl_gotoInstall()'},
+        {key:'maintenance', svg:'06_maintenance.svg', color:'#795548', goto:'wl_gotoMaintenance()'}
+      ];
+      var h = '<div class="wl-flow-grid">';
+      steps.forEach(function(s, i){
+        h += '<div class="wl-flow-card" style="border-top-color:'+s.color+'" onclick="'+s.goto+'">'
+          + '<div class="wl-flow-num" style="background:'+s.color+'">0'+(i+1)+'</div>'
+          + '<img class="wl-flow-svg" src="/flow_svg/'+s.svg+'" alt="'+wl_i18n('flow_'+s.key)+'">'
+          + '<div class="wl-flow-title">'+wl_i18n('flow_'+s.key)+'</div>'
+          + '<div class="wl-flow-sub">'+wl_i18n('flow_sub_'+s.key)+'</div>'
+          + '</div>';
+      });
+      h += '</div>';
+      body.innerHTML = h;
+    }
+    function wl_gotoProdTab(tab){
+      var id = WL_CUR && WL_CUR.id; if(!id) return;
+      try{
+        window.__VIEW_JUMPING = 1;
+        if(typeof switchView==='function') switchView('production');
+        setTimeout(function(){ window.__VIEW_JUMPING = 0; }, 0);
+        if(typeof prod_open==='function') prod_open(id);
+        if(typeof prod_renderTab==='function') prod_renderTab(tab);
+      }catch(e){}
+    }
+    function wl_gotoProcurement(){ wl_gotoProdTab('D'); }
+    function wl_gotoProduction(){ wl_gotoProdTab('E'); }
+    function wl_gotoFinished(){ wl_gotoProdTab('G'); }
+    function wl_gotoWarehouse(){ wl_gotoProdTab('H'); }
+    function wl_gotoMaintenance(){ wl_gotoProdTab('F'); }
+    function wl_gotoInstall(){
+      var id = WL_CUR && WL_CUR.id; if(!id) return;
+      try{
+        window.__VIEW_JUMPING = 1;
+        if(typeof switchView==='function') switchView('install');
+        setTimeout(function(){ window.__VIEW_JUMPING = 0; }, 0);
+        window.__INST_OPEN_TAB = 'C';
+        if(typeof inst_openProject==='function') inst_openProject(id);
+      }catch(e){}
     }
     // 语言切换后，若当前在工作日志，刷新列表与标签文案
     try {
