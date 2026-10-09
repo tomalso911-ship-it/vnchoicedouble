@@ -3749,28 +3749,32 @@ def library_upload():
         project_id = None
     else:
         project_id = int(project_id)
+    paths = request.form.getlist("paths") or []
     uploaded = []
-    for f in files:
-        if not f.filename:
+    for idx, f in enumerate(files):
+        rel = (paths[idx] if idx < len(paths) else "") or ""
+        rel = rel.replace("\\", "/").strip()
+        display = rel or f.filename
+        if not display:
             continue
-        if not _lib_safe_ext(f.filename):
-            uploaded.append({"ok": False, "error": "blocked", "original_name": f.filename})
+        if not _lib_safe_ext(display):
+            uploaded.append({"ok": False, "error": "blocked", "original_name": display})
             continue
-        base = safe_name(f.filename)
+        base = safe_name(display)
         ext = os.path.splitext(base)[1].lower() or ".file"
-        fname = f"lib_{int(time.time()*1000)}_{hashlib.md5(base.encode('utf-8')).hexdigest()[:8]}{ext}"
+        fname = f"lib_{int(time.time()*1000)}_{hashlib.md5((base + str(idx)).encode('utf-8')).hexdigest()[:8]}{ext}"
         fpath = os.path.join(LIB_DIR, fname)
         f.save(fpath)
         size = os.path.getsize(fpath) if os.path.isfile(fpath) else 0
         conn = get_db()
         cur = conn.execute(
             "INSERT INTO library_files (project_id, filename, original_name, uploader, size) VALUES (?, ?, ?, ?, ?)",
-            (project_id, fname, f.filename, _lib_user(), size),
+            (project_id, fname, display, _lib_user(), size),
         )
         fid = cur.lastrowid
         conn.commit()
         conn.close()
-        uploaded.append({"ok": True, "id": fid, "filename": fname, "original_name": f.filename, "size": size})
+        uploaded.append({"ok": True, "id": fid, "filename": fname, "original_name": display, "size": size})
     ok_count = sum(1 for u in uploaded if u.get("ok"))
     return jsonify({"ok": ok_count > 0, "uploaded": uploaded, "count": ok_count})
 
@@ -3820,7 +3824,8 @@ def library_download(fid):
     if not row:
         return jsonify({"error": "not found"}), 404
     as_att = (request.args.get("dl") or "").strip() not in ("", "0", "false")
-    return send_from_directory(LIB_DIR, row["filename"], as_attachment=as_att, download_name=row["original_name"])
+    dl_name = os.path.basename((row["original_name"] or row["filename"]).replace("\\", "/"))
+    return send_from_directory(LIB_DIR, row["filename"], as_attachment=as_att, download_name=dl_name)
 
 @app.route("/api/library/files/<int:fid>/preview")
 def library_preview(fid):
