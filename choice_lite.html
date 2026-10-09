@@ -19052,7 +19052,7 @@ var I18N = {
     lib_col_name:"名称", lib_col_modified:"修改日期", lib_col_type:"类型", lib_col_size:"大小", lib_col_action:"操作",
     lib_kind_image:"图片", lib_kind_pdf:"PDF 文档", lib_kind_doc:"Word 文档", lib_kind_sheet:"Excel 表格", lib_kind_slide:"PPT 演示文稿", lib_kind_archive:"压缩包", lib_kind_text:"文本文档", lib_kind_file:"文件",
     lib_crumb_root:"资料库", lib_selected_n:"已选中 {n} 项", lib_items_n:"共 {n} 个项目", lib_no_match:"没有匹配的文件",
-    lib_view:"阅览", lib_loading:"加载中…", lib_previewing:"正在生成预览…", lib_close:"关闭", lib_sheet:"工作表", lib_slide:"幻灯片", lib_unsupported:"该格式暂不支持在线阅览，请下载后查看",
+    lib_view:"阅览", lib_loading:"加载中…", lib_previewing:"正在生成预览…", lib_converting:"首次预览需转换，请稍候…", lib_close:"关闭", lib_sheet:"工作表", lib_slide:"幻灯片", lib_unsupported:"该格式暂不支持在线阅览，请下载后查看",
     lib_filename:"文件名", lib_uploader:"上传人", lib_upload_time:"上传时间", lib_size:"大小", lib_action:"操作",
     lib_forbidden_upload:"仅管理员/指定人员可上传、删除或重命名", lib_confirm_delete:"确定删除该文件？", lib_rename_placeholder:"新文件名", lib_no_preview:"该文件类型不支持在线预览，请下载查看",
     empty: { dash_title:"看板", dash_sub:"CRM + 签约 + 失败数据分析", dash_hint:"数据分析面板开发中，敬请期待",
@@ -19831,7 +19831,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     lib_col_name:"Name", lib_col_modified:"Date modified", lib_col_type:"Type", lib_col_size:"Size", lib_col_action:"Actions",
     lib_kind_image:"Image", lib_kind_pdf:"PDF Document", lib_kind_doc:"Word Document", lib_kind_sheet:"Excel Worksheet", lib_kind_slide:"PowerPoint", lib_kind_archive:"Archive", lib_kind_text:"Text Document", lib_kind_file:"File",
     lib_crumb_root:"Library", lib_selected_n:"{n} item(s) selected", lib_items_n:"{n} item(s)", lib_no_match:"No matching files",
-    lib_view:"View", lib_loading:"Loading…", lib_previewing:"Preparing preview…", lib_close:"Close", lib_sheet:"Sheet", lib_slide:"Slide", lib_unsupported:"Preview is not supported for this format, please download to view",
+    lib_view:"View", lib_loading:"Loading…", lib_previewing:"Preparing preview…", lib_converting:"Converting for first preview, please wait…", lib_close:"Close", lib_sheet:"Sheet", lib_slide:"Slide", lib_unsupported:"Preview is not supported for this format, please download to view",
     lib_filename:"File name", lib_uploader:"Uploader", lib_upload_time:"Uploaded", lib_size:"Size", lib_action:"Action",
     lib_forbidden_upload:"Only admin/designated users can upload, delete or rename", lib_confirm_delete:"Delete this file?", lib_rename_placeholder:"New file name", lib_no_preview:"Online preview is not supported for this file type, please download",
     empty: { dash_title:"Dashboard", dash_sub:"CRM + Won + Failed Analytics", dash_hint:"Analytics panel under development",
@@ -20613,7 +20613,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     lib_col_name:"Tên", lib_col_modified:"Ngày sửa", lib_col_type:"Loại", lib_col_size:"Kích thước", lib_col_action:"Thao tác",
     lib_kind_image:"Hình ảnh", lib_kind_pdf:"Tài liệu PDF", lib_kind_doc:"Tài liệu Word", lib_kind_sheet:"Bảng tính Excel", lib_kind_slide:"Trình chiếu PPT", lib_kind_archive:"Tệp nén", lib_kind_text:"Tài liệu văn bản", lib_kind_file:"Tệp",
     lib_crumb_root:"Thư viện", lib_selected_n:"Đã chọn {n} mục", lib_items_n:"{n} mục", lib_no_match:"Không có tệp phù hợp",
-    lib_view:"Xem", lib_loading:"Đang tải…", lib_previewing:"Đang tạo bản xem trước…", lib_close:"Đóng", lib_sheet:"Trang tính", lib_slide:"Trang chiếu", lib_unsupported:"Định dạng này chưa hỗ trợ xem trực tuyến, vui lòng tải xuống để xem",
+    lib_view:"Xem", lib_loading:"Đang tải…", lib_previewing:"Đang tạo bản xem trước…", lib_converting:"Đang chuyển đổi cho lần xem đầu tiên, vui lòng đợi…", lib_close:"Đóng", lib_sheet:"Trang tính", lib_slide:"Trang chiếu", lib_unsupported:"Định dạng này chưa hỗ trợ xem trực tuyến, vui lòng tải xuống để xem",
     lib_filename:"Tên tệp", lib_uploader:"Ngườitải lên", lib_upload_time:"Thờigian tải lên", lib_size:"Kích thước", lib_action:"Thao tác",
     lib_forbidden_upload:"Chỉ quản trị viên/ngườichỉ định mới được tải lên, xóa hoặc đổi tên", lib_confirm_delete:"Xóa tệp này?", lib_rename_placeholder:"Tên tệp mới", lib_no_preview:"Loại tệp này không hỗ trợ xem trước trực tuyến, vui lòng tải xuống",
     empty: { dash_title:"Bảng điều khiển", dash_sub:"Phân tích CRM + Thắng + Thất bại", dash_hint:"Bảng phân tích đang phát triển",
@@ -42599,11 +42599,34 @@ function submitAuth() {
     if(ext === 'pdf'){ body.innerHTML = '<iframe class="libview-frame" src="' + lib_attr(raw) + '"></iframe>'; return; }
     if(['jpg','jpeg','png','gif','webp','bmp','svg','ico'].indexOf(ext) >= 0){ body.innerHTML = '<img class="libview-img" src="' + lib_attr(raw) + '">'; return; }
     if(['txt','md','log','json','xml','ini','yml','yaml'].indexOf(ext) >= 0){ lib_viewText(raw, body); return; }
-    if(['docx'].indexOf(ext) >= 0){ lib_viewDocx(raw, body); return; }
-    if(['xlsx','xls','csv'].indexOf(ext) >= 0){ lib_viewXlsx(raw, body); return; }
-    if(['pptx'].indexOf(ext) >= 0){ lib_viewPptx(raw, body); return; }
+    if(['doc','docx','rtf','odt','xls','xlsx','xlsm','csv','ppt','pptx','pptm'].indexOf(ext) >= 0){
+      body.innerHTML = '<div class="libview-loading">' + lt('lib_converting') + '</div>';
+      lib_viewOfficePdf(id, ext, raw, body);
+      return;
+    }
     lib_viewFail(body);
   };
+
+  // 优先用服务端 Office → PDF 高保真预览；不可用时回退到前端渲染
+  function lib_viewOfficePdf(id, ext, raw, body){
+    var pdfUrl = '/api/library/files/' + id + '/pdfview';
+    function fallback(){
+      if(ext === 'docx') lib_viewDocx(raw, body);
+      else if(['xlsx','xls','xlsm','csv'].indexOf(ext) >= 0) lib_viewXlsx(raw, body);
+      else if(['pptx','pptm'].indexOf(ext) >= 0) lib_viewPptx(raw, body);
+      else lib_viewFail(body);
+    }
+    var ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = setTimeout(function(){ if(ac) try { ac.abort(); } catch(e){} }, 150000);
+    fetch(pdfUrl + '?check=1', ac ? { signal: ac.signal } : undefined)
+      .then(function(r){ return r.json().catch(function(){ return { ok: false }; }); })
+      .then(function(j){
+        clearTimeout(timer);
+        if(j && j.ok){ body.innerHTML = '<iframe class="libview-frame" src="' + lib_attr(pdfUrl) + '"></iframe>'; }
+        else { fallback(); }
+      })
+      .catch(function(){ clearTimeout(timer); fallback(); });
+  }
 
   function lib_viewText(url, body){
     fetch(url).then(function(r){ return r.text(); }).then(function(t){

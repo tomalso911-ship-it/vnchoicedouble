@@ -18,6 +18,7 @@ import sqlite3
 import time
 import shutil
 import mimetypes
+import subprocess
 from datetime import datetime, timedelta
 import re
 import copy
@@ -3845,6 +3846,85 @@ def library_raw(fid):
     ct = mimetypes.guess_type(row["original_name"])[0] or "application/octet-stream"
     resp = send_from_directory(LIB_DIR, row["filename"], mimetype=ct, as_attachment=False,
                                download_name=row["original_name"])
+    resp.headers["Cache-Control"] = "private, max-age=600"
+    return resp
+
+# ---- 高保真在线预览：用本机 Microsoft Office 把 Word/Excel/PPT 转成 PDF 后内联展示 ----
+LIB_OFFICE_EXT = {".doc", ".docx", ".rtf", ".odt", ".txt",
+                  ".xls", ".xlsx", ".xlsm", ".csv",
+                  ".ppt", ".pptx", ".pptm"}
+LIB_PDF_CACHE = os.path.join(LIB_DIR, "_pdfcache")
+
+def _lib_office_to_pdf(src, dst):
+    """调用本机 Office（PowerShell COM）把 Office 文档转成 PDF；成功返回 True。"""
+    ps = shutil.which("powershell") or shutil.which("pwsh")
+    script = os.path.join(BASE_DIR, "office2pdf.ps1")
+    if not ps or not os.path.isfile(script):
+        return False
+    try:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if os.path.isfile(dst):
+            try:
+                os.remove(dst)
+            except OSError:
+                pass
+        r = subprocess.run(
+            [ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script,
+             "-In", src, "-Out", dst],
+            capture_output=True, timeout=240,
+        )
+        ok = os.path.isfile(dst) and os.path.getsize(dst) > 0
+        if not ok:
+            print("[lib-pdf] convert failed rc=%s out=%s err=%s" % (
+                r.returncode,
+                (r.stdout or b"")[-300:].decode("utf-8", "replace"),
+                (r.stderr or b"")[-300:].decode("utf-8", "replace")))
+        return ok
+    except Exception as e:
+        print("[lib-pdf] convert error:", e)
+        return False
+
+@app.route("/api/library/files/<int:fid>/pdfview")
+def library_pdfview(fid):
+    """返回可内联预览的 PDF：原生 PDF 直接给；Word/Excel/PPT 由本机 Office 转 PDF（按 mtime 缓存）。
+    ?check=1 时只返回 JSON {"ok":true} 或错误，用于前端先探测是否能高保真预览。"""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT filename, original_name FROM library_files WHERE id=?", (fid,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    fname = row["filename"]
+    ext = os.path.splitext(row["original_name"] or fname)[1].lower()
+    src = os.path.join(LIB_DIR, fname)
+    if not os.path.isfile(src):
+        return jsonify({"error": "file missing"}), 404
+    check = (request.args.get("check") or "").strip().lower() in ("1", "true", "yes")
+
+    if ext == ".pdf":
+        if check:
+            return jsonify({"ok": True, "pdf": True})
+        resp = send_from_directory(LIB_DIR, fname, mimetype="application/pdf", as_attachment=False)
+        resp.headers["Cache-Control"] = "private, max-age=600"
+        return resp
+
+    if ext not in LIB_OFFICE_EXT:
+        return jsonify({"ok": False, "error": "unsupported"}), 415
+
+    try:
+        st = os.stat(src)
+        key = hashlib.md5(("%s|%d|%d" % (fname, st.st_size, int(st.st_mtime))).encode("utf-8")).hexdigest()
+    except OSError:
+        return jsonify({"ok": False, "error": "stat failed"}), 500
+    pdf_name = key + ".pdf"
+    pdf_path = os.path.join(LIB_PDF_CACHE, pdf_name)
+    if not (os.path.isfile(pdf_path) and os.path.getsize(pdf_path) > 0):
+        if not _lib_office_to_pdf(src, pdf_path):
+            return jsonify({"ok": False, "error": "convert_failed"}), 501
+    if check:
+        return jsonify({"ok": True, "pdf": True})
+    resp = send_from_directory(LIB_PDF_CACHE, pdf_name, mimetype="application/pdf", as_attachment=False)
     resp.headers["Cache-Control"] = "private, max-age=600"
     return resp
 
