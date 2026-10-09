@@ -42443,7 +42443,7 @@ function submitAuth() {
     }
     if(lib_canEdit()){
       html += '<button class="lib-btn lib-btn-primary" onclick="lib_pickUpload()">＋ ' + lt('lib_upload') + '</button>';
-      html += '<button class="lib-btn" onclick="lib_pickUploadDir()">🗂 ' + lt('lib_upload_dir') + '</button>';
+      html += '<button class="lib-btn" title="' + lib_attr(lt('lib_upload_dir')) + '" onclick="lib_pickUploadDir()">🗂 ' + lt('lib_upload_dir') + '</button>';
       html += '<input type="file" id="lib-file-input" class="lib-upload-input" multiple onchange="lib_doUpload(this)">';
       html += '<input type="file" id="lib-dir-input" class="lib-upload-input" webkitdirectory directory multiple onchange="lib_doUploadDir(this)">';
       html += '<span class="lib-hint" style="margin:0;">' + lt('lib_upload_hint') + '</span>';
@@ -42517,6 +42517,15 @@ function submitAuth() {
       '<span class="sb-strong" id="lib-sb-sel" style="display:none;"></span>' +
       '</div>';
     body.innerHTML = html;
+    // 兜底：个别内核通过 innerHTML 生成目录选择框时不会生效，这里显式设置属性/属性位
+    var _di = document.getElementById('lib-dir-input');
+    if(_di){
+      try {
+        _di.setAttribute('webkitdirectory', '');
+        _di.setAttribute('directory', '');
+        _di.webkitdirectory = true;
+      } catch(e){}
+    }
     lib_renderList();
   }
 
@@ -42951,7 +42960,10 @@ function submitAuth() {
   };
   window.lib_pickUploadDir = function(){
     var inp = document.getElementById('lib-dir-input');
-    if(inp){ inp.value = ''; inp.click(); }
+    if(!inp){ showToast(lt('lib_unsupported')); return; }
+    try { inp.setAttribute('webkitdirectory', ''); inp.webkitdirectory = true; } catch(e){}
+    inp.value = '';
+    inp.click();
   };
 
   // 核心上传：items = [{file:File, path:'folder/sub/name.ext'}]
@@ -42987,13 +42999,14 @@ function submitAuth() {
 
   // 文件夹上传（保留相对路径）
   window.lib_doUploadDir = function(input){
-    if(!input || !input.files || !input.files.length) return;
+    if(!input || !input.files || !input.files.length){ showToast(lt('lib_no_files')); return; }
     if(!lib_canEdit()){ showToast(lt('lib_forbidden_op')); input.value = ''; return; }
     var items = [];
     for(var i=0;i<input.files.length;i++){
       var f = input.files[i];
       items.push({file: f, path: f.webkitRelativePath || f.name});
     }
+    showToast(lt('lib_uploading') + ' (' + items.length + ')');
     lib_postUpload(items);
     input.value = '';
   };
@@ -43195,7 +43208,7 @@ function submitAuth() {
       }
       if(!entries.length) return;
       var out = [], pending = entries.length, finished = false;
-      var finish = function(){ if(finished) return; finished = true; if(out.length) lib_postUpload(out); };
+      var finish = function(){ if(finished) return; finished = true; if(out.length) lib_postUpload(out); else showToast(lt('lib_no_files')); };
       entries.forEach(function(en){
         lib_collectEntry(en, '', function(list){
           for(var z=0;z<list.length;z++) out.push(list[z]);
