@@ -42498,10 +42498,11 @@ function submitAuth() {
 
   function lib_renderList(){
     var wrap = document.getElementById('lib-files-wrap'); if(!wrap) return;
+    // 列表重渲染时：气泡只跟随重新定位，绝不因重渲染而关闭（避免切语言/刷新时消失）
     if(document.getElementById('libconfirm')){
       var _aid = LIB_CONFIRM && LIB_CONFIRM.anchorId;
-      if(_aid && !document.querySelector('#lib-body [data-id="' + _aid + '"]')) lib_confirmClose();
-      else lib_confirmReposition();
+      var _el = _aid ? document.querySelector('#lib-body [data-id="' + _aid + '"]') : null;
+      if(_el) lib_placeConfirm(document.getElementById('libconfirm'), _el);
     }
     var list = lib_sortedFiles();
     if(!list.length){
@@ -42602,6 +42603,13 @@ function submitAuth() {
       anchor = document.querySelector('#lib-body [data-id="' + LIB_CONFIRM.anchorId + '"]');
     }
     lib_placeConfirm(pop, anchor);
+  };
+  // 切语言等重渲染后兜底：气泡若被清掉则按原参数重建，否则就地刷新+重新定位
+  window.lib_confirmReassert = function(){
+    if(!LIB_CONFIRM) return;
+    if(document.getElementById('libconfirm')){ lib_confirmRefresh(); lib_confirmReposition(); return; }
+    var anchor = LIB_CONFIRM.anchorId ? document.querySelector('#lib-body [data-id="' + LIB_CONFIRM.anchorId + '"]') : null;
+    lib_confirm(LIB_CONFIRM.key, anchor, LIB_CONFIRM.onOk);
   };
   window.lib_itemCtx = function(ev, id){
     ev.preventDefault(); ev.stopPropagation();
@@ -43026,6 +43034,9 @@ function submitAuth() {
     if(window.currentView === 'library' && typeof lib_refresh === 'function'){
       lib_refresh(true);
     }
+    // 兜底：切语言后若删除确认气泡被任何重渲染清掉，则就地重建并翻译
+    setTimeout(function(){ try { if(typeof lib_confirmReassert === 'function') lib_confirmReassert(); } catch(e){} }, 40);
+    setTimeout(function(){ try { if(typeof lib_confirmReassert === 'function') lib_confirmReassert(); } catch(e){} }, 400);
   });
 
   // 拖拽 / 粘贴上传（全局）
@@ -43116,12 +43127,14 @@ function submitAuth() {
     }
   }
 
-  // 点击气泡外部关闭；但点击语言切换按钮【不关闭】——切语言时气泡保留并就地翻译
+  // 仅在“点击资料库文件区域”时自动关闭气泡（点另一个文件=放弃删除）；
+  // 顶栏（含语言切换）、其它任何地方都不会关闭气泡 —— 保证切语言时气泡保留并就地翻译。
   document.addEventListener('mousedown', function(e){
     if(!document.getElementById('libconfirm')) return;
     var t = e.target;
-    if(t && t.closest && (t.closest('.libconfirm') || t.closest('.lang-switch') || t.closest('#loginLangSwitch'))) return;
-    lib_confirmClose();
+    if(!t || !t.closest) return;
+    if(t.closest('.libconfirm')) return;
+    if(t.closest('#lib-files-wrap, .lib-proj-cards, .lib-toolbar, .lib-crumb')) lib_confirmClose();
   }, true);
 })();
 </script>
