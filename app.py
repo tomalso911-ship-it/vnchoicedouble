@@ -3834,6 +3834,20 @@ def library_preview(fid):
         return jsonify({"error": "not previewable"}), 415
     return send_from_directory(LIB_DIR, row["filename"], mimetype=ct)
 
+@app.route("/api/library/files/<int:fid>/raw")
+def library_raw(fid):
+    """原始文件（内联），供前端在线阅览 PDF/Office 等（任意格式，不做类型限制）。"""
+    conn = get_db()
+    row = conn.execute("SELECT filename, original_name FROM library_files WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    ct = mimetypes.guess_type(row["original_name"])[0] or "application/octet-stream"
+    resp = send_from_directory(LIB_DIR, row["filename"], mimetype=ct, as_attachment=False,
+                               download_name=row["original_name"])
+    resp.headers["Cache-Control"] = "private, max-age=600"
+    return resp
+
 # ===================== API：补充协议摘要 =====================
 @app.route("/api/won-projects/<int:pid>/supp-summary", methods=["PUT"])
 def update_supp_summary(pid):

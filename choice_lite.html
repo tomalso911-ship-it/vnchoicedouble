@@ -2928,6 +2928,37 @@ function _ovLoadChartLib(cb){
   .lib-ctx .cx-sep{height:1px;background:#eef1f5;margin:4px 6px;}
   .lib-statusbar{display:flex;align-items:center;gap:16px;font-size:12px;color:#8b97a6;margin-top:12px;padding-top:9px;border-top:1px solid #f0f3f7;}
   .lib-statusbar .sb-strong{color:#3c4858;font-weight:700;}
+  .lib-rename-input{font:inherit;font-size:12.5px;padding:2px 6px;border:1px solid #E53935;border-radius:6px;outline:none;width:100%;box-sizing:border-box;background:#fff;box-shadow:0 0 0 3px rgba(229,57,53,.14);}
+  .lib-tile .lib-rename-input{text-align:center;}
+  /* ===== 资料库 · 在线阅览弹窗 ===== */
+  .libview-ov{position:fixed;inset:0;background:rgba(15,20,30,.62);z-index:3800;display:none;align-items:center;justify-content:center;padding:22px;}
+  .libview-ov.show{display:flex;}
+  .libview-box{background:#fff;border-radius:12px;width:min(1120px,97vw);height:min(88vh,900px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45);}
+  .libview-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #eef1f5;background:#f7f9fc;}
+  .libview-title{font-weight:700;font-size:14px;color:#2b3648;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .libview-head .libview-btn{padding:5px 12px;border-radius:7px;border:1px solid #d3dae4;background:#fff;cursor:pointer;font-size:12.5px;color:#3c4858;}
+  .libview-head .libview-btn:hover{background:#eef4ff;}
+  .libview-head .libview-btn.primary{background:#E53935;color:#fff;border-color:#E53935;}
+  .libview-body{flex:1;overflow:auto;background:#eef1f5;position:relative;}
+  .libview-frame{width:100%;height:100%;border:0;background:#fff;display:block;}
+  .libview-img{display:block;margin:0 auto;max-width:100%;background:#fff;}
+  .libview-doc{padding:22px 28px;background:#fff;min-height:100%;font-size:14px;line-height:1.7;color:#222;box-sizing:border-box;}
+  .libview-doc img{max-width:100%;}
+  .libview-doc table{border-collapse:collapse;margin:10px 0;}
+  .libview-doc td,.libview-doc th{border:1px solid #ccc;padding:4px 8px;}
+  .libview-msg{padding:60px 30px;text-align:center;color:#66707c;font-size:14px;background:#fff;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;box-sizing:border-box;}
+  .libview-loading{padding:60px;text-align:center;color:#66707c;font-size:14px;background:#fff;min-height:100%;box-sizing:border-box;}
+  .libview-tabs{display:flex;gap:6px;padding:8px 12px;background:#fafbfd;border-bottom:1px solid #eef1f5;overflow-x:auto;flex-wrap:wrap;position:sticky;top:0;z-index:3;}
+  .libview-tab{padding:5px 12px;border-radius:7px;border:1px solid #d9e0e9;background:#fff;cursor:pointer;font-size:12.5px;white-space:nowrap;}
+  .libview-tab.active{background:#E53935;color:#fff;border-color:#E53935;}
+  .libview-xls{background:#fff;padding:10px 12px;}
+  .libview-xls table{border-collapse:collapse;font-size:12.5px;}
+  .libview-xls td,.libview-xls th{border:1px solid #e0e5ec;padding:4px 8px;white-space:nowrap;}
+  .libview-xls th{background:#f2f6fb;font-weight:700;}
+  .libview-slide{background:#fff;border:1px solid #e3e8ef;border-radius:10px;margin:14px 20px;padding:18px 22px;box-shadow:0 2px 8px rgba(0,0,0,.05);}
+  .libview-slide h4{margin:0 0 10px;color:#E53935;font-size:13px;}
+  .libview-slide ul{margin:0;padding-left:20px;font-size:14px;line-height:1.8;color:#2b3648;}
+  .libview-slide .ls-none{color:#98a2b0;font-size:13px;}
 </style>
 </head>
 
@@ -16451,6 +16482,17 @@ var PROD_EQUIP_FAULT_KB = {
       </div>
     </div>
     <div class="lib-drag-overlay" id="lib-drag-overlay">松开以上传文件</div>
+    <!-- 在线阅览弹窗 -->
+    <div class="libview-ov" id="libviewOv">
+      <div class="libview-box">
+        <div class="libview-head">
+          <span class="libview-title" id="libviewTitle"></span>
+          <button class="libview-btn" id="libviewDl" onclick="lib_viewDownload()">下载</button>
+          <button class="libview-btn primary" id="libviewClose" onclick="lib_closeView()">关闭</button>
+        </div>
+        <div class="libview-body" id="libviewBody"></div>
+      </div>
+    </div>
   </section>
 
   <!-- 股东权益（占位） -->
@@ -19010,6 +19052,7 @@ var I18N = {
     lib_col_name:"名称", lib_col_modified:"修改日期", lib_col_type:"类型", lib_col_size:"大小", lib_col_action:"操作",
     lib_kind_image:"图片", lib_kind_pdf:"PDF 文档", lib_kind_doc:"Word 文档", lib_kind_sheet:"Excel 表格", lib_kind_slide:"PPT 演示文稿", lib_kind_archive:"压缩包", lib_kind_text:"文本文档", lib_kind_file:"文件",
     lib_crumb_root:"资料库", lib_selected_n:"已选中 {n} 项", lib_items_n:"共 {n} 个项目", lib_no_match:"没有匹配的文件",
+    lib_view:"阅览", lib_loading:"加载中…", lib_previewing:"正在生成预览…", lib_close:"关闭", lib_sheet:"工作表", lib_slide:"幻灯片", lib_unsupported:"该格式暂不支持在线阅览，请下载后查看",
     lib_filename:"文件名", lib_uploader:"上传人", lib_upload_time:"上传时间", lib_size:"大小", lib_action:"操作",
     lib_forbidden_upload:"仅管理员/指定人员可上传、删除或重命名", lib_confirm_delete:"确定删除该文件？", lib_rename_placeholder:"新文件名", lib_no_preview:"该文件类型不支持在线预览，请下载查看",
     empty: { dash_title:"看板", dash_sub:"CRM + 签约 + 失败数据分析", dash_hint:"数据分析面板开发中，敬请期待",
@@ -19788,6 +19831,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     lib_col_name:"Name", lib_col_modified:"Date modified", lib_col_type:"Type", lib_col_size:"Size", lib_col_action:"Actions",
     lib_kind_image:"Image", lib_kind_pdf:"PDF Document", lib_kind_doc:"Word Document", lib_kind_sheet:"Excel Worksheet", lib_kind_slide:"PowerPoint", lib_kind_archive:"Archive", lib_kind_text:"Text Document", lib_kind_file:"File",
     lib_crumb_root:"Library", lib_selected_n:"{n} item(s) selected", lib_items_n:"{n} item(s)", lib_no_match:"No matching files",
+    lib_view:"View", lib_loading:"Loading…", lib_previewing:"Preparing preview…", lib_close:"Close", lib_sheet:"Sheet", lib_slide:"Slide", lib_unsupported:"Preview is not supported for this format, please download to view",
     lib_filename:"File name", lib_uploader:"Uploader", lib_upload_time:"Uploaded", lib_size:"Size", lib_action:"Action",
     lib_forbidden_upload:"Only admin/designated users can upload, delete or rename", lib_confirm_delete:"Delete this file?", lib_rename_placeholder:"New file name", lib_no_preview:"Online preview is not supported for this file type, please download",
     empty: { dash_title:"Dashboard", dash_sub:"CRM + Won + Failed Analytics", dash_hint:"Analytics panel under development",
@@ -20569,6 +20613,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     lib_col_name:"Tên", lib_col_modified:"Ngày sửa", lib_col_type:"Loại", lib_col_size:"Kích thước", lib_col_action:"Thao tác",
     lib_kind_image:"Hình ảnh", lib_kind_pdf:"Tài liệu PDF", lib_kind_doc:"Tài liệu Word", lib_kind_sheet:"Bảng tính Excel", lib_kind_slide:"Trình chiếu PPT", lib_kind_archive:"Tệp nén", lib_kind_text:"Tài liệu văn bản", lib_kind_file:"Tệp",
     lib_crumb_root:"Thư viện", lib_selected_n:"Đã chọn {n} mục", lib_items_n:"{n} mục", lib_no_match:"Không có tệp phù hợp",
+    lib_view:"Xem", lib_loading:"Đang tải…", lib_previewing:"Đang tạo bản xem trước…", lib_close:"Đóng", lib_sheet:"Trang tính", lib_slide:"Trang chiếu", lib_unsupported:"Định dạng này chưa hỗ trợ xem trực tuyến, vui lòng tải xuống để xem",
     lib_filename:"Tên tệp", lib_uploader:"Ngườitải lên", lib_upload_time:"Thờigian tải lên", lib_size:"Kích thước", lib_action:"Thao tác",
     lib_forbidden_upload:"Chỉ quản trị viên/ngườichỉ định mới được tải lên, xóa hoặc đổi tên", lib_confirm_delete:"Xóa tệp này?", lib_rename_placeholder:"Tên tệp mới", lib_no_preview:"Loại tệp này không hỗ trợ xem trước trực tuyến, vui lòng tải xuống",
     empty: { dash_title:"Bảng điều khiển", dash_sub:"Phân tích CRM + Thắng + Thất bại", dash_hint:"Bảng phân tích đang phát triển",
@@ -42379,7 +42424,7 @@ function submitAuth() {
     list.forEach(function(f){
       var nm = f.original_name || f.filename || '';
       html += '<div class="lib-tile' + (LIB_SELECTED===f.id?' selected':'') + '" data-id="' + f.id + '"' +
-        ' onclick="lib_itemClick(event,' + f.id + ')" ondblclick="lib_open(' + f.id + ')"' +
+        ' onclick="lib_itemClick(event,' + f.id + ')" ondblclick="lib_view(' + f.id + ')"' +
         ' oncontextmenu="lib_itemCtx(event,' + f.id + ')" title="' + lib_attr(nm) + '">' +
         '<div class="ft-icon">' + lib_fileIcon(nm) + '</div>' +
         '<div class="ft-name">' + esc(nm) + '</div>' +
@@ -42400,14 +42445,14 @@ function submitAuth() {
     list.forEach(function(f){
       var nm = f.original_name || f.filename || '';
       html += '<tr class="' + (LIB_SELECTED===f.id?'selected':'') + '" data-id="' + f.id + '"' +
-        ' onclick="lib_itemClick(event,' + f.id + ')" ondblclick="lib_open(' + f.id + ')"' +
+        ' onclick="lib_itemClick(event,' + f.id + ')" ondblclick="lib_view(' + f.id + ')"' +
         ' oncontextmenu="lib_itemCtx(event,' + f.id + ')">' +
         '<td><span class="fl-icon">' + lib_fileIcon(nm) + '</span><span class="fl-name">' + esc(nm) + '</span></td>' +
         '<td>' + libFormatDate(f.created_at) + '</td>' +
         '<td>' + esc(lib_fileKind(nm)) + '</td>' +
         '<td>' + libBytes(f.size) + '</td>' +
         '<td onclick="event.stopPropagation()">' +
-        '<button class="lib-act-btn" onclick="lib_open(' + f.id + ')">' + lt('lib_open') + '</button>' +
+        '<button class="lib-act-btn" onclick="lib_view(' + f.id + ')">' + lt('lib_view') + '</button>' +
         '<button class="lib-act-btn" onclick="lib_download(' + f.id + ')">' + lt('lib_download') + '</button>' +
         '<button class="lib-act-btn" onclick="lib_rename(' + f.id + ')">' + lt('lib_rename') + '</button>' +
         '<button class="lib-act-btn" onclick="lib_delete(' + f.id + ')">' + lt('lib_delete') + '</button>' +
@@ -42483,7 +42528,8 @@ function submitAuth() {
     lib_closeCtx();
     var menu = document.createElement('div');
     menu.className = 'lib-ctx'; menu.id = 'lib-ctx';
-    var items = '<div class="cx-item" onclick="lib_closeCtx();lib_open(' + id + ')">📂 ' + lt('lib_open') + '</div>' +
+    var items = '<div class="cx-item" onclick="lib_closeCtx();lib_view(' + id + ')">📖 ' + lt('lib_view') + '</div>' +
+      '<div class="cx-item" onclick="lib_closeCtx();lib_open(' + id + ')">📂 ' + lt('lib_open') + '</div>' +
       '<div class="cx-item" onclick="lib_closeCtx();lib_download(' + id + ')">⬇ ' + lt('lib_download') + '</div>';
     if(LIB_CAN_EDIT){
       items += '<div class="cx-sep"></div>' +
@@ -42497,12 +42543,187 @@ function submitAuth() {
     menu.style.top  = Math.max(6, Math.min(ev.clientY, window.innerHeight - h - 8)) + 'px';
   };
   window.lib_open = function(id){
-    var f = null;
-    for(var i=0;i<LIB_FILES.length;i++){ if(LIB_FILES[i].id === id){ f = LIB_FILES[i]; break; } }
+    var f = lib_fileById(id);
     var prev = ['pdf','jpg','jpeg','png','gif','webp'];
     if(f && prev.indexOf(lib_ext(f.original_name||f.filename)) >= 0) lib_preview(id);
     else lib_download(id);
   };
+
+  /* ==================== 在线阅览（多格式） ==================== */
+  function lib_fileById(id){
+    for(var i=0;i<LIB_FILES.length;i++){ if(LIB_FILES[i].id === id) return LIB_FILES[i]; }
+    return null;
+  }
+  var LIB_VENDOR_LOADED = {};
+  function lib_loadVendor(url, cdn, cb, fail){
+    if(LIB_VENDOR_LOADED[url]){ if(cb) cb(); return; }
+    var s = document.createElement('script');
+    s.src = url;
+    s.onload = function(){ LIB_VENDOR_LOADED[url] = true; if(cb) cb(); };
+    s.onerror = function(){
+      if(!cdn){ if(fail) fail(); return; }
+      var c = document.createElement('script');
+      c.src = cdn;
+      c.onload = function(){ LIB_VENDOR_LOADED[url] = true; if(cb) cb(); };
+      c.onerror = function(){ if(fail) fail(); };
+      document.head.appendChild(c);
+    };
+    document.head.appendChild(s);
+  }
+  function lib_viewFail(body){ body.innerHTML = '<div class="libview-msg"><div>📄</div><div>' + lt('lib_unsupported') + '</div><button class="libview-btn primary" onclick="lib_viewDownload()">' + lt('lib_download') + '</button></div>'; }
+
+  window.lib_closeView = function(){
+    var ov = document.getElementById('libviewOv');
+    if(ov) ov.classList.remove('show');
+    var body = document.getElementById('libviewBody');
+    if(body) body.innerHTML = '';
+    window.__libViewId = null;
+  };
+  window.lib_viewDownload = function(){ if(window.__libViewId) lib_download(window.__libViewId); };
+
+  window.lib_view = function(id){
+    var f = lib_fileById(id); if(!f) return;
+    var ov = document.getElementById('libviewOv');
+    var body = document.getElementById('libviewBody');
+    var title = document.getElementById('libviewTitle');
+    if(!ov || !body) return;
+    var nm = f.original_name || f.filename || '';
+    window.__libViewId = id;
+    if(title) title.textContent = nm;
+    var dl = document.getElementById('libviewDl'); if(dl) dl.textContent = lt('lib_download');
+    var cl = document.getElementById('libviewClose'); if(cl) cl.textContent = lt('lib_close');
+    ov.classList.add('show');
+    body.innerHTML = '<div class="libview-loading">' + lt('lib_loading') + '</div>';
+    var ext = lib_ext(nm);
+    var raw = '/api/library/files/' + id + '/raw';
+    if(ext === 'pdf'){ body.innerHTML = '<iframe class="libview-frame" src="' + lib_attr(raw) + '"></iframe>'; return; }
+    if(['jpg','jpeg','png','gif','webp','bmp','svg','ico'].indexOf(ext) >= 0){ body.innerHTML = '<img class="libview-img" src="' + lib_attr(raw) + '">'; return; }
+    if(['txt','md','log','json','xml','ini','yml','yaml'].indexOf(ext) >= 0){ lib_viewText(raw, body); return; }
+    if(['docx'].indexOf(ext) >= 0){ lib_viewDocx(raw, body); return; }
+    if(['xlsx','xls','csv'].indexOf(ext) >= 0){ lib_viewXlsx(raw, body); return; }
+    if(['pptx'].indexOf(ext) >= 0){ lib_viewPptx(raw, body); return; }
+    lib_viewFail(body);
+  };
+
+  function lib_viewText(url, body){
+    fetch(url).then(function(r){ return r.text(); }).then(function(t){
+      var pre = document.createElement('pre');
+      pre.style.cssText = 'margin:0;padding:20px 24px;background:#fff;min-height:100%;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:#222;box-sizing:border-box;';
+      pre.textContent = t;
+      body.innerHTML = ''; body.appendChild(pre);
+    }).catch(function(){ lib_viewFail(body); });
+  }
+  function lib_viewDocx(url, body){
+    function run(){
+      fetch(url).then(function(r){ return r.arrayBuffer(); }).then(function(buf){
+        return window.mammoth.convertToHtml({ arrayBuffer: buf });
+      }).then(function(res){
+        var d = document.createElement('div');
+        d.className = 'libview-doc';
+        d.innerHTML = (res && res.value) ? res.value : '';
+        body.innerHTML = ''; body.appendChild(d);
+      }).catch(function(){ lib_viewFail(body); });
+    }
+    if(window.mammoth){ run(); return; }
+    body.innerHTML = '<div class="libview-loading">' + lt('lib_previewing') + '</div>';
+    lib_loadVendor('/vendor/mammoth.browser.min.js', 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js', run, function(){ lib_viewFail(body); });
+  }
+  function lib_viewXlsx(url, body){
+    function run(){
+      fetch(url).then(function(r){ return r.arrayBuffer(); }).then(function(buf){
+        var wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+        var names = wb.SheetNames || [];
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'background:#fff;min-height:100%;';
+        var tabs = document.createElement('div'); tabs.className = 'libview-tabs';
+        var host = document.createElement('div'); host.className = 'libview-xls';
+        names.forEach(function(nm, i){
+          var b = document.createElement('button');
+          b.className = 'libview-tab' + (i === 0 ? ' active' : '');
+          b.textContent = nm;
+          b.onclick = function(){
+            var all = tabs.querySelectorAll('.libview-tab');
+            for(var k=0;k<all.length;k++) all[k].classList.remove('active');
+            b.classList.add('active');
+            lib_xlsRender(wb, nm, host);
+          };
+          tabs.appendChild(b);
+        });
+        if(names.length) lib_xlsRender(wb, names[0], host);
+        wrap.appendChild(tabs); wrap.appendChild(host);
+        body.innerHTML = ''; body.appendChild(wrap);
+      }).catch(function(){ lib_viewFail(body); });
+    }
+    if(window.XLSX){ run(); return; }
+    body.innerHTML = '<div class="libview-loading">' + lt('lib_previewing') + '</div>';
+    lib_loadVendor('/vendor/xlsx.full.min.js', 'https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js', run, function(){ lib_viewFail(body); });
+  }
+  function lib_xlsRender(wb, name, host){
+    try{ host.innerHTML = XLSX.utils.sheet_to_html(wb.Sheets[name], { editable: false }); }
+    catch(e){ host.innerHTML = '<div class="libview-msg">' + lt('lib_unsupported') + '</div>'; }
+  }
+  function lib_unzipEntries(buf){
+    var u8 = new Uint8Array(buf), dv = new DataView(buf);
+    var eocd = -1;
+    for(var i = u8.length - 22; i >= 0 && i >= u8.length - 22 - 65535; i--){
+      if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+    }
+    if(eocd < 0) return Promise.reject(new Error('not zip'));
+    var count = dv.getUint16(eocd + 10, true);
+    var cdOff = dv.getUint32(eocd + 16, true);
+    var entries = [], p = cdOff;
+    for(var e = 0; e < count; e++){
+      if(dv.getUint32(p, true) !== 0x02014b50) break;
+      var method = dv.getUint16(p + 10, true);
+      var compSize = dv.getUint32(p + 20, true);
+      var fnLen = dv.getUint16(p + 28, true);
+      var exLen = dv.getUint16(p + 30, true);
+      var cmLen = dv.getUint16(p + 32, true);
+      var localOff = dv.getUint32(p + 42, true);
+      var name = new TextDecoder('utf-8').decode(u8.subarray(p + 46, p + 46 + fnLen));
+      entries.push({ name: name, method: method, compSize: compSize, localOff: localOff });
+      p += 46 + fnLen + exLen + cmLen;
+    }
+    var jobs = entries.map(function(en){
+      var lo = en.localOff;
+      var lfnLen = dv.getUint16(lo + 26, true);
+      var lexLen = dv.getUint16(lo + 28, true);
+      var start = lo + 30 + lfnLen + lexLen;
+      var comp = u8.subarray(start, start + en.compSize);
+      if(en.method === 0) return Promise.resolve({ name: en.name, data: comp });
+      try{
+        var ds = new DecompressionStream('deflate-raw');
+        var stream = new Blob([comp]).stream().pipeThrough(ds);
+        return new Response(stream).arrayBuffer().then(function(ab){ return { name: en.name, data: new Uint8Array(ab) }; });
+      }catch(err){ return Promise.reject(err); }
+    });
+    return Promise.all(jobs);
+  }
+  function lib_viewPptx(url, body){
+    if(typeof DecompressionStream === 'undefined'){ lib_viewFail(body); return; }
+    body.innerHTML = '<div class="libview-loading">' + lt('lib_previewing') + '</div>';
+    fetch(url).then(function(r){ return r.arrayBuffer(); })
+      .then(function(buf){ return lib_unzipEntries(buf); })
+      .then(function(entries){
+        var slides = entries.filter(function(e){ return /^ppt\/slides\/slide\d+\.xml$/.test(e.name); });
+        slides.sort(function(a, b){
+          return (parseInt((a.name.match(/(\d+)/) || [0, 0])[1], 10)) - (parseInt((b.name.match(/(\d+)/) || [0, 0])[1], 10));
+        });
+        if(!slides.length){ lib_viewFail(body); return; }
+        var dec = new TextDecoder('utf-8'), html = '';
+        slides.forEach(function(s, i){
+          var xml = dec.decode(s.data);
+          var texts = [], re = /<a:t[^>]*>([\s\S]*?)<\/a:t>/g, m;
+          while((m = re.exec(xml))){ texts.push(m[1]); }
+          html += '<div class="libview-slide"><h4>' + lt('lib_slide') + ' ' + (i + 1) + '</h4>';
+          if(texts.length){ html += '<ul>'; texts.forEach(function(t){ html += '<li>' + esc(t) + '</li>'; }); html += '</ul>'; }
+          else { html += '<div class="ls-none">—</div>'; }
+          html += '</div>';
+        });
+        body.innerHTML = html;
+      })
+      .catch(function(){ lib_viewFail(body); });
+  }
 
   function esc(s){
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -42597,15 +42818,43 @@ function submitAuth() {
     }).catch(function(e){ showToast('delete failed'); });
   };
 
+  // 就地重命名（类似 Windows 文档：直接在原位置改名，无弹跳框）
   window.lib_rename = function(id){
-    var oldName = '';
-    for(var i=0;i<LIB_FILES.length;i++){ if(LIB_FILES[i].id === id){ oldName = LIB_FILES[i].original_name || LIB_FILES[i].filename || ''; break; } }
-    var name = prompt(lt('lib_rename_placeholder'), oldName);
-    if(!name || name === oldName) return;
-    fetch('/api/library/files/' + id + '/rename', {method:'PUT', headers: authHeaders({'Content-Type':'application/json'}), body: JSON.stringify({original_name: name})}).then(function(r){ return r.json(); }).then(function(res){
-      if(res.ok){ lib_loadFiles(); showToast(lt('saveOk')); }
-      else { showToast(res.error || 'rename failed'); }
-    }).catch(function(e){ showToast('rename failed'); });
+    lib_closeCtx();
+    var item = document.querySelector('#lib-body [data-id="' + id + '"]');
+    if(!item || item.querySelector('.lib-rename-input')) return;
+    var el = item.querySelector('.fl-name') || item.querySelector('.ft-name');
+    if(!el) return;
+    var f = lib_fileById(id);
+    var oldName = f ? (f.original_name || f.filename || '') : (el.textContent || '');
+    var input = document.createElement('input');
+    input.className = 'lib-rename-input';
+    input.value = oldName;
+    el.style.display = 'none';
+    el.parentNode.insertBefore(input, el.nextSibling);
+    input.focus();
+    var dot = oldName.lastIndexOf('.');
+    try { input.setSelectionRange(0, dot > 0 ? dot : oldName.length); } catch(e){}
+    var done = false;
+    function cancel(){ if(done) return; done = true; if(input.parentNode) input.parentNode.removeChild(input); el.style.display = ''; }
+    function commit(){
+      if(done) return;
+      var name = (input.value || '').trim();
+      if(!name || name === oldName){ cancel(); return; }
+      done = true;
+      fetch('/api/library/files/' + id + '/rename', {method:'PUT', headers: authHeaders({'Content-Type':'application/json'}), body: JSON.stringify({original_name: name})})
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+          if(res.ok){ lib_loadFiles(); showToast(lt('saveOk')); }
+          else { showToast(res.error || 'rename failed'); done = false; cancel(); }
+        })
+        .catch(function(){ showToast('rename failed'); done = false; cancel(); });
+    }
+    input.addEventListener('keydown', function(ev){
+      if(ev.key === 'Enter'){ ev.preventDefault(); commit(); }
+      else if(ev.key === 'Escape'){ ev.preventDefault(); cancel(); }
+    });
+    input.addEventListener('blur', function(){ commit(); });
   };
 
   function lib_setTitle(){
@@ -42722,8 +42971,12 @@ function submitAuth() {
     lib_closeCtx();
   });
   document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape') lib_closeCtx();
+    if(e.key === 'Escape'){ lib_closeCtx(); lib_closeView(); }
   });
+  var __libViewOv = document.getElementById('libviewOv');
+  if(__libViewOv){
+    __libViewOv.addEventListener('click', function(e){ if(e.target === __libViewOv) lib_closeView(); });
+  }
 })();
 </script>
 
