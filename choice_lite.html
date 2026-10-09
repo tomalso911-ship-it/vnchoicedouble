@@ -4014,20 +4014,15 @@ var WL_FLOW_IMG = {
         if(typeof inst_openProject==='function') inst_openProject(id);
       }catch(e){}
     }
-    // 语言切换后，若当前在工作日志，刷新列表与标签文案
+    // 语言切换后，强制刷新工作日志全部文案（不依赖 currentView 守卫，避免跳转路径导致漏刷）
     try {
       window.addEventListener('app:langchange', function(){
-        if(window.currentView !== 'worklog') return;
+        var h2 = document.querySelector('#view-worklog h2'); if(h2) h2.textContent = wl_i18n('wl_title');
         var backBtn = document.querySelector('#wl-detail .wl-back'); if(backBtn) backBtn.textContent = wl_i18n('wl_back');
         wl_renderList();
         if(WL_CUR) wl_renderTabs(WL_ACTIVE_TAB);
       });
-      // 兜底：只要「我的工作」流程图当前可见，语言切换即重绘（不依赖 currentView 守卫）
-      window.addEventListener('app:langchange', function(){
-        var body = document.getElementById('wl-tab-body');
-        if(body && body.querySelector('.wl-flow-card')){ try { wl_renderMywork(); } catch(e){} }
-      });
-    } catch(e){}
+    } catch(e){ console.warn('[wl] langchange refresh failed', e); }
     </script>
   </section>
 
