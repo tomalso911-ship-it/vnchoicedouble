@@ -4022,6 +4022,11 @@ var WL_FLOW_IMG = {
         wl_renderList();
         if(WL_CUR) wl_renderTabs(WL_ACTIVE_TAB);
       });
+      // 兜底：只要「我的工作」流程图当前可见，语言切换即重绘（不依赖 currentView 守卫）
+      window.addEventListener('app:langchange', function(){
+        var body = document.getElementById('wl-tab-body');
+        if(body && body.querySelector('.wl-flow-card')){ try { wl_renderMywork(); } catch(e){} }
+      });
     } catch(e){}
     </script>
   </section>
