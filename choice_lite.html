@@ -42300,7 +42300,8 @@ function submitAuth() {
     var fd = new FormData();
     fd.append('file', file);
     var url = '/api/library/upload' + (LIB_PROJECT_ID ? '?project_id=' + LIB_PROJECT_ID : '');
-    fetch(url, {method:'POST', headers: authHeaders({}), body: fd}).then(function(r){ return r.json(); }).then(function(res){
+    var headers = {'X-User-Name': (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : ''};
+    fetch(url, {method:'POST', headers: headers, body: fd}).then(function(r){ return r.json(); }).then(function(res){
       if(res.ok){ lib_loadFiles(); showToast(lt('saveOk')); }
       else { showToast(res.error || lt('lib_upload')); }
     }).catch(function(e){ showToast('upload failed'); });
