@@ -19,6 +19,7 @@ import time
 import shutil
 import mimetypes
 import subprocess
+import struct
 from datetime import datetime, timedelta
 import re
 import copy
@@ -3930,6 +3931,90 @@ def library_pdfview(fid):
     if check:
         return jsonify({"ok": True, "pdf": True})
     resp = send_from_directory(LIB_PDF_CACHE, pdf_name, mimetype="application/pdf", as_attachment=False)
+    resp.headers["Cache-Control"] = "private, max-age=600"
+    return resp
+
+# ---- CAD(DWG/DXF) 在线预览：提取 DWG 内嵌的 PNG/BMP 缩略图（无需任何转换器） ----
+LIB_CAD_EXT = {".dwg", ".dxf", ".dwf", ".dwfx"}
+
+def _lib_cad_thumbnail(src):
+    """从 CAD 文件中提取内嵌缩略图（AutoCAD 保存时写入的预览图）。
+    优先 PNG；否则查找合法的 BMP。返回 (bytes, mime) 或 None。"""
+    try:
+        with open(src, "rb") as fh:
+            head = fh.read(3 * 1024 * 1024)
+    except OSError:
+        return None
+    png_sig = b"\x89PNG\r\n\x1a\n"
+    pi = head.find(png_sig)
+    if pi >= 0:
+        end = pi + 8
+        n = len(head)
+        while end + 8 <= n:
+            ln = struct.unpack_from(">I", head, end)[0]
+            typ = head[end + 4:end + 8]
+            if typ == b"IEND":
+                blob = head[pi:end + 12]
+                if len(blob) > 100:
+                    return blob, "image/png"
+                break
+            end += 12 + ln
+    i = 0
+    while True:
+        i = head.find(b"BM", i)
+        if i < 0:
+            break
+        try:
+            bf = struct.unpack_from("<I", head, i + 2)[0]
+            off = struct.unpack_from("<I", head, i + 10)[0]
+            hsz = struct.unpack_from("<I", head, i + 14)[0]
+            w = struct.unpack_from("<i", head, i + 18)[0]
+            h = struct.unpack_from("<i", head, i + 22)[0]
+            bits = struct.unpack_from("<H", head, i + 28)[0]
+            if (hsz == 40 and 0 < w <= 4096 and 0 < abs(h) <= 4096
+                    and bits in (1, 4, 8, 24, 32) and off < 4096
+                    and bf and i + bf <= len(head)):
+                return head[i:i + bf], "image/bmp"
+        except Exception:
+            pass
+        i += 2
+    return None
+
+@app.route("/api/library/files/<int:fid>/cadthumb")
+def library_cadthumb(fid):
+    """返回 CAD 文件内嵌的预览缩略图（PNG/BMP）。?check=1 只返回 JSON。"""
+    conn = get_db()
+    row = conn.execute("SELECT filename, original_name FROM library_files WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    fname = row["filename"]
+    src = os.path.join(LIB_DIR, fname)
+    if not os.path.isfile(src):
+        return jsonify({"error": "file missing"}), 404
+    try:
+        st = os.stat(src)
+        key = hashlib.md5(("cad|%s|%d|%d" % (fname, st.st_size, int(st.st_mtime))).encode("utf-8")).hexdigest()
+    except OSError:
+        return jsonify({"ok": False, "error": "stat failed"}), 500
+    os.makedirs(LIB_PDF_CACHE, exist_ok=True)
+    cached = None
+    for cand in (".png", ".bmp"):
+        p = os.path.join(LIB_PDF_CACHE, key + cand)
+        if os.path.isfile(p) and os.path.getsize(p) > 0:
+            cached = key + cand
+            break
+    if not cached:
+        thumb = _lib_cad_thumbnail(src)
+        if not thumb:
+            return jsonify({"ok": False, "error": "no_thumbnail"}), 404
+        data, mime = thumb
+        cached = key + (".png" if mime == "image/png" else ".bmp")
+        with open(os.path.join(LIB_PDF_CACHE, cached), "wb") as fh:
+            fh.write(data)
+    if (request.args.get("check") or "").strip().lower() in ("1", "true", "yes"):
+        return jsonify({"ok": True})
+    resp = send_from_directory(LIB_PDF_CACHE, cached, as_attachment=False)
     resp.headers["Cache-Control"] = "private, max-age=600"
     return resp
 
