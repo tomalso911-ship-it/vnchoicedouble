@@ -2959,6 +2959,9 @@ function _ovLoadChartLib(cb){
   .libview-slide h4{margin:0 0 10px;color:#E53935;font-size:13px;}
   .libview-slide ul{margin:0;padding-left:20px;font-size:14px;line-height:1.8;color:#2b3648;}
   .libview-slide .ls-none{color:#98a2b0;font-size:13px;}
+  .libview-ov.max{padding:0;}
+  .libview-box.max{width:100vw;height:100vh;max-width:none;max-height:none;border-radius:0;}
+  .libview-head .libview-btn.libview-max-on{background:#E53935;color:#fff;border-color:#E53935;}
 </style>
 </head>
 
@@ -16487,6 +16490,7 @@ var PROD_EQUIP_FAULT_KB = {
       <div class="libview-box">
         <div class="libview-head">
           <span class="libview-title" id="libviewTitle"></span>
+          <button class="libview-btn" id="libviewMax" onclick="lib_toggleMax()">最大化</button>
           <button class="libview-btn" id="libviewDl" onclick="lib_viewDownload()">下载</button>
           <button class="libview-btn primary" id="libviewClose" onclick="lib_closeView()">关闭</button>
         </div>
@@ -19052,7 +19056,7 @@ var I18N = {
     lib_col_name:"名称", lib_col_modified:"修改日期", lib_col_type:"类型", lib_col_size:"大小", lib_col_action:"操作",
     lib_kind_image:"图片", lib_kind_pdf:"PDF 文档", lib_kind_doc:"Word 文档", lib_kind_sheet:"Excel 表格", lib_kind_slide:"PPT 演示文稿", lib_kind_archive:"压缩包", lib_kind_text:"文本文档", lib_kind_file:"文件",
     lib_crumb_root:"资料库", lib_selected_n:"已选中 {n} 项", lib_items_n:"共 {n} 个项目", lib_no_match:"没有匹配的文件",
-    lib_view:"阅览", lib_loading:"加载中…", lib_previewing:"正在生成预览…", lib_converting:"首次预览需转换，请稍候…", lib_close:"关闭", lib_sheet:"工作表", lib_slide:"幻灯片", lib_unsupported:"该格式暂不支持在线阅览，请下载后查看",
+    lib_view:"阅览", lib_loading:"加载中…", lib_previewing:"正在生成预览…", lib_converting:"首次预览需转换，请稍候…", lib_close:"关闭", lib_maximize:"最大化", lib_restore:"还原", lib_sheet:"工作表", lib_slide:"幻灯片", lib_unsupported:"该格式暂不支持在线阅览，请下载后查看",
     lib_filename:"文件名", lib_uploader:"上传人", lib_upload_time:"上传时间", lib_size:"大小", lib_action:"操作",
     lib_forbidden_upload:"仅管理员/指定人员可上传、删除或重命名", lib_confirm_delete:"确定删除该文件？", lib_rename_placeholder:"新文件名", lib_no_preview:"该文件类型不支持在线预览，请下载查看",
     empty: { dash_title:"看板", dash_sub:"CRM + 签约 + 失败数据分析", dash_hint:"数据分析面板开发中，敬请期待",
@@ -19831,7 +19835,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     lib_col_name:"Name", lib_col_modified:"Date modified", lib_col_type:"Type", lib_col_size:"Size", lib_col_action:"Actions",
     lib_kind_image:"Image", lib_kind_pdf:"PDF Document", lib_kind_doc:"Word Document", lib_kind_sheet:"Excel Worksheet", lib_kind_slide:"PowerPoint", lib_kind_archive:"Archive", lib_kind_text:"Text Document", lib_kind_file:"File",
     lib_crumb_root:"Library", lib_selected_n:"{n} item(s) selected", lib_items_n:"{n} item(s)", lib_no_match:"No matching files",
-    lib_view:"View", lib_loading:"Loading…", lib_previewing:"Preparing preview…", lib_converting:"Converting for first preview, please wait…", lib_close:"Close", lib_sheet:"Sheet", lib_slide:"Slide", lib_unsupported:"Preview is not supported for this format, please download to view",
+    lib_view:"View", lib_loading:"Loading…", lib_previewing:"Preparing preview…", lib_converting:"Converting for first preview, please wait…", lib_close:"Close", lib_maximize:"Maximize", lib_restore:"Restore", lib_sheet:"Sheet", lib_slide:"Slide", lib_unsupported:"Preview is not supported for this format, please download to view",
     lib_filename:"File name", lib_uploader:"Uploader", lib_upload_time:"Uploaded", lib_size:"Size", lib_action:"Action",
     lib_forbidden_upload:"Only admin/designated users can upload, delete or rename", lib_confirm_delete:"Delete this file?", lib_rename_placeholder:"New file name", lib_no_preview:"Online preview is not supported for this file type, please download",
     empty: { dash_title:"Dashboard", dash_sub:"CRM + Won + Failed Analytics", dash_hint:"Analytics panel under development",
@@ -20613,7 +20617,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     lib_col_name:"Tên", lib_col_modified:"Ngày sửa", lib_col_type:"Loại", lib_col_size:"Kích thước", lib_col_action:"Thao tác",
     lib_kind_image:"Hình ảnh", lib_kind_pdf:"Tài liệu PDF", lib_kind_doc:"Tài liệu Word", lib_kind_sheet:"Bảng tính Excel", lib_kind_slide:"Trình chiếu PPT", lib_kind_archive:"Tệp nén", lib_kind_text:"Tài liệu văn bản", lib_kind_file:"Tệp",
     lib_crumb_root:"Thư viện", lib_selected_n:"Đã chọn {n} mục", lib_items_n:"{n} mục", lib_no_match:"Không có tệp phù hợp",
-    lib_view:"Xem", lib_loading:"Đang tải…", lib_previewing:"Đang tạo bản xem trước…", lib_converting:"Đang chuyển đổi cho lần xem đầu tiên, vui lòng đợi…", lib_close:"Đóng", lib_sheet:"Trang tính", lib_slide:"Trang chiếu", lib_unsupported:"Định dạng này chưa hỗ trợ xem trực tuyến, vui lòng tải xuống để xem",
+    lib_view:"Xem", lib_loading:"Đang tải…", lib_previewing:"Đang tạo bản xem trước…", lib_converting:"Đang chuyển đổi cho lần xem đầu tiên, vui lòng đợi…", lib_close:"Đóng", lib_maximize:"Phóng to", lib_restore:"Khôi phục", lib_sheet:"Trang tính", lib_slide:"Trang chiếu", lib_unsupported:"Định dạng này chưa hỗ trợ xem trực tuyến, vui lòng tải xuống để xem",
     lib_filename:"Tên tệp", lib_uploader:"Ngườitải lên", lib_upload_time:"Thờigian tải lên", lib_size:"Kích thước", lib_action:"Thao tác",
     lib_forbidden_upload:"Chỉ quản trị viên/ngườichỉ định mới được tải lên, xóa hoặc đổi tên", lib_confirm_delete:"Xóa tệp này?", lib_rename_placeholder:"Tên tệp mới", lib_no_preview:"Loại tệp này không hỗ trợ xem trước trực tuyến, vui lòng tải xuống",
     empty: { dash_title:"Bảng điều khiển", dash_sub:"Phân tích CRM + Thắng + Thất bại", dash_hint:"Bảng phân tích đang phát triển",
@@ -42574,10 +42578,28 @@ function submitAuth() {
 
   window.lib_closeView = function(){
     var ov = document.getElementById('libviewOv');
-    if(ov) ov.classList.remove('show');
+    if(ov){ ov.classList.remove('show'); ov.classList.remove('max'); }
+    var box = ov ? ov.querySelector('.libview-box') : null;
+    if(box) box.classList.remove('max');
+    var mb = document.getElementById('libviewMax');
+    if(mb){ mb.textContent = lt('lib_maximize'); mb.classList.remove('libview-max-on'); mb.title = ''; }
     var body = document.getElementById('libviewBody');
     if(body) body.innerHTML = '';
     window.__libViewId = null;
+  };
+  window.lib_toggleMax = function(){
+    var ov = document.getElementById('libviewOv');
+    var box = ov ? ov.querySelector('.libview-box') : null;
+    if(!ov || !box) return;
+    var on = !box.classList.contains('max');
+    box.classList.toggle('max', on);
+    ov.classList.toggle('max', on);
+    var mb = document.getElementById('libviewMax');
+    if(mb){
+      mb.textContent = on ? lt('lib_restore') : lt('lib_maximize');
+      mb.classList.toggle('libview-max-on', on);
+      mb.title = on ? lt('lib_restore') : lt('lib_maximize');
+    }
   };
   window.lib_viewDownload = function(){ if(window.__libViewId) lib_download(window.__libViewId); };
 
@@ -42592,6 +42614,10 @@ function submitAuth() {
     if(title) title.textContent = nm;
     var dl = document.getElementById('libviewDl'); if(dl) dl.textContent = lt('lib_download');
     var cl = document.getElementById('libviewClose'); if(cl) cl.textContent = lt('lib_close');
+    var mb = document.getElementById('libviewMax');
+    if(mb){ mb.textContent = lt('lib_maximize'); mb.classList.remove('libview-max-on'); mb.title = lt('lib_maximize'); }
+    ov.classList.remove('max');
+    var _box = ov.querySelector('.libview-box'); if(_box) _box.classList.remove('max');
     ov.classList.add('show');
     body.innerHTML = '<div class="libview-loading">' + lt('lib_loading') + '</div>';
     var ext = lib_ext(nm);
@@ -42999,6 +43025,13 @@ function submitAuth() {
   var __libViewOv = document.getElementById('libviewOv');
   if(__libViewOv){
     __libViewOv.addEventListener('click', function(e){ if(e.target === __libViewOv) lib_closeView(); });
+    var __libViewHead = __libViewOv.querySelector('.libview-head');
+    if(__libViewHead){
+      __libViewHead.addEventListener('dblclick', function(e){
+        if(e.target && e.target.closest && e.target.closest('.libview-btn')) return;
+        lib_toggleMax();
+      });
+    }
   }
 })();
 </script>
