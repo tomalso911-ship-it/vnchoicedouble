@@ -42982,78 +42982,78 @@ function submitAuth() {
   }
 
   // 核心上传：items = [{file:File, path:'folder/sub/name.ext'}]
-  // 策略：分批(≤8 个 / ≤8MB) → 每批先把文件读入内存 → 失败则该批自动降级为"逐个文件上传"
+  // 自适应策略（无任何大小/数量预设限制）：
+  //   1) 默认【一次请求上传全部文件】（直接流式引用 File，省内存、最快）
+  //   2) 若该趟失败 → 自动【对半拆分】重试，递归直到单个文件
+  //   3) 单文件仍失败 → 改用【预读进内存】方式再试一次（规避 Edge 惰性 File 的 ERR_FAILED）
   function lib_postUpload(items){
     if(!items || !items.length) return;
     if(!lib_canEdit()){ showToast(lt('lib_forbidden_op')); return; }
-    var MAXN = 8, MAXSZ = 8 * 1024 * 1024;
-    var batches = [], cur = [], curSz = 0;
-    for(var i=0;i<items.length;i++){
-      var sz = (items[i].file && items[i].file.size) || 0;
-      if(cur.length && (cur.length >= MAXN || curSz + sz > MAXSZ)){ batches.push(cur); cur = []; curSz = 0; }
-      cur.push(items[i]); curSz += sz;
-    }
-    if(cur.length) batches.push(cur);
-
-    var total = items.length, okCount = 0, doneCount = 0, bi = 0;
     var url = '/api/library/upload' + (LIB_PROJECT_ID ? '?project_id=' + LIB_PROJECT_ID : '');
     var headers = {'X-User-Name': (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : ''};
+    var total = items.length, okCount = 0, doneCount = 0;
 
-    function finish(){
-      lib_loadFiles();
-      showToast(lt('lib_upload_done').replace('{ok}', okCount).replace('{total}', total));
+    function doFetch(fd, cb){
+      fetch(url, { method: 'POST', headers: headers, body: fd })
+        .then(function(r){ return r.json().catch(function(){ return { ok: false }; }); })
+        .then(function(res){ cb(!!(res && res.ok)); })
+        .catch(function(){ cb(false); });
     }
-    function postOne(it, cb){
-      lib_readAsArrayBuffer(it.file, function(ab){
-        var blob = lib_blobOf(it, ab);
-        if(!blob){ cb(false); return; }
-        var fd = new FormData();
-        fd.append('file', blob, it.file.name);
-        fd.append('paths', it.path || it.file.name);
-        fetch(url, { method: 'POST', headers: headers, body: fd })
-          .then(function(r){ return r.json().catch(function(){ return { ok: false }; }); })
-          .then(function(res){ cb(!!(res && res.ok)); })
-          .catch(function(){ cb(false); });
-      }, function(){ cb(false); });
-    }
-    function fallbackOneByOne(batch){
-      var k = 0;
-      function step(){
-        if(k >= batch.length){ nextBatch(); return; }
-        var it = batch[k++];
-        postOne(it, function(ok){ if(ok) okCount++; doneCount++; step(); });
-      }
-      step();
-    }
-    function nextBatch(){
-      if(bi >= batches.length){ finish(); return; }
-      var batch = batches[bi++];
-      var fd = new FormData(), idx = 0, added = 0;
-      function build(){
-        if(idx >= batch.length){
-          if(!added){ doneCount += batch.length; nextBatch(); return; }
-          showToast(lt('lib_uploading') + ' ' + doneCount + '/' + total);
-          fetch(url, { method: 'POST', headers: headers, body: fd })
-            .then(function(r){ return r.json().catch(function(){ return { ok: false }; }); })
-            .then(function(res){
-              if(res && res.ok){ okCount += (res.count || added); doneCount += batch.length; nextBatch(); }
-              else { fallbackOneByOne(batch); }
-            })
-            .catch(function(){ fallbackOneByOne(batch); });
-          return;
+    // stream=true：直接用 File 引用（流式，不占内存）；false：先读进内存再发
+    function sendBatch(batch, stream, cb){
+      var fd = new FormData();
+      if(stream){
+        for(var i=0;i<batch.length;i++){
+          try { fd.append('file', batch[i].file); fd.append('paths', batch[i].path || batch[i].file.name); } catch(e){}
         }
+        doFetch(fd, cb);
+        return;
+      }
+      var idx = 0, added = 0;
+      (function step(){
+        if(idx >= batch.length){ if(!added){ cb(false); return; } doFetch(fd, cb); return; }
         var it = batch[idx++];
         lib_readAsArrayBuffer(it.file, function(ab){
           var blob = lib_blobOf(it, ab);
           if(blob){
             try { fd.append('file', blob, it.file.name); fd.append('paths', it.path || it.file.name); added++; } catch(e){}
           }
-          build();
-        }, function(){ build(); });
-      }
-      build();
+          step();
+        }, function(){ step(); });
+      })();
     }
-    nextBatch();
+
+    var queue = [{ batch: items, stream: true }], inflight = false;
+    function pump(){
+      if(inflight) return;
+      var task = queue.shift();
+      if(!task){
+        lib_loadFiles();
+        showToast(lt('lib_upload_done').replace('{ok}', okCount).replace('{total}', total));
+        return;
+      }
+      inflight = true;
+      sendBatch(task.batch, task.stream, function(ok){
+        inflight = false;
+        if(ok){
+          okCount += task.batch.length; doneCount += task.batch.length;
+          showToast(lt('lib_uploading') + ' ' + doneCount + '/' + total);
+          pump();
+          return;
+        }
+        if(task.batch.length === 1){
+          if(task.stream){ queue.unshift({ batch: task.batch, stream: false }); }
+          else { doneCount += 1; }   // 两种方式都失败 → 该文件确实读不到
+          pump();
+          return;
+        }
+        var mid = Math.ceil(task.batch.length / 2);
+        queue.unshift({ batch: task.batch.slice(mid), stream: task.stream });
+        queue.unshift({ batch: task.batch.slice(0, mid), stream: task.stream });
+        pump();
+      });
+    }
+    pump();
   }
 
   window.lib_uploadFiles = function(files){
