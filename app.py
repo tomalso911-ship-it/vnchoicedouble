@@ -3765,9 +3765,10 @@ def serve_lost_table():
 def serve_flow_svg(fn):
     import werkzeug.utils as _wu
     fn = _wu.secure_filename(fn)
-    if not fn.endswith(".svg"):
+    if not fn.endswith((".svg", ".webp", ".png")):
         return ("", 404)
-    return send_from_directory(os.path.join(BASE_DIR, "flow_svg"), fn, mimetype="image/svg+xml")
+    _ct = "image/svg+xml" if fn.endswith(".svg") else ("image/webp" if fn.endswith(".webp") else "image/png")
+    return send_from_directory(os.path.join(BASE_DIR, "flow_svg"), fn, mimetype=_ct)
 
 @app.route("/vn_provinces.js")
 def serve_vn_provinces():
