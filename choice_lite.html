@@ -2848,6 +2848,32 @@ function _ovLoadChartLib(cb){
   #prod-detail .prod-op,#prod-detail .mini-btn,#prod-detail .receipt-collapse-btn,
   #inst-detail .prod-btn,#inst-detail .prod-tab,#inst-detail .prod-subtab,
   #inst-detail .prod-op,#inst-detail .mini-btn{ border:1px solid #000 !important; }
+  /* ===================== 资料库 ===================== */
+  .library-page{padding:12px;}
+  .lib-tabs{display:flex;flex-wrap:nowrap;gap:4px;border-bottom:2px solid #E7F2D4;padding-bottom:6px;margin-bottom:12px;overflow-x:auto;white-space:nowrap;-ms-overflow-style:none;scrollbar-width:none;}
+  .lib-tabs::-webkit-scrollbar{display:none;}
+  .lib-tab{flex:0 0 auto;white-space:nowrap;padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-size:14px;background:#f4f6f2;color:#444;border:1px solid #b8c4d0;border-bottom:none;}
+  .lib-tab.active{background:#E53935;color:#fff;font-weight:600;border-color:#E53935;}
+  .lib-proj-tabs{display:flex;gap:8px;margin:4px 0 12px;border-bottom:1px solid #eee;padding-bottom:6px;overflow-x:auto;white-space:nowrap;}
+  .lib-proj-tabs::-webkit-scrollbar{display:none;}
+  .lib-proj-tab{flex:0 0 auto;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;background:#eef2f6;color:#455a73;border:1px solid #dfe6ee;}
+  .lib-proj-tab:hover{background:#e3eaf2;}
+  .lib-proj-tab.active{background:#E53935;color:#fff;border-color:#E53935;}
+  .lib-body{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;min-height:400px;}
+  .lib-drop{border:2px dashed #ccc;border-radius:10px;padding:30px;text-align:center;color:#666;cursor:pointer;margin-bottom:16px;background:#fafafa;transition:.2s;}
+  .lib-drop:hover,.lib-drop.dragover{border-color:#E53935;background:#fff5f5;}
+  .lib-file-list{width:100%;border-collapse:collapse;font-size:13px;}
+  .lib-file-list th,.lib-file-list td{border:1px solid #e0e0e0;padding:8px;text-align:left;}
+  .lib-file-list th{background:#f5f5f5;font-weight:600;}
+  .lib-file-list tr:hover{background:#f9f9f9;}
+  .lib-btn{margin-left:6px;padding:4px 10px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;font-size:12px;}
+  .lib-btn:hover{background:#f0f0f0;}
+  .lib-btn-primary{background:#E53935;color:#fff;border-color:#E53935;}
+  .lib-btn-primary:hover{background:#c62828;}
+  .lib-empty{color:#888;text-align:center;padding:40px 20px;}
+  .lib-hint{font-size:12px;color:#999;margin-top:6px;}
+  .lib-upload-wrap{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .lib-upload-input{display:none;}
 </style>
 </head>
 
@@ -3231,7 +3257,7 @@ function _ovLoadChartLib(cb){
     <button class="tb-item" data-view="production" onclick="switchView('production')"><span class="tb-label" data-i18n="nav_production">生产管理</span></button>
     <button class="tb-item" data-view="install" onclick="switchView('install')"><span class="tb-label">安装管理</span></button>
     <button class="tb-item" data-view="finance" onclick="switchView('finance')"><span class="tb-label">财务管理</span></button>
-    <button class="tb-item" data-view="library" onclick="switchView('library')"><span class="tb-label">资料库</span></button>
+    <button class="tb-item" data-view="library" onclick="switchView('library')"><span class="tb-label" data-i18n="nav_library">资料库</span></button>
     <button class="tb-item" data-view="equity" onclick="switchView('equity')"><span class="tb-label">股东权益</span></button>
     <button class="tb-item" data-view="approvals" onclick="switchView('approvals')"><span class="tb-label">Approvals</span><span class="pend-badge" id="pendBadge">0</span></button>
     <button class="tb-item" data-view="users" onclick="switchView('users')">Users</button>
@@ -16358,11 +16384,17 @@ var PROD_EQUIP_FAULT_KB = {
     </div>
   </section>
 
-  <!-- 资料库（占位） -->
+  <!-- 资料库 -->
   <section class="view" id="view-library">
-    <div class="approvals-page">
-      <div class="page-header"><h2>资料库</h2></div>
-      <p>资料库模块开发中，敬请期待。</p>
+    <div class="library-page">
+      <div class="page-header"><h2 id="lib-title">资料库</h2></div>
+      <div class="lib-tabs" id="lib-tabs">
+        <div class="lib-tab active" data-key="project" onclick="lib_switchTab('project')">独立项目资料</div>
+        <div class="lib-tab" data-key="common" onclick="lib_switchTab('common')">公用资料</div>
+      </div>
+      <div class="lib-body" id="lib-body">
+        <div class="lib-empty">加载中…</div>
+      </div>
     </div>
   </section>
 
@@ -18916,6 +18948,10 @@ var I18N = {
     nav: { dashboard:"看板", crm:"潜在项目", won:"签约项目", lost:"失败项目", worklog:"工作日志", production:"生产管理", install:"安装管理", finance:"财务管理", library:"资料库", equity:"股东权益", approvals:"审批", users:"用户与授权", commission:"个人佣金", lang:"语言", logout:"退出登录", role_admin:"(管理员)", export_pdf:"导出PDF", fit:"适应", fit_exit:"还原", fit_tip:"把整张表缩放到一屏宽；双击表格或再点一次还原" },
     /* 手机横屏专用短标签：原名太长会挤掉后面的标签，这里用短名保证 6 个标签一屏可见 */
     nav_short: { dashboard:"看板", crm:"潜在", won:"签约", lost:"失败", worklog:"日志", production:"生产", install:"安装", finance:"财务", library:"资料", equity:"权益", approvals:"审批", users:"用户", commission:"佣金" },
+    lib_title:"资料库", lib_tab_project:"独立项目资料", lib_tab_common:"公用资料", lib_project_placeholder:"选择项目", lib_no_projects:"暂无签约项目", lib_no_files:"暂无文件",
+    lib_upload:"上传文件", lib_upload_hint:"点击或拖拽上传", lib_preview:"预览", lib_download:"下载", lib_delete:"删除", lib_rename:"重命名", lib_save:"保存", lib_cancel:"取消",
+    lib_filename:"文件名", lib_uploader:"上传人", lib_upload_time:"上传时间", lib_size:"大小", lib_action:"操作",
+    lib_forbidden_upload:"仅管理员/指定人员可上传、删除或重命名", lib_confirm_delete:"确定删除该文件？", lib_rename_placeholder:"新文件名", lib_no_preview:"该文件类型不支持在线预览，请下载查看",
     empty: { dash_title:"看板", dash_sub:"CRM + 签约 + 失败数据分析", dash_hint:"数据分析面板开发中，敬请期待",
              dash_card_title:"数据看板", dash_refresh:"刷新", dash_loading:"数据加载中…", dash_load_failed:"数据加载失败",
              dash_potential_count:"潜在项目总数", dash_potential_amt:"潜在项目总金额",
@@ -19685,6 +19721,10 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     nav: { dashboard:"Dashboard", crm:"Potential Projects", won:"Won Projects", lost:"Failed Projects", worklog:"Work Log", production:"Production", install:"Installation", finance:"Finance", library:"Library", equity:"Equity", approvals:"Approvals", users:"User & Authorization", commission:"Personal Commission", lang:"Lang", logout:"Logout", role_admin:"(admin)", export_pdf:"Export PDF", fit:"Fit", fit_exit:"100%", fit_tip:"Fit table to screen width; double-tap the table or tap again to restore" },
     /* Short labels used on phone landscape so all 6 tabs fit on one row */
     nav_short: { dashboard:"Board", crm:"Potential", won:"Won", lost:"Failed", worklog:"Log", production:"Prod", install:"Inst", finance:"Fin", library:"Lib", equity:"Equity", approvals:"Approvals", users:"Users", commission:"Comm" },
+    lib_title:"Document Library", lib_tab_project:"Project Documents", lib_tab_common:"Common Documents", lib_project_placeholder:"Select project", lib_no_projects:"No won projects", lib_no_files:"No files",
+    lib_upload:"Upload", lib_upload_hint:"Click or drag to upload", lib_preview:"Preview", lib_download:"Download", lib_delete:"Delete", lib_rename:"Rename", lib_save:"Save", lib_cancel:"Cancel",
+    lib_filename:"File name", lib_uploader:"Uploader", lib_upload_time:"Uploaded", lib_size:"Size", lib_action:"Action",
+    lib_forbidden_upload:"Only admin/designated users can upload, delete or rename", lib_confirm_delete:"Delete this file?", lib_rename_placeholder:"New file name", lib_no_preview:"Online preview is not supported for this file type, please download",
     empty: { dash_title:"Dashboard", dash_sub:"CRM + Won + Failed Analytics", dash_hint:"Analytics panel under development",
              dash_card_title:"Dashboard", dash_refresh:"Refresh", dash_loading:"Loading…", dash_load_failed:"Failed to load data",
              dash_potential_count:"Total Potential Projects", dash_potential_amt:"Total Potential Project Value",
@@ -20457,6 +20497,10 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     nav: { dashboard:"Bảng điều khiển", crm:"Dự án tiềm năng", won:"Dự án Thắng", lost:"Dự án thất bại", worklog:"Nhật ký công việc", production:"Quản lý sản xuất", install:"Quản lý lắp đặt", finance:"Quản lý tài chính", library:"Thư viện tài liệu", equity:"Quyền lợi cổ đông", approvals:"Phê duyệt", users:"Người dùng & Ủy quyền", commission:"Hoa Hồng Cá Nhân", lang:"Ngôn ngữ", logout:"Đăng xuất", role_admin:"(quản trị)", export_pdf:"Xuất PDF", fit:"Vừa", fit_exit:"100%", fit_tip:"Thu nhỏ bảng vừa màn hình; nhấn đúp vào bảng để trở lại" },
     /* Nhãn ngắn dùng cho màn hình ngang để 6 tab vừa một hàng */
     nav_short: { dashboard:"Tổng quan", crm:"Tiềm năng", won:"Thắng", lost:"Thất bại", worklog:"Nhật ký", production:"Sản xuất", install:"Lắp đặt", finance:"Tài chính", library:"Tài liệu", equity:"Cổ đông", approvals:"Phê duyệt", users:"Người dùng", commission:"HH" },
+    lib_title:"Thư viện tài liệu", lib_tab_project:"Tài liệu dự án độc lập", lib_tab_common:"Tài liệu chung", lib_project_placeholder:"Chọn dự án", lib_no_projects:"Chưa có dự án thắng", lib_no_files:"Chưa có tệp",
+    lib_upload:"Tải lên", lib_upload_hint:"Bấm hoặc kéo thả để tải lên", lib_preview:"Xem trước", lib_download:"Tải xuống", lib_delete:"Xóa", lib_rename:"Đổi tên", lib_save:"Lưu", lib_cancel:"Hủy",
+    lib_filename:"Tên tệp", lib_uploader:"Ngườitải lên", lib_upload_time:"Thờigian tải lên", lib_size:"Kích thước", lib_action:"Thao tác",
+    lib_forbidden_upload:"Chỉ quản trị viên/ngườichỉ định mới được tải lên, xóa hoặc đổi tên", lib_confirm_delete:"Xóa tệp này?", lib_rename_placeholder:"Tên tệp mới", lib_no_preview:"Loại tệp này không hỗ trợ xem trước trực tuyến, vui lòng tải xuống",
     empty: { dash_title:"Bảng điều khiển", dash_sub:"Phân tích CRM + Thắng + Thất bại", dash_hint:"Bảng phân tích đang phát triển",
              dash_card_title:"Bảng dữ liệu", dash_refresh:"Làm mới", dash_loading:"Đang tải…", dash_load_failed:"Tải dữ liệu thất bại",
              dash_potential_count:"Tổng số dự án tiềm năng", dash_potential_amt:"Tổng giá trị dự án tiềm năng",
@@ -37672,6 +37716,11 @@ function switchView(name) {
       inst_renderProduction();
     }
   }
+  // 进入资料库视图
+  if (name === 'library' && typeof renderLibrary === 'function') {
+    if ((typeof globalWonData === 'undefined' || !globalWonData.length) && typeof loadWon === 'function') { loadWon(); }
+    renderLibrary();
+  }
   // 进入工作日志视图：独立模块，只保留「每日记录报告」「我的工作」两个标签
   if (name === 'worklog' && typeof wl_renderList === 'function') {
     if ((typeof globalWonData === 'undefined' || !globalWonData.length) && typeof loadWon === 'function') {
@@ -42087,6 +42136,250 @@ function submitAuth() {
   } else {
     _initDraggables();
   }
+})();
+</script>
+
+<script>
+/* ===================== 资料库（Document Library） ===================== */
+(function(){
+  var LIB_TAB = 'project'; // 'project' | 'common'
+  var LIB_PROJECT_ID = null;
+  var LIB_PROJECTS = [];
+  var LIB_FILES = [];
+  var LIB_CAN_EDIT = false;
+
+  function lt(k){ var t=T(); return t[k] || k; }
+  function libApi(path, opts){
+    opts = opts || {};
+    var h = authHeaders(opts.headers || {});
+    opts.headers = h;
+    return fetch(path, opts).then(function(r){ return r.json().catch(function(){ return {ok:false, error:'network'} }); });
+  }
+  function libCheckEdit(){
+    var me = (authUser && authUser.username || '').toLowerCase();
+    LIB_CAN_EDIT = ['tom','cuong','james'].indexOf(me) >= 0;
+  }
+  function libBytes(n){
+    if(!n) return '-';
+    if(n < 1024) return n + ' B';
+    if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+  }
+  function libFormatDate(s){ if(!s) return '-'; return s.replace(/-/g,'/').replace(' ', ' '); }
+
+  function lib_renderTabs(){
+    var box = document.getElementById('lib-tabs'); if(!box) return;
+    box.innerHTML = '';
+    var tabs = [
+      {k:'project', l:'lib_tab_project'},
+      {k:'common', l:'lib_tab_common'}
+    ];
+    tabs.forEach(function(t){
+      var d = document.createElement('div');
+      d.className = 'lib-tab' + (LIB_TAB === t.k ? ' active' : '');
+      d.setAttribute('data-key', t.k);
+      d.textContent = lt(t.l);
+      d.onclick = function(){ lib_switchTab(t.k); };
+      box.appendChild(d);
+    });
+  }
+
+  function lib_renderProjectTabs(){
+    var wrap = document.getElementById('lib-proj-tabs');
+    if(LIB_TAB !== 'project'){ if(wrap) wrap.style.display='none'; return; }
+    if(!wrap){
+      var body = document.getElementById('lib-body');
+      if(!body) return;
+      wrap = document.createElement('div');
+      wrap.id = 'lib-proj-tabs';
+      wrap.className = 'lib-proj-tabs';
+      body.insertBefore(wrap, body.firstChild);
+    }
+    wrap.style.display = '';
+    wrap.innerHTML = '';
+    if(!LIB_PROJECTS.length){
+      wrap.innerHTML = '<div class="lib-empty">' + lt('lib_no_projects') + '</div>';
+      return;
+    }
+    LIB_PROJECTS.forEach(function(p){
+      var d = document.createElement('div');
+      d.className = 'lib-proj-tab' + (LIB_PROJECT_ID === p.id ? ' active' : '');
+      d.textContent = (p.project_name || p.contract_no || ('#'+p.id));
+      d.title = (p.customer || '') + ' ' + (p.contract_no || '');
+      d.onclick = function(){ LIB_PROJECT_ID = p.id; lib_loadFiles(); };
+      wrap.appendChild(d);
+    });
+  }
+
+  function lib_renderFiles(){
+    var body = document.getElementById('lib-body'); if(!body) return;
+    var html = '';
+    if(LIB_CAN_EDIT){
+      html += '<div class="lib-upload-wrap">' +
+        '<button class="lib-btn lib-btn-primary" onclick="lib_pickUpload()">' + lt('lib_upload') + '</button>' +
+        '<span class="lib-hint">' + lt('lib_upload_hint') + '</span>' +
+        '<input type="file" id="lib-file-input" class="lib-upload-input" onchange="lib_doUpload(this)">' +
+        '</div>';
+    } else if(LIB_TAB === 'project' && !LIB_PROJECTS.length){
+      // no hint needed
+    } else {
+      html += '<div class="lib-hint" style="margin-bottom:12px;">' + lt('lib_forbidden_upload') + '</div>';
+    }
+    if(!LIB_FILES.length){
+      html += '<div class="lib-empty">' + lt('lib_no_files') + '</div>';
+      body.innerHTML = html;
+      lib_renderProjectTabs();
+      return;
+    }
+    html += '<table class="lib-file-list"><thead><tr>' +
+      '<th>' + lt('lib_filename') + '</th>' +
+      '<th>' + lt('lib_uploader') + '</th>' +
+      '<th>' + lt('lib_upload_time') + '</th>' +
+      '<th>' + lt('lib_size') + '</th>' +
+      '<th>' + lt('lib_action') + '</th>' +
+      '</tr></thead><tbody>';
+    LIB_FILES.forEach(function(f){
+      html += '<tr>' +
+        '<td>' + esc(f.original_name || f.filename || '') + '</td>' +
+        '<td>' + esc(f.uploader || '-') + '</td>' +
+        '<td>' + libFormatDate(f.created_at) + '</td>' +
+        '<td>' + libBytes(f.size) + '</td>' +
+        '<td>' +
+        '<button class="lib-btn" onclick="lib_preview(' + f.id + ')">' + lt('lib_preview') + '</button>' +
+        '<button class="lib-btn" onclick="lib_download(' + f.id + ')">' + lt('lib_download') + '</button>';
+      if(LIB_CAN_EDIT){
+        html += '<button class="lib-btn" onclick="lib_rename(' + f.id + ', this)">' + lt('lib_rename') + '</button>' +
+          '<button class="lib-btn" onclick="lib_delete(' + f.id + ')">' + lt('lib_delete') + '</button>';
+      }
+      html += '</td></tr>';
+    });
+    html += '</tbody></table>';
+    body.innerHTML = html;
+    lib_renderProjectTabs();
+  }
+
+  function esc(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  window.lib_switchTab = function(k){
+    LIB_TAB = k;
+    if(k === 'project'){
+      if(!LIB_PROJECT_ID && LIB_PROJECTS.length) LIB_PROJECT_ID = LIB_PROJECTS[0].id;
+    } else {
+      LIB_PROJECT_ID = null;
+    }
+    lib_renderTabs();
+    lib_loadFiles();
+  };
+
+  window.lib_loadProjects = function(){
+    libApi('/api/library/projects').then(function(data){
+      LIB_PROJECTS = Array.isArray(data) ? data : [];
+      if(LIB_TAB === 'project' && !LIB_PROJECT_ID && LIB_PROJECTS.length) LIB_PROJECT_ID = LIB_PROJECTS[0].id;
+      lib_loadFiles();
+    });
+  };
+
+  window.lib_loadFiles = function(){
+    var url = '/api/library/files' + (LIB_PROJECT_ID ? '?project_id=' + LIB_PROJECT_ID : '');
+    libApi(url).then(function(data){
+      LIB_FILES = Array.isArray(data) ? data : [];
+      lib_renderFiles();
+    });
+  };
+
+  window.lib_pickUpload = function(){
+    var inp = document.getElementById('lib-file-input');
+    if(inp){ inp.value = ''; inp.click(); }
+  };
+
+  window.lib_doUpload = function(input){
+    if(!input || !input.files || !input.files[0]) return;
+    var file = input.files[0];
+    var fd = new FormData();
+    fd.append('file', file);
+    var url = '/api/library/upload' + (LIB_PROJECT_ID ? '?project_id=' + LIB_PROJECT_ID : '');
+    fetch(url, {method:'POST', headers: authHeaders({}), body: fd}).then(function(r){ return r.json(); }).then(function(res){
+      if(res.ok){ lib_loadFiles(); showToast(lt('saveOk')); }
+      else { showToast(res.error || lt('lib_upload')); }
+    }).catch(function(e){ showToast('upload failed'); });
+  };
+
+  window.lib_preview = function(id){
+    fetch('/api/library/files/' + id + '/preview').then(function(r){
+      if(!r.ok){ return r.json().then(function(j){ throw new Error(j.error); }); }
+      return r.blob();
+    }).then(function(blob){
+      var url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    }).catch(function(e){ showToast(lt('lib_no_preview')); });
+  };
+
+  window.lib_download = function(id){
+    window.open('/api/library/files/' + id + '/download?dl=1', '_blank');
+  };
+
+  window.lib_delete = function(id){
+    if(!confirm(lt('lib_confirm_delete'))) return;
+    fetch('/api/library/files/' + id, {method:'DELETE', headers: authHeaders({})}).then(function(r){ return r.json(); }).then(function(res){
+      if(res.ok){ lib_loadFiles(); showToast(lt('saveOk')); }
+      else { showToast(res.error || 'delete failed'); }
+    }).catch(function(e){ showToast('delete failed'); });
+  };
+
+  window.lib_rename = function(id, btn){
+    var row = btn.parentNode.parentNode;
+    var td = row.cells[0];
+    var oldName = td.textContent;
+    var name = prompt(lt('lib_rename_placeholder'), oldName);
+    if(!name || name === oldName) return;
+    fetch('/api/library/files/' + id + '/rename', {method:'PUT', headers: authHeaders({'Content-Type':'application/json'}), body: JSON.stringify({original_name: name})}).then(function(r){ return r.json(); }).then(function(res){
+      if(res.ok){ lib_loadFiles(); showToast(lt('saveOk')); }
+      else { showToast(res.error || 'rename failed'); }
+    }).catch(function(e){ showToast('rename failed'); });
+  };
+
+  window.renderLibrary = function(){
+    libCheckEdit();
+    lib_renderTabs();
+    if(LIB_TAB === 'project'){
+      lib_loadProjects();
+    } else {
+      LIB_PROJECT_ID = null;
+      lib_loadFiles();
+    }
+  };
+
+  // 语言切换时，若资料库当前可见则重绘
+  window.addEventListener('app:langchange', function(){
+    if(window.currentView === 'library' && typeof renderLibrary === 'function'){
+      renderLibrary();
+    }
+  });
+
+  // 拖拽上传
+  document.addEventListener('dragover', function(e){
+    if(window.currentView !== 'library') return;
+    var drop = document.querySelector('.lib-drop');
+    if(drop && drop.contains(e.target)){ e.preventDefault(); drop.classList.add('dragover'); }
+  });
+  document.addEventListener('dragleave', function(e){
+    var drop = document.querySelector('.lib-drop');
+    if(drop && !drop.contains(e.relatedTarget)){ drop.classList.remove('dragover'); }
+  });
+  document.addEventListener('drop', function(e){
+    if(window.currentView !== 'library') return;
+    var drop = document.querySelector('.lib-drop');
+    if(drop && drop.contains(e.target)){
+      e.preventDefault();
+      drop.classList.remove('dragover');
+      if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]){
+        var inp = document.getElementById('lib-file-input');
+        if(inp){ inp.files = e.dataTransfer.files; lib_doUpload(inp); }
+      }
+    }
+  });
 })();
 </script>
 

@@ -17,6 +17,7 @@ import hashlib
 import sqlite3
 import time
 import shutil
+import mimetypes
 from datetime import datetime, timedelta
 import re
 import copy
@@ -53,6 +54,8 @@ if getattr(sys, "frozen", False):
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(VAULT_DIR, exist_ok=True)
+LIB_DIR = os.path.join(UPLOAD_DIR, "library")
+os.makedirs(LIB_DIR, exist_ok=True)
 
 # ===================== 私密空间（Vault）配置 =====================
 # 仅 tom 一人可使用；PIN 为 4 位密码，输对后服务端签发有时效的 token。
@@ -977,6 +980,23 @@ def init_db():
 
     # 迁移：把旧权限数据里存的审批人数字 ID 全部转换为用户名
     _migrate_approver_ids_to_usernames(c)
+
+    # ===================== 资料库文件索引表 =====================
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS library_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER DEFAULT NULL,
+            filename TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            uploader TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            size INTEGER DEFAULT 0
+        )
+    """)
+    try:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_library_project ON library_files(project_id)")
+    except Exception:
+        pass
 
     conn.commit()
     conn.close()
@@ -3670,6 +3690,146 @@ def delete_won_doc(pid):
     conn.close()
     _rm_upload_file(old_val)
     return jsonify({"ok": True})
+
+# ===================== API：资料库（Document Library） =====================
+LIB_ALLOWED_EXT = {
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+    ".txt", ".csv", ".md", ".jpg", ".jpeg", ".png", ".gif", ".webp",
+    ".zip", ".rar", ".7z", ".dwg", ".dxf"
+}
+LIB_BLOCKED_EXT = {".exe", ".bat", ".cmd", ".com", ".scr", ".msi", ".sh", ".js", ".vbs", ".ps1", ".jar", ".dll", ".app"}
+
+def _lib_user():
+    return (request.headers.get("X-User-Name") or "").strip().lower()
+
+def _lib_can_edit():
+    return _lib_user() in TRI_APPROVERS
+
+def _lib_safe_ext(filename):
+    ext = os.path.splitext(filename or "")[1].lower()
+    if ext in LIB_BLOCKED_EXT:
+        return False
+    if not ext or ext in LIB_ALLOWED_EXT:
+        return True
+    return False
+
+@app.route("/api/library/projects", methods=["GET"])
+def library_projects():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, contract_no, customer FROM won_projects ORDER BY id DESC"
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/library/files", methods=["GET"])
+def library_files():
+    project_id = request.args.get("project_id")
+    conn = get_db()
+    if project_id in (None, "", "null"):
+        rows = conn.execute(
+            "SELECT id, project_id, filename, original_name, uploader, created_at, size FROM library_files WHERE project_id IS NULL ORDER BY created_at DESC"
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, project_id, filename, original_name, uploader, created_at, size FROM library_files WHERE project_id=? ORDER BY created_at DESC",
+            (int(project_id),),
+        ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/library/upload", methods=["POST"])
+def library_upload():
+    if not _lib_can_edit():
+        return jsonify({"error": "forbidden"}), 403
+    if "file" not in request.files:
+        return jsonify({"error": "no file"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"error": "empty filename"}), 400
+    if not _lib_safe_ext(f.filename):
+        return jsonify({"error": "invalid file type"}), 415
+    project_id = request.args.get("project_id") or request.form.get("project_id") or None
+    if project_id in (None, "", "null"):
+        project_id = None
+    else:
+        project_id = int(project_id)
+    base = safe_name(f.filename)
+    ext = os.path.splitext(base)[1].lower() or ".file"
+    fname = f"lib_{int(time.time()*1000)}_{hashlib.md5(base.encode('utf-8')).hexdigest()[:8]}{ext}"
+    fpath = os.path.join(LIB_DIR, fname)
+    f.save(fpath)
+    size = os.path.getsize(fpath) if os.path.isfile(fpath) else 0
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO library_files (project_id, filename, original_name, uploader, size) VALUES (?, ?, ?, ?, ?)",
+        (project_id, fname, f.filename, _lib_user(), size),
+    )
+    fid = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "id": fid, "filename": fname, "original_name": f.filename})
+
+@app.route("/api/library/files/<int:fid>", methods=["DELETE"])
+def library_delete(fid):
+    if not _lib_can_edit():
+        return jsonify({"error": "forbidden"}), 403
+    conn = get_db()
+    row = conn.execute("SELECT filename FROM library_files WHERE id=?", (fid,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    conn.execute("DELETE FROM library_files WHERE id=?", (fid,))
+    conn.commit()
+    conn.close()
+    try:
+        fp = os.path.join(LIB_DIR, row["filename"])
+        if os.path.isfile(fp):
+            os.remove(fp)
+    except OSError:
+        pass
+    return jsonify({"ok": True})
+
+@app.route("/api/library/files/<int:fid>/rename", methods=["PUT"])
+def library_rename(fid):
+    if not _lib_can_edit():
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(force=True, silent=True) or {}
+    new_name = (data.get("original_name") or "").strip()
+    if not new_name:
+        return jsonify({"error": "empty name"}), 400
+    conn = get_db()
+    row = conn.execute("SELECT id FROM library_files WHERE id=?", (fid,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "not found"}), 404
+    conn.execute("UPDATE library_files SET original_name=? WHERE id=?", (new_name, fid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+@app.route("/api/library/files/<int:fid>/download")
+def library_download(fid):
+    conn = get_db()
+    row = conn.execute("SELECT filename, original_name FROM library_files WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    as_att = (request.args.get("dl") or "").strip() not in ("", "0", "false")
+    return send_from_directory(LIB_DIR, row["filename"], as_attachment=as_att, download_name=row["original_name"])
+
+@app.route("/api/library/files/<int:fid>/preview")
+def library_preview(fid):
+    conn = get_db()
+    row = conn.execute("SELECT filename, original_name FROM library_files WHERE id=?", (fid,)).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    ext = os.path.splitext(row["filename"])[1].lower()
+    ct = mimetypes.guess_type(row["original_name"])[0] or "application/octet-stream"
+    if ext not in (".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp"):
+        return jsonify({"error": "not previewable"}), 415
+    return send_from_directory(LIB_DIR, row["filename"], mimetype=ct)
 
 # ===================== API：补充协议摘要 =====================
 @app.route("/api/won-projects/<int:pid>/supp-summary", methods=["PUT"])
