@@ -3709,9 +3709,7 @@ def _lib_safe_ext(filename):
     ext = os.path.splitext(filename or "")[1].lower()
     if ext in LIB_BLOCKED_EXT:
         return False
-    if not ext or ext in LIB_ALLOWED_EXT:
-        return True
-    return False
+    return True
 
 @app.route("/api/library/projects", methods=["GET"])
 def library_projects():
@@ -3742,33 +3740,38 @@ def library_files():
 def library_upload():
     if not _lib_can_edit():
         return jsonify({"error": "forbidden"}), 403
-    if "file" not in request.files:
+    files = request.files.getlist("file")
+    if not files:
         return jsonify({"error": "no file"}), 400
-    f = request.files["file"]
-    if not f.filename:
-        return jsonify({"error": "empty filename"}), 400
-    if not _lib_safe_ext(f.filename):
-        return jsonify({"error": "invalid file type"}), 415
     project_id = request.args.get("project_id") or request.form.get("project_id") or None
     if project_id in (None, "", "null"):
         project_id = None
     else:
         project_id = int(project_id)
-    base = safe_name(f.filename)
-    ext = os.path.splitext(base)[1].lower() or ".file"
-    fname = f"lib_{int(time.time()*1000)}_{hashlib.md5(base.encode('utf-8')).hexdigest()[:8]}{ext}"
-    fpath = os.path.join(LIB_DIR, fname)
-    f.save(fpath)
-    size = os.path.getsize(fpath) if os.path.isfile(fpath) else 0
-    conn = get_db()
-    cur = conn.execute(
-        "INSERT INTO library_files (project_id, filename, original_name, uploader, size) VALUES (?, ?, ?, ?, ?)",
-        (project_id, fname, f.filename, _lib_user(), size),
-    )
-    fid = cur.lastrowid
-    conn.commit()
-    conn.close()
-    return jsonify({"ok": True, "id": fid, "filename": fname, "original_name": f.filename})
+    uploaded = []
+    for f in files:
+        if not f.filename:
+            continue
+        if not _lib_safe_ext(f.filename):
+            uploaded.append({"ok": False, "error": "blocked", "original_name": f.filename})
+            continue
+        base = safe_name(f.filename)
+        ext = os.path.splitext(base)[1].lower() or ".file"
+        fname = f"lib_{int(time.time()*1000)}_{hashlib.md5(base.encode('utf-8')).hexdigest()[:8]}{ext}"
+        fpath = os.path.join(LIB_DIR, fname)
+        f.save(fpath)
+        size = os.path.getsize(fpath) if os.path.isfile(fpath) else 0
+        conn = get_db()
+        cur = conn.execute(
+            "INSERT INTO library_files (project_id, filename, original_name, uploader, size) VALUES (?, ?, ?, ?, ?)",
+            (project_id, fname, f.filename, _lib_user(), size),
+        )
+        fid = cur.lastrowid
+        conn.commit()
+        conn.close()
+        uploaded.append({"ok": True, "id": fid, "filename": fname, "original_name": f.filename, "size": size})
+    ok_count = sum(1 for u in uploaded if u.get("ok"))
+    return jsonify({"ok": ok_count > 0, "uploaded": uploaded, "count": ok_count})
 
 @app.route("/api/library/files/<int:fid>", methods=["DELETE"])
 def library_delete(fid):

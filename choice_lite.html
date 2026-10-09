@@ -2882,6 +2882,8 @@ function _ovLoadChartLib(cb){
   .lib-proj-card .pc-chip:hover{background:#ffe6f0;color:#9a1b56;transform:translateY(-2px);}
   .lib-proj-card .pc-row{font-size:13px;color:#444;margin:3px 0;}
   .lib-back-btn{margin-right:auto;}
+  .lib-drag-overlay{position:fixed;inset:42px 0 0 0;background:rgba(229,57,53,.12);border:4px dashed #E53935;z-index:2000;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#E53935;pointer-events:none;opacity:0;transition:opacity .2s ease;}
+  .lib-drag-overlay.show{opacity:1;}
 </style>
 </head>
 
@@ -16404,6 +16406,7 @@ var PROD_EQUIP_FAULT_KB = {
         <div class="lib-empty">加载中…</div>
       </div>
     </div>
+    <div class="lib-drag-overlay" id="lib-drag-overlay">松开以上传文件</div>
   </section>
 
   <!-- 股东权益（占位） -->
@@ -18958,7 +18961,7 @@ var I18N = {
     nav_short: { dashboard:"看板", crm:"潜在", won:"签约", lost:"失败", worklog:"日志", production:"生产", install:"安装", finance:"财务", library:"资料", equity:"权益", approvals:"审批", users:"用户", commission:"佣金" },
     lib_title:"资料库", lib_tab_project:"独立项目资料", lib_tab_common:"公用资料", lib_project_placeholder:"选择项目", lib_no_projects:"暂无签约项目", lib_no_files:"暂无文件",
     lib_back:"← 返回项目", lib_project_files:"项目文件", card_contract:"合同", card_spec:"规格",
-    lib_upload:"上传文件", lib_upload_hint:"点击或拖拽上传", lib_preview:"预览", lib_download:"下载", lib_delete:"删除", lib_rename:"重命名", lib_save:"保存", lib_cancel:"取消",
+    lib_upload:"上传文件", lib_uploading:"上传中…", lib_upload_hint:"点击、拖拽或粘贴上传", lib_drop_here:"松开以上传文件", lib_preview:"预览", lib_download:"下载", lib_delete:"删除", lib_rename:"重命名", lib_save:"保存", lib_cancel:"取消",
     lib_filename:"文件名", lib_uploader:"上传人", lib_upload_time:"上传时间", lib_size:"大小", lib_action:"操作",
     lib_forbidden_upload:"仅管理员/指定人员可上传、删除或重命名", lib_confirm_delete:"确定删除该文件？", lib_rename_placeholder:"新文件名", lib_no_preview:"该文件类型不支持在线预览，请下载查看",
     empty: { dash_title:"看板", dash_sub:"CRM + 签约 + 失败数据分析", dash_hint:"数据分析面板开发中，敬请期待",
@@ -19732,7 +19735,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     nav_short: { dashboard:"Board", crm:"Potential", won:"Won", lost:"Failed", worklog:"Log", production:"Prod", install:"Inst", finance:"Fin", library:"Lib", equity:"Equity", approvals:"Approvals", users:"Users", commission:"Comm" },
     lib_title:"Document Library", lib_tab_project:"Project Documents", lib_tab_common:"Common Documents", lib_project_placeholder:"Select project", lib_no_projects:"No won projects", lib_no_files:"No files",
     lib_back:"← Back to projects", lib_project_files:"Project files", card_contract:"Contract", card_spec:"Spec",
-    lib_upload:"Upload", lib_upload_hint:"Click or drag to upload", lib_preview:"Preview", lib_download:"Download", lib_delete:"Delete", lib_rename:"Rename", lib_save:"Save", lib_cancel:"Cancel",
+    lib_upload:"Upload", lib_uploading:"Uploading…", lib_upload_hint:"Click, drag or paste to upload", lib_drop_here:"Drop to upload", lib_preview:"Preview", lib_download:"Download", lib_delete:"Delete", lib_rename:"Rename", lib_save:"Save", lib_cancel:"Cancel",
     lib_filename:"File name", lib_uploader:"Uploader", lib_upload_time:"Uploaded", lib_size:"Size", lib_action:"Action",
     lib_forbidden_upload:"Only admin/designated users can upload, delete or rename", lib_confirm_delete:"Delete this file?", lib_rename_placeholder:"New file name", lib_no_preview:"Online preview is not supported for this file type, please download",
     empty: { dash_title:"Dashboard", dash_sub:"CRM + Won + Failed Analytics", dash_hint:"Analytics panel under development",
@@ -20509,7 +20512,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     nav_short: { dashboard:"Tổng quan", crm:"Tiềm năng", won:"Thắng", lost:"Thất bại", worklog:"Nhật ký", production:"Sản xuất", install:"Lắp đặt", finance:"Tài chính", library:"Tài liệu", equity:"Cổ đông", approvals:"Phê duyệt", users:"Người dùng", commission:"HH" },
     lib_title:"Thư viện tài liệu", lib_tab_project:"Tài liệu dự án độc lập", lib_tab_common:"Tài liệu chung", lib_project_placeholder:"Chọn dự án", lib_no_projects:"Chưa có dự án thắng", lib_no_files:"Chưa có tệp",
     lib_back:"← Quay lại dự án", lib_project_files:"Tệp dự án", card_contract:"Hợp đồng", card_spec:"Quy cách",
-    lib_upload:"Tải lên", lib_upload_hint:"Bấm hoặc kéo thả để tải lên", lib_preview:"Xem trước", lib_download:"Tải xuống", lib_delete:"Xóa", lib_rename:"Đổi tên", lib_save:"Lưu", lib_cancel:"Hủy",
+    lib_upload:"Tải lên", lib_uploading:"Đang tải lên…", lib_upload_hint:"Bấm, kéo thả hoặc dán để tải lên", lib_drop_here:"Thả để tải lên", lib_preview:"Xem trước", lib_download:"Tải xuống", lib_delete:"Xóa", lib_rename:"Đổi tên", lib_save:"Lưu", lib_cancel:"Hủy",
     lib_filename:"Tên tệp", lib_uploader:"Ngườitải lên", lib_upload_time:"Thờigian tải lên", lib_size:"Kích thước", lib_action:"Thao tác",
     lib_forbidden_upload:"Chỉ quản trị viên/ngườichỉ định mới được tải lên, xóa hoặc đổi tên", lib_confirm_delete:"Xóa tệp này?", lib_rename_placeholder:"Tên tệp mới", lib_no_preview:"Loại tệp này không hỗ trợ xem trước trực tuyến, vui lòng tải xuống",
     empty: { dash_title:"Bảng điều khiển", dash_sub:"Phân tích CRM + Thắng + Thất bại", dash_hint:"Bảng phân tích đang phát triển",
@@ -42250,7 +42253,7 @@ function submitAuth() {
     if(LIB_CAN_EDIT){
       html += '<button class="lib-btn lib-btn-primary" onclick="lib_pickUpload()">' + lt('lib_upload') + '</button>' +
         '<span class="lib-hint">' + lt('lib_upload_hint') + '</span>' +
-        '<input type="file" id="lib-file-input" class="lib-upload-input" onchange="lib_doUpload(this)">';
+        '<input type="file" id="lib-file-input" class="lib-upload-input" multiple onchange="lib_doUpload(this)">';
     } else {
       html += '<span class="lib-hint">' + lt('lib_forbidden_upload') + '</span>';
     }
@@ -42332,17 +42335,24 @@ function submitAuth() {
     if(inp){ inp.value = ''; inp.click(); }
   };
 
-  window.lib_doUpload = function(input){
-    if(!input || !input.files || !input.files[0]) return;
-    var file = input.files[0];
+  window.lib_uploadFiles = function(files){
+    if(!files || !files.length) return;
+    if(!LIB_CAN_EDIT){ showToast(lt('lib_forbidden_upload')); return; }
     var fd = new FormData();
-    fd.append('file', file);
+    for(var i=0;i<files.length;i++){ fd.append('file', files[i]); }
     var url = '/api/library/upload' + (LIB_PROJECT_ID ? '?project_id=' + LIB_PROJECT_ID : '');
     var headers = {'X-User-Name': (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : ''};
+    showToast(lt('lib_uploading') || '上传中…');
     fetch(url, {method:'POST', headers: headers, body: fd}).then(function(r){ return r.json(); }).then(function(res){
-      if(res.ok){ lib_loadFiles(); showToast(lt('saveOk')); }
+      if(res.ok){ lib_loadFiles(); showToast(lt('saveOk') + (res.count ? ' ('+res.count+')' : '')); }
       else { showToast(res.error || lt('lib_upload')); }
     }).catch(function(e){ showToast('upload failed'); });
+  };
+
+  window.lib_doUpload = function(input){
+    if(!input || !input.files || !input.files.length) return;
+    lib_uploadFiles(input.files);
+    input.value = '';
   };
 
   window.lib_preview = function(id){
@@ -42417,26 +42427,68 @@ function submitAuth() {
     }
   });
 
-  // 拖拽上传
+  // 拖拽 / 粘贴上传（全局）
+  var __libDragCounter = 0;
+  function __libShowDragOverlay(show){
+    var ov = document.getElementById('lib-drag-overlay');
+    if(!ov) return;
+    ov.textContent = lt('lib_drop_here');
+    ov.classList.toggle('show', show);
+  }
+  function __libHasFiles(dt){
+    if(!dt || !dt.types) return false;
+    var types = dt.types;
+    if(typeof types.contains === 'function') return types.contains('Files');
+    if(typeof types.indexOf === 'function') return types.indexOf('Files') !== -1;
+    for(var i=0;i<types.length;i++){ if(types[i] === 'Files') return true; }
+    return false;
+  }
+  document.addEventListener('dragenter', function(e){
+    if(window.currentView !== 'library') return;
+    if(!__libHasFiles(e.dataTransfer)) return;
+    __libDragCounter++;
+    __libShowDragOverlay(true);
+  });
   document.addEventListener('dragover', function(e){
     if(window.currentView !== 'library') return;
-    var drop = document.querySelector('.lib-drop');
-    if(drop && drop.contains(e.target)){ e.preventDefault(); drop.classList.add('dragover'); }
+    if(!__libHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    if(e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    __libShowDragOverlay(true);
   });
   document.addEventListener('dragleave', function(e){
-    var drop = document.querySelector('.lib-drop');
-    if(drop && !drop.contains(e.relatedTarget)){ drop.classList.remove('dragover'); }
+    if(window.currentView !== 'library') return;
+    __libDragCounter--;
+    if(__libDragCounter <= 0){ __libDragCounter = 0; __libShowDragOverlay(false); }
   });
   document.addEventListener('drop', function(e){
     if(window.currentView !== 'library') return;
-    var drop = document.querySelector('.lib-drop');
-    if(drop && drop.contains(e.target)){
+    __libDragCounter = 0;
+    __libShowDragOverlay(false);
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if(files && files.length){
       e.preventDefault();
-      drop.classList.remove('dragover');
-      if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]){
-        var inp = document.getElementById('lib-file-input');
-        if(inp){ inp.files = e.dataTransfer.files; lib_doUpload(inp); }
+      lib_uploadFiles(files);
+    }
+  });
+  document.addEventListener('paste', function(e){
+    if(window.currentView !== 'library') return;
+    var files = [];
+    if(e.clipboardData && e.clipboardData.files && e.clipboardData.files.length){
+      for(var i=0;i<e.clipboardData.files.length;i++) files.push(e.clipboardData.files[i]);
+    }
+    if(!files.length && e.clipboardData && e.clipboardData.items){
+      for(var j=0;j<e.clipboardData.items.length;j++){
+        var item = e.clipboardData.items[j];
+        if(item.kind === 'file'){
+          var file = item.getAsFile();
+          if(file) files.push(file);
+        }
       }
+    }
+    if(files.length){
+      e.preventDefault();
+      lib_uploadFiles(files);
     }
   });
 })();
