@@ -42384,6 +42384,19 @@ function submitAuth() {
     if(el) el.textContent = lt('lib_title');
   }
 
+  function lib_refresh(preserve){
+    libCheckEdit();
+    lib_setTitle();
+    lib_renderTabs();
+    if(LIB_TAB === 'project'){
+      if(LIB_PROJECT_ID) lib_loadFiles();
+      else lib_renderProjectCards();
+      if(!lib_projectsSource().length) lib_loadProjects();
+    } else {
+      lib_loadFiles();
+    }
+  }
+
   window.renderLibrary = function(){
     libCheckEdit();
     lib_setTitle();
@@ -42397,10 +42410,10 @@ function submitAuth() {
     }
   };
 
-  // 语言切换时，若资料库当前可见则重绘
+  // 语言切换时，若资料库当前可见则重绘（保留当前选中的项目/标签状态）
   window.addEventListener('app:langchange', function(){
-    if(window.currentView === 'library' && typeof renderLibrary === 'function'){
-      renderLibrary();
+    if(window.currentView === 'library' && typeof lib_refresh === 'function'){
+      lib_refresh(true);
     }
   });
 
