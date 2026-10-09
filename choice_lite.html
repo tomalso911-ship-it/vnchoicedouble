@@ -2874,6 +2874,14 @@ function _ovLoadChartLib(cb){
   .lib-hint{font-size:12px;color:#999;margin-top:6px;}
   .lib-upload-wrap{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
   .lib-upload-input{display:none;}
+  .lib-proj-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:14px;}
+  .lib-proj-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:.15s;}
+  .lib-proj-card:hover{background:#fff0f5;box-shadow:0 4px 14px rgba(0,0,0,.12);transform:translateY(-2px);}
+  .lib-proj-card .pc-title{font-weight:700;font-size:15px;margin-bottom:6px;}
+  .lib-proj-card .pc-chip{display:inline-block;background:#E7F2D4;color:#3a6b1e;border-radius:20px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0;cursor:default;transition:.15s;}
+  .lib-proj-card .pc-chip:hover{background:#ffe6f0;color:#9a1b56;transform:translateY(-2px);}
+  .lib-proj-card .pc-row{font-size:13px;color:#444;margin:3px 0;}
+  .lib-back-btn{margin-right:auto;}
 </style>
 </head>
 
@@ -18949,6 +18957,7 @@ var I18N = {
     /* 手机横屏专用短标签：原名太长会挤掉后面的标签，这里用短名保证 6 个标签一屏可见 */
     nav_short: { dashboard:"看板", crm:"潜在", won:"签约", lost:"失败", worklog:"日志", production:"生产", install:"安装", finance:"财务", library:"资料", equity:"权益", approvals:"审批", users:"用户", commission:"佣金" },
     lib_title:"资料库", lib_tab_project:"独立项目资料", lib_tab_common:"公用资料", lib_project_placeholder:"选择项目", lib_no_projects:"暂无签约项目", lib_no_files:"暂无文件",
+    lib_back:"← 返回项目", lib_project_files:"项目文件", card_contract:"合同", card_spec:"规格",
     lib_upload:"上传文件", lib_upload_hint:"点击或拖拽上传", lib_preview:"预览", lib_download:"下载", lib_delete:"删除", lib_rename:"重命名", lib_save:"保存", lib_cancel:"取消",
     lib_filename:"文件名", lib_uploader:"上传人", lib_upload_time:"上传时间", lib_size:"大小", lib_action:"操作",
     lib_forbidden_upload:"仅管理员/指定人员可上传、删除或重命名", lib_confirm_delete:"确定删除该文件？", lib_rename_placeholder:"新文件名", lib_no_preview:"该文件类型不支持在线预览，请下载查看",
@@ -19722,6 +19731,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     /* Short labels used on phone landscape so all 6 tabs fit on one row */
     nav_short: { dashboard:"Board", crm:"Potential", won:"Won", lost:"Failed", worklog:"Log", production:"Prod", install:"Inst", finance:"Fin", library:"Lib", equity:"Equity", approvals:"Approvals", users:"Users", commission:"Comm" },
     lib_title:"Document Library", lib_tab_project:"Project Documents", lib_tab_common:"Common Documents", lib_project_placeholder:"Select project", lib_no_projects:"No won projects", lib_no_files:"No files",
+    lib_back:"← Back to projects", lib_project_files:"Project files", card_contract:"Contract", card_spec:"Spec",
     lib_upload:"Upload", lib_upload_hint:"Click or drag to upload", lib_preview:"Preview", lib_download:"Download", lib_delete:"Delete", lib_rename:"Rename", lib_save:"Save", lib_cancel:"Cancel",
     lib_filename:"File name", lib_uploader:"Uploader", lib_upload_time:"Uploaded", lib_size:"Size", lib_action:"Action",
     lib_forbidden_upload:"Only admin/designated users can upload, delete or rename", lib_confirm_delete:"Delete this file?", lib_rename_placeholder:"New file name", lib_no_preview:"Online preview is not supported for this file type, please download",
@@ -20498,6 +20508,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     /* Nhãn ngắn dùng cho màn hình ngang để 6 tab vừa một hàng */
     nav_short: { dashboard:"Tổng quan", crm:"Tiềm năng", won:"Thắng", lost:"Thất bại", worklog:"Nhật ký", production:"Sản xuất", install:"Lắp đặt", finance:"Tài chính", library:"Tài liệu", equity:"Cổ đông", approvals:"Phê duyệt", users:"Người dùng", commission:"HH" },
     lib_title:"Thư viện tài liệu", lib_tab_project:"Tài liệu dự án độc lập", lib_tab_common:"Tài liệu chung", lib_project_placeholder:"Chọn dự án", lib_no_projects:"Chưa có dự án thắng", lib_no_files:"Chưa có tệp",
+    lib_back:"← Quay lại dự án", lib_project_files:"Tệp dự án", card_contract:"Hợp đồng", card_spec:"Quy cách",
     lib_upload:"Tải lên", lib_upload_hint:"Bấm hoặc kéo thả để tải lên", lib_preview:"Xem trước", lib_download:"Tải xuống", lib_delete:"Xóa", lib_rename:"Đổi tên", lib_save:"Lưu", lib_cancel:"Hủy",
     lib_filename:"Tên tệp", lib_uploader:"Ngườitải lên", lib_upload_time:"Thờigian tải lên", lib_size:"Kích thước", lib_action:"Thao tác",
     lib_forbidden_upload:"Chỉ quản trị viên/ngườichỉ định mới được tải lên, xóa hoặc đổi tên", lib_confirm_delete:"Xóa tệp này?", lib_rename_placeholder:"Tên tệp mới", lib_no_preview:"Loại tệp này không hỗ trợ xem trước trực tuyến, vui lòng tải xuống",
@@ -42184,51 +42195,69 @@ function submitAuth() {
     });
   }
 
-  function lib_renderProjectTabs(){
-    var wrap = document.getElementById('lib-proj-tabs');
-    if(LIB_TAB !== 'project'){ if(wrap) wrap.style.display='none'; return; }
-    if(!wrap){
-      var body = document.getElementById('lib-body');
-      if(!body) return;
-      wrap = document.createElement('div');
-      wrap.id = 'lib-proj-tabs';
-      wrap.className = 'lib-proj-tabs';
-      body.insertBefore(wrap, body.firstChild);
-    }
-    wrap.style.display = '';
-    wrap.innerHTML = '';
-    if(!LIB_PROJECTS.length){
-      wrap.innerHTML = '<div class="lib-empty">' + lt('lib_no_projects') + '</div>';
+  function lib_projectsSource(){
+    if(typeof globalWonData !== 'undefined' && globalWonData && globalWonData.length) return globalWonData;
+    return LIB_PROJECTS;
+  }
+
+  function lib_projectById(id){
+    var arr = lib_projectsSource();
+    for(var i=0;i<arr.length;i++){ if(arr[i].id == id) return arr[i]; }
+    return null;
+  }
+
+  function lib_renderProjectCards(){
+    var body = document.getElementById('lib-body'); if(!body) return;
+    var data = lib_projectsSource();
+    if(!data.length){
+      body.innerHTML = '<div class="lib-empty">' + lt('lib_no_projects') + '</div>';
       return;
     }
-    LIB_PROJECTS.forEach(function(p){
-      var d = document.createElement('div');
-      d.className = 'lib-proj-tab' + (LIB_PROJECT_ID === p.id ? ' active' : '');
-      d.textContent = (p.project_name || p.contract_no || ('#'+p.id));
-      d.title = (p.customer || '') + ' ' + (p.contract_no || '');
-      d.onclick = function(){ LIB_PROJECT_ID = p.id; lib_loadFiles(); };
-      wrap.appendChild(d);
+    var html = '<div class="lib-proj-cards">';
+    data.forEach(function(p){
+      var id = p.id;
+      var client = p.customer || p.client || '';
+      var prov = p.province || '';
+      var code = p.contract_no || '';
+      var spec = p.spec || '';
+      html += '<div class="lib-proj-card" onclick="lib_selectProject(' + id + ')">' +
+        '<div class="pc-title">' + esc(client) + (prov ? ' · ' + esc(prov) : '') + '</div>' +
+        (code ? '<span class="pc-chip">' + lt('card_contract') + ' ' + esc(code) + '</span>' : '') +
+        (spec ? '<span class="pc-chip">' + lt('card_spec') + ' ' + esc(spec) + '</span>' : '') +
+        '</div>';
     });
+    html += '</div>';
+    body.innerHTML = html;
+  }
+
+  function lib_selectedProjectTitle(){
+    var p = lib_projectById(LIB_PROJECT_ID);
+    if(!p) return '';
+    return esc(p.customer || p.client || p.contract_no || ('#'+p.id));
   }
 
   function lib_renderFiles(){
     var body = document.getElementById('lib-body'); if(!body) return;
-    var html = '';
-    if(LIB_CAN_EDIT){
-      html += '<div class="lib-upload-wrap">' +
-        '<button class="lib-btn lib-btn-primary" onclick="lib_pickUpload()">' + lt('lib_upload') + '</button>' +
-        '<span class="lib-hint">' + lt('lib_upload_hint') + '</span>' +
-        '<input type="file" id="lib-file-input" class="lib-upload-input" onchange="lib_doUpload(this)">' +
-        '</div>';
-    } else if(LIB_TAB === 'project' && !LIB_PROJECTS.length){
-      // no hint needed
-    } else {
-      html += '<div class="lib-hint" style="margin-bottom:12px;">' + lt('lib_forbidden_upload') + '</div>';
+    if(LIB_TAB === 'project' && !LIB_PROJECT_ID){
+      lib_renderProjectCards();
+      return;
     }
+    var html = '<div class="lib-upload-wrap">';
+    if(LIB_TAB === 'project'){
+      html += '<button class="lib-btn lib-back-btn" onclick="lib_backToProjects()">' + lt('lib_back') + '</button>' +
+        '<span class="lib-hint" style="font-weight:600;">' + lib_selectedProjectTitle() + '</span>';
+    }
+    if(LIB_CAN_EDIT){
+      html += '<button class="lib-btn lib-btn-primary" onclick="lib_pickUpload()">' + lt('lib_upload') + '</button>' +
+        '<span class="lib-hint">' + lt('lib_upload_hint') + '</span>' +
+        '<input type="file" id="lib-file-input" class="lib-upload-input" onchange="lib_doUpload(this)">';
+    } else {
+      html += '<span class="lib-hint">' + lt('lib_forbidden_upload') + '</span>';
+    }
+    html += '</div>';
     if(!LIB_FILES.length){
       html += '<div class="lib-empty">' + lt('lib_no_files') + '</div>';
       body.innerHTML = html;
-      lib_renderProjectTabs();
       return;
     }
     html += '<table class="lib-file-list"><thead><tr>' +
@@ -42255,29 +42284,38 @@ function submitAuth() {
     });
     html += '</tbody></table>';
     body.innerHTML = html;
-    lib_renderProjectTabs();
   }
 
   function esc(s){
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  window.lib_selectProject = function(id){
+    LIB_PROJECT_ID = id;
+    lib_loadFiles();
+  };
+
+  window.lib_backToProjects = function(){
+    LIB_PROJECT_ID = null;
+    lib_renderProjectCards();
+  };
+
   window.lib_switchTab = function(k){
     LIB_TAB = k;
-    if(k === 'project'){
-      if(!LIB_PROJECT_ID && LIB_PROJECTS.length) LIB_PROJECT_ID = LIB_PROJECTS[0].id;
-    } else {
-      LIB_PROJECT_ID = null;
-    }
+    LIB_PROJECT_ID = null;
     lib_renderTabs();
-    lib_loadFiles();
+    if(k === 'project'){
+      lib_renderProjectCards();
+      if(!LIB_PROJECTS.length && !lib_projectsSource().length) lib_loadProjects();
+    } else {
+      lib_loadFiles();
+    }
   };
 
   window.lib_loadProjects = function(){
     libApi('/api/library/projects').then(function(data){
       LIB_PROJECTS = Array.isArray(data) ? data : [];
-      if(LIB_TAB === 'project' && !LIB_PROJECT_ID && LIB_PROJECTS.length) LIB_PROJECT_ID = LIB_PROJECTS[0].id;
-      lib_loadFiles();
+      if(LIB_TAB === 'project' && !LIB_PROJECT_ID) lib_renderProjectCards();
     });
   };
 
@@ -42341,13 +42379,20 @@ function submitAuth() {
     }).catch(function(e){ showToast('rename failed'); });
   };
 
+  function lib_setTitle(){
+    var el = document.getElementById('lib-title');
+    if(el) el.textContent = lt('lib_title');
+  }
+
   window.renderLibrary = function(){
     libCheckEdit();
+    lib_setTitle();
     lib_renderTabs();
+    LIB_PROJECT_ID = null;
     if(LIB_TAB === 'project'){
-      lib_loadProjects();
+      lib_renderProjectCards();
+      if(!lib_projectsSource().length) lib_loadProjects();
     } else {
-      LIB_PROJECT_ID = null;
       lib_loadFiles();
     }
   };

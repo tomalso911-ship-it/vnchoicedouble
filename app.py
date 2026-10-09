@@ -3717,7 +3717,7 @@ def _lib_safe_ext(filename):
 def library_projects():
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, contract_no, customer FROM won_projects ORDER BY id DESC"
+        "SELECT id, contract_no, customer, province FROM won_projects ORDER BY id DESC"
     ).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
