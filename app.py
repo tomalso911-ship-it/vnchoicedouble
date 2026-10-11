@@ -3588,6 +3588,167 @@ def serve_vendor(filename):
     vendor_dir = os.path.join(BASE_DIR, "vendor")
     return send_from_directory(vendor_dir, filename)
 
+
+# ===================== 财务管理：越南报表（Univer）本地落盘 =====================
+# 前端用 Univer 打开并可编辑；保存时把整本 xlsx 写回服务器文件。
+# 历史行不会被删除（财务只在末尾插行），实现“数据单向递增”。
+# 每日自动一份备份（滚动保留 30 天）；支持按月/按年生成快照存档。
+import datetime as _fdt
+
+FIN_DIR = os.path.join(BASE_DIR, "finance_data")
+FIN_REPORT = os.path.join(FIN_DIR, "vn_report.xlsx")
+FIN_BACKUP_DIR = os.path.join(FIN_DIR, "backups")
+FIN_ARCHIVE_DIR = os.path.join(FIN_DIR, "archive")
+for _d in (FIN_DIR, FIN_BACKUP_DIR, FIN_ARCHIVE_DIR):
+    os.makedirs(_d, exist_ok=True)
+
+
+def _fin_daily_backup():
+    """每日一份备份；删除超过 30 天的旧备份，磁盘占用封顶约 30 份。"""
+    today = _fdt.date.today().strftime("%Y-%m-%d")
+    bpath = os.path.join(FIN_BACKUP_DIR, "vn_report_%s.xlsx.bak" % today)
+    if not os.path.isfile(bpath) and os.path.isfile(FIN_REPORT):
+        try:
+            shutil.copyfile(FIN_REPORT, bpath)
+        except OSError:
+            pass
+    cutoff = _fdt.date.today() - _fdt.timedelta(days=30)
+    for fn in os.listdir(FIN_BACKUP_DIR):
+        if not (fn.startswith("vn_report_") and fn.endswith(".xlsx.bak")):
+            continue
+        try:
+            d = _fdt.datetime.strptime(fn[len("vn_report_"):-len(".xlsx.bak")], "%Y-%m-%d").date()
+        except Exception:
+            continue
+        if d < cutoff:
+            try:
+                os.remove(os.path.join(FIN_BACKUP_DIR, fn))
+            except OSError:
+                pass
+
+
+@app.route("/api/finance/vn-report", methods=["GET"])
+def fin_get_report():
+    # 尚未初始化（无种子文件）时返回 404，前端提示先导入
+    if not os.path.isfile(FIN_REPORT):
+        return jsonify({"error": "not initialized"}), 404
+    return send_from_directory(
+        FIN_DIR, "vn_report.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=False,
+    )
+
+
+@app.route("/api/finance/vn-report", methods=["POST"])
+def fin_save_report():
+    data = request.get_data()
+    if not data:
+        return jsonify({"error": "empty"}), 400
+    tmp = FIN_REPORT + ".tmp"
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+    try:
+        os.replace(tmp, FIN_REPORT)  # 原子替换，避免半写损坏
+    except OSError:
+        # Windows 下目标文件偶被占用，退回直接覆盖写
+        with open(FIN_REPORT, "wb") as fh:
+            fh.write(data)
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    _fin_daily_backup()
+    return jsonify({
+        "ok": True,
+        "bytes": len(data),
+        "saved_at": _fdt.datetime.now().isoformat(timespec="seconds"),
+    })
+
+
+@app.route("/api/finance/vn-report/snapshot", methods=["POST"])
+def fin_snapshot_report():
+    period = (request.args.get("period") or "").strip()
+    if not period:
+        return jsonify({"error": "period required"}), 400
+    m = re.match(r"^(\d{4})(?:-(\d{1,2}))?$", period)
+    if not m:
+        return jsonify({"error": "period format YYYY or YYYY-MM"}), 400
+    if m.group(2) and not (1 <= int(m.group(2)) <= 12):
+        return jsonify({"error": "month out of range"}), 400
+    # 归一化月份为两位：2026-5 -> 2026-05
+    period = m.group(1) if not m.group(2) else ("%s-%02d" % (m.group(1), int(m.group(2))))
+    if not os.path.isfile(FIN_REPORT):
+        return jsonify({"error": "not initialized"}), 404
+    os.makedirs(FIN_ARCHIVE_DIR, exist_ok=True)
+    dest = os.path.join(FIN_ARCHIVE_DIR, "vn_%s.xlsx" % period)
+    shutil.copyfile(FIN_REPORT, dest)
+    return jsonify({"ok": True, "file": "vn_%s.xlsx" % period})
+
+
+@app.route("/api/finance/vn-report/init", methods=["POST"])
+def fin_init_report():
+    # 仅用于“重新初始化/换表”：上传一份 xlsx 作为新种子（覆盖旧文件与备份）。
+    if "file" not in request.files:
+        return jsonify({"error": "no file"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"error": "empty filename"}), 400
+    data = f.read()
+    if not data:
+        return jsonify({"error": "empty"}), 400
+    tmp = FIN_REPORT + ".tmp"
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+    os.replace(tmp, FIN_REPORT)
+    _fin_daily_backup()
+    return jsonify({"ok": True, "bytes": len(data)})
+
+
+@app.route("/api/finance/vn-report/snapshot", methods=["GET"])
+def fin_get_snapshot():
+    # 返回 Univer 快照（JSON），前端 createUniverSheet 加载（xlsx->快照在后端用 openpyxl 完成）
+    if not os.path.isfile(FIN_REPORT):
+        return jsonify({"error": "not initialized"}), 404
+    try:
+        sys.path.insert(0, BASE_DIR)
+        import univer_convert
+        snap = univer_convert.xlsx_to_univer(FIN_REPORT)
+    except Exception as e:
+        return jsonify({"error": "convert failed: %s" % e}), 500
+    return jsonify(snap)
+
+
+@app.route("/api/finance/vn-report/save", methods=["POST"])
+def fin_save_snapshot():
+    # 接收 Univer 快照（JSON），写回 xlsx 落盘（快照->xlsx 在后端用 openpyxl 完成）
+    data = request.get_json(force=False, silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid json"}), 400
+    try:
+        sys.path.insert(0, BASE_DIR)
+        import univer_convert
+        tmp = FIN_REPORT + ".tmp.xlsx"
+        univer_convert.univer_to_xlsx(data, tmp)
+        try:
+            os.replace(tmp, FIN_REPORT)
+        except OSError:
+            import shutil
+            with open(FIN_REPORT, "wb") as fh:
+                fh.write(open(tmp, "rb").read())
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        _fin_daily_backup()
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        sys.stderr.write("[fin_save_snapshot] ERROR: %s\n%s\n" % (e, tb))
+        sys.stderr.flush()
+        return jsonify({"error": "convert failed: %s" % e}), 500
+    return jsonify({"ok": True, "saved_at": _fdt.datetime.now().isoformat(timespec="seconds")})
+
+
 # ===================== API：CRM 报价单 PDF 上传 =====================
 @app.route("/api/crm-projects/<int:pid>/documents", methods=["POST"])
 def upload_crm_pdf(pid):

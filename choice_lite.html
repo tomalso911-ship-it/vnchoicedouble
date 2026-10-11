@@ -2908,6 +2908,22 @@ function _ovLoadChartLib(cb){
   .lib-tile .ft-icon{font-size:44px;line-height:1;margin-bottom:9px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.12));}
   .lib-tile .ft-name{font-size:12.5px;color:#2b3648;word-break:break-all;line-height:1.32;max-height:34px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
   .lib-tile .ft-meta{font-size:11px;color:#95a1b0;margin-top:6px;}
+  /* 文件夹瓦片 + 图片缩略图 */
+  .lib-tile .ft-icon-img{width:64px;height:64px;display:flex;align-items:center;justify-content:center;margin-bottom:9px;overflow:hidden;border-radius:8px;background:#f4f7fb;box-sizing:border-box;}
+  .lib-tile .ft-thumb{width:100%;height:100%;object-fit:cover;display:block;border-radius:8px;}
+  .lib-tile .ft-icon-img .ft-icon-fb{display:none;}
+  .lib-tile .ft-icon-img.thumb-failed{background:transparent;}
+  .lib-tile .ft-icon-img.thumb-failed .ft-icon-fb{display:block;}
+  .lib-tile-dir{background:#fbfdff;}
+  .lib-tile-dir .ft-icon{font-size:46px;filter:none;}
+  .lib-list tr.lib-row-dir .fl-name{font-weight:600;color:#243b53;}
+  .lib-list tr.lib-row-dir .fl-icon{font-size:20px;margin-right:9px;vertical-align:middle;filter:none;}
+  /* 多选框选：禁止拖拽过程中选中文字/拖走图片 */
+  .lib-grid,.lib-list{user-select:none;-webkit-user-select:none;}
+  .lib-tile .ft-thumb{-webkit-user-drag:none;user-select:none;pointer-events:none;}
+  .lib-marquee{position:fixed;left:0;top:0;width:0;height:0;z-index:3500;display:none;pointer-events:none;
+    border:1px solid #3b82f6;background:rgba(59,130,246,.16);border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.6) inset;}
+  .lib-marquee.show{display:block;}
   .lib-list{width:100%;border-collapse:collapse;font-size:13px;}
   .lib-list thead th{position:sticky;top:0;z-index:2;background:#f5f8fc;border-bottom:1px solid #e3e9f1;padding:9px 12px;text-align:left;font-weight:700;color:#46536a;cursor:pointer;white-space:nowrap;user-select:none;}
   .lib-list thead th:hover{background:#eaf1fa;}
@@ -2975,6 +2991,31 @@ function _ovLoadChartLib(cb){
   .libconfirm .lc-cancel{background:#fff;color:#3c4858;border:1px solid #d3dae4;border-radius:7px;padding:6px 14px;cursor:pointer;font-size:13px;}
   .libconfirm .lc-cancel:hover{background:#f0f4f9;}
 </style>
+
+<!-- ============ Univer 0.5.5（开源 + 专业版 exchange 导入导出） ============
+     通过 esm.sh 提供 ESM；财务电脑首次加载需联网一次，之后浏览器缓存即离线可用。
+     如需彻底断网，把相同 URL 镜像到 /vendor 并改写下方 import map 即可。 -->
+<script type="importmap">
+{
+  "imports": {
+    "@univerjs/presets": "https://esm.sh/@univerjs/presets@0.5.5",
+    "@univerjs/presets/": "https://esm.sh/@univerjs/presets@0.5.5/",
+    "@univerjs/sheets-filter": "https://esm.sh/@univerjs/sheets-filter@0.5.5",
+    "@univerjs/sheets-filter/": "https://esm.sh/@univerjs/sheets-filter@0.5.5/",
+    "@univerjs/sheets-filter-ui": "https://esm.sh/@univerjs/sheets-filter-ui@0.5.5",
+    "@univerjs/sheets-filter-ui/": "https://esm.sh/@univerjs/sheets-filter-ui@0.5.5/",
+    "@univerjs/sheets-sort": "https://esm.sh/@univerjs/sheets-sort@0.5.5",
+    "@univerjs/sheets-sort/": "https://esm.sh/@univerjs/sheets-sort@0.5.5/",
+    "@univerjs/sheets-sort-ui": "https://esm.sh/@univerjs/sheets-sort-ui@0.5.5",
+    "@univerjs/sheets-sort-ui/": "https://esm.sh/@univerjs/sheets-sort-ui@0.5.5/"
+  }
+}
+</script>
+<link rel="stylesheet" href="https://esm.sh/@univerjs/presets@0.5.5/lib/styles/preset-sheets-core.css">
+<link rel="stylesheet" href="https://esm.sh/@univerjs/design@0.5.5/lib/index.css">
+<link rel="stylesheet" href="https://esm.sh/@univerjs/ui@0.5.5/lib/index.css">
+<link rel="stylesheet" href="https://esm.sh/@univerjs/sheets-filter-ui@0.5.5/lib/index.css">
+<link rel="stylesheet" href="https://esm.sh/@univerjs/sheets-sort-ui@0.5.5/lib/index.css">
 </head>
 
 <body>
@@ -3355,12 +3396,12 @@ function _ovLoadChartLib(cb){
   <div class="tb-menu" id="tbMenu">
     <button class="tb-item" data-view="dashboard" onclick="switchView('dashboard')">Dashboard</button>
     <button class="tb-item" data-view="won" onclick="switchView('won')">Won Projects</button>
-    <button class="tb-item" data-view="worklog" onclick="switchView('worklog')"><span class="tb-label">工作日志</span></button>
+    <button class="tb-item" data-view="worklog" onclick="switchView('worklog')"><span class="tb-label" data-i18n="nav_worklog">工作日志</span></button>
     <button class="tb-item" data-view="production" onclick="switchView('production')"><span class="tb-label" data-i18n="nav_production">生产管理</span></button>
-    <button class="tb-item" data-view="install" onclick="switchView('install')"><span class="tb-label">安装管理</span></button>
-    <button class="tb-item" data-view="finance" onclick="switchView('finance')"><span class="tb-label">财务管理</span></button>
+    <button class="tb-item" data-view="install" onclick="switchView('install')"><span class="tb-label" data-i18n="nav_install">安装管理</span></button>
+    <button class="tb-item" data-view="finance" onclick="switchView('finance')"><span class="tb-label" data-i18n="nav_finance">财务管理</span></button>
     <button class="tb-item" data-view="library" onclick="switchView('library')"><span class="tb-label" data-i18n="nav_library">资料库</span></button>
-    <button class="tb-item" data-view="equity" onclick="switchView('equity')"><span class="tb-label">股东权益</span></button>
+    <button class="tb-item" data-view="equity" onclick="switchView('equity')"><span class="tb-label" data-i18n="nav_equity">股东权益</span></button>
     <button class="tb-item" data-view="approvals" onclick="switchView('approvals')"><span class="tb-label">Approvals</span><span class="pend-badge" id="pendBadge">0</span></button>
     <button class="tb-item" data-view="users" onclick="switchView('users')">Users</button>
   </div>
@@ -4209,6 +4250,51 @@ var WL_FLOW_IMG = {
       .prod-subtab{flex:0 0 auto;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;background:#eef2f6;color:#455a73;border:1px solid #dfe6ee;}
       .prod-subtab:hover{background:#e3eaf2;}
       .prod-subtab.active{background:#E53935;color:#fff;border-color:#E53935;}
+      /* 财务管理：三语标签页 */
+      .fin-tabs{display:flex;flex-wrap:nowrap;gap:8px;margin:0 0 16px;padding:0;}
+      .fin-tab{flex:0 0 auto;white-space:nowrap;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;background:#f4f6f2;color:#444;border:1px solid #000;transition:.15s;display:flex;align-items:center;justify-content:center;text-align:center;box-sizing:border-box;}
+      .fin-tab:hover{background:#e3eaf2;}
+      .fin-tab.active{background:#E53935;color:#fff;border-color:#E53935;}
+      .fin-toolbar{display:flex;flex-wrap:nowrap;gap:4px;align-items:center;margin:4px 0 10px;overflow-x:auto;}
+      .fin-btn{padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;background:#E53935;color:#fff;border:1px solid #E53935;transition:.15s;white-space:nowrap;flex:0 0 auto;}
+      .fin-btn:hover{background:#c62828;}
+      .fin-btn-green{background:#2e9e5b;border-color:#2e9e5b;color:#fff;}
+      .fin-btn-green:hover{background:#25824b;border-color:#25824b;}
+      .fin-sort-arrow{margin-left:6px;font-weight:700;}
+      .fin-spacer{flex:1 0 auto;min-width:8px;}
+      .fin-status{font-size:12px;color:#666;white-space:nowrap;flex:0 0 auto;}
+      .fin-toolbar2{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;margin:0 0 8px;overflow-x:auto;}
+      .fin-select{height:28px;border:1px solid #dfe6ee;border-radius:6px;font-size:12px;padding:0 6px;flex:0 0 auto;}
+      .fin-btn2{padding:5px 10px;border-radius:6px;border:1px solid #dfe6ee;background:#fff;color:#333;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex:0 0 auto;}
+      .fin-btn2:hover{background:#f5f7fa;}
+      .fin-icon{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #dfe6ee;border-radius:6px;background:#fff;color:#333;cursor:pointer;flex:0 0 auto;padding:0;}
+      .fin-icon:hover{background:#f5f7fa;}
+      .fin-icon svg{width:16px;height:16px;}
+      /* 货币下拉：显示成「$」符号按钮（去掉“货币”文字与原生下拉箭头） */
+      .fin-select.fin-currency-icon{width:auto;min-width:28px;height:28px;padding:0 6px;text-align:center;text-align-last:center;font-size:14px;font-weight:700;line-height:26px;color:#333;cursor:pointer;appearance:none;-webkit-appearance:none;-moz-appearance:none;}
+      .fin-debug{font-size:11px;color:#c00;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%;flex:0 1 auto;}
+      /* 我们的控件移动到 Univer 工具栏最左侧后，去掉多余外边距 */
+      .univer-toolbar-container .fin-toolbar2{margin:0 8px 0 0;}
+      /* Univer 自带工具栏（第三行）：强制靠左、不换行 */
+      .univer-toolbar-container{display:flex !important;flex-wrap:nowrap !important;justify-content:flex-start !important;align-items:center !important;}
+      .univer-toolbar{flex-wrap:nowrap !important;justify-content:flex-start !important;}
+      .univer-container{height:660px;border:1px solid #dfe6ee;border-radius:8px;overflow:visible;}
+      /* Univer 自带工具栏：强制一行、靠左；空间不足时沿用自带「…」收纳 */
+      .univer-container [class*="toolbar"]{flex-wrap:nowrap !important;justify-content:flex-start !important;}
+      .univer-container [class*="toolbar"] > *{flex:0 0 auto;}
+      /* 用户要求：不再出现 Univer 自带的「⋮」溢出收纳按钮（它会把 % 等按钮收进去藏起来）。
+         :has() 是现代浏览器选择器；老内核由 fin_mountToolbar2 打 .fin-hide-more-btn 兜底。 */
+      .univer-container .fin-hide-more-btn{display:none !important;}
+      .univer-container button.univer-toolbar-btn:has(svg[class*="more-function-single"]){display:none !important;}
+      /* 用户要求：工作表标签「选中」时背景成黄色 */
+      .univer-container .univer-slide-tab-active{background:#FFFF00 !important;}
+      /* 内置筛选面板浮层不被裁剪 */
+      .univer-container [class*="popup"],
+      .univer-container [class*="filter-panel"]{z-index:1200;}
+      .fin-note{font-size:12px;color:#999;margin-top:8px;line-height:1.6;}
+      .fin-note code{background:#f2f2f2;padding:1px 5px;border-radius:4px;}
+      .fin-panel{display:none;background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;}
+      .fin-panel.active{display:block;}
       /* 设备故障图标报告：图表盒（锁高度防 Chart.js resize 死循环） */
       .prod-eq-charts{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0 14px;}
       .prod-eq-chart-box{flex:1 1 360px;min-width:280px;max-width:560px;height:320px;background:#fff;border:1px solid #eef1f4;border-radius:10px;padding:10px 12px;position:relative;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;}
@@ -8143,7 +8229,10 @@ var WL_FLOW_IMG = {
       var _mmHF = prod_slatsMatrix();
       h += '<div class="prod-sec-title" style="border-color:#6c757d;margin-top:14px" data-i18n="sec_house_card">'+pt('sec_house_card')+'</div>'
         + '<div class="house-filter-pills" id="pd_house_filter">'
-        + _mmHF.houseOrder.map(function(hh){ var _sel=PROD_SELECTED_HOUSES.indexOf(hh)>=0?' checked':''; return '<label class="chk"><input type="checkbox" class="pd_house_filter" onchange="prod_houseFilterChange(this)" value="'+prod_esc(hh)+'"'+_sel+'><span>'+prod_esc(prod_phName(hh))+'</span></label>'; }).join('')
+        /* class 必须是 pd_house：全库 7 处消费者（筛选取值 8495/8523/8533/8546/9826/9929、
+           切语言刷新胶囊文案 16076）都用 .pd_house 查询，写成 pd_house_filter 会全部匹配不到，
+           导致①猪舍筛选失效 ②切语言后胶囊文案停留在旧语言。禁止改回。 */
+        + _mmHF.houseOrder.map(function(hh){ var _sel=PROD_SELECTED_HOUSES.indexOf(hh)>=0?' checked':''; return '<label class="chk"><input type="checkbox" class="pd_house" onchange="prod_houseFilterChange(this)" value="'+prod_esc(hh)+'"'+_sel+'><span>'+prod_esc(prod_phName(hh))+'</span></label>'; }).join('')
         + '</div>'
         + '<div style="margin-top:6px;"><span id="pd_house_filter_tip" style="font-size:12px;color:#666;"></span></div>'
         + '<div id="pd_house_preview" style="margin-top:10px;"></div>'
@@ -16478,13 +16567,1021 @@ var PROD_EQUIP_FAULT_KB = {
     </style>
   </section>
 
-  <!-- 财务管理（占位） -->
+  <!-- 财务管理：越南/中国/合并三语标签页（跟随语言切换；点击高亮红色；带边框） -->
   <section class="view" id="view-finance">
     <div class="approvals-page">
-      <div class="page-header"><h2>财务管理</h2></div>
-      <p>财务管理模块开发中，敬请期待。</p>
+      <div class="page-header"><h2 data-i18n="nav_finance">财务管理</h2></div>
+      <div class="fin-tabs" id="fin-tabs">
+        <div class="fin-tab active" data-key="vn" data-i18n="fin_tab_vn_report" onclick="fin_switchTab('vn')">越南财务报表</div>
+        <div class="fin-tab" data-key="cn" data-i18n="fin_tab_cn_report" onclick="fin_switchTab('cn')">中国财务报表</div>
+        <div class="fin-tab" data-key="merge" data-i18n="fin_tab_merge_report" onclick="fin_switchTab('merge')">合并财务总报表</div>
+      </div>
+      <div class="fin-panel active" id="fin_panel_vn">
+        <h3 data-i18n="fin_tab_vn_report">越南财务报表</h3>
+        <div class="fin-toolbar">
+          <button class="fin-btn fin-btn-green" onclick="fin_sortDatesByBlock()"><span data-i18n="fin_btn_date_fmt">按日-月-年排序</span><span id="fin_date_sort_arrow" class="fin-sort-arrow">↑</span></button>
+          <button class="fin-btn" data-i18n="fin_btn_load" onclick="fin_loadOrReload()">载入/刷新报表</button>
+          <button class="fin-btn" data-i18n="fin_btn_save" onclick="fin_autoSave()">保存</button>
+          <button class="fin-btn" data-i18n="fin_btn_snapshot" onclick="fin_snapshotPrompt()">快照</button>
+          <button class="fin-btn" data-i18n="fin_btn_export" onclick="fin_exportLocal()">导出 xlsx</button>
+          <button class="fin-btn" data-i18n="fin_btn_reimport" onclick="document.getElementById('fin_reimport_file').click()">重导</button>
+          <input type="file" id="fin_reimport_file" accept=".xlsx" style="display:none" onchange="fin_reimport(this)">
+          <span class="fin-spacer"></span>
+          <span id="fin_status" class="fin-status" data-i18n="fin_status_not_loaded">未载入</span>
+        </div>
+        <div class="fin-toolbar2">
+          <!-- 货币下拉：按要求显示成「$」符号按钮（不再显示“货币”文字；下拉可选 USD/RMB/VND/THB） -->
+          <select id="fin_currency" class="fin-select fin-currency-icon" onchange="fin_applyCurrency(this.value)" data-title-key="fin_title_currency">
+            <option value="">$</option>
+            <option value="&quot;$&quot;#,##0.00">USD $</option>
+            <option value="&quot;¥&quot;#,##0.00">RMB ¥</option>
+            <option value="&quot;₫&quot;#,##0">VND ₫</option>
+            <option value="&quot;฿&quot;#,##0.00">THB ฿</option>
+          </select>
+          <button class="fin-icon" data-title-key="fin_title_reset" onclick="fin_sortReset()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12a8 8 0 1 0 3-6.2"/>
+              <path d="M4 4v5h5"/>
+            </svg>
+          </button>
+          <!-- 用户要求：百分号 % 固定放在最上面这一行（Univer 原生的 % 在窗口不够宽时会被收进「⋮」，已隐藏原生的） -->
+          <button class="fin-icon" data-title-key="fin_title_percent" onclick="fin_applyPercent()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 5L5 19"/>
+              <circle cx="7.5" cy="7.5" r="2.5"/>
+              <circle cx="16.5" cy="16.5" r="2.5"/>
+            </svg>
+          </button>
+        </div>
+        <div id="univer_container" class="univer-container"></div>
+      </div>
+      <div class="fin-panel" id="fin_panel_cn">
+        <h3 data-i18n="fin_tab_cn_report">中国财务报表</h3>
+        <p data-i18n="fin_panel_placeholder">该报表内容建设中，敬请期待。</p>
+      </div>
+      <div class="fin-panel" id="fin_panel_merge">
+        <h3 data-i18n="fin_tab_merge_report">合并财务总报表</h3>
+        <p data-i18n="fin_panel_placeholder">该报表内容建设中，敬请期待。</p>
+      </div>
     </div>
   </section>
+  <script>
+    /* 财务管理三语标签页：状态与切换 */
+    // 屏蔽 Univer 组件重复注册的无害警告
+    (function(){
+      var ow = console.warn;
+      console.warn = function(){
+        var msg = Array.prototype.slice.call(arguments).join(' ');
+        if (/COMPONENT_DOC_HEADER_FOOTER_PANEL already exists/i.test(msg)) return;
+        return ow.apply(console, arguments);
+      };
+    })();
+    var FIN_ACTIVE_TAB = (function(){ try { return sessionStorage.getItem('won_fin_tab'); } catch(e){ return null; } })() || 'vn';
+    function fin_renderTabs(active){
+      FIN_ACTIVE_TAB = active || 'vn';
+      try { sessionStorage.setItem('won_fin_tab', FIN_ACTIVE_TAB); } catch(e){}
+      var tabs = document.querySelectorAll('#fin-tabs .fin-tab');
+      for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.toggle('active', tabs[i].getAttribute('data-key') === FIN_ACTIVE_TAB);
+      }
+      var panels = document.querySelectorAll('#view-finance .fin-panel');
+      for (var j = 0; j < panels.length; j++) {
+        panels[j].classList.toggle('active', panels[j].id === ('fin_panel_' + FIN_ACTIVE_TAB));
+      }
+    }
+    function fin_switchTab(key){
+      if (!key || !document.getElementById('fin_panel_' + key)) return;
+      fin_renderTabs(key);
+      if (key === 'vn') fin_initUniver();   // 切到越南报表时懒加载 Univer
+    }
+    fin_renderTabs(FIN_ACTIVE_TAB);
+
+    /* ============ 越南财务报表：Univer 嵌入（OSS，免授权） ============ */
+    // 路线 A：Univer OSS 核心(@univerjs/presets + preset-sheets-core) 负责界面/编辑；
+    // xlsx 导入导出由后端 Python(openpyxl) 完成，前端只 load/save 快照。无需 Pro 授权、无水印。
+    var finUniver = null, finUniverAPI = null, finSheet = null, finPresets = null;
+    var finInited = false, finReady = false, finLoading = false;
+    var finLastSnapshot = null, finFilterActive = false;
+    var finRowOrder = [];
+    var finToolbarObserver = null;
+    var finSaveTimer = null, finDirty = false, finSaving = false;
+    var finStatusKey = 'fin_status_not_loaded', finStatusSuffix = '';
+
+    function fin_L(k){ try { var d = (typeof T === 'function') ? T() : null; return (d && d[k]) || k; } catch(e){ return k; } }
+    function fin_setStatusKey(k, suffix){
+      finStatusKey = k; finStatusSuffix = suffix || '';
+      var s = document.getElementById('fin_status');
+      if (s) s.textContent = fin_L(k) + (finStatusSuffix ? finStatusSuffix : '');
+    }
+    // 语言切换时原地刷新状态文字与按钮（三语联动）
+    window.addEventListener('app:langchange', function(){
+      try { fin_setStatusKey(finStatusKey, finStatusSuffix); } catch(e){}
+      try { if (typeof sweepI18n === 'function') sweepI18n(document.getElementById('fin_panel_vn')); } catch(e){}
+    });
+
+    function fin_currentSnapshot(){
+      if (finSheet && typeof finSheet.getSnapshot === 'function') {
+        try { return finSheet.getSnapshot(); } catch (e) { console.warn('getSnapshot', e); }
+      }
+      if (finUniver && typeof finUniver.getSnapshot === 'function') {
+        try { return finUniver.getSnapshot(); } catch (e) {}
+      }
+      return null;
+    }
+
+    async function fin_initUniver(){
+      if (finInited) return;
+      finInited = true;
+      try {
+        fin_setStatusKey('fin_status_engine');
+        var presets = await import('@univerjs/presets');
+        var corePreset = await import('@univerjs/presets/preset-sheets-core');
+        // 三语 locale：初始语言由 CUR_LANG 决定；切语言时调用 finUniver.setLocale()
+        var localeMod = await import('@univerjs/presets/preset-sheets-core/locales/en-US');
+        var zhLocaleMod = await import('@univerjs/presets/preset-sheets-core/locales/zh-CN').catch(function(){ return null; });
+        var viLocaleMod = await import('@univerjs/presets/preset-sheets-core/locales/vi-VN').catch(function(){ return null; });
+        var filterMod = await import('@univerjs/sheets-filter');
+        var filterUiMod = await import('@univerjs/sheets-filter-ui');
+        var sortMod = await import('@univerjs/sheets-sort');
+        var sortUiMod = await import('@univerjs/sheets-sort-ui');
+        // 注意：locale 是单数 /locale/en-US（复数会返回 default null）
+        var filterLocaleMod = await import('@univerjs/sheets-filter-ui/locale/en-US').catch(function(){ return null; });
+        var sortLocaleMod = await import('@univerjs/sheets-sort/locale/en-US').catch(function(){ return null; });
+        var sortUiLocaleMod = await import('@univerjs/sheets-sort-ui/locale/en-US').catch(function(){ return null; });
+        var filterLocaleModZh = await import('@univerjs/sheets-filter-ui/locale/zh-CN').catch(function(){ return null; });
+        var sortLocaleModZh = await import('@univerjs/sheets-sort/locale/zh-CN').catch(function(){ return null; });
+        var sortUiLocaleModZh = await import('@univerjs/sheets-sort-ui/locale/zh-CN').catch(function(){ return null; });
+        var filterLocaleModVi = await import('@univerjs/sheets-filter-ui/locale/vi-VN').catch(function(){ return null; });
+        var sortLocaleModVi = await import('@univerjs/sheets-sort/locale/vi-VN').catch(function(){ return null; });
+        var sortUiLocaleModVi = await import('@univerjs/sheets-sort-ui/locale/vi-VN').catch(function(){ return null; });
+        // facade 导入（注册 FUniver API，缺了可能影响内置交互）
+        try { await import('@univerjs/sheets-filter/facade'); } catch(e){}
+        try { await import('@univerjs/sheets-sort/facade'); } catch(e){}
+        var mergeFn = presets.merge || function(a, b){ return Object.assign({}, a, b); };
+        function mergeLocales(base, mods){
+          var r = mergeFn({}, base || {});
+          mods.forEach(function(m){
+            var d = (m && (m.default || m)) || {};
+            if (d) r = mergeFn(r, d);
+          });
+          return r;
+        }
+        var enLocale = (localeMod && (localeMod.default || localeMod)) || {};
+        var zhLocale = (zhLocaleMod && (zhLocaleMod.default || zhLocaleMod)) || {};
+        var viLocale = (viLocaleMod && (viLocaleMod.default || viLocaleMod)) || {};
+        var loc = mergeLocales(enLocale, [filterLocaleMod, sortLocaleMod, sortUiLocaleMod]);
+        var zhLoc = mergeLocales(zhLocale, [filterLocaleModZh, sortLocaleModZh, sortUiLocaleModZh]);
+        var viLoc = mergeLocales(viLocale, [filterLocaleModVi, sortLocaleModVi, sortUiLocaleModVi]);
+        var initLocale = presets.LocaleType.EN_US;
+        if (CUR_LANG === 'zh') initLocale = presets.LocaleType.ZH_CN;
+        if (CUR_LANG === 'vi') initLocale = presets.LocaleType.VI_VN;
+        finPresets = presets;
+
+        // 隐藏 Univer 自带工具栏里多余/重复的按钮（用户要求）：
+        //   · 排序菜单（A↓∨）   sheet.menu.sheets-sort
+        //   · 内置筛选（漏斗）  sheet.command.smart-toggle-filter
+        //   · 内置货币（$）     sheet.command.numfmt.set.currency
+        // 并隐藏内置排序菜单里的 ext / custom 多余项（我们注入的 升序/降序/复位 保留在代码里，只是菜单按钮本身被隐藏）
+        var sortMenuCfg = {
+          'sheet.command.sort-range-asc': { hidden: true },
+          'sheet.command.sort-range-desc': { hidden: true },
+          'sheet.command.sort-range-asc-ext': { hidden: true },
+          'sheet.command.sort-range-desc-ext': { hidden: true },
+          'sheet.command.sort-range-custom': { hidden: true },
+          'sheet.command.sort-range-asc-ctx': { hidden: true },
+          'sheet.command.sort-range-desc-ctx': { hidden: true },
+          'sheet.command.sort-range-asc-ext-ctx': { hidden: true },
+          'sheet.command.sort-range-desc-ext-ctx': { hidden: true },
+          'sheet.command.sort-range-custom-ctx': { hidden: true },
+          // 用户要求：Univer 工具栏只保留「小数位 ± / 百分号」，下列【工具栏】按钮全部隐藏
+          // （右键菜单 / 列头筛选等其它入口不动，需要时仍可用）
+          'sheet.menu.sheets-sort': { hidden: true },                 // 排序菜单（A↓∨）
+          'sheet.command.smart-toggle-filter': { hidden: true },      // 内置筛选（漏斗）
+          'sheet.command.numfmt.set.currency': { hidden: true },      // 内置货币 $（已改用左侧货币下拉按钮）
+          // 用户要求：百分号 % 一律显示在最上面那一行（已自建在左侧 .fin-toolbar2 里），
+          // 这里把 Univer 原生的百分号隐藏掉，避免宽窗口下出现两个 %。
+          'sheet.command.numfmt.set.percent': { hidden: true },       // 内置百分号 %
+          'sheet.operation.open.numfmt.panel': { hidden: true },      // 格式下拉（General ∨）
+          'base-ui.operation.toggle-shortcut-panel': { hidden: true }, // 快捷键面板开关（键盘图标）
+          // 用户要求：隐藏全部「保护范围 / 保护工作表」权限相关菜单（工具栏 + 单元格右键 + 工作表标签右键）
+          // id 取自 @univerjs/sheets-ui@0.5.5：
+          //   controllers/menu.schema.ts + controllers/menu/permission.menu.ts
+          //   commands/commands/range-protection.command.ts + worksheet-protection.command.ts
+          'sheet.contextMenu.permission': { hidden: true },              // 右键「保护范围」子菜单容器
+          'sheet.command.add-range-protection-from-toolbar': { hidden: true },         // 工具栏：保护范围
+          'sheet.command.add-range-protection-from-context-menu': { hidden: true },    // 右键：开启保护范围
+          'sheet.command.set-range-protection-from-context-menu': { hidden: true },    // 右键：编辑保护范围
+          'sheet.command.delete-range-protection-from-context-menu': { hidden: true }, // 右键：删除保护范围
+          'sheet.command.view-sheet-permission-from-context-menu': { hidden: true },   // 右键：查看全部保护区域
+          'sheet.command.add-range-protection-from-sheet-bar': { hidden: true },       // 标签右键：保护工作表
+          'sheet.command.delete-worksheet-protection-from-sheet-bar': { hidden: true },// 标签右键：取消保护工作表
+          'sheet.command.change-sheet-protection-from-sheet-bar': { hidden: true },    // 标签右键：更改工作表权限
+          'sheet.command.view-sheet-permission-from-sheet-bar': { hidden: true }       // 标签右键：查看全部保护区域
+        };
+        // 只有在菜单 API 可用时才隐藏内置项，避免注入失败导致菜单变空
+        var canMenu = !!(presets.FUniver && presets.FUniver.prototype && typeof presets.FUniver.prototype.createMenu === 'function');
+        var coreOpts = { container: 'univer_container' };
+        if (canMenu) coreOpts.menu = sortMenuCfg;
+
+        var createResult = presets.createUniver({
+          theme: presets.defaultTheme,
+          locale: initLocale,
+          locales: {
+            [presets.LocaleType.EN_US]: loc,
+            [presets.LocaleType.ZH_CN]: zhLoc,
+            [presets.LocaleType.VI_VN]: viLoc
+          },
+          presets: [
+            corePreset.UniverSheetsCorePreset(coreOpts)
+          ],
+          plugins: [
+            filterMod.UniverSheetsFilterPlugin,
+            filterUiMod.UniverSheetsFilterUIPlugin,
+            sortMod.UniverSheetsSortPlugin,
+            sortUiMod.UniverSheetsSortUIPlugin
+          ]
+        });
+        finUniver = createResult.univer;
+        finUniverAPI = createResult.univerAPI || null;
+        fin_debug('api=' + (finUniverAPI ? 'ok' : 'null') + ' createMenu=' + (typeof (finUniverAPI && finUniverAPI.createMenu)) + ' exec=' + (typeof (finUniverAPI && finUniverAPI.executeCommand)));
+
+        // 让 Univer 内部 locale 与页面当前语言保持一致
+        try { fin_setUniverLocale(CUR_LANG); } catch(e){}
+
+        finReady = true;
+        await fin_loadReport();
+        fin_bindChange();
+        fin_injectSortMenu();
+        setTimeout(function(){ fin_watchToolbar2(); }, 500);
+        fin_setStatusKey('fin_status_ready');
+      } catch (e) {
+        finInited = false;  // 出错允许重试
+        fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e));
+        console.error('Univer init error', e);
+      }
+    }
+
+    // 切换 Univer 内部 locale，让工具栏按钮的悬停提示跟随当前语言
+    // 实测：univer.setLocale() 不生效；要通过 __getInjector().get(LocaleService).setLocale()。
+    function fin_setUniverLocale(lang){
+      try {
+        if (!finUniver || !finUniver.__getInjector || !window.finPresets || !window.finPresets.LocaleService || !window.finPresets.LocaleType) return;
+        var inj = finUniver.__getInjector();
+        if (!inj || !inj.get) return;
+        var ls = inj.get(window.finPresets.LocaleService);
+        if (!ls || !ls.setLocale) return;
+        var lt = window.finPresets.LocaleType.EN_US;
+        if (lang === 'zh') lt = window.finPresets.LocaleType.ZH_CN;
+        if (lang === 'vi') lt = window.finPresets.LocaleType.VI_VN;
+        ls.setLocale(lt);
+      } catch(e){ console.warn('[locale] setLocale failed', e); }
+    }
+
+    // 刷新 HTML 按钮的 title 属性（data-title-key 三语联动）
+    function fin_refreshTitles(root){
+      try {
+        (root || document).querySelectorAll('[data-title-key]').forEach(function(el){
+          var k = el.getAttribute('data-title-key');
+          if (k) el.setAttribute('title', fin_L(k) || k);
+        });
+      } catch(e){}
+    }
+
+    function fin_getUsedRange(snapshot, sid){
+      var sh = snapshot && snapshot.sheets && snapshot.sheets[sid];
+      if (!sh) return null;
+      var cellData = sh.cellData || {};
+      var maxR = 0, maxC = 0, has = false;
+      for (var rk in cellData) {
+        var r = parseInt(rk, 10);
+        if (isNaN(r) || r < 0) continue;
+        if (r > maxR) maxR = r;
+        var row = cellData[rk] || {};
+        for (var ck in row) {
+          var c = parseInt(ck, 10);
+          if (isNaN(c) || c < 0) continue;
+          if (c > maxC) maxC = c;
+          has = true;
+        }
+      }
+      if (!has) return null;
+      // 筛选至少需要 2 行（表头 + 数据）
+      if (maxR < 1) maxR = 1;
+      return { startRow: 0, startColumn: 0, endRow: maxR, endColumn: maxC };
+    }
+
+    function fin_unitId(){
+      return (finSheet && typeof finSheet.getUnitId === 'function' && finSheet.getUnitId()) || (finLastSnapshot && finLastSnapshot.id) || 'vn-report';
+    }
+
+    // 取当前选区（返回 {startRow,startColumn,endRow,endColumn}）
+    function fin_getSelectionRange(){
+      try {
+        var wb = finUniverAPI && finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+        var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+        var rng = sh && sh.getActiveRange && sh.getActiveRange();
+        if (rng && typeof rng.getRow === 'function') {
+          return { startRow: rng.getRow(), startColumn: rng.getColumn(), endRow: rng.getLastRow(), endColumn: rng.getLastColumn() };
+        }
+      } catch(e){}
+      return null;
+    }
+
+    function fin_setFilterRange(range){
+      var sid = fin_curSheetId();
+      if (!sid || !range) return false;
+      if (range.endRow <= range.startRow) range.endRow = range.startRow + 1;
+      try {
+        finUniverAPI.executeCommand('sheet.command.set-filter-range', { unitId: fin_unitId(), subUnitId: sid, range: range });
+        finFilterActive = true;
+        return true;
+      } catch(e){ console.warn('setFilterRange', e); return false; }
+    }
+
+    function fin_removeFilter(){
+      var sid = fin_curSheetId();
+      if (!sid) return;
+      try { finUniverAPI.executeCommand('sheet.command.remove-sheet-filter', { unitId: fin_unitId(), subUnitId: sid }); } catch(e){}
+      finFilterActive = false;
+    }
+
+    function fin_isDatePattern(p){
+      if (!p) return false;
+      var s = String(p).replace(/\[[^\]]*\]/g, '')   // 去掉 [$-418] / [$đ-42A] 这类 locale 段
+                       .replace(/"[^"]*"/g, '')      // 去掉 "VND" / "đ" 这类字面量，避免把货币格式误判成日期
+                       .replace(/\\./g, '');         // 去掉 \" \\ 之类转义
+      return /[yd]/i.test(s);
+    }
+
+    // 合理的 Excel 日期序列号区间（1955-01-01≈20000，2120-01-01≈80000）。
+    // 用来识别“数字格式是 General、但内容其实是日期”的单元格 —— 旧表里日期常被存成纯数字（显示 46051）。
+    function fin_isDateSerial(v){
+      return (typeof v === 'number') && isFinite(v) && v >= 20000 && v <= 80000;
+    }
+
+    // 扫描一张表，找出「表头写着 Ngày/Date」的日期列，返回 0 基列号集合。
+    // 只认短标签（≤30 字符的字符串单元格），避免把备注里的“ngày ...”误判成列名。
+    function fin_dateHeaderCols(sh){
+      var res = {};
+      var cd = (sh && sh.cellData) || {};
+      for (var rk in cd) {
+        var row = cd[rk] || {};
+        for (var ck in row) {
+          var v = row[ck] && row[ck].v;
+          if (typeof v !== 'string') continue;
+          var t = v.trim();
+          if (!t || t.length > 30) continue;
+          if (/ng[aàáạảãâ]y|date/i.test(t)) res[parseInt(ck, 10)] = true;
+        }
+      }
+      return res;
+    }
+
+    // 解析单元格样式：cell.s 可能是 ①内联样式对象（从服务端快照加载的）②样式 id 字符串
+    // （Univer 运行时一旦写过样式——比如调用 numfmt——handleStyle 就会用 styles.setValue() 把 s 变成 id）。
+    function fin_cellStyle(snap, cd){
+      if (!cd) return null;
+      var s = cd.s;
+      if (!s) return null;
+      if (typeof s === 'string') return ((snap && snap.styles) || {})[s] || null;
+      return s;
+    }
+
+    // 一条黑色细边框（Univer BorderStyleTypes.THIN = 1）
+    function fin_blackSide(){ return { s: 1, cl: { rgb: '#000000' } }; }
+
+    // 日期格还缺的样式：缺日期格式 → 补 n；缺四边黑框 → 补 bd。
+    // 返回 { row: { col: { s: patch } } } 矩阵；没有要补的 → null（保证幂等，不会反复写样式）。
+    function fin_dateStyleMatrix(snap, sh){
+      var dateCols = fin_dateHeaderCols(sh);
+      if (!dateCols || !Object.keys(dateCols).length) return null;
+      var cellData = (sh && sh.cellData) || {};
+      var m = null;
+      for (var rk in cellData) {
+        var row = cellData[rk] || {};
+        for (var ck in row) {
+          var c = parseInt(ck, 10);
+          if (!dateCols[c]) continue;
+          var cd = row[ck] || {};
+          if (!fin_isDateSerial(cd.v)) continue;
+          var st = fin_cellStyle(snap, cd);
+          var hasFmt = fin_isDatePattern(st && st.n && st.n.pattern);
+          var bd = st && st.bd;
+          var hasBd = !!(bd && bd.l && bd.r && bd.t && bd.b);
+          if (hasFmt && hasBd) continue;
+          var r = parseInt(rk, 10);
+          if (isNaN(r)) continue;
+          var patch = {};
+          if (!hasFmt) patch.n = { pattern: 'dd-mm-yyyy' };   // 小写 token，numfmt 才认
+          if (!hasBd) patch.bd = { l: fin_blackSide(), r: fin_blackSide(), t: fin_blackSide(), b: fin_blackSide() };
+          if (!m) m = {};
+          if (!m[r]) m[r] = {};
+          m[r][c] = { s: patch };
+        }
+      }
+      return m;
+    }
+
+    // 把日期单元格的数字格式统一为 DD-MM-YYYY
+    //   ① 已经是日期格式的格 → 统一成小写 dd-mm-yyyy（大写 token numfmt 不认，会退化成序列号）
+    //   ② 表头写着 Ngày/Date 的列里、值是合理日期序列号的纯数字 → 也补上日期格式
+    // onlyCol == null：处理【全部工作表】（加载 / 一键按钮）；给了 onlyCol：只处理当前表的该列（排序菜单）。
+    function fin_normalizeDates(snap, onlyCol){
+      if (!finUniverAPI || !finUniverAPI.executeCommand) return 0;
+      var unitId = fin_unitId();
+      var sids = (onlyCol == null)
+        ? (((snap && snap.sheetOrder) || []).slice())
+        : [fin_curSheetId()];
+      var total = 0;
+      for (var si = 0; si < sids.length; si++) {
+        var sid = sids[si];
+        var sh = snap && snap.sheets && snap.sheets[sid];
+        if (!sh) continue;
+        var dateCols = fin_dateHeaderCols(sh);
+        var cellData = sh.cellData || {};
+        var values = [];
+        for (var rk in cellData) {
+          var r = parseInt(rk, 10);
+          if (isNaN(r)) continue;
+          var row = cellData[rk] || {};
+          for (var ck in row) {
+            if (onlyCol != null && String(onlyCol) !== ck) continue;
+            var c = parseInt(ck, 10);
+            if (isNaN(c)) continue;
+            var cd = row[ck] || {};
+            var st0 = fin_cellStyle(snap, cd) || {};
+            var pat = (st0.n && st0.n.pattern) || '';
+            var asDate = fin_isDatePattern(pat) || (dateCols[c] && fin_isDateSerial(cd.v));
+            if (typeof cd.v === 'number' && asDate) {
+              values.push({ row: r, col: c, pattern: 'dd-mm-yyyy' });   // 必须小写：大写的 DD-MM-YYYY 不被 numfmt 识别，会显示成序列号
+            }
+          }
+        }
+        // ① 数字格式（保证显示）
+        if (values.length) {
+          try {
+            finUniverAPI.executeCommand('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid, values: values });
+            total += values.length;
+          } catch(e){ console.warn('normalizeDates', e); }
+        }
+        // ② 样式补丁：把日期格式写进 cell.s（这样服务端保存时能落盘），并补回丢失的黑色四边框
+        var styleMat = fin_dateStyleMatrix(snap, sh);
+        if (styleMat) {
+          try {
+            finUniverAPI.executeCommand('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: styleMat });
+          } catch(e){ console.warn('normalizeDates.style', e); }
+        }
+      }
+      return total;
+    }
+
+    // 把 "18/8/2026" / "18-8-2026" 这类“文本日期”解析成 Excel 日期序列号（1899-12-30 起）
+    function fin_parseDateText(s){
+      var m = /^\s*(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})\s*$/.exec(String(s || ''));
+      if (!m) return null;
+      var a = parseInt(m[1], 10), b = parseInt(m[2], 10), y = parseInt(m[3], 10);
+      var d, mo;
+      if (a > 12) { d = a; mo = b; }        // 18/8/2026 → 日/月
+      else if (b > 12) { d = b; mo = a; }   // 8/18/2026 → 月/日
+      else { d = a; mo = b; }               // 有歧义时按报表约定 dd/mm/yyyy
+      if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > 2999) return null;
+      return Math.floor(Date.UTC(y, mo - 1, d) / 86400000) + 25569;
+    }
+
+    // 一键（绿色按钮）：
+    //   ① 把【全部工作表】的日期强制成 DD-MM-YYYY（文本日期 → 真日期 + 数字格式统一）
+    //   ② 在各自「日期连续块 / 区域」内按日期排序；再次点击切换升序 / 降序
+    // 为什么按“块”排：同一张表里往往有多个板块（如不同银行/项目段），
+    // 上一个板块的日期与下一个板块的日期没有关联，跨块排序会把数据排乱。
+    // 于是把“在日期列上连续有日期的行”视为一个块，只在块内排序。
+    // 落盘策略：①「日期统一」属数据规范化，会保存；②「排序」只是视图操作
+    // （命令 id 含 sort，被 fin_bindChange 忽略，不写盘），点「复位」可还原顺序。
+    // finDateSortDir = 下一次点击的排序方向：1 → 升序(↑，1月→2月→3月…)，-1 → 降序(↓，12月→11月→10月…)
+    // 按钮上的箭头指示“下一次点击”的方向，点一次后自动翻转，如此交替。默认 ↑。
+    var finDateSortDir = 1;
+    function fin_updateDateSortBtn(){
+      try {
+        var el = document.getElementById('fin_date_sort_arrow');
+        if (el) el.textContent = (finDateSortDir === 1 ? '↑' : '↓');
+      } catch(e){}
+    }
+    // 外壳：捕获任何异常并在状态栏给出提示（按钮“点了没反应”时能立刻看到原因），同时防连点
+    var finDateSortBusy = false;
+    async function fin_sortDatesByBlock(){
+      if (finDateSortBusy) return;
+      finDateSortBusy = true;
+      try {
+        await fin_sortDatesByBlockCore();
+      } catch(e){
+        console.warn('[fin] sortDatesByBlock', e);
+        fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e));
+      } finally { finDateSortBusy = false; }
+    }
+    async function fin_sortDatesByBlockCore(){
+      if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
+      var snap = fin_currentSnapshot();
+      if (!snap) { fin_setStatusKey('fin_status_no_wb'); return; }
+      var unitId = fin_unitId();
+      var asc = (finDateSortDir === 1);
+      finDateSortDir = asc ? -1 : 1;    // 点击后箭头翻转，指示“下一次点击”的方向
+      fin_updateDateSortBtn();
+      var dir = asc ? 'asc' : 'desc';   // SortType.ASC='asc' / SortType.DESC='desc'
+      var sids = (snap.sheetOrder || []).slice();
+      var convP = [], fmtP = [], sortP = [];
+      var convTotal = 0, fmtTotal = 0, blockTotal = 0, styleTotal = 0;
+      for (var si = 0; si < sids.length; si++) {
+        var sid = sids[si];
+        var sh = snap.sheets && snap.sheets[sid];
+        if (!sh) continue;
+        var cellData = sh.cellData || {};
+        var dateCols = fin_dateHeaderCols(sh);          // 表头为 Ngày/Date 的日期列（旧表里这些列常是纯数字）
+        var fmtVals = [], dateVal = {}, colCount = {}, maxCol = 0;
+        for (var rk in cellData) {
+          var r = parseInt(rk, 10);
+          if (isNaN(r)) continue;
+          var row = cellData[rk] || {};
+          for (var ck in row) {
+            var c = parseInt(ck, 10);
+            if (isNaN(c)) continue;
+            if (c > maxCol) maxCol = c;
+            var cd = row[ck] || {};
+            var stx = fin_cellStyle(snap, cd) || {};
+            var pat = (stx.n && stx.n.pattern) || '';
+            // 只认日期格：① 已是日期格式；② 位于日期列且值是合理的日期序列号（避免误伤金额/普通文本）
+            var asDate = fin_isDatePattern(pat) || (dateCols[c] && fin_isDateSerial(cd.v));
+            if (!asDate) continue;
+            var serial = null;
+            if (typeof cd.v === 'number') {
+              serial = cd.v;
+            } else if (typeof cd.v === 'string') {
+              serial = fin_parseDateText(cd.v);
+              if (serial == null) continue;
+              var vmat = {}; vmat[r] = {}; vmat[r][c] = { v: serial, t: 2 };   // t:2 = number
+              convP.push(finUniverAPI.executeCommand('sheet.command.set-range-values', {
+                unitId: unitId, subUnitId: sid,
+                range: { startRow: r, startColumn: c, endRow: r, endColumn: c },
+                value: vmat
+              }));
+              convTotal++;
+            } else { continue; }
+            fmtVals.push({ row: r, col: c, pattern: 'dd-mm-yyyy' });   // 小写 token，numfmt 才认
+            dateVal[r + ':' + c] = serial;
+            colCount[c] = (colCount[c] || 0) + 1;
+          }
+        }
+        if (fmtVals.length) {
+          fmtP.push(finUniverAPI.executeCommand('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid, values: fmtVals }));
+          fmtTotal += fmtVals.length;
+        }
+        // 样式补丁：把日期格式写进 cell.s（服务端保存时才能落盘）+ 补回丢失的黑色四边框
+        var styleMat = fin_dateStyleMatrix(snap, sh);
+        if (styleMat) {
+          fmtP.push(finUniverAPI.executeCommand('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: styleMat }));
+          styleTotal++;
+        }
+        // 本表的“日期列” = 日期格最多的那一列
+        var dateCol = -1, best = 0;
+        for (var cc in colCount) { if (colCount[cc] > best) { best = colCount[cc]; dateCol = parseInt(cc, 10); } }
+        if (dateCol < 0 || best < 2) continue;
+        var maxR = 0;
+        for (var dk in dateVal) { var rr = parseInt(String(dk).split(':')[0], 10); if (rr > maxR) maxR = rr; }
+        // 把“日期列上连续有日期”的行切成若干块，逐块排序（块内才有关联性）
+        var start = -1;
+        for (var r2 = 0; r2 <= maxR + 1; r2++) {
+          var has = (r2 <= maxR) && (dateVal[r2 + ':' + dateCol] != null);
+          if (has) { if (start < 0) start = r2; continue; }
+          if (start >= 0) {
+            var end = r2 - 1;
+            if (end > start) {
+              sortP.push(finUniverAPI.executeCommand('sheet.command.sort-range', {
+                unitId: unitId, subUnitId: sid,
+                range: { startRow: start, startColumn: 0, endRow: end, endColumn: maxCol },
+                orderRules: [{ colIndex: dateCol, type: dir }],
+                hasTitle: false
+              }));
+              blockTotal++;
+            }
+            start = -1;
+          }
+        }
+      }
+      try {
+        await Promise.all(convP);       // 1) 文本日期 → 真日期
+        await Promise.all(fmtP);        // 2) 数字格式 → DD-MM-YYYY
+        if (fmtTotal || convTotal || styleTotal) {
+          // 先把「日期规范化」落盘（此刻仍是原始行序），避免随后排序把行序一起写入
+          try { if (finSaveTimer) { clearTimeout(finSaveTimer); finSaveTimer = null; } } catch(e){}
+          try { await fin_autoSave(); } catch(e){}
+        }
+        await Promise.all(sortP);       // 3) 各区域块内按日期排序（视图，不落盘）
+      } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); return; }
+      if (!fmtTotal && !blockTotal && !styleTotal) { fin_setStatusKey('fin_status_dates_none'); return; }
+      fin_setStatusKey('fin_status_dates_sorted', ' ' + (asc ? '↑' : '↓') + ' (' + fmtTotal + (convTotal ? ' +' + convTotal : '') + ')');
+    }
+
+    async function fin_loadReport(){
+      fin_setStatusKey('fin_status_importing');
+      var resp = await fetch('/api/finance/vn-report/snapshot');
+      if (!resp.ok) { fin_setStatusKey('fin_status_not_init'); return; }
+      var snapshot = await resp.json();
+      finLastSnapshot = snapshot;
+      var _sid0 = snapshot && snapshot.sheetOrder && snapshot.sheetOrder[0];
+      var _maxR0 = fin_maxDataRow(snapshot, _sid0);
+      finRowOrder = [];
+      for (var _i = 1; _i <= _maxR0; _i++) finRowOrder.push(_i);
+      finFilterActive = false;
+      finDateSortDir = 1;
+      fin_updateDateSortBtn();
+      finLoading = true;
+      try {
+        fin_disposeUnit();   // 防止重复创建单元导致重影
+        var UNIT_SHEET = (finPresets && finPresets.UniverInstanceType && finPresets.UniverInstanceType.UNIVER_SHEET) || 2;
+        finSheet = finUniver.createUnit(UNIT_SHEET, snapshot);
+      } finally { finLoading = false; }
+      fin_setStatusKey('fin_status_loaded');
+      // 加载后统一日期格式为 DD-MM-YYYY（只改日期单元格）
+      setTimeout(function(){ fin_normalizeDates(snapshot); }, 400);
+    }
+
+    function fin_bindChange(){
+      try {
+        if (finUniver && typeof finUniver.onCommandExecuted === 'function') {
+          finUniver.onCommandExecuted(function(evt){
+            var id = (evt && evt.id) || (arguments[0] && arguments[0].id) || '';
+            // 排序/筛选只是视图操作，不写盘，保证「复位」能回到上次保存的顺序；
+            // 数字格式（numfmt）由「加载/一键按钮」自动重刷，也不单独触发写盘，避免每次刷新页面就重写整份 xlsx。
+            if (typeof id === 'string' && (id.indexOf('sort') >= 0 || id.indexOf('filter') >= 0 || id.indexOf('numfmt') >= 0)) return;
+            fin_markDirty();
+          });
+        }
+      } catch(e){ console.warn('bindChange', e); }
+    }
+
+    function fin_markDirty(){
+      if (finLoading || !finReady) return;
+      finDirty = true;
+      fin_setStatusKey('fin_status_dirty');
+      if (finSaveTimer) clearTimeout(finSaveTimer);
+      finSaveTimer = setTimeout(fin_autoSave, 1500);
+    }
+
+    // ★保存前必须把「样式 id」还原成「内联样式对象」：
+    //   Univer 中只要运行时写过样式（numfmt / set-range-values 等），handleStyle 就会调用
+    //   styles.setValue(merge) 把 cell.s 变成一串样式 id；而服务端 univer_to_xlsx 只认内联对象，
+    //   遇到字符串 id 会整格丢样式 —— 这正是「日期列黑色边框莫名消失」的根因。
+    function fin_inlineStyles(snapshot){
+      try {
+        if (!snapshot || !snapshot.styles) return snapshot;
+        var styles = snapshot.styles;
+        var out = JSON.parse(JSON.stringify(snapshot));   // 深拷贝，避免污染实时单元
+        var sheets = out.sheets || {};
+        for (var sid in sheets) {
+          var cellData = (sheets[sid] && sheets[sid].cellData) || {};
+          for (var rk in cellData) {
+            var row = cellData[rk] || {};
+            for (var ck in row) {
+              var cell = row[ck];
+              if (cell && typeof cell.s === 'string') {
+                var st = styles[cell.s];
+                if (st) cell.s = st; else delete cell.s;
+              }
+            }
+          }
+        }
+        return out;
+      } catch(e){ console.warn('[fin] inlineStyles', e); return snapshot; }
+    }
+
+    async function fin_autoSave(){
+      if (finSaving || !finReady) return;
+      finSaving = true;
+      fin_setStatusKey('fin_status_saving');
+      try {
+        var snapshot = fin_currentSnapshot();
+        if (!snapshot) { fin_setStatusKey('fin_status_no_wb'); finSaving = false; return; }
+        var resp = await fetch('/api/finance/vn-report/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fin_inlineStyles(snapshot))
+        });
+        var j = await resp.json();
+        if (j && j.ok) { finDirty = false; fin_setStatusKey('fin_status_saved', (j.saved_at || '')); }
+        else { fin_setStatusKey('fin_status_save_failed', ((j && j.error) || 'unknown')); }
+      } catch (e) {
+        fin_setStatusKey('fin_status_save_failed', (e && e.message ? e.message : e));
+      } finally { finSaving = false; }
+    }
+
+    function fin_snapshotPrompt(){
+      var p = prompt(fin_L('fin_prompt_snapshot'), '');
+      if (p) fin_snapshot(p.trim());
+    }
+
+    async function fin_snapshot(period){
+      if (finDirty) await fin_autoSave();
+      try {
+        var resp = await fetch('/api/finance/vn-report/snapshot?period=' + encodeURIComponent(period), { method:'POST' });
+        var j = await resp.json();
+        if (j && j.ok) { fin_setStatusKey('fin_status_snapshot_ok', (j.file || '')); }
+        else { fin_setStatusKey('fin_status_snapshot_fail', ((j && j.error) || '')); }
+      } catch(e){ fin_setStatusKey('fin_status_snapshot_fail', (e && e.message ? e.message : e)); }
+    }
+
+    function fin_exportLocal(){
+      // 直接下载服务器上已保存的 xlsx（与当前编辑内容一致，因已自动保存）
+      fin_setStatusKey('fin_status_exporting');
+      fetch('/api/finance/vn-report')
+        .then(function(r){ return r.blob(); })
+        .then(function(blob){
+          var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+          a.download = 'vn_report.xlsx'; a.click(); URL.revokeObjectURL(a.href);
+          fin_setStatusKey('fin_status_exported');
+        })
+        .catch(function(e){ fin_setStatusKey('fin_status_export_fail', e.message); });
+    }
+
+    async function fin_reimport(input){
+      var file = input.files && input.files[0];
+      if (!file) return;
+      fin_setStatusKey('fin_status_reimporting');
+      var fd = new FormData();
+      fd.append('file', file);
+      try {
+        var resp = await fetch('/api/finance/vn-report/init', { method: 'POST', body: fd });
+        var j = await resp.json();
+        if (j && j.ok) {
+          fin_setStatusKey('fin_status_reimported', String(j.bytes || ''));
+          // 重新导入后整页刷新，避免 Univer 插件/组件重复注册
+          setTimeout(function(){ window.location.reload(); }, 400);
+        } else {
+          fin_setStatusKey('fin_status_reimport_fail', ((j && j.error) || ''));
+        }
+      } catch(e) { fin_setStatusKey('fin_status_reimport_fail', (e && e.message ? e.message : e)); }
+      input.value = '';
+    }
+
+    // ===== 排序：升序/降序/复位（保留录入内容） =====
+    function fin_curSheetId(){
+      var snap = finLastSnapshot;
+      return (snap && snap.sheetOrder && snap.sheetOrder[0]) || null;
+    }
+
+    function fin_maxDataRow(snap, sid){
+      var cellData = (snap && snap.sheets && snap.sheets[sid] && snap.sheets[sid].cellData) || {};
+      var maxR = 1;
+      for (var rk in cellData) { var r = parseInt(rk, 10); if (!isNaN(r) && r > maxR) maxR = r; }
+      return maxR;
+    }
+
+    function fin_getActiveColumn(){
+      try {
+        var wb = finUniverAPI && finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+        var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+        var rng = sh && sh.getActiveRange && sh.getActiveRange();
+        if (rng && typeof rng.getColumn === 'function') return rng.getColumn();
+      } catch(e){}
+      return 0;
+    }
+
+    // 销毁当前工作簿单元。
+    // 注意：raw Univer 实例【没有】disposeUnit（v0.5.5 只有门面 FUniver 有），
+    // 必须且只能调用 finUniverAPI.disposeUnit(unitId)。它会：
+    //   1) 把单元从 UniverInstanceService 移除；2) 触发 unitDisposed$，渲染层据此删除旧 canvas
+    //      （少了这一步，旧单元会残留并继续渲染，新建单元叠加其上 → 出现「重影」）。
+    // 【不要】再额外调用 finSheet.dispose()：disposeUnit 已经连带清理了该单元的权限点，
+    // 再调模型 dispose 会去删已不存在的 permissionPoint，抛出
+    // "[PermissionService]: ... permissionPoint does not exist!"。
+    function fin_disposeUnit(){
+      var oldId = null;
+      try { if (finSheet && typeof finSheet.getUnitId === 'function') oldId = finSheet.getUnitId(); } catch(e){}
+      if (oldId && finUniverAPI && typeof finUniverAPI.disposeUnit === 'function') {
+        try { finUniverAPI.disposeUnit(oldId); } catch(e){ if (window.console) console.warn('disposeUnit', e); }
+      }
+      finSheet = null;
+    }
+
+    function fin_applySnapshot(snap){
+      fin_disposeUnit();
+      // 【必须复用同一个 unitId】（服务端快照自带 'vn-report'）。
+      // Univer 的权限点是按 unitId 注册的；若每次换成 'vn-report-<时间戳>'，
+      // 旧单元被真正移除后，仍残留的权限校验（形如 1.1_vn-report）会查不到权限点，
+      // 抛出 "[PermissionService]: 1.1_vn-report permissionPoint does not exist!"。
+      // 复用同一 id 后，新单元会把同一批权限点按原 id 重新注册，残留校验就能命中。
+      if (!snap.id) snap.id = 'vn-report';
+      var UNIT_SHEET = (finPresets && finPresets.UniverInstanceType && finPresets.UniverInstanceType.UNIVER_SHEET) || 2;
+      try {
+        finSheet = finUniver.createUnit(UNIT_SHEET, snap);
+      } catch (e) {
+        // 万一同名单元没清干净（__addUnit 会因重复 id 抛错），退化为唯一 id 兜底
+        snap.id = 'vn-report-' + Date.now();
+        finSheet = finUniver.createUnit(UNIT_SHEET, snap);
+      }
+      finLastSnapshot = snap;
+    }
+
+    function fin_afterDataChange(){
+      try { fin_markDirty(); } catch(e){}
+      try { if (typeof fin_autoSave === 'function') fin_autoSave(); } catch(e){}
+    }
+
+    function fin_sortByColumn(dir){
+      if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
+      try {
+        var col = fin_getActiveColumn();
+        // 排序前先把该列日期格统一成 DD-MM-YYYY（非日期格跳过）
+        var snap = fin_currentSnapshot();
+        if (snap) fin_normalizeDates(snap, col);
+        // 用 Univer 内置排序（正确维护行高/合并/公式）；日期为数值序列号，会按真实日期排序
+        setTimeout(function(){
+          try {
+            finUniverAPI.executeCommand(dir > 0 ? 'sheet.command.sort-range-asc' : 'sheet.command.sort-range-desc');
+            fin_setStatusKey(dir > 0 ? 'fin_status_sorted_asc' : 'fin_status_sorted_desc');
+          } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); }
+        }, 200);
+      } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); }
+    }
+
+    // 复位 = 从服务器重新加载（自动保存保证录入内容已落盘），恢复干净视图与原始顺序
+    async function fin_reload(){
+      if (!finUniver || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
+      fin_setStatusKey('fin_status_importing');
+      try {
+        // 先撤掉筛选：否则旧单元被销毁时，筛选插件仍持有状态并可能再发一次
+        // 带旧 unitId 的权限校验命令，从而在控制台抛 PermissionService 报错。
+        try { fin_removeFilter(); } catch(e){}
+        var resp = await fetch('/api/finance/vn-report/snapshot');
+        if (!resp.ok) { fin_setStatusKey('fin_status_not_init'); return; }
+        var snap = await resp.json();
+        finLastSnapshot = snap;
+        var sid0 = snap && snap.sheetOrder && snap.sheetOrder[0];
+        var maxR0 = fin_maxDataRow(snap, sid0);
+        finRowOrder = [];
+        for (var i = 1; i <= maxR0; i++) finRowOrder.push(i);
+        fin_applySnapshot(snap);
+        finFilterActive = false;
+        finDateSortDir = 1;
+        fin_updateDateSortBtn();
+        setTimeout(function(){ fin_normalizeDates(snap); }, 400);
+        fin_setStatusKey('fin_status_restored');
+      } catch(e){
+        fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e));
+      }
+    }
+
+    function fin_sortReset(){ fin_reload(); }
+
+    function fin_loadOrReload(){
+      if (finInited && finUniver && finSheet) { fin_reload(); return; }
+      fin_initUniver();
+    }
+
+    function fin_injectSortMenu(){
+      if (!finUniverAPI || typeof finUniverAPI.createMenu !== 'function') {
+        fin_debug('no createMenu API');
+        return;
+      }
+      var defs = [
+        { key: 'asc',   title: fin_L('fin_menu_sort_asc'),   order: 0, act: function(){ fin_sortByColumn(1); } },
+        { key: 'desc',  title: fin_L('fin_menu_sort_desc'),  order: 1, act: function(){ fin_sortByColumn(-1); } },
+        { key: 'reset', title: fin_L('fin_menu_sort_reset'), order: 2, act: function(){ fin_sortReset(); } }
+      ];
+      var errs = [];
+      ['sheet.menu.sheets-sort', 'sheet.menu.sheets-sort-ctx'].forEach(function(parent){
+        defs.forEach(function(d){
+          try {
+            finUniverAPI.createMenu({
+              id: 'fin.sort.' + d.key + (parent.indexOf('ctx') >= 0 ? '.ctx' : '.ribbon'),
+              title: d.title,
+              order: d.order,
+              action: d.act
+            }).appendTo(parent);
+          } catch(e){ errs.push(parent + ':' + (e && e.message ? e.message : e)); }
+        });
+      });
+      fin_debug(errs.length ? ('menu err ' + errs.slice(0,2).join(' | ')) : 'menu ok');
+    }
+
+    function fin_debug(msg){
+      try {
+        var el = document.getElementById('fin_debug');
+        if (el) el.textContent = String(msg || '');
+        if (window.console && console.log) console.log('[fin]', msg);
+      } catch(e){}
+    }
+
+    function fin_applyCurrency(pattern, statusKey){
+      if (!pattern) return;
+      if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
+      try {
+        var sid = fin_curSheetId();
+        var snap = finLastSnapshot;
+        var unitId = (typeof finSheet.getUnitId === 'function' && finSheet.getUnitId()) || (snap && snap.id) || 'vn-report';
+        var cells = [];
+        // 优先用当前选区
+        try {
+          var wb = finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+          var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+          var rng = sh && sh.getActiveRange && sh.getActiveRange();
+          if (rng && typeof rng.getRow === 'function') {
+            var sr = rng.getRow(), sc = rng.getColumn(), er = rng.getLastRow(), ec = rng.getLastColumn();
+            for (var r = sr; r <= er; r++) {
+              for (var c = sc; c <= ec; c++) cells.push({ row: r, col: c, pattern: pattern });
+            }
+          }
+        } catch(e){}
+        // 没有选区则用整片数据区
+        if (!cells.length) {
+          var range = sid ? fin_getUsedRange(snap, sid) : null;
+          if (range) {
+            for (var rr = range.startRow; rr <= range.endRow; rr++) {
+              for (var cc = range.startColumn; cc <= range.endColumn; cc++) cells.push({ row: rr, col: cc, pattern: pattern });
+            }
+          }
+        }
+        if (!cells.length) { fin_setStatusKey('fin_status_not_init'); return; }
+        finUniverAPI.executeCommand('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid, values: cells });
+        fin_setStatusKey(statusKey || 'fin_status_currency_applied');
+        fin_afterDataChange();
+      } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); }
+    }
+
+    // 用户要求：最上面一行固定显示「%」，点击对当前选区套用百分比格式
+    // （与 Univer 原生百分号同一套 numfmt 命令，原生按钮已隐藏）
+    function fin_applyPercent(){
+      fin_applyCurrency('0.00%', 'fin_status_percent_applied');
+    }
+
+    function fin_openFilterPanel(){
+      if (!finUniverAPI || !finUniverAPI.executeCommand) { fin_setStatusKey('fin_status_not_init'); return; }
+      var sid = fin_curSheetId();
+      var snap = finLastSnapshot;
+      if (!sid) { return; }
+      var unitId = fin_unitId();
+      var col = fin_getActiveColumn();
+      // 再点一次 = 取消筛选（像 Excel 的开关）
+      if (finFilterActive) {
+        fin_removeFilter();
+        fin_setStatusKey('fin_status_filter_off');
+        return;
+      }
+      // 以「当前选区」为筛选区域，向下扩展到数据末行（表头+数据，至少 2 行）
+      var sel = fin_getSelectionRange();
+      var used = fin_getUsedRange(snap, sid);
+      var range;
+      if (sel) {
+        range = {
+          startRow: sel.startRow,
+          startColumn: sel.startColumn,
+          endRow: Math.max(sel.endRow, used ? used.endRow : sel.endRow),
+          endColumn: sel.endColumn
+        };
+      } else if (used) {
+        range = used;
+      }
+      if (!range) { fin_setStatusKey('fin_status_not_init'); return; }
+      if (!fin_setFilterRange(range)) return;
+      fin_setStatusKey('fin_status_filter_on');
+      // 打开当前列的筛选面板（内置 Excel 式面板）
+      setTimeout(function(){
+        try { finUniverAPI.executeCommand('sheet.operation.open-filter-panel', { unitId: unitId, subUnitId: sid, col: col }); } catch(e){}
+      }, 250);
+    }
+
+    // 把「货币/升序/降序/复位/筛选」移到 Univer 自带工具栏最左侧
+    function fin_mountToolbar2(){
+      var bar = document.querySelector('.fin-toolbar2');
+      var host = document.querySelector('#univer_container .univer-toolbar-container');
+      if (!bar || !host) return;
+      if (bar.parentElement !== host) {
+        host.insertBefore(bar, host.firstChild);
+      } else if (host.firstChild !== bar) {
+        host.insertBefore(bar, host.firstChild);
+      }
+      fin_hideToolbarMore();
+    }
+    // 用户要求：隐藏 Univer 自带的「⋮」溢出收纳按钮（窗口不够宽时它会把 % 等按钮收进去藏起来）。
+    // 优先用 CSS :has()；这里给按钮打 class 做老内核兜底，并且每次 DOM 变动都重新打一遍。
+    function fin_hideToolbarMore(){
+      try {
+        var svgs = document.querySelectorAll('#univer_container svg[class*="more-function-single"]');
+        for (var i = 0; i < svgs.length; i++) {
+          var b = svgs[i].closest ? svgs[i].closest('button') : null;
+          if (!b) b = svgs[i].parentElement;
+          if (b && b.classList) b.classList.add('fin-hide-more-btn');
+        }
+      } catch(e){}
+    }
+    function fin_watchToolbar2(){
+      try { fin_mountToolbar2(); } catch(e){}
+      var host = document.getElementById('univer_container');
+      if (!host || !window.MutationObserver) return;
+      try {
+        if (finToolbarObserver) finToolbarObserver.disconnect();
+        finToolbarObserver = new MutationObserver(function(){ fin_mountToolbar2(); });
+        finToolbarObserver.observe(host, { childList: true, subtree: true });
+      } catch(e){}
+    }
+  </script>
 
   <!-- 资料库 -->
   <section class="view" id="view-library">
@@ -17236,8 +18333,8 @@ var PROD_EQUIP_FAULT_KB = {
     <div class="modal-header">
       <span id="modalTitle">编辑用户权限</span>
       <span class="modal-actions">
-        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" title="最大化">&#9633;</button>
-        <button class="close" type="button" onclick="closeModal()" title="关闭">&times;</button>
+        <button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest('.modal'))" data-title-key="fin_title_maximize">&#9633;</button>
+        <button class="close" type="button" onclick="closeModal()" data-title-key="fin_title_close">&times;</button>
       </span>
     </div>
     <div class="modal-tabs">
@@ -18667,6 +19764,7 @@ var I18N = {
     slats_table_remark:"备注", slats_table_op:"操作", slats_table_add:"+ 新增行", slats_table_total:"总计", slats_fill_required:"请完成全部必填框！",
     slats_default_bar_len_tip:"默认值是6，请根据实际修改！", slats_default_bar_wid_tip:"默认值是3，请根据实际修改！",
     slats_pig_house_1:"公猪站", slats_pig_house_2:"配种舍", slats_pig_house_3:"怀孕舍", slats_pig_house_4:"分娩舍", slats_pig_house_5:"保育舍", slats_pig_house_6:"育肥舍", slats_pig_house_7:"隔离舍", slats_pig_house_8:"后备舍", slats_pig_house_9:"转猪舍", slats_pig_house_10:"断奶培育舍", slats_pig_house_11:"代售舍", slats_pig_house_12:"过道", slats_pig_house_13:"自留备用", slats_pig_house_14:"其他房舍",     slats_pig_house_15:"其他用途",
+    nav_dashboard:"仪表盘", nav_won:"中标项目", nav_worklog:"工作日志", nav_install:"安装管理", nav_finance:"财务管理", nav_library:"资料库", nav_equity:"股东权益",
     nav_production:"生产管理", prod_title:"生产管理 · 现场工厂", prod_sub:"每个签约项目 = 一个独立现场工厂（人员/产能/设备/库存互不串）", prod_back:"← 返回列表",
     slats_mesh_1:"1", slats_mesh_2:"2",
     slats_rebar_φ6:"φ6", slats_rebar_φ8:"φ8", slats_rebar_φ10:"φ10", slats_rebar_φ12:"φ12",
@@ -19068,8 +20166,10 @@ var I18N = {
     lib_upload:"上传文件", lib_uploading:"上传中…", lib_upload_hint:"点击、拖拽或粘贴上传", lib_drop_here:"松开以上传文件", lib_preview:"预览", lib_download:"下载", lib_delete:"删除", lib_rename:"重命名", lib_save:"保存", lib_cancel:"取消",
     lib_open:"打开", lib_view_grid:"大图标", lib_view_list:"详细信息", lib_search_ph:"搜索文件…",
     lib_col_name:"名称", lib_col_modified:"修改日期", lib_col_type:"类型", lib_col_size:"大小", lib_col_action:"操作",
-    lib_kind_image:"图片", lib_kind_pdf:"PDF 文档", lib_kind_doc:"Word 文档", lib_kind_sheet:"Excel 表格", lib_kind_slide:"PPT 演示文稿", lib_kind_archive:"压缩包", lib_kind_text:"文本文档", lib_kind_file:"文件",
+    lib_kind_image:"图片", lib_kind_pdf:"PDF 文档", lib_kind_doc:"Word 文档", lib_kind_sheet:"Excel 表格", lib_kind_slide:"PPT 演示文稿", lib_kind_archive:"压缩包", lib_kind_text:"文本文档", lib_kind_file:"文件", lib_kind_video:"视频", lib_kind_audio:"音频",
     lib_crumb_root:"资料库", lib_selected_n:"已选中 {n} 项", lib_items_n:"共 {n} 个项目", lib_no_match:"没有匹配的文件",
+    lib_folder:"文件夹", lib_folder_meta:"{n} 个文件", lib_up_level:"上一级", lib_open_folder:"打开文件夹", lib_confirm_delete_dir:"确定删除该文件夹及其全部内容？", lib_upload_to:"上传到：",
+    lib_confirm_delete_multi:"确定删除选中的 {n} 项？",
     lib_view:"阅览", lib_loading:"加载中…", lib_previewing:"正在生成预览…", lib_converting:"首次预览需转换，请稍候…", lib_close:"关闭", lib_ok:"确定", lib_maximize:"最大化", lib_restore:"还原", lib_sheet:"工作表", lib_slide:"幻灯片", lib_unsupported:"该格式暂不支持在线阅览，请下载后查看", lib_forbidden_op:"您无权操作！", lib_upload_dir:"上传文件夹", lib_upload_done:"上传完成：成功 {ok} / 共 {total}", lib_cad_note:"此为 CAD 文件内嵌的预览缩略图；如需查看完整图纸，请下载后用 AutoCAD 打开。",
     lib_filename:"文件名", lib_uploader:"上传人", lib_upload_time:"上传时间", lib_size:"大小", lib_action:"操作",
     lib_forbidden_upload:"仅管理员/指定人员可上传、删除或重命名", lib_confirm_delete:"确定删除该文件？", lib_rename_placeholder:"新文件名", lib_no_preview:"该文件类型不支持在线预览，请下载查看",
@@ -19423,7 +20523,19 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     bp_opt_yes:"有", bp_opt_no:"无", bp_finished_yes:"结束", bp_finished_no:"尚未", bp_nature_advance:"提前预支佣金", bp_nature_normal:"正常支付佣金",
     comm_opt_agi:"AGI-客户", comm_opt_gs:"GS-客户",
     comm_col_currency:"签约货币", comm_f_currency:"签约货币", comm_cur_rmb:"人民币 RMB", comm_cur_usd:"美元 USD", comm_cur_vnd:"越南盾 VND",
-    comm_f_equip_rmb:"设备金额 RMB", comm_f_equip_usd:"设备金额 USD", comm_f_equip_vnd:"设备金额 VND", comm_f_deposit:"定金给付时间"
+    comm_f_equip_rmb:"设备金额 RMB", comm_f_equip_usd:"设备金额 USD", comm_f_equip_vnd:"设备金额 VND", comm_f_deposit:"定金给付时间",
+    fin_tab_vn_report:"越南财务报表", fin_tab_cn_report:"中国财务报表", fin_tab_merge_report:"合并财务总报表", fin_panel_placeholder:"该报表内容建设中，敬请期待。",
+    fin_btn_load:"载入/刷新报表", fin_btn_save:"保存", fin_btn_snapshot:"快照", fin_btn_export:"导出 xlsx", fin_btn_reimport:"重导", fin_btn_filter:"筛选", fin_btn_sort_asc:"升序", fin_btn_sort_desc:"降序",     fin_btn_restore:"复原", fin_btn_date_fmt:"按日-月-年排序",
+    fin_menu_sort_asc:"升序", fin_menu_sort_desc:"降序", fin_menu_sort_reset:"复位", fin_cur_none:"货币",
+    fin_status_not_loaded:"未载入", fin_status_engine:"正在加载表格引擎…", fin_status_importing:"正在导入报表…", fin_status_loaded:"报表已载入", fin_status_ready:"已就绪",
+    fin_status_dirty:"有改动，待保存…", fin_status_saving:"保存中…", fin_status_saved:"已保存 ", fin_status_save_failed:"保存失败：", fin_status_no_wb:"保存失败：找不到工作簿",
+    fin_status_load_failed:"加载失败：", fin_status_not_init:"尚未初始化报表（需先初始化 Excel）", fin_status_dates_fmt:"已按 DD-MM-YYYY 重排日期，共处理 ", fin_status_dates_none:"没有需要重排的日期单元格", fin_status_dates_sorted:"已在各区域按 DD-MM-YYYY 排序",
+    fin_status_snapshot_ok:"已生成快照 ", fin_status_snapshot_fail:"快照失败：", fin_status_exporting:"正在导出…", fin_status_exported:"已导出", fin_status_export_fail:"导出失败：",
+    fin_status_reimporting:"正在重新导入…", fin_status_reimported:"已重新导入 ", fin_status_reimport_fail:"重新导入失败：",
+    fin_status_filter_on:"筛选已开启", fin_status_filter_off:"筛选已关闭", fin_status_sorted_asc:"已升序", fin_status_sorted_desc:"已降序", fin_status_restored:"已复原", fin_status_currency_applied:"已应用货币格式", fin_status_percent_applied:"已应用百分比格式",
+    // 按钮悬停释义（三语联动）
+    fin_title_currency:"货币", fin_title_reset:"复位", fin_title_percent:"百分比", fin_title_maximize:"最大化", fin_title_close:"关闭", fin_title_rollback:"回滚到此版本",
+    fin_prompt_snapshot:"生成快照周期，例如 2026-10（当月）或 2026（当年）"
   },
   en: { 
     // ---- Login page / Reset Password / Forget Password (top-level keys for data-i18n scan) ----
@@ -19446,6 +20558,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     slats_table_remark:"Remarks", slats_table_op:"Operation", slats_table_add:"+ Add Row", slats_table_total:"Total", slats_fill_required:"Please complete all required fields!",
     slats_default_bar_len_tip:"Default is 6, please adjust as actual!", slats_default_bar_wid_tip:"Default is 3, please adjust as actual!",
     slats_pig_house_1:"Boar stud", slats_pig_house_2:"Mating barn", slats_pig_house_3:"Gestation barn", slats_pig_house_4:"Farrowing barn", slats_pig_house_5:"Nursery barn", slats_pig_house_6:"Finishing barn", slats_pig_house_7:"Isolation barn", slats_pig_house_8:"Gilt barn", slats_pig_house_9:"Transfer barn", slats_pig_house_10:"Weaner barn", slats_pig_house_11:"Sales barn", slats_pig_house_12:"Passage", slats_pig_house_13:"Reserved", slats_pig_house_14:"Other house",     slats_pig_house_15:"Other purposes",
+    nav_dashboard:"Dashboard", nav_won:"Won Projects", nav_worklog:"Work Log", nav_install:"Installation", nav_finance:"Finance", nav_library:"Library", nav_equity:"Equity",
     nav_production:"Production Management", prod_title:"Production Management · On-site Factory", prod_sub:"Each signed project = one independent on-site factory (staff / capacity / equipment / inventory are isolated)", prod_back:"← Back to list",
     slats_mesh_1:"1", slats_mesh_2:"2",
     slats_rebar_φ6:"φ6", slats_rebar_φ8:"φ8", slats_rebar_φ10:"φ10", slats_rebar_φ12:"φ12",
@@ -19847,8 +20960,10 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     lib_upload:"Upload", lib_uploading:"Uploading…", lib_upload_hint:"Click, drag or paste to upload", lib_drop_here:"Drop to upload", lib_preview:"Preview", lib_download:"Download", lib_delete:"Delete", lib_rename:"Rename", lib_save:"Save", lib_cancel:"Cancel",
     lib_open:"Open", lib_view_grid:"Large icons", lib_view_list:"Details", lib_search_ph:"Search files…",
     lib_col_name:"Name", lib_col_modified:"Date modified", lib_col_type:"Type", lib_col_size:"Size", lib_col_action:"Actions",
-    lib_kind_image:"Image", lib_kind_pdf:"PDF Document", lib_kind_doc:"Word Document", lib_kind_sheet:"Excel Worksheet", lib_kind_slide:"PowerPoint", lib_kind_archive:"Archive", lib_kind_text:"Text Document", lib_kind_file:"File",
+    lib_kind_image:"Image", lib_kind_pdf:"PDF Document", lib_kind_doc:"Word Document", lib_kind_sheet:"Excel Worksheet", lib_kind_slide:"PowerPoint", lib_kind_archive:"Archive", lib_kind_text:"Text Document", lib_kind_file:"File", lib_kind_video:"Video", lib_kind_audio:"Audio",
     lib_crumb_root:"Library", lib_selected_n:"{n} item(s) selected", lib_items_n:"{n} item(s)", lib_no_match:"No matching files",
+    lib_folder:"Folder", lib_folder_meta:"{n} file(s)", lib_up_level:"Up one level", lib_open_folder:"Open folder", lib_confirm_delete_dir:"Delete this folder and all its contents?", lib_upload_to:"Upload to: ",
+    lib_confirm_delete_multi:"Delete the {n} selected item(s)?",
     lib_view:"View", lib_loading:"Loading…", lib_previewing:"Preparing preview…", lib_converting:"Converting for first preview, please wait…", lib_close:"Close", lib_ok:"OK", lib_maximize:"Maximize", lib_restore:"Restore", lib_sheet:"Sheet", lib_slide:"Slide", lib_unsupported:"Preview is not supported for this format, please download to view", lib_forbidden_op:"You are not allowed to do this!", lib_upload_dir:"Upload folder", lib_upload_done:"Upload finished: {ok} of {total} succeeded", lib_cad_note:"This is the embedded preview thumbnail of the CAD file. Download and open with AutoCAD for the full drawing.",
     lib_filename:"File name", lib_uploader:"Uploader", lib_upload_time:"Uploaded", lib_size:"Size", lib_action:"Action",
     lib_forbidden_upload:"Only admin/designated users can upload, delete or rename", lib_confirm_delete:"Delete this file?", lib_rename_placeholder:"New file name", lib_no_preview:"Online preview is not supported for this file type, please download",
@@ -20205,7 +21320,19 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     bp_opt_yes:"Yes", bp_opt_no:"No", bp_finished_yes:"Finished", bp_finished_no:"Pending", bp_nature_advance:"Advance Commission", bp_nature_normal:"Regular Commission",
     comm_opt_agi:"AGI-Customer", comm_opt_gs:"GS-Customer",
     comm_col_currency:"Contract Currency", comm_f_currency:"Contract Currency", comm_cur_rmb:"CNY (RMB)", comm_cur_usd:"USD", comm_cur_vnd:"VND",
-    comm_f_equip_rmb:"Equip Amount RMB", comm_f_equip_usd:"Equip Amount USD", comm_f_equip_vnd:"Equip Amount VND", comm_f_deposit:"Deposit Payment Date"
+    comm_f_equip_rmb:"Equip Amount RMB", comm_f_equip_usd:"Equip Amount USD", comm_f_equip_vnd:"Equip Amount VND", comm_f_deposit:"Deposit Payment Date",
+    fin_tab_vn_report:"Vietnam Financial Report", fin_tab_cn_report:"China Financial Report", fin_tab_merge_report:"Consolidated Financial Statement", fin_panel_placeholder:"Content under construction, please stay tuned.",
+    fin_btn_load:"Load / Refresh", fin_btn_save:"Save", fin_btn_snapshot:"Snapshot", fin_btn_export:"Export xlsx", fin_btn_reimport:"Re-import", fin_btn_filter:"Filter", fin_btn_sort_asc:"Asc", fin_btn_sort_desc:"Desc", fin_btn_restore:"Restore", fin_btn_date_fmt:"Sort by day-month-year",
+    fin_menu_sort_asc:"Sort A → Z", fin_menu_sort_desc:"Sort Z → A", fin_menu_sort_reset:"Reset sort", fin_cur_none:"Currency",
+    fin_status_not_loaded:"Not loaded", fin_status_engine:"Loading engine…", fin_status_importing:"Importing report…", fin_status_loaded:"Report loaded", fin_status_ready:"Ready",
+    fin_status_dirty:"Unsaved changes…", fin_status_saving:"Saving…", fin_status_saved:"Saved ", fin_status_save_failed:"Save failed: ", fin_status_no_wb:"Save failed: workbook not found",
+    fin_status_load_failed:"Load failed: ", fin_status_not_init:"Report not initialized (init Excel first)", fin_status_dates_fmt:"Dates reformatted as DD-MM-YYYY, total ", fin_status_dates_none:"No date cells to reformat", fin_status_dates_sorted:"Sorted by DD-MM-YYYY within each block",
+    fin_status_snapshot_ok:"Snapshot created ", fin_status_snapshot_fail:"Snapshot failed: ", fin_status_exporting:"Exporting…", fin_status_exported:"Exported", fin_status_export_fail:"Export failed: ",
+    fin_status_reimporting:"Re-importing…", fin_status_reimported:"Re-imported ", fin_status_reimport_fail:"Re-import failed: ",
+    fin_status_filter_on:"Filter on", fin_status_filter_off:"Filter off", fin_status_sorted_asc:"Sorted ascending", fin_status_sorted_desc:"Sorted descending", fin_status_restored:"Restored", fin_status_currency_applied:"Currency format applied", fin_status_percent_applied:"Percent format applied",
+    // Button hover tooltips (trilingual)
+    fin_title_currency:"Currency", fin_title_reset:"Reset", fin_title_percent:"Percent", fin_title_maximize:"Maximize", fin_title_close:"Close", fin_title_rollback:"Rollback to this version",
+    fin_prompt_snapshot:"Snapshot period, e.g. 2026-10 (month) or 2026 (year)"
   },
   vi: { 
     // ---- Trang đăng nhập / Đặt lại mật khẩu / Quên mật khẩu (key cấp cao nhất) ----
@@ -20228,6 +21355,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     slats_table_remark:"Ghi chú", slats_table_op:"Thao tác", slats_table_add:"+ Thêm dòng", slats_table_total:"Tổng cộng", slats_fill_required:"Vui lòng điền đầy đủ các trường bắt buộc!",
     slats_default_bar_len_tip:"Mặc định là 6, vui lòng điều chỉnh theo thực tế!", slats_default_bar_wid_tip:"Mặc định là 3, vui lòng điều chỉnh theo thực tế!",
     slats_pig_house_1:"Trạm đực giống", slats_pig_house_2:"Chuồng phối giống", slats_pig_house_3:"Chuồng mang thai", slats_pig_house_4:"Chuồng đẻ", slats_pig_house_5:"Chuồng úm", slats_pig_house_6:"Chuồng vỗ béo", slats_pig_house_7:"Chuồng cách ly", slats_pig_house_8:"Chuồng heo dự bị", slats_pig_house_9:"Chuồng chuyển heo", slats_pig_house_10:"Chuồng cai sữa", slats_pig_house_11:"Chuồng chờ bán", slats_pig_house_12:"Hành lang", slats_pig_house_13:"Dành riêng", slats_pig_house_14:"Chuồng khác",     slats_pig_house_15:"Mục đích khác",
+    nav_dashboard:"Bảng điều khiển", nav_won:"Dự án trúng thầu", nav_worklog:"Nhật ký công việc", nav_install:"Quản lý lắp đặt", nav_finance:"Quản lý tài chính", nav_library:"Thư viện", nav_equity:"Quyền lợi cổ đông",
     nav_production:"Quản lý Sản xuất", prod_title:"Quản lý Sản xuất · Nhà máy tại công trường", prod_sub:"Mỗi dự án đã ký = một nhà máy độc lập tại công trường (nhân sự / công suất / thiết bị / tồn kho độc lập)", prod_back:"← Quay lại danh sách",
     slats_mesh_1:"1", slats_mesh_2:"2",
     slats_rebar_φ6:"φ6", slats_rebar_φ8:"φ8", slats_rebar_φ10:"φ10", slats_rebar_φ12:"φ12",
@@ -20629,8 +21757,10 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     lib_upload:"Tải lên", lib_uploading:"Đang tải lên…", lib_upload_hint:"Bấm, kéo thả hoặc dán để tải lên", lib_drop_here:"Thả để tải lên", lib_preview:"Xem trước", lib_download:"Tải xuống", lib_delete:"Xóa", lib_rename:"Đổi tên", lib_save:"Lưu", lib_cancel:"Hủy",
     lib_open:"Mở", lib_view_grid:"Biểu tượng lớn", lib_view_list:"Chi tiết", lib_search_ph:"Tìm tệp…",
     lib_col_name:"Tên", lib_col_modified:"Ngày sửa", lib_col_type:"Loại", lib_col_size:"Kích thước", lib_col_action:"Thao tác",
-    lib_kind_image:"Hình ảnh", lib_kind_pdf:"Tài liệu PDF", lib_kind_doc:"Tài liệu Word", lib_kind_sheet:"Bảng tính Excel", lib_kind_slide:"Trình chiếu PPT", lib_kind_archive:"Tệp nén", lib_kind_text:"Tài liệu văn bản", lib_kind_file:"Tệp",
+    lib_kind_image:"Hình ảnh", lib_kind_pdf:"Tài liệu PDF", lib_kind_doc:"Tài liệu Word", lib_kind_sheet:"Bảng tính Excel", lib_kind_slide:"Trình chiếu PPT", lib_kind_archive:"Tệp nén", lib_kind_text:"Tài liệu văn bản", lib_kind_file:"Tệp", lib_kind_video:"Video", lib_kind_audio:"Âm thanh",
     lib_crumb_root:"Thư viện", lib_selected_n:"Đã chọn {n} mục", lib_items_n:"{n} mục", lib_no_match:"Không có tệp phù hợp",
+    lib_folder:"Thư mục", lib_folder_meta:"{n} tệp", lib_up_level:"Lên một cấp", lib_open_folder:"Mở thư mục", lib_confirm_delete_dir:"Xóa thư mục này và toàn bộ nội dung?", lib_upload_to:"Tải lên vào: ",
+    lib_confirm_delete_multi:"Xóa {n} mục đã chọn?",
     lib_view:"Xem", lib_loading:"Đang tải…", lib_previewing:"Đang tạo bản xem trước…", lib_converting:"Đang chuyển đổi cho lần xem đầu tiên, vui lòng đợi…", lib_close:"Đóng", lib_ok:"Đồng ý", lib_maximize:"Phóng to", lib_restore:"Khôi phục", lib_sheet:"Trang tính", lib_slide:"Trang chiếu", lib_unsupported:"Định dạng này chưa hỗ trợ xem trực tuyến, vui lòng tải xuống để xem", lib_forbidden_op:"Bạn không có quyền thao tác!", lib_upload_dir:"Tải thư mục lên", lib_upload_done:"Tải lên xong: thành công {ok}/{total}", lib_cad_note:"Đây là ảnh thu nhỏ nhúng trong tệp CAD. Hãy tải xuống và mở bằng AutoCAD để xem bản vẽ đầy đủ.",
     lib_filename:"Tên tệp", lib_uploader:"Ngườitải lên", lib_upload_time:"Thờigian tải lên", lib_size:"Kích thước", lib_action:"Thao tác",
     lib_forbidden_upload:"Chỉ quản trị viên/ngườichỉ định mới được tải lên, xóa hoặc đổi tên", lib_confirm_delete:"Xóa tệp này?", lib_rename_placeholder:"Tên tệp mới", lib_no_preview:"Loại tệp này không hỗ trợ xem trước trực tuyến, vui lòng tải xuống",
@@ -20985,7 +22115,19 @@ crm_yes:"Có", crm_no_yes:"Không", lostRestore:"Chuyển về Dự án Tiềm n
     bp_opt_yes:"Có", bp_opt_no:"Không", bp_finished_yes:"Kết thúc", bp_finished_no:"Chưa", bp_nature_advance:"Ứng trước hoa hồng", bp_nature_normal:"TT hoa hồng bình thường",
     comm_opt_agi:"AGI-Khách hàng", comm_opt_gs:"GS-Khách hàng",
     comm_col_currency:"Loại tiền tệ HĐ", comm_f_currency:"Loại tiền tệ HĐ", comm_cur_rmb:"Nhân dân tệ RMB", comm_cur_usd:"Đô USD", comm_cur_vnd:"Việt Nam đồng VND",
-    comm_f_equip_rmb:"Giá trị TB RMB", comm_f_equip_usd:"Giá trị TB USD",     comm_f_equip_vnd:"Giá trị TB VND", comm_f_deposit:"Ngày trả đặt cọc"
+    comm_f_equip_rmb:"Giá trị TB RMB", comm_f_equip_usd:"Giá trị TB USD",     comm_f_equip_vnd:"Giá trị TB VND", comm_f_deposit:"Ngày trả đặt cọc",
+    fin_tab_vn_report:"Báo cáo tài chính Việt Nam", fin_tab_cn_report:"Báo cáo tài chính Trung Quốc", fin_tab_merge_report:"Báo cáo tài chính tổng hợp", fin_panel_placeholder:"Nội dung đang xây dựng, vui lòng chờ.",
+    fin_btn_load:"Tải lại báo cáo", fin_btn_save:"Lưu", fin_btn_snapshot:"Ảnh chụp", fin_btn_export:"Xuất xlsx", fin_btn_reimport:"Nhập lại", fin_btn_filter:"Lọc", fin_btn_sort_asc:"Tăng", fin_btn_sort_desc:"Giảm", fin_btn_restore:"Khôi phục", fin_btn_date_fmt:"Sắp xếp theo ngày-tháng-năm",
+    fin_menu_sort_asc:"Sắp xếp A → Z", fin_menu_sort_desc:"Sắp xếp Z → A", fin_menu_sort_reset:"Khôi phục thứ tự", fin_cur_none:"Tiền tệ",
+    fin_status_not_loaded:"Chưa tải", fin_status_engine:"Đang tải công cụ bảng…", fin_status_importing:"Đang nhập báo cáo…", fin_status_loaded:"Đã tải báo cáo", fin_status_ready:"Sẵn sàng",
+    fin_status_dirty:"Có thay đổi, chờ lưu…", fin_status_saving:"Đang lưu…", fin_status_saved:"Đã lưu ", fin_status_save_failed:"Lưu thất bại: ", fin_status_no_wb:"Lưu thất bại: không tìm thấy bảng tính",
+    fin_status_load_failed:"Tải thất bại: ", fin_status_not_init:"Báo cáo chưa khởi tạo (cần khởi tạo Excel)", fin_status_dates_fmt:"Đã sắp xếp lại ngày theo DD-MM-YYYY, tổng ", fin_status_dates_none:"Không có ô ngày cần sắp xếp lại", fin_status_dates_sorted:"Đã sắp xếp theo DD-MM-YYYY trong từng khối",
+    fin_status_snapshot_ok:"Đã tạo ảnh chụp ", fin_status_snapshot_fail:"Ảnh chụp thất bại: ", fin_status_exporting:"Đang xuất…", fin_status_exported:"Đã xuất", fin_status_export_fail:"Xuất thất bại: ",
+    fin_status_reimporting:"Đang nhập lại…", fin_status_reimported:"Đã nhập lại ", fin_status_reimport_fail:"Nhập lại thất bại: ",
+    fin_status_filter_on:"Đã bật lọc", fin_status_filter_off:"Đã tắt lọc", fin_status_sorted_asc:"Đã sắp xếp tăng", fin_status_sorted_desc:"Đã sắp xếp giảm", fin_status_restored:"Đã khôi phục", fin_status_currency_applied:"Đã áp dụng định dạng tiền tệ", fin_status_percent_applied:"Đã áp dụng định dạng phần trăm",
+    // Chú thích nút khi hover (3 ngôn ngữ)
+    fin_title_currency:"Tiền tệ", fin_title_reset:"Đặt lại", fin_title_percent:"Phần trăm", fin_title_maximize:"Phóng to", fin_title_close:"Đóng", fin_title_rollback:"Khôi phục về phiên bản này",
+    fin_prompt_snapshot:"Nhập kỳ ảnh chụp, ví dụ 2026-10 (tháng) hoặc 2026 (năm)"
   }
 };
 var CUR_LANG = 'en';
@@ -21051,7 +22193,15 @@ function sweepI18n(root) {
   var list = root.querySelectorAll('[data-i18n]');
   for (var i = 0; i < list.length; i++) {
     var k = list[i].getAttribute('data-i18n');
-    if (k && t[k] !== undefined) list[i].textContent = t[k];
+    if (!k) continue;
+    var v = t[k];
+    if (v === undefined && window.__EXTRA_I18N && window.__EXTRA_I18N[k] && window.__EXTRA_I18N[k][CUR_LANG] !== undefined) {
+      v = window.__EXTRA_I18N[k][CUR_LANG];
+    }
+    if (v === undefined && window.PROD_I18N && window.PROD_I18N[CUR_LANG] && window.PROD_I18N[CUR_LANG][k] !== undefined) {
+      v = window.PROD_I18N[CUR_LANG][k];
+    }
+    if (v !== undefined) list[i].textContent = v;
   }
   var alist = root.querySelectorAll('[data-i18n-attr]');
   for (var j = 0; j < alist.length; j++) {
@@ -23031,6 +24181,8 @@ function setLangDebug(lang) {
   // ---- 第一步：立即切换语言并高亮按钮（用户马上看到反馈）----
   CUR_LANG = lang;
   try { window.__lang = lang; } catch(e){}
+  // Univer 表格工具栏悬停提示跟随语言
+  try { fin_setUniverLocale(lang); } catch(e){}
   // 广播语言切换事件，供各模块（生产管理等）直接订阅重渲染，避免依赖 lightSteps 作用域
   try { window.dispatchEvent(new CustomEvent('app:langchange', { detail:{lang:lang} })); } catch(e){}
   // ================================================================
@@ -23087,19 +24239,34 @@ function setLangDebug(lang) {
     if (typeof markViewsDirty === 'function') markViewsDirty(['dashboard', 'users', 'approvals']);
   } catch(e){}
 
+  // 统一取词：主 I18N → __EXTRA_I18N → PROD_I18N，与 T()/resolveText() 的解析顺序保持一致。
+  // 【必须保留】历史上这里只查 I18N[CUR_LANG]，导致 data-i18n 指向 __EXTRA_I18N / PROD_I18N 的键
+  // 在切语言时永远扫不到、文案停留在旧语言（"漏网之鱼"，如生产管理 D 区的
+  // lbl_floor_spec「当前生产的地板规格」/ lbl_for_house2「用于猪舍的水泥板」）。
+  var __langTr = function(k){
+    if(k == null) return undefined;
+    var I = window.I18N;
+    if(I && I[CUR_LANG] && I[CUR_LANG][k] !== undefined) return I[CUR_LANG][k];
+    var E = window.__EXTRA_I18N;
+    if(E && E[k] && E[k][CUR_LANG] !== undefined) return E[k][CUR_LANG];
+    var P = window.PROD_I18N;
+    if(P && P[CUR_LANG] && P[CUR_LANG][k] !== undefined) return P[CUR_LANG][k];
+    return undefined;
+  };
+
   // 登录页文案随切语言实时刷新（独立于主顶栏，覆盖登录/忘记/重置文案）
   try {
     var t2 = (I18N && I18N[CUR_LANG]) || I18N.en;
     var lp = document.getElementById('loginPage');
     if (lp && getComputedStyle(lp).display !== 'none') {
       lp.querySelectorAll('[data-i18n]').forEach(function(el){
-        var k = el.getAttribute('data-i18n'); if (t2[k] !== undefined) el.textContent = t2[k];
+        var k = el.getAttribute('data-i18n'); var v = __langTr(k); if (v !== undefined) el.textContent = v;
       });
       lp.querySelectorAll('[data-i18n-attr]').forEach(function(el){
         var spec = el.getAttribute('data-i18n-attr') || '';
         spec.split(';').forEach(function(pair){
           var parts = pair.split(':');
-          if (parts.length === 2 && t2[parts[1]] !== undefined) el.setAttribute(parts[0], t2[parts[1]]);
+          if (parts.length === 2) { var v = __langTr(parts[1]); if (v !== undefined) el.setAttribute(parts[0], v); }
         });
       });
       // 清掉旧的报错（避免不同语言下残留前一次的提示）
@@ -23109,13 +24276,13 @@ function setLangDebug(lang) {
     var ao = document.getElementById('authModalOverlay');
     if (ao && !ao.classList.contains('hidden')) {
       ao.querySelectorAll('[data-i18n]').forEach(function(el){
-        var k = el.getAttribute('data-i18n'); if (t2[k] !== undefined) el.textContent = t2[k];
+        var k = el.getAttribute('data-i18n'); var v = __langTr(k); if (v !== undefined) el.textContent = v;
       });
       ao.querySelectorAll('[data-i18n-attr]').forEach(function(el){
         var spec = el.getAttribute('data-i18n-attr') || '';
         spec.split(';').forEach(function(pair){
           var parts = pair.split(':');
-          if (parts.length === 2 && t2[parts[1]] !== undefined) el.setAttribute(parts[0], t2[parts[1]]);
+          if (parts.length === 2) { var v = __langTr(parts[1]); if (v !== undefined) el.setAttribute(parts[0], v); }
         });
       });
     }
@@ -23124,15 +24291,17 @@ function setLangDebug(lang) {
   // ---- 全局 data-i18n / data-i18n-attr 刷新（上传/预览面板等通用组件）----
   try {
     document.body.querySelectorAll('[data-i18n]').forEach(function(el){
-      var k = el.getAttribute('data-i18n'); if (t2[k] !== undefined) el.textContent = t2[k];
+      var k = el.getAttribute('data-i18n'); var v = __langTr(k); if (v !== undefined) el.textContent = v;
     });
     document.body.querySelectorAll('[data-i18n-attr]').forEach(function(el){
       var spec = el.getAttribute('data-i18n-attr') || '';
       spec.split(';').forEach(function(pair){
         var parts = pair.split(':');
-        if (parts.length === 2 && t2[parts[1]] !== undefined) el.setAttribute(parts[0], t2[parts[1]]);
+        if (parts.length === 2) { var v = __langTr(parts[1]); if (v !== undefined) el.setAttribute(parts[0], v); }
       });
     });
+    // 刷新自定义按钮的 title 属性（data-title-key 三语联动）
+    try { fin_refreshTitles(document.body); } catch(e){}
   } catch(e) { console.warn('[lang] global i18n sweep:', e); }
 
   // ---- 漏缝地板规格下拉菜单：切语言时同步刷新选项文案（保留已选值）----
@@ -37792,6 +38961,12 @@ function switchView(name) {
   if (name === 'commission' && typeof autoFitCommissionTable === 'function') {
     setTimeout(autoFitCommissionTable, 0);
   }
+  // 切到财务管理页后同步三语标签页高亮状态（语言包刷新也走全局 data-i18n 扫描，无需重渲染）
+  if (name === 'finance' && typeof fin_renderTabs === 'function') {
+    setTimeout(function(){ fin_renderTabs(FIN_ACTIVE_TAB); }, 0);
+    // 进入财务视图即懒加载越南报表的 Univer 实例（首次联网拉取引擎，之后走缓存）
+    if (typeof fin_initUniver === 'function') { setTimeout(fin_initUniver, 0); }
+  }
   // 记住当前视图，刷新后仍停留在该标签页
   try { sessionStorage.setItem('won_current_view', name); } catch(e){}
   // 标签横向滚动时，把刚切换到的标签滚进可见区域，避免"点了却看不到高亮"
@@ -41724,6 +42899,8 @@ if (document.getElementById('loginUser')) fillSavedLogin();
         if (parts.length === 2 && t[parts[1]] !== undefined) el.setAttribute(parts[0], t[parts[1]]);
       });
     });
+    // 刷新全页 data-title-key 按钮悬停释义（三语联动）
+    try { if (typeof fin_refreshTitles === 'function') fin_refreshTitles(document.body); } catch(e){}
     // 语言切换按钮高亮（主顶栏 + 登录页右上角）
     ['zh','en','vi'].forEach(function(l){
       ['loginLang','dbgLang'].forEach(function(p){
@@ -42286,7 +43463,15 @@ function submitAuth() {
   var LIB_VIEW = 'grid';      // 'grid' | 'list'
   var LIB_SORT = 'date';      // 'date' | 'name' | 'size'
   var LIB_FILTER = '';
-  var LIB_SELECTED = null;
+  var LIB_SELECTED = null;    // 最后选中的项（用于确认气泡锚点）
+  var LIB_CWD = '';           // 当前所在文件夹（相对根目录的路径，'' = 根）
+  var LIB_SEL = [];           // 多选集合：文件为 'id'，文件夹为 'dir:path'
+  var LIB_ANCHOR = null;      // Shift 连选的锚点
+  var LIB_ORDER = [];         // 当前视图渲染顺序（供 Shift 连选）
+  var LIB_DRAG_MOVED = false; // 本次鼠标操作是否发生了框选拖拽
+  var LIB_MQ = null;          // 框选矩形 DOM
+  var LIB_MQ_START = null;    // 框选起点状态
+  var LIB_MQ_BASE = null;     // 按住 Ctrl 框选时的已有选择
 
   function lt(k){ var t=T(); return t[k] || k; }
   function libApi(path, opts){
@@ -42373,51 +43558,149 @@ function submitAuth() {
     var m = String(name||'').toLowerCase().match(/\.([a-z0-9]+)$/);
     return m ? m[1] : '';
   }
-  function lib_fileIcon(name){
+  /* ---------- Windows / Office 风格的文件类型图标（纯内联 SVG，无外部依赖） ----------
+     统一版式：折角纸张 + 大字母（应用首字母）+ 底部小字（真实扩展名），一眼可辨类型。 */
+  function lib_badgeSvg(letter, label, bg, fold, labelColor){
+    var fs = !letter ? 0 : (letter.length >= 3 ? 9 : (letter.length === 2 ? 11 : 15));
+    var s = '<svg viewBox="0 0 40 44" width="1em" height="1.12em" style="vertical-align:-0.2em" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M3 5a3 3 0 0 1 3-3h20l11 11v26a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" fill="' + bg + '"/>' +
+      '<path d="M26 2l11 11H29a3 3 0 0 1-3-3z" fill="' + fold + '"/>';
+    if(letter){
+      s += '<text x="19" y="23" font-size="' + fs + '" font-weight="700" fill="#ffffff" text-anchor="middle" ' +
+           'font-family="Arial,Helvetica,sans-serif">' + letter + '</text>';
+    }
+    if(label){
+      s += '<text x="20" y="35" font-size="8" font-weight="700" fill="' + (labelColor || '#ffffff') + '" ' +
+           'text-anchor="middle" font-family="Arial,Helvetica,sans-serif">' + label + '</text>';
+    }
+    return s + '</svg>';
+  }
+  // 扩展名 → 图标配色/文字（与 Windows / Office 的视觉习惯对齐）
+  function lib_iconSpec(name){
     var e = lib_ext(name);
-    var map = {pdf:'📕',doc:'📘',docx:'📘',xls:'📗',xlsx:'📗',csv:'📊',ppt:'📙',pptx:'📙',txt:'📄',md:'📝',
-      jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',webp:'🖼️',bmp:'🖼️',svg:'🖼️',
-      zip:'🗜️',rar:'🗜️','7z':'🗜️',dwg:'📐',dxf:'📐',mp4:'🎬',mp3:'🎵',wav:'🎵'};
-    return map[e] || '📄';
+    var L = e ? e.toUpperCase().slice(0,4) : 'FILE';
+    if(e === 'pdf')                                 return { letter:'A', label:'PDF',  bg:'#E5252A', fold:'#B00E12', lc:'#ffe0e1' };
+    if(['doc','docx','rtf','odt'].indexOf(e) >= 0)  return { letter:'W', label:L, bg:'#2B579A', fold:'#1E3F73', lc:'#d6e4f7' };
+    if(['xls','xlsx','xlsm','csv'].indexOf(e) >= 0) return { letter:'X', label:L, bg:'#217346', fold:'#175C36', lc:'#d6efdf' };
+    if(['ppt','pptx','pptm'].indexOf(e) >= 0)       return { letter:'P', label:L, bg:'#D24726', fold:'#9E3115', lc:'#ffe0d6' };
+    if(['dwg','dxf','dwf','dwfx'].indexOf(e) >= 0)  return { letter:'A', label:L, bg:'#C8102E', fold:'#8D0B20', lc:'#ffe1e6' };
+    if(['zip','rar','7z','gz','tar','bz2'].indexOf(e) >= 0) return { letter:'Z', label:L, bg:'#D9A204', fold:'#A87C00', lc:'#fff3d1' };
+    if(['jpg','jpeg','png','gif','webp','bmp','svg','ico'].indexOf(e) >= 0) return { letter:'I', label:L, bg:'#1E88E5', fold:'#1565C0', lc:'#dcecff' };
+    if(['mp4','avi','mov','mkv','wmv','flv','m4v'].indexOf(e) >= 0) return { letter:'V', label:L, bg:'#6A1B9A', fold:'#4E1372', lc:'#eadcf7' };
+    if(['mp3','wav','flac','aac','m4a','ogg','wma'].indexOf(e) >= 0) return { letter:'M', label:L, bg:'#00897B', fold:'#00695C', lc:'#d3f2ee' };
+    if(['txt','md','log','json','xml','ini','yml','yaml'].indexOf(e) >= 0) return { letter:'T', label:L, bg:'#5B6B7C', fold:'#42505E', lc:'#e2e9f0' };
+    return { letter:'', label:L, bg:'#9AA5B3', fold:'#7C8794', lc:'#ffffff' };
   }
   function lib_fileKind(name){
     var e = lib_ext(name);
-    if(['jpg','jpeg','png','gif','webp','bmp','svg'].indexOf(e)>=0) return lt('lib_kind_image');
+    if(['jpg','jpeg','png','gif','webp','bmp','svg','ico'].indexOf(e)>=0) return lt('lib_kind_image');
     if(e==='pdf') return lt('lib_kind_pdf');
-    if(['doc','docx'].indexOf(e)>=0) return lt('lib_kind_doc');
-    if(['xls','xlsx','csv'].indexOf(e)>=0) return lt('lib_kind_sheet');
-    if(['ppt','pptx'].indexOf(e)>=0) return lt('lib_kind_slide');
-    if(['zip','rar','7z'].indexOf(e)>=0) return lt('lib_kind_archive');
-    if(['txt','md'].indexOf(e)>=0) return lt('lib_kind_text');
+    if(['doc','docx','rtf','odt'].indexOf(e)>=0) return lt('lib_kind_doc');
+    if(['xls','xlsx','xlsm','csv'].indexOf(e)>=0) return lt('lib_kind_sheet');
+    if(['ppt','pptx','pptm'].indexOf(e)>=0) return lt('lib_kind_slide');
+    if(['zip','rar','7z','gz','tar','bz2'].indexOf(e)>=0) return lt('lib_kind_archive');
+    if(['mp4','avi','mov','mkv','wmv','flv','m4v'].indexOf(e)>=0) return lt('lib_kind_video');
+    if(['mp3','wav','flac','aac','m4a','ogg','wma'].indexOf(e)>=0) return lt('lib_kind_audio');
+    if(['txt','md','log','json','xml','ini','yml','yaml'].indexOf(e)>=0) return lt('lib_kind_text');
     return (e ? e.toUpperCase() + ' ' : '') + lt('lib_kind_file');
   }
-  // CAD(DWG/DXF) 专用图标：红色图纸 + 白色 A + 类型字样，一眼可辨是 AutoCAD 文件
-  function lib_cadBadge(label){
-    return '<svg viewBox="0 0 40 44" width="1em" height="1.12em" style="vertical-align:-0.2em" xmlns="http://www.w3.org/2000/svg">' +
-      '<path d="M3 5a3 3 0 0 1 3-3h20l11 11v26a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z" fill="#C8102E"/>' +
-      '<path d="M26 2l11 11H29a3 3 0 0 1-3-3z" fill="#8D0B20"/>' +
-      '<text x="19" y="23" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle" font-family="Arial,Helvetica,sans-serif">A</text>' +
-      '<text x="20" y="35" font-size="8.5" font-weight="700" fill="#ffe1e6" text-anchor="middle" font-family="Arial,Helvetica,sans-serif">' + label + '</text>' +
-      '</svg>';
-  }
+  // 文件类型图标（Windows / Office 风格）
   function lib_fileIconHtml(name){
-    var e = lib_ext(name);
-    if(e === 'dwg' || e === 'dxf' || e === 'dwf' || e === 'dwfx') return lib_cadBadge(e.toUpperCase());
-    return lib_fileIcon(name);
+    var sp = lib_iconSpec(name);
+    return lib_badgeSvg(sp.letter, sp.label, sp.bg, sp.fold, sp.lc);
   }
   function lib_attr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-  function lib_sortedFiles(){
-    var arr = (LIB_FILES||[]).slice();
-    if(LIB_FILTER){
-      var q = LIB_FILTER.toLowerCase();
-      arr = arr.filter(function(f){ return String(f.original_name||f.filename||'').toLowerCase().indexOf(q)>=0; });
-    }
+  // 用于内联 onclick 里的 JS 字符串字面量（单引号包裹）——同时做 JS 转义 + HTML 属性转义
+  function lib_jsarg(s){
+    s = String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,'\\n');
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  // 用于 CSS 属性选择器 [data-id="..."] 的字符串转义
+  function lib_cssStr(v){ return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/"/g,'\\"'); }
+
+  /* ---------- 文件夹（目录）模型：按 original_name 里的相对路径还原真实层级 ---------- */
+  function lib_normPath(p){ return String(p==null?'':p).replace(/\\/g,'/').replace(/^\/+|\/+$/g,''); }
+  function lib_joinPath(a, b){
+    var x = lib_normPath(a), y = lib_normPath(b);
+    if(!x) return y;
+    if(!y) return x;
+    return x + '/' + y;
+  }
+  function lib_pathParts(p){ var n = lib_normPath(p); return n ? n.split('/') : []; }
+  // 单个文件的相对显示路径（去掉盘符/前导斜杠，兼容历史脏数据）
+  function lib_relPath(f){
+    var p = String((f && (f.original_name || f.filename)) || '').replace(/\\/g,'/');
+    p = p.replace(/^[A-Za-z]:/, '');
+    return lib_normPath(p);
+  }
+  function lib_isImageName(name){
+    var e = lib_ext(name);
+    return ['jpg','jpeg','png','gif','webp','bmp','svg','ico'].indexOf(e) >= 0;
+  }
+
+  function lib_sortFiles(arr){
+    arr = (arr||[]).slice();
     arr.sort(function(a,b){
       if(LIB_SORT==='name') return String(a.original_name||a.filename||'').localeCompare(String(b.original_name||b.filename||''));
       if(LIB_SORT==='size') return (b.size||0)-(a.size||0);
       return String(b.created_at||'').localeCompare(String(a.created_at||''));
     });
     return arr;
+  }
+  // 保留旧签名（其它地方可能调用）：返回全部文件
+  function lib_sortedFiles(){
+    var arr = lib_sortFiles(LIB_FILES);
+    if(LIB_FILTER){
+      var q = LIB_FILTER.toLowerCase();
+      arr = arr.filter(function(f){ return String(f.original_name||f.filename||'').toLowerCase().indexOf(q)>=0; });
+    }
+    return arr;
+  }
+  // 当前视图条目：{ folders:[{name,path,count,size,modified,uploader}], files:[...], search:bool }
+  function lib_entries(){
+    var q = (LIB_FILTER || '').toLowerCase();
+    // 搜索模式：跨层级递归匹配，平铺展示，名称里带上相对路径便于区分
+    if(q){
+      var hit = [];
+      (LIB_FILES||[]).forEach(function(f){
+        if(lib_relPath(f).toLowerCase().indexOf(q) >= 0) hit.push(f);
+      });
+      return { folders: [], files: lib_sortFiles(hit), search: true };
+    }
+    var cwdParts = lib_pathParts(LIB_CWD), depth = cwdParts.length;
+    var files = [], map = {}, order = [];
+    (LIB_FILES||[]).forEach(function(f){
+      var parts = lib_pathParts(lib_relPath(f));
+      var fname = parts.pop();
+      if(!fname || parts.length < depth) return;
+      var match = true;
+      for(var i=0;i<depth;i++){ if(parts[i] !== cwdParts[i]){ match = false; break; } }
+      if(!match) return;
+      if(parts.length > depth){
+        var sub = parts[depth];
+        var path = lib_joinPath(LIB_CWD, sub);
+        var e = map[path];
+        if(!e){
+          e = map[path] = { type:'folder', name: sub, path: path, count:0, size:0, modified:'', uploader:'' };
+          order.push(path);
+        }
+        e.count++;
+        e.size += (f.size || 0);
+        var d = String(f.created_at || '');
+        if(d > e.modified) e.modified = d;
+        if(f.uploader) e.uploader = f.uploader;
+      } else {
+        files.push(f);
+      }
+    });
+    var folders = order.map(function(k){ return map[k]; });
+    folders.sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); });
+    return { folders: folders, files: lib_sortFiles(files), search: false };
+  }
+  // 该文件夹（含所有子层级）下的全部文件
+  function lib_filesUnder(path){
+    var pre = lib_normPath(path) + '/';
+    return (LIB_FILES||[]).filter(function(f){ return lib_relPath(f).indexOf(pre) === 0; });
   }
   function lib_crumbHtml(){
     var html = '<div class="lib-crumb">';
@@ -42426,12 +43709,23 @@ function submitAuth() {
       html += '<span class="cb-sep">›</span>';
       if(LIB_PROJECT_ID){
         html += '<span class="cb-item" onclick="lib_backToProjects()">' + lt('lib_tab_project') + '</span>';
-        html += '<span class="cb-sep">›</span><span class="cb-cur">' + lib_selectedProjectTitle() + '</span>';
+        html += '<span class="cb-sep">›</span><span class="cb-item" onclick="lib_goDir(\'\')">' + lib_selectedProjectTitle() + '</span>';
       } else {
         html += '<span class="cb-cur">' + lt('lib_tab_project') + '</span>';
       }
     } else {
-      html += '<span class="cb-sep">›</span><span class="cb-cur">' + lt('lib_tab_common') + '</span>';
+      html += '<span class="cb-sep">›</span><span class="cb-item" onclick="lib_goDir(\'\')">' + lt('lib_tab_common') + '</span>';
+    }
+    // 逐级目录
+    var parts = lib_pathParts(LIB_CWD), acc = '';
+    for(var i=0;i<parts.length;i++){
+      acc = lib_joinPath(acc, parts[i]);
+      html += '<span class="cb-sep">›</span>';
+      if(i === parts.length - 1){
+        html += '<span class="cb-cur">' + esc(parts[i]) + '</span>';
+      } else {
+        html += '<span class="cb-item" onclick="lib_goDir(\'' + lib_jsarg(acc) + '\')">' + esc(parts[i]) + '</span>';
+      }
     }
     html += '</div>';
     return html;
@@ -42441,15 +43735,19 @@ function submitAuth() {
     if(LIB_TAB === 'project' && LIB_PROJECT_ID){
       html += '<button class="lib-btn lib-back-btn" onclick="lib_backToProjects()">' + lt('lib_back') + '</button>';
     }
+    if(LIB_CWD){
+      html += '<button class="lib-btn" onclick="lib_upLevel()" title="' + lib_attr(lt('lib_up_level')) + '">⬆ ' + lt('lib_up_level') + '</button>';
+    }
     if(lib_canEdit()){
       html += '<button class="lib-btn lib-btn-primary" onclick="lib_pickUpload()">＋ ' + lt('lib_upload') + '</button>';
       html += '<button class="lib-btn" title="' + lib_attr(lt('lib_upload_dir')) + '" onclick="lib_pickUploadDir()">🗂 ' + lt('lib_upload_dir') + '</button>';
       html += '<input type="file" id="lib-file-input" class="lib-upload-input" multiple onchange="lib_doUpload(this)">';
       html += '<input type="file" id="lib-dir-input" class="lib-upload-input" webkitdirectory directory multiple onchange="lib_doUploadDir(this)">';
       html += '<span class="lib-hint" style="margin:0;">' + lt('lib_upload_hint') + '</span>';
-    } else {
-      html += '<span class="lib-hint" style="margin:0;">' + lt('lib_forbidden_upload') + '</span>';
+      if(LIB_CWD) html += '<span class="lib-hint" style="margin:0;color:#E53935;font-weight:600;">' + lt('lib_upload_to') + esc(LIB_CWD) + '</span>';
     }
+    html += '<span id="lib-sel-actions" style="display:none;margin:0;">' +
+      '<button class="lib-btn lib-del-sel-btn" onclick="lib_deleteSelected()">🗑 ' + lt('lib_delete') + '</button></span>';
     html += '<span class="lib-spacer"></span>';
     html += '<input class="lib-search" type="text" placeholder="' + lib_attr(lt('lib_search_ph')) + '" value="' + lib_attr(LIB_FILTER) + '" oninput="lib_setFilter(this.value)">';
     html += '<div class="lib-viewtoggle">' +
@@ -42459,14 +43757,48 @@ function submitAuth() {
     html += '</div>';
     return html;
   }
-  function lib_gridHtml(list){
+  // 缩略图加载失败 → 回退成类型图标
+  window.lib_thumbFail = function(img){
+    if(img) img.style.display = 'none';
+    var p = img && img.parentNode;
+    if(p && p.classList) p.classList.add('thumb-failed');
+  };
+  // 图标：图片在网格里直接显示缩略图（延迟加载），其余用类型图标
+  function lib_tileIcon(f, nm){
+    if(lib_isImageName(nm)){
+      return '<div class="ft-icon ft-icon-img">' +
+        '<img class="ft-thumb" loading="lazy" alt="" src="/api/library/files/' + f.id + '/raw" onerror="lib_thumbFail(this)">' +
+        '<span class="ft-icon-fb">' + lib_fileIconHtml(nm) + '</span>' +
+        '</div>';
+    }
+    return '<div class="ft-icon">' + lib_fileIconHtml(nm) + '</div>';
+  }
+  function lib_fileDisplayName(f, search){
+    var nm = lib_relPath(f);
+    if(search) return nm;                       // 搜索时显示相对路径，便于区分同名文件
+    var parts = lib_pathParts(nm);
+    return parts.length ? parts[parts.length-1] : nm;
+  }
+
+  function lib_gridHtml(ent){
     var html = '<div class="lib-grid">';
-    list.forEach(function(f){
-      var nm = f.original_name || f.filename || '';
-      html += '<div class="lib-tile' + (LIB_SELECTED===f.id?' selected':'') + '" data-id="' + f.id + '"' +
+    (ent.folders||[]).forEach(function(d){
+      html += '<div class="lib-tile lib-tile-dir' + (lib_isSel('dir:'+d.path)?' selected':'') + '"' +
+        ' data-id="dir:' + lib_attr(d.path) + '" data-dir="' + lib_attr(d.path) + '"' +
+        ' onclick="lib_itemClick(event,\'dir:' + lib_jsarg(d.path) + '\')"' +
+        ' ondblclick="lib_openDir(\'' + lib_jsarg(d.path) + '\')"' +
+        ' oncontextmenu="lib_dirCtx(event,\'' + lib_jsarg(d.path) + '\')" title="' + lib_attr(d.name) + '">' +
+        '<div class="ft-icon">📁</div>' +
+        '<div class="ft-name">' + esc(d.name) + '</div>' +
+        '<div class="ft-meta">' + lt('lib_folder_meta').replace('{n}', d.count) + '</div>' +
+        '</div>';
+    });
+    (ent.files||[]).forEach(function(f){
+      var nm = lib_fileDisplayName(f, ent.search);
+      html += '<div class="lib-tile' + (lib_isSel(f.id)?' selected':'') + '" data-id="' + f.id + '"' +
         ' onclick="lib_itemClick(event,' + f.id + ')" ondblclick="lib_view(' + f.id + ')"' +
         ' oncontextmenu="lib_itemCtx(event,' + f.id + ')" title="' + lib_attr(nm) + '">' +
-        '<div class="ft-icon">' + lib_fileIconHtml(nm) + '</div>' +
+        lib_tileIcon(f, nm) +
         '<div class="ft-name">' + esc(nm) + '</div>' +
         '<div class="ft-meta">' + libBytes(f.size) + ' · ' + esc(f.uploader || '-') + '</div>' +
         '</div>';
@@ -42474,7 +43806,7 @@ function submitAuth() {
     html += '</div>';
     return html;
   }
-  function lib_listHtml(list){
+  function lib_listHtml(ent){
     var html = '<table class="lib-list"><thead><tr>' +
       '<th onclick="lib_setSort(\'name\')">' + lt('lib_col_name') + '</th>' +
       '<th onclick="lib_setSort(\'date\')">' + lt('lib_col_modified') + '</th>' +
@@ -42482,9 +43814,23 @@ function submitAuth() {
       '<th onclick="lib_setSort(\'size\')" style="width:110px;">' + lt('lib_col_size') + '</th>' +
       '<th style="width:250px;">' + lt('lib_col_action') + '</th>' +
       '</tr></thead><tbody>';
-    list.forEach(function(f){
-      var nm = f.original_name || f.filename || '';
-      html += '<tr class="' + (LIB_SELECTED===f.id?'selected':'') + '" data-id="' + f.id + '"' +
+    (ent.folders||[]).forEach(function(d){
+      html += '<tr class="lib-row-dir' + (lib_isSel('dir:'+d.path)?' selected':'') + '"' +
+        ' data-id="dir:' + lib_attr(d.path) + '" data-dir="' + lib_attr(d.path) + '"' +
+        ' onclick="lib_itemClick(event,\'dir:' + lib_jsarg(d.path) + '\')"' +
+        ' ondblclick="lib_openDir(\'' + lib_jsarg(d.path) + '\')"' +
+        ' oncontextmenu="lib_dirCtx(event,\'' + lib_jsarg(d.path) + '\')">' +
+        '<td><span class="fl-icon">📁</span><span class="fl-name">' + esc(d.name) + '</span></td>' +
+        '<td>' + libFormatDate(d.modified) + '</td>' +
+        '<td>' + esc(lt('lib_folder')) + '</td>' +
+        '<td>' + libBytes(d.size) + '</td>' +
+        '<td onclick="event.stopPropagation()">' +
+        '<button class="lib-act-btn" onclick="lib_openDir(\'' + lib_jsarg(d.path) + '\')">' + lt('lib_open_folder') + '</button>' +
+        '</td></tr>';
+    });
+    (ent.files||[]).forEach(function(f){
+      var nm = lib_fileDisplayName(f, ent.search);
+      html += '<tr class="' + (lib_isSel(f.id)?'selected':'') + '" data-id="' + f.id + '"' +
         ' onclick="lib_itemClick(event,' + f.id + ')" ondblclick="lib_view(' + f.id + ')"' +
         ' oncontextmenu="lib_itemCtx(event,' + f.id + ')">' +
         '<td><span class="fl-icon">' + lib_fileIconHtml(nm) + '</span><span class="fl-name">' + esc(nm) + '</span></td>' +
@@ -42534,23 +43880,47 @@ function submitAuth() {
     // 列表重渲染时：气泡只跟随重新定位，绝不因重渲染而关闭（避免切语言/刷新时消失）
     if(document.getElementById('libconfirm')){
       var _aid = LIB_CONFIRM && LIB_CONFIRM.anchorId;
-      var _el = _aid ? document.querySelector('#lib-body [data-id="' + _aid + '"]') : null;
+      var _el = _aid ? document.querySelector('#lib-body [data-id="' + lib_cssStr(_aid) + '"]') : null;
       if(_el) lib_placeConfirm(document.getElementById('libconfirm'), _el);
     }
-    var list = lib_sortedFiles();
-    if(!list.length){
-      wrap.innerHTML = '<div class="lib-empty">' + (LIB_FILTER ? lt('lib_no_match') : lt('lib_no_files')) + '</div>';
+    var ent = lib_entries();
+    // 渲染顺序（供 Shift 连选）+ 剔除已不在当前视图中的选择
+    LIB_ORDER = ent.folders.map(function(d){ return 'dir:' + d.path; })
+      .concat(ent.files.map(function(f){ return String(f.id); }));
+    LIB_SEL = LIB_SEL.filter(function(k){ return LIB_ORDER.indexOf(k) >= 0; });
+    if(LIB_SEL.indexOf(String(LIB_SELECTED)) < 0) LIB_SELECTED = LIB_SEL.length ? LIB_SEL[LIB_SEL.length-1] : null;
+    var total = ent.folders.length + ent.files.length;
+    if(!total){
+      wrap.innerHTML = '<div class="lib-empty">' + ((LIB_FILTER || LIB_CWD) ? lt('lib_no_match') : lt('lib_no_files')) + '</div>';
     } else {
-      wrap.innerHTML = (LIB_VIEW === 'grid') ? lib_gridHtml(list) : lib_listHtml(list);
+      wrap.innerHTML = (LIB_VIEW === 'grid') ? lib_gridHtml(ent) : lib_listHtml(ent);
     }
     var cnt = document.getElementById('lib-sb-count');
-    if(cnt) cnt.textContent = lt('lib_items_n').replace('{n}', list.length);
+    if(cnt){
+      var txt = lt('lib_items_n').replace('{n}', total);
+      if(ent.folders.length) txt += ' · ' + lt('lib_folder') + ' ' + ent.folders.length;
+      cnt.textContent = txt;
+    }
     lib_updateSelBar();
   }
+  function lib_isSel(key){ return LIB_SEL.indexOf(String(key)) >= 0; }
+  function lib_selClear(){
+    LIB_SEL = []; LIB_SELECTED = null; LIB_ANCHOR = null;
+    lib_applySelection(); lib_updateSelBar();
+  }
   function lib_updateSelBar(){
-    var sel = document.getElementById('lib-sb-sel'); if(!sel) return;
-    if(LIB_SELECTED){ sel.style.display = ''; sel.textContent = lt('lib_selected_n').replace('{n}', 1); }
-    else { sel.style.display = 'none'; sel.textContent = ''; }
+    var n = LIB_SEL.length;
+    var sel = document.getElementById('lib-sb-sel');
+    if(sel){
+      if(n){ sel.style.display = ''; sel.textContent = lt('lib_selected_n').replace('{n}', n); }
+      else { sel.style.display = 'none'; sel.textContent = ''; }
+    }
+    var box = document.getElementById('lib-sel-actions');
+    if(box){
+      box.style.display = (n && lib_canEdit()) ? '' : 'none';
+      var b = box.querySelector('.lib-del-sel-btn');
+      if(b) b.textContent = '🗑 ' + lt('lib_delete') + ' (' + n + ')';
+    }
   }
   function lib_syncToggle(){
     var btns = document.querySelectorAll('.lib-viewtoggle button');
@@ -42562,16 +43932,139 @@ function submitAuth() {
   window.lib_setView = function(v){ LIB_VIEW = (v === 'list' ? 'list' : 'grid'); lib_syncToggle(); lib_renderList(); };
   window.lib_setFilter = function(v){ LIB_FILTER = v || ''; lib_renderList(); };
   window.lib_setSort = function(s){ LIB_SORT = s; lib_renderList(); };
-  window.lib_crumbRoot = function(){ LIB_PROJECT_ID = null; LIB_SELECTED = null; lib_renderProjectCards(); };
+  window.lib_crumbRoot = function(){
+    LIB_PROJECT_ID = null; LIB_SELECTED = null; LIB_CWD = ''; LIB_FILTER = '';
+    LIB_SEL = []; LIB_ANCHOR = null;
+    if(LIB_TAB === 'project') lib_renderProjectCards();
+    else lib_renderFiles();
+  };
+
+  /* ---------- 目录导航（进入 / 上一级 / 面包屑） ---------- */
+  window.lib_goDir = function(path){
+    LIB_CWD = lib_normPath(path);
+    LIB_SELECTED = null; LIB_SEL = []; LIB_ANCHOR = null;
+    LIB_FILTER = '';
+    lib_renderFiles();
+  };
+  window.lib_openDir = function(path){ lib_goDir(path); };
+  window.lib_upLevel = function(){
+    var parts = lib_pathParts(LIB_CWD);
+    parts.pop();
+    LIB_CWD = parts.join('/');
+    LIB_SELECTED = null; LIB_SEL = []; LIB_ANCHOR = null;
+    LIB_FILTER = '';
+    lib_renderFiles();
+  };
+  window.lib_dirCtx = function(ev, path){
+    ev.preventDefault(); ev.stopPropagation();
+    var key = 'dir:' + lib_normPath(path);
+    if(!lib_isSel(key)){ LIB_SEL = [key]; LIB_ANCHOR = key; }
+    LIB_SELECTED = key;
+    lib_applySelection(); lib_updateSelBar();
+    lib_closeCtx();
+    var menu = document.createElement('div');
+    menu.className = 'lib-ctx'; menu.id = 'lib-ctx';
+    var items = '<div class="cx-item" onclick="lib_closeCtx();lib_openDir(\'' + lib_jsarg(path) + '\')">📂 ' + lt('lib_open_folder') + '</div>';
+    if(lib_canEdit()){
+      if(LIB_SEL.length > 1){
+        items += '<div class="cx-sep"></div>' +
+          '<div class="cx-item cx-danger" onclick="lib_closeCtx();lib_deleteSelected()">🗑 ' + lt('lib_delete') + ' (' + LIB_SEL.length + ')</div>';
+      } else {
+        items += '<div class="cx-sep"></div>' +
+          '<div class="cx-item cx-danger" onclick="lib_closeCtx();lib_dirDelete(\'' + lib_jsarg(path) + '\')">🗑 ' + lt('lib_delete') + '</div>';
+      }
+    }
+    menu.innerHTML = items;
+    document.body.appendChild(menu);
+    var w = menu.offsetWidth, h = menu.offsetHeight;
+    menu.style.left = Math.max(6, Math.min(ev.clientX, window.innerWidth - w - 8)) + 'px';
+    menu.style.top  = Math.max(6, Math.min(ev.clientY, window.innerHeight - h - 8)) + 'px';
+  };
+  // 选中集合 → 实际文件列表（文件夹展开为其下全部文件，自动去重）
+  function lib_selFiles(){
+    var out = [], seen = {};
+    LIB_SEL.forEach(function(k){
+      var arr = (k.indexOf('dir:') === 0) ? lib_filesUnder(k.slice(4)) : [lib_fileById(Number(k))];
+      for(var i=0;i<arr.length;i++){
+        var f = arr[i];
+        if(f && !seen[f.id]){ seen[f.id] = 1; out.push(f); }
+      }
+    });
+    return out;
+  }
+  // 批量删除（逐个请求，全部完成后刷新并清空选择）
+  function lib_deleteFiles(files){
+    var ids = (files||[]).map(function(f){ return f.id; });
+    if(!ids.length) return;
+    var i = 0, failed = 0;
+    (function step(){
+      if(i >= ids.length){
+        lib_selClear();
+        lib_loadFiles();
+        if(failed) showToast('delete failed: ' + failed);
+        else showToast(lt('saveOk'));
+        return;
+      }
+      var fid = ids[i++];
+      showToast(lt('lib_uploading') + ' ' + i + '/' + ids.length);
+      fetch('/api/library/files/' + fid, {method:'DELETE', headers: authHeaders({})})
+        .then(function(r){ return r.json().catch(function(){ return {}; }); })
+        .then(function(res){ if(!(res && res.ok)) failed++; step(); })
+        .catch(function(){ failed++; step(); });
+    })();
+  }
+  // 删除当前多选（可包含文件夹）
+  window.lib_deleteSelected = function(){
+    if(!lib_canEdit()){ showToast(lt('lib_forbidden_op')); return; }
+    var files = lib_selFiles();
+    if(!files.length) return;
+    lib_closeCtx();
+    var multi = LIB_SEL.length > 1;
+    var anchor = LIB_SELECTED ? document.querySelector('#lib-body [data-id="' + lib_cssStr(LIB_SELECTED) + '"]') : null;
+    lib_confirm(multi ? 'lib_confirm_delete_multi' : 'lib_confirm_delete', anchor, function(){
+      lib_deleteFiles(files);
+    }, multi ? LIB_SEL.length : null);
+  };
+  // 删除整个文件夹（含所有子层级文件）
+  window.lib_dirDelete = function(path){
+    if(!lib_canEdit()){ showToast(lt('lib_forbidden_op')); return; }
+    var p = lib_normPath(path);
+    var list = lib_filesUnder(p);
+    if(!list.length) return;
+    var anchor = document.querySelector('#lib-body [data-dir="' + lib_cssStr(p) + '"]');
+    lib_confirm('lib_confirm_delete_dir', anchor, function(){ lib_deleteFiles(list); });
+  };
   window.lib_applySelection = function(){
     var nodes = document.querySelectorAll('#lib-body [data-id]');
     for(var i=0;i<nodes.length;i++){
-      var on = (String(nodes[i].getAttribute('data-id')) === String(LIB_SELECTED));
+      var on = lib_isSel(nodes[i].getAttribute('data-id'));
       if(on) nodes[i].classList.add('selected'); else nodes[i].classList.remove('selected');
     }
   };
+  // 单击 / Ctrl 点选 / Shift 连选（与 Windows 资源管理器一致）
   window.lib_itemClick = function(ev, id){
-    LIB_SELECTED = id;
+    if(LIB_DRAG_MOVED){ LIB_DRAG_MOVED = false; return; }   // 框选刚结束，忽略随之而来的 click
+    var key = String(id);
+    if(ev && ev.shiftKey && LIB_ANCHOR != null){
+      var a = LIB_ORDER.indexOf(String(LIB_ANCHOR)), b = LIB_ORDER.indexOf(key);
+      if(a >= 0 && b >= 0){
+        var lo = Math.min(a,b), hi = Math.max(a,b);
+        LIB_SEL = LIB_ORDER.slice(lo, hi+1);
+        LIB_SELECTED = key;
+        lib_applySelection(); lib_updateSelBar();
+        return;
+      }
+    }
+    if(ev && (ev.ctrlKey || ev.metaKey)){
+      var i = LIB_SEL.indexOf(key);
+      if(i >= 0) LIB_SEL.splice(i,1); else LIB_SEL.push(key);
+      LIB_ANCHOR = key;
+      LIB_SELECTED = LIB_SEL.length ? LIB_SEL[LIB_SEL.length-1] : null;
+    } else {
+      LIB_SEL = [key];
+      LIB_ANCHOR = key;
+      LIB_SELECTED = key;
+    }
     lib_applySelection();
     lib_updateSelBar();
   };
@@ -42587,20 +44080,24 @@ function submitAuth() {
     if(ov && ov.parentNode) ov.parentNode.removeChild(ov);
     LIB_CONFIRM = null;
   };
+  function lib_confirmText(key, count){
+    var t = lt(key);
+    return (count == null) ? t : t.replace('{n}', count);
+  }
   window.lib_confirmRefresh = function(){
     if(!LIB_CONFIRM) return;
     var pop = document.getElementById('libconfirm'); if(!pop) return;
-    var m = pop.querySelector('.lc-msg'); if(m) m.textContent = lt(LIB_CONFIRM.key);
+    var m = pop.querySelector('.lc-msg'); if(m) m.textContent = lib_confirmText(LIB_CONFIRM.key, LIB_CONFIRM.count);
     var ok = pop.querySelector('.lc-ok'); if(ok) ok.textContent = lt('lib_ok');
     var no = pop.querySelector('.lc-cancel'); if(no) no.textContent = lt('lib_cancel');
   };
-  window.lib_confirm = function(msgKey, anchorEl, onOk){
+  window.lib_confirm = function(msgKey, anchorEl, onOk, count){
     lib_confirmClose();
     var ov = document.createElement('div');
     ov.className = 'libconfirm-ov'; ov.id = 'libconfirmOv';
     var pop = document.createElement('div');
     pop.className = 'libconfirm'; pop.id = 'libconfirm';
-    var msg = document.createElement('div'); msg.className = 'lc-msg'; msg.textContent = lt(msgKey);
+    var msg = document.createElement('div'); msg.className = 'lc-msg'; msg.textContent = lib_confirmText(msgKey, count);
     var btns = document.createElement('div'); btns.className = 'lc-btns';
     var ok = document.createElement('button'); ok.className = 'lc-ok'; ok.textContent = lt('lib_ok');
     var no = document.createElement('button'); no.className = 'lc-cancel'; no.textContent = lt('lib_cancel');
@@ -42608,7 +44105,7 @@ function submitAuth() {
     pop.appendChild(msg); pop.appendChild(btns);
     ov.appendChild(pop);
     document.body.appendChild(ov);
-    LIB_CONFIRM = { key: msgKey, onOk: onOk, anchorId: (anchorEl && anchorEl.getAttribute) ? anchorEl.getAttribute('data-id') : null };
+    LIB_CONFIRM = { key: msgKey, onOk: onOk, count: (count == null ? null : count), anchorId: (anchorEl && anchorEl.getAttribute) ? anchorEl.getAttribute('data-id') : null };
     ok.onclick = function(){ var cb = LIB_CONFIRM && LIB_CONFIRM.onOk; lib_confirmClose(); if(cb) cb(); };
     no.onclick = function(){ lib_confirmClose(); };
     lib_placeConfirm(pop, anchorEl);
@@ -42633,7 +44130,7 @@ function submitAuth() {
     var pop = document.getElementById('libconfirm'); if(!pop) return;
     var anchor = null;
     if(LIB_CONFIRM && LIB_CONFIRM.anchorId){
-      anchor = document.querySelector('#lib-body [data-id="' + LIB_CONFIRM.anchorId + '"]');
+      anchor = document.querySelector('#lib-body [data-id="' + lib_cssStr(LIB_CONFIRM.anchorId) + '"]');
     }
     lib_placeConfirm(pop, anchor);
   };
@@ -42641,12 +44138,15 @@ function submitAuth() {
   window.lib_confirmReassert = function(){
     if(!LIB_CONFIRM) return;
     if(document.getElementById('libconfirm')){ lib_confirmRefresh(); lib_confirmReposition(); return; }
-    var anchor = LIB_CONFIRM.anchorId ? document.querySelector('#lib-body [data-id="' + LIB_CONFIRM.anchorId + '"]') : null;
-    lib_confirm(LIB_CONFIRM.key, anchor, LIB_CONFIRM.onOk);
+    var anchor = LIB_CONFIRM.anchorId ? document.querySelector('#lib-body [data-id="' + lib_cssStr(LIB_CONFIRM.anchorId) + '"]') : null;
+    lib_confirm(LIB_CONFIRM.key, anchor, LIB_CONFIRM.onOk, LIB_CONFIRM.count);
   };
   window.lib_itemCtx = function(ev, id){
     ev.preventDefault(); ev.stopPropagation();
-    LIB_SELECTED = id; lib_applySelection();
+    var key = String(id);
+    if(!lib_isSel(key)){ LIB_SEL = [key]; LIB_ANCHOR = key; }
+    LIB_SELECTED = key;
+    lib_applySelection(); lib_updateSelBar();
     lib_closeCtx();
     var menu = document.createElement('div');
     menu.className = 'lib-ctx'; menu.id = 'lib-ctx';
@@ -42654,9 +44154,14 @@ function submitAuth() {
       '<div class="cx-item" onclick="lib_closeCtx();lib_open(' + id + ')">📂 ' + lt('lib_open') + '</div>' +
       '<div class="cx-item" onclick="lib_closeCtx();lib_download(' + id + ')">⬇ ' + lt('lib_download') + '</div>';
     if(lib_canEdit()){
-      items += '<div class="cx-sep"></div>' +
-        '<div class="cx-item" onclick="lib_closeCtx();lib_rename(' + id + ')">✏️ ' + lt('lib_rename') + '</div>' +
-        '<div class="cx-item cx-danger" onclick="lib_closeCtx();lib_delete(' + id + ')">🗑 ' + lt('lib_delete') + '</div>';
+      if(LIB_SEL.length > 1){
+        items += '<div class="cx-sep"></div>' +
+          '<div class="cx-item cx-danger" onclick="lib_closeCtx();lib_deleteSelected()">🗑 ' + lt('lib_delete') + ' (' + LIB_SEL.length + ')</div>';
+      } else {
+        items += '<div class="cx-sep"></div>' +
+          '<div class="cx-item" onclick="lib_closeCtx();lib_rename(' + id + ')">✏️ ' + lt('lib_rename') + '</div>' +
+          '<div class="cx-item cx-danger" onclick="lib_closeCtx();lib_delete(' + id + ')">🗑 ' + lt('lib_delete') + '</div>';
+      }
     }
     menu.innerHTML = items;
     document.body.appendChild(menu);
@@ -42915,21 +44420,26 @@ function submitAuth() {
 
   window.lib_selectProject = function(id){
     LIB_PROJECT_ID = id;
-    LIB_SELECTED = null;
+    LIB_SELECTED = null; LIB_SEL = []; LIB_ANCHOR = null;
+    LIB_CWD = '';
+    LIB_FILTER = '';
     lib_loadFiles();
   };
 
   window.lib_backToProjects = function(){
     LIB_PROJECT_ID = null;
-    LIB_SELECTED = null;
+    LIB_SELECTED = null; LIB_SEL = []; LIB_ANCHOR = null;
+    LIB_CWD = '';
+    LIB_FILTER = '';
     lib_renderProjectCards();
   };
 
   window.lib_switchTab = function(k){
     LIB_TAB = k;
     LIB_PROJECT_ID = null;
-    LIB_SELECTED = null;
+    LIB_SELECTED = null; LIB_SEL = []; LIB_ANCHOR = null;
     LIB_FILTER = '';
+    LIB_CWD = '';
     lib_renderTabs();
     if(k === 'project'){
       lib_renderProjectCards();
@@ -42999,12 +44509,14 @@ function submitAuth() {
         .then(function(res){ cb(!!(res && res.ok)); })
         .catch(function(){ cb(false); });
     }
+    // 上传目标：始终落在"当前所在文件夹"之下（保留所选文件夹自身的层级）
+    function targetPath(rel){ return lib_joinPath(LIB_CWD, rel); }
     // stream=true：直接用 File 引用（流式，不占内存）；false：先读进内存再发
     function sendBatch(batch, stream, cb){
       var fd = new FormData();
       if(stream){
         for(var i=0;i<batch.length;i++){
-          try { fd.append('file', batch[i].file); fd.append('paths', batch[i].path || batch[i].file.name); } catch(e){}
+          try { fd.append('file', batch[i].file); fd.append('paths', targetPath(batch[i].path || batch[i].file.name)); } catch(e){}
         }
         doFetch(fd, cb);
         return;
@@ -43016,7 +44528,7 @@ function submitAuth() {
         lib_readAsArrayBuffer(it.file, function(ab){
           var blob = lib_blobOf(it, ab);
           if(blob){
-            try { fd.append('file', blob, it.file.name); fd.append('paths', it.path || it.file.name); added++; } catch(e){}
+            try { fd.append('file', blob, it.file.name); fd.append('paths', targetPath(it.path || it.file.name)); added++; } catch(e){}
           }
           step();
         }, function(){ step(); });
@@ -43137,7 +44649,7 @@ function submitAuth() {
     var anchor = document.querySelector('#lib-body [data-id="' + id + '"]');
     lib_confirm('lib_confirm_delete', anchor, function(){
       fetch('/api/library/files/' + id, {method:'DELETE', headers: authHeaders({})}).then(function(r){ return r.json(); }).then(function(res){
-        if(res.ok){ if(LIB_SELECTED === id) LIB_SELECTED = null; lib_loadFiles(); showToast(lt('saveOk')); }
+        if(res.ok){ lib_selClear(); lib_loadFiles(); showToast(lt('saveOk')); }
         else { showToast(res.error || 'delete failed'); }
       }).catch(function(e){ showToast('delete failed'); });
     });
@@ -43207,8 +44719,9 @@ function submitAuth() {
     lib_setTitle();
     lib_renderTabs();
     LIB_PROJECT_ID = null;
-    LIB_SELECTED = null;
+    LIB_SELECTED = null; LIB_SEL = []; LIB_ANCHOR = null;
     LIB_FILTER = '';
+    LIB_CWD = '';
     if(LIB_TAB === 'project'){
       lib_renderProjectCards();
       if(!lib_projectsSource().length) lib_loadProjects();
@@ -43317,6 +44830,86 @@ function submitAuth() {
     }
   });
 
+  /* ==================== 鼠标拖拽框选（与 Windows 资源管理器一致） ==================== */
+  function lib_mqEl(){
+    if(LIB_MQ && LIB_MQ.parentNode) return LIB_MQ;
+    var d = document.createElement('div');
+    d.className = 'lib-marquee';
+    document.body.appendChild(d);
+    LIB_MQ = d;
+    return d;
+  }
+  function lib_mqHide(){
+    if(LIB_MQ) LIB_MQ.className = 'lib-marquee';
+    LIB_MQ_START = null;
+  }
+  function lib_mqApply(x1, y1, x2, y2){
+    var l = Math.min(x1, x2), t = Math.min(y1, y2);
+    var w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+    var el = lib_mqEl();
+    el.style.left = l + 'px'; el.style.top = t + 'px';
+    el.style.width = w + 'px'; el.style.height = h + 'px';
+    var wrap = document.getElementById('lib-files-wrap');
+    if(!wrap) return;
+    var nodes = wrap.querySelectorAll('[data-id]');
+    var keys = LIB_MQ_BASE ? LIB_MQ_BASE.slice() : [];
+    for(var i=0;i<nodes.length;i++){
+      var r = nodes[i].getBoundingClientRect();
+      if(r.left < l + w && r.right > l && r.top < t + h && r.bottom > t){
+        var k = String(nodes[i].getAttribute('data-id'));
+        if(keys.indexOf(k) < 0) keys.push(k);
+      }
+    }
+    LIB_SEL = keys;
+    LIB_SELECTED = keys.length ? keys[keys.length-1] : null;
+    lib_applySelection();
+    lib_updateSelBar();
+  }
+  function lib_selAll(){
+    LIB_SEL = LIB_ORDER.slice();
+    LIB_SELECTED = LIB_SEL.length ? LIB_SEL[LIB_SEL.length-1] : null;
+    LIB_ANCHOR = LIB_SEL.length ? LIB_SEL[0] : null;
+    lib_applySelection();
+    lib_updateSelBar();
+  }
+  document.addEventListener('mousedown', function(e){
+    if(window.currentView !== 'library') return;
+    if(e.button !== 0) return;
+    var wrap = document.getElementById('lib-files-wrap');
+    if(!wrap || !wrap.contains(e.target)) return;
+    if(e.target.closest && e.target.closest('button, input, select, textarea, a')) return;
+    // 阻止默认行为前先把失焦逻辑补上（否则就地重命名的输入框不会 commit）
+    var ae = document.activeElement;
+    if(ae && ae !== e.target && ae.tagName && /^(INPUT|TEXTAREA)$/.test(ae.tagName)){
+      try { ae.blur(); } catch(err){}
+    }
+    LIB_DRAG_MOVED = false;
+    LIB_MQ_BASE = (e.ctrlKey || e.metaKey) ? LIB_SEL.slice() : null;
+    LIB_MQ_START = {
+      x: e.clientX, y: e.clientY, moved: false,
+      onItem: !!(e.target.closest && e.target.closest('[data-id]'))
+    };
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e){
+    if(!LIB_MQ_START) return;
+    if(!LIB_MQ_START.moved){
+      if(Math.abs(e.clientX - LIB_MQ_START.x) < 5 && Math.abs(e.clientY - LIB_MQ_START.y) < 5) return;
+      LIB_MQ_START.moved = true;
+      LIB_DRAG_MOVED = true;
+      lib_mqEl().className = 'lib-marquee show';
+    }
+    lib_mqApply(LIB_MQ_START.x, LIB_MQ_START.y, e.clientX, e.clientY);
+  });
+  document.addEventListener('mouseup', function(e){
+    if(!LIB_MQ_START) return;
+    var st = LIB_MQ_START;
+    lib_mqHide();
+    if(st.moved){ setTimeout(function(){ LIB_DRAG_MOVED = false; }, 0); return; }
+    // 未拖动 = 普通单击；点在空白处 → 取消全部选择（按住 Ctrl 时保留）
+    if(!st.onItem && !(e.ctrlKey || e.metaKey)) lib_selClear();
+  });
+
   // 右键菜单：点击别处 / Esc 关闭
   document.addEventListener('click', function(e){
     if(e.target && e.target.closest && e.target.closest('.lib-ctx')) return;
@@ -43326,7 +44919,14 @@ function submitAuth() {
     lib_closeCtx();
   });
   document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape'){ lib_closeCtx(); lib_closeView(); lib_confirmClose(); }
+    if(e.key === 'Escape'){ lib_closeCtx(); lib_closeView(); lib_confirmClose(); lib_selClear(); return; }
+    if(window.currentView !== 'library') return;
+    var t = e.target;
+    if(t && t.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if(e.key === 'Delete' && LIB_SEL.length && lib_canEdit()){ e.preventDefault(); lib_deleteSelected(); return; }
+    if((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')){
+      if(document.getElementById('lib-files-wrap')){ e.preventDefault(); lib_selAll(); }
+    }
   });
   var __libViewOv = document.getElementById('libviewOv');
   if(__libViewOv){
