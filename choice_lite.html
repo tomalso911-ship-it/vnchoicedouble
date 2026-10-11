@@ -16588,6 +16588,8 @@ var PROD_EQUIP_FAULT_KB = {
           <input type="file" id="fin_reimport_file" accept=".xlsx" style="display:none" onchange="fin_reimport(this)">
           <span class="fin-spacer"></span>
           <span id="fin_status" class="fin-status" data-i18n="fin_status_not_loaded">未载入</span>
+          <span id="fin_build_tag" title="FIN-HI-LOCK-20261011" style="font-size:11px;opacity:.5;margin-left:8px;white-space:nowrap">HL6-LOCK</span>
+          <span id="fin_hi_info" style="font-size:11px;opacity:.7;margin-left:8px;white-space:nowrap"></span>
         </div>
         <div class="fin-toolbar2">
           <!-- 货币下拉：按要求显示成「$」符号按钮（不再显示“货币”文字；下拉可选 USD/RMB/VND/THB） -->
@@ -16809,6 +16811,7 @@ var PROD_EQUIP_FAULT_KB = {
         try { fin_setUniverLocale(CUR_LANG); } catch(e){}
 
         finReady = true;
+        console.log('%c[fin] highlight build HL6-LOCK (识别文本日期 + 按区域高亮 + 双形状写样式 + 锁死区 FIN-HI-LOCK-20261011)', 'color:#0a0;font-weight:bold');
         await fin_loadReport();
         fin_bindChange();
         fin_injectSortMenu();
@@ -16845,6 +16848,409 @@ var PROD_EQUIP_FAULT_KB = {
           if (k) el.setAttribute('title', fin_L(k) || k);
         });
       } catch(e){}
+    }
+
+    // =====================================================================
+    // 高亮「最靠近当前日期」的行：红色加粗（仅屏幕显示，绝不写进 xlsx）
+    // 规则（用户要求）：
+    //   - 工作区域 = 每张表 A 列（第 0 列）的“连续日期段 / 区域”。
+    //     Chi tiết thu-chi 一张表里有多个区域，每个区域独立高亮最靠近今天的行；
+    //     TỔNG HỢP 无逐行日期列，自动跳过。
+    //   - 载入 / 编辑后，在每个区域内找 A 列日期与今天距离最小的行，整行文字标红加粗；
+    //   - 当插入/修改日期导致“更靠近今天”的行变化时，旧高亮立即还原（黑、不加粗），新行接管；
+    //   - 保存前在 fin_inlineStyles() 中剥离这些高亮，保证文件干净。
+    // =====================================================================
+    // ★★★★★★★★★★★★ 锁死区 · 禁止篡改（用户 2026-10-11 明确要求）★★★★★★★★★★★★
+    // 文档编号：FIN-HI-LOCK-20261011
+    // 背景：曾经出现「高亮打上去后莫名其妙消失」。根因不是写入失败，而是
+    //   「保存动作本身把屏幕上的红字抹掉」，而 finHiRecompute 只看行号没变动就 return，
+    //   于是抹掉后再也不会补回。以下 4 条不变量是修复的全部内容，任何重构都不得移除：
+    //   ① finHiExecStyle() 写完样式必须设置静默窗口 finHiQuietUntil = Date.now() + 600；
+    //      onCommandExecuted 的回调是【异步】的，进来时 finHiApplying 已复位为 false，
+    //      只靠它必然漏判 → 高亮写入被误判成用户编辑 → fin_markDirty() → 自动保存 → 触发②。
+    //   ② fin_inlineStyles() 里绝不把实时样式库的对象塞进副本的 cell.s：
+    //      snapshot.styles 是【实时样式库】，必须用 fin_cloneStyleObj() 克隆；
+    //      剥离红色高亮时只能 delete 克隆出来的副本，绝不能 delete 原对象；
+    //      深拷贝失败（或 out.sheets/out.styles 缺失）时必须直接 return snapshot。
+    //   ③ finHiCellHasHi()/finHiRowHasHi() 必须存在，且 finHiRecompute() 在「行号相同」
+    //      时仍要抽查红+粗是否真的还在；不在就走"只重写、不撤回"的自愈通道
+    //      （finHiHealAt 做 4s 节流）。
+    //   ④ 高亮是纯屏幕效果，永远不得写进 xlsx：保存副本里必须已剥离红+粗。
+    // 启动时 finHiLockCheck() 会做行为级自检（真正跑一遍保存路径，检查实时样式库有没有被改动），
+    // 任何一条被破坏都会在控制台 console.error 并置 window.__FIN_HI_LOCK_FAILED。
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    var FIN_HI_LOCK = { doc: 'FIN-HI-LOCK-20261011', version: '2026-10-11', quietMs: 600, healMs: 4000 };
+    var finHiState = {};       // sid -> [ { row: <r>, cells: [{r,c}...] }, ... ]
+    var finHiTimer = null;
+    var finHiPollTimer = null;  // 兜底轮询
+    var finHiApplying = false;  // 我们自己打/撤高亮命令执行期间置 true，避免 onCommandExecuted 误判
+    // ★静默窗口：onCommandExecuted 是「命令执行完之后」的异步回调，等它进来时 finHiApplying
+    //   早已被复位成 false，所以单靠那个标志会漏判（实测就把我们自己的 set-range-values 当成用户编辑）。
+    //   漏判的后果：① 高亮写样式 → 误标脏 → 触发自动保存 → 保存路径剥离样式；
+    //              ② 视图命令也被误标脏。高亮是"只显示在屏幕上"的，绝不能触发写盘。
+    var finHiQuietUntil = 0;    // 高亮写样式后的静默截止时间戳（ms）
+    var finHiHealAt = 0;        // 自愈重写的节流时间戳（ms）
+    var FIN_HI_COLOR = '#ff0000';
+    var FIN_HI_BL = 1;
+
+    // Excel 1900 日期系统：serial 25569 = 1970-01-01（忽略 1900 闰年 bug，足够“最接近”比较）
+    function fin_serialToDate(serial){
+      try { return new Date((serial - 25569) * 86400000); } catch(e){ return null; }
+    }
+
+    // 把 A 列单元格转成日期序列号：支持已序列化的数字、文本日期、JS Date 对象、带日期数字格式的格、数字字符串。
+    // 返回 null 表示不是日期。
+    function finHiCellSerial(snap, cd){
+      if (!cd) return null;
+      if (fin_isDateSerial(cd.v)) return cd.v;
+      // JS Date 对象（某些版本 Univer 编辑后会以 Date 对象存入快照）
+      if (cd.v && typeof cd.v === 'object' && typeof cd.v.getTime === 'function'){
+        var serial = Math.round(cd.v.getTime() / 86400000) + 25569;
+        if (fin_isDateSerial(serial)) return serial;
+      }
+      if (typeof cd.v === 'string'){
+        var s = fin_parseDateText(cd.v);
+        if (s != null) return s;
+        var n = Number(cd.v);
+        if (isFinite(n) && fin_isDateSerial(n)) return n;
+      }
+      var st = fin_cellStyle(snap, cd) || {};
+      var pat = (st.n && st.n.pattern) || '';
+      if (fin_isDatePattern(pat)){
+        if (fin_isDateSerial(cd.v)) return cd.v;
+        if (cd.v && typeof cd.v === 'object' && typeof cd.v.getTime === 'function'){
+          var serial2 = Math.round(cd.v.getTime() / 86400000) + 25569;
+          if (fin_isDateSerial(serial2)) return serial2;
+        }
+        if (typeof cd.v === 'string'){
+          var s2 = fin_parseDateText(cd.v);
+          if (s2 != null) return s2;
+          var n2 = Number(cd.v);
+          if (isFinite(n2) && fin_isDateSerial(n2)) return n2;
+        }
+      }
+      return null;
+    }
+
+    // 某格是否为“日期格”
+    function finHiIsDateCell(snap, cd){
+      return finHiCellSerial(snap, cd) != null;
+    }
+
+    // 取某格在「加载时干净快照」里的原始颜色/加粗（用于还原，避免污染源文件）
+    function finHiOriginal(sid, r, c){
+      try {
+        var sh = finLastSnapshot && finLastSnapshot.sheets && finLastSnapshot.sheets[sid];
+        var cd = sh && sh.cellData && sh.cellData[String(r)] && sh.cellData[String(r)][String(c)];
+        var st = fin_cellStyle(finLastSnapshot, cd) || {};
+        var cl = (st.cl !== undefined ? st.cl : null);
+        var bl = (st.bl !== undefined ? st.bl : null);
+        // ★关键修复：如果“加载进来的文件”本身已被历史高亮污染（红+粗），
+        //   绝不能把它当成“原样式”——否则 revert 会把红色又写回去，旧高亮行永远变不黑。
+        if (cl && cl.rgb && String(cl.rgb).toUpperCase().indexOf('FF0000') >= 0){ cl = null; bl = null; }
+        return { cl: cl, bl: bl };
+      } catch(e){ return { cl: null, bl: null }; }
+    }
+
+    // 某行是不是「日期行」（A 列是日期/文本日期）——高亮只可能命中这类行，
+    // 清理历史泄漏的红+粗时也只动这类行，避免误伤表头等原本就是红色的内容。
+    function finHiIsDateRow(snap, sid, r){
+      try {
+        var sh = snap && snap.sheets && snap.sheets[sid];
+        var c0 = sh && sh.cellData && sh.cellData[String(r)] && sh.cellData[String(r)]['0'];
+        return finHiCellSerial(snap, c0) != null;
+      } catch(e){ return false; }
+    }
+
+    // 把 A 列的日期行划分成“连续块 / 工作区域”。空白行或非日期行会把连续块切开。
+    // 每个块独立找“最靠近今天”的那一行（与排序块的概念一致）。
+    function finHiRegions(snap, sid){
+      var sh = snap && snap.sheets && snap.sheets[sid];
+      if (!sh) return [];
+      var cellData = sh.cellData || {};
+      var rows = [];
+      for (var rk in cellData){
+        var r = parseInt(rk, 10); if (isNaN(r)) continue;
+        var c0 = cellData[rk] && cellData[rk]['0'];
+        if (finHiIsDateCell(snap, c0)) rows.push(r);
+      }
+      rows.sort(function(a,b){ return a - b; });
+      var regions = [];
+      var start = null, prev = null;
+      for (var i = 0; i < rows.length; i++){
+        var r = rows[i];
+        if (start === null){ start = r; prev = r; continue; }
+        if (r === prev + 1){ prev = r; continue; }
+        regions.push({ startRow: start, endRow: prev });
+        start = r; prev = r;
+      }
+      if (start !== null) regions.push({ startRow: start, endRow: prev });
+      return regions;
+    }
+
+    // 在指定连续块内找“离今天最近”的行号
+    function finHiClosestInRegion(snap, sid, region, today){
+      var cellData = (snap && snap.sheets && snap.sheets[sid] && snap.sheets[sid].cellData) || {};
+      var best = null, bestDiff = Infinity;
+      for (var r = region.startRow; r <= region.endRow; r++){
+        var c0 = cellData[String(r)] && cellData[String(r)]['0'];
+        var serial = finHiCellSerial(snap, c0);
+        if (serial == null) continue;
+        var d = fin_serialToDate(serial);
+        if (!d) continue;
+        var diff = Math.abs(d.getTime() - today.getTime());
+        if (diff < bestDiff - 1 || (Math.abs(diff - bestDiff) <= 1 && (best === null || r > best))){
+          bestDiff = diff; best = r;
+        }
+      }
+      return best;
+    }
+
+    // 某行实际用到的最大列（只算“有值”的格；并设上限，避免历史遗留的远端空样式格把高亮拉到 16000+ 列）
+    function finHiRowMaxCol(snap, sid, r){
+      var row = snap && snap.sheets && snap.sheets[sid] && snap.sheets[sid].cellData && snap.sheets[sid].cellData[String(r)];
+      var maxC = 0;
+      if (row) for (var ck in row){
+        var c = parseInt(ck, 10); if (isNaN(c)) continue;
+        var cd = row[ck];
+        if (!cd) continue;
+        var hasVal = (cd.v !== undefined && cd.v !== null && cd.v !== '');
+        if (hasVal && c > maxC) maxC = c;
+      }
+      if (maxC > 60) maxC = 60;   // 兜底上限：日期行不会有 60 列以上有意义的内容
+      return maxC;
+    }
+
+    // 某格是否还带着「屏幕高亮」样式（红 + 粗）
+    function finHiCellHasHi(snap, row, c){
+      try {
+        var st = fin_cellStyle(snap, row && row[String(c)]) || {};
+        var cl = st.cl;
+        if (!(cl && cl.rgb && String(cl.rgb).toUpperCase().indexOf('FF0000') >= 0)) return false;
+        return Number(st.bl) === FIN_HI_BL;
+      } catch(e){ return false; }
+    }
+
+    // 某行是否【真的】还显示着红+粗。
+    // 为什么需要它：行号没变并不代表高亮还在 —— 保存时的样式剥离、日期规范化、
+    // 外部写入都可能把红洗掉；历史上 finHiRecompute 只看行号就直接 return，
+    // 于是洗掉之后再也不会补回，用户看到的现象就是"高亮莫名其妙消失了"。
+    // 只抽查行首（第 0 列，一定是日期格）和行尾（最后一个有值的列）两端，足够判定，也避免误判抖动。
+    function finHiRowHasHi(snap, sid, r){
+      try {
+        var row = snap && snap.sheets && snap.sheets[sid] && snap.sheets[sid].cellData && snap.sheets[sid].cellData[String(r)];
+        if (!row) return false;
+        if (!finHiCellHasHi(snap, row, 0)) return false;
+        var maxC = finHiRowMaxCol(snap, sid, r);
+        if (maxC > 0 && !finHiCellHasHi(snap, row, maxC)) return false;
+        return true;
+      } catch(e){ return false; }
+    }
+
+    // 统一写样式的入口：先按 Univer 官方签名（range + 二维数组）写；再按旧 map 形状写一次。
+    // 两种形状写的都是同一批 {s:{...}}，幂等；这样无论哪个版本认哪种形状都能生效。
+    function finHiExecStyle(sid, map, minR, maxR, minC, maxC){
+      var unitId = fin_unitId();
+      finHiApplying = true;
+      try {
+        // 形状 A：range + 二维数组（官方签名）
+        var arr = [];
+        for (var r = minR; r <= maxR; r++){
+          var rowArr = [];
+          for (var c = minC; c <= maxC; c++){
+            rowArr.push((map[r] && map[r][c]) ? map[r][c] : {});
+          }
+          arr.push(rowArr);
+        }
+        finUniverAPI.executeCommand('sheet.command.set-range-values', {
+          unitId: unitId, subUnitId: sid,
+          range: { startRow: minR, startColumn: minC, endRow: maxR, endColumn: maxC },
+          value: arr
+        });
+      } catch(e){ console.warn('[hi] style A', e); }
+      try {
+        // 形状 B：行-列 map（兼容）
+        finUniverAPI.executeCommand('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: map });
+      } catch(e2){ console.warn('[hi] style B', e2); }
+      finHiApplying = false;
+      // 命令的回调是异步的，这里再开一个静默窗口，让 onCommandExecuted 认出"这是我自己的高亮写入"
+      // ★锁死①：见 FIN-HI-LOCK-20261011，此行不得删除
+      finHiQuietUntil = Date.now() + FIN_HI_LOCK.quietMs;
+    }
+
+    function finHiApplyRow(sid, r, maxCol){
+      var m = {};
+      m[r] = {};
+      for (var c = 0; c <= maxCol; c++){
+        m[r][c] = { s: { cl: { rgb: FIN_HI_COLOR }, bl: FIN_HI_BL } };
+      }
+      finHiExecStyle(sid, m, r, r, 0, maxCol);
+      console.log('[hi] apply', sid, 'row', r, 'cols', maxCol+1);
+    }
+
+    function finHiRevertRow(sid, cells){
+      var m = {};
+      var minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+      cells.forEach(function(hc){
+        var orig = finHiOriginal(sid, hc.r, hc.c);
+        var p = {};
+        // 必须用显式黑/不加粗覆盖，不能用 null；Univer 把 null 当成“不修改”，红色会残留。
+        if (orig.cl !== null) p.cl = orig.cl; else p.cl = { rgb: '#000000' };
+        if (orig.bl !== null) p.bl = orig.bl; else p.bl = 0;
+        m[hc.r] = m[hc.r] || {};
+        m[hc.r][hc.c] = { s: p };
+        if (hc.r < minR) minR = hc.r; if (hc.r > maxR) maxR = hc.r;
+        if (hc.c < minC) minC = hc.c; if (hc.c > maxC) maxC = hc.c;
+      });
+      if (minR === Infinity) return;
+      finHiExecStyle(sid, m, minR, maxR, minC, maxC);
+      console.log('[hi] revert', sid, 'cells', cells.length);
+    }
+
+    // 一次性清理：只在「日期行」里把历史泄漏的“红+粗”恢复成黑/不加粗。
+    // 为什么不扫全表：表头/汇总行可能本来就是红色内容，扫全表会误伤。
+    // 返回清理的单元格数，便于调用方决定是否标脏落盘。
+    function finHiCleanup(){
+      if (!finReady || !finUniverAPI || !finSheet) return 0;
+      var snap; try { snap = fin_currentSnapshot(); } catch(e){ return 0; }
+      if (!snap || !snap.sheetOrder) return 0;
+      var total = 0;
+      snap.sheetOrder.forEach(function(sid){
+        try {
+          var sh = snap.sheets[sid]; if (!sh) return;
+          var cellData = sh.cellData || {};
+          var m = {};
+          var minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+          for (var rk in cellData){
+            var r = parseInt(rk, 10); if (isNaN(r)) continue;
+            if (!finHiIsDateRow(snap, sid, r)) continue;   // 只动日期行
+            var row = cellData[rk] || {};
+            for (var ck in row){
+              var c = parseInt(ck, 10); if (isNaN(c)) continue;
+              var cd = row[ck];
+              var st = fin_cellStyle(snap, cd) || {};
+              var isRed = st.cl && st.cl.rgb && String(st.cl.rgb).toUpperCase().indexOf('FF0000') >= 0;
+              if (isRed && st.bl === 1){
+                var orig = finHiOriginal(sid, r, c);   // 已忽略红→返回黑/不加粗
+                var p = {};
+                p.cl = (orig.cl !== null ? orig.cl : { rgb: '#000000' });
+                p.bl = (orig.bl !== null ? orig.bl : 0);
+                m[r] = m[r] || {};
+                m[r][c] = { s: p };
+                if (r < minR) minR = r; if (r > maxR) maxR = r;
+                if (c < minC) minC = c; if (c > maxC) maxC = c;
+              }
+            }
+          }
+          if (Object.keys(m).length && minR !== Infinity){
+            var n = 0; for (var _k in m){ n += Object.keys(m[_k]).length; }
+            total += n;
+            finHiExecStyle(sid, m, minR, maxR, minC, maxC);
+            console.log('[hi] cleanup', sid, n, 'cells');
+          }
+        } catch(e){}
+      });
+      return total;
+    }
+
+    // 调试：打印某表（或所有表）的区域划分、A列日期格识别结果、命中的高亮行
+    function finHiDebug(targetSid){
+      if (!finReady || !finSheet) return console.warn('[hi] not ready');
+      var snap; try { snap = fin_currentSnapshot(); } catch(e){ return console.warn('[hi] snapshot error', e); }
+      if (!snap || !snap.sheetOrder) return;
+      var today = new Date(); today.setHours(0, 0, 0, 0);
+      var sids = targetSid ? [targetSid] : snap.sheetOrder;
+      sids.forEach(function(sid){
+        try {
+          var sh = snap && snap.sheets && snap.sheets[sid];
+          console.log('--- [hi] debug sheet:', sid, 'exists=', !!sh);
+          var regions = finHiRegions(snap, sid);
+          console.log('regions:', JSON.stringify(regions));
+          regions.forEach(function(reg){
+            var rows = [];
+            var cellData = sh.cellData || {};
+            for (var r = reg.startRow; r <= reg.endRow; r++){
+              var c0 = cellData[String(r)] && cellData[String(r)]['0'];
+              var serial = finHiCellSerial(snap, c0);
+              var d = serial != null ? fin_serialToDate(serial) : null;
+              rows.push({ r: r, v: (c0 && c0.v), serial: serial, date: d ? d.toISOString().slice(0,10) : null });
+            }
+            console.log('region', reg.startRow + '-' + reg.endRow, 'dates:', JSON.stringify(rows));
+            var closest = finHiClosestInRegion(snap, sid, reg, today);
+            console.log('closest in region:', closest);
+          });
+          console.log('current state:', JSON.stringify((finHiState[sid] || []).map(function(x){ return x.row; })));
+        } catch(e){ console.warn('[hi] debug error', sid, e); }
+      });
+    }
+
+    // 重新计算所有表的高亮。每张表按 A 列日期连续块划分区域，每个区域独立高亮最靠近今天的行。
+    function finHiRecompute(){
+      if (!finReady || !finUniverAPI || !finSheet) return;
+      var snap;
+      try { snap = fin_currentSnapshot(); } catch(e){ console.warn('[hi] snapshot error', e); return; }
+      if (!snap || !snap.sheetOrder) return;
+      console.log('[hi] recompute start');
+      try { var _el0 = document.getElementById('fin_hi_info'); if (_el0) _el0.textContent = '高亮 计算中…'; } catch(e){}
+      var today = new Date(); today.setHours(0, 0, 0, 0);
+      var _healAllowed = (Date.now() >= finHiHealAt);   // 本轮是否允许自愈重写
+      var _healUsed = false;
+      snap.sheetOrder.forEach(function(sid){
+        try {
+          var regions = finHiRegions(snap, sid);
+          var newRows = [];
+          regions.forEach(function(reg){
+            var closest = finHiClosestInRegion(snap, sid, reg, today);
+            if (closest != null) newRows.push(closest);
+          });
+          newRows.sort(function(a,b){ return a - b; });
+          var prev = finHiState[sid] || [];
+          var prevRows = prev.map(function(x){ return x.row; }).sort(function(a,b){ return a - b; });
+          var rowsSame = (prevRows.length === newRows.length);
+          if (rowsSame) for (var i = 0; i < prevRows.length; i++){ if (prevRows[i] !== newRows[i]){ rowsSame = false; break; } }
+          // ★自愈：行号一样也要确认红+粗真的还在屏幕上（见 finHiRowHasHi 注释）。
+          //   节流 4s，避免"洗掉—补回"高频来回写造成无谓的刷新。
+          var styleOk = rowsSame;
+          if (styleOk) for (var _hi = 0; _hi < newRows.length; _hi++){
+            if (!finHiRowHasHi(snap, sid, newRows[_hi])){ styleOk = false; break; }
+          }
+          if (rowsSame && styleOk) return;   // 真的没变化
+          // 只是样式被洗掉、行号没变 → 走自愈通道（受节流约束，避免高频来回写）
+          // ★锁死③：见 FIN-HI-LOCK-20261011，此分支不得删除
+          if (rowsSame && !styleOk){
+            if (!_healAllowed) return;
+            if (!_healUsed){ _healUsed = true; finHiHealAt = Date.now() + FIN_HI_LOCK.healMs; }
+          }
+          console.log('[hi] update', sid, prevRows, '->', newRows, 'rowsSame=' + rowsSame, 'styleOk=' + styleOk);
+          // 行号真的变了：先撤掉旧高亮，再打上新高亮。
+          // 只是样式被洗掉（行号没变）时不要撤，直接重写红色即可，省掉一次多余的黑/红来回写。
+          if (!rowsSame) prev.forEach(function(h){ if (h && h.cells && h.cells.length) finHiRevertRow(sid, h.cells); });
+          var next = [];
+          newRows.forEach(function(r){
+            var maxCol = finHiRowMaxCol(snap, sid, r);
+            var cells = [];
+            for (var c = 0; c <= maxCol; c++) cells.push({ r: r, c: c });
+            finHiApplyRow(sid, r, maxCol);
+            next.push({ row: r, cells: cells });
+          });
+          finHiState[sid] = next;
+        } catch(e){ console.warn('[hi] recompute sheet error', sid, e); }
+      });
+      // 屏幕指示：显示本次高亮到了哪些表/行，便于肉眼确认功能是否在运行
+      try {
+        var info = [];
+        snap.sheetOrder.forEach(function(sid){
+          var rows = (finHiState[sid] || []).map(function(x){ return x.row + 1; });
+          if (rows.length) info.push(sid + '→' + rows.join(','));
+        });
+        var el = document.getElementById('fin_hi_info');
+        if (el) el.textContent = '高亮 ' + info.length + ' 表' + (info.length ? ' [' + info.join(' / ') + ']' : '');
+      } catch(e){}
+    }
+
+    function finHiSchedule(){
+      if (finHiTimer) clearTimeout(finHiTimer);
+      finHiTimer = setTimeout(function(){ finHiTimer = null; try { finHiRecompute(); } catch(e){} }, 400);
     }
 
     function fin_getUsedRange(snapshot, sid){
@@ -17201,19 +17607,59 @@ var PROD_EQUIP_FAULT_KB = {
       fin_setStatusKey('fin_status_loaded');
       // 加载后统一日期格式为 DD-MM-YYYY（只改日期单元格）
       setTimeout(function(){ fin_normalizeDates(snapshot); }, 400);
+      // 加载后：先清掉历史泄漏到文件里的高亮红（若有），再重新计算高亮。
+      // 清理有改动则标脏，让干净版本自动落盘（从此文件不再被污染）。
+      setTimeout(function(){
+        try {
+          var _cleaned = finHiCleanup();
+          finHiRecompute();
+          if (_cleaned > 0) fin_markDirty();
+        } catch(e){ console.warn('[hi] init', e); }
+      }, 700);
     }
 
     function fin_bindChange(){
       try {
-        if (finUniver && typeof finUniver.onCommandExecuted === 'function') {
-          finUniver.onCommandExecuted(function(evt){
-            var id = (evt && evt.id) || (arguments[0] && arguments[0].id) || '';
-            // 排序/筛选只是视图操作，不写盘，保证「复位」能回到上次保存的顺序；
-            // 数字格式（numfmt）由「加载/一键按钮」自动重刷，也不单独触发写盘，避免每次刷新页面就重写整份 xlsx。
-            if (typeof id === 'string' && (id.indexOf('sort') >= 0 || id.indexOf('filter') >= 0 || id.indexOf('numfmt') >= 0)) return;
-            fin_markDirty();
-          });
+        var listener = function(evt){
+          var id = (evt && evt.id) || '';
+          // 我们自己打/撤高亮的命令一律跳过，避免循环执行、误标脏、误把“视图排序”落盘。
+          // ★必须同时看静默窗口：这个回调是异步的，进来时 finHiApplying 已复位成 false（实测会漏判），
+          //   漏判会让高亮写入把表格标脏 → 1.5s 后自动保存 → 保存路径要剥离高亮样式。
+          if (finHiApplying || Date.now() < finHiQuietUntil) return;
+          console.log('[hi] cmd', id);
+          var isViewOnly = (typeof id === 'string' && (id.indexOf('sort') >= 0 || id.indexOf('filter') >= 0 || id.indexOf('numfmt') >= 0));
+          // 排序/筛选只是视图操作，不写盘，保证「复位」能回到上次保存的顺序；
+          // 数字格式（numfmt）由「加载/一键按钮」自动重刷，也不单独触发写盘，避免每次刷新页面就重写整份 xlsx。
+          // 但高亮要跟着数据位置重算，所以即便是视图操作也安排一次 finHiRecompute。
+          if (!isViewOnly) fin_markDirty();
+          // 数据被改动（新增行 / 改日期 / 排序 / 筛选…）→ 重新计算“最靠近今天”的高亮行
+          try { finHiSchedule(); } catch(e){}
+        };
+        if (finUniverAPI && typeof finUniverAPI.onCommandExecuted === 'function') {
+          finUniverAPI.onCommandExecuted(listener);
+          console.log('[hi] bound to finUniverAPI.onCommandExecuted');
+        } else if (finUniver && typeof finUniver.onCommandExecuted === 'function') {
+          finUniver.onCommandExecuted(listener);
+          console.log('[hi] bound to finUniver.onCommandExecuted');
+        } else {
+          console.warn('[hi] no onCommandExecuted available');
         }
+        // 兜底：每 2 秒轮询一次，防止某些命令没被监听到或 Date 对象解析漏判
+        if (finHiPollTimer) clearInterval(finHiPollTimer);
+        finHiPollTimer = setInterval(function(){
+          if (!finReady || !finSheet) return;
+          console.log('[hi] poll');
+          try { finHiRecompute(); } catch(e){ console.warn('[hi] poll error', e); }
+        }, 2000);
+        // 暴露手动触发，方便调试
+        window.finHiForceRecompute = finHiRecompute;
+        window.finHiCleanup = finHiCleanup;
+        window.finHiDebug = finHiDebug;
+        // ★锁死区自检（FIN-HI-LOCK-20261011）：启动时跑一遍，破坏任何一条不变量都会在控制台报错
+        window.finHiLockCheck = finHiLockCheck;
+        window.finHiLockVerify = finHiLockVerify;
+        window.FIN_HI_LOCK = FIN_HI_LOCK;
+        try { finHiLockVerify(); } catch(e){ console.warn('[hi] lock verify', e); }
       } catch(e){ console.warn('bindChange', e); }
     }
 
@@ -17225,15 +17671,37 @@ var PROD_EQUIP_FAULT_KB = {
       finSaveTimer = setTimeout(fin_autoSave, 1500);
     }
 
+    // 浅拷贝一个样式对象。
+    // 样式对象只有一层基本类型 + 个别嵌套对象，浅拷贝就足以"改副本、不动原件"。
+    function fin_cloneStyleObj(o){
+      var c = {};
+      if (!o || typeof o !== 'object') return c;
+      for (var k in o){ if (Object.prototype.hasOwnProperty.call(o, k)) c[k] = o[k]; }
+      return c;
+    }
+
     // ★保存前必须把「样式 id」还原成「内联样式对象」：
     //   Univer 中只要运行时写过样式（numfmt / set-range-values 等），handleStyle 就会调用
     //   styles.setValue(merge) 把 cell.s 变成一串样式 id；而服务端 univer_to_xlsx 只认内联对象，
     //   遇到字符串 id 会整格丢样式 —— 这正是「日期列黑色边框莫名消失」的根因。
+    // ★★致命坑（2026-10-11 修复）：这里绝不能把【实时样式库里的对象】直接塞进副本的 cell.s。
+    //   snapshot.styles 是实时样式库，把 styles[id] 的引用赋给 cell.s 后，
+    //   下面"剥离红色高亮"的 delete 就会作用在实时对象上 —— 保存这个动作本身
+    //   会把屏幕上正在显示的红字高亮抹掉（现象：cell.s 还是原来那个 id，但样式内容变成空的）。
     function fin_inlineStyles(snapshot){
       try {
         if (!snapshot || !snapshot.styles) return snapshot;
         var styles = snapshot.styles;
-        var out = JSON.parse(JSON.stringify(snapshot));   // 深拷贝，避免污染实时单元
+        // ★必须拿到「真正的副本」才允许往下剥离样式。
+        //   若深拷贝失败（循环引用 / BigInt / 特殊 getter 等），宁可整体跳过剥离，
+        //   也绝不能退回实时快照：否则下面剥离高亮的 delete 会把实时样式库挖空，
+        //   屏幕上正显示的红字高亮会被"保存"这个动作本身抹掉（这正是"高亮一保存就消失"的根因）。
+        var out = null;
+        try { out = JSON.parse(JSON.stringify(snapshot)); } catch(e0){ out = null; }
+        if (!out || !out.sheets || !out.styles){
+          console.warn('[fin] inlineStyles: deep clone failed, skip strip to protect live sheet');
+          return snapshot;
+        }
         var sheets = out.sheets || {};
         for (var sid in sheets) {
           var cellData = (sheets[sid] && sheets[sid].cellData) || {};
@@ -17243,13 +17711,92 @@ var PROD_EQUIP_FAULT_KB = {
               var cell = row[ck];
               if (cell && typeof cell.s === 'string') {
                 var st = styles[cell.s];
-                if (st) cell.s = st; else delete cell.s;
+                // ★必须是副本：styles 是实时样式库，直接赋值等于把实时对象挂到副本的格子上
+                if (st) cell.s = fin_cloneStyleObj(st); else delete cell.s;
               }
             }
           }
         }
+        // 剥离“屏幕高亮”样式（红色加粗）：高亮只显示在屏幕上，绝不写进 xlsx。
+        // ★必须【全表扫描】而不是只扫 finHiState：历史版本曾把红+粗写进文件，
+        //   只清“当前高亮行”会漏掉陈旧红行 → 文件越存越脏 → 重载后 finHiOriginal 把红当成“原样式”读回来 → 旧行永远变不黑。
+        // 只清「日期行」上的红+粗，避免误伤表头/汇总行原本就存在的红色内容。
+        try {
+          for (var _sid4 in out.sheets) {
+            var _sh4 = out.sheets[_sid4]; if (!_sh4) continue;
+            var _cd4 = _sh4.cellData || {};
+            for (var _r4 in _cd4) {
+              if (!finHiIsDateRow(out, _sid4, _r4)) continue;   // 只动日期行
+              var _row4 = _cd4[_r4] || {};
+              for (var _c4 in _row4) {
+                var _cell4 = _row4[_c4]; if (!_cell4) continue;
+                var _s4 = _cell4.s;
+                if (typeof _s4 === 'string') _s4 = (out.styles && out.styles[_s4]) || null;
+                if (!_s4 || typeof _s4 !== 'object') continue;
+                var _cl4 = _s4.cl;
+                if (_cl4 && _cl4.rgb && String(_cl4.rgb).toUpperCase().indexOf('FF0000') >= 0) {
+                  // ★不要在样式对象上直接 delete：万一这个对象与实时样式库共享引用，
+                  //   删除就等于把屏幕上的红色高亮抹掉。克隆一份，只改副本。
+                  var _cp4 = fin_cloneStyleObj(_s4);
+                  delete _cp4.cl;
+                  if (Object.prototype.hasOwnProperty.call(_cp4, 'bl')) delete _cp4.bl;
+                  _cell4.s = _cp4;
+                }
+              }
+            }
+          }
+        } catch(e){ console.warn('[fin] stripHi', e); }
         return out;
       } catch(e){ console.warn('[fin] inlineStyles', e); return snapshot; }
+    }
+
+    // ★锁死区自检（FIN-HI-LOCK-20261011）：行为级回归测试，不是查源码字符串。
+    //   直接跑一遍"保存路径"，验证【实时样式库有没有被改动】—— 这是当年那个 BUG 的核心特征。
+    //   任何一条不变量被破坏都会返回非空数组；调用方会 console.error 并标记 window.__FIN_HI_LOCK_FAILED。
+    function finHiLockCheck(){
+      var errs = [];
+      try {
+        // ① 克隆必须真的是新对象（防止被改成 return o 而直接共享引用）
+        var src = { cl: { rgb: '#ff0000' }, bl: 1, fs: 11 };
+        var cp = fin_cloneStyleObj(src);
+        if (!cp || cp === src) errs.push('fin_cloneStyleObj 未返回新对象');
+        else { cp.cl = { rgb: '#000000' }; if (src.cl && src.cl.rgb !== '#ff0000') errs.push('fin_cloneStyleObj 与源对象共享嵌套引用'); }
+
+        // ② 保存路径绝不能改动传进来的（=实时）样式对象；同时副本里必须已剥离红+粗
+        var live = { cl: { rgb: '#ff0000' }, bl: 1, fs: 11 };
+        var fake = {
+          styles: { S_LOCK: live },
+          sheetOrder: ['sheet_2'],
+          sheets: { sheet_2: { id: 'sheet_2', cellData: { '0': { '0': { v: 45000, s: 'S_LOCK' } } } } }
+        };
+        var out = fin_inlineStyles(fake);
+        if (!live.cl || String(live.cl.rgb).toUpperCase().indexOf('FF0000') < 0 || Number(live.bl) !== 1){
+          errs.push('fin_inlineStyles 改动了实时样式库（高亮会被保存动作抹掉）');
+        }
+        var oc = (((out || {}).sheets || {}).sheet_2 || {}).cellData;
+        var ocs = oc && oc['0'] && oc['0']['0'] && oc['0']['0'].s;
+        if (ocs && ocs.cl && String(ocs.cl.rgb || '').toUpperCase().indexOf('FF0000') >= 0){
+          errs.push('保存副本里仍残留红色高亮样式');
+        }
+
+        // ③ 自愈能力必须存在
+        if (typeof finHiRowHasHi !== 'function' || typeof finHiCellHasHi !== 'function') errs.push('finHiRowHasHi/finHiCellHasHi 缺失（高亮无法自愈）');
+        if (typeof finHiRecompute !== 'function') errs.push('finHiRecompute 缺失');
+      } catch(e){ errs.push('自检异常: ' + (e && e.message ? e.message : e)); }
+      return errs;
+    }
+
+    // 跑自检并把结果放到显眼的地方（控制台 + window 标记），便于任何人在浏览器里一眼确认锁还在
+    function finHiLockVerify(){
+      var errs = finHiLockCheck();
+      window.__FIN_HI_LOCK_FAILED = errs.length ? errs : false;
+      if (errs.length){
+        console.error('[hi] ★锁死自检未通过 [' + FIN_HI_LOCK.doc + ']：', errs);
+        console.error('[hi] ★屏幕高亮可能被保存/重构破坏，请恢复 FIN-HI-LOCK-20261011 的四条不变量');
+      } else {
+        console.log('[hi] 锁死自检通过 [' + FIN_HI_LOCK.doc + ']');
+      }
+      return errs;
     }
 
     async function fin_autoSave(){
@@ -17358,6 +17905,7 @@ var PROD_EQUIP_FAULT_KB = {
         try { finUniverAPI.disposeUnit(oldId); } catch(e){ if (window.console) console.warn('disposeUnit', e); }
       }
       finSheet = null;
+      if (finHiPollTimer){ clearInterval(finHiPollTimer); finHiPollTimer = null; }
     }
 
     function fin_applySnapshot(snap){
