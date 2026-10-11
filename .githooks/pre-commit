@@ -5,11 +5,16 @@
 #   1) check_modal_format.py   —— 模态框放大态 .mmax 几何唯一、无特例覆盖、入口唯一
 #   2) check_print_logic.py    —— 打印逻辑（甘特左右两栏/一页装下、智能报告块级流/兜底目标、
 #                                 打印标记生命周期），见 choice_lite.html 中 [FROZEN 契约 · 打印]
+#   3) check_fin_hi_lock.py    —— 财务表屏幕高亮锁死区（FIN-HI-LOCK-20261011）：
+#                                 ① 高亮写入必须开静默窗口 finHiQuietUntil（不得触发自动保存）
+#                                 ② fin_inlineStyles 只能在克隆副本上剥离红+粗，绝不碰实时样式库
+#                                 ③ finHiRecompute 行号没变也要抽查红+粗，被洗掉即自愈补回
+#                                 ④ 高亮是纯屏幕效果，保存副本里必须已剥离红+粗
 #
-#   以上两条是【硬锁】（代码逻辑，静态扫描 HTML，失败即拦截提交，禁止篡改）。
+#   以上三条是【硬锁】（代码逻辑，静态扫描 HTML，失败即拦截提交，禁止篡改）。
 #
-#   3) check_prod_date_rule.py —— 生产操作日期 ≥ 排产开始日期（数据一致性巡检）
-#   4) check_prod_out_rule.py  —— 出库量 ≤ 当前生产总量（数据一致性巡检）
+#   4) check_prod_date_rule.py —— 生产操作日期 ≥ 排产开始日期（数据一致性巡检）
+#   5) check_prod_out_rule.py  —— 出库量 ≤ 当前生产总量（数据一致性巡检）
 #
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
@@ -38,7 +43,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then
