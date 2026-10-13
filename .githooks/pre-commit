@@ -53,6 +53,21 @@
 #                                  ⑤ 自检 fin_formulaSafeCheck 只在原型上查标记，不得早调 injector.get()
 #                                     （单元未建/服务未注册时 redi 会抛 required dependency items）
 #
+#   11) check_fin_cn_lock.py —— 中国财务报表「统计栏 + 保存不丢」锁死区
+#                                 （FIN-CN-STAT-LOCK-20261013）：
+#                                 ① 统计栏必须从【命令流 set-selections】取全部选区
+#                                    （门面 getSelection() 这版只给一格 → 拉选一整段仍显示 计数:1）
+#                                 ② 统计栏必须【逐格去重】（selections 带"整块+锚点"，不去重会算两遍）
+#                                 ③ 挂起窗口内的改动必须【defer】不是 drop
+#                                    （旧实现 `if (Date.now() < finCnHoldUntil) return;` 会把勾选核销
+#                                      / 录入数字永久丢掉；另需 2 秒看门狗兜底）
+#                                 ④ 保存异步 2~4 秒：只有 finDirtyGen 代数没变才允许清 finDirty
+#                                    （旧实现无条件清 → 保存期间的新勾选被静默吞掉）
+#                                 ⑤ 服务端 CN-BASIS-GUARD 金额守卫（勿移除）：÷3882 换算污染 /
+#                                    三块不同量级 一律拒收落盘、保留服务器文件
+#                                 ⑥ 归一化必须原子落盘 _cn_ws_save_atomic（禁止就地 wb.save）
+#                                    ⑦ 前端三块对账 FIN-CN-TRI-CONSIST（基准块被污染后能自愈）
+#
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
 #   但会在提交时打印，便于及时发现并修复。CI 中建议作为独立步骤做硬阻断。
@@ -80,7 +95,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then

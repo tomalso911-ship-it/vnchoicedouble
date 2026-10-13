@@ -3905,12 +3905,21 @@ def fin_convert_currency():
        因为只是"全表乘同一常数"，D-E=F、小计、滚动余额、跨表汇总(TỔNG HỢP)等恒等式全部守恒，
        不会出现"逐行汇率不同→毛额误差淹没净额→正数变负数"的问题。
        - values：只给【静态数字格】的换算值；公式格不写值，交给表格自身重算（同一汇率 → 结果一致）。
-       - fmt   ：所有金额格（含公式格、汇总表 TỔNG HỢP）的 0 基 row/col，供前端统一套货币格式。"""
+       - fmt   ：所有金额格（含公式格、汇总表 TỔNG HỢP）的 0 基 row/col，供前端统一套货币格式。
+
+       ★kind=cn（中国报表，FIN-CN-CURRENCY-20261013）：中国报表的金额【基准币种是人民币】，
+         所以换算方向与越南报表相反：目标 RMB=原值；USD=num÷USDCNY；VND=num×CNYVND。
+         表头与越南那张「Chi thực tế」完全一致（A=Ngày hạch toán、D=Thu、E=Chi），
+         所以下面的列识别逻辑【一个字都不用改】，只是把源文件换成 cn_report.xlsx。"""
     data = request.get_json(force=False, silent=True) or {}
+    kind = (data.get("kind") or "vn").strip().lower()
+    if kind not in ("vn", "cn"):
+        kind = "vn"
     target = (data.get("target") or "").upper().replace("CNY", "RMB").replace("¥", "RMB")
     if target not in ("VND", "USD", "RMB"):
         return jsonify({"ok": False, "error": "target must be VND/USD/RMB"}), 400
-    if not os.path.isfile(FIN_REPORT):
+    report = CN_REPORT if kind == "cn" else FIN_REPORT
+    if not os.path.isfile(report):
         return jsonify({"ok": False, "error": "report not initialized"}), 404
 
     # 读历史汇率缓存（USD→VND、USD→CNY），推导 CNY→VND（保留精度）
@@ -3953,8 +3962,8 @@ def fin_convert_currency():
             s = s.replace(a, b)
         return s
 
-    wbD = openpyxl.load_workbook(FIN_REPORT, data_only=True)     # 缓存值
-    wbF = openpyxl.load_workbook(FIN_REPORT, data_only=False)    # 公式
+    wbD = openpyxl.load_workbook(report, data_only=True)     # 缓存值
+    wbF = openpyxl.load_workbook(report, data_only=False)    # 公式
 
     ASOF_RE = re.compile(r"as of\s+([A-Za-z]{3,9})\s+(\d{1,2}),\s*(\d{4})", re.I)
     asof_text = None
@@ -4016,8 +4025,22 @@ def fin_convert_currency():
             sheets.append((ws.title, header_row, amount_cols))
 
     asof = asof_text or max_date
-    usd_rate = nearest_rate(asof, usdvnd)
-    cny_rate = nearest_rate(asof, cnyvnd)
+    usd_rate = nearest_rate(asof, usdvnd)      # 1 USD = ? VND
+    cny_rate = nearest_rate(asof, cnyvnd)      # 1 CNY = ? VND
+    usdcny_rate = nearest_rate(asof, usdcny)   # 1 USD = ? CNY
+    # ★基准币种 = VND（越南报表与中国报表一样）。
+    #   中国报表里的金额同样是【越南盾】口径（用户 2026-10-13 实测：7560000 ÷ 3882.17 = 1947.36
+    #   就是他屏幕上看到的 ¥1,947），用户明确要求「参考越南财务报表里面的逻辑」做换算，
+    #   所以两张报表共用同一套 VND 基准的算法；kind 只用来选【哪份文件/哪张表】。
+    base = "VND"
+
+    def _convert(num):
+        """按【VND 基准】换算到目标币种（越/中两张报表共用；同一汇率 → 恒等式守恒）。"""
+        if target == "VND":
+            return num
+        if target == "USD":
+            return round(num / usd_rate, 2) if usd_rate else num
+        return round(num / cny_rate, 2) if cny_rate else num               # RMB
 
     values = {}
     fmt = {}
@@ -4052,13 +4075,7 @@ def fin_convert_currency():
                 flist.append([r - 1, c - 1])     # 套货币格式（含真公式格）
                 if is_real_formula:
                     continue                     # 真公式格：交给表格自身重算，不覆盖
-                if target == "VND":
-                    conv = num
-                elif target == "USD":
-                    conv = round(num / usd_rate, 2) if usd_rate else num
-                else:  # RMB
-                    conv = round(num / cny_rate, 2) if cny_rate else num
-                vmap.setdefault(r - 1, {})[c - 1] = conv
+                vmap.setdefault(r - 1, {})[c - 1] = _convert(num)
         if vmap:
             values[title] = vmap
         if flist:
@@ -4070,7 +4087,15 @@ def fin_convert_currency():
         rate = cny_rate
     else:
         rate = 1
-    return jsonify({"ok": True, "target": target, "asof": asof, "rate": rate,
+    # ★factor = 「换算值 = 原值 × factor」的那个因子（前端在"外币显示下用户改了金额"时
+    #   用它把输入值【换回基准币】再落盘，避免把外币数字当人民币写进文件）。
+    factor = 1.0
+    if target == "USD" and usd_rate:
+        factor = 1.0 / usd_rate
+    elif target == "RMB" and cny_rate:
+        factor = 1.0 / cny_rate
+    return jsonify({"ok": True, "kind": kind, "base": base, "target": target,
+                    "asof": asof, "rate": rate, "factor": factor,
                     "values": values, "fmt": fmt})
 
 
@@ -4136,10 +4161,27 @@ CN_CHECK_OFF = "☐"
 # 纯蓝；想换成柔和的 Office 蓝就改成 "FF0070C0"。
 CN_TEXT_BLUE = "FF0000FF"
 
+# ============ 中国报表：默认人民币符号 + 黑色网格线（FIN-CN-MONEY-20261013）============
+# 用户要求：① 中国财务报表里金额显示【人民币符号】，默认货币就是 RMB（越南报表仍是越南盾）；
+#           ② 中国财务报表加上【黑色网格线】。
+# ★为什么改 xlsx 文件而不是只改屏幕：保存链路（前端 finCnBuildSavePayload）是
+#   「保留文件原样式、只更新值」，屏幕上现加的格式根本不会写回文件；反过来，文件里的格式会成为
+#   单元格"基样式"，用户在 App 或 Excel 里新录入的内容会自动继承 → 一次到位、以后不用管。
+#   （与 _cn_normalize_text_color 的蓝化、_cn_normalize_ac_align 的居中同一套理由。）
+CN_MONEY_FMT = '"¥"#,##0'            # ★与前端 choice_lite.html 的 finCnMoneyFmt 必须完全一致
+CN_MONEY_COLS = ("D", "E", "N", "O", "X", "Y")   # 三语块的「收入 / 支出」列
+CN_BORDER_RGB = "FF000000"           # 黑色网格线
+# 黑色网格线覆盖范围（1 基列区间）：A–AB；核销列 AC 由 _cn_border_cols() 追加 → 实际 A–AC 整行。
+# ★用户 2026-10-13 报「网格线没完全做好」的根因：原来只刷三语块 A-E / K-O / U-Y，
+#   而中国报表视图是「A–J + AC」（K–AB 被隐藏）—— F–J 这 5 列正好露在屏幕上却没有线。
+#   现在整行都刷（隐藏的块也刷，逻辑上与语言无关、且改版隐藏范围时不会再漏）。
+CN_BORDER_BLOCKS = ((1, 28),)
+
 
 def _cn_make_seed_xlsx(path):
     """生成中国报表种子文件：只含一张「实际支出」表，三语表头与越南那张完全一致，
-    并预留 AC 核销列（每行一个空勾选框 ☐）+ 末尾合计行。"""
+    并预留 AC 核销列（每行一个空勾选框 ☐）+ 末尾合计行。
+    ★金额列带人民币符号（CN_MONEY_FMT）+ 整块黑色网格线（CN_BORDER_RGB），见上方区块说明。"""
     import openpyxl
     from openpyxl.styles import Font, Alignment
     wb = openpyxl.Workbook()
@@ -4170,8 +4212,8 @@ def _cn_make_seed_xlsx(path):
     for r in range(CN_FIRST_DATA_ROW, last + 1):
         for col in ("A", "K", "U"):
             ws["%s%d" % (col, r)].number_format = "dd-mm-yyyy"
-        for col in ("D", "E", "N", "O", "X", "Y"):
-            ws["%s%d" % (col, r)].number_format = "#,##0_);(#,##0)"
+        for col in CN_MONEY_COLS:
+            ws["%s%d" % (col, r)].number_format = CN_MONEY_FMT      # ★人民币符号
         ac = ws["AC%d" % r]
         ac.value = CN_CHECK_OFF
         ac.alignment = center          # ★勾选框水平+垂直居中（用户要求"选择框左右居中"）
@@ -4183,9 +4225,84 @@ def _cn_make_seed_xlsx(path):
     ws["O%d" % tot] = _sum
     ws["W%d" % tot] = "TOTAL"
     ws["Y%d" % tot] = _sum
+    for col in CN_MONEY_COLS:
+        ws["%s%d" % (col, tot)].number_format = CN_MONEY_FMT       # 合计行也带 ¥
+    _cn_apply_borders(ws, 1, tot)      # ★黑色网格线（标题行 ~ 合计行）
     for col, w in (("A", 11.7), ("B", 11.3), ("C", 34.8), ("D", 11.7), ("E", 20.3), ("AC", 10)):
         ws.column_dimensions[col].width = w
     wb.save(path)
+
+
+def _cn_border_cols():
+    """要加黑色网格线的列号（1 基）：三语块 A-E / K-O / U-Y + 核销列 AC。"""
+    cols = []
+    for a, b in CN_BORDER_BLOCKS:
+        cols.extend(range(a, b + 1))
+    cols.append(CN_CHECK_COL)
+    return cols
+
+
+def _cn_has_thin_border(bd):
+    """四边都已是细边框（thin）→ True（幂等判定用）。
+    ★只比线型、不比颜色：Excel/主题色/ARGB 三种写法都可能是"黑"，比颜色容易误判成"要改"。"""
+    for name in ("left", "right", "top", "bottom"):
+        s = getattr(bd, name, None) if bd is not None else None
+        if s is None or (s.style or "") != "thin":
+            return False
+    return True
+
+
+def _cn_apply_borders(ws, first_row, last_row):
+    """给中国报表的三语块 + 核销列刷黑色细边框，返回改动的格子数
+    （0 = 本来就已经有网格线 → 调用方不必重写文件、也不会白动 mtime）。
+
+    ★必须跳过【合并区域里除左上角以外】的格子：Excel 只保留合并区左上角的边框，
+      其它格子存盘后边框会被丢掉 —— 不跳过的话每次启动都会"发现少 8 个边框"→ 重写文件 →
+      白动 mtime → 白重建一次快照缓存（实测就是合并的 A1:E1 / A2:E2 那 8 个格子）。"""
+    from openpyxl.styles import Border, Side
+    side = Side(style="thin", color=CN_BORDER_RGB)
+    border = Border(left=side, right=side, top=side, bottom=side)
+    skip = set()
+    try:
+        for rng in ws.merged_cells.ranges:
+            for row in ws.iter_rows(min_row=rng.min_row, max_row=rng.max_row,
+                                    min_col=rng.min_col, max_col=rng.max_col):
+                for cell in row:
+                    if (cell.row, cell.column) != (rng.min_row, rng.min_col):
+                        skip.add((cell.row, cell.column))
+    except Exception:
+        pass
+    changed = 0
+    cols = _cn_border_cols()
+    for r in range(first_row, last_row + 1):
+        for c in cols:
+            if (r, c) in skip:
+                continue
+            cell = ws.cell(row=r, column=c)
+            if _cn_has_thin_border(cell.border):
+                continue
+            cell.border = border
+            changed += 1
+    return changed
+
+
+def _cn_ws_save_atomic(wb, path=None):
+    """★原子落盘（FIN-CN-ATOMIC-SAVE-20261013）：先写同目录临时文件，再 os.replace 顶替。
+    为什么必须这样：归一化那几步（核销列居中 / 数据区蓝字 / 金额 ¥ 符号 / 黑色网格线）
+    原来直接用 openpyxl 的 save 就地重写线上文件 ——
+    实测就在这一瞬间读 cn_report.xlsx 会拿到坏 zip（BadZipFile: File is not a zip file），
+    并发读快照拿到的内容会不完整；万一进程/断电中断，报表文件直接被写坏。"""
+    p = path or CN_REPORT
+    tmp = p + ".norm.tmp"
+    wb.save(tmp)
+    try:
+        os.replace(tmp, p)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def _cn_normalize_ac_align():
@@ -4214,7 +4331,7 @@ def _cn_normalize_ac_align():
             cell.alignment = center
             changed += 1
         if changed:
-            wb.save(CN_REPORT)
+            _cn_ws_save_atomic(wb)
             sys.stderr.write("[fin-cn] 核销列 %d 个单元格已设为居中\n" % changed)
         return changed > 0
     except Exception as e:
@@ -4275,7 +4392,7 @@ def _cn_normalize_text_color():
                 cell.font = nf
                 changed += 1
         if changed:
-            wb.save(CN_REPORT)
+            _cn_ws_save_atomic(wb)
             sys.stderr.write("[fin-cn] 数据区 %d 个单元格字体已设为蓝色\n" % changed)
         return changed > 0
     except Exception as e:
@@ -4283,20 +4400,110 @@ def _cn_normalize_text_color():
         return False
 
 
+_CN_MONEY_TEXT_RE = re.compile(r"^\d{1,3}(?:,\d{3})+(?:\.\d+)?$|^\d+(?:\.\d+)?$")
+
+
+def _cn_money_to_number(cell):
+    """★把「文本型金额」转成真正的数字 —— 用户 2026-10-13 报「货币符号没体现」的真正原因。
+
+    原始导出里金额常常是【文本】：'41,400,000\\xa0'（末尾还带一个不间断空格）。
+    Excel/Univer 的数字格式对【文本】格一律不生效 —— 数字格式就算写成 "¥"#,##0，
+    屏幕上照样只显示原文 '41,400,000'，永远看不到 ¥。所以必须先变成数字。
+    ★只转「纯数字 / 千分位数字」字符串（'41,400,000'、'0'、'1,234.5'）；
+      '41,400,000 VND'、含货币符号或文字的格子一律不碰（不猜、不丢信息）。
+    已经是数字的格原样返回 False（幂等：第二次调用不会再改文件）。"""
+    v = cell.value
+    if not isinstance(v, str):
+        return False
+    raw = v.replace("\u00a0", " ").strip()
+    if not raw or not _CN_MONEY_TEXT_RE.match(raw):
+        return False
+    try:
+        n = float(raw.replace(",", ""))
+    except ValueError:
+        return False
+    cell.value = int(n) if n == int(n) else n
+    return True
+
+
+def _cn_normalize_money_fmt():
+    """中国报表【金额列】统一成人民币符号 —— 用户要求「中国财务报表里默认货币是 RMB」。
+
+    ★为什么落进文件：见上方「默认人民币符号 + 黑色网格线」区块（保存链路只更新值、保留文件原样式）。
+    ★范围：数据区 + 合计行（合计行也要带 ¥，否则最后一行光秃秃的）；
+      行数按【实际内容】走（max(种子预留行, ws.max_row)），用户录到第 300 行也照样覆盖。
+    ★与"币种下拉"的关系：这张报表的金额本来就是人民币，右下角下拉只做显示符号、不做换算。
+    ★文本型金额先转数字（_cn_money_to_number）—— 否则数字格式对文本格不生效，永远看不到 ¥。
+    幂等：已经等于 CN_MONEY_FMT 的格子跳过；完全没改动就不重写文件（避免白动 mtime）。
+    返回 True 表示改过文件（调用方据此让快照缓存失效）。"""
+    if not os.path.isfile(CN_REPORT):
+        return False
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(CN_REPORT)
+        ws = wb[CN_SHEET_NAME] if CN_SHEET_NAME in wb.sheetnames else wb[wb.sheetnames[0]]
+        last = max(CN_FIRST_DATA_ROW + CN_SEED_ROWS, ws.max_row)   # 含合计行
+        changed = 0
+        num_fixed = 0
+        for r in range(CN_FIRST_DATA_ROW, last + 1):
+            for col in CN_MONEY_COLS:
+                cell = ws["%s%d" % (col, r)]
+                if _cn_money_to_number(cell):      # ★文本 → 数字
+                    num_fixed += 1
+                    changed += 1
+                if (cell.number_format or "").strip() == CN_MONEY_FMT:
+                    continue
+                cell.number_format = CN_MONEY_FMT
+                changed += 1
+        if num_fixed:
+            sys.stderr.write("[fin-cn] 金额列 %d 个「文本型金额」已转成数字（否则 ¥ 不显示）\n" % num_fixed)
+        if changed:
+            _cn_ws_save_atomic(wb)
+            sys.stderr.write("[fin-cn] 金额列 %d 个单元格已套人民币符号 %s\n" % (changed, CN_MONEY_FMT))
+        return changed > 0
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 金额符号处理失败: %s\n" % e)
+        return False
+
+
+def _cn_normalize_border():
+    """给中国报表加【黑色网格线】—— 用户要求「中国财务报表加上黑色网格线」。
+
+    ★为什么落进文件：同上（屏幕上的边框不会被写回；文件里的边框会成为基样式被新录入的内容继承）。
+    ★范围：A–AB 整行 + 核销列 AC（见 CN_BORDER_BLOCKS），行 1 ~ 最后一行（含标题行、表头行、合计行）。
+    幂等：四边已是细边框的格子跳过（见 _cn_has_thin_border）；没改动就不重写文件。
+    返回 True 表示改过文件（调用方据此让快照缓存失效）。"""
+    if not os.path.isfile(CN_REPORT):
+        return False
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(CN_REPORT)
+        ws = wb[CN_SHEET_NAME] if CN_SHEET_NAME in wb.sheetnames else wb[wb.sheetnames[0]]
+        last = max(CN_FIRST_DATA_ROW + CN_SEED_ROWS, ws.max_row)   # 含合计行
+        changed = _cn_apply_borders(ws, 1, last)
+        if changed:
+            _cn_ws_save_atomic(wb)
+            sys.stderr.write("[fin-cn] %d 个单元格已加黑色网格线\n" % changed)
+        return changed > 0
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 网格线处理失败: %s\n" % e)
+        return False
+
+
 def _cn_normalize_style():
-    """中国报表外观归一化（幂等）：① AC 核销列居中；② 数据区字体蓝色。
+    """中国报表外观归一化（幂等）：① AC 核销列居中；② 数据区字体蓝色；
+    ③ 金额列人民币符号；④ 黑色网格线。
     返回 True 表示动过文件（调用方据此让快照缓存失效）。"""
     changed = False
-    try:
-        if _cn_normalize_ac_align():
-            changed = True
-    except Exception as e:
-        sys.stderr.write("[fin-cn] 核销列居中失败: %s\n" % e)
-    try:
-        if _cn_normalize_text_color():
-            changed = True
-    except Exception as e:
-        sys.stderr.write("[fin-cn] 数据区蓝色失败: %s\n" % e)
+    for fn, tag in ((_cn_normalize_ac_align, "核销列居中"),
+                    (_cn_normalize_text_color, "数据区蓝色"),
+                    (_cn_normalize_money_fmt, "金额人民币符号"),
+                    (_cn_normalize_border, "黑色网格线")):
+        try:
+            if fn():
+                changed = True
+        except Exception as e:
+            sys.stderr.write("[fin-cn] %s失败: %s\n" % (tag, e))
     return changed
 
 
@@ -4518,6 +4725,41 @@ def fin_cn_init_report():
     return jsonify({"ok": True, "bytes": len(data), "snapshot": "built" if _warm_ok else "lazy"})
 
 
+def _cn_rev():
+    """中国报表文件的版本号（mtime_ns + 字节数）—— 保存时的【乐观锁】。
+    ★为什么需要（FIN-CN-REV-20261013，2026-10-13 实测事故）：
+      用户在 A 标签页里录入金额 / 勾了核销，另一个【还开着旧数据的标签页】随后自动保存，
+      把旧快照整份写回文件 → 新录入与勾选被静默回滚（文件金额变回 41,400,000、核销全变 ☐）。
+      有了 rev：客户端只能提交"基于当前文件"的快照，版本对不上就拒收并让它重新加载。"""
+    try:
+        st = os.stat(CN_REPORT)
+        return "%d-%d" % (int(st.st_mtime_ns), int(st.st_size))
+    except OSError:
+        return ""
+
+
+def _cn_block_total(path, cols, r0=5, r1=205):
+    """三语块里「某几个列」在数据区的绝对值合计 —— 用于判断落盘快照是否被"货币换算值"污染。
+    ★为什么按列分组：三语块（A–E 越南文 / K–O 中文 / U–Y 英文）存的是【同一个越南盾数值】，
+      所以基准块 D,E（第 4,5 列）与中文块 N,O（第 14,15 列）、英文块 X,Y（第 24,25 列）
+      必须【同量级】。人民币换算污染的特征极其鲜明：基准块 ≈ 中文块 ÷ 3882.17。"""
+    try:
+        wb = openpyxl.load_workbook(path, data_only=False)
+        ws = wb[wb.sheetnames[0]]
+        t = 0.0
+        for r in range(r0, r1 + 1):
+            for c in cols:
+                v = ws.cell(r, c).value
+                if isinstance(v, bool):
+                    continue
+                if isinstance(v, (int, float)):
+                    t += abs(float(v))
+        wb.close()
+        return t
+    except Exception:
+        return 0.0
+
+
 @app.route("/api/finance/cn-report/snapshot", methods=["GET"])
 def fin_cn_get_snapshot():
     """返回中国报表的 Univer 快照（命中缓存直发，conditional=True 支持 304）。"""
@@ -4536,6 +4778,7 @@ def fin_cn_get_snapshot():
                                mimetype="application/json", conditional=True)
     resp.headers["Content-Type"] = "application/json; charset=utf-8"
     resp.headers["X-Fin-Snap-Cache"] = "hit"
+    resp.headers["X-Fin-Rev"] = _cn_rev()      # ★版本号：前端保存时原样带回（乐观锁，见 _cn_rev）
     return resp
 
 
@@ -4547,12 +4790,57 @@ def fin_cn_save_snapshot():
     data = request.get_json(force=False, silent=True)
     if not isinstance(data, dict):
         return jsonify({"error": "invalid json"}), 400
+    # ★乐观锁（FIN-CN-REV-20261013）：前端带上它【加载时】的版本号（GET /snapshot 的 X-Fin-Rev）。
+    #   版本对不上 ⇒ 期间有人（或另一个还开着旧数据的标签页）已经写过文件了。
+    #   这时绝不能拿这份旧快照覆盖整份文件，否则别人刚录的金额/刚勾的核销会被静默回滚
+    #   （2026-10-13 实测：文件被旧标签页从新数据覆盖回 41,400,000，核销全被抹成 ☐）。
+    #   返回 HTTP 200 + stale:true（不是 4xx，避免浏览器控制台一片红），前端会重新加载后再让用户操作。
+    _cli_rev = str(data.get("__rev") or "")
+    _cur_rev = _cn_rev()
+    if _cli_rev and _cur_rev and _cli_rev != _cur_rev:
+        sys.stderr.write("[fin-cn] stale-blocked(rev %s != %s)\n" % (_cli_rev, _cur_rev))
+        return jsonify({"ok": False, "stale": True, "rev": _cur_rev,
+                        "error": "stale snapshot"}), 200
     _normalized = False        # ★数据区字色是否被本次保存修正过（返回值给前端决定要不要刷屏）
     try:
         sys.path.insert(0, BASE_DIR)
         import univer_convert
         tmp = CN_REPORT + ".tmp.xlsx"
         univer_convert.univer_to_xlsx(data, tmp)
+        # ★★CN-BASIS-GUARD-20261013（服务端硬守卫，勿移除）★★
+        #   为什么必须留在服务端：前端那套"把人民币显示值换回越南盾"的守卫依赖
+        #     「当前下拉币种 + 汇率因子缓存 + 金额列登记」三个运行时状态，
+        #     任何一个没就绪（切报表种类会把 finCnConvCur/finCnConvFactor 清零、缓存键丢失…）
+        #     就会整段失效，而失效的表现是【静默】的：屏幕上的人民币数字被原样写进文件。
+        #   2026-10-13 实测事故：基准块 D/E 被写成人民币换算值（41,400,000 → 10,664.14 → 再 ÷3882 → 2.75），
+        #     每自动保存一次就再缩 3882 倍；而中文块 N/O、英文块 X/Y 还是真值 41,400,000，
+        #     于是用户看到「中国报表的数据全变了」。
+        #   本守卫用两个与前端状态无关的【文件级】判据把这种快照挡在落盘之前：
+        #     ① 整表缩水：新基准块合计 / 旧基准块合计 < 0.02（≈÷3882 / ÷26292 的换算污染）；
+        #     ② 三块不同量级：新基准块合计 / 新中文块合计 < 0.5（三语块必须同值，基准块被写成人民币了）。
+        #   命中就【拒绝落盘】（删掉 tmp、保留服务器更正确的文件），
+        #   返回 HTTP 200 + stale:true（不是 4xx，避免控制台一片红），前端收到 stale 会重新加载干净数据。
+        try:
+            _old_base = _cn_block_total(CN_REPORT, (4, 5))
+            _new_base = _cn_block_total(tmp, (4, 5))
+            _new_zh = _cn_block_total(tmp, (14, 15))
+            _bad_total = bool(_old_base > 0 and _new_base > 0 and (_new_base / _old_base) < 0.02)
+            _bad_ratio = bool(_new_zh > 0 and _new_base > 0 and (_new_base / _new_zh) < 0.5)
+            if _bad_total or _bad_ratio:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+                sys.stderr.write("[fin-cn] CN-BASIS-GUARD 拒绝落盘：%s (old_base=%.2f new_base=%.2f new_zh=%.2f ratio=%.8f)\n"
+                                 % ("整表缩水" if _bad_total else "三块不同量级",
+                                    _old_base, _new_base, _new_zh,
+                                    (_new_base / _old_base) if _old_base else 0))
+                sys.stderr.flush()
+                return jsonify({"ok": True, "stale": True, "guard": "currency-regression",
+                                "old_total": _old_base, "new_total": _new_base, "zh_total": _new_zh,
+                                "rev": _cur_rev, "error": "amounts look like currency-converted values"}), 200
+        except Exception as _ge:
+            sys.stderr.write("[fin-cn] CN-BASIS-GUARD warning: %s\n" % _ge)
         try:
             os.replace(tmp, CN_REPORT)
         except OSError:
@@ -4586,7 +4874,7 @@ def fin_cn_save_snapshot():
         sys.stderr.flush()
         return jsonify({"error": "convert failed: %s" % e}), 500
     return jsonify({"ok": True, "saved_at": _fdt.datetime.now().isoformat(timespec="seconds"),
-                    "normalized": bool(_normalized)})
+                    "normalized": bool(_normalized), "rev": _cn_rev()})
 
 
 # ===================== API：CRM 报价单 PDF 上传 =====================

@@ -4309,7 +4309,10 @@ var WL_FLOW_IMG = {
       /* Univer 自带工具栏（第三行）：强制靠左、不换行 */
       .univer-toolbar-container{display:flex !important;flex-wrap:nowrap !important;justify-content:flex-start !important;align-items:center !important;}
       .univer-toolbar{flex-wrap:nowrap !important;justify-content:flex-start !important;}
-      .univer-container{height:660px;border:1px solid #dfe6ee;border-radius:8px;overflow:visible;}
+      /* ★position:relative：让底部统计栏（.fin-statbar）能绝对定位贴在容器下沿
+         （FIN-STATBAR-DOCK-20261013）。容器 660px 是固定高度且 overflow:visible，
+         所以这一条永远贴在"看得见的表格下沿"，不会被挤到屏幕折线以下。 */
+      .univer-container{position:relative;height:660px;border:1px solid #dfe6ee;border-radius:8px;overflow:visible;}
       /* Univer 自带工具栏：强制一行、靠左；空间不足时沿用自带「…」收纳 */
       .univer-container [class*="toolbar"]{flex-wrap:nowrap !important;justify-content:flex-start !important;}
       .univer-container [class*="toolbar"] > *{flex:0 0 auto;}
@@ -4324,6 +4327,30 @@ var WL_FLOW_IMG = {
       .univer-container [class*="filter-panel"]{z-index:1200;}
       .fin-note{font-size:12px;color:#999;margin-top:8px;line-height:1.6;}
       .fin-note code{background:#f2f2f2;padding:1px 5px;border-radius:4px;}
+      /* ★财务底部统计栏（FIN-STATBAR-20261013，用户要求）：计数/总计/平均/最大值/最小值，字号要小 */
+      /* ★FIN-STATBAR-FIX-20261013：容器是固定 660px（.univer-container），统计栏排在它下面，
+         在笔记本（可视高度 ~900px）上会被挤到折线以下 → 用户只看得到 Univer 自带的那条「计数」。
+         改成 sticky 贴住可视区底部：不占别人的位置、不遮挡任何东西，
+         只要工作表区域还在屏幕上就一定看得见（这就是 Excel 状态栏的位置感）。 */
+      /* ★FIN-STATBAR-DOCK-20261013：绝对定位贴在【Univer 容器内部】的下沿 ——
+         就是 Excel 状态栏的位置。原来用 sticky 排在容器外面：容器固定 660px，
+         在笔记本（可视高 ~760–900px）上整条统计栏会被挤到屏幕折线以下，
+         用户只看得到 Univer 自带那条「计数」（2026-10-13 实测现象）。 */
+      /* bottom:30px = 抬到 Univer 自带底条（工作表标签/缩放那条，约 28px）的上面，
+         别把它盖住。 */
+      .fin-statbar{position:absolute;left:0;right:0;bottom:30px;z-index:500;pointer-events:none;
+        display:flex;flex-wrap:wrap;gap:16px;align-items:center;
+        padding:3px 10px;font-size:11px;line-height:1.6;color:#333;background:#f7f8fa;
+        border-top:1px solid #e6eaf1;min-height:24px;
+        box-shadow:0 -2px 6px rgba(16,30,60,.06);}
+      .fin-statbar .fin-stat-item{white-space:nowrap;font-size:11px;}
+      .fin-statbar .fin-stat-item b{font-weight:600;color:#7a8699;margin-right:2px;}
+      /* ★隐藏 Univer 自带的底部状态栏，改用上面的 fin-statbar，避免两条统计重复显示。
+         类名可能随 Univer 版本变，所以再加一层"容器内 class 含 status-bar/statusbar"的兜底；
+         仍有漏网时由 fin_statCompute 里的 JS 兜底（按文本含 计数/Count/Đếm 判定）。 */
+      .univer-status-bar{display:none !important;}
+      .univer-container [class*="status-bar"],
+      .univer-container [class*="statusbar"]{display:none !important;}
       .fin-panel{display:none;background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;}
       .fin-panel.active{display:block;}
       /* ★共用工作区（FIN-CN-REPORT-20261013）：越南/中国两张报表共用这一块；
@@ -16661,7 +16688,12 @@ var PROD_EQUIP_FAULT_KB = {
             </svg>
           </button>
         </div>
-        <div id="univer_container" class="univer-container"></div>
+        <!-- ★统计栏直接放进 Univer 容器里（FIN-STATBAR-DOCK-20261013）：
+             绝对定位贴在容器下沿，永远跟着"看得见的表格"走，不会被挤到屏幕外面。
+             Univer 若把它清掉，fin_statCompute 每次都会重新挂回来。 -->
+        <div id="univer_container" class="univer-container">
+          <div id="fin_statbar" class="fin-statbar"></div>
+        </div>
       </div>
       <div class="fin-panel" id="fin_panel_merge">
         <h3 data-i18n="fin_tab_merge_report">合并财务总报表</h3>
@@ -16742,7 +16774,24 @@ var PROD_EQUIP_FAULT_KB = {
       var changed = (finTitlesKind !== null && finTitlesKind !== k);
       FIN_KIND = k;
       FIN_KINDS[k] && (FIN_VIEW_MAXCOL = FIN_KINDS[k].viewMaxCol);
+      /* ★★FIN-CN-CURRENCY-FIX2-20261013（用户报「货币转换的逻辑有严重错误」）：
+         同一种报表被【重复调用】时，这里必须什么都不动。旧实现每次都会干两件坏事：
+           ① 把币种下拉重置成默认 —— 用户手动切的 USD/RMB 会被悄悄吃掉；
+           ② 清空 finCnConvCur / finCnConvView —— 保存时"跳过换算显示值"的保护随即失效，
+              屏幕上的人民币换算值就被写进了 cn_report.xlsx。
+         2026-10-13 的实际事故正是它：支出 41,400,000 VND 被写成 ¥10,664，
+         并且空行 D16:D204 / E16:E204 被灌了 189×2 个 0。
+         所以：只有【真的首次进入 / 越南⇄中国 切换】才做"设默认币种 + 清换算状态"。 */
       if (finTitlesKind === k) return;
+      /* ★默认货币按报表种类走（FIN-CN-MONEY-20261013）：中国报表默认 RMB，
+         越南报表 VND。★只改下拉框的值、不触发 onchange，绝不在这里走换算接口。 */
+      try {
+        var _selCur = document.getElementById('fin_currency');
+        if (_selCur) _selCur.value = (k === 'cn') ? 'RMB' : 'VND';
+      } catch(e){}
+      /* ★FIN-CN-CURRENCY-20261013：换报表（越南 ⇄ 中国）时把"显示层换算状态"清干净，
+         否则上一张报表的换算币种/换算格表会残留到新视图里，干扰保存时的跳过判定。 */
+      try { finCnConvCur = ''; finCnConvView = {}; finCnConvFactor = 0; } catch(e){}
       finTitlesKind = k;
       fin_applyTitlesFallback();
       finTitlesLoaded = false;
@@ -16802,12 +16851,20 @@ var PROD_EQUIP_FAULT_KB = {
     var finUniver = null, finUniverAPI = null, finSheet = null, finPresets = null;
     var finInited = false, finReady = false, finLoading = false;
     var finLastSnapshot = null, finFilterActive = false;
+    /* ★中国报表文件的版本号（来自 GET /snapshot 的 X-Fin-Rev 头）—— 保存时原样带回做乐观锁。
+       版本对不上说明别的标签页已经写过文件，这份快照不能再覆盖（FIN-CN-REV-20261013）。 */
+    var finSnapRev = '';
     // finLastView = 实际送进 Univer 的「显示快照」（VI 基准块 + 当前语言文字）。
     // 所有要"写回显示单元"的例程都必须基于它（列已被裁到 0..9），不能用完整快照，否则会把裁掉的列又造出来。
     var finLastView = null;
     var finRowOrder = [];
     var finToolbarObserver = null;
     var finSaveTimer = null, finDirty = false, finSaving = false;
+    /* ★改动代数（FIN-CN-LOSTSAVE-FIX-20261013）：保存是【异步】的（服务端要 2~4 秒）。
+       旧代码在保存成功时无条件 finDirty=false —— 于是"保存发出之后、响应回来之前"用户新做的改动
+       （实测就是刚勾上的核销）会被这一行悄悄抹掉：界面显示已勾选、状态栏显示已保存，文件里却没有。
+       现在每次【真实改动】把代数 +1，保存回来时只有代数没变才敢清 dirty，否则立刻再排一次保存。 */
+    var finDirtyGen = 0;
     var finStatusKey = 'fin_status_not_loaded', finStatusSuffix = '';
 
     function fin_L(k){ try { var d = (typeof T === 'function') ? T() : null; return (d && d[k]) || k; } catch(e){ return k; } }
@@ -16866,6 +16923,14 @@ var PROD_EQUIP_FAULT_KB = {
     /* 显示块固定为 VI 基准块 A–J（0..9）。任何"写回显示单元"的操作（货币换算/百分比/筛选…）
        都必须夹在这个范围内，否则会在 J 右边凭空造出列，把裁好的视图又撑开。 */
     var FIN_VIEW_MAXCOL = 9;
+    /* ★「当前语言基准块」的最后一列（0 基 = H）。
+       ★为什么是 7 而不是 9：三语块布局是【8 列一块】—— A–H / K–R / U–AB，
+         所以保存 payload 的 `c / c+10 / c+20` 三块写入必须满足 c ≤ 7，
+         否则 c=8/9 会把值写到 AC(28)/AD(29)：2026-10-13 实测就是 c=8 的 `c+20`
+         把 I 列的值写进 AC，把核销列表头「核销」盖成了 0。
+         FIN_VIEW_MAXCOL 在中国报表会放大到 28（为把 AC 留在视图里），
+         所以这两个常量绝对不能混用（FIN-CN-CURRENCY-20261013）。 */
+    var FIN_BLOCK_MAXCOL = 7;
     function fin_langOffset(lang){
       lang = lang || (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi');
       if (lang === 'zh') return 10;
@@ -16946,6 +17011,21 @@ var PROD_EQUIP_FAULT_KB = {
       if (!fin_hasNoTrans(orig)) return trans;
       return fin_hasNoTrans(trans) ? trans : null;
     }
+    /* ★译文语言合理性判定（FIN-TRANS-SANITY-20261013）：只判「明显不是目标语言」的，拿不准一律放行。
+       · 与原文一字不差 → 不是译文（历史上"翻译失败就退回原文"的产物）；
+       · 英文译文里出现汉字 → 绝不是英文（历史保存兜底把中文写进英文块的产物，就是这次的 BUG）；
+       · 中文译文里没有汉字 → 只可能是把越南文原样搬过去 → 不是中文。 */
+    function fin_hasCJK(s){
+      return /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(String(s == null ? '' : s));
+    }
+    function fin_transLooksLike(cand, lang, src){
+      var c = String(cand == null ? '' : cand);
+      if (!c.trim()) return false;
+      if (c === src) return false;
+      if (lang === 'en') return !fin_hasCJK(c);
+      if (lang === 'zh') return fin_hasCJK(c);
+      return true;
+    }
     function fin_targetName(sid, lang){
       var on = finOrigName[sid] || '';
       var t = finSheetTitles[on];
@@ -16994,8 +17074,18 @@ var PROD_EQUIP_FAULT_KB = {
             if (rec.vi == null) rec.vi = cell.v;
             var zc = row[String(c + 10)];
             var ec = row[String(c + 20)];
-            if (zc && !zc.f && typeof zc.v === 'string' && zc.v) rec.zh = zc.v;
-            if (ec && !ec.f && typeof ec.v === 'string' && ec.v) rec.en = ec.v;
+            var zt = (zc && !zc.f && typeof zc.v === 'string' && zc.v) ? zc.v : null;
+            var et = (ec && !ec.f && typeof ec.v === 'string' && ec.v) ? ec.v : null;
+            /* ★FIN-TRANS-SANITY-20261013（用户 2026-10-13 报「英文列/越南语列不翻译」）：
+               文件里的「英文块」内容其实是中文（历史上保存兜底把"当前语言原文"写进了别国块）。
+               照单全收的后果：这种假译文被当成"已经翻好了" → 英文视图永远显示中文，
+               而且因为 finTransCache 里有 en 值，fin_requestTrans 也不会再去翻 → 永远修不回来。
+               这里做【语言合理性判定】：不合理的候选一律当"没有译文"（不写进 rec），
+               于是建视图时判定为缺译文 → 走 fin_requestTrans 重新翻 → 补写屏幕 + 写回文件 = 自愈。 */
+            if (zt && !fin_transLooksLike(zt, 'zh', cell.v)) zt = null;
+            if (et && !fin_transLooksLike(et, 'en', cell.v)) et = null;
+            if (zt) rec.zh = zt;
+            if (et) rec.en = et;
             finTransCache[cell.v] = rec;
             if (rec.zh) finTransCache[rec.zh] = rec;
             if (rec.en) finTransCache[rec.en] = rec;
@@ -17261,6 +17351,10 @@ var PROD_EQUIP_FAULT_KB = {
        来源两类：① 服务端 fmt 列表里认定过的列；② 快照里已经有 ₫/$/¥ 数字格式的列。 */
     var finAmtCols = {};           // sid -> { "col": 1 }
     var finCurFmtMap = { "VND": '"₫"#,##0', "USD": '"$"#,##0.00', "RMB": '"¥"#,##0.00' };
+    /* ★中国报表金额格式（FIN-CN-MONEY-20261013）：与 app.py 的 CN_MONEY_FMT 必须完全一致。
+       为什么中国报表单独一套：这张报表的金额本来就是人民币、文件里已经是 ¥#,##0（不带小数，
+       与既有整数金额一致），且它默认币种就是 RMB —— 用户新录入的金额格要跟文件里长得一样。 */
+    var finCnMoneyFmt = '"¥"#,##0';
     function fin_valKey(v){
       if (v === undefined || v === null || v === '') return '';
       if (typeof v === 'object' && v && typeof v.getTime === 'function') return 'D' + v.getTime();
@@ -17363,6 +17457,9 @@ var PROD_EQUIP_FAULT_KB = {
       } catch(e){ return 'VND'; }
     }
     function fin_moneyPattern(cur){
+      /* ★中国报表 + RMB：用跟文件里一致的 ¥#,##0（不带小数），避免"文件里 0 位小数、
+         新录入却变 2 位小数"的混排（FIN-CN-MONEY-20261013）。 */
+      if (fin_isCn() && cur === 'RMB') return finCnMoneyFmt;
       return finCurFmtMap[cur] || finCurFmtMap.VND;
     }
     /* 登记"这一列是金额列"（只登记显示块内的列） */
@@ -17942,6 +18039,7 @@ var PROD_EQUIP_FAULT_KB = {
       setTimeout(function(){
         try { fin_captureEditBase(); } catch(e){}
         finDirty = true;                       // 有改动待保存
+        finDirtyGen++;                         // ★改动代数 +1（供"保存期间是否又有改动"判定）
         try { finCnMarkDirty(); } catch(e){}   // ★中国报表：勾选核销也立刻自动保存
         fin_setStatusKey('fin_status_dirty');
       }, 80);
@@ -19268,18 +19366,400 @@ var PROD_EQUIP_FAULT_KB = {
       return (finSheet && typeof finSheet.getUnitId === 'function' && finSheet.getUnitId()) || (finLastSnapshot && finLastSnapshot.id) || fin_cfg().unitId;
     }
 
-    // 取当前选区（返回 {startRow,startColumn,endRow,endColumn}）
-    function fin_getSelectionRange(){
+    /* 单个 range 对象 → {startRow,startColumn,endRow,endColumn}（兼容 Facade FRange 与裸 IRange） */
+    function fin_statRangeOf(rng){
       try {
-        var wb = finUniverAPI && finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
-        var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
-        var rng = sh && sh.getActiveRange && sh.getActiveRange();
-        if (rng && typeof rng.getRow === 'function') {
-          return { startRow: rng.getRow(), startColumn: rng.getColumn(), endRow: rng.getLastRow(), endColumn: rng.getLastColumn() };
+        if (!rng) return null;
+        if (typeof rng.getRow === 'function'){
+          var sr = rng.getRow(), sc = rng.getColumn();
+          if (isNaN(sr) || isNaN(sc)) return null;
+          return { startRow: sr, startColumn: sc,
+                   endRow: (typeof rng.getLastRow === 'function') ? rng.getLastRow() : sr,
+                   endColumn: (typeof rng.getLastColumn === 'function') ? rng.getLastColumn() : sc };
+        }
+        var rr = rng.range ? rng.range : rng;
+        if (rr && rr.startRow != null && rr.startColumn != null){
+          return { startRow: rr.startRow, startColumn: rr.startColumn,
+                   endRow: (rr.endRow != null ? rr.endRow : rr.startRow),
+                   endColumn: (rr.endColumn != null ? rr.endColumn : rr.startColumn) };
         }
       } catch(e){}
       return null;
     }
+    /* ★取【全部】选区（FIN-STATBAR-SEL2-20261013）：
+       ⚠ FWorksheet.getActiveRange() 在这版 Univer 里只返回"活动单元格"那一格 ——
+       用它做统计，用户框选一整列也会显示「计数: 1」。必须读 getSelection().getRanges()。 */
+    function fin_getSelectionRanges(){
+      var out = [];
+      try {
+        var wb = finUniverAPI && finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+        var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+        if (!sh) return out;
+        var sel = (typeof sh.getSelection === 'function') ? sh.getSelection() : null;
+        if (sel && typeof sel.getRanges === 'function'){
+          var rs = sel.getRanges() || [];
+          for (var i = 0; i < rs.length; i++){ var o = fin_statRangeOf(rs[i]); if (o) out.push(o); }
+        }
+        if (!out.length){
+          var rng = (sel && typeof sel.getActiveRange === 'function') ? sel.getActiveRange() : null;
+          if (!rng && typeof sh.getActiveRange === 'function') rng = sh.getActiveRange();
+          var o2 = fin_statRangeOf(rng);
+          if (o2) out.push(o2);
+        }
+      } catch(e){}
+      return out;
+    }
+    /* 取当前选区（单个，取第一个 range）—— 给核销勾选等旧调用方用 */
+    function fin_getSelectionRange(){
+      var a = fin_getSelectionRanges();
+      return a.length ? a[0] : null;
+    }
+    /* ★整表范围兜底：选区接口取不到时用「有内容的最大矩形」，让统计栏永远显示数字
+       （用户 2026-10-13 报「看不到总计/平均/最大值/最小值」，根因就是选区一路返回 null
+        → 统计栏只能显示"未选择单元格"）。 */
+    function fin_statWholeRange(cells){
+      try {
+        if (!cells) return null;
+        var r0 = Infinity, r1 = -Infinity, c0 = Infinity, c1 = -Infinity, n = 0;
+        for (var rk in cells){
+          var row = cells[rk];
+          if (!row) continue;
+          for (var ck in row){
+            var v = row[ck] && row[ck].v;
+            if (v === undefined || v === null) continue;
+            if (typeof v === 'string' && !String(v).trim()) continue;
+            var rr = parseInt(rk, 10), cc = parseInt(ck, 10);
+            if (isNaN(rr) || isNaN(cc)) continue;
+            if (rr < r0) r0 = rr;
+            if (rr > r1) r1 = rr;
+            if (cc < c0) c0 = cc;
+            if (cc > c1) c1 = cc;
+            if (++n > 200000) break;
+          }
+        }
+        return n ? { startRow: r0, startColumn: c0, endRow: r1, endColumn: c1 } : null;
+      } catch(e){ return null; }
+    }
+
+    /* ============ ★财务底部统计栏（FIN-STATBAR-20261013，用户要求）★============
+       用户要求：Excel 底部除了「计数」以外，还要有「总计 / 平均 / 最大值 / 最小值」，三语、字号小。
+       · 自建一条 bar（#fin_statbar），跟随当前选区实时计算；
+       · Univer 自带的状态栏已用 CSS（.univer-status-bar）隐藏，避免上下两条重复；
+       · 计数 = 选区内的非空格数；总计/平均/最大/最小 只统计【数字格】；
+       · 日期格（数字格式含 ymd 的 token）不计入数字统计，免得日期序列号被当金额加进去；
+       · 标签走 fin_L('fin_stat_*')（三语），下一个刷新周期即随语言切换生效。 */
+    var finStatTimer = null;
+    var finStatDomBound = false;
+    var finStatLastHtml = null;
+    /* ★命令流里记下的「当前选区」（FIN-STATBAR-SEL3-20261013）：
+       实测（真实浏览器 + 真实 Univer 0.5.5）门面那两条路都不可靠 ——
+         · getSelection().getRanges() 常常只给出「活动单元格」那一格；
+         · getActiveRange() 返回的包装对象甚至是 _disposed 状态。
+       结果就是用户【拉选一整段】后统计栏仍显示「计数: 1」（用户 2026-10-13 截图）。
+       而鼠标按下/拖动时引擎一定会发 `sheet.operation.set-selections`，
+       params.selections 里就是 [[起行,起列,止行,止列], ...]（含 Ctrl 多选）——
+       所以这里把命令流里的选区记下来，作为统计栏的【第一优先】数据源。 */
+    var finStatSel = null;
+    var finStatSelSid = '';       // 记下这份选区属于哪张工作表（换表后自动作废）
+
+    function fin_statSym(){
+      try {
+        var c = fin_curCurrencyCode();
+        if (c === 'RMB') return '\u00a5';
+        if (c === 'USD') return '$';
+        return '\u20ab';
+      } catch(e){ return ''; }
+    }
+    function fin_statFmt(n){
+      try {
+        if (n === null || n === undefined || !isFinite(n)) return '-';
+        var s = (Math.abs(n) >= 1000) ? String(Math.round(n)) : String(Math.round(n * 100) / 100);
+        s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return fin_statSym() + s;
+      } catch(e){ return String(n); }
+    }
+    function fin_statPattern(snap, cell){
+      try {
+        var s = cell && cell.s;
+        var st = (typeof s === 'string') ? ((snap && snap.styles && snap.styles[s]) || null) : s;
+        return (st && st.n && st.n.pattern) || '';
+      } catch(e){ return ''; }
+    }
+    function fin_statIsDate(pat){
+      try { return (typeof fin_isDatePattern === 'function') ? !!fin_isDatePattern(pat) : false; } catch(e){ return false; }
+    }
+    /* ★把 Univer 自带的状态栏彻底隐身（FIN-STATBAR-FIX-20261013）：
+       ★FIN-STATBAR-HIDE2-20261013：不只扫 #univer_container，还扫 document.body ——
+       Univer 的浮层有时经 React 传送门挂到 body 上，只扫容器就会漏掉，
+       用户就会看到「两条统计」（我们那条 + 自带的「计数」）。
+       过滤条件很严：class 必须匹配 /status-?bar|statusbar/i 且文本含 计数/Count/Đếm，
+       并排除我们自己的 #fin_statbar（它叫 fin-statbar，不含 status，本就撞不上）。
+       最多尝试 30 次即放弃，避免每 1.5 秒白扫一遍 DOM。 */
+    var finStatBuiltinTries = 0;
+    function fin_statHideBuiltinBar(){
+      try {
+        if (window.__finStatBuiltinHidden || finStatBuiltinTries >= 30) return;
+        finStatBuiltinTries++;
+        var mine = document.getElementById('fin_statbar');
+        var roots = [document.getElementById('univer_container'), document.body];
+        for (var ri = 0; ri < roots.length; ri++){
+          var root = roots[ri];
+          if (!root || !root.querySelectorAll) continue;
+          var all = root.querySelectorAll('[class*="status"]');
+          for (var i = 0; i < all.length; i++){
+            var el = all[i];
+            if (mine && (el === mine || el.contains(mine) || mine.contains(el))) continue;
+            if (!/status-?bar|statusbar/i.test(String(el.className || ''))) continue;
+            if (/计数|Count|Đếm/.test(el.textContent || '')){
+              el.style.display = 'none';
+              el.setAttribute('data-fin-statbar-hidden', '1');
+              window.__finStatBuiltinHidden = true;
+            }
+          }
+        }
+      } catch(e){}
+    }
+    /* ★保证统计栏元素存在（FIN-STATBAR-ENSURE-20261013）—— 这就是"底部什么都没有"的根因：
+       Univer 挂载时会清空/重建 #univer_container 的内容，我们放在容器里的统计栏被【一并删掉】。
+       原来的代码是 `var bar = getElementById(...); if (!bar) return;` —— 取不到就静默返回，
+       之后每 1.5 秒都这样静默返回 → 统计栏永远消失，而且控制台一个错都不报。 */
+    function fin_statEnsureBar(){
+      var b = document.getElementById('fin_statbar');
+      if (b) return b;
+      try {
+        var cont = document.getElementById('univer_container');
+        if (!cont) return null;
+        b = document.createElement('div');
+        b.id = 'fin_statbar';
+        b.className = 'fin-statbar';
+        cont.appendChild(b);
+        finStatLastHtml = null;
+        try { console.log('[fin-statbar] bar was removed by Univer -> recreated'); } catch(e){}
+      } catch(e){ return null; }
+      return b;
+    }
+    function fin_statPaint(bar, html){
+      try { finStatLastHtml = html; bar.innerHTML = html; } catch(e){}
+    }
+    function fin_statCompute(){
+      try { fin_statHideBuiltinBar(); } catch(e){}
+      try {
+        var bar = fin_statEnsureBar();
+        if (!bar) return;
+        if (!finReady){ fin_statPaint(bar, '<span class="fin-stat-item">…表格初始化中</span>'); return; }
+        /* ★停靠（FIN-STATBAR-DOCK-20261013）：挂进 Univer 容器内部，
+           由 CSS 绝对定位贴在容器下沿（Univer 底条上方）。 */
+        var cont = document.getElementById('univer_container');
+        if (cont && bar.parentNode !== cont){
+          try { cont.appendChild(bar); } catch(e){}
+        }
+        var rc = bar.getBoundingClientRect();
+        if (!rc.width) return;
+        var snap = null; try { snap = fin_currentSnapshot(); } catch(e){}
+        var sid = ''; try { sid = fin_curSheetId(); } catch(e){}
+        var cells = (snap && snap.sheets && snap.sheets[sid] && snap.sheets[sid].cellData) || null;
+        /* ★选区来源优先级（FIN-STATBAR-SEL3-20261013，用户要求「拉选多个数据就能统计多少个」）：
+           ① 命令流记下的选区（鼠标按下/拖动时引擎必发 sheet.operation.set-selections，含 Ctrl 多选）
+              —— 与当前工作表一致、且比门面给的【更大】时以它为准；
+           ② 门面 getSelection().getRanges()（这版实测常常只给"活动单元格"那一格 → 计数恒为 1）；
+           ③ 两者都取不到 → 退化成"有内容的最大矩形"（兜底，免得统计栏一片空白）。 */
+        var ranges = fin_getSelectionRanges();
+        var cmdSel = (finStatSel && finStatSel.length && (!finStatSelSid || !sid || finStatSelSid === sid))
+                     ? finStatSel : null;
+        if (cmdSel && fin_statSize(cmdSel) > fin_statSize(ranges)) ranges = cmdSel;
+        var usedWhole = false;
+        if (!ranges.length){
+          var wr = fin_statWholeRange(cells);
+          if (wr){ ranges = [wr]; usedWhole = true; }
+        }
+        var cnt = 0, nums = 0, sum = 0, mn = null, mx = null, scanned = 0;
+        /* ★格级去重（FIN-STATBAR-SEL3-20261013）：Univer 的 selections 里【同时】带着
+           "整块选区"和"锚点单元格"（实测 [[4,4,14,4],[4,4,4,4]]），Ctrl 多选也可能重叠 ——
+           不去重就会把锚点那一格算两次（用户拉选 E5:E15 → 计数 12、总计多出 10,664）。
+           Excel 的语义是「每个格只算一次」，所以这里按 r,c 去重。 */
+        var seen = {};
+        for (var qi = 0; qi < ranges.length && scanned < 20000; qi++){
+          var rq = ranges[qi];
+          for (var rr = rq.startRow; rr <= rq.endRow; rr++){
+            var row = cells[String(rr)];
+            if (!row) continue;
+            for (var cc = rq.startColumn; cc <= rq.endColumn; cc++){
+              if (++scanned > 20000) break;                 // 超大选区保护
+              var _key = rr + ',' + cc;
+              if (seen[_key]) continue;                     // 同一格只统计一次
+              seen[_key] = 1;
+              var cell = row[String(cc)];
+              var v = cell && cell.v;
+              if (v === undefined || v === null) continue;
+              if (typeof v === 'string' && v.trim() === '') continue;
+              cnt++;
+              var num = null;
+              if (typeof v === 'number') num = v;
+              else if (typeof v === 'string' && /^-?[\d,]+(\.\d+)?$/.test(v.trim())) num = Number(v.replace(/,/g, ''));
+              if (num !== null && isFinite(num) && !fin_statIsDate(fin_statPattern(snap, cell))){
+                nums++; sum += num;
+                if (mn === null || num < mn) mn = num;
+                if (mx === null || num > mx) mx = num;
+              }
+            }
+          }
+        }
+        var h;
+        if (!ranges.length){
+          h = '<span class="fin-stat-item">' + fin_L('fin_stat_none') + '</span>';
+        } else {
+          h = '<span class="fin-stat-item"><b>' + fin_L('fin_stat_cnt') + ':</b> ' + cnt + '</span>'
+            + '<span class="fin-stat-item"><b>' + fin_L('fin_stat_sum') + ':</b> ' + (nums ? fin_statFmt(sum) : '-') + '</span>'
+            + '<span class="fin-stat-item"><b>' + fin_L('fin_stat_avg') + ':</b> ' + (nums ? fin_statFmt(sum / nums) : '-') + '</span>'
+            + '<span class="fin-stat-item"><b>' + fin_L('fin_stat_max') + ':</b> ' + (nums ? fin_statFmt(mx) : '-') + '</span>'
+            + '<span class="fin-stat-item"><b>' + fin_L('fin_stat_min') + ':</b> ' + (nums ? fin_statFmt(mn) : '-') + '</span>';
+        }
+        if (h !== finStatLastHtml){ finStatLastHtml = h; bar.innerHTML = h; }
+        /* ★诊断（FIN-STATBAR-DIAG-20261013）：结果挂到 window，F12 控制台执行
+           `window.__finStatInfo` 就能看到为什么是空的；首次计算会打一条 console.log。 */
+        try {
+          window.__finStatInfo = { ready: !!finReady, sheetId: sid, ranges: ranges, usedWhole: usedWhole,
+                                   cnt: cnt, nums: nums, sum: sum, min: mn, max: mx,
+                                   barW: Math.round(rc.width), barBottom: Math.round(rc.bottom),
+                                   vh: window.innerHeight, html: h };
+          if (!window.__finStatLogged){ window.__finStatLogged = 1; console.log('[fin-statbar]', window.__finStatInfo); }
+        } catch(e){}
+      } catch(e){}
+    }
+    /* F12 里可手动触发（排查用）：finStatNow() */
+    function finStatNow(){ try { fin_statCompute(); } catch(e){} return window.__finStatInfo || null; }
+    function fin_statSchedule(){
+      if (finStatTimer) clearTimeout(finStatTimer);
+      finStatTimer = setTimeout(function(){ try { fin_statCompute(); } catch(e){} }, 90);
+    }
+    /* 递归扫出命令参数里所有「单元格范围」：既认 {startRow,startColumn,endRow,endColumn} 对象，
+       也认 set-selections 用的 [起行,起列,止行,止列] 四元数组。 */
+    function fin_statScanRanges(o, depth, out){
+      if (!o || typeof o !== 'object' || depth > 6) return;
+      if (typeof o.startRow === 'number' && typeof o.startColumn === 'number'){
+        var _sr = o.startRow, _sc = o.startColumn;
+        var _er = (typeof o.endRow === 'number') ? o.endRow : _sr;
+        var _ec = (typeof o.endColumn === 'number') ? o.endColumn : _sc;
+        if (_sr >= 0 && _sc >= 0 && _er < 100000 && _ec < 1000){
+          out.push({ startRow: Math.min(_sr, _er), startColumn: Math.min(_sc, _ec),
+                     endRow: Math.max(_sr, _er), endColumn: Math.max(_sc, _ec) });
+        }
+        return;
+      }
+      if (Object.prototype.toString.call(o) === '[object Array]' && o.length === 4 &&
+          typeof o[0] === 'number' && typeof o[1] === 'number' &&
+          typeof o[2] === 'number' && typeof o[3] === 'number' &&
+          o[0] >= 0 && o[1] >= 0 && o[2] < 100000 && o[3] < 1000){
+        out.push({ startRow: Math.min(o[0], o[2]), startColumn: Math.min(o[1], o[3]),
+                   endRow: Math.max(o[0], o[2]), endColumn: Math.max(o[1], o[3]) });
+        return;
+      }
+      for (var k in o){
+        if (k === 's' || k === 'styles') continue;
+        var v = o[k];
+        if (v && typeof v === 'object') fin_statScanRanges(v, depth + 1, out);
+      }
+    }
+    /* 选区总格数（用来比较"门面给的"与"命令流记的"哪个更大） */
+    function fin_statSize(ranges){
+      var n = 0;
+      for (var i = 0; i < (ranges || []).length; i++){
+        var r = ranges[i];
+        if (!r) continue;
+        n += (Math.max(0, r.endRow - r.startRow) + 1) * (Math.max(0, r.endColumn - r.startColumn) + 1);
+      }
+      return n;
+    }
+    function fin_statOnCommand(evt){
+      try {
+        var id = String((evt && evt.id) || '');
+        var isSel = (id.indexOf('selection') >= 0 || id.indexOf('range') >= 0);
+        if (!isSel) return;
+        /* ★先把选区记下来（见 finStatSel 的说明）：只要这一条命令真的带了范围，
+           就以它为准 —— 门面接口拿不到/只给一格时，统计栏仍然按用户实际拉选的范围算。 */
+        if (id.indexOf('set-selections') >= 0){
+          var found = [];
+          fin_statScanRanges(evt && evt.params, 0, found);
+          if (found.length){
+            finStatSel = found;
+            try { finStatSelSid = String(((evt.params || {}).subUnitId) || ''); } catch(e){ finStatSelSid = ''; }
+          }
+        }
+        fin_statSchedule();
+      } catch(e){}
+    }
+    function fin_statTryApi(){
+      try {
+        if (window.__finStatApiBound) return;
+        var api = (typeof finUniverAPI !== 'undefined') ? finUniverAPI : null;
+        if (api && typeof api.onCommandExecuted === 'function'){
+          api.onCommandExecuted(fin_statOnCommand);
+          window.__finStatApiBound = true;
+        } else if (typeof finUniver !== 'undefined' && finUniver && typeof finUniver.onCommandExecuted === 'function'){
+          finUniver.onCommandExecuted(fin_statOnCommand);
+          window.__finStatApiBound = true;
+        }
+      } catch(e){}
+    }
+    /* ★★锁死区自检（FIN-CN-STAT-LOCK-20261013）—— 行为级回归，禁止删除 ★★
+       四条不变量（用户在 2026-10-13 依次发现、已全部修复并被硬锁脚本 check_fin_cn_lock.py 守卫）：
+       ① 统计栏必须从【命令流 set-selections】取全部选区（门面 getSelection() 这版只给一格 → 计数恒为 1）；
+       ② 统计栏必须【逐格去重】（Univer 的 selections 带"整块 + 锚点"，不去重会把锚点算两次）；
+       ③ 挂起窗口内的改动必须【推迟】而不是丢弃（否则勾选核销/录入数字永远不落盘）；
+       ④ 保存是异步的，只有"改动代数没变"才允许清 finDirty（否则保存期间的新改动被静默吞掉）。
+       任何一条被改坏 → 控制台报错 + window.__FIN_CN_LOCK_FAILED = true。 */
+    function finCnLockCheck(){
+      var bad = [];
+      try {
+        if (typeof fin_statScanRanges !== 'function') bad.push('①缺 fin_statScanRanges');
+        else {
+          var o1 = []; fin_statScanRanges({ selections: [[4, 28, 6, 28]] }, 0, o1);
+          var o2 = []; fin_statScanRanges({ selections: [{ startRow: 4, startColumn: 4, endRow: 14, endColumn: 4 }] }, 0, o2);
+          if (o1.length !== 1 || o1[0].startRow !== 4 || o1[0].endRow !== 6) bad.push('①命令流四元数组解析错误');
+          if (o2.length !== 1 || o2[0].endRow !== 14) bad.push('①命令流对象解析错误');
+        }
+        if (typeof fin_statSize !== 'function') bad.push('①缺 fin_statSize');
+        else if (fin_statSize([{ startRow: 4, startColumn: 4, endRow: 14, endColumn: 4 }]) !== 11)
+          bad.push('①fin_statSize 算错（11 格应为 11）');
+        var sCompute = (typeof fin_statCompute === 'function') ? String(fin_statCompute) : '';
+        if (sCompute.indexOf('seen[_key]') < 0) bad.push('②统计栏缺少格级去重 seen[_key]');
+        if (sCompute.indexOf('fin_statSize(cmdSel) > fin_statSize(ranges)') < 0) bad.push('①统计栏未按"选区更大者优先"取命令流选区');
+        var sMark = (typeof finCnMarkDirty === 'function') ? String(finCnMarkDirty) : '';
+        if (sMark.indexOf('finCnHoldTimer') < 0 || sMark.indexOf('if (finDirty) finCnScheduleSave();') < 0)
+          bad.push('③挂起窗口内的改动被丢弃（应 defer 而非 drop）');
+        if (typeof finDirtyGen !== 'number') bad.push('④缺 finDirtyGen 改动代数');
+        var sSave = (typeof finCnSave === 'function') ? String(finCnSave) : '';
+        if (sSave.indexOf('genAtBuild') < 0 || sSave.indexOf('finDirtyGen === genAtBuild') < 0)
+          bad.push('④保存成功未做代数判定（保存期间的新改动会被吞掉）');
+      } catch(e){ bad.push('自检异常 ' + String(e)); }
+      if (bad.length){
+        window.__FIN_CN_LOCK_FAILED = true;
+        if (window.console) console.error('[锁死区] FIN-CN-STAT-LOCK-20261013 被破坏：', bad);
+      }
+      return bad;
+    }
+
+    function fin_statBind(){
+      if (finStatDomBound) return;
+      finStatDomBound = true;
+      try { finCnLockCheck(); } catch(e){}      // ★锁死区启动自检
+      try {
+        document.addEventListener('mouseup', function(){ fin_statSchedule(); }, true);
+        document.addEventListener('keyup', function(){ fin_statSchedule(); }, true);
+        // 兜底轮询：既防命令没监听到，也负责「切语言后就地刷新统计栏标签」
+        setInterval(function(){ try { fin_statCompute(); } catch(e){} }, 1500);
+      } catch(e){}
+      fin_statTryApi();
+    }
+    try {
+      fin_statBind();
+      var _finStatBooter = setInterval(function(){
+        try { fin_statTryApi(); } catch(e){}
+        try { fin_statCompute(); } catch(e){}
+        if (window.__finStatApiBound) clearInterval(_finStatBooter);
+      }, 800);
+      setTimeout(function(){ try { clearInterval(_finStatBooter); } catch(e){} }, 90000);
+    } catch(e){}
 
     /* ★「插入 N 行」（FIN-INS-ROWS-20261012）：
        below=true → 在【选区最后一行】下方插入 N 行；below=false → 在【选区第一行】上方插入 N 行。
@@ -19954,6 +20434,7 @@ var PROD_EQUIP_FAULT_KB = {
       var wantKind = FIN_KIND;   // ★认住这次加载属于哪张报表：加载途中用户可能又切了标签
       var resp = await fetch(fin_api('/snapshot'));
       if (!resp.ok) { fin_setStatusKey('fin_status_not_init'); return; }
+      try { finSnapRev = resp.headers.get('X-Fin-Rev') || ''; } catch(e){ finSnapRev = ''; }
       var snapshot = await resp.json();
       finLastSnapshot = snapshot;
       var _sid0 = snapshot && snapshot.sheetOrder && snapshot.sheetOrder[0];
@@ -19991,6 +20472,9 @@ var PROD_EQUIP_FAULT_KB = {
       setTimeout(function(){ fin_normalizeDates(finLastView || snapshot); }, 400);
       // ★加载后重放"当前选中币种"（默认 VND）：让每张工作表的金额都带货币符号
       setTimeout(function(){ try { fin_reapplyCurrency(true); } catch(e){} }, 900);
+      /* ★中国报表：把「金额列」从快照里的 ¥ 格式反推登记（FIN-CN-MONEY-20261013），
+         这样用户新录入的金额格才会被自动补上人民币符号（fin_maybeFormatMoneyCell）。 */
+      if (fin_isCn()) setTimeout(function(){ try { fin_collectAmtCols(); } catch(e){} }, 600);
       setTimeout(function(){ try { fin_captureEditBase(); } catch(e){} }, 1400);
       // 加载后：先清掉历史泄漏到文件里的高亮红（若有），再重新计算高亮。
       // 清理有改动则标脏，让干净版本自动落盘（从此文件不再被污染）。
@@ -20063,7 +20547,7 @@ var PROD_EQUIP_FAULT_KB = {
          命令流已经把「排序 / 筛选 / numfmt」这些纯视图操作排除掉了（见 fin_bindChange），
          所以走到这里的都是真正要落盘的改动 → 排一次 700ms 防抖的自动保存。
          ★越南报表仍然只读：不改脏、不设保存定时器（下面这行一个字符都不动）。 */
-      if (fin_isCn()) return finCnScheduleSave();
+      if (fin_isCn()) { finDirtyGen++; return finCnScheduleSave(); }   // ★真实改动：代数 +1
       if (FIN_READONLY) return;   /* ★只读模式：不改脏、不设保存定时器 */
       finDirty = true;
       fin_setStatusKey('fin_status_dirty');
@@ -20275,31 +20759,176 @@ var PROD_EQUIP_FAULT_KB = {
             // ★核销列：只把「勾选框」写回；表头那种文字（当前语言的"核销"标签）
             //   不写回，保持文件里的原值，由译文缓存负责三语跟翻。
             var av = (cell && cell.v !== undefined && cell.v !== null) ? String(cell.v) : '';
-            if (av !== '' && av !== FIN_CHECK_ON && av !== FIN_CHECK_OFF) continue;
+            /* ★FIN-CN-SAVE-GUARD-20261013：空值一律【不写回】。
+               核销列是自动生成的（只有 ☐/☑），视图里空白只可能意味着"本行还没本地化/被清空"，
+               写回去会把文件里的内容抹掉 —— 2026-10-13 实际发生过：AC4 表头「核销」被一次
+               保存抹成空（视图里那一格当时是空的）。宁可少写，不可抹掉。 */
+            if (av === '') continue;
+            if (av !== FIN_CHECK_ON && av !== FIN_CHECK_OFF) continue;
             put(r, c, av);
             continue;
           }
-          if (c > FIN_VIEW_MAXCOL) continue;
+          // ★只处理【当前语言基准块 A–J】：K–AB 是另两种语言的块 / 视图里的隐藏区。
+          //   用 FIN_VIEW_MAXCOL 在这里是错的（中国报表它是 28）—— 视图里 K–AB 的格会被
+          //   当成"基准块"再 +10/+20 写到 33 列以外，把 cn_report.xlsx 写坏。
+          if (c > FIN_BLOCK_MAXCOL) continue;
           var isText = !!(cell && !cell.f && typeof cell.v === 'string' && cell.v !== '');
+          // ★FIN-CN-CURRENCY-20261013：这一格若只是"外币换算后的显示值"，绝不能写回文件。
+          //   判定：当前显示币种不是基准币(VND) 且 视图里的值 === 当时写进去的换算值。
+          //   （用户若在换算状态下【手动改过】这一格，值就不等于换算值 → 按用户输入正常写回。）
+          //   ★基准币 = VND（FIN-CN-CURRENCY-FIX-20261013）：中国报表源文件存的是越南盾，
+          //     与越南报表同源；默认显示 RMB 只是"换个货币看"，文件原值仍是 VND。
+          if (finCnConvCur && finCnConvCur !== 'VND' && finCnConvView[r + ',' + c] !== undefined
+              && fin_valKey(cell && cell.v) === fin_valKey(finCnConvView[r + ',' + c])){
+            continue;      // 保留文件里的越南盾原值
+          }
+          /* ★★FIN-CN-NO-ZERO-20261013（用户 2026-10-13：「没有录入的数据，请不要提前写0！」）：
+             视图这一格若是【0 或空】，而文件里（dst = 载入时的快照副本）本来就没有任何值，
+             就绝不写回去 —— 否则一次自动保存就会把整片空行变成 0，而且会被继续读回来、
+             越存越脏（实测发生过：D16:D204 / E16:E204 凭空多出 189×2 个 0）。 */
+          var _ov = (dst[r] && dst[r][c]) ? dst[r][c].v : undefined;
+          var _hadVal = (_ov !== undefined && _ov !== null && String(_ov).trim() !== '');
+          if (!_hadVal){
+            var _nv = (cell && cell.v);
+            var _blank = (_nv === undefined || _nv === null || String(_nv).trim() === '');
+            var _numV = _blank ? NaN : Number(String(_nv).replace(/[,\s\u00a0]/g, ''));
+            if (_blank || (isFinite(_numV) && _numV === 0)) continue;   // 只写"用户真录入的值"
+          }
           if (!isText){
             if (!cell){ var dr = dst[r]; if (dr) delete dr[c]; continue; }
+            /* ★换算显示下用户改了金额：屏幕上写的是【外币数字】，文件里必须是【越南盾】。
+               用同一个汇率因子换回来再落盘（factor = 显示值 / 越南盾）。
+               ★★FIN-CN-CONVBACK-GUARD-20261013（事故修复，★三段条件一个都不能少）：
+                 2026-10-13 实际出事：这段没有限定范围时，**日期列**（A/K/U，值是日期序列号
+                 46109）也被当成"外币金额"除了汇率 → 46109/3882.17 = 11.88 → 整列日期变成
+                 1900-01-11。现在必须同时满足：
+                   ① 这一格在【已登记的金额列】里（fin_isAmtCol，由 ¥/$ 格式反推登记）；
+                   ② 不是公式格（公式留给表格自己重算，绝不能把 f 换成固定值）；
+                   ③ 数字格式不是日期格式（dd-mm-yyyy / 含 ymd 的 token）。
+                 只满足"非文本"就动手是绝对不行的。 */
+            /* ★★FIN-CN-BASIS-GUARD-20261013（根治「表格里的数据不起作用」）：
+               旧实现依赖 finCnConvCur / finCnConvFactor，而这两个变量会在「切报表种类」时
+               被 fin_setKind 清零（见其注释）。一旦清零，判定整段失效 —— 屏幕上的
+               【人民币换算值】就被原样写回文件，把三语块全部覆盖成 ¥10,664，
+               真实的 41,400,000 越南盾被抹掉（2026-10-13 实际事故）。
+               新判定【不依赖】这两个变量：
+                 · 汇率因子改从 finCurCache 按【当前下拉币种】取（缓存不会被清空）；
+                 · 与【文件原值】比对：期望显示值 = 文件原值 × 因子；
+                     显示值 ≈ 期望值 → 只是换算显示、用户没改 → 原样写回【文件原值】；
+                     显示值 ≠ 期望值 → 用户手动改过 → 显示值 ÷ 因子 还原成越南盾。
+               两条分支落盘的都是越南盾，换算值永远进不了文件。
+               （下面 ①②③ 三条前置条件保留不动，尤其日期列绝不能被除汇率。） */
+            var _curNow = '';
+            try { _curNow = String(fin_curCurrencyCode() || '').toUpperCase(); } catch(e){}
+            if (_curNow === 'CNY') _curNow = 'RMB';
+            var _factorNow = 0;
+            try {
+              var _fx = finCurCache[FIN_KIND + ':' + _curNow];
+              if (_fx && isFinite(Number(_fx.factor))) _factorNow = Number(_fx.factor);
+            } catch(e){}
+            if (!_factorNow) { _factorNow = finCnConvFactor; }
+            var _fileCell = (dst[r] && dst[r][c]) ? dst[r][c] : null;
+            var _fileV = _fileCell ? _fileCell.v : undefined;
+            if (_curNow && _curNow !== 'VND' && _factorNow > 0
+                && !cell.f
+                && fin_isAmtCol(sid, c)
+                && !fin_isDatePattern(cell && cell.s && cell.s.n && cell.s.n.pattern)){
+              var _dv = (typeof cell.v === 'number') ? cell.v
+                        : Number(String(cell.v === undefined || cell.v === null ? '' : cell.v).replace(/[,\s\u00a0]/g, ''));
+              var _fv = (_fileV === undefined || _fileV === null || _fileV === '') ? NaN
+                        : (typeof _fileV === 'number' ? _fileV
+                           : Number(String(_fileV).replace(/[,\s\u00a0]/g, '')));
+              if (isFinite(_dv) && isFinite(_fv) && _fv !== 0){
+                var _exp = _fv * _factorNow;
+                var _tol = Math.max(Math.abs(_exp) * 0.005, 0.01);
+                if (Math.abs(_dv - _exp) <= _tol){
+                  cell = { v: _fv };                                       // 换算显示值 → 保留文件原值
+                } else {
+                  cell = { v: Math.round(_dv / _factorNow * 100) / 100 };  // 用户改过 → 还原成越南盾
+                }
+              } else if (isFinite(_dv)){
+                cell = { v: Math.round(_dv / _factorNow * 100) / 100 };    // 新录入的格（文件里原本没有值）
+              }
+            }
             put(r, c, cell); put(r, c + 10, cell); put(r, c + 20, cell);
             continue;
           }
-          // ★文字：写进【当前语言】那一块；另外两块用译文缓存里的译文，
-          //   ★译文还没到（或只有原文）时退回原文 —— 与界面上"缺译文就显示原文"的口径一致，
-          //   绝不能留空（留空会导致切到那种语言时这一格看着"数据丢了"）。
+          // ★文字：写进【当前语言】那一块；另外两块【只有真的拿到该语言的译文】才写，
+          //   拿不到就一格都不动（保留文件原值）—— 与函数上方"取不到就保留文件原值，绝不写空"一致。
+          //   ★FIN-TRANS-NO-CLOBBER-20261013（用户 2026-10-13 报「英文/越南语块变成中文」）：
+          //   绝不能再拿【当前语言原文】兜底 —— 在中文视图里自动保存会把中文写进英文块，
+          //   英文视图从此显示中文；更糟的是它会被 fin_seedLang 当成"已有译文"，
+          //   从此再也不会重新翻译（就是这次的 BUG）。
           var txt = cell.v;
-          put(r, c + srcOff, txt);
+          /* ★语言无关的文字（单号 UNC00009 / 纯数字样式 '41,400,000' 等）：
+             三块同步原样写 —— 它们本来就不该翻译，也不该因为"取不到译文"而漏写。 */
+          if (fin_isCodeLike(txt) && txt.length <= 60){
+            put(r, c, txt); put(r, c + 10, txt); put(r, c + 20, txt);
+            continue;
+          }
           var rec = finTransCache[txt];
-          var tSrc = (srcOff === 0)  ? txt : ((rec && rec.vi) || txt);
-          var tZh  = (srcOff === 10) ? txt : ((rec && rec.zh) || txt);
-          var tEn  = (srcOff === 20) ? txt : ((rec && rec.en) || txt);
-          put(r, c, tSrc);
-          put(r, c + 10, tZh);
-          put(r, c + 20, tEn);
+          var tSrc = (srcOff === 0)  ? txt : ((rec && rec.vi) || null);
+          var tZh  = (srcOff === 10) ? txt : ((rec && rec.zh) || null);
+          var tEn  = (srcOff === 20) ? txt : ((rec && rec.en) || null);
+          if (tSrc !== null) put(r, c, tSrc);
+          if (tZh  !== null) put(r, c + 10, tZh);
+          if (tEn  !== null) put(r, c + 20, tEn);
         }
       }
+      /* ★★FIN-CN-TRI-CONSIST-20261013（根治「金额变成 ¥2.75 / 越南盾原值被人民币换算值覆盖」）★★
+         不变量：三语块（A–E / K–O / U–Y）存的都是【同一个越南盾数值】—— 语言只影响文字，不影响数值。
+         事故链（2026-10-13 实测，硬证据在日志与文件里）：
+           · 屏幕切到「人民币显示」时，基准块 A–E 被写进了换算后的 ¥ 数字：
+             41,400,000 → 10,664.14（÷3882.17）→ 再被换算一次 2.75（÷3882.17 再次）；
+           · 而中文块 N/O、英文块 X/Y 仍是真实越南盾 41,400,000 → 文件三块不一致；
+           · 保存路径里"保留文件原值 / 跳过换算显示值"的规则会把这份错误【原样留住】，
+             于是每保存一次，基准块就再缩 3882 倍，屏幕上的金额越来越小（用户看到 ¥2.75）。
+         这里在【即将落盘的 payload】上做一次三块对账（只认数值格），把基准块拉回真值：
+           · 三块都是有限数字、基准块与中文块不一致 → 以【中文块】为准（它没被显示换算污染）；
+           · 中文块/英文块没有可比数字（用户刚新录入、另两块本来就是空）→ 保留基准块的值，
+             绝不抹掉用户新录入的金额；
+           · 公式格（cell.f）/ 文字格（描述等，各语言本来就不同）/ 核销列 → 一律不碰。
+         ★这一步让"已经写进文件"的污染在下一次保存时自动修回来，不需要人工改数据。 */
+      try {
+        if (fin_isCn()){
+          var _maxc = FIN_BLOCK_MAXCOL;
+          function _numFinite(v){
+            if (typeof v === 'number') return isFinite(v) ? v : NaN;
+            if (typeof v === 'string' && v.trim() !== ''){
+              var n = Number(v.replace(/[,\s\u00a0]/g, ''));
+              return isFinite(n) ? n : NaN;
+            }
+            return NaN;
+          }
+          for (var _r = 4; _r <= 204; _r++){
+            var _crow = dst[_r];
+            if (!_crow) continue;
+            for (var _c = 0; _c <= _maxc; _c++){
+              if (_c === FIN_CHECK_COL) continue;
+              var _bc = _crow[_c], _zc = _crow[_c + 10], _ec = _crow[_c + 20];
+              if (!_bc || _bc.f) continue;                    // 空格 / 公式格不碰
+              if (typeof _bc.v === 'string' && !isFinite(_numFinite(_bc.v))) continue;   // 文字格不碰
+              var _bv = _numFinite(_bc.v);
+              if (!isFinite(_bv)) continue;
+              var _zv = _zc ? _numFinite(_zc.v) : NaN;
+              var _ev = _ec ? _numFinite(_ec.v) : NaN;
+              if (!isFinite(_zv) || !isFinite(_ev)) continue;  // 另两块没有可比数字 → 保留（新录入）
+              var _tolv = Math.max(Math.abs(_zv) * 0.001, 0.01);
+              if (Math.abs(_bv - _zv) <= _tolv) continue;      // 三块一致 → 不动
+              var _fx = {}; for (var _k in _bc) _fx[_k] = _bc[_k];
+              _fx.v = _zv;
+              _crow[_c] = _fx;                                 // ★基准块 ← 中文块（真值）
+              if (Math.abs(_ev - _zv) > _tolv && _ec){
+                var _f2 = {}; for (var _k2 in _ec) _f2[_k2] = _ec[_k2];
+                _f2.v = _zv;
+                _crow[_c + 20] = _f2;                          // 英文块也拉回同一个值
+              }
+              if (window.console) console.warn('[fin-cn] 三块对账：行' + (_r + 1) + ' 列' + _c
+                                               + ' 基准块 ' + _bv + ' → ' + _zv + '（以三语块的越南盾真值为准）');
+            }
+          }
+        }
+      } catch(e){ if (window.console) console.warn('[fin-cn] tri-consist', e); }
       return cp;
     }
     /* ============★ 中国报表：数据区「立即变蓝」（CN-BLUE-LIVE-20261013）★============
@@ -20422,10 +21051,28 @@ var PROD_EQUIP_FAULT_KB = {
       finSaveTimer = setTimeout(fin_autoSaveTick, FIN_CN_AUTOSAVE_MS);
     }
 
-    /* 改动扫描路径：可能是真录入，也可能是视图操作留下的假改动 → 过挂起窗口 */
+    /* 改动扫描路径：可能是真录入，也可能是视图操作留下的假改动 → 过挂起窗口
+       ★★FIN-CN-LOSTSAVE-FIX-20261013（根治「勾了核销 / 录入了数字，界面显示已勾上，
+          状态栏一直停在"未保存"，刷新后全没了」）★★
+       实测（真实浏览器打桩）：挂起窗口内调用 finCnMarkDirty() 时，
+       旧实现是【直接 return】—— 于是这次改动只把 finDirty 置成了 true，
+       却没有任何定时器去落盘，窗口结束后也不会补排 → 这一笔改动【永久丢失】，
+       直到用户再改一次别的格子（且那一刻恰好在窗口外）才可能被带出去。
+       正确做法：窗口内【不丢】，只把落盘推迟到窗口结束之后（defer，不是 drop）。
+       窗口里可能被调用很多次，所以只保留一个兜底定时器。 */
+    var finCnHoldTimer = null;
     function finCnMarkDirty(){
       if (!fin_isCn()) return;                 // ★越南报表绝不自动保存
-      if (Date.now() < finCnHoldUntil) return; // ★视图操作刚做完：这不是用户录入，别排自动保存
+      var wait = finCnHoldUntil - Date.now();
+      if (wait > 0){
+        if (!finCnHoldTimer){
+          finCnHoldTimer = setTimeout(function(){
+            finCnHoldTimer = null;
+            if (finDirty) finCnScheduleSave();     // ★窗口结束后补排，绝不丢这笔改动
+          }, wait + 60);
+        }
+        return;
+      }
       finCnScheduleSave();
     }
 
@@ -20466,7 +21113,8 @@ var PROD_EQUIP_FAULT_KB = {
           try { sent = navigator.sendBeacon(url, new Blob([body], { type: 'application/json' })); }
           catch(e){ sent = false; }
         }
-        if (sent) finDirty = false;
+        /* ★不要在这里清 finDirty：sendBeacon 拿不到响应，服务器可能因 stale/守卫拒收，
+           清了就等于"以为存了其实没存"。留住 dirty，交给看门狗补一次正常保存。 */
       } catch(e){}
     }
 
@@ -20480,6 +21128,20 @@ var PROD_EQUIP_FAULT_KB = {
       } catch(e){}
       try { window.addEventListener('pagehide', function(){ finCnFlushBeacon(); }); } catch(e){}
       try { window.addEventListener('beforeunload', function(){ finCnFlushBeacon(); }); } catch(e){}
+      /* ★★FIN-CN-LOSTSAVE-FIX-20261013：看门狗（最后一道保险）。
+         只要「有未落盘的改动 + 没有待发的定时器 + 没在保存中 + 挂起窗口已过」，
+         就补排一次自动保存。它能兜住任何"定时器被清掉/被别的路径吞掉"的漏网情况
+         （实测就是这么漏的：finDirty=true 却 finSaveTimer=null，12 秒一次请求都没发）。 */
+      try {
+        setInterval(function(){
+          try {
+            if (!fin_isCn() || !finReady || finLoading || finSaving) return;
+            if (!finDirty || finSaveTimer || finCnHoldTimer) return;
+            if (Date.now() < finCnHoldUntil) return;
+            finCnScheduleSave();
+          } catch(e){}
+        }, 2000);
+      } catch(e){}
     }
 
     /* ★中国报表：数据区蓝字校正（CN-BLUE-20261013）
@@ -20534,7 +21196,9 @@ var PROD_EQUIP_FAULT_KB = {
       if (finSaving || !finReady) return;
       var manual = !!(opts && opts.manual);
       var ok = false;
+      var resaveNeeded = false;
       var payload = null;
+      var genAtBuild = finDirtyGen;      // ★这份快照对应的改动代数（之后再有改动就不算数）
       try { payload = finCnBuildSavePayload(); } catch(e){ console.warn('[fin-cn] build payload', e); }
       if (!payload) { fin_setStatusKey('fin_status_save_failed', 'no snapshot'); return; }
       finSaving = true;
@@ -20542,16 +21206,33 @@ var PROD_EQUIP_FAULT_KB = {
       try {
         var out = payload;
         try { out = fin_inlineStyles(payload); } catch(e){ out = payload; }
+        if (finSnapRev) out.__rev = finSnapRev;    // ★乐观锁：带上加载时的版本号（FIN-CN-REV-20261013）
         var resp = await fetch(fin_api('/save'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(out)
         });
         var j = await resp.json();
-        if (j && j.ok){
+        if (j && j.stale){
+          /* ★别人的新数据已经写进文件了（多半是另一个还开着旧数据的标签页）。
+             这份旧快照绝不能覆盖 → 丢掉本地改动、重新载入最新数据，并明确提示用户。 */
+          finDirty = false;
+          if (j.rev) finSnapRev = j.rev;
+          try { fin_reload(); } catch(e){}
+          fin_setStatusKey('fin_status_stale_reload');
+        } else if (j && j.ok){
           ok = true;
           finLastSnapshot = payload;      // 已落盘：后续保存继续以它为底合并
-          finDirty = false;
+          if (j.rev) finSnapRev = j.rev;
+          /* ★代数判定（FIN-CN-LOSTSAVE-FIX-20261013）：服务端要跑 2~4 秒，
+             这期间用户完全可能又勾了核销 / 又录了一笔 —— 那种改动【不在这份快照里】，
+             绝不能因为"本次保存成功"就把 dirty 清掉（旧代码就是这么把改动吞掉的）。 */
+          if (finDirtyGen === genAtBuild){
+            finDirty = false;
+          } else {
+            resaveNeeded = true;
+            if (window.console) console.log('[fin-cn] 保存期间又有新改动 → 保持 dirty，稍后再存一次');
+          }
           fin_setStatusKey('fin_status_saved', (j.saved_at || ''));
           /* ★粘贴进来的数据在屏幕上是黑字 → 重载一次让屏幕也变蓝（保留滚动位置）。
              ★只手动保存才重载：自动保存重载会把光标顶掉、打断录入。
@@ -20568,9 +21249,11 @@ var PROD_EQUIP_FAULT_KB = {
         fin_setStatusKey('fin_status_save_failed', (e && e.message ? e.message : e));
       } finally {
         finSaving = false;
-        /* ★保存期间用户又改了 → 再排一次，保证最后那次改动也落盘。
-           ★只在成功后排（失败不重试，免得服务器出错时死循环打请求）。 */
-        if (ok && finDirty && fin_isCn()) { try { finCnMarkDirty(); } catch(e){} }
+        /* ★保存期间用户又改了 → 立刻再排一次，保证最后那次改动也落盘。
+           ★只在成功后排（失败不重试，免得服务器出错时死循环打请求）。
+           ★这里直接 finCnScheduleSave()：它已经被代数判定为"真实改动"，
+             不能再走 finCnMarkDirty() 的挂起窗口（那条路会 defer，白等一次）。 */
+        if (ok && (resaveNeeded || finDirty) && fin_isCn()) { try { finCnScheduleSave(); } catch(e){} }
       }
     }
 
@@ -21731,6 +22414,14 @@ var PROD_EQUIP_FAULT_KB = {
     /* ★货币视图缓存（FIN-CURRENCY-20261012）：报表文件是只读源，"哪些格是金额"与"换算值"
        只取决于文件本身 → 每个币种向后端要一次即可，之后切语言/复位/切回都用缓存重放。 */
     var finCurCache = {};
+    /* ★中国报表：显示层正在用的换算币种 + 被换算写进视图的格（FIN-CN-CURRENCY-20261013）。
+       cn_report.xlsx 里存的【永远是越南盾原值】（FIN-CN-CURRENCY-FIX-20261013：与越南报表同源），
+       所以保存时必须跳过这些"只是显示"的换算值，否则一次很普通的保存就会把整表金额
+       写成换算后的外币（数据事故）。
+       finCnConvCur = '' 表示还没做过换算。 */
+    var finCnConvCur = '';
+    var finCnConvView = {};       // "r,c" -> 当时写进视图的换算值
+    var finCnConvFactor = 0;      // 「显示值 = 越南盾 × factor」（0=未知；把用户输入换回越南盾要用它）
     function fin_applyCurrency(pattern, statusKey, silent){
       if (!pattern) return;
       if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
@@ -21773,16 +22464,23 @@ var PROD_EQUIP_FAULT_KB = {
       if (cur === '$') cur = 'USD';
       if (cur !== 'VND' && cur !== 'USD' && cur !== 'RMB') { return; }
       // ★缓存命中：切语言/复位/切回同一币种都不再打后端（FIN-CURRENCY-20261012）
-      if (finCurCache[cur]) { fin_applyCurrencyData(cur, finCurCache[cur], silent); return; }
+      //   ★缓存键要带报表种类：两张报表的基准币种【都是 VND】，但源文件不同、金额不同，
+      //     同一币种的换算结果当然不同 —— 所以缓存必须按报表种类分开。
+      var ckey = FIN_KIND + ':' + cur;
+      if (finCurCache[ckey]) { fin_applyCurrencyData(cur, finCurCache[ckey], silent); return; }
       if (!silent) fin_setStatusKey('fin_status_importing', ' ' + cur);
       fetch('/api/finance/convert-currency', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: cur })
+        /* ★kind=cn：中国报表的金额基准【同样是越南盾】，与越南报表同源
+           （FIN-CN-BASIS-FIX-20261013：文件里三语块存的都是越南盾原值）。
+           kind 只用来告诉服务端读哪份文件；换算方向与越南报表完全一致
+           （VND→RMB = ÷CNYVND，VND→USD = ÷USDVND）。 */
+        body: JSON.stringify({ target: cur, kind: fin_isCn() ? 'cn' : 'vn' })
       })
       .then(function(r){ return r.json(); })
       .then(function(j){
         if (!j || !j.ok) throw new Error((j && j.error) || 'convert failed');
-        finCurCache[cur] = j;                       // 缓存：文件是只读源，结果可复用
+        finCurCache[ckey] = j;                      // 缓存：文件是只读源，结果可复用
         fin_applyCurrencyData(cur, j, silent);
       })
       .catch(function(e){ if (!silent) fin_setStatusKey('fin_status_load_failed', 'currency: ' + String(e)); });
@@ -21797,9 +22495,9 @@ var PROD_EQUIP_FAULT_KB = {
         if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) return;
         /* ★CN-AUTOSAVE-20261013：币种换算是【显示层】的重算（文件是只读源），
            它写进来的换算值不该被自动保存当成"用户录入"。
-           ★注意（既有隐患，未在本轮改动）：该换算值留在视图里，之后任何一次保存
-             （手动或自动）都可能把换算后的金额写回文件。若你在中国报表里会用
-             右上角币种下拉（USD/RMB），告诉我，我再单独处理。 */
+           ★FIN-CN-CURRENCY-20261013：这个隐患已经堵死 —— 下面会把"写进视图的换算值"
+             逐格记进 finCnConvView，finCnBuildSavePayload 遇到这些格一律跳过
+             （文件里永远保留人民币原值）。所以现在中国报表也能安全地用币种下拉换算。 */
         try { finCnHoldAutoSave(3000); } catch(e){}
         var fmtMap = finCurFmtMap;   // ★单一事实源（FIN-CURR-MONEY-20261012）
         var snap = finLastSnapshot;
@@ -21813,6 +22511,14 @@ var PROD_EQUIP_FAULT_KB = {
           if (n) nameToSid[n] = sid;
         }
         var values = (j && j.values) || {};
+        /* ★中国报表：记下"这次显示用的是哪个币种"以及"哪些格被写成了换算值"
+           （FIN-CN-CURRENCY-20261013）。保存时靠它跳过这些格 —— 文件里永远保留人民币原值。 */
+        if (fin_isCn()) {
+          finCnConvCur = cur;
+          finCnConvView = {};
+          finCnConvFactor = (j && isFinite(Number(j.factor))) ? Number(j.factor) : 0;
+        }
+        var convView = finCnConvView;
         // 1) 写换算值：只写静态数字格；公式格不覆盖，交给表格自身用同一汇率重算（保证恒等式守恒）
         for (var sname in values) {
           var vsid = nameToSid[sname];
@@ -21824,11 +22530,14 @@ var PROD_EQUIP_FAULT_KB = {
             var cols = smap[rstr];
             var rowMap = null;
             for (var cstr in cols) {
-              // ★只写显示块内的列（FIN-LANG-VIEW-20261012）：服务端三块都算，视图只留 VI 块
-              if (parseInt(cstr, 10) > FIN_VIEW_MAXCOL) continue;
+              // ★只写【当前语言基准块 A–J】的列（FIN-BLOCK-MAXCOL）：服务端三块都算，
+              //   视图里当前语言的内容只在 A–J；K–AB 是隐藏区，写进去会变成"凭空造格"→ 被保存写坏文件。
+              var cN = parseInt(cstr, 10);
+              if (cN > FIN_BLOCK_MAXCOL) continue;
               if (!rowMap) rowMap = {};
               // f:null 必须带：否则 Univer 不会清掉该格原有公式（如 "=150000000"），覆盖值会被忽略
-              rowMap[parseInt(cstr, 10)] = { v: cols[cstr], t: 2, f: null };
+              rowMap[cN] = { v: cols[cstr], t: 2, f: null };
+              if (fin_isCn()) convView[r + ',' + cN] = cols[cstr];
             }
             if (rowMap) rangeMap[r] = rowMap;
           }
@@ -21853,9 +22562,10 @@ var PROD_EQUIP_FAULT_KB = {
           var list = fmtLists[sn] || [];
           var fmtCells = [];
           for (var k = 0; k < list.length; k++) {
-            if (list[k][1] > FIN_VIEW_MAXCOL) continue;   // ★同上：只套显示块内的列
+            if (list[k][1] > FIN_BLOCK_MAXCOL) continue;   // ★同上：只套当前语言基准块 A–J 内的列
             fin_markAmtCol(sid2, list[k][1]);             // ★登记金额列：用户后来新录入的金额也要带符号
-            fmtCells.push({ row: list[k][0], col: list[k][1], pattern: fmtMap[cur] || fmtMap.VND });
+            // ★走 fin_moneyPattern：中国报表 + RMB 要用文件里一致的 ¥#,##0（不带小数），越南报表同旧值
+            fmtCells.push({ row: list[k][0], col: list[k][1], pattern: fin_moneyPattern(cur) });
           }
           if (fmtCells.length) {
             try { finExecSilent('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid2, values: fmtCells }); } catch(e){ console.warn('[fin currency] set numfmt', e); }
@@ -21864,7 +22574,7 @@ var PROD_EQUIP_FAULT_KB = {
         // 2b) ★用户新录入的金额格不在服务端 fmt 列表里 → 按"已登记的金额列"补套当前币种符号
         //     （否则：录入时带 ₫，一切到 USD，这一格会孤零零留着 ₫，与全表不一致）
         try {
-          var curPat = fmtMap[cur] || fmtMap.VND;
+          var curPat = fin_moneyPattern(cur);   // ★同上：中国报表 RMB 用 ¥#,##0
           var dispSnap = (typeof fin_currentSnapshot === 'function') ? fin_currentSnapshot() : null;
           for (var csid in finAmtCols) {
             var cMap = finAmtCols[csid] || {};
@@ -21901,6 +22611,12 @@ var PROD_EQUIP_FAULT_KB = {
        这里统一重放，保证"选了货币 → 所有工作表立即、且始终是那个货币符号"。 */
     function fin_reapplyCurrency(silent){
       try {
+        /* ★中国报表（FIN-CN-CURRENCY-FIX-20261013）：必须重放 ——
+           中国报表源文件存的是【越南盾】（与越南报表同源），而默认显示货币是 RMB，
+           所以首屏就得把 VND 换算成人民币再显示。
+           ★旧实现有一句 `if (fin_isCn() && !finCnConvCur) return;`（默认 RMB 且从未换算过时
+             直接返回），它的前提"文件本身就是人民币原值 + ¥ 格式"是错的 —— 会让首屏显示
+             未换算的越南盾数字（¥41,400,000 而不是 ¥10,718）。已删除该提前返回。 */
         var cur = fin_curCurrencyCode();
         fin_applyCurrency(cur, null, silent !== false);
       } catch(e){ console.warn('[fin] reapply currency', e); }
@@ -24934,10 +25650,12 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     fin_menu_sort_asc:"升序", fin_menu_sort_desc:"降序", fin_menu_sort_reset:"复位", fin_cur_none:"货币",
     fin_status_not_loaded:"未载入", fin_status_engine:"正在加载表格引擎…", fin_status_importing:"正在导入报表…", fin_status_loaded:"报表已载入", fin_status_ready:"已就绪",
     fin_status_dirty:"有改动，待保存…", fin_status_saving:"保存中…", fin_status_saved:"已保存 ", fin_status_save_failed:"保存失败：", fin_status_no_wb:"保存失败：找不到工作簿",
-    fin_status_load_failed:"加载失败：", fin_status_not_init:"尚未初始化报表（需先初始化 Excel）", fin_status_dates_fmt:"已按 DD-MM-YYYY 重排日期，共处理 ", fin_status_dates_none:"没有需要重排的日期单元格", fin_status_dates_sorted:"已在各区域按 DD-MM-YYYY 排序",
+    fin_status_load_failed:"加载失败：", fin_status_not_init:"尚未初始化报表（需先初始化 Excel）", fin_status_stale_reload:"服务器已有更新（别的窗口保存过），已重新载入最新数据，请重新操作", fin_status_dates_fmt:"已按 DD-MM-YYYY 重排日期，共处理 ", fin_status_dates_none:"没有需要重排的日期单元格", fin_status_dates_sorted:"已在各区域按 DD-MM-YYYY 排序",
     fin_status_snapshot_ok:"已生成快照 ", fin_status_snapshot_fail:"快照失败：", fin_status_exporting:"正在导出…", fin_status_exported:"已导出", fin_status_export_fail:"导出失败：",
     fin_status_reimporting:"正在重新导入…", fin_status_reimported:"已重新导入 ", fin_status_reimport_fail:"重新导入失败：",
     fin_status_filter_on:"筛选已开启", fin_status_filter_off:"筛选已关闭", fin_status_sorted_asc:"已升序", fin_status_sorted_desc:"已降序", fin_status_restored:"已复原", fin_status_currency_applied:"已应用货币格式", fin_status_percent_applied:"已应用百分比格式", fin_status_ins_rows:"已插入行数：",
+    // ★底部统计栏（FIN-STATBAR-20261013）
+    fin_stat_cnt:"计数", fin_stat_sum:"总计", fin_stat_avg:"平均", fin_stat_max:"最大值", fin_stat_min:"最小值", fin_stat_none:"未选择单元格",
     // 按钮悬停释义（三语联动）
     fin_title_currency:"货币", fin_title_reset:"复位", fin_title_percent:"百分比", fin_title_maximize:"最大化", fin_title_close:"关闭", fin_title_rollback:"回滚到此版本", fin_title_ins_rows:"在选中行下方插入 N 行（填 1–200，回车或点按钮）",
     fin_prompt_snapshot:"生成快照周期，例如 2026-10（当月）或 2026（当年）"
@@ -25735,10 +26453,12 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     fin_menu_sort_asc:"Sort A → Z", fin_menu_sort_desc:"Sort Z → A", fin_menu_sort_reset:"Reset sort", fin_cur_none:"Currency",
     fin_status_not_loaded:"Not loaded", fin_status_engine:"Loading engine…", fin_status_importing:"Importing report…", fin_status_loaded:"Report loaded", fin_status_ready:"Ready",
     fin_status_dirty:"Unsaved changes…", fin_status_saving:"Saving…", fin_status_saved:"Saved ", fin_status_save_failed:"Save failed: ", fin_status_no_wb:"Save failed: workbook not found",
-    fin_status_load_failed:"Load failed: ", fin_status_not_init:"Report not initialized (init Excel first)", fin_status_dates_fmt:"Dates reformatted as DD-MM-YYYY, total ", fin_status_dates_none:"No date cells to reformat", fin_status_dates_sorted:"Sorted by DD-MM-YYYY within each block",
+    fin_status_load_failed:"Load failed: ", fin_status_not_init:"Report not initialized (init Excel first)", fin_status_stale_reload:"The server has newer data (saved from another window) — reloaded the latest; please redo your action", fin_status_dates_fmt:"Dates reformatted as DD-MM-YYYY, total ", fin_status_dates_none:"No date cells to reformat", fin_status_dates_sorted:"Sorted by DD-MM-YYYY within each block",
     fin_status_snapshot_ok:"Snapshot created ", fin_status_snapshot_fail:"Snapshot failed: ", fin_status_exporting:"Exporting…", fin_status_exported:"Exported", fin_status_export_fail:"Export failed: ",
     fin_status_reimporting:"Re-importing…", fin_status_reimported:"Re-imported ", fin_status_reimport_fail:"Re-import failed: ",
     fin_status_filter_on:"Filter on", fin_status_filter_off:"Filter off", fin_status_sorted_asc:"Sorted ascending", fin_status_sorted_desc:"Sorted descending", fin_status_restored:"Restored", fin_status_currency_applied:"Currency format applied", fin_status_percent_applied:"Percent format applied", fin_status_ins_rows:"Rows inserted: ",
+    // Bottom statistics bar (FIN-STATBAR-20261013)
+    fin_stat_cnt:"Count", fin_stat_sum:"Total", fin_stat_avg:"Average", fin_stat_max:"Max", fin_stat_min:"Min", fin_stat_none:"No cells selected",
     // Button hover tooltips (trilingual)
     fin_title_currency:"Currency", fin_title_reset:"Reset", fin_title_percent:"Percent", fin_title_maximize:"Maximize", fin_title_close:"Close", fin_title_rollback:"Rollback to this version", fin_title_ins_rows:"Insert N rows below the selected row (1–200, then Enter or click)",
     fin_prompt_snapshot:"Snapshot period, e.g. 2026-10 (month) or 2026 (year)"
@@ -26534,10 +27254,12 @@ crm_yes:"Có", crm_no_yes:"Không", lostRestore:"Chuyển về Dự án Tiềm n
     fin_menu_sort_asc:"Sắp xếp A → Z", fin_menu_sort_desc:"Sắp xếp Z → A", fin_menu_sort_reset:"Khôi phục thứ tự", fin_cur_none:"Tiền tệ",
     fin_status_not_loaded:"Chưa tải", fin_status_engine:"Đang tải công cụ bảng…", fin_status_importing:"Đang nhập báo cáo…", fin_status_loaded:"Đã tải báo cáo", fin_status_ready:"Sẵn sàng",
     fin_status_dirty:"Có thay đổi, chờ lưu…", fin_status_saving:"Đang lưu…", fin_status_saved:"Đã lưu ", fin_status_save_failed:"Lưu thất bại: ", fin_status_no_wb:"Lưu thất bại: không tìm thấy bảng tính",
-    fin_status_load_failed:"Tải thất bại: ", fin_status_not_init:"Báo cáo chưa khởi tạo (cần khởi tạo Excel)", fin_status_dates_fmt:"Đã sắp xếp lại ngày theo DD-MM-YYYY, tổng ", fin_status_dates_none:"Không có ô ngày cần sắp xếp lại", fin_status_dates_sorted:"Đã sắp xếp theo DD-MM-YYYY trong từng khối",
+    fin_status_load_failed:"Tải thất bại: ", fin_status_not_init:"Báo cáo chưa khởi tạo (cần khởi tạo Excel)", fin_status_stale_reload:"Máy chủ đã có dữ liệu mới hơn (được lưu từ cửa sổ khác) — đã tải lại dữ liệu mới nhất, vui lòng thao tác lại", fin_status_dates_fmt:"Đã sắp xếp lại ngày theo DD-MM-YYYY, tổng ", fin_status_dates_none:"Không có ô ngày cần sắp xếp lại", fin_status_dates_sorted:"Đã sắp xếp theo DD-MM-YYYY trong từng khối",
     fin_status_snapshot_ok:"Đã tạo ảnh chụp ", fin_status_snapshot_fail:"Ảnh chụp thất bại: ", fin_status_exporting:"Đang xuất…", fin_status_exported:"Đã xuất", fin_status_export_fail:"Xuất thất bại: ",
     fin_status_reimporting:"Đang nhập lại…", fin_status_reimported:"Đã nhập lại ", fin_status_reimport_fail:"Nhập lại thất bại: ",
     fin_status_filter_on:"Đã bật lọc", fin_status_filter_off:"Đã tắt lọc", fin_status_sorted_asc:"Đã sắp xếp tăng", fin_status_sorted_desc:"Đã sắp xếp giảm", fin_status_restored:"Đã khôi phục", fin_status_currency_applied:"Đã áp dụng định dạng tiền tệ", fin_status_percent_applied:"Đã áp dụng định dạng phần trăm", fin_status_ins_rows:"Đã chèn số dòng: ",
+    // Thanh thống kê dưới cùng (FIN-STATBAR-20261013)
+    fin_stat_cnt:"Đếm", fin_stat_sum:"Tổng", fin_stat_avg:"Trung bình", fin_stat_max:"Lớn nhất", fin_stat_min:"Nhỏ nhất", fin_stat_none:"Chưa chọn ô nào",
     // Chú thích nút khi hover (3 ngôn ngữ)
     fin_title_currency:"Tiền tệ", fin_title_reset:"Đặt lại", fin_title_percent:"Phần trăm", fin_title_maximize:"Phóng to", fin_title_close:"Đóng", fin_title_rollback:"Khôi phục về phiên bản này", fin_title_ins_rows:"Chèn N dòng bên dưới dòng đã chọn (nhập 1–200, rồi Enter hoặc bấm nút)",
     fin_prompt_snapshot:"Nhập kỳ ảnh chụp, ví dụ 2026-10 (tháng) hoặc 2026 (năm)"
