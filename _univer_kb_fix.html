@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Univer 0.5.5 Excel 键盘补丁 验证床</title>
+<script type="importmap">
+{
+  "imports": {
+    "@univerjs/presets": "https://esm.sh/@univerjs/presets@0.5.5",
+    "@univerjs/presets/": "https://esm.sh/@univerjs/presets@0.5.5/"
+  }
+}
+</script>
+<link rel="stylesheet" href="https://esm.sh/@univerjs/presets@0.5.5/lib/styles/preset-sheets-core.css">
+<link rel="stylesheet" href="https://esm.sh/@univerjs/design@0.5.5/lib/index.css">
+<link rel="stylesheet" href="https://esm.sh/@univerjs/ui@0.5.5/lib/index.css">
+<style>
+  body{margin:0;background:#fff;font-family:system-ui,Arial}
+  #c{height:420px;border:1px solid #ddd}
+</style>
+</head>
+<body>
+<div id="c"></div>
+<script>
+window.__ready = false; window.__err = null;
+(async function(){
+  try {
+    const presets  = await import('@univerjs/presets');
+    const corePreset = await import('@univerjs/presets/preset-sheets-core');
+    const localeMod = await import('@univerjs/presets/preset-sheets-core/locales/en-US');
+    const en = (localeMod && (localeMod.default || localeMod)) || {};
+    const snapshot = {
+      id: 't', name: 't', sheetOrder: ['s1'],
+      sheets: { s1: { id: 's1', name: 'S1', rowCount: 200, columnCount: 20,
+        cellData: { '0': { '0': { v: 'A1' }, '1': { v: 'B1' } },
+                    '1': { '0': { v: 11 } },
+                    '2': { '0': { v: 22 } },
+                    '3': { '0': { v: 'ABCDE' } },
+                    '60': { '0': { v: 'LAST60' } } } } },
+      styles: {}
+    };
+    const r = presets.createUniver({
+      theme: presets.defaultTheme,
+      locale: presets.LocaleType.EN_US,
+      locales: { [presets.LocaleType.EN_US]: en },
+      presets: [ corePreset.UniverSheetsCorePreset({ container: 'c' }) ]
+    });
+    window.presets = presets; window.u = r.univer; window.api = r.univerAPI;
+    const UNIT = (presets.UniverInstanceType && presets.UniverInstanceType.UNIVER_SHEET) || 2;
+    window.sheet = window.u.createUnit(UNIT, snapshot);
+    window.__ready = true;
+    // 补丁必须在 createUnit 之后绑定（此时 api 可用）
+    try { finExcelKeysBind(); window.__fixBound = true; } catch(e){ window.__fixErr = String(e); }
+  } catch (e) { window.__err = String((e && e.message) || e); }
+})();
+</script>
+
+<script>
+/* =========================================================================
+   ★ Excel 键盘行为补丁（FIN-EXCEL-KEYS）—— 与 choice_lite.html 中保持同一份实现
+   这里的 finUniverAPI 在测试页里用 window.api 兜底
+   ========================================================================= */
+
+/* ===================== ★ 锁死区 ★ FIN-EXCEL-KEYS-LOCK-20261011 =====================
+   本补丁的契约常量 + 【行为级】自检。
+   ★任何重构都不得删除、改名或弱化本区块，也不得移除 finExcelKeysBind() 末尾对
+     finExcelKeysLockCheck() 的调用。
+   为什么需要：本补丁每条规则都建立在「实测得来」的前提上（见下面各 ★ 注释），前提一旦
+   被重构掉，症状是「Excel 手感又坏了」，但代码看起来依旧完整 —— 静态扫描发现不了，
+   所以这里在运行时真的验证一遍：函数是否都在、接线是否成立、行列数/画布是否可取得。
+   自检只报错（console.error + window.__FIN_EXCEL_KEYS_LOCK_FAILED），不抛异常、
+   不影响表格使用。静态硬锁见仓库根 check_fin_excel_keys_lock.py + .githooks/pre-commit。
+   ================================================================================== */
+var FIN_EXCEL_KEYS_LOCK = {
+  id: 'FIN-EXCEL-KEYS-LOCK-20261011',
+  captureOnWindow: true,    /* 必须挂 window 捕获阶段：挂 document 会被 Univer 抢先 */
+  editDeleteRight: true,    /* 编辑态 Delete = 删除光标右侧字符 */
+  sheetSizeOnly: true,      /* 边界唯一来源 finSheetSize()，不得回退 getMaxRows() */
+  snapshotBase: true,       /* Ctrl+方向键基准 = 「按键之前」的快照 finPrevCur */
+  neverSwallow: true,       /* 算不出边界 / 量不到行数一律交回 Univer，绝不吞键 */
+  boundFlag: '__finExcelKeysBound'
+};
+
+function finExcelKeysLockCheck(){
+  var bad = [], warn = [];
+  try {
+    var need = {
+      finExcelKeysBind: typeof finExcelKeysBind,
+      finAPI: typeof finAPI,
+      finSheetObj: typeof finSheetObj,
+      finIsEditingCell: typeof finIsEditingCell,
+      finActiveCell: typeof finActiveCell,
+      finVisibleRange: typeof finVisibleRange,
+      finScrollState: typeof finScrollState,
+      finScrollTo: typeof finScrollTo,
+      finScrollToSoon: typeof finScrollToSoon,
+      finEnsureVisible: typeof finEnsureVisible,
+      finLastUsedCell: typeof finLastUsedCell,
+      finRowLastCol: typeof finRowLastCol,
+      finSheetSize: typeof finSheetSize,
+      finGridCanvas: typeof finGridCanvas,
+      finPageRows: typeof finPageRows,
+      finGotoCell: typeof finGotoCell,
+      finDataEdge: typeof finDataEdge,
+      finRememberCur: typeof finRememberCur,
+      finRememberSoon: typeof finRememberSoon,
+      finContainer: typeof finContainer
+    };
+    for (var k in need) { if (need[k] !== 'function') bad.push(k + ' 缺失'); }
+    if (window[FIN_EXCEL_KEYS_LOCK.boundFlag] !== true) bad.push('未绑定（__finExcelKeysBound !== true）');
+    if (FIN_EXCEL_KEYS_LOCK.id !== 'FIN-EXCEL-KEYS-LOCK-20261011') bad.push('契约常量 id 被改动');
+    /* 有工作表才校验行列数；绑定时机早于 createUnit，无表时跳过（不误报） */
+    try {
+      var sz = finSheetSize();
+      if (sz && (!(sz.rows > 0) || !(sz.cols > 0))) bad.push('finSheetSize() 异常: ' + JSON.stringify(sz));
+    } catch(e1){ bad.push('finSheetSize() 抛错: ' + e1); }
+    try {
+      var c = finContainer();
+      if (c && c.offsetHeight && !finGridCanvas()) warn.push('取不到主表格画布（PageUp/PageDown 可能失效）');
+    } catch(e2){ warn.push('finGridCanvas() 抛错: ' + e2); }
+  } catch(e){ bad.push('自检自身抛错: ' + e); }
+  if (warn.length) { try { console.warn('[fin-keys] 锁死区告警：' + warn.join('；')); } catch(e5){} }
+  if (bad.length) {
+    window.__FIN_EXCEL_KEYS_LOCK_FAILED = bad.slice();
+    try { console.error('✗ [FIN-EXCEL-KEYS-LOCK] 锁死区自检未通过：' + bad.join('；')); } catch(e3){}
+    return false;
+  }
+  window.__FIN_EXCEL_KEYS_LOCK_OK = true;
+  try { console.log('%c[fin-keys] 锁死区自检通过 FIN-EXCEL-KEYS-LOCK-20261011', 'color:#0a0;font-weight:bold'); } catch(e4){}
+  return true;
+}
+
+function finAPI(){ try { return (typeof finUniverAPI !== 'undefined' && finUniverAPI) ? finUniverAPI : (window.finUniverAPI || window.api); } catch(e){ return window.api; } }
+
+function finSheetObj(){
+  try { var a = finAPI(); var wb = a && a.getActiveWorkbook && a.getActiveWorkbook(); return (wb && wb.getActiveSheet) ? wb.getActiveSheet() : null; } catch(e){ return null; }
+}
+
+/* 是否正在编辑单元格。
+   ★不能看 document.activeElement：Univer 的输入宿主 .univer-editor 在非编辑态也是 activeElement（实测）。
+   可靠判据：单元格编辑覆盖层 .univer-editor-container 的尺寸 —— 空闲时约 2×2，进入编辑后变成单元格大小（如 90×26）。 */
+function finIsEditingCell(){
+  try {
+    var boxes = document.querySelectorAll('.univer-editor-container');
+    for (var i = 0; i < boxes.length; i++) {
+      var r = boxes[i].getBoundingClientRect();
+      if (r.width > 10 && r.height > 10) return true;
+    }
+  } catch(e){}
+  return false;
+}
+
+function finActiveCell(){
+  try {
+    var sh = finSheetObj(); if (!sh) return null;
+    var sel = sh.getSelection && sh.getSelection();
+    var ar = sel && sel.getActiveRange && sel.getActiveRange();
+    if (!ar) return null;
+    return { row: ar.getRow(), col: ar.getColumn() };
+  } catch(e){ return null; }
+}
+
+/* 可见区（兼容两种返回：FRange 门面 / 纯 {startRow,endRow,...} 对象，实测两者都出现过） */
+function finVisibleRange(){
+  try {
+    var sh = finSheetObj(); if (!sh) return null;
+    var vr = sh.getVisibleRange && sh.getVisibleRange();
+    if (!vr) return null;
+    if (typeof vr.startRow === 'number' && typeof vr.endRow === 'number') {
+      return { startRow: vr.startRow, endRow: vr.endRow, startColumn: vr.startColumn, endColumn: vr.endColumn };
+    }
+    if (vr.getRow && vr.getNumRows) {
+      var r0 = vr.getRow(), c0 = vr.getColumn();
+      return { startRow: r0, endRow: r0 + vr.getNumRows() - 1,
+               startColumn: c0, endColumn: c0 + vr.getNumColumns() - 1 };
+    }
+  } catch(e){}
+  return null;
+}
+
+/* 当前滚动位置（视口左上角落在哪一行/列） */
+function finScrollState(){
+  try {
+    var sh = finSheetObj(); if (!sh || !sh.getScrollState) return null;
+    var s = sh.getScrollState();
+    if (!s) return null;
+    return { row: s.sheetViewStartRow || 0, col: s.sheetViewStartColumn || 0 };
+  } catch(e){ return null; }
+}
+
+/* 滚动到「让 startRow/startCol 落在视口左上角」。
+   实测 scrollToCell(n, m) 的语义就是把第 n 行/第 m 列顶到视口左上角（并自动夹紧到边界），
+   因此可以用它实现 Excel 的「最小滚动」。 */
+function finScrollTo(startRow, startCol){
+  try {
+    var sh = finSheetObj(); if (!sh || !sh.scrollToCell) return false;
+    if (startRow < 0) startRow = 0;
+    if (startCol < 0) startCol = 0;
+    sh.scrollToCell(startRow, startCol);
+    return true;
+  } catch(e){ return false; }
+}
+
+/* ★Excel 的「选区跟随滚动」：选区出了可见区才滚，且只滚到刚好露出来（不把单元格顶到最上面）。
+   ★为什么必须自己做：真实财务报表页（choice_lite.html → #univer_container，带 filter/sort 插件、
+   容器 overflow:visible）里 Univer 0.5.5 的方向键【完全不会】把选区带进视野 —— 实测按住 ↓ 一路走到
+   第 26 行，scrollState 始终 [0,0]、可见区始终 0..14，选中的格子早就跑到屏幕外看不见了。
+   而在另建的极简验证床上同一个版本是会滚的，说明这是宿主环境差异，不能指望 Univer 自己修好。
+   这里统一在按键之后补一次「最小滚动」，让两个宿主表现一致（Excel 行为）。 */
+function finEnsureVisible(){
+  try {
+    var cur = finActiveCell(); if (!cur) return;
+    var vr = finVisibleRange(); if (!vr) return;
+    var ss = finScrollState(); if (!ss) return;
+    var nsr = ss.row, nsc = ss.col;
+    if (cur.row > vr.endRow) nsr = ss.row + (cur.row - vr.endRow);
+    else if (cur.row < vr.startRow) nsr = ss.row - (vr.startRow - cur.row);
+    if (typeof vr.endColumn === 'number') {
+      if (cur.col > vr.endColumn) nsc = ss.col + (cur.col - vr.endColumn);
+      else if (cur.col < vr.startColumn) nsc = ss.col - (vr.startColumn - cur.col);
+    }
+    if (nsr < 0) nsr = 0;
+    if (nsc < 0) nsc = 0;
+    if (nsr !== ss.row || nsc !== ss.col) finScrollTo(nsr, nsc);
+  } catch(e){}
+}
+
+function finIsDateSerialish(x){ return typeof x === 'number' && isFinite(x); }
+
+/* 取得"最后一个有内容的单元格"（Ctrl+End），Excel 语义。
+   ★不能拿 getDataRange() 的行列数去推：Univer 0.5.5 的 getDataRange() 总是从 A1 开始，
+   且 FRange 上【没有】getNumRows/getNumColumns/getRowCount/getColumnCount（实测全 undefined），
+   旧写法会一路兜底成 1×1，于是 Ctrl+End 永远停在 A1（实测 act=[0,0]）。
+   正确来源是 Worksheet 门面上的 getLastRow()/getLastColumn()（实测 60/1 正确）。*/
+function finLastUsedCell(){
+  try {
+    var sh = finSheetObj(); if (!sh) return null;
+    var lr = (typeof sh.getLastRow === 'function') ? sh.getLastRow() : null;
+    var lc = (typeof sh.getLastColumn === 'function') ? sh.getLastColumn() : null;
+    if (typeof lr === 'number' && typeof lc === 'number' && lr >= 0 && lc >= 0) {
+      return { row: lr, col: lc };
+    }
+    /* 兜底：在 getDataRange() 的值矩阵里从右下往上找最后一个非空格 */
+    var rng = sh.getDataRange && sh.getDataRange();
+    if (!rng || !rng.getValues) return null;
+    var v = rng.getValues(); if (!v || !v.length) return null;
+    var r0 = rng.getRow ? rng.getRow() : 0, c0 = rng.getColumn ? rng.getColumn() : 0;
+    for (var i = v.length - 1; i >= 0; i--) {
+      var row = v[i] || [];
+      for (var j = row.length - 1; j >= 0; j--) {
+        var val = row[j];
+        if (val !== null && val !== undefined && val !== '') return { row: r0 + i, col: c0 + j };
+      }
+    }
+    return null;
+  } catch(e){ return null; }
+}
+
+/* 某一行的最后一个有内容的列（End 键；Excel 语义：本行最右边有数据的格子） */
+function finRowLastCol(row){
+  try {
+    var sh = finSheetObj(); if (!sh) return 0;
+    var maxC = (typeof sh.getMaxColumns === 'function') ? sh.getMaxColumns() : 0;
+    var lastC = (typeof sh.getLastColumn === 'function') ? sh.getLastColumn() : 0;
+    if (maxC > 0 && lastC > maxC - 1) lastC = maxC - 1;
+    if (lastC <= 0) return 0;
+    var vals = sh.getRange(row, 0, 1, lastC + 1).getValues();
+    var r = vals && vals[0]; if (!r) return 0;
+    for (var c = r.length - 1; c >= 0; c--) {
+      var v = r[c];
+      if (v !== null && v !== undefined && v !== '') return c;
+    }
+  } catch(e){}
+  return 0;
+}
+
+/* 表格总行/列数（边界判定的唯一来源）。
+   ★不能只用 getMaxRows()/getMaxColumns()：实测真实财务报表里 getMaxRows() 返回 42，
+     而 getLastRow() 是 43（xlsx→快照时 rowCount 没跟着数据一起更新）。
+     拿它当边界会把光标卡在第 41 行、最后几行永远走不到。
+     所以取「声明行列数」与「最后一个有数据的行列 + 1」中的较大值。 */
+function finSheetSize(){
+  try {
+    var sh = finSheetObj(); if (!sh) return null;
+    var r = (sh.getMaxRows ? sh.getMaxRows() : 0) || 0;
+    var c = (sh.getMaxColumns ? sh.getMaxColumns() : 0) || 0;
+    try {
+      var lr = (typeof sh.getLastRow === 'function') ? sh.getLastRow() : -1;
+      var lc = (typeof sh.getLastColumn === 'function') ? sh.getLastColumn() : -1;
+      if (typeof lr === 'number' && lr >= 0) r = Math.max(r, lr + 1);
+      if (typeof lc === 'number' && lc >= 0) c = Math.max(c, lc + 1);
+    } catch(e2){}
+    return { rows: r, cols: c };
+  } catch(e){ return null; }
+}
+
+/* 取"主表格画布"。
+   ★不能直接用 document.querySelector('.univer-render-canvas')：DOM 里第一个匹配的是
+   公式栏里的小画布（实测 888×27，父节点 .univer-sheet-embedding-formula-editor-text），
+   拿它算不出可见行数（曾导致 finPageRows() 返回 0、PageUp/PageDown 完全不生效）。
+   主表格画布是 .univer-workbench-container-canvas 里的那块（实测 1098×323 / 真实报表 1380×561）。 */
+function finGridCanvas(){
+  try {
+    var cv = document.querySelector('.univer-workbench-container-canvas canvas.univer-render-canvas');
+    if (cv && cv.getBoundingClientRect().height > 60) return cv;
+    /* 兜底：排除公式栏内的小画布，取最高的一块 */
+    var all = document.querySelectorAll('canvas.univer-render-canvas');
+    var best = null, bestH = 0;
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.closest && el.closest('.univer-sheet-embedding-formula-editor')) continue;
+      var r = el.getBoundingClientRect();
+      if (r.height > bestH) { bestH = r.height; best = el; }
+    }
+    return (best && bestH > 60) ? best : null;
+  } catch(e){ return null; }
+}
+
+/* 一屏能显示多少行（用于 PageUp/PageDown；取不到就返回 0 = 不接管） */
+function finPageRows(){
+  try {
+    var vr = finVisibleRange();
+    if (vr && typeof vr.endRow === 'number') {
+      var n = vr.endRow - vr.startRow;      // Excel：PageDown 走「可见行数 - 1」行
+      if (n >= 1) return n;
+    }
+    var cv = finGridCanvas();
+    if (!cv) return 0;
+    var h = cv.getBoundingClientRect().height;
+    if (!h || h < 60) return 0;
+    var rowH = 24;   // Univer 0.5.5 默认行高（实测：y=61 起、每行 24px）
+    try {
+      var sh = finSheetObj();
+      var cur = finActiveCell();
+      var ws = sh && sh.getSheet && sh.getSheet();
+      var rd = (ws && ws.getRowData && cur) ? ws.getRowData(cur.row) : null;
+      if (rd && rd.h) rowH = rd.h;
+    } catch(e){}
+    return Math.max(2, Math.floor((h - 26) / rowH) - 1);
+  } catch(e){ return 0; }
+}
+
+/* 跳到某格：activate() 换掉选区。不主动滚动，由 finEnsureVisible() 统一按 Excel 语义补最小滚动 */
+function finGotoCell(row, col){
+  try {
+    var sh = finSheetObj(); if (!sh) return false;
+    var sz = finSheetSize() || {};
+    var maxR = sz.rows || 100000;
+    var maxC = sz.cols || 200;
+    if (row < 0) row = 0;
+    if (col < 0) col = 0;
+    if (row > maxR - 1) row = maxR - 1;
+    if (col > maxC - 1) col = maxC - 1;
+    var rng = sh.getRange(row, col);
+    if (rng && rng.activate) rng.activate();
+    else if (sh.setActiveRange) sh.setActiveRange(rng);
+    finRememberCur({ row: row, col: col });     /* 主动跳格后同步快照 */
+    return true;
+  } catch(e){ return false; }
+}
+
+/* ★Ctrl+方向键：跳到「数据边界」（Excel 语义）。
+   实测 Univer 原生只做到「本块末尾」，再按一次直接跳到整表最后一行/列，跨过空档不会停在下一块数据上。
+   这里按 Excel 规则自己算：邻格有内容 → 跳到本连续块的最后一个；邻格为空 → 跳到该方向上下一个非空格；
+   该方向再无数据 → 跳到整表最后一行/列。扫描范围超过 MAXSCAN 就放弃（交回 Univer 原生），避免大表卡死。 */
+var FIN_EDGE_SCAN = 4000;
+function finDataEdge(dr, dc, base){
+  try {
+    var sh = finSheetObj(); if (!sh) return null;
+    var cur = base || finActiveCell(); if (!cur) return null;
+    var maxR = (sh.getMaxRows ? sh.getMaxRows() : 1) - 1;
+    var maxC = (sh.getMaxColumns ? sh.getMaxColumns() : 1) - 1;
+    var isV = (dr !== 0);
+    var limit = isV ? maxR : maxC;
+    var from = isV ? cur.row : cur.col;
+    var fixed = isV ? cur.col : cur.row;
+    var dir = isV ? dr : dc;
+    /* 逐格取"是否有值" */
+    var step = dir > 0 ? 1 : -1;
+    function hasAt(i){
+      try {
+        var rng = isV ? sh.getRange(i, fixed) : sh.getRange(fixed, i);
+        var v = rng && rng.getValue ? rng.getValue() : null;
+        return !(v === null || v === undefined || v === '');
+      } catch(e){ return false; }
+    }
+    var scanned = 0;
+    var i = from + step;
+    if (i < 0 || i > limit) return null;
+    var neighborHas = hasAt(i);
+    var last = null;
+    while (i >= 0 && i <= limit && scanned < FIN_EDGE_SCAN) {
+      scanned++;
+      var has = hasAt(i);
+      if (neighborHas) {
+        if (!has) break;               /* 连续块到头 */
+        last = i;
+      } else {
+        if (has) { last = i; break; }  /* 跨过空档后的下一块数据 */
+      }
+      i += step;
+    }
+    if (scanned >= FIN_EDGE_SCAN) return null;   /* 太大，交回原生 */
+    var target = (last === null) ? limit : last; /* 该方向没有数据 → 整表最后一行/列 */
+    return isV ? { row: target, col: cur.col } : { row: cur.row, col: target };
+  } catch(e){ return null; }
+}
+
+/* ★「按键之前」的选区快照（跨调用共享）。
+   为什么需要：Univer 自己【先】处理绑定过的键（方向键/Ctrl+方向键）——实测同一次 Ctrl+↓，
+   我的监听里读到的 cur 已经是 Univer 移完之后的位置（A1 按下时读到的是 A4），
+   用它算「数据边界」会整段错位（期望 A4，实际跳到 A61）。
+   所以每次跳格/按键结束后把结果记下来，下一次按键用这个快照当基准，不再依赖事件顺序。 */
+var finPrevCur = null, finLastKeyAt = 0;
+function finRememberCur(c){ if (c && typeof c.row === 'number') finPrevCur = { row: c.row, col: c.col }; }
+function finRememberSoon(){ setTimeout(function(){ try { finRememberCur(finActiveCell()); } catch(e){} }, 0); }
+
+/* Univer 所在容器：用来限定补丁的作用范围（只有焦点/事件落在表格里才接管，
+   这样页面上的其它弹窗、输入框、报表标签页的键盘行为完全不受影响）。 */
+function finContainer(){
+  try {
+    return document.getElementById('univer_container')
+        || document.querySelector('.univer-container')
+        || document.getElementById('c');
+  } catch(e){ return null; }
+}
+
+/* 延迟滚动：finGotoCell() 内部 activate() 引发的滚动是异步落地的，
+   当场调用 finScrollTo 会被它随后覆盖（实测 PageDown 会把视口又顶回选区处），
+   所以「显式指定落点」的滚动统一走这里，排在 activate 之后执行。 */
+function finScrollToSoon(startRow, startCol){
+  var run = function(){ try { finScrollTo(startRow, startCol); } catch(e){} };
+  try { requestAnimationFrame(run); } catch(e){}
+  setTimeout(run, 60);
+}
+
+/* ★主入口：绑定 Excel 键盘补丁
+   · 编辑态：只补 Delete（删光标右侧字符）；Backspace 原生已正确，其余键交回 Univer；
+   · 非编辑态：补 Univer 0.5.5 没实现的键（Home/End/Ctrl+Home/Ctrl+End/PageUp/PageDown、
+     Ctrl+方向键的数据边界语义、到边界的「不回卷」），并按 Excel 规则补选区跟随滚动。
+
+   ★★监听必须挂在 window 的捕获阶段（不能挂 document）：
+     同一个节点（document）上多个 keydown 监听按【注册先后】执行，而 Univer 是在我们之前注册的，
+     所以挂 document 时 Univer 会先把选区移走，我们随后读到的 cur 已经是移动之后的位置 ——
+     实测症状：A1 按 Ctrl+↓ 期望走到 A4，实际走成了 A61（拿 A4 算的下一段）。
+     window 是捕获链的第一站（window → document → … → target），挂这里才能先于 Univer 拿到原始选区，
+     并且 stopPropagation() 能真正拦住 Univer 自己的处理。 */
+function finExcelKeysBind(){
+  if (window.__finExcelKeysBound) return;
+  window.__finExcelKeysBound = true;
+
+  function followSoon(){
+    try { requestAnimationFrame(function(){ finEnsureVisible(); setTimeout(finEnsureVisible, 60); }); }
+    catch(e){ setTimeout(finEnsureVisible, 0); }
+  }
+
+  try { finRememberCur(finActiveCell()); } catch(e){}
+  /* 空闲时用真实选区校准快照（用户用鼠标或程序改了选区时，快照不会一直陈旧） */
+  try {
+    setInterval(function(){
+      if (document.hidden) return;
+      if (Date.now() - finLastKeyAt < 400) return;      // 正在连续按键，不去打扰
+      finRememberCur(finActiveCell());
+    }, 250);
+    window.addEventListener('mousedown', function(){ setTimeout(function(){ finRememberCur(finActiveCell()); }, 0); }, true);
+  } catch(e){}
+  /* 是否该由本补丁接管这个按键。
+     ★不能只判断「焦点是否在容器内」：Univer 的输入宿主 .univer-editor 是挂在 body 上的 portal，
+       并不在 #univer_container 里面（实测 c.contains(activeElement) === false），
+       所以必须认它这个类名；容器可见性则用来区分「当前不在财务页/标签页被隐藏」的情况。 */
+  function finIsUniverElem(el){
+    try {
+      if (!el || el.nodeType !== 1) return false;
+      if (el.classList && el.classList.contains('univer-editor')) return true;
+      if (el.closest && el.closest('.univer-editor-container')) return true;
+      if (el.closest && el.closest('.univer-workbench-layout')) return true;
+      if (el.closest && el.closest('.univer-container')) return true;
+    } catch(err){}
+    return false;
+  }
+  function inScope(e){
+    try {
+      var c = finContainer(); if (!c) return false;
+      if (!c.offsetHeight && !c.getClientRects().length) return false;   // 容器不可见 → 不接管
+      var t = e && e.target, a = document.activeElement;
+      if (t && c.contains(t)) return true;
+      if (a && c.contains(a)) return true;
+      if (finIsUniverElem(t) || finIsUniverElem(a)) return true;
+      return false;
+    } catch(err){ return false; }
+  }
+
+  window.addEventListener('keydown', function(e){
+    try {
+      if (!e || e.isComposing) return;
+      /* 诊断开关：window.__finDebug = [] 时记录每个按键走了哪条路（排障用，未开启时零开销） */
+      if (window.__finDebug) { try { window.__finDebug.push(e.key + (inScope(e) ? '' : '|OUTSCOPE')); } catch(e3){} }
+      finLastKeyAt = Date.now();
+      if (!inScope(e)) return;
+      var k = e.key;
+      var editing = finIsEditingCell();
+
+      /* ① 编辑态：Delete = 删除光标右侧一个字符（Excel 行为）。
+            Univer 0.5.5 在编辑态对 Delete 完全不处理（实测无任何命令），
+            这里直接派发文档域的向前删除命令。 */
+      if (editing) {
+        if (k === 'Delete' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          try { finAPI().executeCommand('doc.command.delete-right', {}); } catch(err){}
+          return;
+        }
+        return;   // 编辑态的其它按键一律交回 Univer
+      }
+
+      if (e.altKey || e.metaKey) return;
+      var cur = finActiveCell();
+      if (!cur) return;
+      if (window.__finDebug) { try { window.__finDebug[window.__finDebug.length - 1] += '|cur=' + cur.row + ',' + cur.col; } catch(e4){} }
+      var sz = finSheetSize() || {};
+      var maxR = sz.rows || 0;
+      var maxC = sz.cols || 0;
+
+      /* ② 普通方向键：Excel 走到表格边界就停住，不会回卷到下一列/上一行（Univer 会回卷）。
+            判据用「按键之前」的快照 prev（Univer 可能已经先动过手了），并直接识别回卷特征。 */
+      if (!e.ctrlKey && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) {
+        var prev = finPrevCur || cur;
+        var wrapped = (k === 'ArrowDown' && cur.row < prev.row)
+                   || (k === 'ArrowUp' && cur.row > prev.row)
+                   || (k === 'ArrowRight' && cur.col < prev.col)
+                   || (k === 'ArrowLeft' && cur.col > prev.col);
+        var atEdge = (k === 'ArrowDown' && maxR > 0 && prev.row >= maxR - 1)
+                  || (k === 'ArrowUp' && prev.row <= 0)
+                  || (k === 'ArrowRight' && maxC > 0 && prev.col >= maxC - 1)
+                  || (k === 'ArrowLeft' && prev.col <= 0);
+        if (atEdge || wrapped) {
+          e.preventDefault(); e.stopPropagation();
+          if (cur.row !== prev.row || cur.col !== prev.col) finGotoCell(prev.row, prev.col);   // 撤销 Univer 的回卷
+          finRememberCur(prev);
+          followSoon();
+          return;
+        }
+        followSoon();
+        finRememberSoon();
+        return;
+      }
+
+      /* ③ Ctrl+方向键：Excel 的数据边界语义（邻格有值→本块末尾；邻格为空→跨空档到下一块；
+            该方向没数据→整表最后一行/列）。基准取「按键之前」的快照，避开 Univer 已先移动的干扰。 */
+      if (e.ctrlKey && !e.shiftKey && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) {
+        var base = finPrevCur || cur;
+        var dr = (k === 'ArrowDown') ? 1 : (k === 'ArrowUp' ? -1 : 0);
+        var dc = (k === 'ArrowRight') ? 1 : (k === 'ArrowLeft' ? -1 : 0);
+        var t = finDataEdge(dr, dc, base);
+        if (t) {
+          e.preventDefault(); e.stopPropagation();
+          finGotoCell(t.row, t.col);
+          finRememberCur(t);
+          followSoon();
+          return;
+        }
+        followSoon();     /* 算不出来（超大表）就交回 Univer 原生，滚动照样要跟 */
+        finRememberSoon();
+        return;
+      }
+
+      if (!e.ctrlKey && !e.shiftKey && k === 'Home') {          /* 行首（A 列），纵向视口不动 */
+        e.preventDefault(); e.stopPropagation();
+        var ssH = finScrollState();
+        finGotoCell(cur.row, 0);
+        finScrollToSoon(ssH ? ssH.row : 0, 0);
+        return;
+      }
+      if (!e.ctrlKey && !e.shiftKey && k === 'End') {           /* 本行最后一个有内容的列（贴右边缘露出） */
+        e.preventDefault(); e.stopPropagation();
+        var ssE = finScrollState(), vrE = finVisibleRange();
+        var tc = finRowLastCol(cur.row);
+        var nsc = ssE ? ssE.col : 0;
+        var vcols = (vrE && typeof vrE.endColumn === 'number') ? Math.max(1, vrE.endColumn - vrE.startColumn + 1) : 1;
+        if (tc < nsc) nsc = tc;
+        else if (tc > nsc + vcols - 1) nsc = tc - vcols + 1;
+        finGotoCell(cur.row, tc);
+        finScrollToSoon(ssE ? ssE.row : 0, Math.max(0, nsc));
+        return;
+      }
+      if (e.ctrlKey && !e.shiftKey && k === 'Home') {           /* A1（Excel：视口也回到左上角） */
+        e.preventDefault(); e.stopPropagation();
+        finGotoCell(0, 0);
+        finScrollToSoon(0, 0);
+        return;
+      }
+      if (e.ctrlKey && !e.shiftKey && k === 'End') {            /* 最后一个有内容的格子（Excel：贴右下角露出） */
+        e.preventDefault(); e.stopPropagation();
+        var last = finLastUsedCell();
+        if (last) {
+          var vr = finVisibleRange();
+          var rows = vr ? Math.max(1, vr.endRow - vr.startRow + 1) : 1;
+          var cols = (vr && typeof vr.endColumn === 'number') ? Math.max(1, vr.endColumn - vr.startColumn + 1) : 1;
+          finGotoCell(last.row, last.col);
+          finScrollToSoon(Math.max(0, last.row - rows + 1), Math.max(0, last.col - cols + 1));
+        }
+        return;
+      }
+      if (!e.ctrlKey && !e.shiftKey && (k === 'PageDown' || k === 'PageUp')) {
+        var page = finPageRows();
+        if (page <= 0) return;                     // 量不到就不接管，保持 Univer 原样
+        e.preventDefault(); e.stopPropagation();
+        var ss = finScrollState();
+        var target = (k === 'PageDown') ? cur.row + page : cur.row - page;
+        finGotoCell(target, cur.col);
+        /* Excel：选区与视口移动同样多的行 → 选区在屏幕上的相对位置保持不变 */
+        if (ss) finScrollToSoon((k === 'PageDown') ? ss.row + page : Math.max(0, ss.row - page), ss.col);
+        else followSoon();
+        return;
+      }
+
+      /* ④ 其它会动选区的键（Tab / Enter / Shift+方向键…）：不拦，只补跟随滚动 */
+      if (k === 'Tab' || k === 'Enter') followSoon();
+    } catch(err){}
+  }, true);
+
+  /* ★锁死区自检（FIN-EXCEL-KEYS-LOCK-20261011）：确认依赖的函数与接线都在。
+     只报错，不抛异常、不影响表格使用。★不得移除本调用。 */
+  try { finExcelKeysLockCheck(); } catch(e){}
+}
+</script>
+</body>
+</html>

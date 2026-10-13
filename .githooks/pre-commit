@@ -10,11 +10,27 @@
 #                                 ② fin_inlineStyles 只能在克隆副本上剥离红+粗，绝不碰实时样式库
 #                                 ③ finHiRecompute 行号没变也要抽查红+粗，被洗掉即自愈补回
 #                                 ④ 高亮是纯屏幕效果，保存副本里必须已剥离红+粗
+#   4) check_fin_excel_keys_lock.py
+#                              —— 财务 Univer「Excel 键盘行为补丁」锁死区
+#                                 （FIN-EXCEL-KEYS-LOCK-20261011）：
+#                                 ① window 捕获阶段监听 + 幂等 + 只在 Univer 内生效（认 .univer-editor）
+#                                 ② 编辑态只补 Delete（doc.command.delete-right），其余交回 Univer
+#                                 ③ 边界只用 finSheetSize()，基准只用按键前快照 finPrevCur，撤销回卷
+#                                 ④ 算不出边界/量不到行数必须交回 Univer，绝不吞键
+#                                 ⑤ finExcelKeysBind() 必须绑在 finReady = true; 之前
+#                                 ⑥ 必须与验证床 _univer_kb_fix.html 逐行一致（改后跑 python _port_fin_keys.py）
 #
-#   以上三条是【硬锁】（代码逻辑，静态扫描 HTML，失败即拦截提交，禁止篡改）。
+#   以上四条是【硬锁】（代码逻辑，静态扫描 HTML，失败即拦截提交，禁止篡改）。
 #
-#   4) check_prod_date_rule.py —— 生产操作日期 ≥ 排产开始日期（数据一致性巡检）
-#   5) check_prod_out_rule.py  —— 出库量 ≤ 当前生产总量（数据一致性巡检）
+#   5) check_fin_snap_cache.py —— 财务 Univer 快照缓存（FIN-SNAP-CACHE-20261011）：
+#                                 ① 缓存键 = 源 xlsx 的 mtime + size（缺一必误命中）
+#                                 ② 三个写入点都必须 _fin_cache_invalidate()
+#                                 ③ 写缓存必须原子（.tmp + os.replace），且先数据文件后键文件
+#                                 ④ GET 必须走缓存判定，不得再直接 xlsx_to_univer
+#                                 ⑤ 出缓存必须 conditional=True（重复加载退化为 304）
+#
+#   6) check_prod_date_rule.py —— 生产操作日期 ≥ 排产开始日期（数据一致性巡检）
+#   7) check_prod_out_rule.py  —— 出库量 ≤ 当前生产总量（数据一致性巡检）
 #
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
@@ -43,7 +59,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then

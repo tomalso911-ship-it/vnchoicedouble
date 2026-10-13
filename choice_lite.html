@@ -154,7 +154,14 @@ function _ovLoadChartLib(cb){
     showErr((e.message || 'error') + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
   });
   window.addEventListener('unhandledrejection', function (e) {
-    showErr('Promise: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+    // 忽略噪声：Univer 粘贴时调用 navigator.clipboard.read() 被浏览器拒绝（未授予 clipboard-read 权限时必然发生）。
+    // 代码在 esm.sh 的 Univer bundle 里，改不了；粘贴本身走 paste 事件，功能不受影响。
+    var r = e && e.reason;
+    if (r && r.name === 'NotAllowedError' && /clipboard/i.test(String(r.message || ''))) {
+      e.preventDefault && e.preventDefault();   // 同时抑制控制台里的 "Uncaught (in promise)"
+      return;
+    }
+    showErr('Promise: ' + (r && r.message ? r.message : r));
   });
 })();
 </script>
@@ -2205,6 +2212,13 @@ function _ovLoadChartLib(cb){
   .app-body.hidden { display:none; }
   .view { display:none; }
   .view.active { display:block; }
+  /* ===== 财务页后台预热（FIN-PREWARM）=====
+     登录后在后台就把 Univer 引擎装好，用户真正点「财务管理」时只需加载数据。
+     为什么要这么写：Univer 初始化必须量得到容器真实尺寸（.univer-container 固定 660px 高），
+     而 .view 默认 display:none（0×0）会让布局量不到；这里改成「保持 block 布局 + 离屏 + 不可见」，
+     尺寸正常但用户看不见也不可点。可见性用 visibility 而不是 display:none，正是为了保住布局。 */
+  #view-finance.fin-prewarm:not(.active){ display:block !important; position:fixed; left:-12000px; top:0;
+    width:1360px; height:820px; visibility:hidden; pointer-events:none; z-index:-1; }
   /* 空页面占位 */
   .empty-page {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -4270,6 +4284,13 @@ var WL_FLOW_IMG = {
       .fin-icon{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #dfe6ee;border-radius:6px;background:#fff;color:#333;cursor:pointer;flex:0 0 auto;padding:0;}
       .fin-icon:hover{background:#f5f7fa;}
       .fin-icon svg{width:16px;height:16px;}
+      /* 右键行号 →「插入」→「在下方插入行」+ 小图标 + 行数输入栏（DOM 补丁，见 finPatchInsertRowMenu） */
+      .fin-menu-ins-item{display:flex !important;align-items:center;gap:6px;cursor:pointer;}
+      .fin-menu-ins-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+      .fin-menu-ins-icon svg{width:16px;height:16px;}
+      .fin-menu-ins-lbl{flex:0 0 auto;}
+      .fin-menu-ins-input{width:46px;height:22px;border:1px solid #dfe6ee;border-radius:4px;font-size:12px;padding:0 4px;text-align:center;box-sizing:border-box;background:#fff;color:#333;flex:0 0 auto;}
+      .fin-menu-ins-input:focus{outline:none;border-color:#E53935;}
       /* 货币下拉：显示成「$」符号按钮（去掉“货币”文字与原生下拉箭头） */
       .fin-select.fin-currency-icon{width:auto;min-width:28px;height:28px;padding:0 6px;text-align:center;text-align-last:center;font-size:14px;font-weight:700;line-height:26px;color:#333;cursor:pointer;appearance:none;-webkit-appearance:none;-moz-appearance:none;}
       .fin-debug{font-size:11px;color:#c00;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%;flex:0 1 auto;}
@@ -16589,16 +16610,13 @@ var PROD_EQUIP_FAULT_KB = {
           <span class="fin-spacer"></span>
           <span id="fin_status" class="fin-status" data-i18n="fin_status_not_loaded">未载入</span>
           <span id="fin_build_tag" title="FIN-HI-LOCK-20261011" style="font-size:11px;opacity:.5;margin-left:8px;white-space:nowrap">HL6-LOCK</span>
-          <span id="fin_hi_info" style="font-size:11px;opacity:.7;margin-left:8px;white-space:nowrap"></span>
         </div>
         <div class="fin-toolbar2">
-          <!-- 货币下拉：按要求显示成「$」符号按钮（不再显示“货币”文字；下拉可选 USD/RMB/VND/THB） -->
+          <!-- 货币下拉：默认 VND，移除 THB；选择 USD/RMB 时按历史汇率自动换算 -->
           <select id="fin_currency" class="fin-select fin-currency-icon" onchange="fin_applyCurrency(this.value)" data-title-key="fin_title_currency">
-            <option value="">$</option>
-            <option value="&quot;$&quot;#,##0.00">USD $</option>
-            <option value="&quot;¥&quot;#,##0.00">RMB ¥</option>
-            <option value="&quot;₫&quot;#,##0">VND ₫</option>
-            <option value="&quot;฿&quot;#,##0.00">THB ฿</option>
+            <option value="VND" selected data-fmt="&quot;₫&quot;#,##0">VND ₫</option>
+            <option value="USD" data-fmt="&quot;$&quot;#,##0.00">USD $</option>
+            <option value="RMB" data-fmt="&quot;¥&quot;#,##0.00">RMB ¥</option>
           </select>
           <button class="fin-icon" data-title-key="fin_title_reset" onclick="fin_sortReset()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -16639,6 +16657,13 @@ var PROD_EQUIP_FAULT_KB = {
       };
     })();
     var FIN_ACTIVE_TAB = (function(){ try { return sessionStorage.getItem('won_fin_tab'); } catch(e){ return null; } })() || 'vn';
+    /* ★ 越南财务报表只读开关（FIN-READONLY）：
+       用户要求「就是这一份，不要每日保存」。打开后：
+       ① 任何单元格改动不再触发 fin_markDirty / fin_autoSave；
+       ② 日期规范化、排序等视图操作不再回写 xlsx；
+       ③ 保存按钮禁用；更新报表请走「重导」上传新的 xlsx。
+       关闭：改成 false 即可恢复自动保存。 */
+    var FIN_READONLY = true;
     function fin_renderTabs(active){
       FIN_ACTIVE_TAB = active || 'vn';
       try { sessionStorage.setItem('won_fin_tab', FIN_ACTIVE_TAB); } catch(e){}
@@ -16664,6 +16689,9 @@ var PROD_EQUIP_FAULT_KB = {
     var finUniver = null, finUniverAPI = null, finSheet = null, finPresets = null;
     var finInited = false, finReady = false, finLoading = false;
     var finLastSnapshot = null, finFilterActive = false;
+    // finLastView = 实际送进 Univer 的「显示快照」（VI 基准块 + 当前语言文字）。
+    // 所有要"写回显示单元"的例程都必须基于它（列已被裁到 0..9），不能用完整快照，否则会把裁掉的列又造出来。
+    var finLastView = null;
     var finRowOrder = [];
     var finToolbarObserver = null;
     var finSaveTimer = null, finDirty = false, finSaving = false;
@@ -16679,6 +16707,7 @@ var PROD_EQUIP_FAULT_KB = {
     window.addEventListener('app:langchange', function(){
       try { fin_setStatusKey(finStatusKey, finStatusSuffix); } catch(e){}
       try { if (typeof sweepI18n === 'function') sweepI18n(document.getElementById('fin_panel_vn')); } catch(e){}
+      try { if (typeof fin_menuInsRefresh === 'function') fin_menuInsRefresh(); } catch(e){}
     });
 
     function fin_currentSnapshot(){
@@ -16691,34 +16720,1464 @@ var PROD_EQUIP_FAULT_KB = {
       return null;
     }
 
+    /* ============ 三语「跟翻」视图（FIN-LANG-VIEW-20261012） ============
+       报表文件里是三块并排：VI(A–H) | ZH(K–R) | EN(U–AB)。
+       为了让「一屏只显示当前语言、不用横向拖」，这里以【VI 块为基准布局】生成"显示快照"：
+         · 只保留第 0..9 列（A–J），裁掉 ZH/EN 两块；
+         · 文字列 A/C/G 换成当前语言块（+10 / +20）的文本；
+         · 工作表标签名随语言（/api/finance/sheet-titles）。
+       ★只改"显示快照"，绝不写回 xlsx（财务页 FIN_READONLY=true）。
+       ★VI 块是基准：其公式引用 VI 列，裁剪后公式仍成立 → 货币换算/小计/余额不受影响。 */
+    /* ★工作表标签三语兜底表（FIN-LANG-VIEW-20261012）：
+       首选服务端 /api/finance/sheet-titles（= finance_data/fin_sheet_titles.json），
+       但服务端没重启 / 接口不可用时必须还有这份兜底 —— 保证「标签一定跟随语言切换」。
+       ⚠ 改标签名时【两处都要改】：finance_data/fin_sheet_titles.json 与本表。 */
+    var FIN_SHEET_TITLES_FALLBACK = {
+      'TỔNG HỢP':             { vi:'TỔNG HỢP',             zh:'汇总',          en:'SUMMARY' },
+      'Chi tiết thu-chi':     { vi:'Chi tiết thu-chi',     zh:'收支明细',      en:'Income & Expenditure Details' },
+      'Thu nội bộ':           { vi:'Thu nội bộ',           zh:'内部收入',      en:'Internal Receipts' },
+      'Thu thực tế Mr Cường': { vi:'Thu thực tế Mr Cường', zh:'何明强先生实收', en:'Actual Receipts - Mr. Cường' },
+      'Thu Dabaco':           { vi:'Thu Dabaco',           zh:'达巴科收款',    en:'Dabaco Receipts' },
+      'Thu khác':             { vi:'Thu khác',             zh:'其他收入',      en:'Other Receipts' },
+      'Chi thực tế':          { vi:'Chi thực tế',          zh:'实际支出',      en:'Actual Payments' },
+      'Chi nội bộ':           { vi:'Chi nội bộ',           zh:'内部支出',      en:'Internal Payments' }
+    };
+    var finSheetTitles = FIN_SHEET_TITLES_FALLBACK;
+    var finTitlesLoaded = false;
+    var finTitlesTried = 0;
+    /* 显示块固定为 VI 基准块 A–J（0..9）。任何"写回显示单元"的操作（货币换算/百分比/筛选…）
+       都必须夹在这个范围内，否则会在 J 右边凭空造出列，把裁好的视图又撑开。 */
+    var FIN_VIEW_MAXCOL = 9;
+    function fin_langOffset(lang){
+      lang = lang || (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi');
+      if (lang === 'zh') return 10;
+      if (lang === 'en') return 20;
+      return 0;
+    }
+    function fin_loadSheetTitles(force){
+      if (finTitlesLoaded && !force) return Promise.resolve();
+      if (!force && finTitlesTried >= 3) return Promise.resolve();   // 接口不可用就别一直重试
+      finTitlesTried++;
+      return fetch('/api/finance/sheet-titles').then(function(r){ return r.json(); }).then(function(j){
+        if (j && j.ok && j.titles && Object.keys(j.titles).length){
+          finSheetTitles = j.titles; finTitlesLoaded = true;         // 服务端为准
+        }
+      }).catch(function(){ /* 接口不可用：继续用兜底表，标签仍随语言切换 */ });
+    }
+    /* ★改工作表标签名时必须同步改写公式里的跨表引用（'旧名'! → '新名'!）。
+       本工作簿 VI 基准块的跨表引用【全部】是带单引号形式（实测 11 处，零例外），
+       所以做「引号内整名替换」即可，绝不会误伤正文。 */
+    function fin_rewriteSheetRefs(f, rename){
+      if (!f || !rename) return f;
+      for (var a in rename){
+        var qa = "'" + a + "'";
+        if (f.indexOf(qa) >= 0) f = f.split(qa).join("'" + rename[a] + "'");
+      }
+      return f;
+    }
+    /* 判断一张表是不是「三语并列」布局（VI A–H | ZH K–R | EN U–AB）。
+       只有确认是三语并列才做裁剪/跟翻——否则（例如用户「重导」了一份普通报表，
+       K 列之后其实是真实数据列）必须原样显示，绝不能把真实列裁掉。 */
+    function fin_isTrilingualSheet(s){
+      var cd = (s && s.cellData) || {};
+      var hits = 0;
+      for (var r = 0; r < 20; r++){
+        var row = cd[String(r)];
+        if (!row) continue;
+        for (var c = 0; c <= 7; c++){
+          var a = row[String(c)];
+          var b = row[String(c + 10)];
+          if (a && b && a.v !== undefined && a.v !== null && a.v !== ''
+              && b.v !== undefined && b.v !== null && b.v !== ''){ hits++; if (hits >= 3) return true; }
+        }
+      }
+      return false;
+    }
+    /* ---- 表名三语映射（公式跨表引用改写用；从任意语言切到任意语言都幂等） ---- */
+    var finOrigName = {};     // sid -> 原(VI)表名
+    var finSheetKind = {};    // sid -> true=三语并列表（只有这类表才裁剪/跟翻/改标签）
+    function fin_nameVariants(sid){
+      var on = finOrigName[sid] || '';
+      var t = finSheetTitles[on];
+      var arr = [on];
+      if (t){
+        ['vi','zh','en'].forEach(function(l){ if (t[l] && arr.indexOf(t[l]) < 0) arr.push(t[l]); });
+      }
+      return arr;
+    }
+    function fin_targetName(sid, lang){
+      var on = finOrigName[sid] || '';
+      var t = finSheetTitles[on];
+      return (t && t[lang]) ? t[lang] : on;
+    }
+    function fin_rewriteAllRefs(f){
+      if (!f || f.indexOf("'") < 0) return f;
+      for (var sid in finOrigName){
+        var target = fin_targetName(sid, CUR_LANG);
+        if (!target) continue;
+        var vs = fin_nameVariants(sid);
+        for (var i = 0; i < vs.length; i++){
+          if (!vs[i] || vs[i] === target) continue;
+          var q = "'" + vs[i] + "'";
+          if (f.indexOf(q) >= 0) f = f.split(q).join("'" + target + "'");
+        }
+      }
+      return f;
+    }
+
+    /* ★加载时用【原始完整快照】种一遍三语信息（FIN-LIVE-TRANS-20261012）：
+       ① 记下每张表的原名与"是否三语并列表"；
+       ② 把三块并排的文字灌进内容键翻译缓存（VI 原文 ↔ ZH 译文 ↔ EN 译文 互为键），
+          这样切语言、以及用户新录入的内容，都能从缓存里取到专业译文。 */
+    function fin_seedLang(snap){
+      if (!snap || !snap.sheets) return;
+      finOrigName = {};
+      finSheetKind = {};
+      finTransCache = {};
+      (snap.sheetOrder || []).forEach(function(sid){
+        var sh = snap.sheets[sid];
+        if (!sh) return;
+        finOrigName[sid] = sh.name;
+        var tri = !!fin_isTrilingualSheet(sh);
+        finSheetKind[sid] = tri;
+        if (!tri) return;
+        var cd = sh.cellData || {};
+        for (var rk in cd){
+          var row = cd[rk] || {};
+          for (var c = 0; c <= 7; c++){
+            var cell = row[String(c)];
+            if (!cell || cell.f || typeof cell.v !== 'string' || !cell.v) continue;
+            var rec = finTransCache[cell.v] || { vi: cell.v, zh: null, en: null };
+            if (rec.vi == null) rec.vi = cell.v;
+            var zc = row[String(c + 10)];
+            var ec = row[String(c + 20)];
+            if (zc && !zc.f && typeof zc.v === 'string' && zc.v) rec.zh = zc.v;
+            if (ec && !ec.f && typeof ec.v === 'string' && ec.v) rec.en = ec.v;
+            finTransCache[cell.v] = rec;
+            if (rec.zh) finTransCache[rec.zh] = rec;
+            if (rec.en) finTransCache[rec.en] = rec;
+          }
+        }
+      });
+      console.log('[fin] 三语缓存已种：表', Object.keys(finOrigName).length, '文本', Object.keys(finTransCache).length);
+    }
+    /* ★显示快照构建（FIN-LANG-VIEW-20261012，v2 = 可编辑版）：
+       base 可以是①首次加载的原始完整快照，②上一次的显示快照（携带用户改动）。
+       文字不再从「ZK/EN 列块」直接取，而是走内容键翻译缓存 finTransCache：
+         · 缓存里任何一条记录都可以用 vi/zh/en 任一语言的文字查到（三条键指向同一记录）；
+         · 这样"用户在某语言下改/加的内容"切到别的语言时也能取到专业译文。 */
+    function fin_buildLangView(base, lang){
+      if (!base || !base.sheets) return base;
+      var out = {};
+      for (var k0 in base) out[k0] = base[k0];
+      var outs = {};
+      var order = base.sheetOrder || [];
+      for (var i = 0; i < order.length; i++){
+        var sid = order[i];
+        var s = base.sheets[sid];
+        if (!s) continue;
+        var tri = finSheetKind[sid];
+        if (tri === undefined){ tri = fin_isTrilingualSheet(s); finSheetKind[sid] = tri; }
+        if (!tri){ outs[sid] = s; continue; }          // ★非三语表原样保留（不裁列、不改标签）
+        var ns = {};
+        for (var k in s) ns[k] = s[k];
+        var cd = s.cellData || {};
+        var ncd = {};
+        for (var rk in cd){
+          var row = cd[rk] || {};
+          var nrow = {}, has = false;
+          for (var ck in row){
+            var c = parseInt(ck, 10);
+            if (c > FIN_VIEW_MAXCOL) continue;         // ★裁掉 ZH(K–R)/EN(U–AB) 两块，只留基准块 A–J（幂等）
+            var cell = row[ck];
+            // ★只换「纯文字格」：本身是字符串、非公式（数字/日期/公式一律原样，保证小计与余额安全）
+            if (cell && !cell.f && typeof cell.v === 'string' && cell.v !== ''){
+              var rec = finTransCache[cell.v];
+              var tt = rec && rec[lang];
+              if (tt && tt !== cell.v){
+                var cp = {};
+                for (var kk in cell) cp[kk] = cell[kk];
+                cp.v = tt;
+                nrow[ck] = cp; has = true; continue;
+              }
+              if (!rec) fin_requestTrans(cell.v, lang);   // 缓存里没有 → 立即调 API，到了再补写
+            }
+            nrow[ck] = cell; has = true;
+          }
+          if (has) ncd[rk] = nrow;
+        }
+        // 公式跨表引用：把任意语言变体统一成当前语言的目标表名
+        for (var rk2 in ncd){
+          var nrow2 = ncd[rk2];
+          for (var ck2 in nrow2){
+            var c2 = nrow2[ck2];
+            if (c2 && typeof c2.f === 'string' && c2.f.indexOf("'") >= 0){
+              var nf = fin_rewriteAllRefs(c2.f);
+              if (nf !== c2.f){
+                var c3 = {};
+                for (var k3 in c2) c3[k3] = c2[k3];
+                c3.f = nf;
+                nrow2[ck2] = c3;
+              }
+            }
+          }
+        }
+        ns.cellData = ncd;
+        var cold = s.columnData || {}, ncol = {};
+        for (var cc in cold){ if (parseInt(cc, 10) <= FIN_VIEW_MAXCOL) ncol[cc] = cold[cc]; }
+        ns.columnData = ncol;
+        if (s.mergeData){
+          ns.mergeData = s.mergeData.filter(function(m){ return (m.endColumn || 0) <= FIN_VIEW_MAXCOL; });
+        }
+        ns.columnCount = FIN_VIEW_MAXCOL + 1;
+        var tn = fin_targetName(sid, lang);
+        if (tn) ns.name = tn;
+        outs[sid] = ns;
+      }
+      out.sheets = outs;
+      return out;
+    }
+
+    /* ============ 内容键翻译缓存 + 编辑监控（FIN-LIVE-TRANS-20261012） ============
+       用户在任何工作表、任何语言下改动/新增内容时：
+         · 记下这份文字属于哪个语言；
+         · 【立即】调 /api/translate 把另外两种语言的译文取回来（"专业翻译同步到其他语言"）；
+         · 切语言时用缓存里的译文重建显示，译文还没回来的先原样显示，回来后再补写。 */
+    var finTransCache = {};      // 文字 -> {vi,zh,en}（vi/zh/en 三个键都指向同一条记录）
+    var finTransPending = {};    // "文字|lang" -> true（在途请求，防重复）
+    var finPatchTimer = null;
+    function fin_isCodeLike(t){
+      var s = String(t).trim();
+      if (!s) return true;
+      if (s.length > 160) return true;                                  // 超长不折腾
+      if (/^[\d\s.,%+\-()/:]+$/.test(s)) return true;                    // 纯数字/日期样式
+      if (s.indexOf(' ') < 0 && /\d/.test(s) && /[A-Za-zÀ-ỹ]/.test(s)) return true;   // NTTK00001 / CTNB00010
+      return false;
+    }
+    function fin_requestTrans(text, lang){
+      if (!lang || !text) return;
+      if (fin_isCodeLike(text)) return;
+      var known = finTransCache[text];
+      if (known && known[lang]) return;                                  // 已有译文，不用再问
+      var key = text + '|' + lang;
+      if (finTransPending[key]) return;
+      finTransPending[key] = true;
+      fetch('/api/translate?q=' + encodeURIComponent(text) + '&target=' + lang)
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          delete finTransPending[key];
+          if (!j || !j.ok || !j.text) return;
+          var t = String(j.text);
+          var rec = finTransCache[text] || {};
+          var cp = {};
+          for (var k in rec) cp[k] = rec[k];
+          cp[lang] = t || text;
+          finTransCache[text] = cp;
+          if (t) finTransCache[t] = cp;
+          fin_schedulePatchTrans();
+        })
+        .catch(function(){ delete finTransPending[key]; });
+    }
+    function fin_schedulePatchTrans(){
+      if (finPatchTimer) clearTimeout(finPatchTimer);
+      finPatchTimer = setTimeout(function(){ finPatchTimer = null; try { fin_patchTransView(); } catch(e){} }, 150);
+    }
+    // 译文回来后，把当前视图里"还显示着别的语言"的文字补成当前语言
+    function fin_patchTransView(){
+      if (!finReady || !finUniverAPI || !finSheet) return;
+      if (finEditSuppress > 0) return;
+      var lang = CUR_LANG || 'vi';
+      var snap; try { snap = fin_currentSnapshot(); } catch(e){ return; }
+      if (!snap || !snap.sheetOrder) return;
+      var unitId = fin_unitId();
+      var n = 0;
+      finEditSuppress++;
+      try {
+        snap.sheetOrder.forEach(function(sid){
+          try {
+            if (!finSheetKind[sid]) return;
+            var cd = (snap.sheets[sid] || {}).cellData || {};
+            for (var rk in cd){
+              var row = cd[rk] || {};
+              for (var ck in row){
+                var c = parseInt(ck, 10);
+                if (c > FIN_VIEW_MAXCOL) continue;
+                var cell = row[ck];
+                if (!cell || cell.f || typeof cell.v !== 'string' || !cell.v) continue;
+                var rec = finTransCache[cell.v];
+                var want = rec && rec[lang];
+                if (!want || want === cell.v) continue;
+                var m = {}; m[rk] = {};
+                m[rk][ck] = { v: want };
+                try { finExecSilent('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: m }); n++; } catch(e){}
+              }
+            }
+          } catch(e){}
+        });
+      } finally { finEditSuppress--; finEditQuietUntil = Date.now() + 400; }
+      if (n){ console.log('[fin] patch trans cells', n); fin_captureEditBase(); }
+    }
+
+    /* ---- 编辑监控：与上次基线逐格对比，发现"用户改了/加了什么" ---- */
+    var finEditBase = {};          // sid -> { "r,c": 值字符串 }
+    var finEditSuppress = 0;       // 我们自己写盘时抑制误判
+    var finEditQuietUntil = 0;     // 异步回调的静默窗口
+    var finEditScanTimer = null;
+    var finEditPollTimer = null;
+    /* ★金额列登记（FIN-CURR-MONEY-20261012）：
+       用户【新录入】的金额必须自动带上"当前所选币种"的符号（选了越南盾 → 加 ₫）。
+       来源两类：① 服务端 fmt 列表里认定过的列；② 快照里已经有 ₫/$/¥ 数字格式的列。 */
+    var finAmtCols = {};           // sid -> { "col": 1 }
+    var finCurFmtMap = { "VND": '"₫"#,##0', "USD": '"$"#,##0.00', "RMB": '"¥"#,##0.00' };
+    function fin_valKey(v){
+      if (v === undefined || v === null || v === '') return '';
+      if (typeof v === 'object' && v && typeof v.getTime === 'function') return 'D' + v.getTime();
+      return String(v);
+    }
+    function fin_captureEditBase(snap){
+      if (!snap){ try { snap = fin_currentSnapshot(); } catch(e){ return; } }
+      if (!snap || !snap.sheetOrder) return;
+      var base = {};
+      snap.sheetOrder.forEach(function(sid){
+        var sh = snap.sheets && snap.sheets[sid];
+        if (!sh || !finSheetKind[sid]) return;
+        var cd = sh.cellData || {}, m = {};
+        for (var rk in cd){
+          var row = cd[rk] || {};
+          for (var ck in row){
+            if (parseInt(ck, 10) > FIN_VIEW_MAXCOL) continue;
+            var s = fin_valKey(row[ck] && row[ck].v);
+            if (s) m[rk + ',' + ck] = s;
+          }
+        }
+        base[sid] = m;
+      });
+      finEditBase = base;
+    }
+    function fin_scheduleEditScan(){
+      if (finEditScanTimer) clearTimeout(finEditScanTimer);
+      finEditScanTimer = setTimeout(function(){ finEditScanTimer = null; try { fin_scanEdits(); } catch(e){} }, 180);
+    }
+    function fin_scanEdits(){
+      if (!finReady || !finSheet || !finUniverAPI) return 0;
+      if (finEditSuppress > 0 || Date.now() < finEditQuietUntil) return 0;
+      var snap; try { snap = fin_currentSnapshot(); } catch(e){ return 0; }
+      if (!snap || !snap.sheetOrder) return 0;
+      var changed = [];
+      snap.sheetOrder.forEach(function(sid){
+        try {
+          if (!finSheetKind[sid]) return;
+          var old = finEditBase[sid] || {};
+          var cd = (snap.sheets[sid] || {}).cellData || {};
+          for (var rk in cd){
+            var row = cd[rk] || {};
+            for (var ck in row){
+              var c = parseInt(ck, 10);
+              if (c > FIN_VIEW_MAXCOL) continue;
+              var sv = fin_valKey(row[ck] && row[ck].v);
+              if (!sv) continue;
+              if (old[rk + ',' + ck] !== sv) changed.push({ sid: sid, r: parseInt(rk, 10), c: c, v: row[ck] && row[ck].v });
+            }
+          }
+        } catch(e){}
+      });
+      if (!changed.length) return 0;
+      console.log('[fin] 检测到用户改动', changed.length, '格');
+      finEditSuppress++;
+      try { changed.forEach(function(ch){ try { fin_handleUserEdit(ch.sid, ch.r, ch.c, ch.v); } catch(e){} }); }
+      finally { finEditSuppress--; finEditQuietUntil = Date.now() + 250; }
+      fin_captureEditBase();        // 内部写入（日期规范化）之后再打基线
+      try { finHiRecompute(); } catch(e){}      // ★立即重算"离今天最近"的高亮行
+      fin_captureEditBase();
+      return changed.length;
+    }
+    // 一次用户编辑：① 日期强制成 DD-MM-YYYY ② 文字立即调 API 翻译并同步到其它语言
+    function fin_handleUserEdit(sid, r, c, v){
+      var lang = CUR_LANG || 'vi';
+      try { fin_fixDateCell(sid, r, c); } catch(e){}
+      if (typeof v === 'string' && v.trim() && !fin_isCodeLike(v)){
+        var rec = finTransCache[v] || {};
+        if (rec[lang] !== v){
+          var cp = {};
+          for (var k in rec) cp[k] = rec[k];
+          cp[lang] = v;
+          if (!cp.vi) cp.vi = (lang === 'vi' ? v : undefined);
+          finTransCache[v] = cp;
+        }
+        ['vi','zh','en'].forEach(function(l){ if (l !== lang) fin_requestTrans(v, l); });
+      }
+      // ★③ 用户录入的金额 → 立即套上"当前所选币种"的符号（FIN-CURR-MONEY-20261012）
+      try { fin_maybeFormatMoneyCell(sid, r, c, v); } catch(e){}
+    }
+
+    /* ★当前选中的币种（与 #fin_currency 完全一致；CNY/¥ 归一成 RMB） */
+    function fin_curCurrencyCode(){
+      try {
+        var sel = document.getElementById('fin_currency');
+        var cur = (sel && sel.value) ? String(sel.value).toUpperCase() : 'VND';
+        if (cur === 'CNY' || cur === '¥' || cur === '￥') cur = 'RMB';
+        if (cur === '$') cur = 'USD';
+        if (cur !== 'VND' && cur !== 'USD' && cur !== 'RMB') cur = 'VND';
+        return cur;
+      } catch(e){ return 'VND'; }
+    }
+    function fin_moneyPattern(cur){
+      return finCurFmtMap[cur] || finCurFmtMap.VND;
+    }
+    /* 登记"这一列是金额列"（只登记显示块内的列） */
+    function fin_markAmtCol(sid, col){
+      if (!sid) return;
+      var c = parseInt(col, 10);
+      if (!(c >= 0) || c > FIN_VIEW_MAXCOL) return;
+      if (!finAmtCols[sid]) finAmtCols[sid] = {};
+      finAmtCols[sid][String(c)] = 1;
+    }
+    function fin_isAmtCol(sid, col){
+      return !!(finAmtCols[sid] && finAmtCols[sid][String(parseInt(col, 10))]);
+    }
+    /* 兜底：从当前快照里"已经带货币符号的格"反推金额列 */
+    function fin_collectAmtCols(snap){
+      try {
+        if (!snap) snap = (typeof fin_currentSnapshot === 'function') ? fin_currentSnapshot() : null;
+        if (!snap || !snap.sheetOrder) return;
+        var styles = snap.styles || {};
+        for (var i = 0; i < snap.sheetOrder.length; i++){
+          var sid = snap.sheetOrder[i];
+          var sh = snap.sheets && snap.sheets[sid];
+          if (!sh || !sh.cellData) continue;
+          for (var rk in sh.cellData){
+            var row = sh.cellData[rk] || {};
+            for (var ck in row){
+              var c = parseInt(ck, 10);
+              if (c > FIN_VIEW_MAXCOL) continue;
+              var cell = row[ck];
+              var s = cell && cell.s;
+              var st = (typeof s === 'string') ? styles[s] : s;
+              var pat = (st && st.n && st.n.pattern) || '';
+              if (pat && /[₫$¥]/.test(pat)) fin_markAmtCol(sid, c);
+            }
+          }
+        }
+      } catch(e){}
+    }
+    /* ★用户新录入金额 → 立刻套"当前币种"的数字格式（不动值，只补符号） */
+    function fin_maybeFormatMoneyCell(sid, r, c, v){
+      try {
+        if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) return false;
+        var col = parseInt(c, 10);
+        if (!(col >= 0) || col > FIN_VIEW_MAXCOL) return false;
+        if (!fin_isAmtCol(sid, col)) return false;
+        var isNum = (typeof v === 'number' && isFinite(v)) ||
+                    (typeof v === 'string' && v.trim() !== '' && isFinite(Number(String(v).replace(/,/g, ''))));
+        if (!isNum) return false;
+        finExecSilent('sheet.command.numfmt.set.numfmt', {
+          unitId: fin_unitId(), subUnitId: sid,
+          values: [{ row: parseInt(r, 10), col: col, pattern: fin_moneyPattern(fin_curCurrencyCode()) }]
+        });
+        return true;
+      } catch(e){ return false; }
+    }
+
+    /* ============ ★内部维护写入不污染撤销/重做栈（FIN-UNDO-CLEAN-20261012） ============
+       背景：Univer 的撤销栈是按「命令」记的，程序化 executeCommand 一样会入栈；
+             而 LocalUndoRedoService.pushUndoRedo() 每入栈一次都会 `redoStack.length = 0`。
+       我们会在用户改完格子后【悄悄补写】：日期规范化、三语同步、货币符号、高亮样式……
+       这些记录会带来两个可见故障：
+         ① 压在用户操作之上 → 点「撤销」撤掉的是我们刚补的格式（屏幕毫无变化）→ 像"撤销失灵"；
+         ② 顺手清空 redo 栈 → 用户撤销完再也「重做」不回来 → 像"重做失灵"。
+       做法：内部写入期间把撤销服务的 pushUndoRedo 临时置空——我们的写入照样生效，
+             但既不新增撤销记录、也不清 redo 栈；撤销栈顶永远回到用户自己的操作。
+       恢复时机：入栈发生在 executeCommand 的微任务里（命令执行完才通知监听器），
+             所以必须等一个宏任务再恢复；期间所有兄弟内部写入一并被吞掉（不会漏）。 */
+    var fin_undoSvcCache = null, fin_undoCleanDiag = false;
+    var fin_undoMute = 0;        // >0 = 正处于"内部写入静默窗口"（期间丢弃一切撤销入栈）
+    function fin_undoRedoService(){
+      if (fin_undoSvcCache) return fin_undoSvcCache;
+      try {
+        if (!finUniver || typeof finUniver.__getInjector !== 'function') return null;
+        var tok = window.finPresets && window.finPresets.IUndoRedoService;
+        if (!tok) return null;
+        var svc = finUniver.__getInjector().get(tok);
+        if (!svc) return null;
+        fin_undoSvcCache = svc;
+        return svc;
+      } catch(e){ return null; }
+    }
+    /* 内部维护写入的统一入口（替代 finUniverAPI.executeCommand），返回值语义不变（Promise）。
+       ★这一段写入不进撤销栈、也不清 redo 栈；用户自己点的排序/筛选/百分比仍走原生 executeCommand，照旧可撤销。 */
+    function finExecSilent(cmdId, params){
+      if (!finUniverAPI || !finUniverAPI.executeCommand) return null;
+      var ur = fin_undoRedoService();
+      if (!ur || typeof ur.pushUndoRedo !== 'function'){
+        try { return finUniverAPI.executeCommand(cmdId, params); } catch(e){ return null; }
+      }
+      if (fin_undoMute > 0){          // 已在静默窗口内：直接执行，由最外层统一恢复
+        try { return finUniverAPI.executeCommand(cmdId, params); } catch(e){ return null; }
+      }
+      // 先记现场（拿得到 Univer 私有栈才记）：万一"静默"没生效，就用它兜底摘掉我们那条、并复原 redo 栈
+      var unitId = ''; try { unitId = fin_unitId(); } catch(e){}
+      var stk = null, stkLen = -1, stkTop = null, redoSnap = null;
+      try {
+        if (unitId && typeof ur._getUndoStack === 'function'){
+          stk = ur._getUndoStack(unitId) || null;
+          if (stk){ stkLen = stk.length; stkTop = stk.length ? stk[stk.length - 1] : null; }
+        }
+        if (unitId && typeof ur._getRedoStack === 'function'){
+          var _r0 = ur._getRedoStack(unitId) || null;
+          if (_r0 && _r0.length) redoSnap = _r0.slice();
+        }
+      } catch(e){ stk = null; }
+      // 把 pushUndoRedo 换成空函数（备份原始实现 + 它原本是自有属性还是原型方法）
+      var hadOwn = false, orig = null, muted = false;
+      try {
+        orig = ur.pushUndoRedo;
+        hadOwn = Object.prototype.hasOwnProperty.call(ur, 'pushUndoRedo');
+        ur.pushUndoRedo = function(){};
+        muted = (ur.pushUndoRedo !== orig);     // 只读属性会赋值失败 → 退回"事后摘除"兜底
+      } catch(e){ muted = false; }
+      if (!muted && !stk){
+        try { return finUniverAPI.executeCommand(cmdId, params); } catch(e){ return null; }
+      }
+      if (muted) fin_undoMute = 1;
+      if (!fin_undoCleanDiag){
+        fin_undoCleanDiag = true;
+        console.log('[fin] undo-clean 已启用（内部写入不进撤销栈、也不清重做栈） muted=' + muted +
+                    ' hasStack=' + !!stk + ' unit=' + unitId);
+      }
+      var out = null, failed = false;
+      try { out = finUniverAPI.executeCommand(cmdId, params); }
+      catch(e){ failed = true; }
+      var releaseMute = function(){
+        if (muted && fin_undoMute > 0){
+          fin_undoMute = 0;
+          try {
+            if (hadOwn) ur.pushUndoRedo = orig;
+            else delete ur.pushUndoRedo;
+          } catch(e){ try { ur.pushUndoRedo = orig; } catch(_e){} }
+        }
+      };
+      // ★硬上限：即便因为某种原因命令的 Promise 一直不落地，也必须在 1.5s 内把静默窗口放掉，
+      //   否则 pushUndoRedo 会永久被掏空 → 撤销栈冻结 → 「撤销按钮不工作」。
+      var capFired = false;
+      var capId = setTimeout(function(){ capFired = true; releaseMute(); }, 1500);
+      var finish = function(){
+        if (capId){ clearTimeout(capId); capId = null; }
+        releaseMute();
+        if (capFired) return;      // 已由硬上限放掉：不再动撤销栈（避免延迟后误摘用户自己的记录）
+        // 兜底自检：万一静默没生效（只读属性 / 拿到的是别的实例 …），就把我们新增的那条撤销记录摘掉，
+        // 并把被它清空的 redo 栈原样复原 —— 保证「撤销 / 重做」都不因我们的内部写入而失灵。
+        try {
+          if (!stk) return;
+          var removed = false, guard = 0;
+          while (stk.length > stkLen && guard++ < 5 && stk[stk.length - 1] !== stkTop){ stk.pop(); removed = true; }
+          if (!removed) return;
+          if (redoSnap && typeof ur._getRedoStack === 'function'){
+            var rk = ur._getRedoStack(unitId) || null;
+            if (rk && !rk.length){ for (var i = 0; i < redoSnap.length; i++) rk.push(redoSnap[i]); }
+          }
+          if (typeof ur._updateStatus === 'function') ur._updateStatus();
+        } catch(e){}
+      };
+      if (failed){ finish(); return null; }
+      // 入栈发生在命令的微任务里，所以必须等一个宏任务再恢复；期间兄弟写入的入栈一并被吞掉。
+      if (out && typeof out.then === 'function'){
+        return out.then(function(v){ setTimeout(finish, 0); return v; },
+                        function(err){ setTimeout(finish, 0); throw err; });
+      }
+      setTimeout(finish, 0);
+      return out;
+    }
+    /* ★Univer 的输入解析按 en-US 习惯（月-日-年）办事：
+       用户敲 "11-10-2026"，它当成 11月10日 → 序列号 46336，显示出来就是 10-11-2026。
+       它是在【解析之后】才通知我们（命令里只剩序列号，onBeforeCommandExecuted 也拿不到原文），
+       所以必须在提交前把编辑器里的原文抓下来，随后按 dd-mm-yyyy 重新解释并覆盖。
+       （FIN-DATE-INPUT-20261012） */
+    var finLastTyped = null;
+    /* ★原文在哪里？——实测（_pw_edom_out.txt / _pw_doc_read2_out.txt）：Univer 0.5.5 的单元格编辑器是
+       canvas 渲染（.univer-editor 的 innerHTML/textContent 恒为空，容器里只有一个 height:0 的
+       univer-render-canvas），所以【DOM 里读不到用户敲的原文】——第一版就是栽在这。
+       原文只存在于内部 doc 单元里（开始编辑那一刻创建）：
+         unitId = '__INTERNAL_EDITOR__DOCS_NORMAL'（单元格） / '..._DOCS_FORMULA_BAR'（公式栏）
+       取法：finUniver.__getInjector().get(IUniverInstanceService).getUnit(id).getSnapshot().body.dataStream
+       （dataStream 恒以 \r\n 结尾）。 */
+    function fin_editorRawText(){
+      try {
+        if (!finUniver || typeof finUniver.__getInjector !== 'function') return '';
+        var IS = window.finPresets && window.finPresets.IUniverInstanceService;
+        if (!IS) return '';
+        var svc = finUniver.__getInjector().get(IS);
+        if (!svc || typeof svc.getUnit !== 'function') return '';
+        var ids = ['__INTERNAL_EDITOR__DOCS_NORMAL', '__INTERNAL_EDITOR__DOCS_FORMULA_BAR'];
+        for (var i = 0; i < ids.length; i++){
+          var u = null;
+          try { u = svc.getUnit(ids[i]); } catch(e){ u = null; }
+          if (!u) continue;
+          var sn = null;
+          try { sn = u.getSnapshot(); } catch(e){ sn = null; }
+          var s = (sn && sn.body && sn.body.dataStream) ? String(sn.body.dataStream) : '';
+          if (s) return s.replace(/[\r\n]+$/, '');
+        }
+      } catch(e){}
+      return '';
+    }
+    /* 当前活动工作表 id。
+       ★不能再用 fin_curSheetId()：它返回 finLastSnapshot.sheetOrder[0]（永远是第一张表），
+       而改动是 fin_scanEdits() 按真实 sid 报上来的（用户在第 8 张表里改日期 → 'sheet_8'），
+       两边对不上 → finLastTyped 直接被丢掉，日期修正等于没做。 */
+    function fin_activeSheetId(){
+      try {
+        var wb = finUniverAPI && finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+        var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+        var id = sh && sh.getSheetId && sh.getSheetId();
+        if (id) return id;
+      } catch(e){}
+      try { return fin_curSheetId(); } catch(e){ return null; }
+    }
+    /* ★必须"逐键"抓，不能只等回车那一刻再抓：
+       Univer 自己的键盘监听注册得比我们早，同一个 window 捕获阶段里它先跑 —— 回车键一到，
+       它就先提交并销毁内部 doc 单元，我们再去 getUnit() 已经是 null，原文照样拿不到（实测）。
+       敲字/退格时抓是安全的：那时单元一定存在，而且抓的是"当前完整文本"。
+       用 keydown + keyup 双保险，避免监听先后顺序导致漏掉最后敲的那个字符。 */
+    function fin_captureTypedNow(){
+      try {
+        var t = String(fin_editorRawText() || '').trim();
+        if (!t || t.length > 40) return;          // 编辑器没开/已提交（空）→ 保留上一次
+        var ac = null;
+        try { ac = finActiveCell(); } catch(e){}
+        finLastTyped = { text: t, at: Date.now(),
+                         sid: fin_activeSheetId(),
+                         r: (ac ? ac.row : null), c: (ac ? ac.col : null) };
+      } catch(e){}
+    }
+    function fin_bindTypedDateCapture(){
+      if (window.__finTypedBound) return;
+      window.__finTypedBound = true;
+      var pick = function(ev){
+        try {
+          var k = ev.key;
+          var typing = (k && k.length === 1) || k === 'Backspace' || k === 'Delete';
+          if (!typing) return;                    // 回车/Tab/方向键等不管：那一刻已被 Univer 抢先提交
+          fin_captureTypedNow();
+        } catch(e){}
+      };
+      window.addEventListener('keydown', pick, true);
+      window.addEventListener('keyup', pick, true);
+    }
+    /* 日期强制规范化（用户输入当下就做，不等按钮）：
+       ① 文本日期（含 yyyy-mm-dd / dd-mm-yy 等）→ 真日期序列号；
+       ② 日期格一律 dd-mm-yyyy 数字格式（小写！大写 DD-MM-YYYY 不被 numfmt 认）。 */
+    function fin_fixDateCell(sid, r, c){
+      try {
+        var snap = fin_currentSnapshot();
+        var sh = snap && snap.sheets && snap.sheets[sid];
+        if (!sh) return false;
+        var row = (sh.cellData || {})[String(r)];
+        var cell = row && row[String(c)];
+        if (!cell) return false;
+        var v = cell.v;
+        var dateCols = fin_dateHeaderCols(sh);
+        var isDateCol = (c === 0) || !!dateCols[c];
+        var serial = null;
+        // ★① 先看"用户字面输入"：以 dd-mm-yyyy 为准（修正 Univer 的 m/d/y 误判）
+        if (finLastTyped && finLastTyped.text && (Date.now() - finLastTyped.at) < 8000
+            && (finLastTyped.sid == null || String(finLastTyped.sid) === String(sid))){
+          var mine = fin_parseDateText(finLastTyped.text);
+          var swap = fin_parseDateText(finLastTyped.text, true);   // Univer 按美式读会得到什么
+          var sameCell = (finLastTyped.r == null) || (finLastTyped.r === r && finLastTyped.c === c);
+          // 采纳条件（任一即可，且必须是"日期文本"）：
+          //   a) 位置一致（正常路径）；或
+          //   b) 铁证：单元格里的数字恰好等于该文本的「月-日-年」误读值 → 必是 Univer 误判，纠正它。
+          //      （b 是为了不依赖 finActiveCell() 的行列号：它在编辑态下未必可靠。）
+          if (mine != null && (sameCell || (typeof v === 'number' && swap != null && swap === v))){
+            serial = mine;
+            finLastTyped = null;
+          }
+        }
+        if (serial == null){
+          if (typeof v === 'string'){
+            serial = fin_parseDateText(v);
+          } else if (typeof v === 'object' && v && typeof v.getTime === 'function'){
+            var s0 = Math.round(v.getTime() / 86400000) + 25569;
+            if (fin_isDateSerial(s0)) serial = s0;
+          } else if (typeof v === 'number' && isDateCol && fin_isDateSerial(v)){
+            serial = v;
+          }
+        }
+        if (serial == null) return false;
+        var unitId = fin_unitId();
+        var m = {}; m[String(r)] = {};
+        m[String(r)][String(c)] = { v: serial, t: 2, s: { n: { pattern: 'dd-mm-yyyy' } } };
+        finEditSuppress++;
+        try {
+          finExecSilent('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: m });
+          finExecSilent('sheet.command.numfmt.set.numfmt', {
+            unitId: unitId, subUnitId: sid, values: [{ row: r, col: c, pattern: 'dd-mm-yyyy' }] });
+        } finally { finEditSuppress--; finEditQuietUntil = Date.now() + 250; }
+        console.log('[fin] 日期规范化 r' + r + ' c' + c + ' -> ' + serial);
+        return true;
+      } catch(e){ console.warn('[fin] fixDateCell', e); return false; }
+    }
+    /* ★语言切换时必须"留在用户正在看的那张表"（FIN-KEEP-SHEET-20261012）：
+       重建显示单元后，Univer 默认回到第一张表 —— 用户切语言就被弹回「汇总」。
+       这里先记下当前活动表（sheetId 在三语间不变，我们只改 name）+ 滚动位置 + 选区，
+       重建完再恢复。 */
+    function fin_captureSheetState(){
+      try {
+        var wb = finUniverAPI && finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+        var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+        if (!sh) return null;
+        var st = { sid: null, scroll: null, range: null };
+        try { st.sid = sh.getSheetId ? sh.getSheetId() : null; } catch(e){}
+        // ★行/列滚动位置：三语视图的列布局完全一致（都是 A–J），所以坐标可以 1:1 还原
+        try { st.scroll = finScrollState(); } catch(e){}
+        try {
+          var r = sh.getActiveRange && sh.getActiveRange();
+          if (r && r.getRange) st.range = r.getRange();
+        } catch(e){}
+        return st.sid ? st : null;
+      } catch(e){ return null; }
+    }
+    function fin_restoreSheetState(st){
+      if (!st) return;
+      try {
+        if (st.sid){
+          var wb = finUniverAPI && finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+          var cur = wb && wb.getActiveSheet && wb.getActiveSheet();
+          if (!cur || cur.getSheetId() !== st.sid) wb.setActiveSheet(st.sid);
+        }
+        // ★把滚动位置精确还原（finScrollTo 的语义 = 让该行列落在视口左上角）
+        if (st.scroll) finScrollTo(st.scroll.row, st.scroll.col);
+        try {
+          var sh2 = wb.getActiveSheet && wb.getActiveSheet();
+          if (st.range && sh2 && sh2.getRange){
+            var rg = sh2.getRange(st.range.startRow, st.range.startColumn,
+                                  Math.max(1, (st.range.endRow - st.range.startRow + 1)),
+                                  Math.max(1, (st.range.endColumn - st.range.startColumn + 1)));
+            if (rg && rg.activate) rg.activate();
+          }
+        } catch(e){}
+      } catch(e){ console.warn('[fin] restoreSheetState', e); }
+    }
+    /* 用当前语言重建显示单元（语言切换时调用；只读快照，不写盘）。
+       ★v2：base 用【当前显示快照】而不是原始快照 —— 用户在表格里改的/加的记录会被带过去，
+       不会像以前那样一切语言就"回到文件原样"（那是"新增记录没翻译"的根因之一）；
+       同时先记下活动表 + 滚动位置，重建后精确还原（FIN-KEEP-SHEET-20261012）。 */
+    function fin_applyLangView(){
+      if (!finLastSnapshot || !finUniver) return;
+      try {
+        var UNIT_SHEET = (finPresets && finPresets.UniverInstanceType && finPresets.UniverInstanceType.UNIVER_SHEET) || 2;
+        var base = null;
+        try { base = fin_currentSnapshot(); } catch(e){}
+        if (!base) base = finLastView || finLastSnapshot;
+        var keep = fin_captureSheetState();        // ★先记下"用户正在看的表 + 滚动位置"
+        var snapshot = fin_buildLangView(base, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
+        finLastView = snapshot;
+        finLoading = true;
+        try {
+          fin_disposeUnit();
+          finHiState = {};   // 旧单元已销毁：清掉旧高亮坐标（列已裁到 0..9，旧坐标可能越界）
+          finSheet = finUniver.createUnit(UNIT_SHEET, snapshot);
+        }
+        finally { finLoading = false; }
+        finReady = true;
+        fin_bindEdits();
+        fin_captureEditBase();
+        // ★恢复"表 + 滚动位置"：多补几次，防止首帧渲染后又跳回顶部/第一张表
+        var restore = function(){ try { fin_restoreSheetState(keep); } catch(e){} };
+        restore();
+        setTimeout(restore, 80);
+        setTimeout(restore, 260);
+        setTimeout(restore, 620);
+        setTimeout(function(){ try { fin_normalizeDates(snapshot); } catch(e){} }, 400);
+        setTimeout(function(){ try { fin_captureEditBase(); } catch(e){} }, 900);
+        setTimeout(function(){ try { finHiRecompute(); } catch(e){} }, 1000);
+        // ★重建后重放当前选中的币种（含默认 VND）：保证所有工作表都带正确的货币符号
+        setTimeout(function(){ try { fin_reapplyCurrency(true); } catch(e){} }, 1200);
+      } catch(e){ console.warn('[fin] applyLangView failed', e); }
+    }
+    /* 每次新建显示单元后都要重新绑定"单元格改数据"监听（sheet 对象是新的） */
+    var finEditsBound = false;
+    function fin_bindEdits(){
+      if (!finUniverAPI || !finUniverAPI.getActiveWorkbook) return;
+      try { fin_bindTypedDateCapture(); } catch(e){}
+      try {
+        var wb = finUniverAPI.getActiveWorkbook();
+        var sheets = (wb && wb.getSheets && wb.getSheets()) || [];
+        for (var i = 0; i < sheets.length; i++){
+          (function(sh){
+            try {
+              if (!sh || !sh.onCellDataChange) return;
+              sh.onCellDataChange(function(){ fin_scheduleEditScan(); });
+            } catch(e){}
+          })(sheets[i]);
+        }
+        // 兜底轮询：有些改动路径不发事件
+        if (!finEditPollTimer){
+          finEditPollTimer = setInterval(function(){
+            if (document.hidden || !finReady || !finSheet) return;
+            try { fin_scanEdits(); } catch(e){}
+          }, 1200);
+        }
+        finEditsBound = true;
+      } catch(e){ console.warn('[fin] bindEdits', e); }
+    }
+    // 语言切换 → 重建财务显示（只读，安全）
+    window.addEventListener('app:langchange', function(){
+      try {
+        if (!finReady || !finLastSnapshot) return;
+        fin_loadSheetTitles().then(function(){ fin_applyLangView(); });
+      } catch(e){ console.warn('[fin] langchange', e); }
+    });
+    // 调试/自检用钩子（与 finHiForceRecompute 同一风格）
+    window.finApplyLangView = fin_applyLangView;
+    window.finBuildLangView = fin_buildLangView;
+    window.finSetSheetTitles = function(o){ finSheetTitles = o || {}; finTitlesLoaded = true; return finSheetTitles; };
+
+    /* ★财务页后台预热（FIN-PREWARM）：登录后在后台就把 Univer 引擎装起来。
+       ★为什么需要：整页加载后首次打开财务页要 6.9~7.4s（20 份模块图 + createUniver + 插件装配），
+       而且这段耗时是【CPU 密集】——连浏览器缓存全命中也是同样的时间（实测冷启动 6.9s / 纯缓存 7.4s），
+       所以本地化 vendor 收益有限；真正有效的是把这段耗时提前到「用户还在别处操作时」。
+       引擎一旦装好，会话内再切回财务页只要 0.02s，点「财务管理」就只剩加载快照。
+       配合 CSS 的 #view-finance.fin-prewarm：以真实尺寸离屏渲染（Univer 必须量得到容器大小，
+       而 .view 默认 display:none 是 0×0，会让布局量不到）。
+       ★不影响任何锁死契约：引擎装配入口仍是 fin_initUniver()，FIN-EXCEL-KEYS 的绑定时机不变。 */
+    var FIN_PREWARM_ON = true;
+    function fin_prewarmIdle(){
+      try {
+        if (!FIN_PREWARM_ON) return;
+        if (window.__FIN_PREWARM_STARTED) return;                    // 只预热一次
+        if (typeof fin_initUniver !== 'function') return;
+        var v = document.getElementById('view-finance');
+        if (!v) return;
+        if (typeof viewAllowed === 'function' && !viewAllowed('finance')) return;   // 没权限就别浪费
+        window.__FIN_PREWARM_STARTED = true;
+        v.classList.add('fin-prewarm');
+        var done = function(){
+          try { v.classList.remove('fin-prewarm'); } catch(e){}
+          window.__FIN_PREWARM_DONE = true;
+        };
+        Promise.resolve().then(function(){ return fin_initUniver(); }).then(done, done);
+      } catch(e){
+        try { document.getElementById('view-finance').classList.remove('fin-prewarm'); } catch(e2){}
+        try { console.warn('[fin-prewarm] 预热失败（不影响正常使用）', e); } catch(e3){}
+      }
+    }
+
+/* ===== FIN-EXCEL-KEYS：Excel 键盘行为补丁（与 _univer_kb_fix.html 保持同一份实现，勿删）
+       实现/验证记录见补丁头部注释；任何重构都不得删除本补丁或其调用。 ===== */
+    /* =========================================================================
+       ★ Excel 键盘行为补丁（FIN-EXCEL-KEYS）—— 与 choice_lite.html 中保持同一份实现
+       这里的 finUniverAPI 在测试页里用 window.api 兜底
+       ========================================================================= */
+
+    /* ===================== ★ 锁死区 ★ FIN-EXCEL-KEYS-LOCK-20261011 =====================
+       本补丁的契约常量 + 【行为级】自检。
+       ★任何重构都不得删除、改名或弱化本区块，也不得移除 finExcelKeysBind() 末尾对
+         finExcelKeysLockCheck() 的调用。
+       为什么需要：本补丁每条规则都建立在「实测得来」的前提上（见下面各 ★ 注释），前提一旦
+       被重构掉，症状是「Excel 手感又坏了」，但代码看起来依旧完整 —— 静态扫描发现不了，
+       所以这里在运行时真的验证一遍：函数是否都在、接线是否成立、行列数/画布是否可取得。
+       自检只报错（console.error + window.__FIN_EXCEL_KEYS_LOCK_FAILED），不抛异常、
+       不影响表格使用。静态硬锁见仓库根 check_fin_excel_keys_lock.py + .githooks/pre-commit。
+       ================================================================================== */
+    var FIN_EXCEL_KEYS_LOCK = {
+      id: 'FIN-EXCEL-KEYS-LOCK-20261011',
+      captureOnWindow: true,    /* 必须挂 window 捕获阶段：挂 document 会被 Univer 抢先 */
+      editDeleteRight: true,    /* 编辑态 Delete = 删除光标右侧字符 */
+      sheetSizeOnly: true,      /* 边界唯一来源 finSheetSize()，不得回退 getMaxRows() */
+      snapshotBase: true,       /* Ctrl+方向键基准 = 「按键之前」的快照 finPrevCur */
+      neverSwallow: true,       /* 算不出边界 / 量不到行数一律交回 Univer，绝不吞键 */
+      boundFlag: '__finExcelKeysBound'
+    };
+
+    function finExcelKeysLockCheck(){
+      var bad = [], warn = [];
+      try {
+        var need = {
+          finExcelKeysBind: typeof finExcelKeysBind,
+          finAPI: typeof finAPI,
+          finSheetObj: typeof finSheetObj,
+          finIsEditingCell: typeof finIsEditingCell,
+          finActiveCell: typeof finActiveCell,
+          finVisibleRange: typeof finVisibleRange,
+          finScrollState: typeof finScrollState,
+          finScrollTo: typeof finScrollTo,
+          finScrollToSoon: typeof finScrollToSoon,
+          finEnsureVisible: typeof finEnsureVisible,
+          finLastUsedCell: typeof finLastUsedCell,
+          finRowLastCol: typeof finRowLastCol,
+          finSheetSize: typeof finSheetSize,
+          finGridCanvas: typeof finGridCanvas,
+          finPageRows: typeof finPageRows,
+          finGotoCell: typeof finGotoCell,
+          finDataEdge: typeof finDataEdge,
+          finRememberCur: typeof finRememberCur,
+          finRememberSoon: typeof finRememberSoon,
+          finContainer: typeof finContainer
+        };
+        for (var k in need) { if (need[k] !== 'function') bad.push(k + ' 缺失'); }
+        if (window[FIN_EXCEL_KEYS_LOCK.boundFlag] !== true) bad.push('未绑定（__finExcelKeysBound !== true）');
+        if (FIN_EXCEL_KEYS_LOCK.id !== 'FIN-EXCEL-KEYS-LOCK-20261011') bad.push('契约常量 id 被改动');
+        /* 有工作表才校验行列数；绑定时机早于 createUnit，无表时跳过（不误报） */
+        try {
+          var sz = finSheetSize();
+          if (sz && (!(sz.rows > 0) || !(sz.cols > 0))) bad.push('finSheetSize() 异常: ' + JSON.stringify(sz));
+        } catch(e1){ bad.push('finSheetSize() 抛错: ' + e1); }
+        try {
+          var c = finContainer();
+          if (c && c.offsetHeight && !finGridCanvas()) warn.push('取不到主表格画布（PageUp/PageDown 可能失效）');
+        } catch(e2){ warn.push('finGridCanvas() 抛错: ' + e2); }
+      } catch(e){ bad.push('自检自身抛错: ' + e); }
+      if (warn.length) { try { console.warn('[fin-keys] 锁死区告警：' + warn.join('；')); } catch(e5){} }
+      if (bad.length) {
+        window.__FIN_EXCEL_KEYS_LOCK_FAILED = bad.slice();
+        try { console.error('✗ [FIN-EXCEL-KEYS-LOCK] 锁死区自检未通过：' + bad.join('；')); } catch(e3){}
+        return false;
+      }
+      window.__FIN_EXCEL_KEYS_LOCK_OK = true;
+      try { console.log('%c[fin-keys] 锁死区自检通过 FIN-EXCEL-KEYS-LOCK-20261011', 'color:#0a0;font-weight:bold'); } catch(e4){}
+      return true;
+    }
+
+    function finAPI(){ try { return (typeof finUniverAPI !== 'undefined' && finUniverAPI) ? finUniverAPI : (window.finUniverAPI || window.api); } catch(e){ return window.api; } }
+
+    function finSheetObj(){
+      try { var a = finAPI(); var wb = a && a.getActiveWorkbook && a.getActiveWorkbook(); return (wb && wb.getActiveSheet) ? wb.getActiveSheet() : null; } catch(e){ return null; }
+    }
+
+    /* 是否正在编辑单元格。
+       ★不能看 document.activeElement：Univer 的输入宿主 .univer-editor 在非编辑态也是 activeElement（实测）。
+       可靠判据：单元格编辑覆盖层 .univer-editor-container 的尺寸 —— 空闲时约 2×2，进入编辑后变成单元格大小（如 90×26）。 */
+    function finIsEditingCell(){
+      try {
+        var boxes = document.querySelectorAll('.univer-editor-container');
+        for (var i = 0; i < boxes.length; i++) {
+          var r = boxes[i].getBoundingClientRect();
+          if (r.width > 10 && r.height > 10) return true;
+        }
+      } catch(e){}
+      return false;
+    }
+
+    function finActiveCell(){
+      try {
+        var sh = finSheetObj(); if (!sh) return null;
+        var sel = sh.getSelection && sh.getSelection();
+        var ar = sel && sel.getActiveRange && sel.getActiveRange();
+        if (!ar) return null;
+        return { row: ar.getRow(), col: ar.getColumn() };
+      } catch(e){ return null; }
+    }
+
+    /* 可见区（兼容两种返回：FRange 门面 / 纯 {startRow,endRow,...} 对象，实测两者都出现过） */
+    function finVisibleRange(){
+      try {
+        var sh = finSheetObj(); if (!sh) return null;
+        var vr = sh.getVisibleRange && sh.getVisibleRange();
+        if (!vr) return null;
+        if (typeof vr.startRow === 'number' && typeof vr.endRow === 'number') {
+          return { startRow: vr.startRow, endRow: vr.endRow, startColumn: vr.startColumn, endColumn: vr.endColumn };
+        }
+        if (vr.getRow && vr.getNumRows) {
+          var r0 = vr.getRow(), c0 = vr.getColumn();
+          return { startRow: r0, endRow: r0 + vr.getNumRows() - 1,
+                   startColumn: c0, endColumn: c0 + vr.getNumColumns() - 1 };
+        }
+      } catch(e){}
+      return null;
+    }
+
+    /* 当前滚动位置（视口左上角落在哪一行/列） */
+    function finScrollState(){
+      try {
+        var sh = finSheetObj(); if (!sh || !sh.getScrollState) return null;
+        var s = sh.getScrollState();
+        if (!s) return null;
+        return { row: s.sheetViewStartRow || 0, col: s.sheetViewStartColumn || 0 };
+      } catch(e){ return null; }
+    }
+
+    /* 滚动到「让 startRow/startCol 落在视口左上角」。
+       实测 scrollToCell(n, m) 的语义就是把第 n 行/第 m 列顶到视口左上角（并自动夹紧到边界），
+       因此可以用它实现 Excel 的「最小滚动」。 */
+    function finScrollTo(startRow, startCol){
+      try {
+        var sh = finSheetObj(); if (!sh || !sh.scrollToCell) return false;
+        if (startRow < 0) startRow = 0;
+        if (startCol < 0) startCol = 0;
+        sh.scrollToCell(startRow, startCol);
+        return true;
+      } catch(e){ return false; }
+    }
+
+    /* ★Excel 的「选区跟随滚动」：选区出了可见区才滚，且只滚到刚好露出来（不把单元格顶到最上面）。
+       ★为什么必须自己做：真实财务报表页（choice_lite.html → #univer_container，带 filter/sort 插件、
+       容器 overflow:visible）里 Univer 0.5.5 的方向键【完全不会】把选区带进视野 —— 实测按住 ↓ 一路走到
+       第 26 行，scrollState 始终 [0,0]、可见区始终 0..14，选中的格子早就跑到屏幕外看不见了。
+       而在另建的极简验证床上同一个版本是会滚的，说明这是宿主环境差异，不能指望 Univer 自己修好。
+       这里统一在按键之后补一次「最小滚动」，让两个宿主表现一致（Excel 行为）。 */
+    function finEnsureVisible(){
+      try {
+        var cur = finActiveCell(); if (!cur) return;
+        var vr = finVisibleRange(); if (!vr) return;
+        var ss = finScrollState(); if (!ss) return;
+        var nsr = ss.row, nsc = ss.col;
+        if (cur.row > vr.endRow) nsr = ss.row + (cur.row - vr.endRow);
+        else if (cur.row < vr.startRow) nsr = ss.row - (vr.startRow - cur.row);
+        if (typeof vr.endColumn === 'number') {
+          if (cur.col > vr.endColumn) nsc = ss.col + (cur.col - vr.endColumn);
+          else if (cur.col < vr.startColumn) nsc = ss.col - (vr.startColumn - cur.col);
+        }
+        if (nsr < 0) nsr = 0;
+        if (nsc < 0) nsc = 0;
+        if (nsr !== ss.row || nsc !== ss.col) finScrollTo(nsr, nsc);
+      } catch(e){}
+    }
+
+    function finIsDateSerialish(x){ return typeof x === 'number' && isFinite(x); }
+
+    /* 取得"最后一个有内容的单元格"（Ctrl+End），Excel 语义。
+       ★不能拿 getDataRange() 的行列数去推：Univer 0.5.5 的 getDataRange() 总是从 A1 开始，
+       且 FRange 上【没有】getNumRows/getNumColumns/getRowCount/getColumnCount（实测全 undefined），
+       旧写法会一路兜底成 1×1，于是 Ctrl+End 永远停在 A1（实测 act=[0,0]）。
+       正确来源是 Worksheet 门面上的 getLastRow()/getLastColumn()（实测 60/1 正确）。*/
+    function finLastUsedCell(){
+      try {
+        var sh = finSheetObj(); if (!sh) return null;
+        var lr = (typeof sh.getLastRow === 'function') ? sh.getLastRow() : null;
+        var lc = (typeof sh.getLastColumn === 'function') ? sh.getLastColumn() : null;
+        if (typeof lr === 'number' && typeof lc === 'number' && lr >= 0 && lc >= 0) {
+          return { row: lr, col: lc };
+        }
+        /* 兜底：在 getDataRange() 的值矩阵里从右下往上找最后一个非空格 */
+        var rng = sh.getDataRange && sh.getDataRange();
+        if (!rng || !rng.getValues) return null;
+        var v = rng.getValues(); if (!v || !v.length) return null;
+        var r0 = rng.getRow ? rng.getRow() : 0, c0 = rng.getColumn ? rng.getColumn() : 0;
+        for (var i = v.length - 1; i >= 0; i--) {
+          var row = v[i] || [];
+          for (var j = row.length - 1; j >= 0; j--) {
+            var val = row[j];
+            if (val !== null && val !== undefined && val !== '') return { row: r0 + i, col: c0 + j };
+          }
+        }
+        return null;
+      } catch(e){ return null; }
+    }
+
+    /* 某一行的最后一个有内容的列（End 键；Excel 语义：本行最右边有数据的格子） */
+    function finRowLastCol(row){
+      try {
+        var sh = finSheetObj(); if (!sh) return 0;
+        var maxC = (typeof sh.getMaxColumns === 'function') ? sh.getMaxColumns() : 0;
+        var lastC = (typeof sh.getLastColumn === 'function') ? sh.getLastColumn() : 0;
+        if (maxC > 0 && lastC > maxC - 1) lastC = maxC - 1;
+        if (lastC <= 0) return 0;
+        var vals = sh.getRange(row, 0, 1, lastC + 1).getValues();
+        var r = vals && vals[0]; if (!r) return 0;
+        for (var c = r.length - 1; c >= 0; c--) {
+          var v = r[c];
+          if (v !== null && v !== undefined && v !== '') return c;
+        }
+      } catch(e){}
+      return 0;
+    }
+
+    /* 表格总行/列数（边界判定的唯一来源）。
+       ★不能只用 getMaxRows()/getMaxColumns()：实测真实财务报表里 getMaxRows() 返回 42，
+         而 getLastRow() 是 43（xlsx→快照时 rowCount 没跟着数据一起更新）。
+         拿它当边界会把光标卡在第 41 行、最后几行永远走不到。
+         所以取「声明行列数」与「最后一个有数据的行列 + 1」中的较大值。 */
+    function finSheetSize(){
+      try {
+        var sh = finSheetObj(); if (!sh) return null;
+        var r = (sh.getMaxRows ? sh.getMaxRows() : 0) || 0;
+        var c = (sh.getMaxColumns ? sh.getMaxColumns() : 0) || 0;
+        try {
+          var lr = (typeof sh.getLastRow === 'function') ? sh.getLastRow() : -1;
+          var lc = (typeof sh.getLastColumn === 'function') ? sh.getLastColumn() : -1;
+          if (typeof lr === 'number' && lr >= 0) r = Math.max(r, lr + 1);
+          if (typeof lc === 'number' && lc >= 0) c = Math.max(c, lc + 1);
+        } catch(e2){}
+        return { rows: r, cols: c };
+      } catch(e){ return null; }
+    }
+
+    /* 取"主表格画布"。
+       ★不能直接用 document.querySelector('.univer-render-canvas')：DOM 里第一个匹配的是
+       公式栏里的小画布（实测 888×27，父节点 .univer-sheet-embedding-formula-editor-text），
+       拿它算不出可见行数（曾导致 finPageRows() 返回 0、PageUp/PageDown 完全不生效）。
+       主表格画布是 .univer-workbench-container-canvas 里的那块（实测 1098×323 / 真实报表 1380×561）。 */
+    function finGridCanvas(){
+      try {
+        var cv = document.querySelector('.univer-workbench-container-canvas canvas.univer-render-canvas');
+        if (cv && cv.getBoundingClientRect().height > 60) return cv;
+        /* 兜底：排除公式栏内的小画布，取最高的一块 */
+        var all = document.querySelectorAll('canvas.univer-render-canvas');
+        var best = null, bestH = 0;
+        for (var i = 0; i < all.length; i++) {
+          var el = all[i];
+          if (el.closest && el.closest('.univer-sheet-embedding-formula-editor')) continue;
+          var r = el.getBoundingClientRect();
+          if (r.height > bestH) { bestH = r.height; best = el; }
+        }
+        return (best && bestH > 60) ? best : null;
+      } catch(e){ return null; }
+    }
+
+    /* 一屏能显示多少行（用于 PageUp/PageDown；取不到就返回 0 = 不接管） */
+    function finPageRows(){
+      try {
+        var vr = finVisibleRange();
+        if (vr && typeof vr.endRow === 'number') {
+          var n = vr.endRow - vr.startRow;      // Excel：PageDown 走「可见行数 - 1」行
+          if (n >= 1) return n;
+        }
+        var cv = finGridCanvas();
+        if (!cv) return 0;
+        var h = cv.getBoundingClientRect().height;
+        if (!h || h < 60) return 0;
+        var rowH = 24;   // Univer 0.5.5 默认行高（实测：y=61 起、每行 24px）
+        try {
+          var sh = finSheetObj();
+          var cur = finActiveCell();
+          var ws = sh && sh.getSheet && sh.getSheet();
+          var rd = (ws && ws.getRowData && cur) ? ws.getRowData(cur.row) : null;
+          if (rd && rd.h) rowH = rd.h;
+        } catch(e){}
+        return Math.max(2, Math.floor((h - 26) / rowH) - 1);
+      } catch(e){ return 0; }
+    }
+
+    /* 跳到某格：activate() 换掉选区。不主动滚动，由 finEnsureVisible() 统一按 Excel 语义补最小滚动 */
+    function finGotoCell(row, col){
+      try {
+        var sh = finSheetObj(); if (!sh) return false;
+        var sz = finSheetSize() || {};
+        var maxR = sz.rows || 100000;
+        var maxC = sz.cols || 200;
+        if (row < 0) row = 0;
+        if (col < 0) col = 0;
+        if (row > maxR - 1) row = maxR - 1;
+        if (col > maxC - 1) col = maxC - 1;
+        var rng = sh.getRange(row, col);
+        if (rng && rng.activate) rng.activate();
+        else if (sh.setActiveRange) sh.setActiveRange(rng);
+        finRememberCur({ row: row, col: col });     /* 主动跳格后同步快照 */
+        return true;
+      } catch(e){ return false; }
+    }
+
+    /* ★Ctrl+方向键：跳到「数据边界」（Excel 语义）。
+       实测 Univer 原生只做到「本块末尾」，再按一次直接跳到整表最后一行/列，跨过空档不会停在下一块数据上。
+       这里按 Excel 规则自己算：邻格有内容 → 跳到本连续块的最后一个；邻格为空 → 跳到该方向上下一个非空格；
+       该方向再无数据 → 跳到整表最后一行/列。扫描范围超过 MAXSCAN 就放弃（交回 Univer 原生），避免大表卡死。 */
+    var FIN_EDGE_SCAN = 4000;
+    function finDataEdge(dr, dc, base){
+      try {
+        var sh = finSheetObj(); if (!sh) return null;
+        var cur = base || finActiveCell(); if (!cur) return null;
+        var maxR = (sh.getMaxRows ? sh.getMaxRows() : 1) - 1;
+        var maxC = (sh.getMaxColumns ? sh.getMaxColumns() : 1) - 1;
+        var isV = (dr !== 0);
+        var limit = isV ? maxR : maxC;
+        var from = isV ? cur.row : cur.col;
+        var fixed = isV ? cur.col : cur.row;
+        var dir = isV ? dr : dc;
+        /* 逐格取"是否有值" */
+        var step = dir > 0 ? 1 : -1;
+        function hasAt(i){
+          try {
+            var rng = isV ? sh.getRange(i, fixed) : sh.getRange(fixed, i);
+            var v = rng && rng.getValue ? rng.getValue() : null;
+            return !(v === null || v === undefined || v === '');
+          } catch(e){ return false; }
+        }
+        var scanned = 0;
+        var i = from + step;
+        if (i < 0 || i > limit) return null;
+        var neighborHas = hasAt(i);
+        var last = null;
+        while (i >= 0 && i <= limit && scanned < FIN_EDGE_SCAN) {
+          scanned++;
+          var has = hasAt(i);
+          if (neighborHas) {
+            if (!has) break;               /* 连续块到头 */
+            last = i;
+          } else {
+            if (has) { last = i; break; }  /* 跨过空档后的下一块数据 */
+          }
+          i += step;
+        }
+        if (scanned >= FIN_EDGE_SCAN) return null;   /* 太大，交回原生 */
+        var target = (last === null) ? limit : last; /* 该方向没有数据 → 整表最后一行/列 */
+        return isV ? { row: target, col: cur.col } : { row: cur.row, col: target };
+      } catch(e){ return null; }
+    }
+
+    /* ★「按键之前」的选区快照（跨调用共享）。
+       为什么需要：Univer 自己【先】处理绑定过的键（方向键/Ctrl+方向键）——实测同一次 Ctrl+↓，
+       我的监听里读到的 cur 已经是 Univer 移完之后的位置（A1 按下时读到的是 A4），
+       用它算「数据边界」会整段错位（期望 A4，实际跳到 A61）。
+       所以每次跳格/按键结束后把结果记下来，下一次按键用这个快照当基准，不再依赖事件顺序。 */
+    var finPrevCur = null, finLastKeyAt = 0;
+    function finRememberCur(c){ if (c && typeof c.row === 'number') finPrevCur = { row: c.row, col: c.col }; }
+    function finRememberSoon(){ setTimeout(function(){ try { finRememberCur(finActiveCell()); } catch(e){} }, 0); }
+
+    /* Univer 所在容器：用来限定补丁的作用范围（只有焦点/事件落在表格里才接管，
+       这样页面上的其它弹窗、输入框、报表标签页的键盘行为完全不受影响）。 */
+    function finContainer(){
+      try {
+        return document.getElementById('univer_container')
+            || document.querySelector('.univer-container')
+            || document.getElementById('c');
+      } catch(e){ return null; }
+    }
+
+    /* 延迟滚动：finGotoCell() 内部 activate() 引发的滚动是异步落地的，
+       当场调用 finScrollTo 会被它随后覆盖（实测 PageDown 会把视口又顶回选区处），
+       所以「显式指定落点」的滚动统一走这里，排在 activate 之后执行。 */
+    function finScrollToSoon(startRow, startCol){
+      var run = function(){ try { finScrollTo(startRow, startCol); } catch(e){} };
+      try { requestAnimationFrame(run); } catch(e){}
+      setTimeout(run, 60);
+    }
+
+    /* ★主入口：绑定 Excel 键盘补丁
+       · 编辑态：只补 Delete（删光标右侧字符）；Backspace 原生已正确，其余键交回 Univer；
+       · 非编辑态：补 Univer 0.5.5 没实现的键（Home/End/Ctrl+Home/Ctrl+End/PageUp/PageDown、
+         Ctrl+方向键的数据边界语义、到边界的「不回卷」），并按 Excel 规则补选区跟随滚动。
+
+       ★★监听必须挂在 window 的捕获阶段（不能挂 document）：
+         同一个节点（document）上多个 keydown 监听按【注册先后】执行，而 Univer 是在我们之前注册的，
+         所以挂 document 时 Univer 会先把选区移走，我们随后读到的 cur 已经是移动之后的位置 ——
+         实测症状：A1 按 Ctrl+↓ 期望走到 A4，实际走成了 A61（拿 A4 算的下一段）。
+         window 是捕获链的第一站（window → document → … → target），挂这里才能先于 Univer 拿到原始选区，
+         并且 stopPropagation() 能真正拦住 Univer 自己的处理。 */
+    function finExcelKeysBind(){
+      if (window.__finExcelKeysBound) return;
+      window.__finExcelKeysBound = true;
+
+      function followSoon(){
+        try { requestAnimationFrame(function(){ finEnsureVisible(); setTimeout(finEnsureVisible, 60); }); }
+        catch(e){ setTimeout(finEnsureVisible, 0); }
+      }
+
+      try { finRememberCur(finActiveCell()); } catch(e){}
+      /* 空闲时用真实选区校准快照（用户用鼠标或程序改了选区时，快照不会一直陈旧） */
+      try {
+        setInterval(function(){
+          if (document.hidden) return;
+          if (Date.now() - finLastKeyAt < 400) return;      // 正在连续按键，不去打扰
+          finRememberCur(finActiveCell());
+        }, 250);
+        window.addEventListener('mousedown', function(){ setTimeout(function(){ finRememberCur(finActiveCell()); }, 0); }, true);
+      } catch(e){}
+      /* 是否该由本补丁接管这个按键。
+         ★不能只判断「焦点是否在容器内」：Univer 的输入宿主 .univer-editor 是挂在 body 上的 portal，
+           并不在 #univer_container 里面（实测 c.contains(activeElement) === false），
+           所以必须认它这个类名；容器可见性则用来区分「当前不在财务页/标签页被隐藏」的情况。 */
+      function finIsUniverElem(el){
+        try {
+          if (!el || el.nodeType !== 1) return false;
+          if (el.classList && el.classList.contains('univer-editor')) return true;
+          if (el.closest && el.closest('.univer-editor-container')) return true;
+          if (el.closest && el.closest('.univer-workbench-layout')) return true;
+          if (el.closest && el.closest('.univer-container')) return true;
+        } catch(err){}
+        return false;
+      }
+      function inScope(e){
+        try {
+          var c = finContainer(); if (!c) return false;
+          if (!c.offsetHeight && !c.getClientRects().length) return false;   // 容器不可见 → 不接管
+          var t = e && e.target, a = document.activeElement;
+          if (t && c.contains(t)) return true;
+          if (a && c.contains(a)) return true;
+          if (finIsUniverElem(t) || finIsUniverElem(a)) return true;
+          return false;
+        } catch(err){ return false; }
+      }
+
+      window.addEventListener('keydown', function(e){
+        try {
+          if (!e || e.isComposing) return;
+          /* 诊断开关：window.__finDebug = [] 时记录每个按键走了哪条路（排障用，未开启时零开销） */
+          if (window.__finDebug) { try { window.__finDebug.push(e.key + (inScope(e) ? '' : '|OUTSCOPE')); } catch(e3){} }
+          finLastKeyAt = Date.now();
+          if (!inScope(e)) return;
+          var k = e.key;
+          var editing = finIsEditingCell();
+
+          /* ① 编辑态：Delete = 删除光标右侧一个字符（Excel 行为）。
+                Univer 0.5.5 在编辑态对 Delete 完全不处理（实测无任何命令），
+                这里直接派发文档域的向前删除命令。 */
+          if (editing) {
+            if (k === 'Delete' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+              e.preventDefault();
+              e.stopPropagation();
+              try { finAPI().executeCommand('doc.command.delete-right', {}); } catch(err){}
+              return;
+            }
+            return;   // 编辑态的其它按键一律交回 Univer
+          }
+
+          if (e.altKey || e.metaKey) return;
+          var cur = finActiveCell();
+          if (!cur) return;
+          if (window.__finDebug) { try { window.__finDebug[window.__finDebug.length - 1] += '|cur=' + cur.row + ',' + cur.col; } catch(e4){} }
+          var sz = finSheetSize() || {};
+          var maxR = sz.rows || 0;
+          var maxC = sz.cols || 0;
+
+          /* ② 普通方向键：Excel 走到表格边界就停住，不会回卷到下一列/上一行（Univer 会回卷）。
+                判据用「按键之前」的快照 prev（Univer 可能已经先动过手了），并直接识别回卷特征。 */
+          if (!e.ctrlKey && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) {
+            var prev = finPrevCur || cur;
+            var wrapped = (k === 'ArrowDown' && cur.row < prev.row)
+                       || (k === 'ArrowUp' && cur.row > prev.row)
+                       || (k === 'ArrowRight' && cur.col < prev.col)
+                       || (k === 'ArrowLeft' && cur.col > prev.col);
+            var atEdge = (k === 'ArrowDown' && maxR > 0 && prev.row >= maxR - 1)
+                      || (k === 'ArrowUp' && prev.row <= 0)
+                      || (k === 'ArrowRight' && maxC > 0 && prev.col >= maxC - 1)
+                      || (k === 'ArrowLeft' && prev.col <= 0);
+            if (atEdge || wrapped) {
+              e.preventDefault(); e.stopPropagation();
+              if (cur.row !== prev.row || cur.col !== prev.col) finGotoCell(prev.row, prev.col);   // 撤销 Univer 的回卷
+              finRememberCur(prev);
+              followSoon();
+              return;
+            }
+            followSoon();
+            finRememberSoon();
+            return;
+          }
+
+          /* ③ Ctrl+方向键：Excel 的数据边界语义（邻格有值→本块末尾；邻格为空→跨空档到下一块；
+                该方向没数据→整表最后一行/列）。基准取「按键之前」的快照，避开 Univer 已先移动的干扰。 */
+          if (e.ctrlKey && !e.shiftKey && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) {
+            var base = finPrevCur || cur;
+            var dr = (k === 'ArrowDown') ? 1 : (k === 'ArrowUp' ? -1 : 0);
+            var dc = (k === 'ArrowRight') ? 1 : (k === 'ArrowLeft' ? -1 : 0);
+            var t = finDataEdge(dr, dc, base);
+            if (t) {
+              e.preventDefault(); e.stopPropagation();
+              finGotoCell(t.row, t.col);
+              finRememberCur(t);
+              followSoon();
+              return;
+            }
+            followSoon();     /* 算不出来（超大表）就交回 Univer 原生，滚动照样要跟 */
+            finRememberSoon();
+            return;
+          }
+
+          if (!e.ctrlKey && !e.shiftKey && k === 'Home') {          /* 行首（A 列），纵向视口不动 */
+            e.preventDefault(); e.stopPropagation();
+            var ssH = finScrollState();
+            finGotoCell(cur.row, 0);
+            finScrollToSoon(ssH ? ssH.row : 0, 0);
+            return;
+          }
+          if (!e.ctrlKey && !e.shiftKey && k === 'End') {           /* 本行最后一个有内容的列（贴右边缘露出） */
+            e.preventDefault(); e.stopPropagation();
+            var ssE = finScrollState(), vrE = finVisibleRange();
+            var tc = finRowLastCol(cur.row);
+            var nsc = ssE ? ssE.col : 0;
+            var vcols = (vrE && typeof vrE.endColumn === 'number') ? Math.max(1, vrE.endColumn - vrE.startColumn + 1) : 1;
+            if (tc < nsc) nsc = tc;
+            else if (tc > nsc + vcols - 1) nsc = tc - vcols + 1;
+            finGotoCell(cur.row, tc);
+            finScrollToSoon(ssE ? ssE.row : 0, Math.max(0, nsc));
+            return;
+          }
+          if (e.ctrlKey && !e.shiftKey && k === 'Home') {           /* A1（Excel：视口也回到左上角） */
+            e.preventDefault(); e.stopPropagation();
+            finGotoCell(0, 0);
+            finScrollToSoon(0, 0);
+            return;
+          }
+          if (e.ctrlKey && !e.shiftKey && k === 'End') {            /* 最后一个有内容的格子（Excel：贴右下角露出） */
+            e.preventDefault(); e.stopPropagation();
+            var last = finLastUsedCell();
+            if (last) {
+              var vr = finVisibleRange();
+              var rows = vr ? Math.max(1, vr.endRow - vr.startRow + 1) : 1;
+              var cols = (vr && typeof vr.endColumn === 'number') ? Math.max(1, vr.endColumn - vr.startColumn + 1) : 1;
+              finGotoCell(last.row, last.col);
+              finScrollToSoon(Math.max(0, last.row - rows + 1), Math.max(0, last.col - cols + 1));
+            }
+            return;
+          }
+          if (!e.ctrlKey && !e.shiftKey && (k === 'PageDown' || k === 'PageUp')) {
+            var page = finPageRows();
+            if (page <= 0) return;                     // 量不到就不接管，保持 Univer 原样
+            e.preventDefault(); e.stopPropagation();
+            var ss = finScrollState();
+            var target = (k === 'PageDown') ? cur.row + page : cur.row - page;
+            finGotoCell(target, cur.col);
+            /* Excel：选区与视口移动同样多的行 → 选区在屏幕上的相对位置保持不变 */
+            if (ss) finScrollToSoon((k === 'PageDown') ? ss.row + page : Math.max(0, ss.row - page), ss.col);
+            else followSoon();
+            return;
+          }
+
+          /* ④ 其它会动选区的键（Tab / Enter / Shift+方向键…）：不拦，只补跟随滚动 */
+          if (k === 'Tab' || k === 'Enter') followSoon();
+        } catch(err){}
+      }, true);
+
+      /* ★锁死区自检（FIN-EXCEL-KEYS-LOCK-20261011）：确认依赖的函数与接线都在。
+         只报错，不抛异常、不影响表格使用。★不得移除本调用。 */
+      try { finExcelKeysLockCheck(); } catch(e){}
+    }
+
     async function fin_initUniver(){
       if (finInited) return;
       finInited = true;
       try {
         fin_setStatusKey('fin_status_engine');
-        var presets = await import('@univerjs/presets');
-        var corePreset = await import('@univerjs/presets/preset-sheets-core');
-        // 三语 locale：初始语言由 CUR_LANG 决定；切语言时调用 finUniver.setLocale()
-        var localeMod = await import('@univerjs/presets/preset-sheets-core/locales/en-US');
-        var zhLocaleMod = await import('@univerjs/presets/preset-sheets-core/locales/zh-CN').catch(function(){ return null; });
-        var viLocaleMod = await import('@univerjs/presets/preset-sheets-core/locales/vi-VN').catch(function(){ return null; });
-        var filterMod = await import('@univerjs/sheets-filter');
-        var filterUiMod = await import('@univerjs/sheets-filter-ui');
-        var sortMod = await import('@univerjs/sheets-sort');
-        var sortUiMod = await import('@univerjs/sheets-sort-ui');
-        // 注意：locale 是单数 /locale/en-US（复数会返回 default null）
-        var filterLocaleMod = await import('@univerjs/sheets-filter-ui/locale/en-US').catch(function(){ return null; });
-        var sortLocaleMod = await import('@univerjs/sheets-sort/locale/en-US').catch(function(){ return null; });
-        var sortUiLocaleMod = await import('@univerjs/sheets-sort-ui/locale/en-US').catch(function(){ return null; });
-        var filterLocaleModZh = await import('@univerjs/sheets-filter-ui/locale/zh-CN').catch(function(){ return null; });
-        var sortLocaleModZh = await import('@univerjs/sheets-sort/locale/zh-CN').catch(function(){ return null; });
-        var sortUiLocaleModZh = await import('@univerjs/sheets-sort-ui/locale/zh-CN').catch(function(){ return null; });
-        var filterLocaleModVi = await import('@univerjs/sheets-filter-ui/locale/vi-VN').catch(function(){ return null; });
-        var sortLocaleModVi = await import('@univerjs/sheets-sort/locale/vi-VN').catch(function(){ return null; });
-        var sortUiLocaleModVi = await import('@univerjs/sheets-sort-ui/locale/vi-VN').catch(function(){ return null; });
-        // facade 导入（注册 FUniver API，缺了可能影响内置交互）
-        try { await import('@univerjs/sheets-filter/facade'); } catch(e){}
-        try { await import('@univerjs/sheets-sort/facade'); } catch(e){}
+        /* ★并行拉取全部依赖（原实现是 20 个串行 await import）。
+           ★为什么必须并行：串行时每个 import 都要等上一份模块图解析/实例化完才发起下一个，
+           冷启动会变成 20 轮网络瀑布；实测这是「正在加载表格引擎…」最主要的耗时来源
+           （整页加载 6.9~7.4s，而会话内切回财务页只要 0.02s）。
+           并行发起后由浏览器自己调度，模块图重叠解析。
+           注意：presets / preset-sheets-core 必须成功（不加 catch，失败走外层 catch 允许重试）；
+           其余可选模块保持原来的 .catch(→null) 语义。 */
+        var _impOpt = function(s){ return import(s).catch(function(){ return null; }); };
+        var _mods = await Promise.all([
+          import('@univerjs/presets'),                                          // 0
+          import('@univerjs/presets/preset-sheets-core'),                       // 1
+          // 三语 locale：初始语言由 CUR_LANG 决定；切语言时调用 finUniver.setLocale()
+          _impOpt('@univerjs/presets/preset-sheets-core/locales/en-US'),        // 2
+          _impOpt('@univerjs/presets/preset-sheets-core/locales/zh-CN'),        // 3
+          _impOpt('@univerjs/presets/preset-sheets-core/locales/vi-VN'),        // 4
+          import('@univerjs/sheets-filter'),                                    // 5
+          import('@univerjs/sheets-filter-ui'),                                 // 6
+          import('@univerjs/sheets-sort'),                                      // 7
+          import('@univerjs/sheets-sort-ui'),                                   // 8
+          // 注意：locale 是单数 /locale/en-US（复数会返回 default null）
+          _impOpt('@univerjs/sheets-filter-ui/locale/en-US'),                   // 9
+          _impOpt('@univerjs/sheets-sort/locale/en-US'),                        // 10
+          _impOpt('@univerjs/sheets-sort-ui/locale/en-US'),                     // 11
+          _impOpt('@univerjs/sheets-filter-ui/locale/zh-CN'),                   // 12
+          _impOpt('@univerjs/sheets-sort/locale/zh-CN'),                        // 13
+          _impOpt('@univerjs/sheets-sort-ui/locale/zh-CN'),                     // 14
+          _impOpt('@univerjs/sheets-filter-ui/locale/vi-VN'),                   // 15
+          _impOpt('@univerjs/sheets-sort/locale/vi-VN'),                        // 16
+          _impOpt('@univerjs/sheets-sort-ui/locale/vi-VN'),                     // 17
+          // facade 导入（注册 FUniver API，缺了可能影响内置交互）
+          _impOpt('@univerjs/sheets-filter/facade'),                            // 18
+          _impOpt('@univerjs/sheets-sort/facade')                               // 19
+        ]);
+        var presets = _mods[0], corePreset = _mods[1];
+        var localeMod = _mods[2], zhLocaleMod = _mods[3], viLocaleMod = _mods[4];
+        var filterMod = _mods[5], filterUiMod = _mods[6];
+        var sortMod = _mods[7], sortUiMod = _mods[8];
+        var filterLocaleMod = _mods[9], sortLocaleMod = _mods[10], sortUiLocaleMod = _mods[11];
+        var filterLocaleModZh = _mods[12], sortLocaleModZh = _mods[13], sortUiLocaleModZh = _mods[14];
+        var filterLocaleModVi = _mods[15], sortLocaleModVi = _mods[16], sortUiLocaleModVi = _mods[17];
         var mergeFn = presets.merge || function(a, b){ return Object.assign({}, a, b); };
         function mergeLocales(base, mods){
           var r = mergeFn({}, base || {});
@@ -16810,12 +18269,19 @@ var PROD_EQUIP_FAULT_KB = {
         // 让 Univer 内部 locale 与页面当前语言保持一致
         try { fin_setUniverLocale(CUR_LANG); } catch(e){}
 
+        /* Excel 键盘补丁（FIN-EXCEL-KEYS）：api 就绪后绑定，capture 阶段抢在 Univer 之前 */
+        try { finExcelKeysBind(); } catch(e){ console.warn('[fin-keys] bind failed', e); }
         finReady = true;
         console.log('%c[fin] highlight build HL6-LOCK (识别文本日期 + 按区域高亮 + 双形状写样式 + 锁死区 FIN-HI-LOCK-20261011)', 'color:#0a0;font-weight:bold');
+        // ★先把三语工作表标签名取回来，再建显示单元（FIN-LANG-VIEW-20261012）
+        try { await fin_loadSheetTitles(); } catch(e){}
         await fin_loadReport();
         fin_bindChange();
+        // ★右键行号菜单补丁：「插入」子菜单里那条「在下方插入行」+ 行数输入栏（只绑定一次，尽早绑）
+        fin_bindContextMenuOnce();
         fin_injectSortMenu();
         setTimeout(function(){ fin_watchToolbar2(); }, 500);
+        fin_applyReadonlyUI();        /* ★只读模式：禁用保存按钮等 */
         fin_setStatusKey('fin_status_ready');
       } catch (e) {
         finInited = false;  // 出错允许重试
@@ -16837,6 +18303,8 @@ var PROD_EQUIP_FAULT_KB = {
         if (lang === 'zh') lt = window.finPresets.LocaleType.ZH_CN;
         if (lang === 'vi') lt = window.finPresets.LocaleType.VI_VN;
         ls.setLocale(lt);
+        // 菜单里的语言也跟着换：刷新我们注入的「在下方插入行」文案
+        try { fin_menuInsRefresh(); } catch(e){}
       } catch(e){ console.warn('[locale] setLocale failed', e); }
     }
 
@@ -17062,7 +18530,7 @@ var PROD_EQUIP_FAULT_KB = {
           }
           arr.push(rowArr);
         }
-        finUniverAPI.executeCommand('sheet.command.set-range-values', {
+        finExecSilent('sheet.command.set-range-values', {
           unitId: unitId, subUnitId: sid,
           range: { startRow: minR, startColumn: minC, endRow: maxR, endColumn: maxC },
           value: arr
@@ -17070,7 +18538,7 @@ var PROD_EQUIP_FAULT_KB = {
       } catch(e){ console.warn('[hi] style A', e); }
       try {
         // 形状 B：行-列 map（兼容）
-        finUniverAPI.executeCommand('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: map });
+        finExecSilent('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: map });
       } catch(e2){ console.warn('[hi] style B', e2); }
       finHiApplying = false;
       // 命令的回调是异步的，这里再开一个静默窗口，让 onCommandExecuted 认出"这是我自己的高亮写入"
@@ -17191,7 +18659,6 @@ var PROD_EQUIP_FAULT_KB = {
       try { snap = fin_currentSnapshot(); } catch(e){ console.warn('[hi] snapshot error', e); return; }
       if (!snap || !snap.sheetOrder) return;
       console.log('[hi] recompute start');
-      try { var _el0 = document.getElementById('fin_hi_info'); if (_el0) _el0.textContent = '高亮 计算中…'; } catch(e){}
       var today = new Date(); today.setHours(0, 0, 0, 0);
       var _healAllowed = (Date.now() >= finHiHealAt);   // 本轮是否允许自愈重写
       var _healUsed = false;
@@ -17236,15 +18703,14 @@ var PROD_EQUIP_FAULT_KB = {
           finHiState[sid] = next;
         } catch(e){ console.warn('[hi] recompute sheet error', sid, e); }
       });
-      // 屏幕指示：显示本次高亮到了哪些表/行，便于肉眼确认功能是否在运行
+      // 本次高亮到了哪些表/行：只写控制台，界面上不再显示（用户要求清掉那行提示）
       try {
         var info = [];
         snap.sheetOrder.forEach(function(sid){
           var rows = (finHiState[sid] || []).map(function(x){ return x.row + 1; });
           if (rows.length) info.push(sid + '→' + rows.join(','));
         });
-        var el = document.getElementById('fin_hi_info');
-        if (el) el.textContent = '高亮 ' + info.length + ' 表' + (info.length ? ' [' + info.join(' / ') + ']' : '');
+        console.log('[hi] 高亮 ' + info.length + ' 表' + (info.length ? ' [' + info.join(' / ') + ']' : ''));
       } catch(e){}
     }
 
@@ -17273,6 +18739,8 @@ var PROD_EQUIP_FAULT_KB = {
       if (!has) return null;
       // 筛选至少需要 2 行（表头 + 数据）
       if (maxR < 1) maxR = 1;
+      // ★夹到显示块内（FIN-LANG-VIEW-20261012）：视图只到 J 列，超出的列不该被写样式/数字格式
+      if (maxC > FIN_VIEW_MAXCOL) maxC = FIN_VIEW_MAXCOL;
       return { startRow: 0, startColumn: 0, endRow: maxR, endColumn: maxC };
     }
 
@@ -17291,6 +18759,338 @@ var PROD_EQUIP_FAULT_KB = {
         }
       } catch(e){}
       return null;
+    }
+
+    /* ★「插入 N 行」（FIN-INS-ROWS-20261012）：
+       below=true → 在【选区最后一行】下方插入 N 行；below=false → 在【选区第一行】上方插入 N 行。
+       走 Univer 门面 API → 正常命令，可撤销/可重做。n 不传或非法时按 1 行，上限 200。 */
+    function fin_insertRows(nOpt, below){
+      if (!finUniverAPI || !finUniverAPI.getActiveWorkbook || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
+      try {
+        var n = parseInt(nOpt, 10);
+        if (!(n >= 1)) n = 1;
+        if (n > 200) n = 200;
+        var wb = finUniverAPI.getActiveWorkbook();
+        var ws = wb && wb.getActiveSheet && wb.getActiveSheet();
+        if (!ws) { fin_setStatusKey('fin_status_not_init'); return; }
+        var rng = ws.getActiveRange && ws.getActiveRange();
+        if (!rng || typeof rng.getRow !== 'function') { fin_setStatusKey('fin_status_not_init'); return; }
+        var first = rng.getRow();
+        var last = (typeof rng.getLastRow === 'function') ? rng.getLastRow() : first;
+        var ok = false;
+        if (below && typeof ws.insertRowsAfter === 'function'){ ws.insertRowsAfter(last, n); ok = true; }
+        else if (!below && typeof ws.insertRowsBefore === 'function'){ ws.insertRowsBefore(first, n); ok = true; }
+        if (!ok){
+          // 门面不可用时的兜底：直接发 Univer 的插入行命令（优先取真正的 Direction 枚举值）
+          var D = finPresets && finPresets.Direction;
+          var dir = below ? ((D && D.DOWN != null) ? D.DOWN : 1) : ((D && D.UP != null) ? D.UP : 0);
+          var at = below ? last : first;
+          finUniverAPI.executeCommand('sheet.command.insert-row', {
+            unitId: fin_unitId(), subUnitId: fin_curSheetId(),
+            range: { startRow: at, endRow: at + n - 1, startColumn: 0, endColumn: 0 },
+            direction: dir
+          });
+        }
+        fin_setStatusKey('fin_status_ins_rows', ' ' + n);
+      } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); }
+    }
+    function fin_insertRowsBelow(nOpt){ return fin_insertRows(nOpt, true); }
+
+    /* ============ ★右键行号 →「插入」→「在下方插入行」+ 行数输入栏（FIN-INS-ROWS-MENU-20261012） ============
+       用户要求：把行头右键「插入」子菜单里的「插入行」改成「在下方插入行」，并在它后面放一个输入栏，
+                 填 5 就在下方一次性插 5 行。
+       Univer 的菜单是 rc-menu(React) 渲染的，没有"自定义菜单项组件"的公开 API，所以这里在菜单弹出时
+       做一次 DOM 补丁（幂等）：
+         ① 定位「在上方插入行」那一项 —— 用多语言关键词（上方 / above / trên）匹配，不写死单一语言；
+         ② 取它的同级兄弟里那条「插入行」（= 原生在下方插入）；
+         ③ 把原生项隐藏，紧跟着插入一项「在下方插入行」+ 行数输入栏；
+            回车或点这一项 → 一次性在下方插入 N 行。
+       抢事件：输入框/菜单项上的鼠标与按键事件都 stopPropagation，避免 rc-menu 触发原生"插入 1 行"并关菜单。
+       失败即静默放弃：原生「插入行」照旧可用（插 1 行），绝不会把菜单弄坏。 */
+    /* ★★ 关键根因（2026-10-12）：rc-menu 的【子菜单是懒挂载】的 ——
+       「在上方插入行 / 插入行」这两项只有在鼠标【悬停到「插入」上、子菜单弹开】那一刻
+       才会被创建到 DOM 里。右键后的固定几次延时（0/40/120/260ms）几乎必然早于用户去悬停，
+       所以扫不到它们 → 补丁从未生效（这也解释了"第一次碰巧成功、刷新后再也不出现"）。
+       修正：右键后在短时间内挂一个 MutationObserver，盯着新增节点里带 menu 的/li，
+       一旦「插入」子菜单挂载出来就立刻补丁。 */
+    var fin_menuObs = null, fin_menuObsTimer = null, fin_menuObsStopTimer = null;
+    var fin_menuInsRounds = 0, fin_menuInsPatched = 0;
+    function fin_menuWatchStart(){
+      try {
+        if (fin_menuObs) return;
+        if (!window.MutationObserver) return;
+        fin_menuObs = new MutationObserver(function(muts){
+          var hit = false;
+          for (var i = 0; i < muts.length && !hit; i++){
+            var added = muts[i].addedNodes;
+            for (var j = 0; j < added.length; j++){
+              var n = added[j];
+              if (!n || n.nodeType !== 1) continue;
+              var cn = String(n.className || '');
+              if (/menu/i.test(cn) || n.tagName === 'LI' || n.tagName === 'UL'){ hit = true; break; }
+            }
+          }
+          if (!hit || fin_menuObsTimer) return;
+          fin_menuObsTimer = setTimeout(function(){
+            fin_menuObsTimer = null;
+            finPatchInsertRowMenu(false);
+          }, 30);
+        });
+        fin_menuObs.observe(document.body, { childList: true, subtree: true });
+      } catch(e){ fin_menuObs = null; }
+    }
+    function fin_menuWatchStop(){
+      try { if (fin_menuObs) fin_menuObs.disconnect(); } catch(e){}
+      fin_menuObs = null;
+      if (fin_menuObsTimer){ clearTimeout(fin_menuObsTimer); fin_menuObsTimer = null; }
+      if (fin_menuObsStopTimer){ clearTimeout(fin_menuObsStopTimer); fin_menuObsStopTimer = null; }
+      // 诊断：这一轮右键窗口内始终没出现「插入」子菜单（正常情况：右键后没去悬停「插入」）
+      if (fin_menuInsRounds > fin_menuInsPatched){
+        console.log('[fin-ins] 这 15 秒内没看到「插入」子菜单 —— 若你确实悬停「插入」并看到了两项，请把这条消息发我');
+      }
+    }
+    function fin_onContextMenu(){
+      // ① 立刻试几次（子菜单若已挂载过就能马上命中）
+      [0, 40, 120, 260].forEach(function(d, idx){
+        setTimeout(function(){ finPatchInsertRowMenu(idx === 3); }, d);
+      });
+      // ② 随后 15 秒内一直盯着 —— 用户悬停「插入」把子菜单挂出来时立刻补丁
+      fin_menuInsRounds++;
+      fin_menuWatchStart();
+      if (fin_menuObsStopTimer) clearTimeout(fin_menuObsStopTimer);
+      fin_menuObsStopTimer = setTimeout(fin_menuWatchStop, 15000);
+      fin_menuInsRefresh();       // 顺便让已注入的那一项跟上当前语言
+    }
+    // 右键（含浏览器不派发 contextmenu 的极端情况）都触发一次
+    function fin_bindContextMenuOnce(){
+      if (window.__finCtxMenuBound) return;
+      window.__finCtxMenuBound = true;
+      document.addEventListener('contextmenu', fin_onContextMenu, true);
+      document.addEventListener('mousedown', function(e){
+        // 右键 → 起菜单补丁流程
+        if (e && e.button === 2){ fin_onContextMenu(); return; }
+        // 左键：若焦点还停在我们注入的行数输入框上（它在 Univer 容器之外），
+        // Univer 会按 e.target 忽略 Ctrl+Z/Ctrl+Y → 这里主动把焦点交还表格。
+        try {
+          var a = document.activeElement;
+          if (a && a.classList && a.classList.contains('fin-menu-ins-input')){
+            var box = a.closest ? a.closest('.fin-menu-ins-item') : null;
+            if (!box || !box.contains(e.target)){
+              a.blur();
+              setTimeout(function(){ fin_focusSheet(); }, 0);
+            }
+          }
+        } catch(_e){}
+      }, true);
+      console.log('%c[fin-ins] 右键菜单补丁已就绪（会在「插入」子菜单出现的瞬间接管「插入行」）', 'color:#0a0;font-weight:bold');
+    }
+    /* 当前 Univer 菜单所用语言（与菜单条目的语言一致；读不到就返回 null） */
+    function fin_univerLangKey(){
+      try {
+        if (finUniver && finUniver.__getInjector && window.finPresets && window.finPresets.LocaleService){
+          var ls = finUniver.__getInjector().get(window.finPresets.LocaleService);
+          var cur = (ls && ls.getLocale) ? String(ls.getLocale() || '').toLowerCase() : '';
+          if (cur.indexOf('zh') === 0) return 'zh';
+          if (cur.indexOf('vi') === 0) return 'vi';
+          if (cur.indexOf('en') === 0) return 'en';
+        }
+      } catch(e){}
+      return null;
+    }
+    /* ★「在下方插入行」的文案：优先跟 Univer 菜单自己的语言（保证菜单里外一致），退回 App 语言。
+       注意 React 会复用同一批菜单 DOM 节点，所以语言切换后必须主动刷新（见 fin_menuInsRefresh）。 */
+    function fin_insRowsText(key, dflt){
+      var lang = fin_univerLangKey() || (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'zh');
+      try {
+        var d = window.I18N && window.I18N[lang];
+        if (d && d[key]) return d[key];
+      } catch(e){}
+      var t = fin_L(key);
+      return (t && t !== key) ? t : dflt;
+    }
+    function fin_menuInsRefresh(){
+      try {
+        var tipTxt = fin_insRowsText('fin_title_ins_rows', '');
+        var nodes = document.querySelectorAll('.fin-menu-ins-lbl');
+        for (var i = 0; i < nodes.length; i++){
+          var kind = (nodes[i].getAttribute('data-kind') === 'above') ? 'above' : 'below';
+          nodes[i].textContent = (kind === 'above')
+            ? fin_insRowsText('fin_btn_ins_rows_above', '在上方插入行')
+            : fin_insRowsText('fin_btn_ins_rows', '在下方插入行');
+        }
+        var inps = document.querySelectorAll('.fin-menu-ins-input');
+        for (var j = 0; j < inps.length; j++) inps[j].setAttribute('title', tipTxt);
+      } catch(e){}
+    }
+    /* 取原生菜单项的小图标（克隆一份，避免动到 React 的节点） */
+    function fin_menuIconOf(li){
+      try {
+        var ic = li.querySelector('svg') || li.querySelector('i');
+        if (ic) return ic.cloneNode(true);
+        for (var i = 0; i < li.children.length; i++){
+          var c = li.children[i];
+          if (!(c.textContent || '').trim()) return c.cloneNode(true);   // 兜底：第一个"纯图标"子节点
+        }
+      } catch(e){}
+      return null;
+    }
+    /* ★找「插入行(上/下)」这一对菜单项。★不要再靠 "上方/above" 这种词定位——
+       英文界面里 Univer 用的是 "Insert Row Before"（是 Before 不是 Above），
+       所以改成【结构式】判定：同一父节点下恰好 2 项、两项都含 row 词、且都不含 col 词。
+       （单元格右键的「插入」有 4 项且含 col；列头的含 col → 都会被排除。） */
+    var FIN_ROW_WORD = /(行|row|dòng)/i;
+    var FIN_COL_WORD = /(列|col|cột)/i;
+    var FIN_BEFORE_WORD = /(上方|above|before|trên|phía\s*trên|bên\s*trên)/i;
+    function fin_menuRowInsPair(){
+      try {
+        var cands = document.querySelectorAll('li, [role="menuitem"]');
+        var groups = [];
+        for (var i = 0; i < cands.length; i++){
+          var el = cands[i];
+          if (el.classList && el.classList.contains('fin-menu-ins-item')) continue;   // 我们自己注入的
+          var p = el.parentNode;
+          if (!p) continue;
+          var g = null;
+          for (var k = 0; k < groups.length; k++){ if (groups[k].p === p){ g = groups[k]; break; } }
+          if (!g){ g = { p: p, els: [] }; groups.push(g); }
+          g.els.push(el);
+        }
+        for (var m = 0; m < groups.length; m++){
+          var els = groups[m].els;
+          if (els.length !== 2) continue;
+          var a = els[0], b = els[1];
+          var ta = (a.textContent || '').replace(/\s+/g, '');
+          var tb = (b.textContent || '').replace(/\s+/g, '');
+          if (!ta || !tb) continue;
+          if (!FIN_ROW_WORD.test(ta) || !FIN_ROW_WORD.test(tb)) continue;
+          if (FIN_COL_WORD.test(ta) || FIN_COL_WORD.test(tb)) continue;
+          // 再按 before/above 词确认顺序；都不含这种词时按 DOM 顺序（order 0 = 上方）
+          if (FIN_BEFORE_WORD.test(tb) && !FIN_BEFORE_WORD.test(ta)) return [b, a];
+          return [a, b];
+        }
+      } catch(e){}
+      return null;
+    }
+    function finPatchInsertRowMenu(verbose){
+      try {
+        if (!finUniverAPI) return;
+        var before = null, after = null;
+        var pair = fin_menuRowInsPair();
+        if (pair){ before = pair[0]; after = pair[1]; }
+        else {
+          // 兜底（旧启发式）：文本里带 "上方/above/before" + "行/row"，再取同父的兄弟项
+          var lis = document.querySelectorAll('li');
+          for (var i = 0; i < lis.length; i++){
+            var t = (lis[i].textContent || '').replace(/\s+/g, '');
+            if (!t) continue;
+            if (FIN_BEFORE_WORD.test(t) && FIN_ROW_WORD.test(t)){ before = lis[i]; break; }
+          }
+          if (!before) return;
+          var cont = before.parentNode;
+          if (!cont || !cont.children) return;
+          for (var j = 0; j < cont.children.length; j++){
+            var s = cont.children[j];
+            if (s === before || s.nodeType !== 1) continue;
+            if (s.classList && s.classList.contains('fin-menu-ins-item')) continue;   // 跳过我们自己注入的那一项
+            var st = (s.textContent || '').replace(/\s+/g, '');
+            if (st && /(插入行|insert\s*row|chèn\s*dòng)/i.test(st)){ after = s; break; }
+          }
+        }
+        // ★「在上方插入行」也一起改：同样带行数输入栏（只插在上方）
+        if (before) finPatchInsertRowItem(before, 'above');
+        if (after) finPatchInsertRowItem(after, 'below');
+      } catch(e){}
+    }
+    function finPatchInsertRowItem(li, kind){
+      if (!li) return;
+      kind = (kind === 'above') ? 'above' : 'below';
+      if (li.__finMenuPatched){ fin_menuInsRefresh(); return; }   // React 复用同一节点：只刷新语言
+      var host = li.parentNode;
+      if (!host) return;
+      li.__finMenuPatched = true;
+      fin_menuInsPatched++;
+      var labelKey = (kind === 'above') ? 'fin_btn_ins_rows_above' : 'fin_btn_ins_rows';
+      var labelDflt = (kind === 'above') ? '在上方插入行' : '在下方插入行';
+      console.log('[fin-ins] 已接管「' + labelDflt + '」菜单项 → 带行数输入栏');
+      // ★不删 React 的节点（innerHTML='' 会让 React 卸载时 removeChild 报 NotFoundError）：
+      //   沿用原生项的 class 自己造一项插在它后面，再把原生项【隐藏】即可。
+      var mine = document.createElement('li');
+      mine.className = (li.className || '') + ' fin-menu-ins-item';
+      mine.setAttribute('role', 'menuitem');
+      mine.setAttribute('data-kind', kind);
+      // ① 小图标：直接克隆原生菜单项的图标（上/下各是它自己的那个图标）
+      var icon = fin_menuIconOf(li);
+      if (icon){
+        var iw = document.createElement('span');
+        iw.className = 'fin-menu-ins-icon';
+        iw.setAttribute('aria-hidden', 'true');
+        iw.appendChild(icon);
+        mine.appendChild(iw);
+      }
+      // ② 文案 + 行数输入栏
+      var lbl = document.createElement('span');
+      lbl.className = 'fin-menu-ins-lbl';
+      lbl.setAttribute('data-kind', kind);
+      lbl.textContent = fin_insRowsText(labelKey, labelDflt);
+      var inp = document.createElement('input');
+      inp.className = 'fin-menu-ins-input';
+      inp.type = 'text';
+      inp.inputMode = 'numeric';
+      inp.value = '1';
+      inp.maxLength = 3;
+      inp.setAttribute('title', fin_insRowsText('fin_title_ins_rows', ''));
+      mine.appendChild(lbl);
+      mine.appendChild(inp);
+      li.style.display = 'none';
+      host.insertBefore(mine, li.nextSibling);
+      // 输入框上的事件一律不外传，否则会触发 rc-menu 的原生动作并关闭菜单
+      ['pointerdown','mousedown','mouseup','click','dblclick','keydown','keyup','keypress'].forEach(function(ev){
+        inp.addEventListener(ev, function(e){
+          e.stopPropagation();
+          if (ev === 'keydown' && (e.key === 'Enter' || e.keyCode === 13)){
+            e.preventDefault();
+            fin_menuInsertRows(inp, kind);
+          }
+        }, true);
+      });
+      // 点这一项（非输入框区域）= 按输入框里的行数插入
+      mine.addEventListener('click', function(e){
+        if (e.target === inp) return;
+        e.preventDefault();
+        e.stopPropagation();
+        fin_menuInsertRows(inp, kind);
+      }, true);
+      // ★不要自动 focus 输入框：焦点一旦留在菜单里的 input 上，
+      //   Univer 的快捷键服务会按 e.target 判定"不在 Univer 容器内"而忽略按键 → Ctrl+Z/Ctrl+Y 全部失灵。
+      //   用户点一下输入框即可（点它我们已 stopPropagation，不会触发原生动作）。
+    }
+    function fin_menuInsertRows(inp, kind){
+      var n = parseInt(String((inp && inp.value) || '1').replace(/[^0-9]/g, ''), 10);
+      if (!(n >= 1)) n = 1;
+      fin_closeUniverMenu();
+      var below = (kind !== 'above');
+      fin_insertRows(n, below);
+      // ★把焦点交还给表格：否则焦点停在我们注入的 input（在 Univer 容器之外）上，
+      //   Univer 会按 e.target 忽略 Ctrl+Z / Ctrl+Y。
+      try { if (inp && inp.blur) inp.blur(); } catch(e){}
+      fin_focusSheet();
+    }
+    function fin_closeUniverMenu(){
+      try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true })); } catch(e){}
+      try { document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); } catch(e){}
+    }
+    /* ★把键盘焦点交回 Univer 表格（canvas/容器）。
+       原因：Univer 的快捷键服务用 `checkElementInCurrentContainers(e.target)` 判定，
+       事件目标是容器【外面】的元素时（例如我们注入到菜单里的 input、document.body）
+       整个按键会被忽略 —— 表现为「撤销/重做快捷键没反应」。 */
+    function fin_focusSheet(){
+      try {
+        var c = (typeof finContainer === 'function' ? finContainer() : null) || document.getElementById('univer_container');
+        if (!c) return;
+        var t = c.querySelector('canvas') || c;
+        try { if (t && !t.hasAttribute('tabindex')) t.setAttribute('tabindex', '-1'); } catch(e){}
+        try { if (t && t.focus) t.focus({ preventScroll: true }); } catch(e){ try { t.focus(); } catch(_e){} }
+      } catch(e){}
     }
 
     function fin_setFilterRange(range){
@@ -17406,6 +19206,7 @@ var PROD_EQUIP_FAULT_KB = {
         var dateCols = fin_dateHeaderCols(sh);
         var cellData = sh.cellData || {};
         var values = [];
+        var convert = [];
         for (var rk in cellData) {
           var r = parseInt(rk, 10);
           if (isNaN(r)) continue;
@@ -17417,16 +19218,40 @@ var PROD_EQUIP_FAULT_KB = {
             var cd = row[ck] || {};
             var st0 = fin_cellStyle(snap, cd) || {};
             var pat = (st0.n && st0.n.pattern) || '';
+            // ★「老记录」也强制 DD-MM-YYYY：日期列里的**文本日期**（11/10/2026、2026-10-11…）
+            //   直接换成真日期序列号 + dd-mm-yyyy 格式（否则它既排不了序，也不是"日期行"，
+            //   高亮逻辑认不出来 —— 实测这是"新增/老记录不变红"的主因之一）。
+            var isDateCol = !!(dateCols[c] || c === 0);
+            if (typeof cd.v === 'string' && isDateCol) {
+              var tser = fin_parseDateText(cd.v);
+              if (tser != null) {
+                convert.push({ r: r, c: c, serial: tser });
+                values.push({ row: r, col: c, pattern: 'dd-mm-yyyy' });
+                continue;
+              }
+            }
             var asDate = fin_isDatePattern(pat) || (dateCols[c] && fin_isDateSerial(cd.v));
             if (typeof cd.v === 'number' && asDate) {
               values.push({ row: r, col: c, pattern: 'dd-mm-yyyy' });   // 必须小写：大写的 DD-MM-YYYY 不被 numfmt 识别，会显示成序列号
             }
           }
         }
+        // ★文本日期 → 真日期（一次性写值）
+        if (convert.length) {
+          var cmap = {};
+          convert.forEach(function(x){
+            cmap[String(x.r)] = cmap[String(x.r)] || {};
+            cmap[String(x.r)][String(x.c)] = { v: x.serial, t: 2, s: { n: { pattern: 'dd-mm-yyyy' } } };
+          });
+          try {
+            finExecSilent('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: cmap });
+            finEditQuietUntil = Date.now() + 400;
+          } catch(e){ console.warn('normalizeDates.convert', e); }
+        }
         // ① 数字格式（保证显示）
         if (values.length) {
           try {
-            finUniverAPI.executeCommand('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid, values: values });
+            finExecSilent('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid, values: values });
             total += values.length;
           } catch(e){ console.warn('normalizeDates', e); }
         }
@@ -17434,7 +19259,7 @@ var PROD_EQUIP_FAULT_KB = {
         var styleMat = fin_dateStyleMatrix(snap, sh);
         if (styleMat) {
           try {
-            finUniverAPI.executeCommand('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: styleMat });
+            finExecSilent('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: styleMat });
           } catch(e){ console.warn('normalizeDates.style', e); }
         }
       }
@@ -17442,13 +19267,25 @@ var PROD_EQUIP_FAULT_KB = {
     }
 
     // 把 "18/8/2026" / "18-8-2026" 这类“文本日期”解析成 Excel 日期序列号（1899-12-30 起）
-    function fin_parseDateText(s){
-      var m = /^\s*(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})\s*$/.exec(String(s || ''));
+    // monthFirst=true → 按 en-US 的「月-日-年」解析（用于反推 Univer 的误判值，做"铁证"比对）
+    function fin_parseDateText(s, monthFirst){
+      var t = String(s || '').trim();
+      // ① ISO：2026-10-11 / 2026/10/11
+      var mi = /^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/.exec(t);
+      if (mi){
+        var yy = parseInt(mi[1], 10), mm = parseInt(mi[2], 10), dd = parseInt(mi[3], 10);
+        if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+        return Math.floor(Date.UTC(yy, mm - 1, dd) / 86400000) + 25569;
+      }
+      // ② d/m/y 或 m/d/y（3 段）——年份允许 2 位（26 → 2026）
+      var m = /^\s*(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\s*$/.exec(t);
       if (!m) return null;
       var a = parseInt(m[1], 10), b = parseInt(m[2], 10), y = parseInt(m[3], 10);
+      if (m[3].length <= 2) y += (y < 70 ? 2000 : 1900);
       var d, mo;
       if (a > 12) { d = a; mo = b; }        // 18/8/2026 → 日/月
       else if (b > 12) { d = b; mo = a; }   // 8/18/2026 → 月/日
+      else if (monthFirst) { mo = a; d = b; }  // 有歧义 + 要按美式读 → 月/日
       else { d = a; mo = b; }               // 有歧义时按报表约定 dd/mm/yyyy
       if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > 2999) return null;
       return Math.floor(Date.UTC(y, mo - 1, d) / 86400000) + 25569;
@@ -17523,7 +19360,7 @@ var PROD_EQUIP_FAULT_KB = {
               serial = fin_parseDateText(cd.v);
               if (serial == null) continue;
               var vmat = {}; vmat[r] = {}; vmat[r][c] = { v: serial, t: 2 };   // t:2 = number
-              convP.push(finUniverAPI.executeCommand('sheet.command.set-range-values', {
+              convP.push(finExecSilent('sheet.command.set-range-values', {
                 unitId: unitId, subUnitId: sid,
                 range: { startRow: r, startColumn: c, endRow: r, endColumn: c },
                 value: vmat
@@ -17536,13 +19373,13 @@ var PROD_EQUIP_FAULT_KB = {
           }
         }
         if (fmtVals.length) {
-          fmtP.push(finUniverAPI.executeCommand('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid, values: fmtVals }));
+          fmtP.push(finExecSilent('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid, values: fmtVals }));
           fmtTotal += fmtVals.length;
         }
         // 样式补丁：把日期格式写进 cell.s（服务端保存时才能落盘）+ 补回丢失的黑色四边框
         var styleMat = fin_dateStyleMatrix(snap, sh);
         if (styleMat) {
-          fmtP.push(finUniverAPI.executeCommand('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: styleMat }));
+          fmtP.push(finExecSilent('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: styleMat }));
           styleTotal++;
         }
         // 本表的“日期列” = 日期格最多的那一列
@@ -17575,9 +19412,11 @@ var PROD_EQUIP_FAULT_KB = {
         await Promise.all(convP);       // 1) 文本日期 → 真日期
         await Promise.all(fmtP);        // 2) 数字格式 → DD-MM-YYYY
         if (fmtTotal || convTotal || styleTotal) {
-          // 先把「日期规范化」落盘（此刻仍是原始行序），避免随后排序把行序一起写入
-          try { if (finSaveTimer) { clearTimeout(finSaveTimer); finSaveTimer = null; } } catch(e){}
-          try { await fin_autoSave(); } catch(e){}
+          // 非只读模式才落盘：先把「日期规范化」保存（此刻仍是原始行序），避免随后排序把行序一起写入
+          if (!FIN_READONLY) {
+            try { if (finSaveTimer) { clearTimeout(finSaveTimer); finSaveTimer = null; } } catch(e){}
+            try { await fin_autoSave(); } catch(e){}
+          }
         }
         await Promise.all(sortP);       // 3) 各区域块内按日期排序（视图，不落盘）
       } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); return; }
@@ -17602,11 +19441,20 @@ var PROD_EQUIP_FAULT_KB = {
       try {
         fin_disposeUnit();   // 防止重复创建单元导致重影
         var UNIT_SHEET = (finPresets && finPresets.UniverInstanceType && finPresets.UniverInstanceType.UNIVER_SHEET) || 2;
-        finSheet = finUniver.createUnit(UNIT_SHEET, snapshot);
+        // ★先用【原始完整快照】播三语种（表名/三语块/翻译缓存），再生成"当前语言"的显示快照
+        fin_seedLang(snapshot);
+        finLastView = fin_buildLangView(snapshot, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
+        finSheet = finUniver.createUnit(UNIT_SHEET, finLastView);
       } finally { finLoading = false; }
+      // ★绑定"单元格改数据"监控（新增/修改记录 → 立即翻译同步 + 立即重算高亮）
+      try { fin_bindEdits(); } catch(e){}
+      try { fin_captureEditBase(finLastView); } catch(e){}
       fin_setStatusKey('fin_status_loaded');
-      // 加载后统一日期格式为 DD-MM-YYYY（只改日期单元格）
-      setTimeout(function(){ fin_normalizeDates(snapshot); }, 400);
+      // 加载后统一日期格式为 DD-MM-YYYY（只改日期单元格；必须基于显示快照，列不越界）
+      setTimeout(function(){ fin_normalizeDates(finLastView || snapshot); }, 400);
+      // ★加载后重放"当前选中币种"（默认 VND）：让每张工作表的金额都带货币符号
+      setTimeout(function(){ try { fin_reapplyCurrency(true); } catch(e){} }, 900);
+      setTimeout(function(){ try { fin_captureEditBase(); } catch(e){} }, 1400);
       // 加载后：先清掉历史泄漏到文件里的高亮红（若有），再重新计算高亮。
       // 清理有改动则标脏，让干净版本自动落盘（从此文件不再被污染）。
       setTimeout(function(){
@@ -17634,6 +19482,8 @@ var PROD_EQUIP_FAULT_KB = {
           if (!isViewOnly) fin_markDirty();
           // 数据被改动（新增行 / 改日期 / 排序 / 筛选…）→ 重新计算“最靠近今天”的高亮行
           try { finHiSchedule(); } catch(e){}
+          // ★数据改动 → 立刻扫描"用户到底改了什么"：日期强制 DD-MM-YYYY + 新文字立即调 API 翻译同步
+          try { fin_scheduleEditScan(); } catch(e){}
         };
         if (finUniverAPI && typeof finUniverAPI.onCommandExecuted === 'function') {
           finUniverAPI.onCommandExecuted(listener);
@@ -17665,6 +19515,7 @@ var PROD_EQUIP_FAULT_KB = {
 
     function fin_markDirty(){
       if (finLoading || !finReady) return;
+      if (FIN_READONLY) return;   /* ★只读模式：不改脏、不设保存定时器 */
       finDirty = true;
       fin_setStatusKey('fin_status_dirty');
       if (finSaveTimer) clearTimeout(finSaveTimer);
@@ -17801,6 +19652,7 @@ var PROD_EQUIP_FAULT_KB = {
 
     async function fin_autoSave(){
       if (finSaving || !finReady) return;
+      if (FIN_READONLY) { fin_setStatusKey('fin_status_ready', '（只读，不保存）'); return; }  /* ★ */
       finSaving = true;
       fin_setStatusKey('fin_status_saving');
       try {
@@ -17825,7 +19677,7 @@ var PROD_EQUIP_FAULT_KB = {
     }
 
     async function fin_snapshot(period){
-      if (finDirty) await fin_autoSave();
+      if (finDirty && !FIN_READONLY) await fin_autoSave();   /* ★只读模式不自动保存 */
       try {
         var resp = await fetch('/api/finance/vn-report/snapshot?period=' + encodeURIComponent(period), { method:'POST' });
         var j = await resp.json();
@@ -17835,16 +19687,21 @@ var PROD_EQUIP_FAULT_KB = {
     }
 
     function fin_exportLocal(){
-      // 直接下载服务器上已保存的 xlsx（与当前编辑内容一致，因已自动保存）
+      // 下载【服务器上】的 xlsx。★注意：只读模式（FIN_READONLY=true）下浏览器里的改动不会保存，
+      // 所以导出的永远是服务器那一份；不校验 r.ok 的话，接口 404 时会把 {"error":...} 当 xlsx 下下来。
       fin_setStatusKey('fin_status_exporting');
       fetch('/api/finance/vn-report')
-        .then(function(r){ return r.blob(); })
+        .then(function(r){
+          if (!r.ok) throw new Error(r.status === 404 ? fin_L('fin_status_not_init') : ('HTTP ' + r.status));
+          return r.blob();
+        })
         .then(function(blob){
+          if (!blob || !blob.size) throw new Error('empty');
           var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
           a.download = 'vn_report.xlsx'; a.click(); URL.revokeObjectURL(a.href);
           fin_setStatusKey('fin_status_exported');
         })
-        .catch(function(e){ fin_setStatusKey('fin_status_export_fail', e.message); });
+        .catch(function(e){ fin_setStatusKey('fin_status_export_fail', (e && e.message ? e.message : e)); });
     }
 
     async function fin_reimport(input){
@@ -17917,19 +19774,36 @@ var PROD_EQUIP_FAULT_KB = {
       // 复用同一 id 后，新单元会把同一批权限点按原 id 重新注册，残留校验就能命中。
       if (!snap.id) snap.id = 'vn-report';
       var UNIT_SHEET = (finPresets && finPresets.UniverInstanceType && finPresets.UniverInstanceType.UNIVER_SHEET) || 2;
+      // 复位：重新从服务端快照种三语信息（用户本次会话的改动按语义就该丢弃）
+      try { fin_seedLang(snap); } catch(e){}
+      // ★只显示当前语言那一块（FIN-LANG-VIEW-20261012）：finLastSnapshot 仍存完整快照。
+      var view = fin_buildLangView(snap, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
+      finLastView = view;
       try {
-        finSheet = finUniver.createUnit(UNIT_SHEET, snap);
+        finSheet = finUniver.createUnit(UNIT_SHEET, view);
       } catch (e) {
         // 万一同名单元没清干净（__addUnit 会因重复 id 抛错），退化为唯一 id 兜底
-        snap.id = 'vn-report-' + Date.now();
-        finSheet = finUniver.createUnit(UNIT_SHEET, snap);
+        view.id = 'vn-report-' + Date.now();
+        finSheet = finUniver.createUnit(UNIT_SHEET, view);
       }
       finLastSnapshot = snap;
+      try { fin_bindEdits(); } catch(e){}
+      try { fin_captureEditBase(finLastView); } catch(e){}
     }
 
     function fin_afterDataChange(){
+      if (FIN_READONLY) return;   /* ★只读模式：数据变化不触发保存 */
       try { fin_markDirty(); } catch(e){}
       try { if (typeof fin_autoSave === 'function') fin_autoSave(); } catch(e){}
+    }
+
+    /* ★只读模式 UI 反馈：禁用「保存」按钮，提示用户用「重导」更新报表 */
+    function fin_applyReadonlyUI(){
+      if (!FIN_READONLY) return;
+      try {
+        var btn = document.querySelector('#fin_panel_vn button[onclick="fin_autoSave()"]');
+        if (btn) { btn.disabled = true; btn.title = "只读模式：请使用「重导」上传新的 xlsx 更新报表"; }
+      } catch(e){}
     }
 
     function fin_sortByColumn(dir){
@@ -17969,7 +19843,9 @@ var PROD_EQUIP_FAULT_KB = {
         finFilterActive = false;
         finDateSortDir = 1;
         fin_updateDateSortBtn();
-        setTimeout(function(){ fin_normalizeDates(snap); }, 400);
+        setTimeout(function(){ fin_normalizeDates(finLastView || snap); }, 400);
+        // ★复位后同样重放当前币种
+        setTimeout(function(){ try { fin_reapplyCurrency(true); } catch(e){} }, 900);
         fin_setStatusKey('fin_status_restored');
       } catch(e){
         fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e));
@@ -18017,40 +19893,176 @@ var PROD_EQUIP_FAULT_KB = {
       } catch(e){}
     }
 
-    function fin_applyCurrency(pattern, statusKey){
+    /* ★货币视图缓存（FIN-CURRENCY-20261012）：报表文件是只读源，"哪些格是金额"与"换算值"
+       只取决于文件本身 → 每个币种向后端要一次即可，之后切语言/复位/切回都用缓存重放。 */
+    var finCurCache = {};
+    function fin_applyCurrency(pattern, statusKey, silent){
       if (!pattern) return;
       if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
-      try {
-        var sid = fin_curSheetId();
-        var snap = finLastSnapshot;
-        var unitId = (typeof finSheet.getUnitId === 'function' && finSheet.getUnitId()) || (snap && snap.id) || 'vn-report';
-        var cells = [];
-        // 优先用当前选区
+      // 旧逻辑：百分比/自定义数字格式只套用 numfmt，不改值（fin_applyPercent 仍走这里）
+      if (/[%#]/.test(pattern) || pattern.indexOf('0.00') > -1) {
         try {
-          var wb = finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
-          var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
-          var rng = sh && sh.getActiveRange && sh.getActiveRange();
-          if (rng && typeof rng.getRow === 'function') {
-            var sr = rng.getRow(), sc = rng.getColumn(), er = rng.getLastRow(), ec = rng.getLastColumn();
-            for (var r = sr; r <= er; r++) {
-              for (var c = sc; c <= ec; c++) cells.push({ row: r, col: c, pattern: pattern });
+          var sid = fin_curSheetId();
+          var snap = finLastSnapshot;
+          var unitId = (typeof finSheet.getUnitId === 'function' && finSheet.getUnitId()) || (snap && snap.id) || 'vn-report';
+          var cells = [];
+          try {
+            var wb = finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+            var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+            var rng = sh && sh.getActiveRange && sh.getActiveRange();
+            if (rng && typeof rng.getRow === 'function') {
+              var sr = rng.getRow(), sc = rng.getColumn(), er = rng.getLastRow(), ec = rng.getLastColumn();
+              for (var r = sr; r <= er; r++) {
+                for (var c = sc; c <= ec; c++) cells.push({ row: r, col: c, pattern: pattern });
+              }
+            }
+          } catch(e){}
+          if (!cells.length) {
+            var range = sid ? fin_getUsedRange(snap, sid) : null;
+            if (range) {
+              for (var rr = range.startRow; rr <= range.endRow; rr++) {
+                for (var cc = range.startColumn; cc <= range.endColumn; cc++) cells.push({ row: rr, col: cc, pattern: pattern });
+              }
             }
           }
-        } catch(e){}
-        // 没有选区则用整片数据区
-        if (!cells.length) {
-          var range = sid ? fin_getUsedRange(snap, sid) : null;
-          if (range) {
-            for (var rr = range.startRow; rr <= range.endRow; rr++) {
-              for (var cc = range.startColumn; cc <= range.endColumn; cc++) cells.push({ row: rr, col: cc, pattern: pattern });
+          if (!cells.length) { fin_setStatusKey('fin_status_not_init'); return; }
+          finUniverAPI.executeCommand('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid, values: cells });
+          fin_setStatusKey(statusKey || 'fin_status_currency_applied');
+          fin_afterDataChange();
+        } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); }
+        return;
+      }
+      // 新逻辑：VND/USD/RMB 按历史汇率实际换算（只读模式不改 xlsx）
+      var cur = String(pattern).toUpperCase();
+      if (cur === 'CNY' || cur === '¥') cur = 'RMB';
+      if (cur === '$') cur = 'USD';
+      if (cur !== 'VND' && cur !== 'USD' && cur !== 'RMB') { return; }
+      // ★缓存命中：切语言/复位/切回同一币种都不再打后端（FIN-CURRENCY-20261012）
+      if (finCurCache[cur]) { fin_applyCurrencyData(cur, finCurCache[cur], silent); return; }
+      if (!silent) fin_setStatusKey('fin_status_importing', ' ' + cur);
+      fetch('/api/finance/convert-currency', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: cur })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok) throw new Error((j && j.error) || 'convert failed');
+        finCurCache[cur] = j;                       // 缓存：文件是只读源，结果可复用
+        fin_applyCurrencyData(cur, j, silent);
+      })
+      .catch(function(e){ if (!silent) fin_setStatusKey('fin_status_load_failed', 'currency: ' + String(e)); });
+    }
+
+    /* ★把一份换算结果套到【全部工作表】上（FIN-CURRENCY-20261012）：
+       ① 静态数字格写换算值；② 所有金额格（含公式格、汇总表）套该币种符号。
+       服务端返回的 fmt 列表是"哪些格是金额"，与币种无关；values 是逐格换算值。
+       这两块必须在【每一次视图重建后】重放，否则切语言/复位后金额会退回无符号裸数字。 */
+    function fin_applyCurrencyData(cur, j, silent){
+      try {
+        if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) return;
+        var fmtMap = finCurFmtMap;   // ★单一事实源（FIN-CURR-MONEY-20261012）
+        var snap = finLastSnapshot;
+        var unitId = fin_unitId();
+        var sheets = (snap && snap.sheets) || {};
+        var order = (snap && snap.sheetOrder) || [];
+        var nameToSid = {};
+        for (var i = 0; i < order.length; i++) {
+          var sid = order[i];
+          var n = (sheets[sid] && sheets[sid].name) || '';
+          if (n) nameToSid[n] = sid;
+        }
+        var values = (j && j.values) || {};
+        // 1) 写换算值：只写静态数字格；公式格不覆盖，交给表格自身用同一汇率重算（保证恒等式守恒）
+        for (var sname in values) {
+          var vsid = nameToSid[sname];
+          if (!vsid) { continue; }
+          var smap = values[sname];
+          var rangeMap = {};
+          for (var rstr in smap) {
+            var r = parseInt(rstr, 10);
+            var cols = smap[rstr];
+            var rowMap = null;
+            for (var cstr in cols) {
+              // ★只写显示块内的列（FIN-LANG-VIEW-20261012）：服务端三块都算，视图只留 VI 块
+              if (parseInt(cstr, 10) > FIN_VIEW_MAXCOL) continue;
+              if (!rowMap) rowMap = {};
+              // f:null 必须带：否则 Univer 不会清掉该格原有公式（如 "=150000000"），覆盖值会被忽略
+              rowMap[parseInt(cstr, 10)] = { v: cols[cstr], t: 2, f: null };
             }
+            if (rowMap) rangeMap[r] = rowMap;
+          }
+          if (Object.keys(rangeMap).length) {
+            try { finExecSilent('sheet.command.set-range-values', { unitId: unitId, subUnitId: vsid, value: rangeMap }); } catch(e){ console.warn('[fin currency] set values', e); }
           }
         }
-        if (!cells.length) { fin_setStatusKey('fin_status_not_init'); return; }
-        finUniverAPI.executeCommand('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid, values: cells });
-        fin_setStatusKey(statusKey || 'fin_status_currency_applied');
-        fin_afterDataChange();
-      } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); }
+        // 2) 套货币格式：优先用服务端 fmt（含公式格 + 汇总表 TỔNG HỢP），否则退回用 values 推导
+        var fmtLists = (j && j.fmt) || null;
+        if (!fmtLists) {
+          fmtLists = {};
+          for (var sn0 in values) {
+            var list0 = [];
+            var sm0 = values[sn0];
+            for (var rk in sm0) { for (var ck in sm0[rk]) { list0.push([parseInt(rk, 10), parseInt(ck, 10)]); } }
+            fmtLists[sn0] = list0;
+          }
+        }
+        for (var sn in fmtLists) {
+          var sid2 = nameToSid[sn];
+          if (!sid2) { continue; }
+          var list = fmtLists[sn] || [];
+          var fmtCells = [];
+          for (var k = 0; k < list.length; k++) {
+            if (list[k][1] > FIN_VIEW_MAXCOL) continue;   // ★同上：只套显示块内的列
+            fin_markAmtCol(sid2, list[k][1]);             // ★登记金额列：用户后来新录入的金额也要带符号
+            fmtCells.push({ row: list[k][0], col: list[k][1], pattern: fmtMap[cur] || fmtMap.VND });
+          }
+          if (fmtCells.length) {
+            try { finExecSilent('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: sid2, values: fmtCells }); } catch(e){ console.warn('[fin currency] set numfmt', e); }
+          }
+        }
+        // 2b) ★用户新录入的金额格不在服务端 fmt 列表里 → 按"已登记的金额列"补套当前币种符号
+        //     （否则：录入时带 ₫，一切到 USD，这一格会孤零零留着 ₫，与全表不一致）
+        try {
+          var curPat = fmtMap[cur] || fmtMap.VND;
+          var dispSnap = (typeof fin_currentSnapshot === 'function') ? fin_currentSnapshot() : null;
+          for (var csid in finAmtCols) {
+            var cMap = finAmtCols[csid] || {};
+            var colsArr = [];
+            for (var ck2 in cMap) colsArr.push(parseInt(ck2, 10));
+            if (!colsArr.length) continue;
+            var dsheet = dispSnap && dispSnap.sheets && dispSnap.sheets[csid];
+            var dcd = (dsheet && dsheet.cellData) || null;
+            if (!dcd) continue;
+            var extra = [];
+            for (var rk2 in dcd) {
+              var row2 = dcd[rk2] || {};
+              for (var ci = 0; ci < colsArr.length; ci++) {
+                var cc2 = colsArr[ci];
+                var cv2 = row2[String(cc2)] && row2[String(cc2)].v;
+                var numOk = (typeof cv2 === 'number' && isFinite(cv2)) ||
+                            (typeof cv2 === 'string' && cv2.trim() !== '' && isFinite(Number(cv2.replace(/,/g, ''))));
+                if (numOk) extra.push({ row: parseInt(rk2, 10), col: cc2, pattern: curPat });
+              }
+            }
+            if (extra.length) {
+              try { finExecSilent('sheet.command.numfmt.set.numfmt', { unitId: unitId, subUnitId: csid, values: extra }); } catch(e){}
+            }
+          }
+        } catch(e){ console.warn('[fin currency] extra numfmt', e); }
+        // ★金额列登记兜底：命令生效后再从快照里"带符号的格"反推（幂等）
+        setTimeout(function(){ try { fin_collectAmtCols(); } catch(e){} }, 500);
+        if (!silent) fin_setStatusKey('fin_status_currency_applied', ' ' + cur);
+      } catch(e){ console.warn('[fin] applyCurrencyData', e); }
+    }
+
+    /* ★视图重建后重放"当前选中币种"（FIN-CURRENCY-20261012）：
+       首屏 / 复位 / 切语言都会重建显示单元，重建出来的单位是文件原样（多数工作表无货币符号）。
+       这里统一重放，保证"选了货币 → 所有工作表立即、且始终是那个货币符号"。 */
+    function fin_reapplyCurrency(silent){
+      try {
+        var cur = fin_curCurrencyCode();
+        fin_applyCurrency(cur, null, silent !== false);
+      } catch(e){ console.warn('[fin] reapply currency', e); }
     }
 
     // 用户要求：最上面一行固定显示「%」，点击对当前选区套用百分比格式
@@ -21073,16 +23085,16 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     comm_col_currency:"签约货币", comm_f_currency:"签约货币", comm_cur_rmb:"人民币 RMB", comm_cur_usd:"美元 USD", comm_cur_vnd:"越南盾 VND",
     comm_f_equip_rmb:"设备金额 RMB", comm_f_equip_usd:"设备金额 USD", comm_f_equip_vnd:"设备金额 VND", comm_f_deposit:"定金给付时间",
     fin_tab_vn_report:"越南财务报表", fin_tab_cn_report:"中国财务报表", fin_tab_merge_report:"合并财务总报表", fin_panel_placeholder:"该报表内容建设中，敬请期待。",
-    fin_btn_load:"载入/刷新报表", fin_btn_save:"保存", fin_btn_snapshot:"快照", fin_btn_export:"导出 xlsx", fin_btn_reimport:"重导", fin_btn_filter:"筛选", fin_btn_sort_asc:"升序", fin_btn_sort_desc:"降序",     fin_btn_restore:"复原", fin_btn_date_fmt:"按日-月-年排序",
+    fin_btn_load:"载入/刷新报表", fin_btn_save:"保存", fin_btn_snapshot:"快照", fin_btn_export:"导出 xlsx", fin_btn_reimport:"重导", fin_btn_filter:"筛选", fin_btn_sort_asc:"升序", fin_btn_sort_desc:"降序",     fin_btn_restore:"复原", fin_btn_date_fmt:"按日-月-年排序", fin_btn_ins_rows:"在下方插入行", fin_btn_ins_rows_above:"在上方插入行",
     fin_menu_sort_asc:"升序", fin_menu_sort_desc:"降序", fin_menu_sort_reset:"复位", fin_cur_none:"货币",
     fin_status_not_loaded:"未载入", fin_status_engine:"正在加载表格引擎…", fin_status_importing:"正在导入报表…", fin_status_loaded:"报表已载入", fin_status_ready:"已就绪",
     fin_status_dirty:"有改动，待保存…", fin_status_saving:"保存中…", fin_status_saved:"已保存 ", fin_status_save_failed:"保存失败：", fin_status_no_wb:"保存失败：找不到工作簿",
     fin_status_load_failed:"加载失败：", fin_status_not_init:"尚未初始化报表（需先初始化 Excel）", fin_status_dates_fmt:"已按 DD-MM-YYYY 重排日期，共处理 ", fin_status_dates_none:"没有需要重排的日期单元格", fin_status_dates_sorted:"已在各区域按 DD-MM-YYYY 排序",
     fin_status_snapshot_ok:"已生成快照 ", fin_status_snapshot_fail:"快照失败：", fin_status_exporting:"正在导出…", fin_status_exported:"已导出", fin_status_export_fail:"导出失败：",
     fin_status_reimporting:"正在重新导入…", fin_status_reimported:"已重新导入 ", fin_status_reimport_fail:"重新导入失败：",
-    fin_status_filter_on:"筛选已开启", fin_status_filter_off:"筛选已关闭", fin_status_sorted_asc:"已升序", fin_status_sorted_desc:"已降序", fin_status_restored:"已复原", fin_status_currency_applied:"已应用货币格式", fin_status_percent_applied:"已应用百分比格式",
+    fin_status_filter_on:"筛选已开启", fin_status_filter_off:"筛选已关闭", fin_status_sorted_asc:"已升序", fin_status_sorted_desc:"已降序", fin_status_restored:"已复原", fin_status_currency_applied:"已应用货币格式", fin_status_percent_applied:"已应用百分比格式", fin_status_ins_rows:"已插入行数：",
     // 按钮悬停释义（三语联动）
-    fin_title_currency:"货币", fin_title_reset:"复位", fin_title_percent:"百分比", fin_title_maximize:"最大化", fin_title_close:"关闭", fin_title_rollback:"回滚到此版本",
+    fin_title_currency:"货币", fin_title_reset:"复位", fin_title_percent:"百分比", fin_title_maximize:"最大化", fin_title_close:"关闭", fin_title_rollback:"回滚到此版本", fin_title_ins_rows:"在选中行下方插入 N 行（填 1–200，回车或点按钮）",
     fin_prompt_snapshot:"生成快照周期，例如 2026-10（当月）或 2026（当年）"
   },
   en: { 
@@ -21870,16 +23882,16 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     comm_col_currency:"Contract Currency", comm_f_currency:"Contract Currency", comm_cur_rmb:"CNY (RMB)", comm_cur_usd:"USD", comm_cur_vnd:"VND",
     comm_f_equip_rmb:"Equip Amount RMB", comm_f_equip_usd:"Equip Amount USD", comm_f_equip_vnd:"Equip Amount VND", comm_f_deposit:"Deposit Payment Date",
     fin_tab_vn_report:"Vietnam Financial Report", fin_tab_cn_report:"China Financial Report", fin_tab_merge_report:"Consolidated Financial Statement", fin_panel_placeholder:"Content under construction, please stay tuned.",
-    fin_btn_load:"Load / Refresh", fin_btn_save:"Save", fin_btn_snapshot:"Snapshot", fin_btn_export:"Export xlsx", fin_btn_reimport:"Re-import", fin_btn_filter:"Filter", fin_btn_sort_asc:"Asc", fin_btn_sort_desc:"Desc", fin_btn_restore:"Restore", fin_btn_date_fmt:"Sort by day-month-year",
+    fin_btn_load:"Load / Refresh", fin_btn_save:"Save", fin_btn_snapshot:"Snapshot", fin_btn_export:"Export xlsx", fin_btn_reimport:"Re-import", fin_btn_filter:"Filter", fin_btn_sort_asc:"Asc", fin_btn_sort_desc:"Desc", fin_btn_restore:"Restore", fin_btn_date_fmt:"Sort by day-month-year", fin_btn_ins_rows:"Insert rows below", fin_btn_ins_rows_above:"Insert rows above",
     fin_menu_sort_asc:"Sort A → Z", fin_menu_sort_desc:"Sort Z → A", fin_menu_sort_reset:"Reset sort", fin_cur_none:"Currency",
     fin_status_not_loaded:"Not loaded", fin_status_engine:"Loading engine…", fin_status_importing:"Importing report…", fin_status_loaded:"Report loaded", fin_status_ready:"Ready",
     fin_status_dirty:"Unsaved changes…", fin_status_saving:"Saving…", fin_status_saved:"Saved ", fin_status_save_failed:"Save failed: ", fin_status_no_wb:"Save failed: workbook not found",
     fin_status_load_failed:"Load failed: ", fin_status_not_init:"Report not initialized (init Excel first)", fin_status_dates_fmt:"Dates reformatted as DD-MM-YYYY, total ", fin_status_dates_none:"No date cells to reformat", fin_status_dates_sorted:"Sorted by DD-MM-YYYY within each block",
     fin_status_snapshot_ok:"Snapshot created ", fin_status_snapshot_fail:"Snapshot failed: ", fin_status_exporting:"Exporting…", fin_status_exported:"Exported", fin_status_export_fail:"Export failed: ",
     fin_status_reimporting:"Re-importing…", fin_status_reimported:"Re-imported ", fin_status_reimport_fail:"Re-import failed: ",
-    fin_status_filter_on:"Filter on", fin_status_filter_off:"Filter off", fin_status_sorted_asc:"Sorted ascending", fin_status_sorted_desc:"Sorted descending", fin_status_restored:"Restored", fin_status_currency_applied:"Currency format applied", fin_status_percent_applied:"Percent format applied",
+    fin_status_filter_on:"Filter on", fin_status_filter_off:"Filter off", fin_status_sorted_asc:"Sorted ascending", fin_status_sorted_desc:"Sorted descending", fin_status_restored:"Restored", fin_status_currency_applied:"Currency format applied", fin_status_percent_applied:"Percent format applied", fin_status_ins_rows:"Rows inserted: ",
     // Button hover tooltips (trilingual)
-    fin_title_currency:"Currency", fin_title_reset:"Reset", fin_title_percent:"Percent", fin_title_maximize:"Maximize", fin_title_close:"Close", fin_title_rollback:"Rollback to this version",
+    fin_title_currency:"Currency", fin_title_reset:"Reset", fin_title_percent:"Percent", fin_title_maximize:"Maximize", fin_title_close:"Close", fin_title_rollback:"Rollback to this version", fin_title_ins_rows:"Insert N rows below the selected row (1–200, then Enter or click)",
     fin_prompt_snapshot:"Snapshot period, e.g. 2026-10 (month) or 2026 (year)"
   },
   vi: { 
@@ -22665,16 +24677,16 @@ crm_yes:"Có", crm_no_yes:"Không", lostRestore:"Chuyển về Dự án Tiềm n
     comm_col_currency:"Loại tiền tệ HĐ", comm_f_currency:"Loại tiền tệ HĐ", comm_cur_rmb:"Nhân dân tệ RMB", comm_cur_usd:"Đô USD", comm_cur_vnd:"Việt Nam đồng VND",
     comm_f_equip_rmb:"Giá trị TB RMB", comm_f_equip_usd:"Giá trị TB USD",     comm_f_equip_vnd:"Giá trị TB VND", comm_f_deposit:"Ngày trả đặt cọc",
     fin_tab_vn_report:"Báo cáo tài chính Việt Nam", fin_tab_cn_report:"Báo cáo tài chính Trung Quốc", fin_tab_merge_report:"Báo cáo tài chính tổng hợp", fin_panel_placeholder:"Nội dung đang xây dựng, vui lòng chờ.",
-    fin_btn_load:"Tải lại báo cáo", fin_btn_save:"Lưu", fin_btn_snapshot:"Ảnh chụp", fin_btn_export:"Xuất xlsx", fin_btn_reimport:"Nhập lại", fin_btn_filter:"Lọc", fin_btn_sort_asc:"Tăng", fin_btn_sort_desc:"Giảm", fin_btn_restore:"Khôi phục", fin_btn_date_fmt:"Sắp xếp theo ngày-tháng-năm",
+    fin_btn_load:"Tải lại báo cáo", fin_btn_save:"Lưu", fin_btn_snapshot:"Ảnh chụp", fin_btn_export:"Xuất xlsx", fin_btn_reimport:"Nhập lại", fin_btn_filter:"Lọc", fin_btn_sort_asc:"Tăng", fin_btn_sort_desc:"Giảm", fin_btn_restore:"Khôi phục", fin_btn_date_fmt:"Sắp xếp theo ngày-tháng-năm", fin_btn_ins_rows:"Chèn dòng bên dưới", fin_btn_ins_rows_above:"Chèn dòng bên trên",
     fin_menu_sort_asc:"Sắp xếp A → Z", fin_menu_sort_desc:"Sắp xếp Z → A", fin_menu_sort_reset:"Khôi phục thứ tự", fin_cur_none:"Tiền tệ",
     fin_status_not_loaded:"Chưa tải", fin_status_engine:"Đang tải công cụ bảng…", fin_status_importing:"Đang nhập báo cáo…", fin_status_loaded:"Đã tải báo cáo", fin_status_ready:"Sẵn sàng",
     fin_status_dirty:"Có thay đổi, chờ lưu…", fin_status_saving:"Đang lưu…", fin_status_saved:"Đã lưu ", fin_status_save_failed:"Lưu thất bại: ", fin_status_no_wb:"Lưu thất bại: không tìm thấy bảng tính",
     fin_status_load_failed:"Tải thất bại: ", fin_status_not_init:"Báo cáo chưa khởi tạo (cần khởi tạo Excel)", fin_status_dates_fmt:"Đã sắp xếp lại ngày theo DD-MM-YYYY, tổng ", fin_status_dates_none:"Không có ô ngày cần sắp xếp lại", fin_status_dates_sorted:"Đã sắp xếp theo DD-MM-YYYY trong từng khối",
     fin_status_snapshot_ok:"Đã tạo ảnh chụp ", fin_status_snapshot_fail:"Ảnh chụp thất bại: ", fin_status_exporting:"Đang xuất…", fin_status_exported:"Đã xuất", fin_status_export_fail:"Xuất thất bại: ",
     fin_status_reimporting:"Đang nhập lại…", fin_status_reimported:"Đã nhập lại ", fin_status_reimport_fail:"Nhập lại thất bại: ",
-    fin_status_filter_on:"Đã bật lọc", fin_status_filter_off:"Đã tắt lọc", fin_status_sorted_asc:"Đã sắp xếp tăng", fin_status_sorted_desc:"Đã sắp xếp giảm", fin_status_restored:"Đã khôi phục", fin_status_currency_applied:"Đã áp dụng định dạng tiền tệ", fin_status_percent_applied:"Đã áp dụng định dạng phần trăm",
+    fin_status_filter_on:"Đã bật lọc", fin_status_filter_off:"Đã tắt lọc", fin_status_sorted_asc:"Đã sắp xếp tăng", fin_status_sorted_desc:"Đã sắp xếp giảm", fin_status_restored:"Đã khôi phục", fin_status_currency_applied:"Đã áp dụng định dạng tiền tệ", fin_status_percent_applied:"Đã áp dụng định dạng phần trăm", fin_status_ins_rows:"Đã chèn số dòng: ",
     // Chú thích nút khi hover (3 ngôn ngữ)
-    fin_title_currency:"Tiền tệ", fin_title_reset:"Đặt lại", fin_title_percent:"Phần trăm", fin_title_maximize:"Phóng to", fin_title_close:"Đóng", fin_title_rollback:"Khôi phục về phiên bản này",
+    fin_title_currency:"Tiền tệ", fin_title_reset:"Đặt lại", fin_title_percent:"Phần trăm", fin_title_maximize:"Phóng to", fin_title_close:"Đóng", fin_title_rollback:"Khôi phục về phiên bản này", fin_title_ins_rows:"Chèn N dòng bên dưới dòng đã chọn (nhập 1–200, rồi Enter hoặc bấm nút)",
     fin_prompt_snapshot:"Nhập kỳ ảnh chụp, ví dụ 2026-10 (tháng) hoặc 2026 (năm)"
   }
 };
@@ -39149,6 +41161,11 @@ function showMainContent() {
   if (top) top.classList.remove('hidden');
   if (app) app.classList.remove('hidden');
   if (typeof applyTopbarLang === 'function') applyTopbarLang();
+  /* ★登录/会话就绪后，在后台预热财务表格引擎（详见 fin_prewarmIdle 的说明）。
+     延后 800ms 发起，避免和登录后的首屏渲染抢主线程。 */
+  setTimeout(function(){
+    try { if (typeof fin_prewarmIdle === 'function') fin_prewarmIdle(); } catch(e){}
+  }, 800);
   if (typeof applyEmptyLang === 'function') applyEmptyLang();
   if (typeof applyApprovalsLang === 'function') applyApprovalsLang();
   if (typeof updateLangSwitchUI === 'function') updateLangSwitchUI();
@@ -39514,6 +41531,10 @@ function switchView(name) {
     setTimeout(function(){ fin_renderTabs(FIN_ACTIVE_TAB); }, 0);
     // 进入财务视图即懒加载越南报表的 Univer 实例（首次联网拉取引擎，之后走缓存）
     if (typeof fin_initUniver === 'function') { setTimeout(fin_initUniver, 0); }
+    /* 若引擎是离屏预热的（FIN-PREWARM），搬回正式位置后容器尺寸变了 → 通知 Univer 重新量一次视口 */
+    if (window.__FIN_PREWARM_STARTED) {
+      setTimeout(function(){ try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 80);
+    }
   }
   // 记住当前视图，刷新后仍停留在该标签页
   try { sessionStorage.setItem('won_current_view', name); } catch(e){}

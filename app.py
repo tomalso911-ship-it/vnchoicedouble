@@ -23,6 +23,7 @@ import struct
 from datetime import datetime, timedelta
 import re
 import copy
+import openpyxl
 from flask import Flask, request, jsonify, send_from_directory, Response, redirect
 from flask_cors import CORS
 
@@ -3602,6 +3603,131 @@ FIN_ARCHIVE_DIR = os.path.join(FIN_DIR, "archive")
 for _d in (FIN_DIR, FIN_BACKUP_DIR, FIN_ARCHIVE_DIR):
     os.makedirs(_d, exist_ok=True)
 
+# ---- 快照缓存（FIN-SNAP-CACHE-20261011）----------------------------------------
+# 为什么需要：GET /api/finance/vn-report/snapshot 原先【每次】都用 openpyxl 把整本
+# xlsx 重新转成 Univer 快照，一次要好几秒；上传（或每次自动保存）之后，每刷新一次
+# 就再来一遍，用户体感就是「又慢又总是在加载」。
+# 做法：以【源 xlsx 的 mtime(ns) + 文件大小 + 路径】为缓存键，把转换结果落盘为
+# finance_data/vn_report.snapshot.<键哈希>.json；命中就直接把这个文件发出去
+# （send_from_directory + conditional=True → 浏览器带 If-None-Match/If-Modified-Since
+#  时直接 304，连 JSON 都不用传）。
+#
+# ★★ Windows 关键点：快照文件【按缓存键命名】，重建时写的是新文件名，绝不去覆盖
+#    可能正被上一次响应读着的旧文件。最初写成「固定文件名 + os.replace 覆盖」，
+#    实测（_fin_snap_test.py 第 4 步）会因目标文件正被读而报
+#    WinError 5 Access denied → 500。切换缓存靠那个【从不对外发送】的小键文件，
+#    它自身写入则是原子的（.tmp + os.replace）。
+#
+# ★ 契约：任何改写 FIN_REPORT 的地方都必须调用 _fin_cache_invalidate()，
+#   否则会读到旧快照。硬锁脚本 check_fin_snap_cache.py 会静态检查这三处。
+import threading as _fthreading
+
+FIN_SNAP_KEY = os.path.join(FIN_DIR, "vn_report.snapshot.key")
+FIN_SNAP_PREFIX = "vn_report.snapshot."
+_FIN_SNAP_LOCK = _fthreading.Lock()
+
+
+def _fin_report_key():
+    """缓存键 = 源 xlsx 的 mtime(ns) + 大小 + 路径；文件不存在返回 None。"""
+    try:
+        st = os.stat(FIN_REPORT)
+    except OSError:
+        return None
+    return "%d:%d:%s" % (st.st_mtime_ns, st.st_size, FIN_REPORT)
+
+
+def _fin_cache_name(key):
+    """快照文件名由【缓存键】派生：源文件一变名字就变，旧文件永远不会被覆盖。"""
+    return "%s%s.json" % (FIN_SNAP_PREFIX, hashlib.sha1(key.encode("utf-8")).hexdigest()[:16])
+
+
+def _fin_cache_files():
+    """当前目录下所有快照文件（含旧键遗留的，用于清理）。"""
+    try:
+        return [fn for fn in os.listdir(FIN_DIR)
+                if fn.startswith(FIN_SNAP_PREFIX) and fn.endswith(".json")]
+    except OSError:
+        return []
+
+
+def _fin_cache_current():
+    """返回 (当前键, 当前可用的快照绝对路径或 None)。"""
+    key = _fin_report_key()
+    if key is None:
+        return None, None
+    try:
+        with open(FIN_SNAP_KEY, "r", encoding="utf-8") as fh:
+            got = fh.read().strip()
+    except OSError:
+        return key, None
+    if got != key:
+        return key, None
+    path = os.path.join(FIN_DIR, _fin_cache_name(key))
+    return key, (path if os.path.isfile(path) else None)
+
+
+def _fin_cache_valid():
+    """键文件 = 当前源文件的键，且对应快照文件在 → 缓存可用。"""
+    return _fin_cache_current()[1] is not None
+
+
+def _fin_cache_invalidate():
+    """源 xlsx 被改写后必须调用：丢掉键与所有快照（下次 GET 重新转换并缓存）。
+    删不掉的（正被某个响应读着）留到下次 _fin_cache_build 里再清，不影响正确性。"""
+    try:
+        os.remove(FIN_SNAP_KEY)
+    except OSError:
+        pass
+    for fn in _fin_cache_files():
+        try:
+            os.remove(os.path.join(FIN_DIR, fn))
+        except OSError:
+            pass
+
+
+def _fin_cache_build(force=False):
+    """把 xlsx 转成快照并落盘。返回 (ok, detail)；detail ∈ hit/built/错误原因。
+    ★顺序不可颠倒：先把快照写成【新文件名】并原子就位，最后才切键文件 ——
+      保证「有键必有完整快照」，绝不会把半截 JSON 发出去。"""
+    key = _fin_report_key()
+    if key is None:
+        return False, "not initialized"
+    with _FIN_SNAP_LOCK:
+        if not force and _fin_cache_valid():
+            return True, "hit"
+        try:
+            sys.path.insert(0, BASE_DIR)
+            import univer_convert
+            snap = univer_convert.xlsx_to_univer(FIN_REPORT)
+        except Exception as e:
+            return False, "convert failed: %s" % e
+        path = os.path.join(FIN_DIR, _fin_cache_name(key))
+        part = path + ".part"
+        tmp_key = FIN_SNAP_KEY + ".tmp"
+        try:
+            with open(part, "w", encoding="utf-8") as fh:
+                json.dump(snap, fh, ensure_ascii=False, separators=(",", ":"))
+            os.replace(part, path)          # 新文件名，不可能撞上正被读的旧文件
+            with open(tmp_key, "w", encoding="utf-8") as fh:
+                fh.write(key)
+            os.replace(tmp_key, FIN_SNAP_KEY)   # 键文件最后才切（它从不对外发送）
+        except OSError as e:
+            for p in (part, tmp_key):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            return False, "cache write failed: %s" % e
+        # 清掉旧键遗留下来的快照（删不掉的留到下次，不影响正确性）
+        keep = os.path.basename(path)
+        for fn in _fin_cache_files():
+            if fn != keep:
+                try:
+                    os.remove(os.path.join(FIN_DIR, fn))
+                except OSError:
+                    pass
+        return True, "built"
+
 
 def _fin_daily_backup():
     """每日一份备份；删除超过 30 天的旧备份，磁盘占用封顶约 30 份。"""
@@ -3658,6 +3784,7 @@ def fin_save_report():
         except OSError:
             pass
     _fin_daily_backup()
+    _fin_cache_invalidate()   # ★源文件已改写：必须丢掉旧快照缓存
     return jsonify({
         "ok": True,
         "bytes": len(data),
@@ -3701,21 +3828,226 @@ def fin_init_report():
         fh.write(data)
     os.replace(tmp, FIN_REPORT)
     _fin_daily_backup()
-    return jsonify({"ok": True, "bytes": len(data)})
+    _fin_cache_invalidate()   # ★新种子：丢掉旧快照缓存
+    # 上传是一次明确的用户动作（本来就在等），这里顺手把快照转换一次并缓存，
+    # 于是上传后那一次自动刷新也能直接命中缓存，不再重新解析 xlsx。
+    _warm_ok, _warm_detail = _fin_cache_build(force=True)
+    if not _warm_ok:
+        # 预热失败不影响上传结果：留着缓存不写，下次 GET 再惰性转换
+        sys.stderr.write("[fin_init_report] snapshot warm failed: %s\n" % _warm_detail)
+        sys.stderr.flush()
+    return jsonify({"ok": True, "bytes": len(data), "snapshot": "built" if _warm_ok else "lazy"})
 
 
 @app.route("/api/finance/vn-report/snapshot", methods=["GET"])
 def fin_get_snapshot():
-    # 返回 Univer 快照（JSON），前端 createUniverSheet 加载（xlsx->快照在后端用 openpyxl 完成）
+    # 返回 Univer 快照（JSON），前端 createUniverSheet 加载（xlsx->快照在后端用 openpyxl 完成）。
+    # ★ 命中缓存（源 xlsx 未变）就直接发缓存文件，不再重新解析 xlsx：
+    #   conditional=True → 浏览器已存有同一份时回 304，连 JSON 都不必再传一遍。
     if not os.path.isfile(FIN_REPORT):
         return jsonify({"error": "not initialized"}), 404
+    _snap_key, _snap_path = _fin_cache_current()
+    if _snap_path is None:
+        ok, detail = _fin_cache_build(force=True)
+        if not ok:
+            return jsonify({"error": detail}), 500
+        _snap_key, _snap_path = _fin_cache_current()
+        if _snap_path is None:
+            return jsonify({"error": "cache unavailable"}), 500
+    resp = send_from_directory(FIN_DIR, os.path.basename(_snap_path),
+                               mimetype="application/json", conditional=True)
+    resp.headers["Content-Type"] = "application/json; charset=utf-8"
+    resp.headers["X-Fin-Snap-Cache"] = "hit"
+    return resp
+
+
+@app.route("/api/finance/sheet-titles", methods=["GET"])
+def fin_sheet_titles():
+    """各 sheet 的三语标签名（供前端语言切换时改工作表标签）。"""
+    p = os.path.join(FIN_DIR, "fin_sheet_titles.json")
+    titles = {}
+    if os.path.isfile(p):
+        try:
+            with open(p, encoding="utf-8") as fh:
+                titles = json.load(fh) or {}
+        except Exception:
+            titles = {}
+    return jsonify({"ok": True, "titles": titles})
+
+
+@app.route("/api/finance/convert-currency", methods=["POST"])
+def fin_convert_currency():
+    """整张报表用【同一个汇率】（报表截至日 = "As of <date>" 或报表内最大日期）折算。
+       因为只是"全表乘同一常数"，D-E=F、小计、滚动余额、跨表汇总(TỔNG HỢP)等恒等式全部守恒，
+       不会出现"逐行汇率不同→毛额误差淹没净额→正数变负数"的问题。
+       - values：只给【静态数字格】的换算值；公式格不写值，交给表格自身重算（同一汇率 → 结果一致）。
+       - fmt   ：所有金额格（含公式格、汇总表 TỔNG HỢP）的 0 基 row/col，供前端统一套货币格式。"""
+    data = request.get_json(force=False, silent=True) or {}
+    target = (data.get("target") or "").upper().replace("CNY", "RMB").replace("¥", "RMB")
+    if target not in ("VND", "USD", "RMB"):
+        return jsonify({"ok": False, "error": "target must be VND/USD/RMB"}), 400
+    if not os.path.isfile(FIN_REPORT):
+        return jsonify({"ok": False, "error": "report not initialized"}), 404
+
+    # 读历史汇率缓存（USD→VND、USD→CNY），推导 CNY→VND（保留精度）
+    conn = get_db()
     try:
-        sys.path.insert(0, BASE_DIR)
-        import univer_convert
-        snap = univer_convert.xlsx_to_univer(FIN_REPORT)
-    except Exception as e:
-        return jsonify({"error": "convert failed: %s" % e}), 500
-    return jsonify(snap)
+        fx = _fx_load_cache(conn)
+    finally:
+        conn.close()
+    usdvnd = fx.get("USDVND", {})
+    usdcny = fx.get("USDCNY", {})
+    cnyvnd = {}
+    for d, u in usdvnd.items():
+        c = usdcny.get(d)
+        if c:
+            cnyvnd[d] = u / c
+
+    def nearest_rate(date_str, rate_map):
+        if not rate_map or not date_str:
+            return None
+        if date_str in rate_map:
+            return rate_map[date_str]
+        earlier = [d for d in rate_map if d <= date_str]
+        if earlier:
+            return rate_map[max(earlier)]
+        later = [d for d in rate_map if d >= date_str]
+        if later:
+            return rate_map[min(later)]
+        return None
+
+    def norm_header(v):
+        if not v:
+            return ""
+        s = str(v).lower()
+        for a, b in (("à","a"),("á","a"),("ạ","a"),("ả","a"),("ã","a"),("ă","a"),("ắ","a"),("ằ","a"),("ẳ","a"),("ẵ","a"),("ặ","a"),("â","a"),("ấ","a"),("ầ","a"),("ẩ","a"),("ẫ","a"),("ậ","a"),
+                     ("đ","d"),("é","e"),("è","e"),("ẻ","e"),("ẽ","e"),("ẹ","e"),("ê","e"),("ế","e"),("ề","e"),("ể","e"),("ễ","e"),("ệ","e"),
+                     ("í","i"),("ì","i"),("ỉ","i"),("ĩ","i"),("ị","i"),
+                     ("ó","o"),("ò","o"),("ỏ","o"),("õ","o"),("ọ","o"),("ô","o"),("ố","o"),("ồ","o"),("ổ","o"),("ỗ","o"),("ộ","o"),("ơ","o"),("ớ","o"),("ờ","o"),("ở","o"),("ỡ","o"),("ợ","o"),
+                     ("ú","u"),("ù","u"),("ủ","u"),("ũ","u"),("ụ","u"),("ư","u"),("ứ","u"),("ừ","u"),("ử","u"),("ữ","u"),("ự","u"),
+                     ("ý","y"),("ỳ","y"),("ỷ","y"),("ỹ","y"),("ỵ","y")):
+            s = s.replace(a, b)
+        return s
+
+    wbD = openpyxl.load_workbook(FIN_REPORT, data_only=True)     # 缓存值
+    wbF = openpyxl.load_workbook(FIN_REPORT, data_only=False)    # 公式
+
+    ASOF_RE = re.compile(r"as of\s+([A-Za-z]{3,9})\s+(\d{1,2}),\s*(\d{4})", re.I)
+    asof_text = None
+    max_date = None
+    sheets = []   # (title, header_row, amount_cols)
+    for ws in wbD.worksheets:
+        wsF = wbF[ws.title]
+        # (a) 抓 "As of <date>" 文本（前 8 行 × 前 6 列）
+        for r in range(1, min(ws.max_row, 8) + 1):
+            for c in range(1, min(ws.max_column, 6) + 1):
+                v = ws.cell(r, c).value
+                if isinstance(v, str) and "as of" in v.lower():
+                    m = ASOF_RE.search(v)
+                    if m:
+                        raw = "%s %s, %s" % (m.group(1), m.group(2), m.group(3))
+                        for fmt in ("%b %d, %Y", "%B %d, %Y"):
+                            try:
+                                asof_text = datetime.strptime(raw, fmt).strftime("%Y-%m-%d")
+                                break
+                            except Exception:
+                                pass
+        # (b) 明细表：A 列表头为 Ngày hạch toán，且含精确 thu/chi/ton → VI+10+20 三块金额列
+        header_row = None
+        amount_cols = []
+        for r in range(1, min(ws.max_row, 20) + 1):
+            first10 = [norm_header(ws.cell(r, c).value) for c in range(1, min(ws.max_column, 10) + 1)]
+            if not (first10 and ("ngay" in first10[0] or "hach toan" in first10[0])):
+                continue
+            found = [i + 1 for i, h in enumerate(first10) if h in ("thu", "chi", "ton")]
+            if found:
+                header_row = r
+                cols = []
+                for c in found:
+                    for cc in (c, c + 10, c + 20):
+                        if cc <= ws.max_column:
+                            cols.append(cc)
+                amount_cols = sorted(set(cols))
+                break
+        # (c) 汇总表（如 TỔNG HỢP）：列头含 amount / số tiền
+        if not amount_cols:
+            for r in range(1, min(ws.max_row, 20) + 1):
+                hits = []
+                for c in range(1, min(ws.max_column, 30) + 1):
+                    h = norm_header(ws.cell(r, c).value)
+                    if ("amount" in h) or ("so tien" in h):
+                        hits.append(c)
+                if hits:
+                    header_row = r
+                    amount_cols = sorted(set(hits))
+                    break
+        # (d) 该表最大日期（用于兜底"截至日"）
+        for r in range(1, ws.max_row + 1):
+            v = ws.cell(r, 1).value
+            if isinstance(v, datetime):
+                ds = v.strftime("%Y-%m-%d")
+                if max_date is None or ds > max_date:
+                    max_date = ds
+        if amount_cols:
+            sheets.append((ws.title, header_row, amount_cols))
+
+    asof = asof_text or max_date
+    usd_rate = nearest_rate(asof, usdvnd)
+    cny_rate = nearest_rate(asof, cnyvnd)
+
+    values = {}
+    fmt = {}
+    for (title, header_row, amount_cols) in sheets:
+        wsD = wbD[title]
+        wsF = wbF[title]
+        vmap = {}
+        flist = []
+        for r in range(header_row + 1, wsD.max_row + 1):
+            for c in amount_cols:
+                cached = wsD.cell(r, c).value
+                frm = wsF.cell(r, c).value
+                is_formula = isinstance(frm, str) and frm.startswith("=")
+                num = None
+                if is_formula:
+                    # 纯数字常量公式（如 "=150000000"）其实是硬编码金额 → 当静态值换算；
+                    # 只有真正的计算式（=SUM(...)、=D5-E5、=+F..+D..-E..）才交给表格重算。
+                    lit = frm[1:].strip().lstrip("+").strip()
+                    try:
+                        num = float(lit)
+                    except Exception:
+                        num = None
+                elif cached is not None:
+                    try:
+                        num = float(cached)
+                    except Exception:
+                        num = None
+
+                is_real_formula = is_formula and num is None
+                if num is None and not is_real_formula:
+                    continue                     # 空格：不写值也不套格式
+                flist.append([r - 1, c - 1])     # 套货币格式（含真公式格）
+                if is_real_formula:
+                    continue                     # 真公式格：交给表格自身重算，不覆盖
+                if target == "VND":
+                    conv = num
+                elif target == "USD":
+                    conv = round(num / usd_rate, 2) if usd_rate else num
+                else:  # RMB
+                    conv = round(num / cny_rate, 2) if cny_rate else num
+                vmap.setdefault(r - 1, {})[c - 1] = conv
+        if vmap:
+            values[title] = vmap
+        if flist:
+            fmt[title] = flist
+
+    if target == "USD":
+        rate = usd_rate
+    elif target == "RMB":
+        rate = cny_rate
+    else:
+        rate = 1
+    return jsonify({"ok": True, "target": target, "asof": asof, "rate": rate,
+                    "values": values, "fmt": fmt})
 
 
 @app.route("/api/finance/vn-report/save", methods=["POST"])
@@ -3740,6 +4072,7 @@ def fin_save_snapshot():
             except OSError:
                 pass
         _fin_daily_backup()
+        _fin_cache_invalidate()   # ★快照已写回 xlsx：丢掉旧快照缓存
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
@@ -6066,16 +6399,10 @@ def api_translate():
         return jsonify({"ok": False, "error": "empty q"}), 400
     if target not in ("zh", "en", "vi"):
         return jsonify({"ok": False, "error": "bad target"}), 400
-    try:
-        u = ("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl="
-             + urllib.parse.quote(target) + "&dt=t&q=" + urllib.parse.quote(q))
-        _req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(_req, timeout=8) as _resp:
-            _data = json.loads(_resp.read().decode("utf-8"))
-        _text = "".join(seg[0] for seg in (_data[0] or []) if seg and seg[0])
-        return jsonify({"ok": True, "text": _text})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 502
+    t = fin_translate(q, target)
+    if t:
+        return jsonify({"ok": True, "text": t})
+    return jsonify({"ok": False, "error": "translation failed (all providers)"}), 502
 
 # ===================== 服务端备注三语补翻（复刻云端 M13）=====================
 # 触发：前端列表加载后 fire 调用 /api/translate-remarks?table=...&limit=N
@@ -6087,19 +6414,88 @@ def api_translate():
 _TRANSLATE_CACHE = {}  # "text|target" -> translation
 
 
+# ---- 统一翻译链（FIN-TRANS-CHAIN）：Google(主) -> DeepL(备) -> MyMemory(末) ----
+# DeepL key：优先环境变量 DEEPL_API_KEY，否则读 finance_data/.deepl_key（已 gitignore）
+_DEEPL_KEY = os.environ.get("DEEPL_API_KEY") or ""
+if not _DEEPL_KEY:
+    try:
+        _kf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "finance_data", ".deepl_key")
+        if os.path.isfile(_kf):
+            _DEEPL_KEY = open(_kf, encoding="utf-8").read().strip()
+    except Exception:
+        _DEEPL_KEY = ""
+_DEEPL_ENDPOINT = "https://api-free.deepl.com/v2/translate"
+_DEEPL_LANG = {"zh": "ZH", "en": "EN", "vi": "VI"}
+
+
+def _gtrans_google(text, target):
+    try:
+        u = ("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl="
+             + urllib.parse.quote(target) + "&dt=t&q=" + urllib.parse.quote(text))
+        req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            d = json.loads(resp.read().decode("utf-8"))
+        return "".join(seg[0] for seg in (d[0] or []) if seg and seg[0])
+    except Exception:
+        return ""
+
+
+def _gtrans_deepl(text, target):
+    if not _DEEPL_KEY:
+        return ""
+    try:
+        body = urllib.parse.urlencode({"text": text, "target_lang": _DEEPL_LANG[target]}).encode("utf-8")
+        req = urllib.request.Request(_DEEPL_ENDPOINT, data=body, method="POST")
+        req.add_header("Authorization", "DeepL-Auth-Key " + _DEEPL_KEY)
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        req.add_header("User-Agent", "Mozilla/5.0")
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            j = json.loads(resp.read().decode("utf-8"))
+        return (j.get("translations") or [{}])[0].get("text") or ""
+    except Exception:
+        return ""
+
+
+def _gtrans_mymemory(text, target):
+    try:
+        u = ("https://api.mymemory.translated.net/get?q=" + urllib.parse.quote(text)
+             + "&langpair=vi|" + urllib.parse.quote(target))
+        req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            d = json.loads(resp.read().decode("utf-8"))
+        t = (d.get("responseData") or {}).get("translatedText") or ""
+        if "MYMEMORY WARNING" in t:
+            return ""
+        return t
+    except Exception:
+        return ""
+
+
+def fin_translate(text, target):
+    """三档翻译链，返回译文；全失败返回 ''。结果经 _TRANSLATE_CACHE 缓存。"""
+    text = (text or "").strip()
+    if not text or target not in ("zh", "en", "vi"):
+        return ""
+    ck = text + "|" + target
+    if ck in _TRANSLATE_CACHE:
+        return _TRANSLATE_CACHE[ck]
+    res = ""
+    for fn in (_gtrans_google, _gtrans_deepl, _gtrans_mymemory):
+        try:
+            r = fn(text, target)
+        except Exception:
+            r = ""
+        if r:
+            res = r
+            break
+    if res:
+        _TRANSLATE_CACHE[ck] = res
+    return res
+
+
 def _google_translate_single(text, target):
-    key = text + "|" + target
-    if key in _TRANSLATE_CACHE:
-        return _TRANSLATE_CACHE[key]
-    u = ("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl="
-         + urllib.parse.quote(target) + "&dt=t&q=" + urllib.parse.quote(text))
-    _req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(_req, timeout=8) as _resp:
-        _data = json.loads(_resp.read().decode("utf-8"))
-    _text = "".join(seg[0] for seg in (_data[0] or []) if seg and seg[0])
-    if _text:
-        _TRANSLATE_CACHE[key] = _text
-    return _text
+    # 复用统一翻译链（Google->DeepL->MyMemory），保持历史调用方兼容
+    return fin_translate(text, target)
 
 
 def _parse_tri(v):
