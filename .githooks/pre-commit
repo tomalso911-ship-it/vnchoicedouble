@@ -40,6 +40,19 @@
 #   8) check_prod_date_rule.py —— 生产操作日期 ≥ 排产开始日期（数据一致性巡检）
 #   9) check_prod_out_rule.py  —— 出库量 ≤ 当前生产总量（数据一致性巡检）
 #
+#   10) check_fin_formula_lock.py —— 财务 Univer sheets-formula「bufferWhen 爆栈防护」锁死区
+#                                  （FIN-FORMULA-STACK-20261013）：
+#                                  ① importmap 必须把 @univerjs/sheets-formula 指到 preset-sheets-core
+#                                     内部引用的同一个文件 URL（否则浏览器加载第二个模块实例 →
+#                                     DI token 不同 → 补丁打在错的类上，控制台依旧爆栈）
+#                                  ② importmap 必须有 "rxjs" → /rxjs@>=7.0.0?target=es2022（同一份 rxjs）
+#                                  ③ fin_patchFormulaService 必须：包 _initFormulaRegister、把
+#                                     calculateStarted$ 换成「无回放转发外壳」、外壳 pipe 前插 skip(1)
+#                                     （★核心一行，删掉即复发 max call stack）、orig.call(self) 调回原实现
+#                                  ④ 打补丁【必须早于】presets.createUniver(...)：服务的构造函数在其内部跑
+#                                  ⑤ 自检 fin_formulaSafeCheck 只在原型上查标记，不得早调 injector.get()
+#                                     （单元未建/服务未注册时 redi 会抛 required dependency items）
+#
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
 #   但会在提交时打印，便于及时发现并修复。CI 中建议作为独立步骤做硬阻断。
@@ -67,7 +80,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then

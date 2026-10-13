@@ -51,8 +51,10 @@ def _xlsx_border_side(side):
     return {'s': style, 'cl': ({'rgb': cl} if cl else {})}
 
 
-def xlsx_to_univer(path):
-    """读取 xlsx 文件，返回 Univer IWorkbookData 字典。"""
+def xlsx_to_univer(path, snap_id='vn-report'):
+    """读取 xlsx 文件，返回 Univer IWorkbookData 字典。
+    ★snap_id：Univer 工作簿 id（越南报表用默认 'vn-report'；中国报表传 'cn-report'，
+      两张报表各自一个单元，切标签时互不串台）。默认值不变 → 越南那条链路完全不受影响。"""
     wb = openpyxl.load_workbook(path, data_only=False, read_only=False)
     sheet_order = []
     sheets = {}
@@ -144,8 +146,8 @@ def xlsx_to_univer(path):
             'rowData': row_data,
         }
     snapshot = {
-        'id': 'vn-report',
-        'name': 'vn-report',
+        'id': snap_id,
+        'name': snap_id,
         'appVersion': APP_VERSION,
         'locale': 'enUS',
         'styles': styles,

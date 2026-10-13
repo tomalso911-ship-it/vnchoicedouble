@@ -3882,8 +3882,13 @@ def fin_get_snapshot():
 
 @app.route("/api/finance/sheet-titles", methods=["GET"])
 def fin_sheet_titles():
-    """各 sheet 的三语标签名（供前端语言切换时改工作表标签）。"""
-    p = os.path.join(FIN_DIR, "fin_sheet_titles.json")
+    """各 sheet 的三语标签名（供前端语言切换时改工作表标签）。
+    ?kind=vn（默认）→ finance_data/fin_sheet_titles.json
+    ?kind=cn        → finance_data/fin_sheet_titles_cn.json（中国报表，只有「实际支出」一张表）
+    ★两份文件分开存放，中国报表绝不会覆盖越南那份（DABACO 保护词就在越南那份里）。"""
+    kind = (request.args.get("kind") or "vn").strip().lower()
+    fname = "fin_sheet_titles_cn.json" if kind == "cn" else "fin_sheet_titles.json"
+    p = os.path.join(FIN_DIR, fname)
     titles = {}
     if os.path.isfile(p):
         try:
@@ -3891,7 +3896,7 @@ def fin_sheet_titles():
                 titles = json.load(fh) or {}
         except Exception:
             titles = {}
-    return jsonify({"ok": True, "titles": titles})
+    return jsonify({"ok": True, "kind": kind, "titles": titles})
 
 
 @app.route("/api/finance/convert-currency", methods=["POST"])
@@ -4099,6 +4104,489 @@ def fin_save_snapshot():
         sys.stderr.flush()
         return jsonify({"error": "convert failed: %s" % e}), 500
     return jsonify({"ok": True, "saved_at": _fdt.datetime.now().isoformat(timespec="seconds")})
+
+
+# ===================== 财务管理：中国报表（Univer）本地落盘 =====================
+# 用户要求（2026-10-13）：把越南财务报表的【整套表格逻辑】原样复制到中国财务报表，
+# 差别只有一个——中国报表的 Excel 里【只有一张工作表「实际支出」】，其它 7 张表不需要。
+#   · 文件      ：finance_data/cn_report.xlsx（工作表名「实际支出」）
+#   · 快照缓存  ：cn_report.snapshot.<键哈希>.json + cn_report.snapshot.key（与越南同构）
+#   · 每日备份  ：finance_data/backups/cn_report_<YYYY-MM-DD>.xlsx.bak（滚动 30 份）
+#   · 接口      ：/api/finance/cn-report[/snapshot|/init|/save]
+#   · 表名三语  ：finance_data/fin_sheet_titles_cn.json（与越南那份分开，互不覆盖）
+#   · 核销列    ：工作表 AC 列（第 29 列）表头「核销」，下面是每行的勾选框
+#   ★★「自动翻译」逻辑一个字都没改：仍然走前端那套 finTransCache + /api/translate +
+#      fin_translate（FIN-TRANS-CHAIN）。这里只是把【数据源】从 vn_report.xlsx 换成
+#      cn_report.xlsx，翻译链/缓存/保护词判定全部复用，不新增也不改写。
+CN_REPORT = os.path.join(FIN_DIR, "cn_report.xlsx")
+CN_SNAP_KEY = os.path.join(FIN_DIR, "cn_report.snapshot.key")
+CN_SNAP_PREFIX = "cn_report.snapshot."
+CN_TITLES_PATH = os.path.join(FIN_DIR, "fin_sheet_titles_cn.json")
+_CN_SNAP_LOCK = _fthreading.Lock()
+
+CN_SHEET_NAME = "实际支出"      # 中国报表唯一的工作表
+CN_TITLE_ROW = 4                # 表头行（1 基）
+CN_FIRST_DATA_ROW = 5           # 第一条数据行
+CN_SEED_ROWS = 200              # 种子文件预留的空数据行数
+CN_CHECK_COL = 29               # AC 列（1 基）＝核销勾选框列
+CN_CHECK_HEAD = "核销"
+CN_CHECK_ON = "☑"
+CN_CHECK_OFF = "☐"
+# 中国报表【数据区】字体颜色（用户要求：除"屏幕高亮的红色加粗行"外，其余行都是蓝色）。
+# 纯蓝；想换成柔和的 Office 蓝就改成 "FF0070C0"。
+CN_TEXT_BLUE = "FF0000FF"
+
+
+def _cn_make_seed_xlsx(path):
+    """生成中国报表种子文件：只含一张「实际支出」表，三语表头与越南那张完全一致，
+    并预留 AC 核销列（每行一个空勾选框 ☐）+ 末尾合计行。"""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = CN_SHEET_NAME
+    bold = Font(bold=True)
+    center = Alignment(horizontal="center", vertical="center")
+    ws["A1"] = "SỔ CHI TIẾT CHI TIỀN"
+    ws["K1"] = "付款明细账簿"
+    ws["U1"] = "PAYMENTS DETAIL"
+    ws["A2"] = "Tiền mặt + Tiền gửi ngân hàng"
+    ws["K2"] = "现金 + 银行存款"
+    ws["U2"] = "Cash + Bank deposits"
+    ws.merge_cells("A1:E1")
+    ws.merge_cells("A2:E2")
+    for col, txt in (("A", "Ngày hạch toán"), ("B", "Số chứng từ"), ("C", "Diễn giải"),
+                     ("D", "Thu"), ("E", "Chi"),
+                     ("K", "记账日期"), ("L", "凭证号"), ("M", "摘要"),
+                     ("N", "收入"), ("O", "支出"),
+                     ("U", "Accounting date"), ("V", "Document No."), ("W", "Description"),
+                     ("X", "Receipts"), ("Y", "Payments"),
+                     ("AC", CN_CHECK_HEAD)):
+        c = ws["%s%d" % (col, CN_TITLE_ROW)]
+        c.value = txt
+        c.font = bold
+        c.alignment = center
+    last = CN_FIRST_DATA_ROW + CN_SEED_ROWS - 1
+    for r in range(CN_FIRST_DATA_ROW, last + 1):
+        for col in ("A", "K", "U"):
+            ws["%s%d" % (col, r)].number_format = "dd-mm-yyyy"
+        for col in ("D", "E", "N", "O", "X", "Y"):
+            ws["%s%d" % (col, r)].number_format = "#,##0_);(#,##0)"
+        ac = ws["AC%d" % r]
+        ac.value = CN_CHECK_OFF
+        ac.alignment = center          # ★勾选框水平+垂直居中（用户要求"选择框左右居中"）
+    tot = last + 1
+    _sum = "=SUM(E%d:E%d)" % (CN_FIRST_DATA_ROW, last)
+    ws["C%d" % tot] = "TỔNG CỘNG"
+    ws["E%d" % tot] = _sum
+    ws["M%d" % tot] = "全部的"
+    ws["O%d" % tot] = _sum
+    ws["W%d" % tot] = "TOTAL"
+    ws["Y%d" % tot] = _sum
+    for col, w in (("A", 11.7), ("B", 11.3), ("C", 34.8), ("D", 11.7), ("E", 20.3), ("AC", 10)):
+        ws.column_dimensions[col].width = w
+    wb.save(path)
+
+
+def _cn_normalize_ac_align():
+    """把中国报表 AC 列（核销）单元格设成【水平 + 垂直居中】——用户要求"选择框左右居中"。
+    为什么必须改文件：保存链路（前端 finCnBuildSavePayload）写回时是【保留文件原样式、只更新值】，
+       前端视图上的对齐不会被写进文件，所以只能落在 xlsx 里。
+    幂等：已经居中的文件不会被重写（否则每次启动都动 mtime → 白重建一次快照缓存）。
+    返回 True 表示改过文件（调用方据此让快照缓存失效）。"""
+    if not os.path.isfile(CN_REPORT):
+        return False
+    try:
+        import openpyxl
+        from openpyxl.styles import Alignment
+        wb = openpyxl.load_workbook(CN_REPORT)
+        ws = wb[CN_SHEET_NAME] if CN_SHEET_NAME in wb.sheetnames else wb[wb.sheetnames[0]]
+        col = openpyxl.utils.get_column_letter(CN_CHECK_COL)     # 29 -> 'AC'
+        center = Alignment(horizontal="center", vertical="center")
+        changed = 0
+        for r in range(1, ws.max_row + 1):
+            cell = ws["%s%d" % (col, r)]
+            if cell.value is None or str(cell.value).strip() == "":
+                continue
+            a = cell.alignment
+            if a and a.horizontal == "center" and a.vertical == "center":
+                continue
+            cell.alignment = center
+            changed += 1
+        if changed:
+            wb.save(CN_REPORT)
+            sys.stderr.write("[fin-cn] 核销列 %d 个单元格已设为居中\n" % changed)
+        return changed > 0
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 核销列居中处理失败: %s\n" % e)
+        return False
+
+
+# 合计行标签（蓝化时跳过这些行）：三语块各自的合计文字
+CN_TOTAL_LABELS = frozenset(["TỔNG CỘNG", "全部的", "TOTAL", "合计", "总计"])
+
+
+def _cn_is_total_row(row_cells):
+    """判定"合计行"：本行内只要有一个单元格的值正好是合计标签，就认为整行是合计行（不蓝化）。"""
+    for c in row_cells:
+        v = c.value
+        if isinstance(v, str) and v.strip().upper() in CN_TOTAL_LABELS:
+            return True
+    return False
+
+
+def _cn_normalize_text_color():
+    """把中国报表【数据区】的字体设成蓝色 —— 用户要求：「除了红色加粗这一行以外的行，都改成蓝色」。
+
+    ★为什么必须落进文件、而不是只改屏幕：
+      保存链路（前端 finCnBuildSavePayload 里的 put()）是「保留文件原样式、只更新值」，
+      屏幕上现加的颜色根本不会写回 xlsx；反过来，文件里的蓝色会成为单元格的"基样式"，
+      用户在 App 或 Excel 里新录入的内容会自动继承蓝色 → 一次到位、以后不用管。
+    ★与屏幕高亮的关系：高亮（红 + 粗）是【只显示在屏幕上】的，覆盖在蓝色之上，两者不冲突；
+      FIN-HI-LOCK-20261011 的保存剥离只针对红（rgb 含 FF0000）+ 粗，蓝色不受影响。
+    ★范围：第 CN_FIRST_DATA_ROW..CN_FIRST_DATA_ROW+CN_SEED_ROWS-1 行 × A..AB 列
+      （AC 核销列保持黑色；表头行、合计行不动。
+        要连表头/合计行一起变蓝，把下面的 first/last 调一下即可。）
+    幂等：已经蓝色的格子跳过；没改动就完全不重写文件（避免白动 mtime）。"""
+    if not os.path.isfile(CN_REPORT):
+        return False
+    try:
+        import openpyxl
+        from openpyxl.styles import Color
+        from copy import copy as _cp
+        wb = openpyxl.load_workbook(CN_REPORT)
+        ws = wb[CN_SHEET_NAME] if CN_SHEET_NAME in wb.sheetnames else wb[wb.sheetnames[0]]
+        first = CN_FIRST_DATA_ROW
+        # ★行范围必须跟着【实际内容】走，不能只认种子预留的那 200 行：
+        #   用户往里录/粘贴数据后行数可能超过 204；种子末尾的那一行是合计行，必须排除。
+        last = max(CN_FIRST_DATA_ROW + CN_SEED_ROWS - 1, ws.max_row)
+        max_col = CN_CHECK_COL - 1        # A..AB（AC 核销列不动）
+        want = CN_TEXT_BLUE.lstrip('#').upper()[-6:]
+        changed = 0
+        for row in ws.iter_rows(min_row=first, max_row=last, min_col=1, max_col=max_col):
+            if _cn_is_total_row(row):
+                continue                  # ★合计行不蓝化（表头行/标题行本来就不在这个范围内）
+            for cell in row:
+                cur = getattr(getattr(cell.font, 'color', None), 'rgb', None)
+                if isinstance(cur, str) and cur.lstrip('#').upper()[-6:] == want:
+                    continue
+                nf = _cp(cell.font)
+                nf.color = Color(rgb=CN_TEXT_BLUE)
+                cell.font = nf
+                changed += 1
+        if changed:
+            wb.save(CN_REPORT)
+            sys.stderr.write("[fin-cn] 数据区 %d 个单元格字体已设为蓝色\n" % changed)
+        return changed > 0
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 数据区蓝色处理失败: %s\n" % e)
+        return False
+
+
+def _cn_normalize_style():
+    """中国报表外观归一化（幂等）：① AC 核销列居中；② 数据区字体蓝色。
+    返回 True 表示动过文件（调用方据此让快照缓存失效）。"""
+    changed = False
+    try:
+        if _cn_normalize_ac_align():
+            changed = True
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 核销列居中失败: %s\n" % e)
+    try:
+        if _cn_normalize_text_color():
+            changed = True
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 数据区蓝色失败: %s\n" % e)
+    return changed
+
+
+def _cn_seed_if_missing():
+    """中国报表文件/表名映射缺失时自动补一份（服务启动时调用，幂等）。"""
+    try:
+        if not os.path.isfile(CN_REPORT):
+            _cn_make_seed_xlsx(CN_REPORT)
+            sys.stderr.write("[fin-cn] 生成种子报表 %s\n" % CN_REPORT)
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 生成种子报表失败: %s\n" % e)
+    # 外观归一化：核销列居中 + 数据区字体蓝色（对"本次改动之前已生成"的旧文件也生效，
+    # 用户不必手动删文件重生成）。动过文件就让快照缓存失效。
+    try:
+        if _cn_normalize_style():
+            try:
+                _cn_cache_invalidate()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    try:
+        if not os.path.isfile(CN_TITLES_PATH):
+            titles = {CN_SHEET_NAME: {"vi": "Chi thực tế", "zh": CN_SHEET_NAME,
+                                      "en": "Actual Payments"}}
+            with open(CN_TITLES_PATH, "w", encoding="utf-8") as fh:
+                json.dump(titles, fh, ensure_ascii=False, indent=2)
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 写表名映射失败: %s\n" % e)
+
+
+# ---- 快照缓存（与越南同一套做法，只是源文件不同；FIN-SNAP-CACHE-20261011 同构）----
+def _cn_report_key():
+    """缓存键 = 中国报表 xlsx 的 mtime(ns) + 大小 + 路径；文件不存在返回 None。"""
+    try:
+        st = os.stat(CN_REPORT)
+    except OSError:
+        return None
+    return "%d:%d:%s" % (st.st_mtime_ns, st.st_size, CN_REPORT)
+
+
+def _cn_cache_name(key):
+    """快照文件名由【缓存键】派生：源文件一变名字就变，旧文件永远不会被覆盖。"""
+    return "%s%s.json" % (CN_SNAP_PREFIX, hashlib.sha1(key.encode("utf-8")).hexdigest()[:16])
+
+
+def _cn_cache_files():
+    try:
+        return [fn for fn in os.listdir(FIN_DIR)
+                if fn.startswith(CN_SNAP_PREFIX) and fn.endswith(".json")]
+    except OSError:
+        return []
+
+
+def _cn_cache_current():
+    """返回 (当前键, 当前可用的快照绝对路径或 None)。"""
+    key = _cn_report_key()
+    if key is None:
+        return None, None
+    try:
+        with open(CN_SNAP_KEY, "r", encoding="utf-8") as fh:
+            got = fh.read().strip()
+    except OSError:
+        return key, None
+    if got != key:
+        return key, None
+    path = os.path.join(FIN_DIR, _cn_cache_name(key))
+    return key, (path if os.path.isfile(path) else None)
+
+
+def _cn_cache_valid():
+    return _cn_cache_current()[1] is not None
+
+
+def _cn_cache_invalidate():
+    """中国报表 xlsx 被改写后必须调用：丢掉键与所有快照。"""
+    try:
+        os.remove(CN_SNAP_KEY)
+    except OSError:
+        pass
+    for fn in _cn_cache_files():
+        try:
+            os.remove(os.path.join(FIN_DIR, fn))
+        except OSError:
+            pass
+
+
+def _cn_cache_build(force=False):
+    """把中国报表 xlsx 转成快照并落盘。返回 (ok, detail)；detail ∈ hit/built/错误原因。
+    ★顺序与越南一致：先把快照写成【新文件名】原子就位，最后才切键文件。"""
+    key = _cn_report_key()
+    if key is None:
+        return False, "not initialized"
+    with _CN_SNAP_LOCK:
+        if not force and _cn_cache_valid():
+            return True, "hit"
+        try:
+            sys.path.insert(0, BASE_DIR)
+            import univer_convert
+            snap = univer_convert.xlsx_to_univer(CN_REPORT, snap_id="cn-report")
+        except Exception as e:
+            return False, "convert failed: %s" % e
+        path = os.path.join(FIN_DIR, _cn_cache_name(key))
+        part = path + ".part"
+        tmp_key = CN_SNAP_KEY + ".tmp"
+        try:
+            with open(part, "w", encoding="utf-8") as fh:
+                json.dump(snap, fh, ensure_ascii=False, separators=(",", ":"))
+            os.replace(part, path)
+            with open(tmp_key, "w", encoding="utf-8") as fh:
+                fh.write(key)
+            os.replace(tmp_key, CN_SNAP_KEY)
+        except OSError as e:
+            for p in (part, tmp_key):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            return False, "cache write failed: %s" % e
+        keep = os.path.basename(path)
+        for fn in _cn_cache_files():
+            if fn != keep:
+                try:
+                    os.remove(os.path.join(FIN_DIR, fn))
+                except OSError:
+                    pass
+        return True, "built"
+
+
+def _cn_daily_backup():
+    """每改一次中国报表就留一份当日备份（同一天只留一份，滚动 30 份）。"""
+    try:
+        if not os.path.isfile(CN_REPORT):
+            return
+        os.makedirs(FIN_BACKUP_DIR, exist_ok=True)
+        stamp = _fdt.date.today().isoformat()
+        dest = os.path.join(FIN_BACKUP_DIR, "cn_report_%s.xlsx.bak" % stamp)
+        shutil.copyfile(CN_REPORT, dest)
+        olds = sorted(fn for fn in os.listdir(FIN_BACKUP_DIR)
+                      if fn.startswith("cn_report_") and fn.endswith(".xlsx.bak"))
+        for fn in olds[:-30]:
+            try:
+                os.remove(os.path.join(FIN_BACKUP_DIR, fn))
+            except OSError:
+                pass
+    except Exception as e:
+        sys.stderr.write("[fin-cn] daily backup failed: %s\n" % e)
+
+
+@app.route("/api/finance/cn-report", methods=["GET"])
+def fin_cn_get_report():
+    _cn_seed_if_missing()
+    if not os.path.isfile(CN_REPORT):
+        return jsonify({"error": "not initialized"}), 404
+    return send_from_directory(FIN_DIR, "cn_report.xlsx", as_attachment=False,
+                               mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.route("/api/finance/cn-report", methods=["POST"])
+def fin_cn_save_report():
+    data = request.get_data() or b""
+    if not data:
+        return jsonify({"error": "empty body"}), 400
+    tmp = CN_REPORT + ".tmp"
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+    os.replace(tmp, CN_REPORT)
+    _cn_daily_backup()
+    _cn_cache_invalidate()   # ★源文件已改写：必须丢掉旧快照缓存
+    return jsonify({"ok": True, "bytes": len(data)})
+
+
+@app.route("/api/finance/cn-report/snapshot", methods=["POST"])
+def fin_cn_snapshot_report():
+    """把当前中国报表按 period（YYYY / YYYY-MM）复制进 archive。"""
+    period = (request.args.get("period") or "").strip()
+    m = re.match(r"^(\d{4})(?:-(\d{1,2}))?$", period)
+    if not m:
+        return jsonify({"error": "period format YYYY or YYYY-MM"}), 400
+    if m.group(2) and not (1 <= int(m.group(2)) <= 12):
+        return jsonify({"error": "month out of range"}), 400
+    period = m.group(1) if not m.group(2) else ("%s-%02d" % (m.group(1), int(m.group(2))))
+    if not os.path.isfile(CN_REPORT):
+        return jsonify({"error": "not initialized"}), 404
+    os.makedirs(FIN_ARCHIVE_DIR, exist_ok=True)
+    dest = os.path.join(FIN_ARCHIVE_DIR, "cn_%s.xlsx" % period)
+    shutil.copyfile(CN_REPORT, dest)
+    return jsonify({"ok": True, "file": "cn_%s.xlsx" % period})
+
+
+@app.route("/api/finance/cn-report/init", methods=["POST"])
+def fin_cn_init_report():
+    """上传一份 xlsx 作为中国报表的新种子（覆盖旧文件与备份）。
+    ★不调用 fin_trilingual：它写的是【越南】那份表名映射(fin_sheet_titles.json)，
+      让中国报表去动它会把越南表名/保护词(DABACO)覆盖掉。中国报表的译文由前端
+      那套完全相同的「跟翻 + 缓存」链路负责，逻辑不改。"""
+    if "file" not in request.files:
+        return jsonify({"error": "no file"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"error": "empty filename"}), 400
+    data = f.read()
+    if not data:
+        return jsonify({"error": "empty"}), 400
+    tmp = CN_REPORT + ".tmp"
+    with open(tmp, "wb") as fh:
+        fh.write(data)
+    os.replace(tmp, CN_REPORT)
+    _cn_daily_backup()
+    # ★新种子先做外观归一化（核销列居中 + 数据区蓝色），再重建快照
+    try:
+        _cn_normalize_style()
+    except Exception as _ne:
+        sys.stderr.write("[fin-cn] init normalize failed: %s\n" % _ne)
+    _cn_cache_invalidate()   # ★新种子：丢掉旧快照缓存
+    _warm_ok, _warm_detail = _cn_cache_build(force=True)
+    if not _warm_ok:
+        sys.stderr.write("[fin-cn] snapshot warm failed: %s\n" % _warm_detail)
+    return jsonify({"ok": True, "bytes": len(data), "snapshot": "built" if _warm_ok else "lazy"})
+
+
+@app.route("/api/finance/cn-report/snapshot", methods=["GET"])
+def fin_cn_get_snapshot():
+    """返回中国报表的 Univer 快照（命中缓存直发，conditional=True 支持 304）。"""
+    _cn_seed_if_missing()
+    if not os.path.isfile(CN_REPORT):
+        return jsonify({"error": "not initialized"}), 404
+    _snap_key, _snap_path = _cn_cache_current()
+    if _snap_path is None:
+        ok, detail = _cn_cache_build(force=True)
+        if not ok:
+            return jsonify({"error": detail}), 500
+        _snap_key, _snap_path = _cn_cache_current()
+        if _snap_path is None:
+            return jsonify({"error": "cache unavailable"}), 500
+    resp = send_from_directory(FIN_DIR, os.path.basename(_snap_path),
+                               mimetype="application/json", conditional=True)
+    resp.headers["Content-Type"] = "application/json; charset=utf-8"
+    resp.headers["X-Fin-Snap-Cache"] = "hit"
+    return resp
+
+
+@app.route("/api/finance/cn-report/save", methods=["POST"])
+def fin_cn_save_snapshot():
+    """接收 Univer 快照（JSON），写回 cn_report.xlsx。
+    ★中国报表是「手动保存」：前端不自动保存，用户点「保存」才走这里，
+      所以刷新页面不会丢数据。"""
+    data = request.get_json(force=False, silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid json"}), 400
+    _normalized = False        # ★数据区字色是否被本次保存修正过（返回值给前端决定要不要刷屏）
+    try:
+        sys.path.insert(0, BASE_DIR)
+        import univer_convert
+        tmp = CN_REPORT + ".tmp.xlsx"
+        univer_convert.univer_to_xlsx(data, tmp)
+        try:
+            os.replace(tmp, CN_REPORT)
+        except OSError:
+            with open(CN_REPORT, "wb") as fh:
+                fh.write(open(tmp, "rb").read())
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        _cn_daily_backup()
+        _cn_cache_invalidate()   # ★快照已写回 xlsx：丢掉旧快照缓存
+        # ★数据区字色归一化（用户要求：越/中/英三种语言块的数据区都必须是蓝字）：
+        #   用户很可能是从别处【粘贴】进来（粘贴会带来源的黑色样式），所以每次保存后
+        #   都在【文件层面】再刷一遍蓝色。幂等：已经蓝的格子不动，不会无谓重写文件。
+        try:
+            _normalized = bool(_cn_normalize_style())
+        except Exception as _ne:
+            sys.stderr.write("[fin-cn] save normalize failed: %s\n" % _ne)
+        # ★重新生成快照：前端保存成功后会据此把屏幕也刷成蓝的
+        try:
+            _cn_cache_invalidate()
+            _warm_ok, _warm_detail = _cn_cache_build(force=True)
+            if not _warm_ok:
+                sys.stderr.write("[fin-cn] snapshot warm failed: %s\n" % _warm_detail)
+        except Exception as _we:
+            sys.stderr.write("[fin-cn] snapshot rebuild failed: %s\n" % _we)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        sys.stderr.write("[fin_cn_save_snapshot] ERROR: %s\n%s\n" % (e, tb))
+        sys.stderr.flush()
+        return jsonify({"error": "convert failed: %s" % e}), 500
+    return jsonify({"ok": True, "saved_at": _fdt.datetime.now().isoformat(timespec="seconds"),
+                    "normalized": bool(_normalized)})
 
 
 # ===================== API：CRM 报价单 PDF 上传 =====================
@@ -8307,6 +8795,9 @@ if __name__ == "__main__":
 
     # 每次启动先留一份整库快照（防数据丢失第一道保险）
     _auto_backup_db("startup")
+
+    # 中国财务报表：文件/表名映射缺失时补一份种子（幂等；中国报表只有「实际支出」一张表）
+    _cn_seed_if_missing()
 
     def _port_in_use(port, host="127.0.0.1", timeout=0.5):
         """端口占用预检（Windows 安全版）。
