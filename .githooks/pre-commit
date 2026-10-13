@@ -29,8 +29,16 @@
 #                                 ④ GET 必须走缓存判定，不得再直接 xlsx_to_univer
 #                                 ⑤ 出缓存必须 conditional=True（重复加载退化为 304）
 #
-#   6) check_prod_date_rule.py —— 生产操作日期 ≥ 排产开始日期（数据一致性巡检）
-#   7) check_prod_out_rule.py  —— 出库量 ≤ 当前生产总量（数据一致性巡检）
+#   7) check_fin_no_trans_lock.py —— 财务「品牌名不翻译」锁死区（FIN-NO-TRANS-20261013）：
+#                                 ① 前端 FIN_NO_TRANS / fin_hasNoTrans（大小写无关子串匹配）
+#                                 ② 三条使用点：fin_transChecked 退回原文 / fin_targetName 退回原名 /
+#                                    fin_requestTrans 对含保护词的文字不发翻译请求
+#                                 ③ 服务端 _FIN_NO_TRANS + fin_translate「译丢保护词就退回原文」
+#                                 ④ 落地数据：fin_sheet_titles.json / fin_trans_cache.json 里
+#                                    'Thu Dabaco' 的译文必须仍含 Dabaco，且不得再出现「达巴科」
+#
+#   8) check_prod_date_rule.py —— 生产操作日期 ≥ 排产开始日期（数据一致性巡检）
+#   9) check_prod_out_rule.py  —— 出库量 ≤ 当前生产总量（数据一致性巡检）
 #
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
@@ -59,7 +67,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then

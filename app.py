@@ -3828,6 +3828,23 @@ def fin_init_report():
         fh.write(data)
     os.replace(tmp, FIN_REPORT)
     _fin_daily_backup()
+    # ★三语自动补全（FIN-TRI-AUTO-20261013）：上传的若是普通"单块"报表
+    #   （ZH 块 K–R / EN 块 U–AB 为空），前端 fin_isTrilingualSheet 会把它判成
+    #   "非三语表"并【完全不翻译】——这就是"换了新报表却不会自动翻译"的根因。
+    #   这里就地补出两块 + 重写表名三语映射，前端刷新后即可三语切换。
+    #   ★译文优先取持久缓存 finance_data/fin_trans_cache.json：已翻过的绝不重复请求，
+    #     只翻【新增条目】；译文写回 xlsx 即"离线版本"，固定住。
+    #   ★翻译 API 不可达时 fin_trilingual 不碰文件（绝不把源文当译文灌进 K/U）。
+    _tri = {"ok": False, "reason": "skipped"}
+    try:
+        sys.path.insert(0, BASE_DIR)
+        import fin_trilingual
+        _tri = fin_trilingual.ensure_report(FIN_REPORT)
+        sys.stderr.write("[fin_init_report] trilingual: %s\n" % _tri)
+        sys.stderr.flush()
+    except Exception as _te:
+        sys.stderr.write("[fin_init_report] trilingual failed: %s\n" % _te)
+        sys.stderr.flush()
     _fin_cache_invalidate()   # ★新种子：丢掉旧快照缓存
     # 上传是一次明确的用户动作（本来就在等），这里顺手把快照转换一次并缓存，
     # 于是上传后那一次自动刷新也能直接命中缓存，不再重新解析 xlsx。
@@ -3836,7 +3853,9 @@ def fin_init_report():
         # 预热失败不影响上传结果：留着缓存不写，下次 GET 再惰性转换
         sys.stderr.write("[fin_init_report] snapshot warm failed: %s\n" % _warm_detail)
         sys.stderr.flush()
-    return jsonify({"ok": True, "bytes": len(data), "snapshot": "built" if _warm_ok else "lazy"})
+    return jsonify({"ok": True, "bytes": len(data),
+                    "snapshot": "built" if _warm_ok else "lazy",
+                    "trilingual": _tri})
 
 
 @app.route("/api/finance/vn-report/snapshot", methods=["GET"])
@@ -6413,6 +6432,16 @@ def api_translate():
 # ==========================================================================
 _TRANSLATE_CACHE = {}  # "text|target" -> translation
 
+# ★不翻译保护词（FIN-NO-TRANS-20261013）：品牌名「DABACO」在 zh/vi/en 三语里都必须
+#   保留拉丁写法，绝不能被译成中文（如「达巴科」）或越南文。规则：原文含保护词而译文把它
+#   弄丢了 → 直接退回原文（与前端 fin_transChecked 同一套判定）。要加保护词，往这里加小写词。
+_FIN_NO_TRANS = ("dabaco",)
+
+
+def _fin_has_no_trans(s):
+    s = (s or "").lower()
+    return any(w in s for w in _FIN_NO_TRANS)
+
 
 # ---- 统一翻译链（FIN-TRANS-CHAIN）：Google(主) -> DeepL(备) -> MyMemory(末) ----
 # DeepL key：优先环境变量 DEEPL_API_KEY，否则读 finance_data/.deepl_key（已 gitignore）
@@ -6488,6 +6517,8 @@ def fin_translate(text, target):
         if r:
             res = r
             break
+    if res and _fin_has_no_trans(text) and not _fin_has_no_trans(res):
+        res = text   # ★保护词被译掉（如 DABACO→达巴科）→ 退回原文（FIN-NO-TRANS-20261013）
     if res:
         _TRANSLATE_CACHE[ck] = res
     return res

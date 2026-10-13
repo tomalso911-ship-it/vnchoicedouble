@@ -4284,6 +4284,13 @@ var WL_FLOW_IMG = {
       .fin-icon{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #dfe6ee;border-radius:6px;background:#fff;color:#333;cursor:pointer;flex:0 0 auto;padding:0;}
       .fin-icon:hover{background:#f5f7fa;}
       .fin-icon svg{width:16px;height:16px;}
+      /* ===== 查报表浮层（FIN-REPORT-QUERY-20261013）：经典红，复用安装模块 .inst-del-pop 的三段式结构 ===== */
+      .fin-rpt-pop{min-width:236px;}
+      .fin-rpt-bd{padding:10px 12px 12px;}
+      .fin-rpt-row{display:flex;align-items:center;gap:8px;margin:6px 0;}
+      .fin-rpt-row label{flex:0 0 54px;color:#333;font-size:12px;font-weight:600;}
+      .fin-rpt-row select{flex:1 1 auto;min-width:0;height:26px;border:1px solid #dfe6ee;border-radius:6px;font-size:12px;padding:0 6px;background:#fff;}
+      .fin-rpt-note{display:none;margin-top:8px;padding:6px 8px;border-radius:6px;background:#FFF8E1;border:1px solid #FFD54F;color:#8a5a00;font-size:11.5px;font-weight:600;line-height:1.35;}
       /* 右键行号 →「插入」→「在下方插入行」+ 小图标 + 行数输入栏（DOM 补丁，见 finPatchInsertRowMenu） */
       .fin-menu-ins-item{display:flex !important;align-items:center;gap:6px;cursor:pointer;}
       .fin-menu-ins-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
@@ -4788,6 +4795,12 @@ var WL_FLOW_IMG = {
       .inst-del-pop-ok:hover{background:#C62828;}
       .inst-del-pop-cancel{background:#e0e0e0;color:#333;}
       .inst-del-pop-cancel:hover{background:#d0d0d0;}
+      /* 查报表浮层：取消左边多一个「恢复」（把报表恢复到筛选之前） */
+      .fin-rpt-pop .inst-del-pop-restore{background:#fff3cd;color:#8a6d3b;border:1px solid #ffd97a;}
+      .fin-rpt-pop .inst-del-pop-restore:hover{background:#ffe9a8;}
+      /* 查报表浮层：还没到的月份灰显锁定（不可选） */
+      .fin-rpt-pop select option:disabled,
+      .fin-rpt-pop select option.fin-rpt-month-locked{color:#bdbdbd;background:#f5f5f5;}
       /* 安装 Tab C 顶部 KPI 卡片条：参考生产/出库模块的统计卡片 */
       .inst-kpi-bar{display:flex;gap:8px;margin:10px 0;flex-wrap:nowrap;}
       .inst-kpi-card{flex:0.8;min-width:0;background:#fff;border:1px solid #000;border-radius:6px;padding:8px 6px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.05);}
@@ -16603,7 +16616,7 @@ var PROD_EQUIP_FAULT_KB = {
           <button class="fin-btn fin-btn-green" onclick="fin_sortDatesByBlock()"><span data-i18n="fin_btn_date_fmt">按日-月-年排序</span><span id="fin_date_sort_arrow" class="fin-sort-arrow">↑</span></button>
           <button class="fin-btn" data-i18n="fin_btn_load" onclick="fin_loadOrReload()">载入/刷新报表</button>
           <button class="fin-btn" data-i18n="fin_btn_save" onclick="fin_autoSave()">保存</button>
-          <button class="fin-btn" data-i18n="fin_btn_snapshot" onclick="fin_snapshotPrompt()">快照</button>
+          <button class="fin-btn" data-i18n="fin_btn_report" onclick="fin_rptQueryPop(this)">查报表</button>
           <button class="fin-btn" data-i18n="fin_btn_export" onclick="fin_exportLocal()">导出 xlsx</button>
           <button class="fin-btn" data-i18n="fin_btn_reimport" onclick="document.getElementById('fin_reimport_file').click()">重导</button>
           <input type="file" id="fin_reimport_file" accept=".xlsx" style="display:none" onchange="fin_reimport(this)">
@@ -16653,6 +16666,14 @@ var PROD_EQUIP_FAULT_KB = {
       console.warn = function(){
         var msg = Array.prototype.slice.call(arguments).join(' ');
         if (/COMPONENT_DOC_HEADER_FOOTER_PANEL already exists/i.test(msg)) return;
+        /* Univer 的组件管理器在"同名组件已经注册过"时会 warn 一次。我们每次重建工作单元
+           （载入/刷新、切语言、查报表筛选都会 createUnit 一次）都会重新注册同一批内置组件，
+           于是必然刷出这族噪音：
+             · Component COMPONENT_DOC_HEADER_FOOTER_PANEL already exists.
+             · Component univer.sheet.cell-alert already exists.
+           ★无害：注册是幂等的（同名组件不会被换掉，第二次直接跳过），表格与数据都不受影响。
+           这里只静音"以 Component 开头 + already exists"这一族，其它 warn 一律原样输出。 */
+        if (/^component\b/i.test(String(msg).trim()) && /already exists/i.test(msg)) return;
         return ow.apply(console, arguments);
       };
     })();
@@ -16708,6 +16729,8 @@ var PROD_EQUIP_FAULT_KB = {
       try { fin_setStatusKey(finStatusKey, finStatusSuffix); } catch(e){}
       try { if (typeof sweepI18n === 'function') sweepI18n(document.getElementById('fin_panel_vn')); } catch(e){}
       try { if (typeof fin_menuInsRefresh === 'function') fin_menuInsRefresh(); } catch(e){}
+      // ★查报表浮层：只原地刷新文字（不重建、不重算位置）
+      try { if (typeof fin_rptPopLocalize === 'function') fin_rptPopLocalize(); } catch(e){}
     });
 
     function fin_currentSnapshot(){
@@ -16737,7 +16760,8 @@ var PROD_EQUIP_FAULT_KB = {
       'Chi tiết thu-chi':     { vi:'Chi tiết thu-chi',     zh:'收支明细',      en:'Income & Expenditure Details' },
       'Thu nội bộ':           { vi:'Thu nội bộ',           zh:'内部收入',      en:'Internal Receipts' },
       'Thu thực tế Mr Cường': { vi:'Thu thực tế Mr Cường', zh:'何明强先生实收', en:'Actual Receipts - Mr. Cường' },
-      'Thu Dabaco':           { vi:'Thu Dabaco',           zh:'达巴科收款',    en:'Dabaco Receipts' },
+      // ★DABACO 是品牌名，不翻译（FIN-NO-TRANS-20261013）：三语都保留 Dabaco 拉丁写法
+      'Thu Dabaco':           { vi:'Thu Dabaco',           zh:'收款 Dabaco',   en:'Dabaco Receipts' },
       'Thu khác':             { vi:'Thu khác',             zh:'其他收入',      en:'Other Receipts' },
       'Chi thực tế':          { vi:'Chi thực tế',          zh:'实际支出',      en:'Actual Payments' },
       'Chi nội bộ':           { vi:'Chi nội bộ',           zh:'内部支出',      en:'Internal Payments' }
@@ -16805,10 +16829,32 @@ var PROD_EQUIP_FAULT_KB = {
       }
       return arr;
     }
+    /* ★「不翻译保护词」（FIN-NO-TRANS-20261013）：用户要求「DABACO」不要被翻成中文/越南文。
+       规则（对表名、单元格文字一律生效）：
+         · 原文里含保护词 → 译文里必须【仍然保留】这个词；译没了（如 zh「达巴科收款」）→ 退回原文；
+         · 译文里还留着这个词（如 en 'Dabaco Receipts'）→ 照常用。
+       要再加保护词，只往 FIN_NO_TRANS 里加小写词即可（如 'mr cường'）。 */
+    var FIN_NO_TRANS = ['dabaco'];
+    function fin_hasNoTrans(t){
+      var s = String(t == null ? '' : t).toLowerCase();
+      if (!s) return false;
+      for (var i = 0; i < FIN_NO_TRANS.length; i++){
+        if (s.indexOf(FIN_NO_TRANS[i]) >= 0) return true;
+      }
+      return false;
+    }
+    // 过滤一条译文：保护词被译掉时返回 null（调用方退回原文）
+    function fin_transChecked(orig, trans){
+      if (trans == null || trans === '' || trans === orig) return trans;
+      if (!fin_hasNoTrans(orig)) return trans;
+      return fin_hasNoTrans(trans) ? trans : null;
+    }
     function fin_targetName(sid, lang){
       var on = finOrigName[sid] || '';
       var t = finSheetTitles[on];
-      return (t && t[lang]) ? t[lang] : on;
+      var nm = (t && t[lang]) ? t[lang] : on;
+      if (on && fin_hasNoTrans(on) && !fin_hasNoTrans(nm)) return on;   // ★别把 DABACO 译掉
+      return nm;
     }
     function fin_rewriteAllRefs(f){
       if (!f || f.indexOf("'") < 0) return f;
@@ -16893,14 +16939,15 @@ var PROD_EQUIP_FAULT_KB = {
             // ★只换「纯文字格」：本身是字符串、非公式（数字/日期/公式一律原样，保证小计与余额安全）
             if (cell && !cell.f && typeof cell.v === 'string' && cell.v !== ''){
               var rec = finTransCache[cell.v];
-              var tt = rec && rec[lang];
+              var tt = fin_transChecked(cell.v, rec && rec[lang]);   // ★保护词被译掉 → 退回原文
               if (tt && tt !== cell.v){
                 var cp = {};
                 for (var kk in cell) cp[kk] = cell[kk];
                 cp.v = tt;
                 nrow[ck] = cp; has = true; continue;
               }
-              if (!rec) fin_requestTrans(cell.v, lang);   // 缓存里没有 → 立即调 API，到了再补写
+              // 缓存里没有 → 立即调 API，到了再补写；★含保护词的文字不去翻译（免得译出「达巴科」）
+              if (!rec && !fin_hasNoTrans(cell.v)) fin_requestTrans(cell.v, lang);
             }
             nrow[ck] = cell; has = true;
           }
@@ -16957,6 +17004,7 @@ var PROD_EQUIP_FAULT_KB = {
     function fin_requestTrans(text, lang){
       if (!lang || !text) return;
       if (fin_isCodeLike(text)) return;
+      if (fin_hasNoTrans(text)) return;         // ★保护词（DABACO…）不翻译
       var known = finTransCache[text];
       if (known && known[lang]) return;                                  // 已有译文，不用再问
       var key = text + '|' + lang;
@@ -17005,7 +17053,7 @@ var PROD_EQUIP_FAULT_KB = {
                 var cell = row[ck];
                 if (!cell || cell.f || typeof cell.v !== 'string' || !cell.v) continue;
                 var rec = finTransCache[cell.v];
-                var want = rec && rec[lang];
+                var want = fin_transChecked(cell.v, rec && rec[lang]);   // ★保护词被译掉 → 不补写
                 if (!want || want === cell.v) continue;
                 var m = {}; m[rk] = {};
                 m[rk][ck] = { v: want };
@@ -17203,6 +17251,77 @@ var PROD_EQUIP_FAULT_KB = {
         return svc;
       } catch(e){ return null; }
     }
+    /* ★只读诊断钩子（UNDO-DIAG-20261013）：控制台敲 finUndoDiag() 打印撤销机制的真实状态。
+       只读、只在被调用时执行、不改变任何行为；且不写回任何东西。★不得删除（排障用）。 */
+    window.finUndoDiag = function(){
+      var o = { mute: fin_undoMute, hasSvc: false, unit: '' };
+      try { o.unit = fin_unitId(); } catch(e){}
+      try {
+        var ur = fin_undoRedoService();
+        o.hasSvc = !!ur;
+        if (ur){
+          o.svc = (ur.constructor && ur.constructor.name) || String(ur).slice(0, 40);
+          o.frozen = Object.isFrozen(ur);
+          var d = Object.getOwnPropertyDescriptor(ur, 'pushUndoRedo');
+          o.ownDesc = d ? { w: d.writable, g: !!d.get, st: !!d.set, c: d.configurable } : null;
+          var pr = Object.getPrototypeOf(ur);
+          var dp = pr ? Object.getOwnPropertyDescriptor(pr, 'pushUndoRedo') : null;
+          o.protoDesc = dp ? { w: dp.writable, g: !!dp.get, st: !!dp.set, c: dp.configurable } : null;
+          o.protoFrozen = pr ? Object.isFrozen(pr) : null;
+          try {
+            var s = ur._getUndoStack(o.unit);
+            o.undoLen = s ? s.length : -1;
+            o.undoEntries = s ? s.slice(-10).map(function(x){
+              try {
+                var r = { k: Object.keys(x || {}).slice(0, 14) };
+                ['id', 'commandId', '_id', 'type', 'name', 'undoName', 'mutations'].forEach(function(k){
+                  if (x && x[k] !== undefined && typeof x[k] !== 'function' && typeof x[k] !== 'object') r[k] = String(x[k]).slice(0, 50);
+                });
+                return r;
+              } catch(e){ return 'entry-err'; }
+            }) : [];
+          } catch(e){ o.stackErr = String(e).slice(0, 90); }
+          var orig = ur.pushUndoRedo;
+          try { ur.pushUndoRedo = function(){}; o.canAssign = (ur.pushUndoRedo !== orig); ur.pushUndoRedo = orig; }
+          catch(e){ o.canAssign = 'throw:' + String(e).slice(0, 70); }
+        }
+      } catch(e){ o.err = String(e).slice(0, 120); }
+      return o;
+    };
+    /* ★载入期撤销栈清场（UNDO-LOADPURGE-20261013）：
+       工作簿刚载入时渲染会连发上千次内部写入，而它们的命令 Promise 落地极慢，
+       旧的"事后摘除"一次都赶不上 → 空白页撤销栈里就攒着 7~9 条看不见的记录
+       → 用户点「撤销」撤掉的全是这些看不见的写入 → 表现为「撤销完全没反应」。
+       载入的那几秒用户不可能在编辑，因此此刻直接把栈清空是最安全的做法；
+       6s 后自动停止（只在本页首次载入时武装一次），绝不干扰后续用户操作。 */
+    var fin_undoLoadPurgeTimer = null, fin_undoLoadPurgeArmed = false, fin_undoLoadPurgeStart = 0;
+    function fin_undoArmLoadPurge(){
+      if (fin_undoLoadPurgeArmed) return;
+      fin_undoLoadPurgeArmed = true;
+      fin_undoLoadPurgeStart = Date.now();
+      if (fin_undoLoadPurgeTimer) return;
+      fin_undoLoadPurgeTimer = setInterval(function(){
+        var el = Date.now() - fin_undoLoadPurgeStart;
+        // ★只在【报表还没就绪】时清场：就绪后再宽限 1.2s 收尾，然后永久停止。
+        //   绝不按固定时长硬清 —— 否则会把用户就绪后自己做的编辑一起清掉（实测过）。
+        var stillLoading = !finReady || el < 1200;
+        if (stillLoading && el < 12000){
+          try {
+            var ur = fin_undoRedoService();
+            if (ur && typeof ur._getUndoStack === 'function'){
+              var s = ur._getUndoStack(fin_unitId());
+              if (s && s.length){
+                s.length = 0;
+                if (typeof ur._updateStatus === 'function') ur._updateStatus();
+              }
+            }
+          } catch(e){}
+          return;
+        }
+        clearInterval(fin_undoLoadPurgeTimer);
+        fin_undoLoadPurgeTimer = null;
+      }, 300);
+    }
     /* 内部维护写入的统一入口（替代 finUniverAPI.executeCommand），返回值语义不变（Promise）。
        ★这一段写入不进撤销栈、也不清 redo 栈；用户自己点的排序/筛选/百分比仍走原生 executeCommand，照旧可撤销。 */
     function finExecSilent(cmdId, params){
@@ -17217,10 +17336,15 @@ var PROD_EQUIP_FAULT_KB = {
       // 先记现场（拿得到 Univer 私有栈才记）：万一"静默"没生效，就用它兜底摘掉我们那条、并复原 redo 栈
       var unitId = ''; try { unitId = fin_unitId(); } catch(e){}
       var stk = null, stkLen = -1, stkTop = null, redoSnap = null;
+      var stkBefore = null;      // ★本次内部写入【之前】栈里的条目（按对象身份比对，见下方 pruneOnce）
       try {
         if (unitId && typeof ur._getUndoStack === 'function'){
           stk = ur._getUndoStack(unitId) || null;
-          if (stk){ stkLen = stk.length; stkTop = stk.length ? stk[stk.length - 1] : null; }
+          if (stk){
+            stkLen = stk.length;
+            stkTop = stk.length ? stk[stk.length - 1] : null;
+            stkBefore = stk.slice();          // ★快照：用户自己的记录一定在这里面，绝不会被误摘
+          }
         }
         if (unitId && typeof ur._getRedoStack === 'function'){
           var _r0 = ur._getRedoStack(unitId) || null;
@@ -17260,24 +17384,44 @@ var PROD_EQUIP_FAULT_KB = {
       //   否则 pushUndoRedo 会永久被掏空 → 撤销栈冻结 → 「撤销按钮不工作」。
       var capFired = false;
       var capId = setTimeout(function(){ capFired = true; releaseMute(); }, 1500);
-      var finish = function(){
-        if (capId){ clearTimeout(capId); capId = null; }
-        releaseMute();
-        if (capFired) return;      // 已由硬上限放掉：不再动撤销栈（避免延迟后误摘用户自己的记录）
-        // 兜底自检：万一静默没生效（只读属性 / 拿到的是别的实例 …），就把我们新增的那条撤销记录摘掉，
-        // 并把被它清空的 redo 栈原样复原 —— 保证「撤销 / 重做」都不因我们的内部写入而失灵。
+      /* ★★兜底摘除（UNDO-PRUNE-20261013，实测修复）★★
+         实测本版 Univer 的 IUndoRedoService 是【不可改写的代理对象】(canAssign=false)，
+         所以 fin_undoMute 那套"静默 pushUndoRedo"永远 muted=false、根本不可能生效，
+         只能靠"事后把本次内部写入新增的撤销记录摘掉"。旧实现有两个致命缺陷：
+           ① `if (capFired) return;` —— 载入 xlsx / 公式重算时命令 Promise 落地很慢，
+              1.5s 硬上限先触发，于是【一次都不摘】→ 空白页栈里就有 7~9 条内部记录
+              → 用户点「撤销」撤掉的全是看不见的写入 → 表现为「撤销完全没反应」；
+           ② 只摘一次、且上限 5 条，漏掉随后异步入栈的（公式重算 / 自动行高等）。
+         改为按【对象身份】比对本写入发生前的快照 stkBefore：
+           stack 里凡"不在快照中"的条目 = 本次内部写入新增的 → 全部摘掉（含异步来的）；
+           用户自己之前产生的记录必在快照中 → 绝不会被误摘。
+         并在 0 / 150 / 450 / 1200ms 各摘一轮，覆盖异步入栈。 */
+      var stkBeforeSet = stkBefore ? new Set(stkBefore) : null;
+      var pruneOnce = function(){
+        if (!stk || !stkBeforeSet) return;
         try {
-          if (!stk) return;
-          var removed = false, guard = 0;
-          while (stk.length > stkLen && guard++ < 5 && stk[stk.length - 1] !== stkTop){ stk.pop(); removed = true; }
+          var removed = 0;
+          for (var i = stk.length - 1; i >= 0; i--){
+            if (!stkBeforeSet.has(stk[i])){ stk.splice(i, 1); removed++; }
+          }
           if (!removed) return;
           if (redoSnap && typeof ur._getRedoStack === 'function'){
             var rk = ur._getRedoStack(unitId) || null;
-            if (rk && !rk.length){ for (var i = 0; i < redoSnap.length; i++) rk.push(redoSnap[i]); }
+            if (rk && !rk.length){ for (var k = 0; k < redoSnap.length; k++) rk.push(redoSnap[k]); }
           }
           if (typeof ur._updateStatus === 'function') ur._updateStatus();
         } catch(e){}
       };
+      var finish = function(){
+        if (capId){ clearTimeout(capId); capId = null; }
+        releaseMute();
+        pruneOnce();
+      };
+      // ★载入期清场（UNDO-LOADPURGE-20261013）：
+      //   页面/工作簿刚载入时，渲染会连续产生成百上千次内部写入，而命令 Promise 落地极慢，
+      //   旧逻辑一次都摘不掉 → 空白页栈里就攒下 7~9 条看不见的记录 → 用户点撤销"完全没反应"。
+      //   载入期间用户不可能在编辑，故此时直接把栈清空最安全有效；6s 后自动停止，不再打扰用户操作。
+      fin_undoArmLoadPurge();
       if (failed){ finish(); return null; }
       // 入栈发生在命令的微任务里，所以必须等一个宏任务再恢复；期间兄弟写入的入栈一并被吞掉。
       if (out && typeof out.then === 'function'){
@@ -17471,6 +17615,9 @@ var PROD_EQUIP_FAULT_KB = {
         if (!base) base = finLastView || finLastSnapshot;
         var keep = fin_captureSheetState();        // ★先记下"用户正在看的表 + 滚动位置"
         var snapshot = fin_buildLangView(base, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
+        // ★查报表筛选：语言切换后保持「隐藏其它日期行 + 汇总表本期数值/本期文字」
+        try { fin_rptHideInView(snapshot, base); } catch(e){}
+        try { fin_rptApplySummary(snapshot, base); } catch(e){}
         finLastView = snapshot;
         finLoading = true;
         try {
@@ -17482,6 +17629,8 @@ var PROD_EQUIP_FAULT_KB = {
         finReady = true;
         fin_bindEdits();
         fin_captureEditBase();
+        // ★视图建好后把「本期值」写回（压住公式引擎的异步覆盖；语言切换不能把本期值变回全期）
+        try { fin_rptScheduleReapply(); } catch(e){}
         // ★恢复"表 + 滚动位置"：多补几次，防止首帧渲染后又跳回顶部/第一张表
         var restore = function(){ try { fin_restoreSheetState(keep); } catch(e){} };
         restore();
@@ -18197,6 +18346,14 @@ var PROD_EQUIP_FAULT_KB = {
         if (CUR_LANG === 'zh') initLocale = presets.LocaleType.ZH_CN;
         if (CUR_LANG === 'vi') initLocale = presets.LocaleType.VI_VN;
         finPresets = presets;
+        /* ★修复（UNDO-DEAD-20261013）：本文件有多处【只读 window.finPresets】：
+           fin_undoRedoService()(17198 取 IUndoRedoService)、fin_unitId()(17306 取 IUniverInstanceService)、
+           fin_setUniverLocale()(18297 LocaleService/LocaleType)、fin_univerLangKey()(18890)。
+           它们都带 `window.finPresets && ...` 守卫，一旦 window.finPresets 未赋值就【静默 return】，
+           于是 FIN-UNDO-CLEAN-20261012 的「内部写入不进撤销栈」整条机制死掉：
+           高亮/日期修正/三语补写全部压进撤销栈 → 点「撤销」撤掉的是看不见的内部写入 → 表现为「撤销没反应」。
+           ★锁死区相关：不得删除本行，也不得把上面几处 window.finPresets 改成局部变量。 */
+        window.finPresets = presets;
 
         // 隐藏 Univer 自带工具栏里多余/重复的按钮（用户要求）：
         //   · 排序菜单（A↓∨）   sheet.menu.sheets-sort
@@ -19444,12 +19601,16 @@ var PROD_EQUIP_FAULT_KB = {
         // ★先用【原始完整快照】播三语种（表名/三语块/翻译缓存），再生成"当前语言"的显示快照
         fin_seedLang(snapshot);
         finLastView = fin_buildLangView(snapshot, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
+        try { fin_rptHideInView(finLastView, snapshot); } catch(e){}   // ★查报表筛选：首屏/重载同一口径
+        try { fin_rptApplySummary(finLastView, snapshot); } catch(e){} // ★查报表：汇总表按期间重算（甲方案）
         finSheet = finUniver.createUnit(UNIT_SHEET, finLastView);
       } finally { finLoading = false; }
       // ★绑定"单元格改数据"监控（新增/修改记录 → 立即翻译同步 + 立即重算高亮）
       try { fin_bindEdits(); } catch(e){}
       try { fin_captureEditBase(finLastView); } catch(e){}
       fin_setStatusKey('fin_status_loaded');
+      // ★视图建好后把「本期值」写回（压住公式引擎的异步覆盖；首屏已带筛选时同样需要）
+      try { fin_rptScheduleReapply(); } catch(e){}
       // 加载后统一日期格式为 DD-MM-YYYY（只改日期单元格；必须基于显示快照，列不越界）
       setTimeout(function(){ fin_normalizeDates(finLastView || snapshot); }, 400);
       // ★加载后重放"当前选中币种"（默认 VND）：让每张工作表的金额都带货币符号
@@ -19671,9 +19832,715 @@ var PROD_EQUIP_FAULT_KB = {
       } finally { finSaving = false; }
     }
 
+    /* 旧「快照」入口：已按用户要求从工具栏撤下（按钮改为「查报表」）。
+       函数与后端 /api/finance/vn-report/snapshot 保留，将来要挂回随时可用。 */
     function fin_snapshotPrompt(){
       var p = prompt(fin_L('fin_prompt_snapshot'), '');
       if (p) fin_snapshot(p.trim());
+    }
+
+    /* ===== 查报表：按「年份 + 月份」筛选显示（FIN-REPORT-QUERY-20261013）=====
+       点工具栏「查报表」→ 按钮旁弹出经典红浮层 → 选年份 / 月份（0 = 只看年度报告）
+       → 确认后：只保留所选年（或该年该月）的【日期行】，其它年月的日期行做 Excel 式隐藏
+         （写进显示快照 rowData[r].hd=1：不删任何数据、不移动公式、表头/合计行照旧可见）。
+       恢复全部：点「复位」或「载入/刷新报表」（两处都会清掉 finRptFilter）。
+       ★只作用于屏幕显示：财务页 FIN_READONLY=true，本功能不写盘、不发任何请求。
+       ★不侵入锁死区：只复用 fin_dateHeaderCols / finHiCellSerial / fin_serialToDate 等既有只读工具。 */
+    var finRptFilter = null;        // {year:Number, month:Number}  month=0 → 只看年度
+    /* ★「汇总表按期间重算」的两个关键状态（FIN-RPT-SUM-20261013）：
+       · finRptSumBase —— 汇总表在【显示视图】里的原始格数据（公式完整、表名已换成当前语言）。
+         必须留档，因为重算是"删掉公式、写本期值"，之后再也读不到公式了。
+       · finRptCells    —— 最近一次算出来的本期数值 { sid, cells:{"行,列":值} }（调试/自检用）。
+       · fin_rptBaseSnap—— 计算期间指向【原始完整快照】，用于"文字日期被跟翻成译文"的回退判定。
+       ★必须在 createUnit 之后才算：服务端快照里公式格【没有缓存值】（xlsx→快照不带 v），
+         只有表格引擎算完，明细表的逐行余额/合计才有值可读。 */
+    var finRptCells = null;
+    var finRptSumBase = null;
+    var fin_rptBaseSnap = null;
+    var finRptHidden = 0;           // 本次筛选隐藏掉的日期行数（状态栏提示用）
+    var finRptMatched = 0;          // 本次筛选命中的日期行数
+    var finRptOutside = null, finRptEsc = null;
+
+    function fin_rptEscHtml(s){
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // 某张表的「日期列」：候选列 = 表头写着 Ngày/Date 的列 ∪ 第 0 列；
+    // 取其中日期格最多的那一列（与「按日-月-年排序」的口径一致），少于 2 个日期格视为没有日期列。
+    // ★候选列只认显示块 A–J（0..FIN_VIEW_MAXCOL）：显示快照已裁掉 ZH/EN 两块，
+    //   不夹住的话「完整快照 / 显示快照」会算出不同的日期列。
+    function fin_rptDateCol(snap, sh){
+      if (!sh) return -1;
+      var hdr = {};
+      try { hdr = fin_dateHeaderCols(sh) || {}; } catch(e){ hdr = {}; }
+      var cd = sh.cellData || {};
+      var cnt = {};
+      for (var rk in cd){
+        var row = cd[rk] || {};
+        for (var ck in row){
+          var c = parseInt(ck, 10);
+          if (isNaN(c)) continue;
+          if (!(hdr[c] || c === 0)) continue;
+          if (c > FIN_VIEW_MAXCOL) continue;
+          if (finHiCellSerial(snap, row[ck]) == null) continue;
+          cnt[c] = (cnt[c] || 0) + 1;
+        }
+      }
+      var best = -1, bn = 0;
+      for (var cc in cnt){ if (cnt[cc] > bn){ bn = cnt[cc]; best = parseInt(cc, 10); } }
+      return bn >= 2 ? best : -1;
+    }
+
+    // 报表里出现过的年份（各表日期列）∪ 当前年份，升序 —— 到 2027 年会自动多出这一项
+    // ★优先扫【完整快照】：显示快照里「文字日期」会被三语跟翻换成译文（如 September 15, 2026），
+    //   扫完整快照才不会漏掉这种日期行。
+    function fin_rptYears(){
+      var yset = {};
+      yset[new Date().getFullYear()] = true;
+      var snaps = [];
+      if (finLastSnapshot) snaps.push(finLastSnapshot);
+      if (finLastView) snaps.push(finLastView);
+      try {
+        for (var si = 0; si < snaps.length; si++){
+          var snap = snaps[si];
+          if (!snap || !snap.sheets) continue;
+          var order = snap.sheetOrder || [];
+          for (var i = 0; i < order.length; i++){
+            var sh = snap.sheets[order[i]];
+            var dc = fin_rptDateCol(snap, sh);
+            if (dc < 0) continue;
+            var cd = sh.cellData || {};
+            for (var rk in cd){
+              var s = finHiCellSerial(snap, (cd[rk] || {})[String(dc)]);
+              if (s == null) continue;
+              var d = fin_serialToDate(s);
+              if (d) yset[d.getUTCFullYear()] = true;
+            }
+          }
+        }
+      } catch(e){ console.warn('[fin] rptYears', e); }
+      var out = [];
+      for (var y in yset){ var n = parseInt(y, 10); if (!isNaN(n)) out.push(n); }
+      out.sort(function(a, b){ return a - b; });
+      return out;
+    }
+
+    // ★显示快照的 rowData 与 finLastSnapshot 共享引用（fin_buildLangView 只做浅拷贝），
+    //   要写 hd 必须先克隆一份，避免污染完整快照。
+    function fin_rptCloneRowData(src){
+      var out = {};
+      for (var k in src){
+        var v = src[k];
+        if (v && typeof v === 'object'){ var c = {}; for (var x in v) c[x] = v[x]; out[k] = c; }
+        else out[k] = v;
+      }
+      return out;
+    }
+
+    // 把「不在筛选区间」的日期行标记为隐藏（rowData[行].hd = 1，Univer 的 Excel 式隐藏行）
+    // base = 完整快照（可选）：显示快照里「文字日期」会被三语跟翻成译文（识别不出日期），
+    //        这时回退用完整快照同一格的原始值判定，避免这类日期行漏筛。
+    function fin_rptHideInView(view, base){
+      finRptHidden = 0; finRptMatched = 0;
+      if (!finRptFilter || !view || !view.sheets) return;
+      var y = finRptFilter.year, m = finRptFilter.month || 0;
+      var start = Date.UTC(y, m - 1, 1) / 86400000 + 25569;
+      var end   = (m ? Date.UTC(y, m, 0) : Date.UTC(y, 12, 0)) / 86400000 + 25569;
+      try {
+        var order = view.sheetOrder || [];
+        for (var i = 0; i < order.length; i++){
+          var sid = order[i];
+          var sh = view.sheets[sid];
+          if (!sh) continue;
+          var dc = fin_rptDateCol(view, sh);
+          if (dc < 0) continue;
+          var cd = sh.cellData || {};
+          var bcd = (base && base.sheets && base.sheets[sid] && base.sheets[sid].cellData) || {};
+          var src = sh.rowData || {};
+          var rd = null, hiddenHere = 0;
+          for (var rk in cd){
+            var r = parseInt(rk, 10);
+            if (isNaN(r)) continue;
+            var s = finHiCellSerial(view, (cd[rk] || {})[String(dc)]);
+            if (s == null){
+              var bcell = (bcd[rk] || {})[String(dc)];
+              if (bcell) s = finHiCellSerial(base, bcell);
+            }
+            if (s == null) continue;                       // 非日期行（表头/合计/空行）永不隐藏
+            if (s >= start - 0.5 && s <= end + 0.5){ finRptMatched++; continue; }
+            if (rd === null) rd = fin_rptCloneRowData(src);
+            var cur = rd[String(r)];
+            if (!cur || typeof cur !== 'object') cur = {};
+            cur.hd = 1;
+            rd[String(r)] = cur;
+            hiddenHere++;
+          }
+          if (rd && hiddenHere){ sh.rowData = rd; finRptHidden += hiddenHere; }
+        }
+      } catch(e){ console.warn('[fin] rptHide', e); }
+    }
+
+    /* ===== 查报表 · 汇总表按期间重算（甲方案，2026-10-13 用户选定）=====
+       语义：收支各分项（II/III 及各明细行）= 所选期间【发生额】；
+             余额类（I 行各账户、I 合计、IV 期末余额）= 该期间【末】的余额/累计净额。
+       做法：把汇总表里原有的跨表引用（如 ='Chi tiết thu-chi'!$F$5、='Thu nội bộ'!$D$73）
+             与同表公式（=SUM(C9:C13)、=C14-C19）按期间算出数值，只写进【显示快照】；
+             并删掉这些格的公式（视图里直接显示本期值）。
+       安全：财务页 FIN_READONLY=true，本功能不写盘、不发请求；
+             写前先深拷贝汇总表 cellData（显示快照与完整快照共享引用）。
+       恢复：点「复位」/「载入刷新」→ 重新取服务端快照，公式与全期值原样回来。
+       ★不侵入锁死区：不碰 fin_inlineStyles / finHi* / Excel 键盘补丁。 */
+    var FIN_RPT_TS_RE = /^\s*(as of|tính đến|đến|截至)/i;      // 时点文字（三语）
+    var FIN_RPT_LINE_RE = /(发生额|movements|phát sinh)/i;      // 本功能自己写的期间行
+
+    function fin_rptTwo(n){ return (n < 10 ? '0' : '') + n; }
+
+    function fin_rptColIdx(letters){
+      var s = String(letters || '').replace(/\$/g, '').toUpperCase(), n = 0;
+      for (var i = 0; i < s.length; i++){
+        var cc = s.charCodeAt(i);
+        if (cc < 65 || cc > 90) return -1;
+        n = n * 26 + (cc - 64);
+      }
+      return n > 0 ? n - 1 : -1;
+    }
+
+    function fin_rptNameMap(snap){
+      var map = {}, order = (snap && snap.sheetOrder) || [];
+      for (var i = 0; i < order.length; i++){
+        var sh = snap.sheets[order[i]];
+        if (sh && sh.name) map[String(sh.name).toLowerCase()] = order[i];
+      }
+      return map;
+    }
+
+    // 汇总表 = 没有日期列、且「跨表公式 + 时点文字」最多的那张表
+    function fin_rptSummaryId(view){
+      var order = (view && view.sheetOrder) || [], best = null, bestN = 0;
+      for (var i = 0; i < order.length; i++){
+        var sid = order[i], sh = view.sheets[sid];
+        if (!sh) continue;
+        if (fin_rptDateCol(view, sh) >= 0) continue;      // 有日期列 = 明细表
+        var cd = sh.cellData || {}, n = 0;
+        for (var rk in cd){
+          var row = cd[rk] || {};
+          for (var ck in row){
+            var cell = row[ck];
+            if (!cell) continue;
+            if (typeof cell.f === 'string' && cell.f.indexOf('!') >= 0) n++;
+            else if (typeof cell.v === 'string' && (FIN_RPT_TS_RE.test(cell.v) || FIN_RPT_LINE_RE.test(cell.v))) n++;
+          }
+        }
+        if (n > bestN){ bestN = n; best = sid; }
+      }
+      return bestN >= 2 ? best : null;
+    }
+
+    // 某表某日期列上的「连续日期行区块」
+    function fin_rptRegions(snap, sid, dateCol){
+      var sh = snap.sheets[sid], cd = (sh && sh.cellData) || {}, rows = [];
+      for (var rk in cd){
+        var r = parseInt(rk, 10);
+        if (isNaN(r)) continue;
+        if (fin_rptSerialAt(snap, sid, r, dateCol) != null) rows.push(r);
+      }
+      rows.sort(function(a, b){ return a - b; });
+      var out = [], st = null, pv = null;
+      for (var i = 0; i < rows.length; i++){
+        var r2 = rows[i];
+        if (st === null){ st = r2; pv = r2; continue; }
+        if (r2 === pv + 1){ pv = r2; continue; }
+        out.push({ startRow: st, endRow: pv }); st = r2; pv = r2;
+      }
+      if (st !== null) out.push({ startRow: st, endRow: pv });
+      return out;
+    }
+
+    function fin_rptNumAt(snap, sid, r, c){
+      try {
+        var cell = ((snap.sheets[sid].cellData || {})[String(r)] || {})[String(c)];
+        if (!cell || cell.f) return null;      // 公式格不认（明细表的合计行必须被跳过，改用"本期合计"）
+        return (typeof cell.v === 'number' && isFinite(cell.v)) ? cell.v : null;
+      } catch(e){ return null; }
+    }
+
+    // 同上，但【认公式格的缓存值】。余额类取值必须用它：
+    // 账本里的逐行余额本身就是公式（如 =+F301+D302-E302），缓存值就是那一行的余额，
+    // 用 fin_rptNumAt 会把整块都跳过，再往下找就捡到区块外的杂值（实测把 44087104 算成 117）。
+    // ★注意：服务端快照里公式格【没有缓存值】（xlsx→快照不带 v），只有表格引擎算完之后才有；
+    //   所以余额类重算必须安排在 createUnit 之后（见 fin_rptRecomputeLive）。
+    function fin_rptAnyNumAt(snap, sid, r, c){
+      try {
+        var cell = ((snap.sheets[sid].cellData || {})[String(r)] || {})[String(c)];
+        if (!cell) return null;
+        return (typeof cell.v === 'number' && isFinite(cell.v)) ? cell.v : null;
+      } catch(e){ return null; }
+    }
+
+    /* 某格是不是「日期行」：先按传入快照判断；判断不出来时回退【原始完整快照】同一格。
+       为什么要回退：显示视图里「文字日期」（如 '15/9/2026'）会被三语跟翻成译文
+       （'September 15, 2026'）→ 认不出日期 → 该行会被排除在"本期区间"之外，
+       实测 Dabaco 一张表就少算 66 亿。fin_rptHideInView 早就有这一手，这里补齐同款。 */
+    function fin_rptSerialAt(snap, sid, r, c){
+      var v = null;
+      try {
+        var sh = snap.sheets && snap.sheets[sid];
+        var cell = ((sh && sh.cellData) || {})[String(r)];
+        v = finHiCellSerial(snap, cell && cell[String(c)]);
+      } catch(e){ v = null; }
+      if (v != null) return v;
+      var b = fin_rptBaseSnap;
+      if (b && b !== snap){
+        try {
+          var bsh = b.sheets && b.sheets[sid];
+          var bcell = ((bsh && bsh.cellData) || {})[String(r)];
+          bcell = bcell && bcell[String(c)];
+          if (bcell){
+            v = finHiCellSerial(b, bcell);
+            if (v == null && typeof bcell.v === 'string' && typeof fin_parseDateText === 'function'){
+              v = fin_parseDateText(bcell.v);
+            }
+          }
+        } catch(e){}
+      }
+      return v;
+    }
+
+    function fin_rptRefPattern(f){
+      var s = String(f || '').replace(/^=/, '').trim();
+      var m = /^(?:'([^']+)'|([^!'\s]+))!\$?([A-Z]+)\$?(\d+)$/i.exec(s);
+      if (!m) return null;
+      return { name: (m[1] || m[2]), col: fin_rptColIdx(m[3]), row: parseInt(m[4], 10) - 1 };
+    }
+    function fin_rptSumPattern(f){
+      var s = String(f || '').replace(/^=/, '').trim();
+      var m = /^SUM\(\s*\$?([A-Z]+)\$?(\d+)\s*:\s*\$?([A-Z]+)\$?(\d+)\s*\)$/i.exec(s);
+      if (!m) return null;
+      return { col: fin_rptColIdx(m[1]), r1: parseInt(m[2], 10) - 1, col2: fin_rptColIdx(m[3]), r2: parseInt(m[4], 10) - 1 };
+    }
+    function fin_rptArithPattern(f){
+      var s = String(f || '').replace(/^=/, '').trim();
+      var m = /^\$?([A-Z]+)\$?(\d+)\s*([-+])\s*\$?([A-Z]+)\$?(\d+)$/i.exec(s);
+      if (!m) return null;
+      return { c1: fin_rptColIdx(m[1]), r1: parseInt(m[2], 10) - 1, op: m[3], c2: fin_rptColIdx(m[4]), r2: parseInt(m[5], 10) - 1 };
+    }
+
+    // 一个「跨表引用格」在所选期间的值：三选一
+    //   ① 引用格下面紧接着有日期行 → 余额模式：取该区块内「日期 ≤ 期末」最后一行的该列值
+    //      （区间内没有流水时用区块的期初值，如「Số dư đầu kỳ」）
+    //   ② 引用格自己就有数值 → 原样（例：'Tiền mặt 2' 那块没有流水，是静态余额）
+    //   ③ 其余（明细表的合计行）→ 发生额模式：把该列在期间内的日期行相加
+    function fin_rptRefValue(view, refSid, refRow, refCol, ctx){
+      var sh = view.sheets[refSid];
+      if (!sh) return null;
+      var dateCol = fin_rptDateCol(view, sh);
+      if (dateCol >= 0){
+        var regs = fin_rptRegions(view, refSid, dateCol), reg = null;
+        for (var i = 0; i < regs.length; i++){
+          if (regs[i].startRow > refRow && regs[i].startRow <= refRow + 3){ reg = regs[i]; break; }
+        }
+        if (reg){
+          // ★余额口径（FIN-RPT-SUM-BALANCE-20261013）：
+          //   ① 区块内所有日期行都 ≤ 期末（整块被这一期覆盖）→ 直接用【引用格自身】的数值，
+          //      那才是该账户在文件里的余额口径（F5=303401 / F79=360254295 / F293=661708 /
+          //      F300=44087104 / F570=393750000）→ 全期/年末选出来与文件完全一致；
+          //   ② 只覆盖了区块的一部分 → 取「日期 ≤ 期末」最后一行的逐行余额。
+          //   ★逐行余额是公式格，必须用 fin_rptAnyNumAt；用 fin_rptNumAt 会整块跳过。
+          var lastVal = null, covered = true;
+          for (var r = reg.startRow; r <= reg.endRow; r++){
+            var s = fin_rptSerialAt(view, refSid, r, dateCol);
+            if (s == null) continue;                       // 非日期行不参与"覆盖"判断
+            if (s > ctx.end + 0.5){ covered = false; continue; }
+            var v = fin_rptAnyNumAt(view, refSid, r, refCol);
+            if (v != null) lastVal = v;
+          }
+          if (covered){
+            var ownV = fin_rptAnyNumAt(view, refSid, refRow, refCol);
+            if (ownV != null) return ownV;
+          }
+          if (lastVal != null) return lastVal;
+          // 区间完全在区块之前：沿用原逻辑找「区块期初值」。
+          // ★这里保持 fin_rptNumAt（不认公式格）：引用格在本文件里是"期末余额"而不是期初，
+          //   认它会把"该账户当时还没有余额"错算成期末余额。
+          for (var r2 = reg.startRow - 1; r2 >= refRow; r2--){
+            var v2 = fin_rptNumAt(view, refSid, r2, refCol);
+            if (v2 != null) return v2;
+          }
+          return 0;
+        }
+      }
+      var own = fin_rptNumAt(view, refSid, refRow, refCol);
+      if (own != null) return own;
+      if (dateCol >= 0){
+        // 发生额模式：把该列在期间内的日期行相加。
+        // ★无日期的行沿用【上一行的日期】（账本里"同一凭证的第二行"常常不写日期，
+        //   不沿用就会漏钱：实测 'Thu thực tế Mr Cường' 少算 293,750,000，年度合计对不上文件）。
+        var cd2 = sh.cellData || {}, total = 0, hit = false, rows2 = [];
+        for (var rk in cd2){
+          var r4 = parseInt(rk, 10);
+          if (!isNaN(r4) && r4 !== refRow) rows2.push(r4);
+        }
+        rows2.sort(function(a, b){ return a - b; });
+        var carry = null;
+        for (var i2 = 0; i2 < rows2.length; i2++){
+          var r5 = rows2[i2], s5 = fin_rptSerialAt(view, refSid, r5, dateCol);
+          if (s5 != null) carry = s5; else s5 = carry;      // 沿用上一行的日期
+          if (s5 == null) continue;
+          if (s5 < ctx.start - 0.5 || s5 > ctx.end + 0.5) continue;
+          var v5 = fin_rptNumAt(view, refSid, r5, refCol);
+          if (v5 != null){ total += v5; hit = true; }
+        }
+        if (hit) return total;
+      }
+      return 0;
+    }
+
+    // 汇总表某格（可能是跨表引用 / SUM 区间 / 简单加减 / 常量）在所选期间的值
+    function fin_rptValueAt(view, sumSid, row, col, memo, ctx){
+      var key = row + ':' + col;
+      if (memo[key] !== undefined) return memo[key];
+      memo[key] = null;                                        // 防环
+      var cell = (((view.sheets[sumSid] || {}).cellData || {})[String(row)] || {})[String(col)];
+      var out = null;
+      if (cell && typeof cell.f === 'string'){
+        var ref = fin_rptRefPattern(cell.f);
+        var tsid = ref && ctx.byName[String(ref.name).toLowerCase()];
+        if (tsid){ out = fin_rptRefValue(view, tsid, ref.row, ref.col, ctx); }
+        else {
+          var sp = fin_rptSumPattern(cell.f);
+          if (sp){
+            var sum = 0, any = false;
+            for (var r = sp.r1; r <= sp.r2; r++){
+              var v = fin_rptValueAt(view, sumSid, r, sp.col, memo, ctx);
+              if (v != null){ sum += v; any = true; }
+            }
+            out = any ? sum : null;
+          } else {
+            var ap = fin_rptArithPattern(cell.f);
+            if (ap){
+              // ★形如 =C14-C19 的「期末余额」行（IV）：两个操作数必须取【截至期末的累计值】。
+              //   若按"本期区间"算，IV 会变成"本月净额"，与 I 行（期末余额）口径自相矛盾
+              //   （实测 12 月会算成 0，而全期现值是 799056391）。
+              //   memo 单独一份：key 只有"行,列"不含区间，共用会把两套区间算出的值串味。
+              var cctx = { start: -Infinity, end: ctx.end, byName: ctx.byName };
+              var cmemo = {};
+              var a = fin_rptValueAt(view, sumSid, ap.r1, ap.c1, cmemo, cctx);
+              var b = fin_rptValueAt(view, sumSid, ap.r2, ap.c2, cmemo, cctx);
+              if (a != null && b != null) out = (ap.op === '-') ? (a - b) : (a + b);
+            }
+          }
+        }
+      } else if (cell && typeof cell.v === 'number' && isFinite(cell.v)){
+        out = cell.v;
+      }
+      memo[key] = out;
+      return out;
+    }
+
+    // 把汇总表的「时点文字」（标题下那行 + 备注列）改成所选期间的写法，并留档原始格数据；返回改写的格数。
+    // ★数值部分【不在这里算】：服务端快照里公式格没有缓存值，必须等表格引擎算完（createUnit 之后），
+    //   见 fin_rptRecomputeLive。
+    function fin_rptApplySummary(view, base){
+      // ★筛选被复位（「复位」/「载入刷新」）→ 清掉留档，别再按期间重算
+      if (!finRptFilter){ finRptCells = null; finRptSumBase = null; return 0; }
+      if (!view || !view.sheets) return 0;
+      var sumSid = fin_rptSummaryId(view);
+      if (!sumSid) return 0;
+      var sh = view.sheets[sumSid];
+      if (!sh) return 0;
+      var y = finRptFilter.year, m = finRptFilter.month || 0;
+      var end = (m ? Date.UTC(y, m, 0) : Date.UTC(y, 12, 0)) / 86400000 + 25569;
+      var changed = 0;
+      try {
+        // ★深拷贝：显示快照与完整快照共享 sheets 引用，直接改会污染源数据
+        var orig = JSON.parse(JSON.stringify(sh.cellData || {}));
+        // ★留档：公式完整的那一份（视图随后会被写成本期值，再想读公式就来不及了）
+        finRptSumBase = { sid: sumSid, name: sh.name, cellData: JSON.parse(JSON.stringify(orig)) };
+        sh.cellData = orig;
+        // ---- 时点文字：标题下那行（第 0 列）+ 备注列里的「As of …」 ----
+        var subRow = -1, remCol = -1, colHit = {};
+        var bsh = (base && base.sheets && base.sheets[sumSid]) || null;
+        var bcd = (bsh && bsh.cellData) || {};
+        for (var brk in bcd){
+          var brow = bcd[brk] || {};
+          for (var bck in brow){
+            var bc = brow[bck], tv0 = bc && bc.v;
+            if (typeof tv0 !== 'string') continue;
+            if (!FIN_RPT_TS_RE.test(tv0) && !FIN_RPT_LINE_RE.test(tv0)) continue;
+            var c0 = parseInt(bck, 10), r0 = parseInt(brk, 10);
+            if (c0 === 0){ if (subRow < 0 || r0 < subRow) subRow = r0; }
+            else colHit[c0] = (colHit[c0] || 0) + 1;
+          }
+        }
+        var bestC = -1, bestN = 0;
+        for (var cc in colHit){ if (colHit[cc] > bestN){ bestN = colHit[cc]; bestC = parseInt(cc, 10); } }
+        if (bestN >= 2) remCol = bestC;
+        if (subRow >= 0 || remCol >= 0){
+          var pText = m ? (y + '-' + fin_rptTwo(m)) : String(y);
+          var dd = fin_serialToDate(end);
+          var eText = dd ? (fin_rptTwo(dd.getUTCDate()) + '-' + fin_rptTwo(dd.getUTCMonth() + 1) + '-' + dd.getUTCFullYear()) : '';
+          var lineTxt = String(fin_L('fin_rpt_period_line')).replace('{p}', pText).replace('{e}', eText);
+          var remTxt = String(fin_L('fin_rpt_period_remark')).replace('{e}', eText);
+          for (var rk2 in sh.cellData){
+            var r2 = parseInt(rk2, 10), row2 = sh.cellData[rk2] || {};
+            for (var ck2 in row2){
+              var c2 = parseInt(ck2, 10), cell2 = row2[ck2];
+              if (!cell2 || cell2.f || typeof cell2.v !== 'string') continue;
+              var tgt = null;
+              if (subRow >= 0 && r2 === subRow && c2 === 0) tgt = lineTxt;
+              else if (remCol >= 0 && c2 === remCol && FIN_RPT_TS_RE.test(cell2.v)) tgt = remTxt;
+              if (tgt == null) continue;
+              var nc2 = {}; for (var k2 in cell2) nc2[k2] = cell2[k2];
+              nc2.v = tgt; nc2.t = 1;
+              row2[ck2] = nc2;
+              changed++;
+            }
+          }
+        }
+      } catch(e){ console.warn('[fin] rptSummary', e); }
+      return changed;
+    }
+
+    /* ★真正做「按期间重算」：在视图建好、表格引擎算完值之后跑（FIN-RPT-SUM-20261013）。
+       为什么必须晚一步：服务端快照里公式格【没有缓存值】（xlsx → 快照只带公式不带值），
+       createUnit 之前读明细表，逐行余额与合计全是空的 —— 实测会把 44,087,104 算成 117、
+       把 661,708 算成 643,452（都是"往下找不到值、捡到别的格"）。
+       做法：① 明细表用【实时快照】（引擎已经把公式算出来了）；
+             ② 汇总表用 finRptSumBase 留档的公式（视图里那份已经被换成本期值）；
+             ③ 按期间算出各格数值，用一条 set-range-values 写【纯数值】（f:null，引擎不会再动它）。
+       另外：写回必须重复几次 —— createUnit 之后公式引擎还会异步重算一次，把这几格用全期值盖回来
+       （现象：筛选后汇总表数字纹丝不动）。重复写是幂等的，只为压住它的异步覆盖。 */
+    function fin_rptRecomputeLive(){
+      if (!finRptFilter || !finRptSumBase || !finSheet || !finReady) return 0;
+      var live = null; try { live = fin_currentSnapshot(); } catch(e){}
+      if (!live || !live.sheetOrder) return 0;
+      var sumSid = finRptSumBase.sid, sumBase = finRptSumBase.cellData || {};
+      var view = { id: live.id, sheetOrder: live.sheetOrder, styles: live.styles, sheets: {} };
+      for (var i = 0; i < live.sheetOrder.length; i++){
+        var sid = live.sheetOrder[i];
+        view.sheets[sid] = (sid === sumSid) ? finRptSumBase : live.sheets[sid];
+      }
+      var y = finRptFilter.year, m = finRptFilter.month || 0;
+      var start = Date.UTC(y, m - 1, 1) / 86400000 + 25569;
+      var end   = (m ? Date.UTC(y, m, 0) : Date.UTC(y, 12, 0)) / 86400000 + 25569;
+      var ctx = { start: start, end: end, byName: fin_rptNameMap(view) };
+      var mat = {}, n = 0, got = {};
+      var prevBase = fin_rptBaseSnap;
+      fin_rptBaseSnap = finLastSnapshot;          // 文字日期（被跟翻成译文）的回退判定用
+      try {
+        var memo = {}, rows = Object.keys(sumBase);
+        for (var a = 0; a < rows.length; a++){
+          var row = sumBase[rows[a]] || {}, cols = Object.keys(row);
+          for (var b = 0; b < cols.length; b++){
+            var cell = row[cols[b]];
+            if (!cell || typeof cell.f !== 'string') continue;
+            var val = fin_rptValueAt(view, sumSid, parseInt(rows[a], 10), parseInt(cols[b], 10), memo, ctx);
+            if (val == null || !isFinite(val)) continue;
+            var r = parseInt(rows[a], 10), c = parseInt(cols[b], 10);
+            if (!mat[r]) mat[r] = {};
+            mat[r][c] = { v: Math.round(val * 100) / 100, t: 2, f: null };
+            got[rows[a] + ',' + cols[b]] = mat[r][c].v;
+            n++;
+          }
+        }
+      } catch(e){ console.warn('[fin] rptRecompute', e); }
+      finally { fin_rptBaseSnap = prevBase; }
+      if (!n) return 0;
+      finRptCells = { sid: sumSid, cells: got };
+      try {
+        finEditSuppress++;      // 这是程序写视图，不是用户编辑：别让"改动扫描"当成用户改数
+        try {
+          finExecSilent('sheet.command.set-range-values', { unitId: fin_unitId(), subUnitId: sumSid, value: mat });
+        } finally { finEditSuppress--; finEditQuietUntil = Date.now() + 400; }
+      } catch(e){ console.warn('[fin] rptRecompute write', e); }
+      return n;
+    }
+
+    // 视图重建后错峰重算几次：公式引擎算值与它的异步重算落在 createUnit 之后的不同时刻，
+    // 重算+写回是幂等的（同样的输入写出同样的值），多跑几次只为压住它的异步覆盖。
+    function fin_rptScheduleReapply(){
+      if (!finRptFilter) return;
+      [250, 700, 1500, 3000].forEach(function(ms){
+        setTimeout(function(){ try { fin_rptRecomputeLive(); } catch(e){} }, ms);
+      });
+    }
+
+    // 浮层贴着触发按钮：默认在按钮正下方，越界翻到上方/左侧内收（只在打开时算一次，之后不再重算）
+    function fin_rptPopPlace(pop, btn){
+      try {
+        var r = btn.getBoundingClientRect();
+        var pr = pop.getBoundingClientRect();
+        var left = r.left;
+        var top = r.bottom + 6;
+        if (left + pr.width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - pr.width - 8);
+        if (top + pr.height > window.innerHeight - 8) top = Math.max(8, r.top - pr.height - 6);
+        pop.style.left = Math.round(left) + 'px';
+        pop.style.top = Math.round(top) + 'px';
+      } catch(e){}
+    }
+
+    // 只原地刷新文字（语言切换时调用）：绝不重建 DOM、绝不重新定位。
+    // 选 0 时自动出现备注「选择0表示只看年度报告！」（三语）。
+    function fin_rptPopLocalize(pop){
+      try {
+        pop = pop || document.getElementById('finRptPop');
+        if (!pop) return;
+        var q = function(id){ return pop.querySelector('#' + id); };
+        if (q('finRptTitle')) q('finRptTitle').textContent = fin_L('fin_rpt_title');
+        if (q('finRptYearLbl')) q('finRptYearLbl').textContent = fin_L('fin_rpt_year');
+        if (q('finRptMonthLbl')) q('finRptMonthLbl').textContent = fin_L('fin_rpt_month');
+        if (q('finRptOk')) q('finRptOk').textContent = fin_L('fin_rpt_ok');
+        if (q('finRptCancel')) q('finRptCancel').textContent = fin_L('fin_rpt_cancel');
+        if (q('finRptRestore')) q('finRptRestore').textContent = fin_L('fin_rpt_restore');
+        var mon = q('finRptMonth'), note = q('finRptNote');
+        if (note){
+          var isZero = !!(mon && parseInt(mon.value, 10) === 0);
+          note.textContent = isZero ? fin_L('fin_rpt_note0') : '';
+          note.style.display = isZero ? 'block' : 'none';
+        }
+      } catch(e){}
+    }
+
+    function fin_rptClose(){
+      try { document.removeEventListener('mousedown', finRptOutside, true); } catch(e){}
+      try { document.removeEventListener('keydown', finRptEsc, true); } catch(e){}
+      finRptOutside = null; finRptEsc = null;
+      try {
+        var p = document.getElementById('finRptPop');
+        if (p && p.parentNode) p.parentNode.removeChild(p);
+      } catch(e){}
+    }
+
+    /* ★「月份」只允许选到"已经发生"的月份（FIN-RPT-MONTH-LOCK-20261013）：
+         · 所选年份 == 今年 → 上限 = 本月（例：2026-10 时，11/12 灰显不可选）；
+         · 所选年份 < 今年  → 上限 = 12（往年的 1..12 全可选）；
+         · 所选年份 > 今年  → 上限 = 0（全年都还没到，只能看 0=年度）。
+       月 0（年度报告）任何时候都可选。 */
+    function fin_rptMonthLimit(year){
+      var now = new Date();
+      var cy = now.getFullYear(), cm = now.getMonth() + 1;
+      if (!isFinite(year)) return 12;
+      if (year < cy) return 12;
+      if (year > cy) return 0;
+      return cm;
+    }
+    // 按当前选中的年份刷新月份可选项（灰显 + 不可选）；若原本选中的月变成"未到"的月，退回 0
+    function fin_rptMonthApplyLock(pop){
+      try {
+        pop = pop || document.getElementById('finRptPop');
+        if (!pop) return;
+        var ySel = pop.querySelector('#finRptYear'), mSel = pop.querySelector('#finRptMonth');
+        if (!ySel || !mSel) return;
+        var lim = fin_rptMonthLimit(parseInt(ySel.value, 10));
+        var opts = mSel.options || [], curV = parseInt(mSel.value, 10);
+        var fellBack = false;
+        for (var i = 0; i < opts.length; i++){
+          var mv = parseInt(opts[i].value, 10);
+          var locked = (mv > 0 && mv > lim);
+          opts[i].disabled = locked;
+          if (opts[i].classList) opts[i].classList.toggle('fin-rpt-month-locked', locked);
+          if (locked && mv === curV){ fellBack = true; }
+        }
+        if (fellBack && parseInt(mSel.value, 10) !== 0){
+          mSel.value = '0';                    // 选中的月还没到 → 退回年度，避免"选了个未来月"
+          fin_rptPopLocalize(pop);             // 年度提示条要跟着出来
+        }
+      } catch(e){}
+    }
+
+    // 打开「查报表」浮层（锚定在按钮旁）
+    function fin_rptQueryPop(btn){
+      fin_rptClose();
+      var years = fin_rptYears();
+      if (!years.length) years = [new Date().getFullYear()];
+      var cur = finRptFilter || { year: years[years.length - 1], month: 0 };
+      var h = [];
+      h.push('<div class="inst-del-pop-hd" id="finRptTitle">' + fin_rptEscHtml(fin_L('fin_rpt_title')) + '</div>');
+      h.push('<div class="inst-del-pop-bd fin-rpt-bd">');
+      h.push('<div class="fin-rpt-row"><label id="finRptYearLbl" for="finRptYear">' + fin_rptEscHtml(fin_L('fin_rpt_year')) + '</label><select id="finRptYear">');
+      for (var i = 0; i < years.length; i++){
+        h.push('<option value="' + years[i] + '"' + (years[i] === cur.year ? ' selected' : '') + '>' + years[i] + '</option>');
+      }
+      h.push('</select></div>');
+      h.push('<div class="fin-rpt-row"><label id="finRptMonthLbl" for="finRptMonth">' + fin_rptEscHtml(fin_L('fin_rpt_month')) + '</label><select id="finRptMonth">');
+      for (var m = 0; m <= 12; m++){
+        h.push('<option value="' + m + '"' + (m === (cur.month || 0) ? ' selected' : '') + '>' + m + '</option>');
+      }
+      h.push('</select></div>');
+      h.push('<div class="fin-rpt-note" id="finRptNote"></div>');
+      h.push('</div>');
+      h.push('<div class="inst-del-pop-ft"><button type="button" class="inst-del-pop-btn inst-del-pop-restore" id="finRptRestore">' + fin_rptEscHtml(fin_L('fin_rpt_restore')) + '</button>');
+      h.push('<button type="button" class="inst-del-pop-btn inst-del-pop-cancel" id="finRptCancel">' + fin_rptEscHtml(fin_L('fin_rpt_cancel')) + '</button>');
+      h.push('<button type="button" class="inst-del-pop-btn inst-del-pop-ok" id="finRptOk">' + fin_rptEscHtml(fin_L('fin_rpt_ok')) + '</button></div>');
+      var pop = document.createElement('div');
+      pop.className = 'inst-del-pop fin-rpt-pop';
+      pop.id = 'finRptPop';
+      pop.innerHTML = h.join('');
+      document.body.appendChild(pop);
+      fin_rptPopLocalize(pop);
+      fin_rptMonthApplyLock(pop);       // ★未到的月份灰显锁定（选年份后重算）
+      fin_rptPopPlace(pop, btn);
+      var mon = pop.querySelector('#finRptMonth');
+      if (mon) mon.addEventListener('change', function(){ fin_rptPopLocalize(pop); });
+      var yr = pop.querySelector('#finRptYear');
+      if (yr) yr.addEventListener('change', function(){ fin_rptMonthApplyLock(pop); });
+      var ok = pop.querySelector('#finRptOk');
+      if (ok) ok.addEventListener('click', function(){
+        var ySel = pop.querySelector('#finRptYear'), mSel = pop.querySelector('#finRptMonth');
+        var y = parseInt(ySel ? ySel.value : '', 10);
+        var mm = parseInt(mSel ? mSel.value : '', 10);
+        fin_rptClose();
+        if (isNaN(y)) return;
+        fin_rptApplyFilter(y, isNaN(mm) ? 0 : mm);
+      });
+      var ca = pop.querySelector('#finRptCancel');
+      if (ca) ca.addEventListener('click', function(){ fin_rptClose(); });
+      // ★「恢复」：把报表恢复到【应用筛选之前】的数据（清筛选条件 + 重新取完整快照重建视图）
+      var rs = pop.querySelector('#finRptRestore');
+      if (rs) rs.addEventListener('click', function(){ fin_rptClose(); fin_rptRestoreAll(); });
+      finRptEsc = function(ev){ if (ev && ev.key === 'Escape') fin_rptClose(); };
+      finRptOutside = function(ev){
+        try {
+          var p = document.getElementById('finRptPop');
+          if (!p){ try { document.removeEventListener('mousedown', finRptOutside, true); } catch(e2){} return; }
+          if (p.contains(ev.target)) return;
+          if (btn && (btn === ev.target || (btn.contains && btn.contains(ev.target)))) return;
+          // 语言切换按钮不关弹窗（只原地换文字，见 fin_rptPopLocalize）
+          var ls = document.getElementById('langSwitch');
+          if (ls && (ls === ev.target || (ls.contains && ls.contains(ev.target)))) return;
+          fin_rptClose();
+        } catch(e){}
+      };
+      setTimeout(function(){
+        try { document.addEventListener('mousedown', finRptOutside, true); } catch(e){}
+        try { document.addEventListener('keydown', finRptEsc, true); } catch(e){}
+      }, 0);
+    }
+
+    // 「恢复」按钮（查报表浮层，取消左边）：把报表恢复到【应用筛选之前】的样子 ——
+    // 清掉筛选条件、丢掉本期重算的留档、重新从服务端取完整快照重建视图，
+    // 汇总表公式与全期数值原样回来（等价于工具栏的「复位」，但这里用户更容易找到）。
+    function fin_rptRestoreAll(){
+      finRptFilter = null;
+      finRptSumBase = null;
+      finRptCells = null;
+      finRptHidden = 0;
+      fin_sortReset();          // → fin_reload()：不带 keepFilter → 清筛选 + 重新取快照
+    }
+
+    // 应用筛选：记住条件 → 重新加载（保留筛选）→ 状态栏提示
+    async function fin_rptApplyFilter(year, month){
+      if (!finUniver || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
+      finRptFilter = { year: year, month: month || 0 };
+      await fin_reload({ keepFilter: true });
+      var suffix = ' ' + year + ((month || 0) ? '-' + (month < 10 ? '0' + month : month) : '');
+      if (!finRptFilter) return;                       // 期间被复位清掉（用户连点）
+      if (!finRptMatched){
+        fin_setStatusKey('fin_status_rpt_empty', suffix);
+      } else {
+        fin_setStatusKey('fin_status_rpt_filtered', suffix + (finRptHidden ? ' (' + finRptHidden + ')' : ''));
+      }
     }
 
     async function fin_snapshot(period){
@@ -19778,6 +20645,8 @@ var PROD_EQUIP_FAULT_KB = {
       try { fin_seedLang(snap); } catch(e){}
       // ★只显示当前语言那一块（FIN-LANG-VIEW-20261012）：finLastSnapshot 仍存完整快照。
       var view = fin_buildLangView(snap, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
+      try { fin_rptHideInView(view, snap); } catch(e){}   // ★查报表筛选：按年/月隐藏其它日期行（不删数据）
+      try { fin_rptApplySummary(view, snap); } catch(e){} // ★查报表：汇总表按期间重算（甲方案）
       finLastView = view;
       try {
         finSheet = finUniver.createUnit(UNIT_SHEET, view);
@@ -19789,6 +20658,7 @@ var PROD_EQUIP_FAULT_KB = {
       finLastSnapshot = snap;
       try { fin_bindEdits(); } catch(e){}
       try { fin_captureEditBase(finLastView); } catch(e){}
+      try { fin_rptScheduleReapply(); } catch(e){}   // ★视图建好后把本期值写回（压住公式引擎的异步覆盖）
     }
 
     function fin_afterDataChange(){
@@ -19824,8 +20694,11 @@ var PROD_EQUIP_FAULT_KB = {
     }
 
     // 复位 = 从服务器重新加载（自动保存保证录入内容已落盘），恢复干净视图与原始顺序
-    async function fin_reload(){
+    async function fin_reload(opts){
       if (!finUniver || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
+      // ★「查报表」筛选：只有应用筛选时带 {keepFilter:true}；
+      //   「复位」/「载入/刷新报表」都不带参数 → 清掉筛选、恢复显示全部。
+      if (!(opts && opts.keepFilter)) finRptFilter = null;
       fin_setStatusKey('fin_status_importing');
       try {
         // 先撤掉筛选：否则旧单元被销毁时，筛选插件仍持有状态并可能再发一次
@@ -23086,6 +23959,9 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     comm_f_equip_rmb:"设备金额 RMB", comm_f_equip_usd:"设备金额 USD", comm_f_equip_vnd:"设备金额 VND", comm_f_deposit:"定金给付时间",
     fin_tab_vn_report:"越南财务报表", fin_tab_cn_report:"中国财务报表", fin_tab_merge_report:"合并财务总报表", fin_panel_placeholder:"该报表内容建设中，敬请期待。",
     fin_btn_load:"载入/刷新报表", fin_btn_save:"保存", fin_btn_snapshot:"快照", fin_btn_export:"导出 xlsx", fin_btn_reimport:"重导", fin_btn_filter:"筛选", fin_btn_sort_asc:"升序", fin_btn_sort_desc:"降序",     fin_btn_restore:"复原", fin_btn_date_fmt:"按日-月-年排序", fin_btn_ins_rows:"在下方插入行", fin_btn_ins_rows_above:"在上方插入行",
+    fin_btn_report:"查报表", fin_rpt_title:"查报表", fin_rpt_year:"年份", fin_rpt_month:"月份", fin_rpt_note0:"选择0表示只看年度报告！", fin_rpt_ok:"确认", fin_rpt_cancel:"取消", fin_rpt_restore:"恢复",
+    fin_status_rpt_filtered:"已筛选：", fin_status_rpt_empty:"该年份/月份没有记录：",
+    fin_rpt_period_line:"{p} 发生额 · 余额截至 {e}", fin_rpt_period_remark:"截至 {e}",
     fin_menu_sort_asc:"升序", fin_menu_sort_desc:"降序", fin_menu_sort_reset:"复位", fin_cur_none:"货币",
     fin_status_not_loaded:"未载入", fin_status_engine:"正在加载表格引擎…", fin_status_importing:"正在导入报表…", fin_status_loaded:"报表已载入", fin_status_ready:"已就绪",
     fin_status_dirty:"有改动，待保存…", fin_status_saving:"保存中…", fin_status_saved:"已保存 ", fin_status_save_failed:"保存失败：", fin_status_no_wb:"保存失败：找不到工作簿",
@@ -23883,6 +24759,9 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     comm_f_equip_rmb:"Equip Amount RMB", comm_f_equip_usd:"Equip Amount USD", comm_f_equip_vnd:"Equip Amount VND", comm_f_deposit:"Deposit Payment Date",
     fin_tab_vn_report:"Vietnam Financial Report", fin_tab_cn_report:"China Financial Report", fin_tab_merge_report:"Consolidated Financial Statement", fin_panel_placeholder:"Content under construction, please stay tuned.",
     fin_btn_load:"Load / Refresh", fin_btn_save:"Save", fin_btn_snapshot:"Snapshot", fin_btn_export:"Export xlsx", fin_btn_reimport:"Re-import", fin_btn_filter:"Filter", fin_btn_sort_asc:"Asc", fin_btn_sort_desc:"Desc", fin_btn_restore:"Restore", fin_btn_date_fmt:"Sort by day-month-year", fin_btn_ins_rows:"Insert rows below", fin_btn_ins_rows_above:"Insert rows above",
+    fin_btn_report:"Query Report", fin_rpt_title:"Query Report", fin_rpt_year:"Year", fin_rpt_month:"Month", fin_rpt_note0:"Choose 0 to view the annual report only!", fin_rpt_ok:"Confirm", fin_rpt_cancel:"Cancel", fin_rpt_restore:"Restore",
+    fin_status_rpt_filtered:"Filtered: ", fin_status_rpt_empty:"No records for ",
+    fin_rpt_period_line:"{p} movements · balances as of {e}", fin_rpt_period_remark:"As of {e}",
     fin_menu_sort_asc:"Sort A → Z", fin_menu_sort_desc:"Sort Z → A", fin_menu_sort_reset:"Reset sort", fin_cur_none:"Currency",
     fin_status_not_loaded:"Not loaded", fin_status_engine:"Loading engine…", fin_status_importing:"Importing report…", fin_status_loaded:"Report loaded", fin_status_ready:"Ready",
     fin_status_dirty:"Unsaved changes…", fin_status_saving:"Saving…", fin_status_saved:"Saved ", fin_status_save_failed:"Save failed: ", fin_status_no_wb:"Save failed: workbook not found",
@@ -24678,6 +25557,9 @@ crm_yes:"Có", crm_no_yes:"Không", lostRestore:"Chuyển về Dự án Tiềm n
     comm_f_equip_rmb:"Giá trị TB RMB", comm_f_equip_usd:"Giá trị TB USD",     comm_f_equip_vnd:"Giá trị TB VND", comm_f_deposit:"Ngày trả đặt cọc",
     fin_tab_vn_report:"Báo cáo tài chính Việt Nam", fin_tab_cn_report:"Báo cáo tài chính Trung Quốc", fin_tab_merge_report:"Báo cáo tài chính tổng hợp", fin_panel_placeholder:"Nội dung đang xây dựng, vui lòng chờ.",
     fin_btn_load:"Tải lại báo cáo", fin_btn_save:"Lưu", fin_btn_snapshot:"Ảnh chụp", fin_btn_export:"Xuất xlsx", fin_btn_reimport:"Nhập lại", fin_btn_filter:"Lọc", fin_btn_sort_asc:"Tăng", fin_btn_sort_desc:"Giảm", fin_btn_restore:"Khôi phục", fin_btn_date_fmt:"Sắp xếp theo ngày-tháng-năm", fin_btn_ins_rows:"Chèn dòng bên dưới", fin_btn_ins_rows_above:"Chèn dòng bên trên",
+    fin_btn_report:"Tra cứu báo cáo", fin_rpt_title:"Tra cứu báo cáo", fin_rpt_year:"Năm", fin_rpt_month:"Tháng", fin_rpt_note0:"Chọn 0 nghĩa là chỉ xem báo cáo theo năm!", fin_rpt_ok:"Xác nhận", fin_rpt_cancel:"Hủy", fin_rpt_restore:"Khôi phục",
+    fin_status_rpt_filtered:"Đã lọc: ", fin_status_rpt_empty:"Không có dữ liệu cho ",
+    fin_rpt_period_line:"Phát sinh {p} · số dư đến {e}", fin_rpt_period_remark:"Đến {e}",
     fin_menu_sort_asc:"Sắp xếp A → Z", fin_menu_sort_desc:"Sắp xếp Z → A", fin_menu_sort_reset:"Khôi phục thứ tự", fin_cur_none:"Tiền tệ",
     fin_status_not_loaded:"Chưa tải", fin_status_engine:"Đang tải công cụ bảng…", fin_status_importing:"Đang nhập báo cáo…", fin_status_loaded:"Đã tải báo cáo", fin_status_ready:"Sẵn sàng",
     fin_status_dirty:"Có thay đổi, chờ lưu…", fin_status_saving:"Đang lưu…", fin_status_saved:"Đã lưu ", fin_status_save_failed:"Lưu thất bại: ", fin_status_no_wb:"Lưu thất bại: không tìm thấy bảng tính",
