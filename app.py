@@ -4877,6 +4877,138 @@ def fin_cn_save_snapshot():
                     "normalized": bool(_normalized), "rev": _cn_rev()})
 
 
+# ===================== API：合并财务总报表（FIN-MERGE-20261014）=====================
+# 用户 2026-10-14 要求：「越南财务报表」里【不能】出现中国报表的数据，合并结果只体现于
+# 「合并财务总报表」。因此合并结果落盘为【独立文件】merge_report.xlsx：
+#   · vn_report.xlsx    = 干净版（只有越南记录）
+#   · merge_report.xlsx = 合并版（越南 8 张表 + 中国「实际支出」记录，中国行蓝字）
+# ★本接口【只读】该文件（前端也是只读模式）—— 绝不写回 vn_report.xlsx / cn_report.xlsx，
+#   两个原文件与合并文件三者互不覆盖。
+# 快照缓存机制与 vn / cn 完全一致：键 = mtime(ns)+size+路径，源文件一变缓存自动失效。
+MERGE_REPORT = os.path.join(FIN_DIR, "merge_report.xlsx")
+MERGE_SNAP_KEY = os.path.join(FIN_DIR, "merge_report.snapshot.key")
+MERGE_SNAP_PREFIX = "merge_report.snapshot."
+_MG_SNAP_LOCK = _fthreading.Lock()
+
+
+def _mg_report_key():
+    """缓存键 = 合并报表 xlsx 的 mtime(ns) + 大小 + 路径；文件不存在返回 None。"""
+    try:
+        st = os.stat(MERGE_REPORT)
+    except OSError:
+        return None
+    return "%d:%d:%s" % (st.st_mtime_ns, st.st_size, MERGE_REPORT)
+
+
+def _mg_cache_name(key):
+    """快照文件名由【缓存键】派生：源文件一变名字就变，旧文件永远不会被覆盖。"""
+    return "%s%s.json" % (MERGE_SNAP_PREFIX, hashlib.sha1(key.encode("utf-8")).hexdigest()[:16])
+
+
+def _mg_cache_files():
+    try:
+        return [fn for fn in os.listdir(FIN_DIR)
+                if fn.startswith(MERGE_SNAP_PREFIX) and fn.endswith(".json")]
+    except OSError:
+        return []
+
+
+def _mg_cache_current():
+    """返回 (当前键, 当前可用的快照绝对路径或 None)。"""
+    key = _mg_report_key()
+    if key is None:
+        return None, None
+    try:
+        with open(MERGE_SNAP_KEY, "r", encoding="utf-8") as fh:
+            got = fh.read().strip()
+    except OSError:
+        return key, None
+    if got != key:
+        return key, None
+    path = os.path.join(FIN_DIR, _mg_cache_name(key))
+    return key, (path if os.path.isfile(path) else None)
+
+
+def _mg_cache_valid():
+    return _mg_cache_current()[1] is not None
+
+
+def _mg_cache_invalidate():
+    """merge_report.xlsx 被改写后必须调用：丢掉键与所有快照。"""
+    try:
+        os.remove(MERGE_SNAP_KEY)
+    except OSError:
+        pass
+    for fn in _mg_cache_files():
+        try:
+            os.remove(os.path.join(FIN_DIR, fn))
+        except OSError:
+            pass
+
+
+def _mg_cache_build(force=False):
+    """把合并报表 xlsx 转成快照并落盘。返回 (ok, detail)；detail ∈ hit/built/错误原因。
+    ★顺序与越南/中国一致：先把快照写成【新文件名】原子就位，最后才切键文件。"""
+    key = _mg_report_key()
+    if key is None:
+        return False, "not initialized"
+    with _MG_SNAP_LOCK:
+        if not force and _mg_cache_valid():
+            return True, "hit"
+        try:
+            sys.path.insert(0, BASE_DIR)
+            import univer_convert
+            snap = univer_convert.xlsx_to_univer(MERGE_REPORT, snap_id="merge-report")
+        except Exception as e:
+            return False, "convert failed: %s" % e
+        path = os.path.join(FIN_DIR, _mg_cache_name(key))
+        part = path + ".part"
+        tmp_key = MERGE_SNAP_KEY + ".tmp"
+        try:
+            with open(part, "w", encoding="utf-8") as fh:
+                json.dump(snap, fh, ensure_ascii=False, separators=(",", ":"))
+            os.replace(part, path)
+            with open(tmp_key, "w", encoding="utf-8") as fh:
+                fh.write(key)
+            os.replace(tmp_key, MERGE_SNAP_KEY)
+        except OSError as e:
+            for p in (part, tmp_key):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+            return False, "cache write failed: %s" % e
+        keep = os.path.basename(path)
+        for fn in _mg_cache_files():
+            if fn != keep:
+                try:
+                    os.remove(os.path.join(FIN_DIR, fn))
+                except OSError:
+                    pass
+        return True, "built"
+
+
+@app.route("/api/finance/merge-report/snapshot", methods=["GET"])
+def fin_mg_get_snapshot():
+    """返回「合并财务总报表」的 Univer 快照（只读，命中缓存直发，conditional=True 支持 304）。
+    文件不存在 → 404（前端提示未载入），绝不因此去改动 vn/cn 两个原文件。"""
+    if not os.path.isfile(MERGE_REPORT):
+        return jsonify({"error": "not initialized"}), 404
+    _snap_key, _snap_path = _mg_cache_current()
+    if _snap_path is None:
+        ok, detail = _mg_cache_build(force=True)
+        if not ok:
+            return jsonify({"error": detail}), 500
+        _snap_key, _snap_path = _mg_cache_current()
+        if _snap_path is None:
+            return jsonify({"error": "cache unavailable"}), 500
+    resp = send_from_directory(FIN_DIR, os.path.basename(_snap_path),
+                               mimetype="application/json", conditional=True)
+    resp.headers["Content-Type"] = "application/json; charset=utf-8"
+    resp.headers["X-Fin-Snap-Cache"] = "hit"
+    return resp
+
+
 # ===================== API：CRM 报价单 PDF 上传 =====================
 @app.route("/api/crm-projects/<int:pid>/documents", methods=["POST"])
 def upload_crm_pdf(pid):

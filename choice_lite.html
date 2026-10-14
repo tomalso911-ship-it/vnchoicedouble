@@ -16695,9 +16695,16 @@ var PROD_EQUIP_FAULT_KB = {
           <div id="fin_statbar" class="fin-statbar"></div>
         </div>
       </div>
+      <!-- ★合并财务总报表（FIN-MERGE-20261014，用户 2026-10-14 要求）：
+           独立数据源 merge_report.xlsx —— 由 _merge_cn_into_vn.py 把中国报表「实际支出」的记录
+           按日期并入越南的 8 张表（其中「Chi thực tế」合并，中国行整行蓝字）后另存成的文件。
+           ★★越南财务报表【不含】任何中国数据：越南标签读 vn_report.xlsx（纯净版），
+              合并标签读 merge_report.xlsx（合并版）；两个文件、两条链路必须始终分离。
+           这里不再有"建设中"占位：复用共用的工作区显示（只读）。
+           为兼顾老会话可能存下的 'merge' 标签，fin_panel_merge 必须保留（fin_switchTab 的校验依赖它）。 -->
       <div class="fin-panel" id="fin_panel_merge">
         <h3 data-i18n="fin_tab_merge_report">合并财务总报表</h3>
-        <p data-i18n="fin_panel_placeholder">该报表内容建设中，敬请期待。</p>
+        <p class="fin-cn-hint" data-i18n="fin_merge_hint">越南报表全部 8 张表，另并入中国报表的「实际支出」记录（中国行蓝字）。只读；越南财务报表本身不含中国数据。</p>
       </div>
     </div>
   </section>
@@ -16720,6 +16727,64 @@ var PROD_EQUIP_FAULT_KB = {
         return ow.apply(console, arguments);
       };
     })();
+
+    /* ★上游 Univer 0.5.5 已知缺陷的定向静音（FIN-COLWIDTH-20261014）
+       报错原文：The column width is less than 0, need to adjust page width to make it great than 0
+       出处（已定位到源码，非猜测）：@univerjs/engine-render@0.5.5 的文档排版函数 h0()：
+           let v = k.column;                 // 文档「页」里的列
+           if (v.width <= 0){ console.error("The column width is less than 0, ..."); return; }
+       列宽 = 文档页宽 − 左右边距；文档页宽 = 承载这段文本的 DOM 宽度（单元格编辑器 / 富文本）。
+       也就是说：只要【承载它的容器当下宽度为 0】，引擎就必然算出 ≤0 并丢这一条。
+       ★实测复现（Playwright + 真实 Univer 0.5.5，见 _probe_colwarn6_out.txt）：
+         · 容器可见、把列宽压到 1px 再进编辑态      → 不报
+         · 容器 width:0px   时进编辑态            → 必报（每次 2 条）
+         · 容器 display:none 时进编辑态           → 必报（每次 2 条）
+       → 结论：这是 Univer 在【表格不可见时用 0 宽度排版】的上游缺陷（官方 issue #5869，未修复）。
+         此刻表格根本看不见，引擎只是跳过这一次文本排版：不丢数据、不写坏文件、不影响保存。
+       → 因此只在【容器确实量到 0 尺寸】时静音这一条（并给一条 info 说明）；
+         容器可见时一律原样输出，绝不掩盖真问题。 */
+    (function(){
+      var oe = console.error, hinted = false;
+      console.error = function(){
+        try {
+          var msg = Array.prototype.slice.call(arguments).join(' ');
+          if (/column width is less than 0/i.test(msg)){
+            /* ★判定必须避开 offsetWidth：.univer-container 有 1px 边框，
+               容器 width 被压成 0 时 offsetWidth 是 2（不是 0）→ 会误判成"可见"而漏网。
+               clientWidth 不含边框；getClientRects().length===0 覆盖 display:none（自身或祖先）。 */
+            var el = document.getElementById('univer_container');
+            var cs = el ? (window.getComputedStyle ? window.getComputedStyle(el) : null) : null;
+            var zero = !el
+                    || (el.getClientRects ? el.getClientRects().length === 0 : false)
+                    || (el.clientWidth || 0) <= 0
+                    || (el.clientHeight || 0) <= 0
+                    || (cs && cs.display === 'none');
+            if (zero){
+              if (!hinted){
+                hinted = true;
+                console.info('[fin] 已忽略 Univer 上游告警「column width is less than 0」：' +
+                  '发生时表格容器宽度为 0（不可见），引擎跳过该次文本排版，无数据影响。');
+              }
+              return;
+            }
+          }
+        } catch(e){}
+        return oe.apply(console, arguments);
+      };
+    })();
+
+    /* ★隐藏表格前先收起单元格编辑框（FIN-COLWIDTH-20261014，配合上面的静音做「治本」）
+       切到「合并财务总报表」标签（工作区 display:none）或切到别的模块（#view-finance 变 display:none）
+       时，容器尺寸会瞬间变成 0×0；若此刻编辑框还开着，Univer 就会用 0 宽度排版 → 上面那条告警。
+       这里先把焦点从 Univer 编辑器上摘掉（等价于按 Esc 收起编辑框），再让容器隐藏。
+       ★只做 blur，不派发按键、不改数据。 */
+    function fin_stopEditBeforeHide(){
+      try {
+        var el = document.getElementById('univer_container');
+        var ae = document.activeElement;
+        if (el && ae && ae !== document.body && el.contains(ae) && typeof ae.blur === 'function') ae.blur();
+      } catch(e){}
+    }
     var FIN_ACTIVE_TAB = (function(){ try { return sessionStorage.getItem('won_fin_tab'); } catch(e){ return null; } })() || 'vn';
     /* ★ 越南财务报表只读开关（FIN-READONLY）：
        用户要求「就是这一份，不要每日保存」。打开后：
@@ -16747,7 +16812,14 @@ var PROD_EQUIP_FAULT_KB = {
       vn: { slug: 'vn-report', unitId: 'vn-report', dl: 'vn_report.xlsx',
             viewMaxCol: 9,  explicitSave: false, checkCol: false },
       cn: { slug: 'cn-report', unitId: 'cn-report', dl: 'cn_report.xlsx',
-            viewMaxCol: 28, explicitSave: true,  checkCol: true }
+            viewMaxCol: 28, explicitSave: true,  checkCol: true },
+      /* ★合并财务总报表（FIN-MERGE-20261014，用户 2026-10-14 要求）：
+         独立数据源 merge_report.xlsx（= 越南 8 张表 + 中国「实际支出」记录，中国行蓝字）。
+         ★★越南财务报表【绝不能】含中国数据 —— 两个数据源必须始终分离：
+           越南标签读 vn_report.xlsx（纯净版），合并标签读 merge_report.xlsx（合并版）。
+         只读：explicitSave=false 且非 cn → 沿用越南的「只读 + 重导」规则，永不写回文件。 */
+      merge: { slug: 'merge-report', unitId: 'merge-report', dl: 'merge_report.xlsx',
+               viewMaxCol: 9, explicitSave: false, checkCol: false }
     };
     function fin_cfg(){ return FIN_KINDS[FIN_KIND] || FIN_KINDS.vn; }
     function fin_isCn(){ return FIN_KIND === 'cn'; }
@@ -16769,7 +16841,7 @@ var PROD_EQUIP_FAULT_KB = {
     }
     /* 切报表种类：换数据源相关的全局（表名映射 / 显示窗口宽度 / 标题兜底），并重拉表名 */
     function fin_setKind(k){
-      if (k !== 'vn' && k !== 'cn') k = 'vn';
+      if (k !== 'vn' && k !== 'cn' && k !== 'merge') k = 'vn';
       var first = (finTitlesKind === null);
       var changed = (finTitlesKind !== null && finTitlesKind !== k);
       FIN_KIND = k;
@@ -16799,6 +16871,8 @@ var PROD_EQUIP_FAULT_KB = {
       if (changed && !first) { try { fin_loadSheetTitles(true); } catch(e){} }   // 首次由 fin_initUniver 统一拉
     }
     function fin_renderTabs(active){
+      /* ★切标签/切模块都可能让工作区变成 0×0 → 先收起编辑框，避免 0 宽度排版告警 */
+      try { fin_stopEditBeforeHide(); } catch(e){}
       FIN_ACTIVE_TAB = active || 'vn';
       try { sessionStorage.setItem('won_fin_tab', FIN_ACTIVE_TAB); } catch(e){}
       var tabs = document.querySelectorAll('#fin-tabs .fin-tab');
@@ -16809,10 +16883,13 @@ var PROD_EQUIP_FAULT_KB = {
       for (var j = 0; j < panels.length; j++) {
         panels[j].classList.toggle('active', panels[j].id === ('fin_panel_' + FIN_ACTIVE_TAB));
       }
-      // ★报表种类：vn / cn 共用同一块工作区；merge（合并总报表）还没做 → 隐藏工作区
-      fin_setKind(FIN_ACTIVE_TAB === 'cn' ? 'cn' : 'vn');
+      // ★报表种类：vn / cn / merge 共用同一块工作区（FIN-MERGE-20261014）
+      //   merge（合并财务总报表）=【合并后的越南报表】：中国报表的「实际支出」记录已按日期
+      //   并入越南「Chi thực tế」（中国行蓝字），数据源仍是 vn_report.xlsx →
+      //   因此 merge 同样走 'vn' 这一套表格逻辑与只读规则，工作区要正常显示。
+      fin_setKind(FIN_KINDS[FIN_ACTIVE_TAB] ? FIN_ACTIVE_TAB : 'vn');
       var ws = document.getElementById('fin_workspace');
-      if (ws) ws.style.display = (FIN_ACTIVE_TAB === 'merge') ? 'none' : '';
+      if (ws) ws.style.display = '';
       try { fin_applyReadonlyUI(); } catch(e){}
     }
     /* 换报表：丢掉当前单元与按报表缓存的状态，重新拉目标报表的快照 */
@@ -16836,7 +16913,11 @@ var PROD_EQUIP_FAULT_KB = {
       if (!key || !document.getElementById('fin_panel_' + key)) return;
       var prevKind = FIN_KIND;
       fin_renderTabs(key);
-      if (key !== 'vn' && key !== 'cn') return;          // merge 还没做
+      /* ★FIN-MERGE-20261014：merge 放行。它是【独立数据源】merge_report.xlsx
+         （越南 8 张表 + 中国记录），fin_renderTabs 已把 FIN_KIND 设成 'merge'；
+         只要 FIN_KIND 与上一张不同，下面的判断就会自动换数据源重载。
+         ★越南财务报表读的是 vn_report.xlsx（干净版），两者绝不共用文件。 */
+      if (key !== 'vn' && key !== 'cn' && key !== 'merge') return;
       if (finInited && finUniver) {
         if (FIN_KIND !== prevKind) fin_switchKindReload();  // 换报表 → 换数据源重载
         return;
@@ -25641,7 +25722,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     comm_opt_agi:"AGI-客户", comm_opt_gs:"GS-客户",
     comm_col_currency:"签约货币", comm_f_currency:"签约货币", comm_cur_rmb:"人民币 RMB", comm_cur_usd:"美元 USD", comm_cur_vnd:"越南盾 VND",
     comm_f_equip_rmb:"设备金额 RMB", comm_f_equip_usd:"设备金额 USD", comm_f_equip_vnd:"设备金额 VND", comm_f_deposit:"定金给付时间",
-    fin_tab_vn_report:"越南财务报表", fin_tab_cn_report:"中国财务报表", fin_tab_merge_report:"合并财务总报表", fin_panel_placeholder:"该报表内容建设中，敬请期待。",
+    fin_tab_vn_report:"越南财务报表", fin_tab_cn_report:"中国财务报表", fin_tab_merge_report:"合并财务总报表", fin_merge_hint:"越南报表全部 8 张表，另并入中国报表的「实际支出」记录（中国行蓝字）。只读；越南财务报表本身不含中国数据。", fin_panel_placeholder:"该报表内容建设中，敬请期待。",
     fin_cn_hint:"与越南报表同一套表格逻辑；Excel 里只有「实际支出」一张表。改动后请点「保存」。", fin_title_save_cn:"手动保存到服务器（中国报表：不会自动保存）", fin_title_save_ro:"只读模式：请使用「重导」上传新的 xlsx 更新报表",
     fin_btn_load:"载入/刷新报表", fin_btn_save:"保存", fin_btn_snapshot:"快照", fin_btn_export:"导出 xlsx", fin_btn_reimport:"重导", fin_btn_filter:"筛选", fin_btn_sort_asc:"升序", fin_btn_sort_desc:"降序",     fin_btn_restore:"复原", fin_btn_date_fmt:"按日-月-年排序", fin_btn_ins_rows:"在下方插入行", fin_btn_ins_rows_above:"在上方插入行",
     fin_btn_report:"查报表", fin_rpt_title:"查报表", fin_rpt_year:"年份", fin_rpt_month:"月份", fin_rpt_note0:"选择0表示只看年度报告！", fin_rpt_ok:"确认", fin_rpt_cancel:"取消", fin_rpt_restore:"恢复",
@@ -26444,7 +26525,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     comm_opt_agi:"AGI-Customer", comm_opt_gs:"GS-Customer",
     comm_col_currency:"Contract Currency", comm_f_currency:"Contract Currency", comm_cur_rmb:"CNY (RMB)", comm_cur_usd:"USD", comm_cur_vnd:"VND",
     comm_f_equip_rmb:"Equip Amount RMB", comm_f_equip_usd:"Equip Amount USD", comm_f_equip_vnd:"Equip Amount VND", comm_f_deposit:"Deposit Payment Date",
-    fin_tab_vn_report:"Vietnam Financial Report", fin_tab_cn_report:"China Financial Report", fin_tab_merge_report:"Consolidated Financial Statement", fin_panel_placeholder:"Content under construction, please stay tuned.",
+    fin_tab_vn_report:"Vietnam Financial Report", fin_tab_cn_report:"China Financial Report", fin_tab_merge_report:"Consolidated Financial Statement", fin_merge_hint:"All 8 sheets of the Vietnam report plus the China report's Actual Payments records (China rows in blue). Read-only; the Vietnam report itself contains no China data.", fin_panel_placeholder:"Content under construction, please stay tuned.",
     fin_cn_hint:"Same table logic as the Vietnam report; the Excel contains only the \u201cActual Payments\u201d sheet. Click Save after editing.", fin_title_save_cn:"Save to the server manually (China report: no auto-save)", fin_title_save_ro:"Read-only: use Re-import to upload a new xlsx",
     fin_btn_load:"Load / Refresh", fin_btn_save:"Save", fin_btn_snapshot:"Snapshot", fin_btn_export:"Export xlsx", fin_btn_reimport:"Re-import", fin_btn_filter:"Filter", fin_btn_sort_asc:"Asc", fin_btn_sort_desc:"Desc", fin_btn_restore:"Restore", fin_btn_date_fmt:"Sort by day-month-year", fin_btn_ins_rows:"Insert rows below", fin_btn_ins_rows_above:"Insert rows above",
     fin_btn_report:"Query Report", fin_rpt_title:"Query Report", fin_rpt_year:"Year", fin_rpt_month:"Month", fin_rpt_note0:"Choose 0 to view the annual report only!", fin_rpt_ok:"Confirm", fin_rpt_cancel:"Cancel", fin_rpt_restore:"Restore",
@@ -27245,7 +27326,7 @@ crm_yes:"Có", crm_no_yes:"Không", lostRestore:"Chuyển về Dự án Tiềm n
     comm_opt_agi:"AGI-Khách hàng", comm_opt_gs:"GS-Khách hàng",
     comm_col_currency:"Loại tiền tệ HĐ", comm_f_currency:"Loại tiền tệ HĐ", comm_cur_rmb:"Nhân dân tệ RMB", comm_cur_usd:"Đô USD", comm_cur_vnd:"Việt Nam đồng VND",
     comm_f_equip_rmb:"Giá trị TB RMB", comm_f_equip_usd:"Giá trị TB USD",     comm_f_equip_vnd:"Giá trị TB VND", comm_f_deposit:"Ngày trả đặt cọc",
-    fin_tab_vn_report:"Báo cáo tài chính Việt Nam", fin_tab_cn_report:"Báo cáo tài chính Trung Quốc", fin_tab_merge_report:"Báo cáo tài chính tổng hợp", fin_panel_placeholder:"Nội dung đang xây dựng, vui lòng chờ.",
+    fin_tab_vn_report:"Báo cáo tài chính Việt Nam", fin_tab_cn_report:"Báo cáo tài chính Trung Quốc", fin_tab_merge_report:"Báo cáo tài chính tổng hợp", fin_merge_hint:"Toàn bộ 8 sheet của báo cáo Việt Nam, gộp thêm các bản ghi Chi thực tế của báo cáo Trung Quốc (dòng Trung Quốc màu xanh). Chỉ đọc; báo cáo Việt Nam không chứa dữ liệu Trung Quốc.", fin_panel_placeholder:"Nội dung đang xây dựng, vui lòng chờ.",
     fin_cn_hint:"Cùng logic bảng như báo cáo Việt Nam; Excel chỉ có một sheet \u201cChi thực tế\u201d. Nhớ bấm Lưu sau khi nhập.", fin_title_save_cn:"Lưu thủ công lên máy chủ (báo cáo Trung Quốc: không tự động lưu)", fin_title_save_ro:"Chế độ chỉ đọc: dùng Nhập lại để tải xlsx mới",
     fin_btn_load:"Tải lại báo cáo", fin_btn_save:"Lưu", fin_btn_snapshot:"Ảnh chụp", fin_btn_export:"Xuất xlsx", fin_btn_reimport:"Nhập lại", fin_btn_filter:"Lọc", fin_btn_sort_asc:"Tăng", fin_btn_sort_desc:"Giảm", fin_btn_restore:"Khôi phục", fin_btn_date_fmt:"Sắp xếp theo ngày-tháng-năm", fin_btn_ins_rows:"Chèn dòng bên dưới", fin_btn_ins_rows_above:"Chèn dòng bên trên",
     fin_btn_report:"Tra cứu báo cáo", fin_rpt_title:"Tra cứu báo cáo", fin_rpt_year:"Năm", fin_rpt_month:"Tháng", fin_rpt_note0:"Chọn 0 nghĩa là chỉ xem báo cáo theo năm!", fin_rpt_ok:"Xác nhận", fin_rpt_cancel:"Hủy", fin_rpt_restore:"Khôi phục",
@@ -44087,6 +44168,9 @@ function switchView(name) {
   window.currentView = name;
   // 切换视图前关闭所有弹窗
   closeAllModals();
+  /* ★离开财务页会把 #view-finance 变 display:none（Univer 容器 0×0）→
+     先收起单元格编辑框，避免 Univer 用 0 宽度排版刷告警（FIN-COLWIDTH-20261014） */
+  try { if (typeof fin_stopEditBeforeHide === 'function') fin_stopEditBeforeHide(); } catch (e) {}
   // 切换到新视图，确保导航解锁（理论上此时无弹窗）
   updateNavLock();
   var views = document.querySelectorAll('#app .view');
