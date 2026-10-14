@@ -4105,11 +4105,21 @@ def fin_save_snapshot():
     data = request.get_json(force=False, silent=True)
     if not isinstance(data, dict):
         return jsonify({"error": "invalid json"}), 400
+    _n_dt = 0
     try:
         sys.path.insert(0, BASE_DIR)
         import univer_convert
         tmp = FIN_REPORT + ".tmp.xlsx"
         univer_convert.univer_to_xlsx(data, tmp)
+        # ★日期格式强制统一（FIN-DATE-FMT-20261014）：界面上以【文本】或【中文/美式格式】
+        #   录入的日期，一律在落盘前刷成 dd-mm-yyyy（幂等：无异常就不重写文件）。
+        try:
+            _n_dt = _fin_force_date_fmt(tmp)
+            if _n_dt:
+                sys.stderr.write("[fin-datefmt] vn 保存：%d 个日期格已强制成 %s\n" % (_n_dt, FIN_DATE_FMT))
+                sys.stderr.flush()
+        except Exception as _dfe:
+            sys.stderr.write("[fin-datefmt] vn 保存归一化失败: %s\n" % _dfe)
         try:
             os.replace(tmp, FIN_REPORT)
         except OSError:
@@ -4128,7 +4138,8 @@ def fin_save_snapshot():
         sys.stderr.write("[fin_save_snapshot] ERROR: %s\n%s\n" % (e, tb))
         sys.stderr.flush()
         return jsonify({"error": "convert failed: %s" % e}), 500
-    return jsonify({"ok": True, "saved_at": _fdt.datetime.now().isoformat(timespec="seconds")})
+    return jsonify({"ok": True, "saved_at": _fdt.datetime.now().isoformat(timespec="seconds"),
+                    "datefmt_fixed": _n_dt})
 
 
 # ===================== 财务管理：中国报表（Univer）本地落盘 =====================
@@ -4490,21 +4501,155 @@ def _cn_normalize_border():
         return False
 
 
+# ===================== 日期格式强制统一（FIN-DATE-FMT-20261014）=====================
+# 用户 2026-10-14 要求：报表里【所有】日期列都必须是 dd-mm-yyyy，「哪怕是文本」。
+# 现象：越南报表日历列里出现「2026 年 8 月 18 日」。根因两条：
+#   ① 格子里存的是【文本】日期（'18/8/2026'、'2026年8月18日'）→ 界面按文本原样显示；
+#   ② 格子是真日期 / 日期序列号，但 number_format 是 General（或 mm-dd-yy 这种美式）
+#      → Univer 按浏览器【中文区域】默认格式渲染成「2026年8月18日」。
+# 做法：先识别「日期列」——【必须】同时满足：① 该列第 1~6 行出现 Ngày/date/日期/Tháng/月份
+#       这类表头词；② 该列非空格中「日期/文本日期/日期序列号」占比 >= 0.6。
+#       加 ① 这条硬条件是为了【绝不把数值列误判成日期列】（40000~60000 的普通数字
+#       和 Excel 日期序列号长得一模一样）。识别到之后，把列里的日期格强制
+#       number_format=dd-mm-yyyy，文本日期解析回真日期。
+# ★幂等：没有任何异常【完全不重写文件】——不白动 mtime，也就不会白重建一次快照缓存。
+#       空格子【不碰】：既避免误伤，也保证稳态下 changed=0（不会每次保存都白重写一遍）。
+# ★调用点：vn 保存(fin_save_snapshot，作用在 tmp 上) / cn 保存(fin_cn_save_snapshot)
+#           + _cn_normalize_style()（中国报表服务启动与保存后的文件级归一化）。
+FIN_DATE_FMT = "dd-mm-yyyy"
+FIN_DATE_MAXCOL = 45      # 报表最宽用到 AN(40) 列
+FIN_DATE_MAXROW = 1200
+_FIN_DATE_RX = (
+    (re.compile(r"^(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?$"), "ymd"),
+    (re.compile(r"^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$"), "ymd"),
+    (re.compile(r"^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$"), "dmy"),
+    (re.compile(r"^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2})$"), "dmy"),
+)
+_FIN_DATE_HINT = re.compile(r"(ng[aà]y|\bdate\b|日期|th[aá]ng|月份)", re.I)
+
+
+def _fin_parse_datetext(s):
+    """文本日期 -> datetime：'2026年8月18日' / '18/8/2026'（越南 d/m/y 优先）/
+    '9/25/2026'（月份位 > 12，自动按美式 m/d/y 兜底）。解析不出返回 None。"""
+    t = (s or "").strip()
+    for rx, kind in _FIN_DATE_RX:
+        m = rx.match(t)
+        if not m:
+            continue
+        g = [int(x) for x in m.groups()]
+        if kind == "ymd":
+            cands = [(g[2], g[1], g[0])]
+        else:
+            cands = [(g[0], g[1], g[2]), (g[1], g[0], g[2])]
+            if g[2] < 100:
+                cands = [(a, b, 2000 + c) for (a, b, c) in cands]
+        for d, mo, y in cands:
+            try:
+                return _fdt.datetime(y, mo, d)
+            except ValueError:
+                continue
+        return None
+    return None
+
+
+def _fin_date_kind(v):
+    """格子的日期类型：'date'（真日期）/ 'text'（文本日期）/ 'serial'（日期序列号）/ None。"""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    if isinstance(v, (_fdt.datetime, _fdt.date)):
+        return "date"
+    if isinstance(v, str):
+        return "text" if _fin_parse_datetext(v) else None
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        if float(v).is_integer() and 40000 <= v <= 60000:
+            return "serial"
+    return None
+
+
+def _fin_force_date_fmt(path, sheet_names=None):
+    """把 path（xlsx）里所有日期列强制成 dd-mm-yyyy；返回被改动的格子数（0 = 文件没动）。
+    日期列判定：该列非空格中「日期/文本日期/日期序列号」占比 >= 0.8，
+                或 >= 0.6 且第 1~6 行出现 Ngày/date/日期/Tháng/月份 这类表头词。"""
+    if not os.path.isfile(path):
+        return 0
+    try:
+        wb = openpyxl.load_workbook(path, data_only=False)
+    except Exception as e:
+        sys.stderr.write("[fin-datefmt] 打不开 %s: %s\n" % (path, e))
+        return 0
+    changed = 0
+    try:
+        for sn in (sheet_names or wb.sheetnames):
+            if sn not in wb.sheetnames:
+                continue
+            ws = wb[sn]
+            ncol = min(max(ws.max_column, 1), FIN_DATE_MAXCOL)
+            last = min(max(ws.max_row, 1), FIN_DATE_MAXROW)
+            for c in range(1, ncol + 1):
+                dated = 0
+                other = 0
+                hint = False
+                for r in range(1, last + 1):
+                    cv = ws.cell(r, c).value
+                    if _fin_date_kind(cv):
+                        dated += 1
+                    elif cv is not None:
+                        other += 1
+                    if r <= 6 and isinstance(cv, str) and _FIN_DATE_HINT.search(cv):
+                        hint = True
+                nonblank = dated + other
+                if dated < 3 or nonblank <= 0 or not hint:
+                    continue
+                if (dated / float(nonblank)) < 0.6:
+                    continue
+                for r in range(1, last + 1):
+                    cell = ws.cell(r, c)
+                    k = _fin_date_kind(cell.value)
+                    if k == "text":
+                        cell.value = _fin_parse_datetext(cell.value)
+                        cell.number_format = FIN_DATE_FMT
+                        changed += 1
+                    elif k in ("date", "serial"):
+                        if (cell.number_format or "").strip().lower() != FIN_DATE_FMT:
+                            cell.number_format = FIN_DATE_FMT
+                            changed += 1
+        if changed:
+            tmp = path + ".datefmt.tmp"
+            wb.save(tmp)
+            os.replace(tmp, path)
+    finally:
+        try:
+            wb.close()
+        except Exception:
+            pass
+    return changed
+
+
 def _cn_normalize_style():
     """中国报表外观归一化（幂等）：① AC 核销列居中；② 数据区字体蓝色；
-    ③ 金额列人民币符号；④ 黑色网格线。
+    ③ 金额列人民币符号；④ 黑色网格线；⑤ 日期列强制 dd-mm-yyyy。
     返回 True 表示动过文件（调用方据此让快照缓存失效）。"""
     changed = False
     for fn, tag in ((_cn_normalize_ac_align, "核销列居中"),
                     (_cn_normalize_text_color, "数据区蓝色"),
                     (_cn_normalize_money_fmt, "金额人民币符号"),
-                    (_cn_normalize_border, "黑色网格线")):
+                    (_cn_normalize_border, "黑色网格线"),
+                    (_cn_normalize_date_fmt, "日期格式 dd-mm-yyyy")):
         try:
             if fn():
                 changed = True
         except Exception as e:
             sys.stderr.write("[fin-cn] %s失败: %s\n" % (tag, e))
     return changed
+
+
+def _cn_normalize_date_fmt():
+    """中国报表日期列强制 dd-mm-yyyy（幂等）。返回 True 表示动过文件。"""
+    try:
+        return _fin_force_date_fmt(CN_REPORT) > 0
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 日期格式处理失败: %s\n" % e)
+        return False
 
 
 def _cn_seed_if_missing():
@@ -4802,11 +4947,21 @@ def fin_cn_save_snapshot():
         return jsonify({"ok": False, "stale": True, "rev": _cur_rev,
                         "error": "stale snapshot"}), 200
     _normalized = False        # ★数据区字色是否被本次保存修正过（返回值给前端决定要不要刷屏）
+    _n_dt = 0                  # ★本次保存强制修正过的日期格数（FIN-DATE-FMT-20261014）
     try:
         sys.path.insert(0, BASE_DIR)
         import univer_convert
         tmp = CN_REPORT + ".tmp.xlsx"
         univer_convert.univer_to_xlsx(data, tmp)
+        # ★日期格式强制统一（FIN-DATE-FMT-20261014）：与越南报表同一套逻辑，
+        #   落盘前把日期列刷成 dd-mm-yyyy（幂等：无异常就不重写文件）。
+        try:
+            _n_dt = _fin_force_date_fmt(tmp)
+            if _n_dt:
+                sys.stderr.write("[fin-datefmt] cn 保存：%d 个日期格已强制成 %s\n" % (_n_dt, FIN_DATE_FMT))
+                sys.stderr.flush()
+        except Exception as _dfe:
+            sys.stderr.write("[fin-datefmt] cn 保存归一化失败: %s\n" % _dfe)
         # ★★CN-BASIS-GUARD-20261013（服务端硬守卫，勿移除）★★
         #   为什么必须留在服务端：前端那套"把人民币显示值换回越南盾"的守卫依赖
         #     「当前下拉币种 + 汇率因子缓存 + 金额列登记」三个运行时状态，
@@ -4874,7 +5029,7 @@ def fin_cn_save_snapshot():
         sys.stderr.flush()
         return jsonify({"error": "convert failed: %s" % e}), 500
     return jsonify({"ok": True, "saved_at": _fdt.datetime.now().isoformat(timespec="seconds"),
-                    "normalized": bool(_normalized), "rev": _cn_rev()})
+                    "normalized": bool(_normalized), "datefmt_fixed": _n_dt, "rev": _cn_rev()})
 
 
 # ===================== API：合并财务总报表（FIN-MERGE-20261014）=====================
@@ -5007,6 +5162,173 @@ def fin_mg_get_snapshot():
     resp.headers["Content-Type"] = "application/json; charset=utf-8"
     resp.headers["X-Fin-Snap-Cache"] = "hit"
     return resp
+
+
+# ===================== API：财务报告看板（FIN-DASHBOARD-20261014，只读） =====================
+# 轻量公式求值：财务表只用到 SUM / 单元格引用 / 加减 / 数字字面量（如 =150000000）。
+_FIN_SUM_RE = re.compile(r'SUM\s*\((.*)\)\s*$', re.IGNORECASE)
+_FIN_REF_RE = re.compile(r'^\s*([A-Za-z]+)\s*(\d+)\s*$')
+_FIN_ARITH_RE = re.compile(r'^(.+?)\s*([+\-])\s*(.+)$')
+
+
+def _fin_col_idx(col):
+    n = 0
+    for ch in col.upper():
+        n = n * 26 + (ord(ch) - 64)
+    return n
+
+
+def _fin_parse_ref(ref):
+    if not isinstance(ref, str):
+        return None, None, None
+    ref = ref.strip().replace('$', '')
+    if '!' in ref:
+        sh, cell = ref.split('!', 1)
+        sh = sh.strip().strip("'")
+    else:
+        sh, cell = None, ref
+    m = _FIN_REF_RE.match(cell.strip())
+    if not m:
+        return None, None, None
+    return sh, _fin_col_idx(m.group(1)), int(m.group(2))
+
+
+def _fin_cell_val(wb, sheet, col, row, memo, visited, depth=0):
+    if depth > 32:
+        return None
+    key = (sheet, col, row)
+    if key in memo:
+        return memo[key]
+    if key in visited:
+        return None
+    visited.add(key)
+    try:
+        v = wb[sheet].cell(row, col).value
+    except Exception:
+        memo[key] = None
+        return None
+    if isinstance(v, str) and v.startswith('='):
+        ev = _fin_eval_formula(v, wb, sheet, memo, visited, depth + 1)
+        memo[key] = ev
+        return ev
+    memo[key] = v
+    return v
+
+
+def _fin_eval_formula(formula, wb, cur_sheet, memo, visited=None, depth=0):
+    if visited is None:
+        visited = set()
+    if depth > 32:
+        return None
+    if not isinstance(formula, str) or not formula.startswith('='):
+        return None
+    expr = formula[1:].strip()
+    try:
+        return float(expr)                      # 数字字面量（=150000000）
+    except (ValueError, TypeError):
+        pass
+    m = _FIN_SUM_RE.match(expr)
+    if m:
+        total = 0.0
+        for part in m.group(1).split(','):
+            part = part.strip()
+            if ':' in part:
+                a, b = part.split(':')
+                sa, ca, ra = _fin_parse_ref(a)
+                sb, cb, rb = _fin_parse_ref(b)
+                sh = sa or sb or cur_sheet
+                for r in range(ra, rb + 1):
+                    for c in range(ca, cb + 1):
+                        v = _fin_cell_val(wb, sh, c, r, memo, visited, depth + 1)
+                        if isinstance(v, (int, float)):
+                            total += v
+            else:
+                s, c, r = _fin_parse_ref(part)
+                v = _fin_cell_val(wb, s or cur_sheet, c, r, memo, visited, depth + 1)
+                if isinstance(v, (int, float)):
+                    total += v
+        return total
+    m = _FIN_ARITH_RE.match(expr)
+    if m:
+        left, op, right = m.group(1).strip(), m.group(2), m.group(3).strip()
+        lv = _fin_eval_formula(left if left.startswith('=') else '=' + left,
+                               wb, cur_sheet, memo, visited, depth + 1)
+        rv = _fin_eval_formula(right if right.startswith('=') else '=' + right,
+                               wb, cur_sheet, memo, visited, depth + 1)
+        if isinstance(lv, (int, float)) and isinstance(rv, (int, float)):
+            return lv + rv if op == '+' else lv - rv
+    s, c, r = _fin_parse_ref(expr)
+    if s is None and c is None and r is None:
+        return None
+    v = _fin_cell_val(wb, s or cur_sheet, c, r, memo, visited, depth + 1)
+    if isinstance(v, (int, float)):
+        return v
+    return None
+
+
+def _fin_tonghop_summary(path):
+    """读取某份报表「TỔNG HỢP」的 6 个关键合计（C 列）。失败返回 None。"""
+    try:
+        wb = openpyxl.load_workbook(path, data_only=False)
+    except Exception:
+        return None
+    try:
+        if "TỔNG HỢP" not in wb.sheetnames:
+            return None
+        ws = wb["TỔNG HỢP"]
+        out = {}
+        for key, row in (("bank", 8), ("receipts", 14), ("disbursements", 19),
+                         ("internal", 20), ("actual", 21), ("ending", 22)):
+            v = ws.cell(row, 3).value
+            if isinstance(v, str) and v.startswith('='):
+                v = _fin_eval_formula(v, wb, "TỔNG HỢP", {})
+            out[key] = v if isinstance(v, (int, float)) else None
+        return out
+    except Exception:
+        return None
+    finally:
+        try:
+            wb.close()
+        except Exception:
+            pass
+
+
+def _fin_cn_totals(path):
+    """中国报表首表「实际支出」的 Chi(E) 合计 + 记录笔数（E 非零行）。"""
+    try:
+        wb = openpyxl.load_workbook(path, data_only=False)
+    except Exception:
+        return None
+    try:
+        ws = wb[wb.sheetnames[0]]
+        total, cnt = 0.0, 0
+        for r in range(5, ws.max_row + 1):
+            v = ws.cell(r, 5).value
+            if isinstance(v, str) and v.startswith('='):
+                v = _fin_eval_formula(v, wb, ws.title, {})
+            if isinstance(v, (int, float)):
+                total += v
+                if v:
+                    cnt += 1
+        return {"actual": total, "records": cnt}
+    except Exception:
+        return None
+    finally:
+        try:
+            wb.close()
+        except Exception:
+            pass
+
+
+@app.route("/api/finance/summary", methods=["GET"])
+def fin_summary():
+    """财务报告看板：汇总越南 / 中国 / 合并三份报表的关键数字（纯只读，不写任何文件）。"""
+    vn = _fin_tonghop_summary(FIN_REPORT) or {}
+    cn = _fin_cn_totals(CN_REPORT) or {"actual": None, "records": 0}
+    mg = _fin_tonghop_summary(MERGE_REPORT) or {}
+    mv, vv = mg.get("actual"), vn.get("actual")
+    delta = (mv - vv) if isinstance(mv, (int, float)) and isinstance(vv, (int, float)) else None
+    return jsonify({"ok": True, "vn": vn, "cn": cn, "merge": mg, "chinaDelta": delta})
 
 
 # ===================== API：CRM 报价单 PDF 上传 =====================

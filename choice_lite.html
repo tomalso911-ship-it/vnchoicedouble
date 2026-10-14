@@ -3801,6 +3801,7 @@ function _ovLoadChartLib(cb){
       var backBtn = document.querySelector('#wl-detail .wl-back'); if(backBtn) backBtn.textContent = wl_i18n('wl_back');
       document.getElementById('wl-detail-title').textContent = wl_name(p);
       wl_renderTabs(WL_ACTIVE_TAB || 'daily');
+      if (typeof prodWxAutoFixAll === 'function') { try { prodWxAutoFixAll(); } catch(e){} }
     }
     function wl_back(){
       WL_CUR = null;
@@ -4357,6 +4358,18 @@ var WL_FLOW_IMG = {
          merge（合并总报表）还没做 → fin_renderTabs 会把它隐藏。 */
       .fin-workspace{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;margin-top:12px;}
       .fin-cn-hint{font-size:12px;color:#777;margin:4px 0 0;line-height:1.6;}
+      /* ★财务报告看板（FIN-DASHBOARD-20261014）：越南/中国/合并三块 KPI 卡片 */
+      .fin-dash-wrap{display:flex;flex-direction:column;gap:16px;}
+      .fin-dash-loading{padding:24px;text-align:center;color:#888;font-size:13px;}
+      .fin-dash-sec{background:#fff;border:1px solid #eef1f4;border-radius:12px;padding:14px 16px;}
+      .fin-dash-sec-title{font-size:15px;font-weight:700;color:#263238;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid #E53935;}
+      .fin-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+      .fin-dash-kpi{background:#f7f9fb;border:1px solid #eef1f4;border-radius:10px;padding:10px 12px;}
+      .fin-dash-kpi.hi{background:#FFF3F3;border-color:#f3c0c0;}
+      .fin-dash-kpi-lbl{font-size:11.5px;color:#7a8699;font-weight:600;margin-bottom:6px;line-height:1.3;}
+      .fin-dash-kpi-val{font-size:16px;font-weight:700;color:#1f2d3d;word-break:break-all;line-height:1.25;}
+      .fin-dash-kpi.hi .fin-dash-kpi-val{color:#E53935;}
+      .fin-dash-cur{font-size:11px;color:#9aa7b5;font-weight:600;margin-top:4px;}
       /* 设备故障图标报告：图表盒（锁高度防 Chart.js resize 死循环） */
       .prod-eq-charts{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0 14px;}
       .prod-eq-chart-box{flex:1 1 360px;min-width:280px;max-width:560px;height:320px;background:#fff;border:1px solid #eef1f4;border-radius:10px;padding:10px 12px;position:relative;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;}
@@ -4386,6 +4399,19 @@ var WL_FLOW_IMG = {
       .prod-form-nowrap .prod-field label{white-space:nowrap;}
       .prod-form-nowrap .prod-field input,
       .prod-form-nowrap .prod-field select{min-width:110px;width:100%;}
+      /* ★ 2026-10-14 修复「工厂概况单行表单长标签叠字」：
+         越南语等长标签（Ngày bắt đầu sản xuất / Địa chỉ công trường …）在 white-space:nowrap
+         且字段 min-width:0 的情况下会溢出字段盒、压到右侧相邻字段的标签上（视觉"叠在一起"）。
+         这里把每个字段做成独立隔离盒：标签超宽自动折行、输入框不再撑破字段盒 → 永不重叠。
+         日历弹窗 #cpCalPopup 是 body 下的 position:fixed 顶层元素，不受 overflow:hidden 影响。 */
+      .prod-form.prod-form-nowrap > .prod-field{overflow:hidden !important;}
+      .prod-form.prod-form-nowrap > .prod-field > label{
+        white-space:normal !important;word-break:break-word;overflow-wrap:anywhere;line-height:1.15;
+      }
+      .prod-form.prod-form-nowrap > .prod-field > input,
+      .prod-form.prod-form-nowrap > .prod-field > select,
+      .prod-form.prod-form-nowrap > .prod-field > .cp-date-input-wrapper{min-width:0 !important;}
+      .prod-form.prod-form-nowrap > .prod-field .cp-date-input-wrapper input{min-width:0 !important;}
       .prod-form-row{display:flex;flex-wrap:wrap;gap:10px;width:100%;align-items:flex-end;}
       .prod-form-row .prod-field{flex:1 1 140px;min-width:0;}
       .prod-form-row .prod-field:first-child{flex:0 0 160px;}
@@ -6734,6 +6760,7 @@ var WL_FLOW_IMG = {
       PROD_CUR = id;
       try{ window.__CUR_PROJECT_ID = id; }catch(e){}
       prodStartWeatherTimer();
+      if (typeof prodWxAutoFixAll === 'function') { try { prodWxAutoFixAll(); } catch(e){} }
       prod_el('prod-list').style.display = 'none';
       prod_el('prod-detail').style.display = 'block';
       var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==id; }) : null;
@@ -8081,6 +8108,12 @@ var WL_FLOW_IMG = {
       }
       _prodCopyRowCore(dd);
     }
+    /* ★ 复制取值口径（2026-10-14 用户确认）：
+       ① 默认取「当前表单输入框里的数值」（Tab C 界面上 pc_<角色> 输入框的值）；表单不在 DOM 时
+          回退到"所选日期之前最近有数据的那天"（旧口径），保证任何入口复制都不会取到空值。
+       ② TET(春节)=「是」时允许 0 值；TET=「否」时出现 0 一律改用默认模板值 PROD_WORKER_DEFAULTS，
+          避免把普通工作日复制成整行 0 人的班次记录（=用户反馈的问题。注意模板本身对
+          铲车工/其他临时工/材料看管员就是 0，不受影响）。 */
     function _prodCopyRowCore(dd){
       var f = prod_get(PROD_CUR);
       if(!f.workers || !f.workers[dd]) return;
@@ -8090,10 +8123,21 @@ var WL_FLOW_IMG = {
       var allDates = prod_sortDateKeys(Object.keys(f.workers||{}), false);
       var prevDates = allDates.filter(function(x){ return dmyToYmd(x) < dmyToYmd(dd); });
       var latest = prevDates.length ? f.workers[prevDates[prevDates.length-1]] : null;
+      /* 表单是否存在：以 pc_date 为锚（Tab C 已渲染时才读输入框） */
+      var hasForm = !!prod_el('pc_date');
+      var holiSel = prod_el('pc_holiday');
+      var srcHoliday = holiSel ? (String(holiSel.value||'no')==='yes' ? 'yes' : 'no')
+                               : ((latest && latest.holiday==='yes') ? 'yes' : 'no');
       var clone = {};
-      PROD_WORKERS.forEach(function(k){ clone[k[0]] = latest ? (+latest[k[0]]||0) : (PROD_WORKER_DEFAULTS[k[0]]||0); });
+      PROD_WORKERS.forEach(function(k){
+        var v = null;
+        if(hasForm){ var el = prod_el('pc_'+k[0]); if(el) v = mathNum(el.value); }
+        if(v==null) v = latest ? (+latest[k[0]]||0) : (PROD_WORKER_DEFAULTS[k[0]]||0);
+        if(v===0 && srcHoliday!=='yes') v = (PROD_WORKER_DEFAULTS[k[0]]||0);
+        clone[k[0]] = v;
+      });
       clone.recorder = prod_loginUser();
-      clone.holiday = (latest && latest.holiday==='yes') ? 'yes' : 'no';
+      clone.holiday = (srcHoliday==='yes') ? 'yes' : 'no';
       f.workers[tk] = clone; prod_save(f); prod_renderTab('C');
       prod_toast(pt('toast_copied') + ' → ' + tk);
     }
@@ -8257,6 +8301,183 @@ var WL_FLOW_IMG = {
           if(pm && (!w.weatherPm || w.weatherPm.v!==2)){ w.weatherPm = pm; ch = true; }
         });
         if(ch){ prod_save(f); if(PROD_ACTIVE_TAB==='C') prod_renderTab('C'); }
+      });
+    }
+    /* ===================== ★ 全项目天气自动补齐（跨项目，2026-10-14） =====================
+       ⛔ 勿删勿改：天气自动抓取此前【只作用于当前打开的项目】（prodTryCaptureWeather 仅今天、
+         prodAutoBackfillWeather / prodAutoBackfillWeatherE 仅在打开该项目 C/E 标签页时触发）。
+         结果：从没被打开过的项目里，旧版天气(v!==2)永远迁移不到、缺失的也永远补不上，
+         页面按 v===2 过滤后显示为空 → 用户看到"有些自动更新了，有些没有"。
+       本区块遍历【全部项目】（服务端为基），把人员日记录 / 每日生产 / 安装日记录 /
+       出库·入库日快照里缺失或旧版(v!==2)的上午(09点)下午(14点)天气一次性补齐并落库。
+       · 今天只补已过点的时段（上午需 >=09:00、下午需 >=14:00），与 prod_wxDisplay 时间锁一致。
+       · 当前打开的项目(PROD_CUR)不走这里，交给原有 prodTryCaptureWeather/prodAutoBackfill* 处理，
+         避免与服务端同步门禁(__PROD_SYNCED/__PROD_SYNC_INFLIGHT)冲突。 */
+    var PROD_WX_ALL_RUNNING = false, PROD_WX_ALL_AT = 0, PROD_WX_ALL_TIMER = null;
+    function prodFactoryProvKeyFor(id){
+      var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return String(x.id)===String(id); }) : null;
+      var prov = p ? (p.province||p.region||'') : '';
+      if(!prov){
+        try{
+          var ff = (typeof PROD_MEM!=='undefined' && PROD_MEM[id]) || null;
+          if(!ff){ try{ ff = JSON.parse(localStorage.getItem(PROD_LS+id)); }catch(_){} }
+          prov = (ff && ff.profile && ff.profile.province) || '';
+        }catch(_){}
+      }
+      return prov;
+    }
+    /* 待补天气清单：人员日记录 / 每日生产 / 安装日记录 / 出库·入库日快照（任一处缺失或 v!==2） */
+    function prodWxPendingSlots(f){
+      var out = [];
+      function scan(map){
+        if(!map || typeof map!=='object') return;
+        Object.keys(map).forEach(function(dd){
+          var o = map[dd]; if(!o || typeof o!=='object' || o._deleted) return;
+          var ymd = dmyToYmd(dd); if(!ymd) return;
+          var needAm = (!o.weatherAm || o.weatherAm.v!==2), needPm = (!o.weatherPm || o.weatherPm.v!==2);
+          if(needAm || needPm) out.push({ ymd:ymd, o:o, needAm:needAm, needPm:needPm });
+        });
+      }
+      scan(f.workers);
+      scan(f.production);
+      scan(f.installation && f.installation.workers);
+      var ho = f.houseOut || {};
+      Object.keys(ho).forEach(function(hk){
+        var rec = ho[hk]; if(!rec || typeof rec!=='object') return;
+        scan(rec.outDaily); scan(rec.inDaily);
+      });
+      return out;
+    }
+    /* 按 09/14 点小时数据写入；今天必须过点才写（时间锁，不得放宽） */
+    function prodWxApplySlots(slots, hr){
+      if(!hr) return false;
+      var today = prod_today(), hh = new Date().getHours();
+      var ch = false;
+      slots.forEach(function(s){
+        var isToday = (s.ymd===today);
+        if(s.needAm && (!isToday || hh>=9)){
+          var am = prodWxFromHourly(hr, prodHourIdx(hr, s.ymd, '09'));
+          if(am){ s.o.weatherAm = am; ch = true; }
+        }
+        if(s.needPm && (!isToday || hh>=14)){
+          var pm = prodWxFromHourly(hr, prodHourIdx(hr, s.ymd, '14'));
+          if(pm){ s.o.weatherPm = pm; ch = true; }
+        }
+      });
+      return ch;
+    }
+    function prodWxLoadArchiveDirect(prov, ymdStart, ymdEnd, cb){
+      var pr = (typeof vnProvinceByKey==='function') ? vnProvinceByKey(prov) : null; if(!pr){ cb(null); return; }
+      var q = '?latitude='+pr.lat+'&longitude='+pr.lng
+        + '&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=Asia%2FHo_Chi_Minh'
+        + '&start_date='+ymdStart+'&end_date='+ymdEnd;
+      try {
+        fetch('https://archive-api.open-meteo.com/v1/archive'+q).then(function(r){ return r.json(); })
+          .then(function(d){ cb(d && d.hourly && d.hourly.time && d.hourly.time.length ? d.hourly : null); })
+          .catch(function(){ cb(null); });
+      } catch(e){ cb(null); }
+    }
+    function prodWxMergeHourly(a, b){
+      if(!a) return b; if(!b) return a;
+      var out = { time:a.time.slice(), temperature_2m:a.temperature_2m.slice(), relative_humidity_2m:a.relative_humidity_2m.slice(), wind_speed_10m:a.wind_speed_10m.slice(), weather_code:a.weather_code.slice() };
+      var idx = {}; out.time.forEach(function(t,i){ idx[t]=i; });
+      b.time.forEach(function(t,i){
+        var j = idx[t];
+        if(j!=null){ out.temperature_2m[j]=b.temperature_2m[i]; out.relative_humidity_2m[j]=b.relative_humidity_2m[i]; out.wind_speed_10m[j]=b.wind_speed_10m[i]; out.weather_code[j]=b.weather_code[i]; }
+        else { idx[t]=out.time.length; out.time.push(t); out.temperature_2m.push(b.temperature_2m[i]); out.relative_humidity_2m.push(b.relative_humidity_2m[i]); out.wind_speed_10m.push(b.wind_speed_10m[i]); out.weather_code.push(b.weather_code[i]); }
+      });
+      return out;
+    }
+    /* 分段抓取：Open-Meteo forecast 只覆盖最近约 92 天，更早的必须走 archive。
+       不分段时跨 92 天的请求会被裁剪成近期区间且返回非空 → 老日期永远补不上（旧版实现缺陷）。 */
+    function prodWxFetchRange(prov, ymdStart, ymdEnd, cb){
+      var cut = prod_ymdStr(new Date(new Date(prod_today()+'T00:00:00').getTime() - 91*86400000));
+      if(ymdStart >= cut){ prodLoadWeatherArchive(prov, ymdStart, ymdEnd, cb); return; }
+      var oldEnd = prod_ymdStr(new Date(new Date(cut+'T00:00:00').getTime() - 86400000));
+      prodWxLoadArchiveDirect(prov, ymdStart, oldEnd, function(hrOld){
+        var startNew = (ymdStart > cut) ? ymdStart : cut;
+        prodLoadWeatherArchive(prov, startNew, ymdEnd, function(hrNew){ cb(prodWxMergeHourly(hrOld, hrNew)); });
+      });
+    }
+    /* 单个项目：拉服务端最新副本 → 只补天气字段 → 原样 PUT 回去（不改动任何其它字段/键格式）。
+       这样绝不会用本地旧快照覆盖服务端，也不会把日期键改写成另一种格式产生重复行。 */
+    function prodWxFixOneProject(pid, prov, done){
+      var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : '';
+      if(!me){ done(0); return; }
+      fetch('/api/prod-factory/'+encodeURIComponent(pid)+'?me='+encodeURIComponent(me))
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(d){
+          var f = (d && d.ok && d.data) ? d.data : null;
+          if(!f){ done(0); return; }
+          var slots = prodWxPendingSlots(f);
+          if(!slots.length){ done(0); return; }
+          var start='', end='';
+          slots.forEach(function(s){ if(!start || s.ymd<start) start=s.ymd; if(!end || s.ymd>end) end=s.ymd; });
+          prodWxFetchRange(prov, start, end, function(hr){
+            if(!hr || !prodWxApplySlots(slots, hr)){ done(0); return; }
+            fetch('/api/prod-factory/'+encodeURIComponent(pid), {
+              method:'PUT', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ requester:me, data:f })
+            }).then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+              try{
+                var base = (j && j.data) ? j.data : f;
+                if(base){
+                  if(base.id==null || base.id==='') base.id = pid;
+                  var localCopy = (typeof PROD_MEM!=='undefined' && PROD_MEM[pid]) || null;
+                  if(!localCopy){ try{ localCopy = JSON.parse(localStorage.getItem(PROD_LS+pid)); }catch(_){ localCopy = null; } }
+                  var merged = localCopy ? prod_mergeFactory(localCopy, base) : base;
+                  if(merged && (merged.id==null || merged.id==='')) merged.id = pid;
+                  PROD_MEM[pid] = merged;
+                  try{ localStorage.setItem(PROD_LS+pid, JSON.stringify(merged)); }catch(_){}
+                }
+              }catch(_){}
+              done(slots.length);
+            }).catch(function(){ done(0); });
+          });
+        })
+        .catch(function(){ done(0); });
+    }
+    /* 遍历全部项目补齐天气（节流 3 分钟；首次调用后每 10 分钟自动巡一遍） */
+    function prodWxAutoFixAll(force){
+      if(PROD_WX_ALL_RUNNING) return;
+      var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : '';
+      if(!me) return;
+      if(!force && PROD_WX_ALL_AT && (Date.now()-PROD_WX_ALL_AT) < 180000) return;
+      /* 签约项目未加载时不走也不设节流：等 loadWon 回来会再次触发 */
+      var wonList = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData : [];
+      if(!wonList.length) return;
+      var seen = {}, list = [];
+      wonList.forEach(function(p){ var k=String(p.id); if(k && !seen[k]){ seen[k]=1; list.push(k); } });
+      try{
+        for(var i=0;i<localStorage.length;i++){
+          var lk = localStorage.key(i); if(!lk || lk.indexOf(PROD_LS)!==0) continue;
+          var lid = lk.slice(PROD_LS.length); if(lid && !seen[lid]){ seen[lid]=1; list.push(lid); }
+        }
+      }catch(_){}
+      if(PROD_CUR){ /* 当前项目交给原有抓取/补抓链路，避免与同步门禁冲突 */
+        try{ if(PROD_ACTIVE_TAB==='C') prodAutoBackfillWeather(); }catch(_){}
+        try{ if(PROD_ACTIVE_TAB==='E'){ prodAutoBackfillWeatherE(); prodAutoBackfillWeatherEAll(); } }catch(_){}
+        try{ prodTryCaptureWeather(); }catch(_){}
+        try{ if(typeof inst_backfillWeather==='function') inst_backfillWeather(); }catch(_){}
+      }
+      var targets = list.filter(function(id){ return String(id)!==String(PROD_CUR); });
+      if(!PROD_WX_ALL_TIMER && !force) PROD_WX_ALL_TIMER = setInterval(function(){ prodWxAutoFixAll(); }, 600000);
+      if(!targets.length) return;
+      PROD_WX_ALL_AT = Date.now(); PROD_WX_ALL_RUNNING = true;
+      var pending = targets.length, fixedProjects = 0, fixedRows = 0;
+      targets.forEach(function(pid){
+        var prov = prodFactoryProvKeyFor(pid);
+        if(!prov){ if(--pending<=0) { PROD_WX_ALL_RUNNING = false; } return; }
+        prodWxFixOneProject(pid, prov, function(n){
+          if(n){ fixedProjects++; fixedRows += n; }
+          if(--pending<=0){
+            PROD_WX_ALL_RUNNING = false;
+            if(fixedProjects){
+              try{ console.log('[prodWxAutoFixAll] 已自动补齐天气：项目 '+fixedProjects+' 个 / 记录 '+fixedRows+' 条'); }catch(_){}
+              try{ if(typeof prod_renderProduction==='function' && window.currentView==='production' && PROD_ACTIVE_TAB && PROD_CUR) prod_renderTab(PROD_ACTIVE_TAB); }catch(_){}
+            }
+          }
+        });
       });
     }
     /* D 原料与库存（自采；收货后提交采购经理审批） */
@@ -15483,7 +15704,10 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function prod_trHas(trObj){ return !!(trObj && (trObj.zh||trObj.en||trObj.vi)); }
     function prod_hazardLevel(trObj){
-      var s = (trObj && (trObj.zh||'')+' '+(trObj.en||'')+' '+(trObj.vi||'')).toLowerCase();
+      /* ★修复：trObj 为空时 (trObj && …) 返回 null，直接 .toLowerCase() 会抛
+         "Cannot read properties of null (reading 'toLowerCase')"，改为先判空。 */
+      if (!trObj) return 'medium';
+      var s = ((trObj.zh||'')+' '+(trObj.en||'')+' '+(trObj.vi||'')).toLowerCase();
       if(/高|high|cao/.test(s)) return 'high';
       if(/低|low|thấp/.test(s)) return 'low';
       return 'medium';
@@ -16643,6 +16867,9 @@ var PROD_EQUIP_FAULT_KB = {
         <div class="fin-tab active" data-key="vn" data-i18n="fin_tab_vn_report" onclick="fin_switchTab('vn')">越南财务报表</div>
         <div class="fin-tab" data-key="cn" data-i18n="fin_tab_cn_report" onclick="fin_switchTab('cn')">中国财务报表</div>
         <div class="fin-tab" data-key="merge" data-i18n="fin_tab_merge_report" onclick="fin_switchTab('merge')">合并财务总报表</div>
+        <!-- ★FIN-DASHBOARD-20261014（用户 2026-10-14 要求）：合并报表右侧的「财务报告看板」，
+             点开显示越南/中国/合并三块看板（KPI 卡片，三语）。不加载 Univer，只读汇总数据。 -->
+        <div class="fin-tab" data-key="dash" data-i18n="fin_tab_dashboard" onclick="fin_switchTab('dash')">财务报告看板</div>
       </div>
       <div class="fin-panel active" id="fin_panel_vn">
         <h3 data-i18n="fin_tab_vn_report">越南财务报表</h3>
@@ -16661,6 +16888,10 @@ var PROD_EQUIP_FAULT_KB = {
           <button class="fin-btn" data-i18n="fin_btn_report" onclick="fin_rptQueryPop(this)">查报表</button>
           <button class="fin-btn" data-i18n="fin_btn_export" onclick="fin_exportLocal()">导出 xlsx</button>
           <button class="fin-btn" id="fin_reimport_btn" data-i18n="fin_btn_reimport" onclick="document.getElementById('fin_reimport_file').click()">重导</button>
+          <!-- ★FIN-MERGE-CN-GROUP-20261014（用户 2026-10-14 要求）：只在「合并财务总报表」显示，
+               取代该标签下的「重导」（合并报表只读，不需要重导）。点击后把来自中国报表的
+               蓝色记录整体挪到「Chi thực tế」数据区最下方，与越南成本数据完全分开。 -->
+          <button class="fin-btn" id="fin_merge_group_btn" style="display:none" data-i18n="fin_merge_group_btn" onclick="fin_mergeToggleCnGroup()">中国成本独立显示</button>
           <input type="file" id="fin_reimport_file" accept=".xlsx" style="display:none" onchange="fin_reimport(this)">
           <span class="fin-spacer"></span>
           <span id="fin_status" class="fin-status" data-i18n="fin_status_not_loaded">未载入</span>
@@ -16705,6 +16936,13 @@ var PROD_EQUIP_FAULT_KB = {
       <div class="fin-panel" id="fin_panel_merge">
         <h3 data-i18n="fin_tab_merge_report">合并财务总报表</h3>
         <p class="fin-cn-hint" data-i18n="fin_merge_hint">越南报表全部 8 张表，另并入中国报表的「实际支出」记录（中国行蓝字）。只读；越南财务报表本身不含中国数据。</p>
+      </div>
+      <!-- ★FIN-DASHBOARD-20261014：财务报告看板面板（三块看板由 fin_renderDashboard 动态渲染） -->
+      <div class="fin-panel" id="fin_panel_dash">
+        <h3 data-i18n="fin_tab_dashboard">财务报告看板</h3>
+        <div id="fin_dash_body" class="fin-dash-wrap">
+          <div class="fin-dash-loading" data-i18n="fin_dash_loading">正在加载…</div>
+        </div>
       </div>
     </div>
   </section>
@@ -16889,7 +17127,8 @@ var PROD_EQUIP_FAULT_KB = {
       //   因此 merge 同样走 'vn' 这一套表格逻辑与只读规则，工作区要正常显示。
       fin_setKind(FIN_KINDS[FIN_ACTIVE_TAB] ? FIN_ACTIVE_TAB : 'vn');
       var ws = document.getElementById('fin_workspace');
-      if (ws) ws.style.display = '';
+      /* ★FIN-DASHBOARD-20261014：看板标签（dash）不显示表格工作区，只显示 #fin_panel_dash */
+      if (ws) ws.style.display = (FIN_ACTIVE_TAB === 'dash') ? 'none' : '';
       try { fin_applyReadonlyUI(); } catch(e){}
     }
     /* 换报表：丢掉当前单元与按报表缓存的状态，重新拉目标报表的快照 */
@@ -16911,6 +17150,12 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function fin_switchTab(key){
       if (!key || !document.getElementById('fin_panel_' + key)) return;
+      /* ★FIN-DASHBOARD-20261014：财务报告看板 —— 不加载 Univer，只渲染三块 KPI 看板 */
+      if (key === 'dash') {
+        fin_renderTabs('dash');
+        try { fin_renderDashboard(); } catch(e){}
+        return;
+      }
       var prevKind = FIN_KIND;
       fin_renderTabs(key);
       /* ★FIN-MERGE-20261014：merge 放行。它是【独立数据源】merge_report.xlsx
@@ -16924,7 +17169,77 @@ var PROD_EQUIP_FAULT_KB = {
       }
       fin_initUniver();                                   // 首次：懒加载 Univer 引擎
     }
+    /* ============ ★FIN-DASHBOARD-20261014：财务报告看板（越南/中国/合并，三语） ============
+       数据来自只读接口 GET /api/finance/summary（后端汇总三份 xlsx），前端只负责渲染；
+       不加载 Univer、不写任何文件、不改动任何锁定逻辑。 */
+    function fin_dashT(k){
+      /* T() 返回的是【翻译对象】（用 T()[key] 取值），不是 T(key)。 */
+      try { if (typeof i18nVal === 'function'){ var s = i18nVal(k, ''); if (s) return s; } } catch(e){}
+      try { if (typeof T === 'function'){ var t = T(); var v = t && t[k]; if (v) return v; } } catch(e){}
+      return k;
+    }
+    function fin_dashMoney(n){
+      if (n === null || n === undefined || n === '' || isNaN(n)) return '—';
+      return Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    function fin_dashKpi(lblKey, val, curKey, hi){
+      return '<div class="fin-dash-kpi' + (hi ? ' hi' : '') + '">'
+        + '<div class="fin-dash-kpi-lbl">' + fin_dashT(lblKey) + '</div>'
+        + '<div class="fin-dash-kpi-val">' + fin_dashMoney(val) + '</div>'
+        + (curKey ? '<div class="fin-dash-cur">' + fin_dashT(curKey) + '</div>' : '')
+        + '</div>';
+    }
+    function fin_dashSection(titleKey, kpis){
+      return '<div class="fin-dash-sec"><div class="fin-dash-sec-title">' + fin_dashT(titleKey) + '</div>'
+        + '<div class="fin-dash-grid">' + kpis.join('') + '</div></div>';
+    }
+    function fin_dashHtml(j){
+      var vn = j.vn || {}, cn = j.cn || {}, mg = j.merge || {};
+      var vnKpis = [
+        fin_dashKpi('fin_dash_kpi_bank', vn.bank, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_receipts', vn.receipts, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_internal', vn.internal, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_actual', vn.actual, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_disb', vn.disbursements, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_ending', vn.ending, 'fin_dash_currency_vnd')
+      ];
+      var cnKpis = [
+        fin_dashKpi('fin_dash_kpi_actual', cn.actual, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_records', cn.records, null)
+      ];
+      var mgKpis = [
+        fin_dashKpi('fin_dash_kpi_bank', mg.bank, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_receipts', mg.receipts, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_internal', mg.internal, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_actual', mg.actual, 'fin_dash_currency_vnd', true),
+        fin_dashKpi('fin_dash_kpi_disb', mg.disbursements, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_ending', mg.ending, 'fin_dash_currency_vnd'),
+        fin_dashKpi('fin_dash_kpi_china', j.chinaDelta, 'fin_dash_currency_vnd', true)
+      ];
+      return fin_dashSection('fin_dash_vn', vnKpis)
+        + fin_dashSection('fin_dash_cn', cnKpis)
+        + fin_dashSection('fin_dash_merge', mgKpis);
+    }
+    function fin_renderDashboard(){
+      var box = document.getElementById('fin_dash_body');
+      if (!box) return;
+      box.innerHTML = '<div class="fin-dash-loading">' + fin_dashT('fin_dash_loading') + '</div>';
+      fetch('/api/finance/summary', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(j){
+        if (!j || !j.ok){ box.innerHTML = '<div class="fin-dash-loading">' + fin_dashT('fin_dash_fail') + '</div>'; return; }
+        box.innerHTML = fin_dashHtml(j);
+      }).catch(function(){
+        box.innerHTML = '<div class="fin-dash-loading">' + fin_dashT('fin_dash_fail') + '</div>';
+      });
+    }
+    /* 语言切换时若正停留在看板标签，重新渲染以刷新三语文案 */
+    try {
+      window.addEventListener('app:langchange', function(){
+        if (FIN_ACTIVE_TAB === 'dash') { try { fin_renderDashboard(); } catch(e){} }
+      });
+    } catch(e){}
     fin_renderTabs(FIN_ACTIVE_TAB);
+    /* ★延迟到本页所有脚本块执行完之后再渲染：此时 T()/i18nVal() 才已定义（否则会显示原始 key）。 */
+    try { if (FIN_ACTIVE_TAB === 'dash') setTimeout(function(){ try { fin_renderDashboard(); } catch(e){} }, 0); } catch(e){}
 
     /* ============ 越南财务报表：Univer 嵌入（OSS，免授权） ============ */
     // 路线 A：Univer OSS 核心(@univerjs/presets + preset-sheets-core) 负责界面/编辑；
@@ -17081,6 +17396,10 @@ var PROD_EQUIP_FAULT_KB = {
     function fin_hasNoTrans(t){
       var s = String(t == null ? '' : t).toLowerCase();
       if (!s) return false;
+      /* ★FIN-SEQ-NO-TRANS-20261014：序号罗马数字（I/II/III/IV/XII…）是「序号标记」，
+         绝不能当英文代词 "I" 送去翻译（否则屏幕会显示成「我」）。
+         仅当整串由罗马数字字母组成、且长度<=7 时才保护，避免误伤正常词。 */
+      if (/^[ivxlcdm]{1,7}$/.test(s)) return true;
       for (var i = 0; i < FIN_NO_TRANS.length; i++){
         if (s.indexOf(FIN_NO_TRANS[i]) >= 0) return true;
       }
@@ -20541,6 +20860,9 @@ var PROD_EQUIP_FAULT_KB = {
         finLastView.id = fin_cfg().unitId;   // ★按报表种类认领单元 id（切标签时互不串台）
         try { fin_rptHideInView(finLastView, snapshot); } catch(e){}   // ★查报表筛选：首屏/重载同一口径
         try { fin_rptApplySummary(finLastView, snapshot); } catch(e){} // ★查报表：汇总表按期间重算（甲方案）
+        /* ★FIN-MERGE-CN-GROUP-20261014：合并报表的「中国成本独立显示」→ 中国行整体挪到最下方。
+           必须在 createUnit 之前改视图（函数内部已自判 FIN_KIND==='merge' 且开关为真）。 */
+        try { fin_mergeApplyCnGroup(); } catch(e){}
         finSheet = finUniver.createUnit(UNIT_SHEET, finLastView);
       } finally { finLoading = false; }
       // ★绑定"单元格改数据"监控（新增/修改记录 → 立即翻译同步 + 立即重算高亮）
@@ -20556,6 +20878,12 @@ var PROD_EQUIP_FAULT_KB = {
       /* ★中国报表：把「金额列」从快照里的 ¥ 格式反推登记（FIN-CN-MONEY-20261013），
          这样用户新录入的金额格才会被自动补上人民币符号（fin_maybeFormatMoneyCell）。 */
       if (fin_isCn()) setTimeout(function(){ try { fin_collectAmtCols(); } catch(e){} }, 600);
+      /* ★FIN-MERGE-CN-GROUP-20261014：分组状态下重建完成 → 【强行】切到「Chi thực tế（实际支出）」
+         （停在第 1 张表 SUMMARY 上看不到效果）。跑两次：Univer 切表是异步的，第二次兜底重试。 */
+      if (FIN_KIND === 'merge' && FIN_MERGE_CN_GROUP) {
+        setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 700);
+        setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 1700);
+      }
       setTimeout(function(){ try { fin_captureEditBase(); } catch(e){} }, 1400);
       // 加载后：先清掉历史泄漏到文件里的高亮红（若有），再重新计算高亮。
       // 清理有改动则标脏，让干净版本自动落盘（从此文件不再被污染）。
@@ -22351,6 +22679,10 @@ var PROD_EQUIP_FAULT_KB = {
       try { fin_rptHideInView(view, snap); } catch(e){}   // ★查报表筛选：按年/月隐藏其它日期行（不删数据）
       try { fin_rptApplySummary(view, snap); } catch(e){} // ★查报表：汇总表按期间重算（甲方案）
       finLastView = view;
+      /* ★FIN-MERGE-CN-GROUP-20261014：合并报表「中国成本独立显示」→ 中国行整体挪到最下方。
+         ★必须在 finLastView = view 之后、createUnit 之前调用（函数内部读的就是 finLastView）。
+         ★「载入/刷新」「复位」都走 fin_reload → 本函数；按钮切换也走这里。 */
+      try { fin_mergeApplyCnGroup(); } catch(e){}
       try {
         finSheet = finUniver.createUnit(UNIT_SHEET, view);
       } catch (e) {
@@ -22362,6 +22694,12 @@ var PROD_EQUIP_FAULT_KB = {
       try { fin_bindEdits(); } catch(e){}
       try { fin_captureEditBase(finLastView); } catch(e){}
       try { fin_rptScheduleReapply(); } catch(e){}   // ★视图建好后把本期值写回（压住公式引擎的异步覆盖）
+      /* ★FIN-MERGE-CN-GROUP-20261014：分组状态下重建完成 → 【强行】切到「Chi thực tế（实际支出）」，
+         否则用户停在第 1 张表（SUMMARY）上，看不到"中国行已沉到最下方"。跑两次兜底（切表是异步的）。 */
+      if (FIN_KIND === 'merge' && FIN_MERGE_CN_GROUP) {
+        setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 700);
+        setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 1700);
+      }
     }
 
     function fin_afterDataChange(){
@@ -22389,9 +22727,134 @@ var PROD_EQUIP_FAULT_KB = {
           if (isCn){ save.disabled = false; save.title = fin_L('fin_title_save_cn'); }
           else if (FIN_READONLY) { save.disabled = true; save.title = fin_L('fin_title_save_ro'); }
         }
+        /* ★FIN-MERGE-CN-GROUP-20261014：合并财务总报表里「重导」换成「中国成本独立显示」。
+           工具栏是 vn / cn / merge 共用的 → cn 两个都不显示；merge 只显示新按钮；vn 只显示重导。 */
+        var isMerge = (FIN_KIND === 'merge');
         var re = document.getElementById('fin_reimport_btn');
-        if (re) re.style.display = isCn ? 'none' : '';
+        if (re) re.style.display = (isCn || isMerge) ? 'none' : '';
+        var mg = document.getElementById('fin_merge_group_btn');
+        if (mg) mg.style.display = isMerge ? '' : 'none';
+        try { fin_mergeGroupBtnLabel(); } catch(e){}
       } catch(e){}
+    }
+
+    /* ============ 合并报表：中国成本独立显示（FIN-MERGE-CN-GROUP-20261014）============
+       用户 2026-10-14 要求：在「合并财务总报表」里点「中国成本独立显示」后，把来自中国报表的
+       蓝色记录（后端合并脚本写在 AN 列里的 `CN:` 标记行）整体挪到「Chi thực tế」数据区的
+       【最下方】，与越南成本数据完全分开。
+       ★只重排【显示快照 finLastView】的行序：不写盘、不动 vn_report.xlsx / cn_report.xlsx /
+         merge_report.xlsx，也完全不影响「越南财务报表」「中国财务报表」两个标签。 */
+    var FIN_MERGE_CN_GROUP = false;    // 是否处于「中国成本独立显示」状态
+    var FIN_MERGE_CN_MARKCOL = 39;     // AN 列（0 基）＝ 合并脚本写入的 `CN:凭证:日期` 幂等标记列
+
+    /* 按钮文字随状态切换（切语言时 sweepI18n 会按当前 data-i18n 自动刷新） */
+    function fin_mergeGroupBtnLabel(){
+      var btn = document.getElementById('fin_merge_group_btn');
+      if (!btn) return;
+      var key = FIN_MERGE_CN_GROUP ? 'fin_merge_group_btn_on' : 'fin_merge_group_btn';
+      btn.setAttribute('data-i18n', key);
+      btn.textContent = fin_L(key);
+    }
+
+    /* 「Chi thực tế」在 sheetOrder 里的下标（显示快照与原始快照顺序一致，用越南文原名匹配） */
+    function fin_mergeCnSheetIndex(){
+      var snap = finLastSnapshot;
+      if (!snap || !snap.sheetOrder) return -1;
+      for (var i = 0; i < snap.sheetOrder.length; i++) {
+        var sh = snap.sheets[snap.sheetOrder[i]];
+        if (sh && sh.name === 'Chi thực tế') return i;
+      }
+      return -1;
+    }
+
+    /* 核心：把显示快照里「Chi thực tế」的行重排成【越南行(保序) + 中国行(保序)】 */
+    function fin_mergeApplyCnGroup(){
+      if (FIN_KIND !== 'merge' || !FIN_MERGE_CN_GROUP) return 0;
+      var idx = fin_mergeCnSheetIndex();
+      if (idx < 0) return 0;
+      var view = finLastView;
+      if (!view || !view.sheetOrder || !view.sheets) return 0;
+      var vsh = view.sheets[view.sheetOrder[idx]];
+      if (!vsh || !vsh.cellData) return 0;
+      // 1) 从【原始完整快照】的 AN 列找出中国记录的行
+      var src = finLastSnapshot.sheets[finLastSnapshot.sheetOrder[idx]];
+      var cn = {};
+      var scd = (src && src.cellData) || {};
+      Object.keys(scd).forEach(function(r){
+        var cell = (scd[r] || {})[String(FIN_MERGE_CN_MARKCOL)];
+        var v = cell ? cell.v : null;
+        if (typeof v === 'string' && v.indexOf('CN:') === 0) cn[r] = true;
+      });
+      var rows = Object.keys(vsh.cellData).map(Number).sort(function(a, b){ return a - b; });
+      var vnRows = [], cnRows = [];
+      rows.forEach(function(r){ (cn[String(r)] ? cnRows : vnRows).push(r); });
+      if (!cnRows.length) return 0;
+      // 2) 行重排：【越南行(保序)】+【分隔行】+【中国行(保序)】
+      //    ★分隔行（-1 占位）：A 列写一条「中国成本记录」（当前语言），其余列留空 ——
+      //      两段数据一眼分开，用户不会把中国记录误当成越南记录。
+      var secTitle = fin_L('fin_merge_cn_section');
+      var order = vnRows.slice();
+      var sepAt = order.length;          // 分隔行的新行号（0 基）
+      order.push(-1);
+      var cnAt = order.length;           // 中国记录区块的起始新行号（0 基）
+      order = order.concat(cnRows);
+      var newCd = {};
+      order.forEach(function(oldR, i){
+        if (oldR < 0) { newCd[String(i)] = { '0': { v: secTitle, t: 1 } }; return; }
+        newCd[String(i)] = vsh.cellData[String(oldR)];
+      });
+      vsh.cellData = newCd;
+      // 3) 行高跟着走（新增的分隔行没有源行高 → 用默认）
+      if (vsh.rowData) {
+        var newRd = {};
+        order.forEach(function(oldR, i){
+          if (oldR >= 0 && vsh.rowData[String(oldR)]) newRd[String(i)] = vsh.rowData[String(oldR)];
+        });
+        vsh.rowData = newRd;
+      }
+      // 4) 合并单元格：只保留表头区（0~3 行）；数据区重排后原有合并会错位
+      if (vsh.mergeData && vsh.mergeData.length) {
+        vsh.mergeData = vsh.mergeData.filter(function(m){ return m.endRow <= 3; });
+      }
+      // 5) 行数必须容得下多出来的分隔行
+      if (vsh.rowCount) vsh.rowCount = Math.max(vsh.rowCount, order.length + 5);
+      window.__FIN_MERGE_CN_ROWS = cnRows.length;
+      window.__FIN_MERGE_SEP_ROW = sepAt;          // 0 基：分隔行
+      window.__FIN_MERGE_CN_ROWBASE = cnAt;        // 0 基：中国区块起始行
+      return cnRows.length;
+    }
+
+    /* 切换：改状态 → 走 fin_reload 的完整重建链路（分组在 fin_loadReport 里统一应用） */
+    function fin_mergeToggleCnGroup(){
+      if (FIN_KIND !== 'merge') return;
+      if (!finReady) { fin_setStatusKey('fin_status_not_loaded'); return; }
+      FIN_MERGE_CN_GROUP = !FIN_MERGE_CN_GROUP;
+      fin_mergeGroupBtnLabel();
+      try { fin_reload(); } catch(e){ try { fin_loadReport(); } catch(e2){} }
+    }
+
+    /* ★强行进入「Chi thực tế（实际支出）」，并把视口滚到中国记录区块的开头。
+       ★★切工作表必须用 wb.setActiveSheet(sheetId) —— 这是 Univer Facade 的正确 API
+         （fin_restoreSheetState 用的就是它）；FWorksheet 上并没有 activate()，
+         旧写法 try/catch 静默失败 → 点了按钮停在 SUMMARY，看起来"没反应"。 */
+    function fin_mergeFocusCnSheet(){
+      try {
+        var idx = fin_mergeCnSheetIndex();
+        if (idx < 0 || !finUniverAPI) return false;
+        var wb = finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+        if (!wb) return false;
+        var sid = (finLastView && finLastView.sheetOrder) ? finLastView.sheetOrder[idx] : null;
+        if (!sid) return false;
+        var cur = wb.getActiveSheet && wb.getActiveSheet();
+        var curId = (cur && typeof cur.getSheetId === 'function') ? cur.getSheetId() : null;
+        if (curId !== sid && typeof wb.setActiveSheet === 'function') wb.setActiveSheet(sid);
+        /* 滚到分隔行（留 2 行上下文）；延迟执行等切表落地 */
+        var t = (typeof window.__FIN_MERGE_SEP_ROW === 'number') ? window.__FIN_MERGE_SEP_ROW
+              : ((typeof window.__FIN_MERGE_CN_ROWBASE === 'number') ? window.__FIN_MERGE_CN_ROWBASE : 0);
+        var row = Math.max(0, t - 2);
+        setTimeout(function(){ try { finScrollTo(row, 0); } catch(e){} }, 280);
+        return true;
+      } catch(e){ return false; }
     }
 
     function fin_sortByColumn(dir){
@@ -25723,8 +26186,9 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     comm_col_currency:"签约货币", comm_f_currency:"签约货币", comm_cur_rmb:"人民币 RMB", comm_cur_usd:"美元 USD", comm_cur_vnd:"越南盾 VND",
     comm_f_equip_rmb:"设备金额 RMB", comm_f_equip_usd:"设备金额 USD", comm_f_equip_vnd:"设备金额 VND", comm_f_deposit:"定金给付时间",
     fin_tab_vn_report:"越南财务报表", fin_tab_cn_report:"中国财务报表", fin_tab_merge_report:"合并财务总报表", fin_merge_hint:"越南报表全部 8 张表，另并入中国报表的「实际支出」记录（中国行蓝字）。只读；越南财务报表本身不含中国数据。", fin_panel_placeholder:"该报表内容建设中，敬请期待。",
+    fin_tab_dashboard:"财务报告看板", fin_dash_vn:"越南财务报告看板", fin_dash_cn:"中国财务报告看板", fin_dash_merge:"合并财务报告看板", fin_dash_loading:"正在加载…", fin_dash_fail:"加载失败，请重试", fin_dash_kpi_bank:"现金和银行余额", fin_dash_kpi_receipts:"收入合计", fin_dash_kpi_disb:"支出合计", fin_dash_kpi_internal:"内部支出", fin_dash_kpi_actual:"实际支出", fin_dash_kpi_ending:"期末余额", fin_dash_kpi_records:"记录笔数", fin_dash_kpi_china:"中国新增实际支出", fin_dash_currency_vnd:"VND 越南盾", fin_dash_currency_rmb:"RMB 人民币",
     fin_cn_hint:"与越南报表同一套表格逻辑；Excel 里只有「实际支出」一张表。改动后请点「保存」。", fin_title_save_cn:"手动保存到服务器（中国报表：不会自动保存）", fin_title_save_ro:"只读模式：请使用「重导」上传新的 xlsx 更新报表",
-    fin_btn_load:"载入/刷新报表", fin_btn_save:"保存", fin_btn_snapshot:"快照", fin_btn_export:"导出 xlsx", fin_btn_reimport:"重导", fin_btn_filter:"筛选", fin_btn_sort_asc:"升序", fin_btn_sort_desc:"降序",     fin_btn_restore:"复原", fin_btn_date_fmt:"按日-月-年排序", fin_btn_ins_rows:"在下方插入行", fin_btn_ins_rows_above:"在上方插入行",
+    fin_btn_load:"载入/刷新报表", fin_btn_save:"保存", fin_btn_snapshot:"快照", fin_btn_export:"导出 xlsx", fin_btn_reimport:"重导", fin_merge_group_btn:"中国成本独立显示", fin_merge_group_btn_on:"恢复原显示顺序", fin_merge_cn_section:"中国成本记录", fin_btn_filter:"筛选", fin_btn_sort_asc:"升序", fin_btn_sort_desc:"降序",     fin_btn_restore:"复原", fin_btn_date_fmt:"按日-月-年排序", fin_btn_ins_rows:"在下方插入行", fin_btn_ins_rows_above:"在上方插入行",
     fin_btn_report:"查报表", fin_rpt_title:"查报表", fin_rpt_year:"年份", fin_rpt_month:"月份", fin_rpt_note0:"选择0表示只看年度报告！", fin_rpt_ok:"确认", fin_rpt_cancel:"取消", fin_rpt_restore:"恢复",
     fin_status_rpt_filtered:"已筛选：", fin_status_rpt_empty:"该年份/月份没有记录：",
     fin_rpt_period_line:"{p} 发生额 · 余额截至 {e}", fin_rpt_period_remark:"截至 {e}",
@@ -26526,8 +26990,9 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     comm_col_currency:"Contract Currency", comm_f_currency:"Contract Currency", comm_cur_rmb:"CNY (RMB)", comm_cur_usd:"USD", comm_cur_vnd:"VND",
     comm_f_equip_rmb:"Equip Amount RMB", comm_f_equip_usd:"Equip Amount USD", comm_f_equip_vnd:"Equip Amount VND", comm_f_deposit:"Deposit Payment Date",
     fin_tab_vn_report:"Vietnam Financial Report", fin_tab_cn_report:"China Financial Report", fin_tab_merge_report:"Consolidated Financial Statement", fin_merge_hint:"All 8 sheets of the Vietnam report plus the China report's Actual Payments records (China rows in blue). Read-only; the Vietnam report itself contains no China data.", fin_panel_placeholder:"Content under construction, please stay tuned.",
+    fin_tab_dashboard:"Financial Dashboard", fin_dash_vn:"Vietnam Financial Dashboard", fin_dash_cn:"China Financial Dashboard", fin_dash_merge:"Consolidated Financial Dashboard", fin_dash_loading:"Loading…", fin_dash_fail:"Failed to load, please retry", fin_dash_kpi_bank:"Cash & Bank Balance", fin_dash_kpi_receipts:"Total Receipts", fin_dash_kpi_disb:"Total Disbursements", fin_dash_kpi_internal:"Internal Expenses", fin_dash_kpi_actual:"Actual Payments", fin_dash_kpi_ending:"Ending Balance", fin_dash_kpi_records:"Records", fin_dash_kpi_china:"China Additional Actual Payments", fin_dash_currency_vnd:"VND", fin_dash_currency_rmb:"RMB",
     fin_cn_hint:"Same table logic as the Vietnam report; the Excel contains only the \u201cActual Payments\u201d sheet. Click Save after editing.", fin_title_save_cn:"Save to the server manually (China report: no auto-save)", fin_title_save_ro:"Read-only: use Re-import to upload a new xlsx",
-    fin_btn_load:"Load / Refresh", fin_btn_save:"Save", fin_btn_snapshot:"Snapshot", fin_btn_export:"Export xlsx", fin_btn_reimport:"Re-import", fin_btn_filter:"Filter", fin_btn_sort_asc:"Asc", fin_btn_sort_desc:"Desc", fin_btn_restore:"Restore", fin_btn_date_fmt:"Sort by day-month-year", fin_btn_ins_rows:"Insert rows below", fin_btn_ins_rows_above:"Insert rows above",
+    fin_btn_load:"Load / Refresh", fin_btn_save:"Save", fin_btn_snapshot:"Snapshot", fin_btn_export:"Export xlsx", fin_btn_reimport:"Re-import", fin_merge_group_btn:"Show China Costs Separately", fin_merge_group_btn_on:"Restore Original Order", fin_merge_cn_section:"China Cost Records", fin_btn_filter:"Filter", fin_btn_sort_asc:"Asc", fin_btn_sort_desc:"Desc", fin_btn_restore:"Restore", fin_btn_date_fmt:"Sort by day-month-year", fin_btn_ins_rows:"Insert rows below", fin_btn_ins_rows_above:"Insert rows above",
     fin_btn_report:"Query Report", fin_rpt_title:"Query Report", fin_rpt_year:"Year", fin_rpt_month:"Month", fin_rpt_note0:"Choose 0 to view the annual report only!", fin_rpt_ok:"Confirm", fin_rpt_cancel:"Cancel", fin_rpt_restore:"Restore",
     fin_status_rpt_filtered:"Filtered: ", fin_status_rpt_empty:"No records for ",
     fin_rpt_period_line:"{p} movements · balances as of {e}", fin_rpt_period_remark:"As of {e}",
@@ -27327,8 +27792,9 @@ crm_yes:"Có", crm_no_yes:"Không", lostRestore:"Chuyển về Dự án Tiềm n
     comm_col_currency:"Loại tiền tệ HĐ", comm_f_currency:"Loại tiền tệ HĐ", comm_cur_rmb:"Nhân dân tệ RMB", comm_cur_usd:"Đô USD", comm_cur_vnd:"Việt Nam đồng VND",
     comm_f_equip_rmb:"Giá trị TB RMB", comm_f_equip_usd:"Giá trị TB USD",     comm_f_equip_vnd:"Giá trị TB VND", comm_f_deposit:"Ngày trả đặt cọc",
     fin_tab_vn_report:"Báo cáo tài chính Việt Nam", fin_tab_cn_report:"Báo cáo tài chính Trung Quốc", fin_tab_merge_report:"Báo cáo tài chính tổng hợp", fin_merge_hint:"Toàn bộ 8 sheet của báo cáo Việt Nam, gộp thêm các bản ghi Chi thực tế của báo cáo Trung Quốc (dòng Trung Quốc màu xanh). Chỉ đọc; báo cáo Việt Nam không chứa dữ liệu Trung Quốc.", fin_panel_placeholder:"Nội dung đang xây dựng, vui lòng chờ.",
+    fin_tab_dashboard:"Bảng điều khiển tài chính", fin_dash_vn:"Bảng điều khiển tài chính Việt Nam", fin_dash_cn:"Bảng điều khiển tài chính Trung Quốc", fin_dash_merge:"Bảng điều khiển tài chính hợp nhất", fin_dash_loading:"Đang tải…", fin_dash_fail:"Tải thất bại, vui lòng thử lại", fin_dash_kpi_bank:"Tiền mặt & Ngân hàng", fin_dash_kpi_receipts:"Tổng thu", fin_dash_kpi_disb:"Tổng chi", fin_dash_kpi_internal:"Chi nội bộ", fin_dash_kpi_actual:"Chi thực tế", fin_dash_kpi_ending:"Tồn cuối", fin_dash_kpi_records:"Số bản ghi", fin_dash_kpi_china:"Chi thực tế tăng thêm từ Trung Quốc", fin_dash_currency_vnd:"VND", fin_dash_currency_rmb:"RMB",
     fin_cn_hint:"Cùng logic bảng như báo cáo Việt Nam; Excel chỉ có một sheet \u201cChi thực tế\u201d. Nhớ bấm Lưu sau khi nhập.", fin_title_save_cn:"Lưu thủ công lên máy chủ (báo cáo Trung Quốc: không tự động lưu)", fin_title_save_ro:"Chế độ chỉ đọc: dùng Nhập lại để tải xlsx mới",
-    fin_btn_load:"Tải lại báo cáo", fin_btn_save:"Lưu", fin_btn_snapshot:"Ảnh chụp", fin_btn_export:"Xuất xlsx", fin_btn_reimport:"Nhập lại", fin_btn_filter:"Lọc", fin_btn_sort_asc:"Tăng", fin_btn_sort_desc:"Giảm", fin_btn_restore:"Khôi phục", fin_btn_date_fmt:"Sắp xếp theo ngày-tháng-năm", fin_btn_ins_rows:"Chèn dòng bên dưới", fin_btn_ins_rows_above:"Chèn dòng bên trên",
+    fin_btn_load:"Tải lại báo cáo", fin_btn_save:"Lưu", fin_btn_snapshot:"Ảnh chụp", fin_btn_export:"Xuất xlsx", fin_btn_reimport:"Nhập lại", fin_merge_group_btn:"Hiển thị riêng chi phí Trung Quốc", fin_merge_group_btn_on:"Khôi phục thứ tự ban đầu", fin_merge_cn_section:"Chi phí Trung Quốc", fin_btn_filter:"Lọc", fin_btn_sort_asc:"Tăng", fin_btn_sort_desc:"Giảm", fin_btn_restore:"Khôi phục", fin_btn_date_fmt:"Sắp xếp theo ngày-tháng-năm", fin_btn_ins_rows:"Chèn dòng bên dưới", fin_btn_ins_rows_above:"Chèn dòng bên trên",
     fin_btn_report:"Tra cứu báo cáo", fin_rpt_title:"Tra cứu báo cáo", fin_rpt_year:"Năm", fin_rpt_month:"Tháng", fin_rpt_note0:"Chọn 0 nghĩa là chỉ xem báo cáo theo năm!", fin_rpt_ok:"Xác nhận", fin_rpt_cancel:"Hủy", fin_rpt_restore:"Khôi phục",
     fin_status_rpt_filtered:"Đã lọc: ", fin_status_rpt_empty:"Không có dữ liệu cho ",
     fin_rpt_period_line:"Phát sinh {p} · số dư đến {e}", fin_rpt_period_remark:"Đến {e}",
@@ -44229,12 +44695,14 @@ function switchView(name) {
         if (_has || _waitWonData._tries > 33 || window.currentView !== 'production') {
           prod_renderProduction();
           _waitWonData._tries = 0;
+          if (typeof prodWxAutoFixAll === 'function') { try { prodWxAutoFixAll(); } catch(e){} }
           return;
         }
         setTimeout(_waitWonData, 300);
       })();
     } else {
       prod_renderProduction();
+      if (typeof prodWxAutoFixAll === 'function') { try { prodWxAutoFixAll(); } catch(e){} }
     }
   }
   // 进入安装管理视图时渲染项目列表（若 won 数据尚未加载则主动拉取并轮询等待）
@@ -44270,12 +44738,14 @@ function switchView(name) {
         if (_has || _waitWonDataWL._tries > 33 || window.currentView !== 'worklog') {
           if (window.currentView === 'worklog') wl_renderList();
           _waitWonDataWL._tries = 0;
+          if (typeof prodWxAutoFixAll === 'function') { try { prodWxAutoFixAll(); } catch(e){} }
           return;
         }
         setTimeout(_waitWonDataWL, 300);
       })();
     } else {
       wl_renderList();
+      if (typeof prodWxAutoFixAll === 'function') { try { prodWxAutoFixAll(); } catch(e){} }
     }
   }
   // 进入 CRM 潜在项目视图时确保数据已渲染（100% 复刻 WON 分支结构）
@@ -57975,6 +58445,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       setTimeout(inst_captureTodayWeather, 1500);
       setTimeout(inst_captureTodayWeather, 4000);
       inst_startWxTimer();
+      if (typeof prodWxAutoFixAll === 'function') { try { prodWxAutoFixAll(); } catch(e){} }
       inst_bindAutoSave('C');
       var cDate = prod_dmy(prod_val('ic_date')||INST_TABC_SELDATE||ymdToDmy(prod_today()));
       inst_renderZoneSelects(f, cDate);
