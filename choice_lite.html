@@ -25231,9 +25231,33 @@ var PROD_EQUIP_FAULT_KB = {
       }, true);
     }
 
+    /* ---------- 语言切换：整实例重建（用户 2026-10-16 要求）----------
+       ① 工具栏按钮的悬停提示（删除线/加粗/Arial…）用的是 Univer 的 locale，
+          它在 createUniver 时就定死了——只有【整个实例重建】才会跟随系统语言切换；
+       ② 工作簿内容（表名/表头/单元格文字）由 load()→seedAndApply→applyTrans 按新语言
+          重新走 /api/translate 翻译（带 localStorage 缓存，切回旧语言秒显示）。 */
+    function rebuildForLang(){
+      try { if (dirty) save(false); } catch(e){}                       /* 未保存的改动先顶上去 */
+      /* 币种下拉此刻挂在 Univer 工具栏里（容器内部），先接回 #eq_inline，不然会被一起清掉 */
+      try {
+        var sel0 = document.getElementById('eq_cur'), bar0 = document.getElementById('eq_inline');
+        if (sel0 && bar0 && sel0.parentElement !== bar0) bar0.appendChild(sel0);
+      } catch(e){}
+      try { if (univer && typeof univer.dispose === 'function') univer.dispose(); } catch(e){}
+      try { var box = document.getElementById('equity_container'); if (box) box.innerHTML = ''; } catch(e){}
+      univer = null; api = null; sheet = null; ready = false; inited = false; loading = false;
+      setTimeout(function(){ try { init(); } catch(e){} }, 80);
+    }
+
     /* ---------- 对外 API ---------- */
     var pub = {
-    ensure: function(){ if (!inited) init(); },
+    ensure: function(){
+      if (window.__eqStaleLocale && univer){                 /* 在别的页面切了语言 → 回来时先重建 */
+        try { window.__eqStaleLocale = false; rebuildForLang(); } catch(e){}
+        return;
+      }
+      if (!inited) init();
+    },
     load: function(){ load(); },
     save: function(m){ save(!!m); },
     exportXlsx: function(){ window.location.href = API; },
@@ -25302,13 +25326,16 @@ var PROD_EQUIP_FAULT_KB = {
     }
     } catch(e){}
 
-    /* ★语言切换：整块重渲染（表名/表头/单元格全部跟翻） */
+    /* ★语言切换（用户 2026-10-16 要求：悬停提示 + 工作簿内容都随系统三语）：
+       在股东权益页 → 整实例重建（locale 换成新语言）+ 数据按新语言重新翻译；
+       在其它页面 → 只打 __eqStaleLocale 标记，等切回股东权益时（pub.ensure）再重建。 */
     window.addEventListener('app:langchange', function(){
     try {
       var v = document.getElementById('view-equity');
-      if (!v || v.style.display === 'none') return;
-      if (typeof sweepI18n === 'function') sweepI18n(v);
-      if (univer) load();
+      if (typeof sweepI18n === 'function' && v) sweepI18n(v);
+      if (!univer) return;
+      if (!v || v.style.display === 'none'){ window.__eqStaleLocale = true; return; }
+      rebuildForLang();
     } catch(e){}
     });
 

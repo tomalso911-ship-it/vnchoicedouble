@@ -176,6 +176,13 @@ chk(re.search(r"addEventListener\('keydown', function\(e\)\{", eqblk) is not Non
 chk("tagName === 'SELECT'" in eqblk and "tagName === 'INPUT'" in eqblk,
     "★币种下拉/公式栏等表单元素不接管（页面其它输入不受影响）")
 
+print("13) 三语随系统切换（用户 2026-10-16 要求：悬停提示 + 工作簿内容）")
+chk("function rebuildForLang" in eqblk, "★语言切换 = 整实例重建 rebuildForLang（locale 只有重建才会换）")
+chk("univer.dispose()" in eqblk and "box.innerHTML = ''" in eqblk, "★重建前先 dispose 旧实例并清容器")
+chk("bar0.appendChild(sel0)" in eqblk, "★重建前把币种下拉接回 #eq_inline（否则随容器被清掉）")
+chk("__eqStaleLocale" in eqblk, "★在其它页切语言 → 打标记，切回股东权益时补重建")
+chk("if (dirty) save(false)" in eqblk, "★重建前先顶上未保存的改动")
+
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")
 sys.exit(0 if ok else 1)
