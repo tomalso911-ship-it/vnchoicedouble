@@ -216,6 +216,9 @@ chk("var seen = {};" in eqblk and "if (seen[key]) continue" in eqblk,
 chk("function eq_statLabels" in eqblk and "计数" in eqblk and "Count" in eqblk and "Đếm" in eqblk,
     "★标签三语：中/英/越")
 chk("eq_statIsDate" in eqblk, "★日期格（数字格式含日期 token）不计入数字统计")
+# 2026-10-16 用户要求：计数 = 选中的单元格总数（含空格），与 Excel 一致
+chk("COUNT-CELLS-ALL-20261016" in eqblk and "cnt++;" in eqblk,
+    "★计数 = 选中的单元格总数（含空格），与 Excel 一致；求和/平均/最大/最小仍只统计数字格")
 
 print("17) 多实例隔离：右键插入行作用于【当前表格】（2026-10-16 修插到财务报表）")
 chk("function eq_bindContextMenuOnce" in eqblk, "★权益必须有自己的右键菜单接管 eq_bindContextMenuOnce")

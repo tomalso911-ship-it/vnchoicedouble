@@ -135,6 +135,8 @@ def check_html(path):
             errors.append("②fin_statCompute 缺少格级去重 seen 容器（锚点格会被算两次）")
         if "if (seen[_key]) continue;" not in comp or "seen[_key] = 1;" not in comp:
             errors.append("②fin_statCompute 的格级去重逻辑不完整")
+        if "COUNT-CELLS-ALL-20261016" not in comp or "cnt++;" not in comp:
+            errors.append("②fin_statCompute 计数逻辑未改为「选中单元格总数（含空格）」")
 
     # ---- ③ 挂起窗口：defer 而不是 drop ----
     if not re.search(r"var\s+finCnHoldTimer\s*=\s*null\s*;", text):

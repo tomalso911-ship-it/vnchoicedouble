@@ -20463,13 +20463,14 @@ var PROD_EQUIP_FAULT_KB = {
         /* ★格级去重（FIN-STATBAR-SEL3-20261013）：Univer 的 selections 里【同时】带着
            "整块选区"和"锚点单元格"（实测 [[4,4,14,4],[4,4,4,4]]），Ctrl 多选也可能重叠 ——
            不去重就会把锚点那一格算两次（用户拉选 E5:E15 → 计数 12、总计多出 10,664）。
-           Excel 的语义是「每个格只算一次」，所以这里按 r,c 去重。 */
+           Excel 的语义是「每个格只算一次」，所以这里按 r,c 去重。
+           ★COUNT-CELLS-ALL-20261016：用户要求「计数 = 选中了多少个单元格」，与 Excel 一致 ——
+             包括空格；求和/平均/最大/最小仍只统计数字格。 */
         var seen = {};
         for (var qi = 0; qi < ranges.length && scanned < 20000; qi++){
           var rq = ranges[qi];
           for (var rr = rq.startRow; rr <= rq.endRow; rr++){
-            var row = cells[String(rr)];
-            if (!row) continue;
+            var row = cells ? cells[String(rr)] : null;
             for (var cc = rq.startColumn; cc <= rq.endColumn; cc++){
               if (++scanned > 20000) break;                 // 超大选区保护
               var _key = rr + ',' + cc;
@@ -20477,11 +20478,13 @@ var PROD_EQUIP_FAULT_KB = {
               seen[_key] = 1;
               /* ★已勾选核销的行 → 整行不计入求和/计数（FIN-CN-CHECK-GRAY-20261015） */
               if (cnCheckedRows && cnCheckedRows[String(rr)]) continue;
+              /* COUNT-CELLS-ALL-20261016：计数 = 选中的单元格总数（含空格），与 Excel 一致 */
+              cnt++;
+              if (!row) continue;
               var cell = row[String(cc)];
               var v = cell && cell.v;
               if (v === undefined || v === null) continue;
               if (typeof v === 'string' && v.trim() === '') continue;
-              cnt++;
               var num = null;
               if (typeof v === 'number') num = v;
               else if (typeof v === 'string' && /^-?[\d,]+(\.\d+)?$/.test(v.trim())) num = Number(v.replace(/,/g, ''));
@@ -25132,22 +25135,25 @@ var PROD_EQUIP_FAULT_KB = {
           if (wr){ ranges = [wr]; usedWhole = true; }
         }
         var cnt = 0, nums = 0, sum = 0, mn = null, mx = null, scanned = 0;
+        /* ★COUNT-CELLS-ALL-20261016：用户要求「计数 = 选中了多少个单元格」，与 Excel 一致 ——
+           包括空格；求和/平均/最大/最小仍只统计数字格。 */
         var seen = {};
         for (var qi = 0; qi < ranges.length && scanned < 20000; qi++){
           var rq = ranges[qi];
           for (var rr = rq.startRow; rr <= rq.endRow; rr++){
             var row = cells ? cells[String(rr)] : null;
-            if (!row) continue;
             for (var cc = rq.startColumn; cc <= rq.endColumn; cc++){
               if (++scanned > 20000) break;
               var key = rr + ',' + cc;
               if (seen[key]) continue;
               seen[key] = 1;
+              /* COUNT-CELLS-ALL-20261016：计数 = 选中的单元格总数（含空格），与 Excel 一致 */
+              cnt++;
+              if (!row) continue;
               var cell = row[String(cc)];
               var v = cell && cell.v;
               if (v === undefined || v === null) continue;
               if (typeof v === 'string' && v.trim() === '') continue;
-              cnt++;
               var num = null;
               if (typeof v === 'number') num = v;
               else if (typeof v === 'string' && /^-?[\d,]+(\.\d+)?$/.test(v.trim())) num = Number(v.replace(/,/g, ''));
