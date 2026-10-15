@@ -91,12 +91,15 @@ for k, n in (('fin_btn_report', '查报表'), ('fin_btn_sort_asc', '升序'), ('
              ('fin_merge_group_btn_on', '恢复原显示顺序')):
     chk(k not in sec, "★已删按钮：「%s」不在工具栏" % n)
 chk('id="eq_cur"' in sec and 'id="eq_inline"' in sec, "币种下拉与按钮组容器存在")
-# ★保存/导出必须留在上方独立行（#eq_inline 内），且币种下拉先于它们出现在 DOM（挂走后剩这两个）
+# ★保存/导出必须是这一行最前面的独立按钮（用户 2026-10-15 第三次调整）
 i_sel = sec.find('id="eq_cur"')
 i_save = sec.find('fin_btn_save')
-chk(i_sel >= 0 and i_save > i_sel, "DOM 顺序：币种下拉在前（挂走后 #eq_inline 里剩 保存/导出）")
+i_exp = sec.find('fin_btn_export')
+chk(i_save >= 0 and i_exp > i_save, "DOM 顺序：保存 在 导出 xlsx 之前")
+chk(i_sel > i_exp, "DOM 顺序：币种下拉排在 保存/导出 之后（挂走后行首只剩这两个按钮）")
+chk('overflow:visible' in sec, "★#eq_inline 用 overflow:visible（下拉浮层不被裁切）")
 
-print("6b) 币种下拉挂 Univer 工具栏最左侧 + 保存/导出留在上方独立行 + 隐藏 $/漏斗/保护图标")
+print("6b) 币种下拉挂 Univer 工具栏最左侧 + 整条工具栏搬到表格上方一行 + 隐藏 $/漏斗/保护图标")
 eqblk = block('股东权益报表引擎（FIN-EQUITY-20261015）', 'window.__eqSwitchWrapped')
 if not eqblk:
     try:
@@ -112,7 +115,16 @@ chk("'sheet.command.add-range-protection-from-toolbar': { hidden: true }" in eqb
 chk(re.search(r"querySelector\('#equity_container \.univer-toolbar-container'\)", eqblk) is not None,
     "找到 Univer 工具栏宿主 .univer-toolbar-container")
 chk(re.search(r"host\.insertBefore\(sel, host\.firstChild\)", eqblk) is not None,
-    "★只有币种下拉插到工具栏最左侧（保存/导出不进去）")
+    "★币种下拉插到工具栏最左侧（保存/导出不进工具栏）")
+# ★用户 2026-10-15 第四次调整：整条 Univer 工具栏（字体/字号/数字格式那些「展开」下拉）
+#   必须搬到表格上方 #eq_inline 一行里，与表格彼此分开。
+chk(re.search(r"var bar = document\.getElementById\('eq_inline'\)", eqblk) is not None,
+    "★工具栏搬移目标是表格上方那一行 #eq_inline")
+chk(re.search(r"bar\.appendChild\(host\)", eqblk) is not None,
+    "★整条 .univer-toolbar-container 被 appendChild 到 #eq_inline（展开下拉都在上面一行）")
+chk("function safeDom(node)" in eqblk and "node.__eqSafeDom" in eqblk,
+    "★搬走后给原父节点打容错补丁（React 卸载不再抛 NotFoundError）")
+chk("more-function-single" in eqblk, "★隐藏 Univer 自带「⋮」收纳按钮（展开下拉不会被藏起来）")
 chk("new MutationObserver(" in eqblk, "DOM 变动自动重挂（切表后不掉下来）")
 
 print("7) 自动保存 0.7s + 手动保存")

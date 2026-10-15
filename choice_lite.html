@@ -4326,6 +4326,11 @@ var WL_FLOW_IMG = {
       .fin-debug{font-size:11px;color:#c00;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%;flex:0 1 auto;}
       /* 我们的控件移动到 Univer 工具栏最左侧后，去掉多余外边距 */
       .univer-toolbar-container .fin-toolbar2{margin:0 8px 0 0;}
+      /* ★股东权益（FIN-EQUITY-20261015）：整条 Univer 自带工具栏（含字体/字号/数字格式等「展开」下拉）
+         被搬到表格上方 #eq_inline 这一行里（用户 2026-10-15：和表格彼此分开、排成一行）。
+         overflow:visible 是硬要求——否则下拉浮层会被裁掉。 */
+      #eq_inline{flex-wrap:nowrap !important;overflow:visible !important;align-items:center;}
+      #eq_inline > .univer-toolbar-container{flex:1 1 auto;min-width:0;margin:0;}
       /* Univer 自带工具栏（第三行）：强制靠左、不换行 */
       .univer-toolbar-container{display:flex !important;flex-wrap:nowrap !important;justify-content:flex-start !important;align-items:center !important;}
       .univer-toolbar{flex-wrap:nowrap !important;justify-content:flex-start !important;}
@@ -24287,17 +24292,19 @@ var PROD_EQUIP_FAULT_KB = {
         <span id="eq_status" style="font-size:12px;color:#666;"></span>
       </div>
       <div id="eq_toolbar" style="margin:10px 0;">
-        <!-- ★用户 2026-10-15（第三次调整）：保存 / 导出 xlsx 是独立按钮，留在表格上方的这一行，
-             与表格分开；只有币种下拉挂进 Univer 自带工具栏最左侧。 -->
-        <div id="eq_inline" class="fin-toolbar2" style="display:flex;gap:8px;align-items:center;">
+        <!-- ★用户 2026-10-15（第四次调整）：表格上方【只有这一行】——
+             保存 / 导出 xlsx（最前面，独立按钮）+ 币种下拉 + Univer 自带的那些「展开」下拉
+             （字体 / 字号 / 数字格式 …）。整条 Univer 工具栏由 JS 搬进 #eq_inline，
+             与表格彼此分开。 -->
+        <div id="eq_inline" class="fin-toolbar2" style="display:flex;gap:8px;align-items:center;flex-wrap:nowrap;overflow:visible;">
+          <button class="fin-btn" data-i18n="fin_btn_save" onclick="window.__eq && window.__eq.save(true)">保存</button>
+          <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
           <select id="eq_cur" onchange="window.__eq && window.__eq.setCurrency(this.value)"
                   style="height:28px;border:1px solid #c8ced6;border-radius:6px;padding:0 6px;background:#fff;margin-right:8px;">
             <option value="VND">VND ₫</option>
             <option value="RMB">RMB ¥</option>
             <option value="USD">USD $</option>
           </select>
-          <button class="fin-btn" data-i18n="fin_btn_save" onclick="window.__eq && window.__eq.save(true)">保存</button>
-          <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
         </div>
       </div>
       <div id="equity_container" style="width:100%;height:calc(100vh - 250px);min-height:420px;"></div>
@@ -24568,15 +24575,62 @@ var PROD_EQUIP_FAULT_KB = {
     });
     }
 
-    /* ---------- 只把【币种下拉】挂到 Univer 自带工具栏最左侧；
-       ★保存 / 导出 xlsx 留在表格上方的独立一行（用户 2026-10-15：和表格彼此分开） ---------- */
+    /* ---------- 工具栏归位（用户 2026-10-15 第四次调整）----------
+       ① 【币种下拉】插到 Univer 自带工具栏最左侧（原契约不变）；
+       ② 【整条 Univer 自带工具栏】——也就是字体 / 字号 / 数字格式那几个「展开」下拉——
+          从表格里搬到表格上方 #eq_inline 那一行里，排成一行、与表格彼此分开；
+          保存 / 导出 xlsx 保持在这一行的最前面。 */
+    /* React 仍按「原父节点」来管理工具栏 DOM。我们把它搬走后，React 若重新挂载/卸载
+       会调用 原父.removeChild(toolbar) 抛 NotFoundError，这里给原父节点打一层容错补丁。 */
+    function safeDom(node){
+      if (!node || node.__eqSafeDom) return;
+      try {
+        var _rc = node.removeChild.bind(node);
+        node.removeChild = function(c){
+          try { if (c && c.parentNode !== node) return c; } catch(e){}
+          return _rc(c);
+        };
+        var _ib = node.insertBefore.bind(node);
+        node.insertBefore = function(c, ref){
+          try { if (ref && ref.parentNode !== node) return node.appendChild(c); } catch(e){}
+          return _ib(c, ref);
+        };
+        node.__eqSafeDom = true;
+      } catch(e){}
+    }
+    /* 隐藏 Univer 自带的「⋮」溢出收纳按钮：它一出现就会把那几个「展开」下拉收进去藏起来 */
+    function eqHideMore(){
+      try {
+        var svgs = document.querySelectorAll('#eq_inline svg[class*="more-function-single"], #equity_container svg[class*="more-function-single"]');
+        for (var i = 0; i < svgs.length; i++){
+          var b = svgs[i].closest ? svgs[i].closest('button') : svgs[i].parentElement;
+          if (b && b.classList){
+            b.classList.add('fin-hide-more-btn');
+            b.style.setProperty('display', 'none', 'important');
+          }
+        }
+      } catch(e){}
+    }
     function mountToolbar(){
       var sel = document.getElementById('eq_cur');
+      var bar = document.getElementById('eq_inline');
       var host = document.querySelector('#equity_container .univer-toolbar-container');
-      if (!sel || !host) return;
-      if (sel.parentElement !== host || host.firstChild !== sel){
-        host.insertBefore(sel, host.firstChild);
+      if (!host) return;
+      /* ① 币种下拉 → 工具栏最左侧 */
+      if (sel && (sel.parentElement !== host || host.firstChild !== sel)){
+        try { host.insertBefore(sel, host.firstChild); } catch(e){}
       }
+      /* ② 整条工具栏 → 表格上方那一行（追加到 保存/导出 之后） */
+      if (bar && host.parentElement !== bar){
+        try {
+          safeDom(host.parentElement);
+          bar.appendChild(host);
+          /* 工具栏搬走后表格区域变高：让 Univer 重新量一次尺寸（ResizeObserver 不会自己触发） */
+          setTimeout(function(){ try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 60);
+          setTimeout(function(){ try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 400);
+        } catch(e){}
+      }
+      eqHideMore();
     }
     function watchToolbar(){
       try { mountToolbar(); } catch(e){}
@@ -24585,6 +24639,9 @@ var PROD_EQUIP_FAULT_KB = {
         var box = document.getElementById('equity_container'); if (!box) return;
         window.__eqToolbarObs = new MutationObserver(function(){ try { mountToolbar(); } catch(e){} });
         window.__eqToolbarObs.observe(box, { childList: true, subtree: true });
+        /* 工具栏搬走后它自己的 DOM 变动（切表、展开下拉）也要盯住，好在「⋮」冒出来时立刻按掉 */
+        var bar2 = document.getElementById('eq_inline');
+        if (bar2) window.__eqToolbarObs.observe(bar2, { childList: true, subtree: true });
       } catch(e){}
     }
 
