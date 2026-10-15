@@ -139,8 +139,8 @@ print("9) 三语：翻译 + 表名改名同步改公式")
 chk("/api/translate?q=" in html, "走 /api/translate 自动翻译")
 chk("function applyTrans(" in html, "applyTrans（单元格译文回填）")
 chk("function applyTitles(" in html, "applyTitles（表名三语）")
-chk(re.search(r"cell\.f = cell\.f\.split\(\"'\" \+ old \+ \"'\"\)\.join\(\"'\" \+ neu \+ \"'\"\)", html) is not None,
-    "★改名时同步替换公式里的表名引用（否则 #REF!）")
+chk(re.search(r"cell\.f\.split\(\"'\" \+ r\.old \+ \"'\"\)\.join\(\"'\" \+ r\.neu \+ \"'\"\)", html) is not None,
+    "★改名时同步替换公式里的表名引用（否则 #REF!；且是全表扫描，跨表引用也不漏）")
 
 print("10) 查报表：按年月隐藏行")
 chk("sh.rowData[rk].hd = 1" in html, "非匹配行 rowData.hd = 1")
@@ -188,6 +188,15 @@ chk("bar0.appendChild(sel0)" in eqblk, "★兜底重建前把币种下拉接回 
 chk("box.innerHTML = ''" not in eqblk, "★不得手动 innerHTML 硬清容器（React removeChild 报错根因）")
 chk("__eqStaleLocale" in eqblk, "★在其它页切语言 → 打标记，切回股东权益时补重建")
 chk("if (dirty) save(false)" in eqblk, "★重建前先顶上未保存的改动")
+
+print("14) 表名三语双向 + 文件永远存越文（2026-10-16：修「表名卡在中文」）")
+chk("function eqRenameSheets" in eqblk, "★eqRenameSheets：任意语言表名 → 目标语言（含跨表公式修正）")
+chk(re.search(r"eqRenameSheets\(v, function\(d\)\{ return \(L === 'zh'\) \? d\.zh : \(L === 'en'\) \? d\.en : d\.vi; \}\)", eqblk) is not None
+    and re.search(r"var d = sheetDef\(sh\.name\); if \(!d\) return;", eqblk) is not None,
+    "★applyTitles 走 sheetDef（中/英/越表名都认）→ 文件在别的语言下被保存过也能映射回来")
+chk("eqRenameSheets(s, function(d){ return d.vi; })" in eqblk,
+    "★payload 存盘前把表名还原成越文（文件=唯一事实源）")
+chk("transOf(cell.v, 'vi')" in eqblk, "★payload 存盘前把翻译过的文字还原成越文原文")
 
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")

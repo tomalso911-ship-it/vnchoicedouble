@@ -24437,30 +24437,42 @@ var PROD_EQUIP_FAULT_KB = {
       });
     });
     }
-    /* ★表名三语：改名的同时把公式里引用的【旧表名】一起换掉，否则跨表公式会断成 #REF!
-     （Excel 重命名工作表时也是这么做的） */
-    function applyTitles(v){
-    var L = lang();
-    var map = {};
-    SHEETS.forEach(function(d){ map[d.vi] = (L === 'zh') ? d.zh : (L === 'en') ? d.en : d.vi; });
-    var sids = v.sheetOrder || Object.keys(v.sheets || {});
+    /* ★表名三语（双向）：不管快照里的表名是越/中/英哪种（用户曾在别的语言下保存过，
+       文件里就可能存着中文表名），都能映射到当前语言的目标名；
+       并把【所有表】公式里的跨表引用一起改掉（总投资表的公式引用的是其它表的名字，
+       只改本表公式会漏掉跨表引用 → #REF!）。显示（applyTitles）与存盘还原越文（payload）共用。 */
+    function eqRenameSheets(s, tgt){
+    var sids = s.sheetOrder || Object.keys(s.sheets || {});
+    var renames = [];
     sids.forEach(function(sid){
-      var sh = v.sheets[sid]; if (!sh) return;
-      var old = sh.name;
-      var neu = map[old];
-      if (!neu || neu === old) return;
+      var sh = s.sheets[sid]; if (!sh) return;
+      var d = sheetDef(sh.name); if (!d) return;
+      var neu = tgt(d);
+      if (!neu || neu === sh.name) return;
+      renames.push({ old: sh.name, neu: neu });
       sh.name = neu;
+    });
+    if (!renames.length) return;
+    sids.forEach(function(sid){
+      var sh = s.sheets[sid]; if (!sh) return;
       var cd = sh.cellData || {};
       Object.keys(cd).forEach(function(rk){
         var row = cd[rk] || {};
         Object.keys(row).forEach(function(ck){
           var cell = row[ck];
-          if (cell && typeof cell.f === 'string' && cell.f.indexOf("'" + old + "'") >= 0){
-            cell.f = cell.f.split("'" + old + "'").join("'" + neu + "'");
-          }
+          if (!cell || typeof cell.f !== 'string') return;
+          renames.forEach(function(r){
+            if (cell.f.indexOf("'" + r.old + "'") >= 0){
+              cell.f = cell.f.split("'" + r.old + "'").join("'" + r.neu + "'");
+            }
+          });
         });
       });
     });
+    }
+    function applyTitles(v){
+    var L = lang();
+    eqRenameSheets(v, function(d){ return (L === 'zh') ? d.zh : (L === 'en') ? d.en : d.vi; });
     }
 
     /* ---------- 日期：识别 Excel 序列号 / 文本 ---------- */
@@ -24659,6 +24671,28 @@ var PROD_EQUIP_FAULT_KB = {
         });
       });
     }
+    /* ★三语还原（2026-10-16）：文件是唯一事实源，里面永远存【越文表名 + 越文原文】，
+       界面翻译只活在屏幕上。否则在中文界面下自动保存会把中文表名/表头写进文件，
+       下次切语言 applyTitles 就认不出来了（表名卡在中文的 BUG 根因）。 */
+    try {
+      var L = lang();
+      if (L !== 'vi'){
+        eqRenameSheets(s, function(d){ return d.vi; });           /* 表名还原越文（含跨表公式修正） */
+        Object.keys(s.sheets || {}).forEach(function(sid){
+          var sh = s.sheets[sid]; if (!sh) return;
+          var cd = sh.cellData || {};
+          Object.keys(cd).forEach(function(rk){
+            var row = cd[rk] || {};
+            Object.keys(row).forEach(function(ck){
+              var cell = row[ck]; if (!cell || cell.f !== undefined) return;
+              if (typeof cell.v !== 'string') return;
+              var orig = transOf(cell.v, 'vi');                    /* 翻译缓存里有越文原文就还原 */
+              if (orig && orig !== cell.v) cell.v = orig;
+            });
+          });
+        });
+      }
+    } catch(e){}
     return s;
     }
     async function save(manual){
