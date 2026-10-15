@@ -234,6 +234,14 @@ chk("function fin_containerOf" in html and "univer_container" in html,
     "★财务侧 fin_containerOf：只认 univer_container（反制：财务的补丁不得再接管权益菜单）")
 chk("if (!finActive) return" in html, "★财务侧 finPatchInsertRowMenu 必须被 finActive 守护（反制跨实例串台）")
 
+print("18) 币种切换：输入数字后点货币要加符号、且不丢录入（2026-10-16 修 BUG）")
+chk("setCurrency: function" in eqblk and "getSnapshot" in eqblk,
+    "★setCurrency 切换前读 live 快照")
+chk("snap = ls" in eqblk, "★把屏幕（含刚输入）的改动并回 snap，重建不再丢未保存录入")
+chk("oldCur !== 'VND'" in eqblk and "cell.v = Math.round(cell.v * _f)" in eqblk,
+    "★切回 VND 时把显示外币乘回 VND 基，保证 snap 始终是 VND 基（避免换算漂移）")
+chk("render();" in eqblk, "★并回 snap 后重建视图（applyCurrency 换算 + fmtCurrency 套货币符号）")
+
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")
 sys.exit(0 if ok else 1)

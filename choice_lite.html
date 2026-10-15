@@ -25963,9 +25963,36 @@ var PROD_EQUIP_FAULT_KB = {
     load: function(){ load(); },
     save: function(m){ save(!!m); },
     exportXlsx: function(){ window.location.href = API; },
+    /* ★币种切换（修「输入数字后点货币没符号 / 未保存录入被重建丢掉的 BUG」，2026-10-16）：
+       切换前先把屏幕上（含刚输入的）改动同步回 snap，并把"当前显示币种"乘回 VND 基，
+       保证 snap 永远是 VND 基 → applyCurrency 的 ÷rate 换算与 fmtCurrency 的货币符号都正确，
+       且不因整实例重建而丢弃未保存的录入。 */
     setCurrency: function(code){
-      cur = code || 'VND';
+      code = code || 'VND';
+      var oldCur = cur;
+      cur = code;
       rate = readRate(cur);
+      try {
+        var ls = (sheet && sheet.getSnapshot) ? sheet.getSnapshot() : null;
+        if (ls){
+          if (oldCur !== 'VND'){
+            var _f = readRate(oldCur);
+            Object.keys(ls.sheets || {}).forEach(function(sid){
+              var sh = ls.sheets[sid]; if (!sh) return;
+              var d = sheetDef(nameOfSid(ls, sid)); if (!d) return;
+              var cd = sh.cellData || {};
+              Object.keys(cd).forEach(function(rk){
+                var row = cd[rk] || {};
+                d.amt.forEach(function(c){
+                  var cell = row[String(c)];
+                  if (cell && cell.f === undefined && isNum(cell.v)) cell.v = Math.round(cell.v * _f);
+                });
+              });
+            });
+          }
+          snap = ls;   /* ★关键：把刚输入的改动并回 snap，重建不再丢录入 */
+        }
+      } catch(e){}
       render();
     },
     openReport: function(){
