@@ -242,6 +242,15 @@ chk("oldCur !== 'VND'" in eqblk and "cell.v = Math.round(cell.v * _f)" in eqblk,
     "★切回 VND 时把显示外币乘回 VND 基，保证 snap 始终是 VND 基（避免换算漂移）")
 chk("render();" in eqblk, "★并回 snap 后重建视图（applyCurrency 换算 + fmtCurrency 套货币符号）")
 
+print("19) 统计栏直接用 getValues 读屏幕值 + 工作簿默认币种（2026-10-16 修 BUG）")
+chk("getValues()" in eqblk, "★eq_statCompute 用 sh.getRange(...).getValues() 直接读屏幕值")
+chk("function eqDefaultCurFor" in eqblk and "中国投资数据" in eqblk,
+    "★eqDefaultCurFor：中国投资数据默认 RMB，其余默认 VND")
+chk("function eqSyncCurToActiveSheet" in eqblk,
+    "★切工作簿标签时按默认币种自动切换（EQ-SHEET-CUR-20261016）")
+chk("wb.getSheets" in eqblk or "getSheets()" in eqblk,
+    "★fmtCurrency 用 workbook.getSheets() 取真实工作表 id 套货币符号")
+
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")
 sys.exit(0 if ok else 1)

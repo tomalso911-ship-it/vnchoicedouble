@@ -24384,6 +24384,7 @@ var PROD_EQUIP_FAULT_KB = {
     var inited = false, loading = false, ready = false;
     var snap = null, view = null;
     var cur = 'VND', rate = 1, filter = null, sortDir = 0;
+    var eqLastActiveSheetName = '';   /* ★EQ-SHEET-CUR-20261016：用于切工作簿时按默认币种切换 */
     var dirty = false, saving = false, saveTimer = null, progUntil = 0;
     var trans = {}, pending = {};
 
@@ -24588,6 +24589,75 @@ var PROD_EQUIP_FAULT_KB = {
     return 1;
     }
     function moneyPattern(code){ return code === 'RMB' ? '#,##0"¥"' : code === 'USD' ? '#,##0"$"' : '#,##0"₫"'; }
+    /* ★EQ-SHEET-CUR-20261016：根据工作表名返回默认币种。
+       中国投资数据（中/英/越三名任一匹配）默认 RMB，其余默认 VND。 */
+    function eqDefaultCurFor(sheetName){
+      if (!sheetName) return 'VND';
+      for (var i = 0; i < SHEETS.length; i++){
+        var d = SHEETS[i];
+        if (d.zh === '中国投资数据' || d.en === 'China Investment' || d.vi === 'Đầu tư Trung Quốc'){
+          if (sheetName === d.zh || sheetName === d.en || sheetName === d.vi) return 'RMB';
+        }
+      }
+      return 'VND';
+    }
+    /* ★把屏幕上（含刚输入）的改动同步回 snap；切换币种前调用，避免重建丢掉未保存录入。
+       oldCur 是当前显示币种，若它非 VND，需把格值乘回 VND 基，保证 snap 永远是 VND 基。 */
+    function eqCaptureLiveToSnap(oldCur){
+      oldCur = oldCur || cur;
+      try {
+        var ls = (sheet && sheet.getSnapshot) ? sheet.getSnapshot() : null;
+        if (!ls) return;
+        if (oldCur !== 'VND'){
+          var _f = readRate(oldCur);
+          Object.keys(ls.sheets || {}).forEach(function(sid){
+            var sh = ls.sheets[sid]; if (!sh) return;
+            var d = sheetDef(nameOfSid(ls, sid)); if (!d) return;
+            var cd = sh.cellData || {};
+            Object.keys(cd).forEach(function(rk){
+              var row = cd[rk] || {};
+              d.amt.forEach(function(c){
+                var cell = row[String(c)];
+                if (cell && cell.f === undefined && isNum(cell.v)) cell.v = Math.round(cell.v * _f);
+              });
+            });
+          });
+        }
+        snap = ls;
+      } catch(e){}
+    }
+    /* ★切工作簿标签时，按该表的默认币种切换（并先 capture 当前屏幕改动）。
+       用户手动选择币种后，同一张表内保持用户选择；换表才重置为默认。 */
+    function eqSyncCurToActiveSheet(){
+      try {
+        var sh = eqSheetObj(); if (!sh) return;
+        var name = '';
+        try { name = (sh.getName && sh.getName()) || sh.name || ''; } catch(e){ name = ''; }
+        if (!name){
+          try {
+            var _sid = eqSubUnitId(sh);
+            if (_sid && view && view.sheets && view.sheets[_sid]) name = view.sheets[_sid].name || '';
+          } catch(e){}
+        }
+        if (!name) return;
+        var sel = document.getElementById('eq_cur');
+        if (name === eqLastActiveSheetName){
+          if (sel && sel.value !== cur) sel.value = cur;
+          return;
+        }
+        eqLastActiveSheetName = name;
+        var want = eqDefaultCurFor(name);
+        if (want !== cur){
+          eqCaptureLiveToSnap(cur);
+          cur = want;
+          rate = readRate(cur);
+          render();
+          if (sel) sel.value = cur;
+        } else if (sel && sel.value !== cur){
+          sel.value = cur;
+        }
+      } catch(e){}
+    }
     function applyCurrency(v){
     if (cur === 'VND') return;
     Object.keys(v.sheets || {}).forEach(function(sid){
@@ -24606,30 +24676,41 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function fmtCurrency(){
     if (!api || !sheet) return;
-    var sid = null;
-    try { sid = sheet.getSheetId ? sheet.getSheetId() : null; } catch(e){}
-    if (!sid) return;
     var v = snap; if (!v) return;
-    Object.keys(v.sheets || {}).forEach(function(s){
-      var sh = v.sheets[s]; var d = sheetDef(sh.name); if (!d) return;
-      var cd = sh.cellData || {};
-      var vals = [];
-      /* ★只对【真实存在】的金额格套格式：空表也一次性灌 1000 行会把命令撑爆 */
-      Object.keys(cd).forEach(function(rk){
-        var row = cd[rk] || {};
-        d.amt.forEach(function(c){
-          var cell = row[String(c)];
-          if (cell && cell.v !== undefined && cell.v !== null && cell.v !== ''){
-            vals.push({ row: parseInt(rk, 10), col: c, pattern: moneyPattern(cur) });
-          }
+    /* ★EQ-CUR-FMT-20261016：用 workbook.getSheets() 取真实工作表 id，不再依赖 snapshot 的 key
+       与 getSheetId 是否一致；金额格套货币符号。 */
+    try {
+      var wb = api.getActiveWorkbook && api.getActiveWorkbook();
+      var sheets = (wb && wb.getSheets && wb.getSheets()) || [];
+      sheets.forEach(function(sh){
+        var sid = eqSubUnitId(sh); if (!sid) return;
+        var snapSheet = v.sheets[sid];
+        var name = '';
+        if (!snapSheet){
+          try { name = (sh.getName && sh.getName()) || sh.name || ''; } catch(e){ name = ''; }
+          Object.keys(v.sheets || {}).forEach(function(s){ if (v.sheets[s] && v.sheets[s].name === name) snapSheet = v.sheets[s]; });
+        }
+        if (!snapSheet) return;
+        var d = sheetDef(snapSheet.name); if (!d) return;
+        var cd = snapSheet.cellData || {};
+        var vals = [];
+        /* ★只对【真实存在】的金额格套格式：空表也一次性灌 1000 行会把命令撑爆 */
+        Object.keys(cd).forEach(function(rk){
+          var row = cd[rk] || {};
+          d.amt.forEach(function(c){
+            var cell = row[String(c)];
+            if (cell && cell.v !== undefined && cell.v !== null && cell.v !== ''){
+              vals.push({ row: parseInt(rk, 10), col: c, pattern: moneyPattern(cur) });
+            }
+          });
         });
+        if (!vals.length) return;
+        try {
+          progUntil = Date.now() + 800;
+          api.executeCommand('sheet.command.numfmt.set.numfmt', { unitId:'equity-report', subUnitId:sid, values:vals });
+        } catch(e){}
       });
-      if (!vals.length) return;
-      try {
-        progUntil = Date.now() + 800;
-        api.executeCommand('sheet.command.numfmt.set.numfmt', { unitId:'equity-report', subUnitId:s, values:vals });
-      } catch(e){}
-    });
+    } catch(e){}
     }
 
     /* ---------- 工具栏归位（用户 2026-10-15 第五次调整：照「越南财务报表」的做法）----------
@@ -24657,6 +24738,8 @@ var PROD_EQUIP_FAULT_KB = {
         try { host.insertBefore(sel, host.firstChild); } catch(e){}
       }
       eqHideMore();
+      /* ★EQ-SHEET-CUR-20261016：工具栏归位时同步一次默认币种（切工作簿标签时触发） */
+      try { eqSyncCurToActiveSheet(); } catch(e){}
     }
     function watchToolbar(){
       try { mountToolbar(); } catch(e){}
@@ -24840,6 +24923,8 @@ var PROD_EQUIP_FAULT_KB = {
       try { eqPatchPermissionService(); } catch(e){}   /* ★权限点放行：右键「插入行」等编辑命令不再被静默拦下 */
       try { eq_statBind(); } catch(e){}                /* ★底部统计栏（计数/总计/平均/最大/最小）*/
       try { eq_bindContextMenuOnce(); } catch(e){}    /* ★右键「插入行」菜单补丁：限定在权益容器内，插入作用于当前表格 */
+      /* ★EQ-SHEET-CUR-20261016：轮询同步工作簿默认币种（中国投资数据→RMB，其余→VND） */
+      if (!window.__eqCurPoll){ window.__eqCurPoll = setInterval(function(){ try { eqSyncCurToActiveSheet(); } catch(e){} }, 600); }
     } catch(e){
       inited = false;
       st('引擎加载失败：' + e.message);
@@ -25127,9 +25212,13 @@ var PROD_EQUIP_FAULT_KB = {
         var rc = bar.getBoundingClientRect();
         if (!rc.width) return;
         var sh = eqSheetObj(); if (!sh) return;
-        var snap = null; try { snap = sh.getSnapshot ? sh.getSnapshot() : null; } catch(e){}
+        /* ★FIN-STATBAR-VALUES-20261016：统计数字格优先用 FWorksheet.getRange(...).getValues()
+           直接读屏幕值，不再强依赖 snapshot.sheets[sid] 的 key 是否匹配 —— 之前 key 对不上时
+           row 为空，导致「计数有、总计/平均/最大/最小没有」。 */
         var sid = eqSubUnitId(sh) || '';
-        var cells = (snap && snap.sheets && snap.sheets[sid] && snap.sheets[sid].cellData) || null;
+        var snap = null, cells = null;
+        try { snap = sh.getSnapshot ? sh.getSnapshot() : null; } catch(e){}
+        if (snap && snap.sheets && snap.sheets[sid]) cells = snap.sheets[sid].cellData || null;
         var ranges = eq_getSelectionRanges();
         var cmdSel = (eqStatSel && eqStatSel.length && (!eqStatSelSid || !sid || eqStatSelSid === sid)) ? eqStatSel : null;
         if (cmdSel && eq_statSize(cmdSel) > eq_statSize(ranges)) ranges = cmdSel;
@@ -25144,8 +25233,12 @@ var PROD_EQUIP_FAULT_KB = {
         var seen = {};
         for (var qi = 0; qi < ranges.length && scanned < 20000; qi++){
           var rq = ranges[qi];
+          var hgt = rq.endRow - rq.startRow + 1;
+          var wid = rq.endColumn - rq.startColumn + 1;
+          var vals = null;
+          try { if (sh && sh.getRange) vals = sh.getRange(rq.startRow, rq.startColumn, hgt, wid).getValues(); } catch(e){ vals = null; }
           for (var rr = rq.startRow; rr <= rq.endRow; rr++){
-            var row = cells ? cells[String(rr)] : null;
+            var rIdx = rr - rq.startRow;
             for (var cc = rq.startColumn; cc <= rq.endColumn; cc++){
               if (++scanned > 20000) break;
               var key = rr + ',' + cc;
@@ -25153,15 +25246,22 @@ var PROD_EQUIP_FAULT_KB = {
               seen[key] = 1;
               /* COUNT-CELLS-ALL-20261016：计数 = 选中的单元格总数（含空格），与 Excel 一致 */
               cnt++;
-              if (!row) continue;
-              var cell = row[String(cc)];
-              var v = cell && cell.v;
+              var v = null;
+              if (vals && vals[rIdx]){
+                var raw = vals[rIdx][cc - rq.startColumn];
+                v = (raw && typeof raw === 'object' && 'v' in raw) ? raw.v : raw;
+              }
+              if ((v === undefined || v === null) && cells && cells[String(rr)] && cells[String(rr)][String(cc)]){
+                v = cells[String(rr)][String(cc)].v;
+              }
               if (v === undefined || v === null) continue;
               if (typeof v === 'string' && v.trim() === '') continue;
               var num = null;
               if (typeof v === 'number') num = v;
               else if (typeof v === 'string' && /^-?[\d,]+(\.\d+)?$/.test(v.trim())) num = Number(v.replace(/,/g, ''));
-              if (num !== null && isFinite(num) && !eq_statIsDate(eq_statPattern(snap, cell))){
+              if (num !== null && isFinite(num)){
+                var cellForPat = (cells && cells[String(rr)] && cells[String(rr)][String(cc)]) || null;
+                if (cellForPat && eq_statIsDate(eq_statPattern(snap, cellForPat))) continue;
                 nums++; sum += num;
                 if (mn === null || num < mn) mn = num;
                 if (mx === null || num > mx) mx = num;
@@ -25181,6 +25281,7 @@ var PROD_EQUIP_FAULT_KB = {
             + '<span class="eq-stat-item"><b>' + lab.min + ':</b> ' + (nums ? eq_statFmt(mn) : '-') + '</span>';
         }
         if (h !== eqStatLastHtml){ eqStatLastHtml = h; bar.innerHTML = h; }
+        try { window.__eqStatInfo = { ready: !!ready, sid: sid, ranges: ranges, usedWhole: usedWhole, cnt: cnt, nums: nums, sum: sum, min: mn, max: mx }; } catch(e){}
       } catch(e){}
     }
     function eqStatNow(){ try { eq_statCompute(); } catch(e){} }
@@ -25974,29 +26075,12 @@ var PROD_EQUIP_FAULT_KB = {
     setCurrency: function(code){
       code = code || 'VND';
       var oldCur = cur;
+      if (code === oldCur) return;
       cur = code;
       rate = readRate(cur);
-      try {
-        var ls = (sheet && sheet.getSnapshot) ? sheet.getSnapshot() : null;
-        if (ls){
-          if (oldCur !== 'VND'){
-            var _f = readRate(oldCur);
-            Object.keys(ls.sheets || {}).forEach(function(sid){
-              var sh = ls.sheets[sid]; if (!sh) return;
-              var d = sheetDef(nameOfSid(ls, sid)); if (!d) return;
-              var cd = sh.cellData || {};
-              Object.keys(cd).forEach(function(rk){
-                var row = cd[rk] || {};
-                d.amt.forEach(function(c){
-                  var cell = row[String(c)];
-                  if (cell && cell.f === undefined && isNum(cell.v)) cell.v = Math.round(cell.v * _f);
-                });
-              });
-            });
-          }
-          snap = ls;   /* ★关键：把刚输入的改动并回 snap，重建不再丢录入 */
-        }
-      } catch(e){}
+      /* ★切换前 capture 屏幕改动并乘回 VND 基，保证 snap 永远是 VND 基，
+         重建不丢未保存录入、applyCurrency 的 ÷rate 换算与 fmtCurrency 的货币符号都正确。 */
+      eqCaptureLiveToSnap(oldCur);
       render();
     },
     openReport: function(){
