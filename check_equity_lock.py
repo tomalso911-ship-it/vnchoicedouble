@@ -107,7 +107,8 @@ chk("'sheet.command.smart-toggle-filter': { hidden: true }" in eqblk, "★内置
 chk("'sheet.command.add-range-protection-from-toolbar': { hidden: true }" in eqblk, "★工具栏「保护范围」图标已隐藏")
 chk(re.search(r"querySelector\('#equity_container \.univer-toolbar-container'\)", eqblk) is not None,
     "找到 Univer 工具栏宿主 .univer-toolbar-container")
-chk(re.search(r"host\.insertBefore\(wrap, host\.firstChild\)", eqblk) is not None, "按钮组插到工具栏最左侧")
+chk(re.search(r"host\.insertBefore\(n, host\.firstChild\)", eqblk) is not None,
+    "保存/导出/币种 三个独立节点依次插到工具栏最左侧")
 chk("new MutationObserver(" in eqblk, "DOM 变动自动重挂（切表后不掉下来）")
 
 print("7) 自动保存 0.7s + 手动保存")
