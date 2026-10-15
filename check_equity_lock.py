@@ -90,9 +90,9 @@ for k, n in (('fin_btn_report', '查报表'), ('fin_btn_sort_asc', '升序'), ('
              ('fin_btn_ins_rows', '在下方插入行'), ('fin_btn_load', '载入/刷新报表'),
              ('fin_merge_group_btn_on', '恢复原显示顺序')):
     chk(k not in sec, "★已删按钮：「%s」不在工具栏" % n)
-chk('id="eq_cur"' in sec and 'id="eq_cur_wrap"' in sec, "币种下拉存在（待挂到 Univer 工具栏最左侧）")
+chk('id="eq_cur"' in sec and 'id="eq_inline"' in sec, "币种下拉 + 按钮组容器存在（整组挂到 Univer 工具栏最左侧）")
 
-print("6b) 币种下拉挂到 Univer 工具栏最左侧 + 隐藏自带 $ 按钮")
+print("6b) 按钮组挂到 Univer 工具栏最左侧 + 隐藏 $/漏斗/保护图标")
 eqblk = block('股东权益报表引擎（FIN-EQUITY-20261015）', 'window.__eqSwitchWrapped')
 if not eqblk:
     try:
@@ -103,9 +103,11 @@ if not eqblk:
         eqblk = ""
 chk(eqblk != "", "定位到股东权益引擎脚本块")
 chk("'sheet.command.numfmt.set.currency': { hidden: true }" in eqblk, "★Univer 自带 $ 按钮已隐藏（与财务同机制）")
+chk("'sheet.command.smart-toggle-filter': { hidden: true }" in eqblk, "★内置筛选（漏斗）已隐藏")
+chk("'sheet.command.add-range-protection-from-toolbar': { hidden: true }" in eqblk, "★工具栏「保护范围」图标已隐藏")
 chk(re.search(r"querySelector\('#equity_container \.univer-toolbar-container'\)", eqblk) is not None,
     "找到 Univer 工具栏宿主 .univer-toolbar-container")
-chk(re.search(r"host\.insertBefore\(wrap, host\.firstChild\)", eqblk) is not None, "下拉插到工具栏最左侧")
+chk(re.search(r"host\.insertBefore\(wrap, host\.firstChild\)", eqblk) is not None, "按钮组插到工具栏最左侧")
 chk("new MutationObserver(" in eqblk, "DOM 变动自动重挂（切表后不掉下来）")
 
 print("7) 自动保存 0.7s + 手动保存")

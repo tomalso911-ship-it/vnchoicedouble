@@ -24286,19 +24286,19 @@ var PROD_EQUIP_FAULT_KB = {
         <h2 style="margin:0;" data-i18n="nav_equity">股东权益</h2>
         <span id="eq_status" style="font-size:12px;color:#666;"></span>
       </div>
-      <div id="eq_toolbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0;">
-        <!-- ★用户 2026-10-15 要求：查报表/恢复原显示顺序/升序/降序/插入行/载入刷新 6 个按钮全部删除；
-             只留 币种下拉（挂到 Univer 自带工具栏最左侧）+ 保存 + 导出。 -->
-        <span id="eq_cur_wrap" class="eq-cur-wrap" style="margin-right:8px;display:inline-flex;align-items:center;">
+      <div id="eq_toolbar" style="margin:10px 0;">
+        <!-- ★用户 2026-10-15（第二次精简）：查报表/恢复原显示顺序/升序/降序/插入行/载入刷新 6 个按钮已删；
+             剩下的 币种下拉 + 保存 + 导出 整组挂进 Univer 自带工具栏最左侧，与它并成【一行】。 -->
+        <div id="eq_inline" class="fin-toolbar2" style="display:flex;gap:6px;align-items:center;">
           <select id="eq_cur" onchange="window.__eq && window.__eq.setCurrency(this.value)"
                   style="height:28px;border:1px solid #c8ced6;border-radius:6px;padding:0 6px;background:#fff;">
             <option value="VND">VND ₫</option>
             <option value="RMB">RMB ¥</option>
             <option value="USD">USD $</option>
           </select>
-        </span>
-        <button class="fin-btn" data-i18n="fin_btn_save" onclick="window.__eq && window.__eq.save(true)">保存</button>
-        <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
+          <button class="fin-btn" data-i18n="fin_btn_save" onclick="window.__eq && window.__eq.save(true)">保存</button>
+          <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
+        </div>
       </div>
       <div id="equity_container" style="width:100%;height:calc(100vh - 250px);min-height:420px;"></div>
     </div>
@@ -24568,9 +24568,10 @@ var PROD_EQUIP_FAULT_KB = {
     });
     }
 
-    /* ---------- 把币种下拉挂到 Univer 自带工具栏最左侧（照搬财务 fin_mountToolbar2） ---------- */
+    /* ---------- 把「币种下拉 + 保存 + 导出」整组挂到 Univer 自带工具栏最左侧
+       （照搬财务 fin_mountToolbar2：一组控件并成一行） ---------- */
     function mountToolbar(){
-      var wrap = document.getElementById('eq_cur_wrap');
+      var wrap = document.getElementById('eq_inline');
       var host = document.querySelector('#equity_container .univer-toolbar-container');
       if (!wrap || !host) return;
       if (wrap.parentElement !== host || host.firstChild !== wrap){
@@ -24699,11 +24700,22 @@ var PROD_EQUIP_FAULT_KB = {
       var lt = presets.LocaleType || {};
       var L = lang();
       var initLocale = (L === 'zh') ? lt.ZH_CN : (L === 'vi') ? lt.VI_VN : lt.EN_US;
-      /* ★用户 2026-10-15 要求：删掉 Univer 自带的「$」货币按钮 —— 币种换算由我们自己的
-         VND₫/RMB¥/USD$ 下拉负责（挂到工具栏最左侧）。机制与财务 fin_initUniver 相同：
-         通过 menu 配置把该命令的菜单项隐藏。 */
+      /* ★用户 2026-10-15 要求：删掉 Univer 自带的「$」货币按钮、内置筛选（漏斗）、
+         以及右端那两个「保护/权限」图标按钮 —— 币种换算由我们自己的 VND₫/RMB¥/USD$ 下拉负责。
+         机制与财务 fin_initUniver 完全相同：通过 menu 配置把命令的菜单项隐藏。 */
       var eqMenuCfg = {
-        'sheet.command.numfmt.set.currency': { hidden: true }   // 内置货币 $（已改用左侧币种下拉）
+        'sheet.command.numfmt.set.currency': { hidden: true },        // 内置货币 $（已改用左侧币种下拉）
+        'sheet.command.smart-toggle-filter': { hidden: true },        // 内置筛选（漏斗）
+        'sheet.command.add-range-protection-from-toolbar': { hidden: true },         // 工具栏：保护范围
+        'sheet.command.add-range-protection-from-context-menu': { hidden: true },    // 右键：开启保护范围
+        'sheet.command.set-range-protection-from-context-menu': { hidden: true },    // 右键：编辑保护范围
+        'sheet.command.delete-range-protection-from-context-menu': { hidden: true }, // 右键：删除保护范围
+        'sheet.command.view-sheet-permission-from-context-menu': { hidden: true },   // 右键：查看全部保护区域
+        'sheet.command.add-range-protection-from-sheet-bar': { hidden: true },       // 标签右键：保护工作表
+        'sheet.command.delete-worksheet-protection-from-sheet-bar': { hidden: true },// 标签右键：取消保护
+        'sheet.command.change-sheet-protection-from-sheet-bar': { hidden: true },    // 标签右键：更改权限
+        'sheet.command.view-sheet-permission-from-sheet-bar': { hidden: true },      // 标签右键：查看权限
+        'base-ui.operation.toggle-shortcut-panel': { hidden: true }                  // 快捷键面板开关
       };
       var canMenu = !!(presets.FUniver && presets.FUniver.prototype && typeof presets.FUniver.prototype.createMenu === 'function');
       var coreOpts = { container: 'equity_container' };
