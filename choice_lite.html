@@ -136,6 +136,18 @@ function _ovLoadChartLib(cb){
   s.onerror = function(){ s.onerror = null; s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'; };
   document.head.appendChild(s);
 }
+
+/* ★PERF-2026-10-15：把「非关键初始化」延后到首屏渲染之后执行
+   （requestIdleCallback 优先，回退 setTimeout），避免登录后一次性在主线程上做
+   大量布局测量/图表/轮询，导致界面数秒不可用。 */
+window.__deferInit = window.__deferInit || function(fn, timeout){
+  if (typeof fn !== 'function') return;
+  var run = function(){ try { fn(); } catch (e) { try { console.warn('[deferInit]', e); } catch(_){} } };
+  try {
+    if (typeof window.requestIdleCallback === 'function') { window.requestIdleCallback(run, { timeout: timeout || 2500 }); return; }
+  } catch (e) {}
+  setTimeout(run, 1);
+};
 </script>
 <script>
 // 全局错误浮层：任何 JS 报错都显示在页面顶部红线，方便定位"进不去"问题
@@ -30389,15 +30401,29 @@ function wonDetailLinkCell(p, field, labelKey) {
   } catch (e) {}
 
   // ---- 测宽：离屏 canvas ----
+  // ★PERF：设置 ctx.font 会重新解析字体串（较贵），且同一批元素会重复测同一段文字；
+  //   这里缓存「相同字体串不重复 set」+「相同(字体,文字)结果直接命中」，显著降低自适应测宽开销。
   var _canvas = document.createElement('canvas');
   var _ctx = _canvas.getContext('2d');
+  var _mwLastFont = null;
+  var _mwCache = {};
+  var _mwCacheN = 0;
   function measureW(text, weight, size, family) {
     if (text == null) text = '';
     text = String(text);
     if (!text) return 0;
-    try { _ctx.font = (weight || '') + ' ' + (size || 13) + 'px ' + (family || 'sans-serif'); }
-    catch (e) { _ctx.font = (size || 13) + 'px sans-serif'; }
-    return _ctx.measureText(text).width;
+    var font = (weight || '') + ' ' + (size || 13) + 'px ' + (family || 'sans-serif');
+    var key = font + '\u0001' + text;
+    var hit = _mwCache[key];
+    if (hit !== undefined) return hit;
+    if (_mwLastFont !== font) {
+      try { _ctx.font = font; } catch (e) { try { _ctx.font = (size || 13) + 'px sans-serif'; } catch (_) {} }
+      _mwLastFont = font;
+    }
+    var w = 0;
+    try { w = _ctx.measureText(text).width; } catch (e) { w = 0; }
+    if (_mwCacheN < 4000) { _mwCache[key] = w; _mwCacheN++; }
+    return w;
   }
 
   // 取某元素在指定语言下的文本（优先 I18N，缺失回退 __EXTRA_I18N，再回退其它语言，最后用当前文本）
@@ -30483,25 +30509,41 @@ function wonDetailLinkCell(p, field, labelKey) {
   var _obs = null;
   function startFitObserver() {
     if (_obs || !window.MutationObserver) return;
+    // ★PERF：把一批 DOM 插入收集起来、按帧统一处理并去重，
+    //   避免大表（86 列）一次渲染就成百上千次 fitOne（每次含多次 getComputedStyle 强排 + 测宽）。
+    var _fitQueue = [];
+    var _fitScheduled = false;
+    function _fitDrain() {
+      _fitScheduled = false;
+      var q = _fitQueue; _fitQueue = [];
+      for (var i = 0; i < q.length; i++) { try { fitOne(q[i]); } catch (e) {} }
+    }
+    function _fitSchedule() {
+      if (_fitScheduled) return;
+      _fitScheduled = true;
+      if (typeof requestAnimationFrame === 'function') { requestAnimationFrame(_fitDrain); }
+      else { setTimeout(_fitDrain, 16); }
+    }
+    function _fitEnqueue(nd) {
+      if (!nd || nd.nodeType !== 1) return;
+      try {
+        if (nd.matches && nd.matches(FIT_SEL)) { if (_fitQueue.indexOf(nd) < 0) _fitQueue.push(nd); }
+        if (nd.querySelectorAll) {
+          var sub = nd.querySelectorAll(FIT_SEL);
+          for (var s = 0; s < sub.length; s++) { if (_fitQueue.indexOf(sub[s]) < 0) _fitQueue.push(sub[s]); }
+        }
+      } catch (e) {}
+    }
     _obs = new MutationObserver(function (muts) {
+      var any = false;
       for (var m = 0; m < muts.length; m++) {
         var mu = muts[m];
         if (mu.type === 'childList') {
           var nodes = mu.addedNodes;
-          for (var n = 0; n < nodes.length; n++) {
-            var nd = nodes[n];
-            if (nd.nodeType === 1) {
-              try {
-                if (nd.matches && nd.matches(FIT_SEL)) fitOne(nd);
-                if (nd.querySelectorAll) {
-                  var sub = nd.querySelectorAll(FIT_SEL);
-                  for (var s = 0; s < sub.length; s++) fitOne(sub[s]);
-                }
-              } catch (e) {}
-            }
-          }
+          for (var n = 0; n < nodes.length; n++) { _fitEnqueue(nodes[n]); any = true; }
         }
       }
+      if (any && _fitQueue.length) _fitSchedule();
     });
     try { _obs.observe(document.body, { childList: true, subtree: true }); } catch (e) {}
   }
@@ -30512,10 +30554,18 @@ function wonDetailLinkCell(p, field, labelKey) {
     try { applyLangFit(document.body); } catch (e) {}
     try { startFitObserver(); } catch (e) {}
   }
+  // ★PERF：字体自适应是纯装饰性工作（锁宽+字号缩放），延后到首屏渲染之后再跑，
+  //   避免它和登录首屏抢主线程（实测该项是加载期最大的可延后热点）。
+  function _langFitSchedule() {
+    try {
+      if (typeof window.__deferInit === 'function') { window.__deferInit(_langFitInit, 2000); return; }
+    } catch (e) {}
+    setTimeout(_langFitInit, 1);
+  }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _langFitInit);
+    document.addEventListener('DOMContentLoaded', _langFitSchedule);
   } else {
-    _langFitInit();
+    _langFitSchedule();
   }
 })();
 
@@ -31228,10 +31278,14 @@ function initFitScreen() {
     if (_fitScreenOn && _inTableArea(ev.target)) exitFitScreen();
   });
 }
+// ★PERF：屏幕适应（缩放）监听与按钮 UI 延后初始化，避免首屏阶段做全表宽度测量/重排
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initFitScreen);
+  document.addEventListener('DOMContentLoaded', function(){
+    try { if (typeof window.__deferInit === 'function') { window.__deferInit(initFitScreen, 2000); return; } } catch(e){}
+    initFitScreen();
+  });
 } else {
-  initFitScreen();
+  try { if (typeof window.__deferInit === 'function') { window.__deferInit(initFitScreen, 2000); } else { initFitScreen(); } } catch(e){ initFitScreen(); }
 }
 // 看板图表：语言切换重渲染防抖（合并 applyEmptyLang 同步调用 + rAF 块调用，避免重复重建）
 var _dashChartsLangTimer = null;
@@ -36594,9 +36648,17 @@ function resolveReq(reqId,action){
   }).catch(function(){ showToast(t.user_approve_fail||'Operation failed'); });
 }
 
-loadUsers();
-refreshPendBadge();
-startPendBadgePolling();   // 角标刷新（已取消定时轮询，改由加载/切换/操作触发）
+// ★PERF：用户表渲染 + 角标轮询与首屏（签约项目）无关，延后到首屏之后再执行，
+//   避免登录后同一时刻在主线程上渲染用户大表、抢占首屏。
+(function(){
+  var _lateInit = function(){
+    try { loadUsers(); } catch(e){}
+    try { refreshPendBadge(); } catch(e){}
+    try { startPendBadgePolling(); } catch(e){}   // 角标刷新（已取消定时轮询，改由加载/切换/操作触发）
+  };
+  try { if (typeof window.__deferInit === 'function') { window.__deferInit(_lateInit, 2500); return; } } catch(e){}
+  setTimeout(_lateInit, 1);
+})();
 
 // ===== 切换语言时只更新文字，不重建表头 =====
 // 注意：此函数被佣金模态框的全局 applyLang()（block2）同名覆盖，故改名 applyWonLang() 供主流程显式调用
@@ -49270,7 +49332,9 @@ window.addEventListener('load', function(){
       // B. 已登录会话（刷新后）启动权限版本轮询
       if (typeof startPermWatch === 'function') startPermWatch(5000);
     }
-    initStickyHScrollbars();
+    // ★PERF：底部滚动条初始化会读取 scrollWidth（强制重排）并挂 Resize/Mutation 观察器，
+    //   延后到首屏之后再建，避免与签约表首屏渲染抢主线程。
+    try { if (typeof window.__deferInit === 'function') { window.__deferInit(initStickyHScrollbars, 2000); } else { initStickyHScrollbars(); } } catch(e){ initStickyHScrollbars(); }
   });
 });
 
@@ -49332,9 +49396,16 @@ function initStickyHScrollbars(){
       p.scroller.scrollLeft = Math.max(0, p.scroller.scrollWidth - p.scroller.clientWidth);
     });
     renderThumb();
-    var ro = new ResizeObserver(renderThumb);
+    // ★PERF：renderThumb 会读 scrollWidth（强制重排）；表格频繁重渲染时把多次触发合并到一帧
+    var _thumbRaf = null;
+    function _scheduleThumb(){
+      if (_thumbRaf) return;
+      if (typeof requestAnimationFrame === 'function') { _thumbRaf = requestAnimationFrame(function(){ _thumbRaf = null; renderThumb(); }); }
+      else { _thumbRaf = setTimeout(function(){ _thumbRaf = null; renderThumb(); }, 16); }
+    }
+    var ro = new ResizeObserver(_scheduleThumb);
     ro.observe(p.table);
-    var mo = new MutationObserver(renderThumb);
+    var mo = new MutationObserver(_scheduleThumb);
     mo.observe(p.table, { childList:true, subtree:true });
   });
 

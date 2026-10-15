@@ -3470,6 +3470,9 @@ def delete_attachment(pid, filename):
 @app.after_request
 def add_no_cache_headers(resp):
     try:
+        # ★PERF：/lite?v=<内容哈希> 是内容寻址的，允许长缓存；其余 HTML/JS 仍禁缓存
+        if resp.headers.get('X-Lite-Cache'):
+            return resp
         mt = (resp.mimetype or '')
         if mt == 'text/html' or mt.startswith('application/javascript') or mt.startswith('text/javascript'):
             resp.headers['Cache-Control'] = 'no-cache'
@@ -6053,9 +6056,26 @@ def index_lite():
         html = re.sub(r"var CLOUD_ONLY\s*=\s*\[[\s\S]*?\];",
                       "var CLOUD_ONLY = [];  /* 本机模式：全部接口走 localhost */",
                       html, count=1)
-        return Response(html, mimetype="text/html",
-                        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-                                 "Pragma": "no-cache", "Expires": "0"})
+        # ★PERF-2026-10-15：整个应用是 ~4MB 的单文件 HTML，之前响应带 no-store →
+        #   每次进入页面（尤其安卓 WebView/慢网）都要重新下载 4MB，导致 3~4 秒白屏。
+        #   这里 URL 已带内容哈希 (?v=<md5>)，天然内容寻址：内容一变 hash 就变、
+        #   URL 也变 → 可安全长缓存（内容不会过期）；同时对响应做 gzip 压缩（约 -75%）。
+        body = html.encode("utf-8")
+        headers = {
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "ETag": '"' + hv + '"',
+            # ★PERF：标记本轮响应为"内容寻址、可长缓存"，供全局 after_request 放行
+            "X-Lite-Cache": "1",
+        }
+        if "gzip" in (request.headers.get("Accept-Encoding", "") or "").lower():
+            try:
+                import gzip as _gzip
+                body = _gzip.compress(body, 6)
+                headers["Content-Encoding"] = "gzip"
+                headers["Vary"] = "Accept-Encoding"
+            except Exception:
+                body = html.encode("utf-8")
+        return Response(body, mimetype="text/html", headers=headers)
     except Exception:
         return send_from_directory(BASE_DIR, "choice_lite.html")
 
@@ -7851,6 +7871,9 @@ def api_users_reorder():
 @app.after_request
 def _no_cache(resp):
     # 禁用浏览器强缓存，确保每次刷新都拿到最新 index.html / JS，避免改了代码却看不到
+    # ★PERF：/lite?v=<内容哈希> 内容一变 URL 就变，可安全长缓存 —— 放行，避免每次进页面重下 4MB
+    if resp.headers.get('X-Lite-Cache'):
+        return resp
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
