@@ -153,8 +153,10 @@ print("12) Excel 键盘行为补丁（EQ-EXCEL-KEYS，用户 2026-10-15 要求�
 for pat, name in (
     ("function eqExcelKeysBind", "主入口 eqExcelKeysBind"),
     ("__eqExcelKeysBound", "幂等守卫 __eqExcelKeysBound"),
-    ("sheet.operation.set-cell-edit-visible", "★单击打字直接进入编辑（与双击同一条 operation）"),
-    ("execCommand('insertText'", "★打进的字符经 .univer-editor 宿主走 Univer 原生 input 流"),
+    ("sheet.operation.set-cell-edit-visible", "★单击打字直接进入编辑（打开单元格编辑器）"),
+    ("sheet.command.set-range-values", "★首字符用 set-range-values 确定性写入（数字列落成数值）"),
+    ("f: null", "★覆盖公式格时也把公式清掉"),
+    ("eventType: 3", "★eventType=Dblclick(3)：载入内容 + 光标落末尾（Keyboard 语义会清空并把光标放 0）"),
     ("function eqTypeToEdit", "eqTypeToEdit"),
     ("function eqGotoCell", "eqGotoCell"),
     ("function eqSheetSize", "eqSheetSize（边界唯一来源）"),
@@ -166,6 +168,8 @@ for pat, name in (
     ("eqExcelKeysBind();", "init() 里已接线"),
 ):
     chk(pat in eqblk, name)
+chk("keycode: e.keyCode" not in eqblk,
+    "★打开编辑器不再传 keycode（传了会被 Univer 当成方向键/快捷键解释，正是数字打不进去的原因）")
 chk(re.search(r"addEventListener\('keydown', function\(e\)\{", eqblk) is not None
     and re.search(r"\}\s*,\s*true\s*\)\s*;", eqblk) is not None,
     "★keydown 挂 window 捕获阶段（先于 Univer 拿到原始选区）")

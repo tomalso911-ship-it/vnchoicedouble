@@ -25011,46 +25011,44 @@ var PROD_EQUIP_FAULT_KB = {
       try { return document.getElementById('equity_container'); } catch(e){ return null; }
     }
 
-    /* ★单击打字直接进入编辑（Excel 行为）。
-       原理：Univer 的单元格编辑器 = 同一个 doc 编辑单元；隐藏态时它的输入宿主
-       .univer-editor（contenteditable，挂在 body）也在。我们用
-       sheet.operation.set-cell-edit-visible（与双击同一条 operation）把编辑器打开，
-       然后在宿主上模拟一次真实输入（selectAll + insertText）→ 走 Univer 自己的
-       input 事件流，效果=「替换原内容并从敲入的字符开始编辑」，与 Excel 一致。 */
+    /* ★单击打字直接进入编辑（Excel 行为：直接覆盖原内容，光标落在字符后面）。
+       为什么不能像之前那样「打开编辑器再塞字符」—— 源码实测（sheets-ui 0.5.5）：
+         _handleEditorVisible 里：eventType=Keyboard 且 keycode≠F2 → 【清空】编辑器内容并把光标放到 0，
+         之后再靠 execCommand('selectAll'+'insertText') 补字符，对数字总是落空（正是「数字打不进去」的 BUG）；
+         eventType=Dblclick → 载入当前格内容 + 光标落到末尾。
+       所以改成确定性两步：
+         ① 先用 set-range-values 把字符写进当前格（数字列自然落成数值，文本落成字符串）；
+         ② 再用 eventType=Dblclick(3)【不带 keycode】打开编辑器 → 载入刚写入的内容 + 光标在末尾，
+            之后的按键走 Univer 原生输入流（编辑态我们一律交回）。 */
+    function eqSubUnitId(sh){
+      try { var s = sh && sh.getSheetId && sh.getSheetId(); if (s) return s; } catch(e){}
+      try { var ws = sh && sh.getSheet && sh.getSheet(); var s2 = ws && ws.getSheetId && ws.getSheetId(); if (s2) return s2; } catch(e){}
+      return null;
+    }
     function eqTypeToEdit(e){
+      var ch = e.key;
+      var sh = eqSheetObj(); if (!sh) return;
+      var cur = eqActiveCell(); if (!cur) return;
+      var isNum = (typeof ch === 'string' && ch.length === 1 && ch >= '0' && ch <= '9');
       try {
         var wb = api && api.getActiveWorkbook && api.getActiveWorkbook();
-        if (!wb) return;
-        var uid = (wb.getId && wb.getId()) || null;
-        api.executeCommand('sheet.operation.set-cell-edit-visible',
-          { visible: true, eventType: 4 /*DeviceInputEventType.Keyboard*/, keycode: e.keyCode, unitId: uid });
-      } catch(err){ return; }
-      var ch = e.key;
+        var uid = (wb && wb.getId && wb.getId()) || 'equity-report';
+        var m = {}; m[cur.row] = {}; m[cur.row][cur.col] = { v: isNum ? Number(ch) : ch, t: isNum ? 2 : 1, f: null };
+        api.executeCommand('sheet.command.set-range-values',
+          { unitId: uid, subUnitId: eqSubUnitId(sh), value: m });
+        if (window.__eqKeyDebug) console.log('[eq-key] write', JSON.stringify({ ch: ch, row: cur.row, col: cur.col }));
+      } catch(err){}
+      /* ★eventType:3 = DeviceInputEventType.Dblclick；★不传 keycode（传了会被当方向键/快捷键解释） */
       setTimeout(function(){
         try {
-          var el = document.querySelector('.univer-editor');
-          if (!el) return;
-          el.focus();
-          var done = false;
-          try {
-            document.execCommand('selectAll', false, null);
-            done = document.execCommand('insertText', false, ch);
-          } catch(e1){}
-          if (!done) {
-            try {
-              var sel = window.getSelection();
-              var rng = document.createRange();
-              rng.selectNodeContents(el); rng.collapse(true);
-              sel.removeAllRanges(); sel.addRange(rng);
-              var tn = document.createTextNode(ch);
-              rng.insertNode(tn);
-              rng.setStartAfter(tn); rng.collapse(true);
-              sel.removeAllRanges(); sel.addRange(rng);
-              el.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: 'insertText' }));
-            } catch(e2){}
-          }
-        } catch(e3){}
-      }, 90);
+          var wb2 = api && api.getActiveWorkbook && api.getActiveWorkbook();
+          var uid2 = (wb2 && wb2.getId && wb2.getId()) || 'equity-report';
+          api.executeCommand('sheet.operation.set-cell-edit-visible', { visible: true, eventType: 3, unitId: uid2 });
+        } catch(err){}
+        setTimeout(function(){
+          if (window.__eqKeyDebug) console.log('[eq-key] editing=' + eqIsEditingCell());
+        }, 150);
+      }, 40);
     }
 
     function eqExcelKeysBind(){
