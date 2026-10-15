@@ -251,6 +251,15 @@ chk("function eqSyncCurToActiveSheet" in eqblk,
 chk("wb.getSheets" in eqblk or "getSheets()" in eqblk,
     "★fmtCurrency 用 workbook.getSheets() 取真实工作表 id 套货币符号")
 
+print("20) 重建保持活动工作表 + 语言识别 + 译文到位后补渲染（2026-10-16 修 BUG）")
+chk("setActiveSheet" in eqblk and "EQ-KEEP-ACTIVE-SHEET-20261016" in eqblk,
+    "★render 重建后恢复之前活动的工作表（EQ-KEEP-ACTIVE-SHEET-20261016，不跳回第一张表）")
+chk("won_lang" in eqblk, "★lang() 必须读主程序的 won_lang（否则中文系统被当成越南语 → 表格显示越文）")
+chk("EQ-TRANS-RERENDER-20261016" in eqblk,
+    "★译文到位后必须补一次重渲染（EQ-TRANS-RERENDER-20261016）")
+chk("EQ-CUR-FMT-20261016" in eqblk,
+    "★新录入数字后立刻套上当前币种符号（EQ-CUR-FMT-20261016）")
+
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")
 sys.exit(0 if ok else 1)

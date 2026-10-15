@@ -24389,7 +24389,15 @@ var PROD_EQUIP_FAULT_KB = {
     var trans = {}, pending = {};
 
     function lang(){
-    try { return (window.CUR_LANG || localStorage.getItem('lang') || 'vi').toLowerCase(); } catch(e){ return 'vi'; }
+    /* ★EQ-LANG-20261016：主程序用 window.CUR_LANG + localStorage['won_lang']（存的是 JSON 字符串，
+       如 "zh"）；旧写法只读 localStorage['lang']（主程序从不用这个键）→ 取不到就回退 'vi'，
+       导致中文系统下表格被翻成越南语。这里把 won_lang / __lang 都纳入，并做 JSON 解析与白名单。 */
+    try {
+      var l = window.CUR_LANG || window.__lang || localStorage.getItem('won_lang') || localStorage.getItem('lang') || 'vi';
+      try { var p = JSON.parse(l); if (typeof p === 'string') l = p; } catch(e){}
+      l = String(l || 'vi').toLowerCase();
+      return (l === 'zh' || l === 'en' || l === 'vi') ? l : 'vi';
+    } catch(e){ return 'vi'; }
     }
     function st(msg){ var el = document.getElementById('eq_status'); if (el) el.textContent = msg || ''; }
     function isNum(v){ return typeof v === 'number' && isFinite(v); }
@@ -24458,7 +24466,14 @@ var PROD_EQUIP_FAULT_KB = {
           var known = (L === 'vi') ? t : transOf(t, L);
           if (L !== 'vi' && !known){
             jobs++;
-            requestTrans(t, L, function(){ done++; if (done >= jobs) fin(); });
+            requestTrans(t, L, function(){
+              done++;
+              if (done >= jobs){
+                /* ★EQ-TRANS-RERENDER-20261016：兜底 2.5s 已先渲染过（译文还没回来）时，
+                   译文回来后必须补一次重渲染，否则表格一直停在原文（中文系统下显示越南语）。 */
+                if (fired) { try { render(); } catch(e){} } else fin();
+              }
+            });
           }
           });
           });
@@ -24764,12 +24779,34 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function render(){
     if (!univer) return;
+    /* ★EQ-KEEP-ACTIVE-SHEET-20261016：重建前记住当前活动工作表（按 id / 序位），
+       否则按币种重建后新单元的活动表默认是第一张 —— 用户点「中国投资数据」会被弹回「总投资数据」。 */
+    var prevSid = '';
+    try { prevSid = eqSubUnitId(sheet) || ''; } catch(e){}
+    var prevIdx = -1;
+    try { prevIdx = ((view && view.sheetOrder) || []).indexOf(prevSid); } catch(e){}
     var v = buildView();
     try { if (sheet && api && typeof api.disposeUnit === 'function') api.disposeUnit(sheet.getUnitId()); } catch(e){}
     var TYPE = (presets && presets.UniverInstanceType && presets.UniverInstanceType.UNIVER_SHEET) || 2;
     sheet = univer.createUnit(TYPE, v);
     view = v;
+    /* ★恢复之前活动的工作表 */
+    try {
+      var wb = api && api.getActiveWorkbook && api.getActiveWorkbook();
+      if (wb){
+        var target = null;
+        if (prevSid && (v.sheets || {})[prevSid]) target = prevSid;
+        else if (prevIdx >= 0 && v.sheetOrder && v.sheetOrder[prevIdx]) target = v.sheetOrder[prevIdx];
+        if (target && typeof wb.setActiveSheet === 'function'){
+          var curId = null;
+          try { curId = sheet && sheet.getSheetId ? sheet.getSheetId() : null; } catch(e){}
+          if (curId !== target) wb.setActiveSheet(target);
+          try { var sh2 = wb.getActiveSheet && wb.getActiveSheet(); if (sh2) sheet = sh2; } catch(e){}
+        }
+      }
+    } catch(e){}
     setTimeout(fmtCurrency, 300);
+    setTimeout(fmtCurrency, 900);
     /* ★币种下拉挂到 Univer 工具栏最左侧：渲染后多试几次（Univer 工具栏是异步挂出来的） */
     setTimeout(watchToolbar, 200);
     setTimeout(watchToolbar, 600);
@@ -24962,6 +24999,14 @@ var PROD_EQUIP_FAULT_KB = {
         if (Date.now() < progUntil) return;                  // 程序写入窗口
         dirty = true;
         scheduleSave();
+        /* ★EQ-CUR-FMT-20261016：新录入/修改的数字立刻套上当前币种符号（与财务一致）。
+           先把屏幕改动并回 snap（非 VND 时乘回 VND 基），再重放金额格式，避免「输入数字后
+           一直不显示 ₫/¥/$，只有切币种才出现」的问题。 */
+        if (window.__eqFmtTimer) clearTimeout(window.__eqFmtTimer);
+        window.__eqFmtTimer = setTimeout(function(){
+          window.__eqFmtTimer = null;
+          try { eqCaptureLiveToSnap(cur); fmtCurrency(); } catch(e){}
+        }, 260);
       } catch(e){}
     });
     }
