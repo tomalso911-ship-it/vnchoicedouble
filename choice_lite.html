@@ -53418,6 +53418,7 @@ var RPT_CSS_EXTRA = '.rpt-loading{padding:60px 20px;text-align:center;color:#888
   + '.rpt-head-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}'
   + '.rpt-lang{padding:4px 9px;border-radius:6px;font-size:11px;background:#fff;color:#D32F2F;border:1px solid #F0C4C4;cursor:pointer;font-weight:600;line-height:1;}'
   + '.rpt-lang:hover,.rpt-lang-active{background:#FBE9E7;}'
+  + '.rpt-close{padding:6px;border-radius:8px;line-height:0;display:inline-flex;align-items:center;justify-content:center;}'
   + '@media print{.rpt-foot .rpt-btn{display:none;}.rpt-head-actions{display:none;}.rpt-sec{page-break-inside:avoid;}}';
 
 function rpt_todayYmd(){
@@ -53523,12 +53524,12 @@ function rpt_faultStats(f){
   return {total:faults.length, down:down, incomplete:incomplete, top:top};
 }
 
-function openProjectReport(id, reuseWin) {
+function openProjectReport(id, reuseWin, forceLang) {
   window.__rptOpener = function(){ openProjectReport(id); };
-  window.__rptSetLang = function(lang, pid){ if(typeof setLang==='function') setLang(lang); openProjectReport(pid, (window.__rptWinMap && window.__rptWinMap[pid]) || null); };
+  window.__rptSetLang = function(lang, pid){ if(typeof setLangDebug==='function'){ try{ setLangDebug(lang); }catch(e){} } openProjectReport(pid, (window.__rptWinMap && window.__rptWinMap[pid]) || null, lang); };
   if (!permGuard('WON-D4')) return;
   var p = globalWonData.find(function(x){return x.id===id;});
-  var _Lrpt = (window.CUR_LANG || CUR_LANG || 'zh');
+  var _Lrpt = forceLang || (window.CUR_LANG || CUR_LANG || 'zh');
   if (!p) { var t=(typeof I18N!=='undefined' && I18N[_Lrpt])?I18N[_Lrpt]:{}; showAlert(t.rpt_not_found||'Project not found'); return; }
   var dic = (typeof I18N!=='undefined' && I18N[_Lrpt]) ? I18N[_Lrpt] : {};
   var rpt = function(k){ if(RPT_I18N[_Lrpt] && RPT_I18N[_Lrpt][k]!==undefined) return RPT_I18N[_Lrpt][k]; if(dic[k]!==undefined) return dic[k]; return k; };
@@ -53552,7 +53553,7 @@ function openProjectReport(id, reuseWin) {
     var _langBtns='<button type="button" class="rpt-btn rpt-lang'+(_Lrpt==='zh'?' rpt-lang-active':'')+'" onclick="if(window.opener&&window.opener.__rptSetLang)window.opener.__rptSetLang(\'zh\','+id+')">'+_rptEsc(rpt('rpt_lang_zh'))+'</button>'
                 +'<button type="button" class="rpt-btn rpt-lang'+(_Lrpt==='en'?' rpt-lang-active':'')+'" onclick="if(window.opener&&window.opener.__rptSetLang)window.opener.__rptSetLang(\'en\','+id+')">'+_rptEsc(rpt('rpt_lang_en'))+'</button>'
                 +'<button type="button" class="rpt-btn rpt-lang'+(_Lrpt==='vi'?' rpt-lang-active':'')+'" onclick="if(window.opener&&window.opener.__rptSetLang)window.opener.__rptSetLang(\'vi\','+id+')">'+_rptEsc(rpt('rpt_lang_vi'))+'</button>';
-    var _closeBtn='<button type="button" class="rpt-btn rpt-btn-outline" onclick="window.close()">'+_rptEsc(rpt('rpt_close'))+'</button>';
+    var _closeBtn='<button type="button" class="rpt-btn rpt-btn-outline rpt-close" onclick="window.close()" title="'+_rptEsc(rpt('rpt_close'))+'" aria-label="'+_rptEsc(rpt('rpt_close'))+'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l6 6M10 4l-6 6"/></svg></button>';
     var _modal='<div class="rpt-modal"><div class="rpt-head"><div class="rpt-head-left"><h3>'+_rptHead+'</h3><span>'+_rptSub+'</span></div><div class="rpt-head-actions">'+_langBtns+_closeBtn+'</div></div><div class="rpt-body">'+htmlBody+'</div><div class="rpt-foot"><span>'+_rptFoot+'</span><div><button class="rpt-btn rpt-btn-outline" onclick="window.print()">🖨 '+_rptEsc(rpt('rpt_print'))+'</button></div></div></div>';
     return '<!DOCTYPE html><html lang="'+_Lrpt+'"><head><meta charset="utf-8"><title>'+_rptTitle+'</title><style>'+PROJECT_REPORT_CSS+RPT_CSS_EXTRA+'</style></head><body>'+_modal+'</body></html>';
   }
