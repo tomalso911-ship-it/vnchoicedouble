@@ -17837,6 +17837,14 @@ var PROD_EQUIP_FAULT_KB = {
       }
       return false;
     }
+    /* ★脏值守卫（FIN-JUNK-GUARD-20261015）：Excel 错误值(#NAME?/#VALUE! 等，
+       含已被机翻成「＃姓名？」的残渣)一律【不翻译、不替换、不请求】，
+       否则「摘要」列会出现乱码（NAME 被译成「姓名」）。 */
+    function fin_isErrText(t){
+      var s = String(t == null ? '' : t).trim();
+      if (!s) return false;
+      return /^[#＃].*[?!？!]$/.test(s);
+    }
     // 过滤一条译文：保护词被译掉时返回 null（调用方退回原文）
     function fin_transChecked(orig, trans){
       if (trans == null || trans === '' || trans === orig) return trans;
@@ -17956,7 +17964,8 @@ var PROD_EQUIP_FAULT_KB = {
             if (c > FIN_VIEW_MAXCOL) continue;         // ★裁掉 ZH(K–R)/EN(U–AB) 两块，只留基准块 A–J（幂等）
             var cell = row[ck];
             // ★只换「纯文字格」：本身是字符串、非公式（数字/日期/公式一律原样，保证小计与余额安全）
-            if (cell && !cell.f && typeof cell.v === 'string' && cell.v !== ''){
+            // ★★ 且不是 Excel 错误值（#NAME? 等）——错误值不翻译、不替换、不请求（FIN-JUNK-GUARD-20261015）
+            if (cell && !cell.f && typeof cell.v === 'string' && cell.v !== '' && !fin_isErrText(cell.v)){
               var rec = finTransCache[cell.v];
               var tt = fin_transChecked(cell.v, rec && rec[lang]);   // ★保护词被译掉 → 退回原文
               if (tt && tt !== cell.v){
