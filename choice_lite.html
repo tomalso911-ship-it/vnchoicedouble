@@ -37057,6 +37057,8 @@ function sortWonTable(colIndex) {
 // ==================== 十字高亮逻辑 ====================
 function bindCrossHighlight(){
   var tbody=document.getElementById('wonTbody'); if(!tbody) return;
+  if(tbody.__chBound) return;   // tbody 元素不重建（只换 innerHTML），避免每次渲染叠加监听器
+  tbody.__chBound=true;
   tbody.addEventListener('mouseover', onCrossOver);
   tbody.addEventListener('mouseout', onCrossOut);
 }
@@ -37102,6 +37104,8 @@ function onCrossOut(e){
 function bindSumOnHover(){
   var tbody = document.getElementById('wonTbody');
   if(!tbody) return;
+  if(tbody.__sumBound) return;   // tbody 元素不重建（只换 innerHTML），避免每次渲染叠加监听器
+  tbody.__sumBound=true;
 
   var activeTooltip = null;
 
@@ -37630,8 +37634,9 @@ function curColSel(){
 // V45：合同两列插入导致货币三连起始再 +2（在 WON_COL_KEY_MAP 基础上逐项核对：
 // P1 十组 14,17,20,23,26,29,32,35,38,41；P2 45,48；P3 54,58,61；P4 66,70,73）
 var WON_CUR_TRIPLE_STARTS = [14,17,20,23,26,29,32,35,38,41,45,48,54,58,61,66,70,73];
-function curHiddenFor(c, kind){
-  var sel = curColSel(), off = -1;
+/* 传入已读取的货币选择，避免每单元格重复读 localStorage（curColSel 内部是 JSON.parse(localStorage.getItem)） */
+function curHiddenForSel(c, kind, sel){
+  var off = -1;
   if (kind === 'won') {
     for (var i = 0; i < WON_CUR_TRIPLE_STARTS.length; i++) {
       var s0 = WON_CUR_TRIPLE_STARTS[i];
@@ -37642,6 +37647,9 @@ function curHiddenFor(c, kind){
   }
   if (off < 0) return false;
   return !sel[off === 0 ? 'rmb' : (off === 1 ? 'usd' : 'vnd')];
+}
+function curHiddenFor(c, kind){
+  return curHiddenForSel(c, kind, curColSel());
 }
 function onCurPillClick(cur){
   var sel = curColSel();
@@ -37688,15 +37696,21 @@ function syncWonColVisibility(){
   hidden[78]=1; hidden[79]=1; hidden[80]=1;
   // ★ 永久隐藏：废弃字段 + P3/P4（与编辑弹窗无法对应的列，用于美化总表；不受折叠/权限影响）
   WON_FORCED_HIDE_COLS.forEach(function(c){ hidden[c]=1; });
-  var hasCurHidden = typeof curHiddenFor==='function';
+  // ★ 性能关键：curColSel() 内部是 JSON.parse(localStorage.getItem(...))，必须整个 sync 只读一次，
+  //   再逐列（86 个）算好隐藏判定；绝不能放进逐单元格循环，否则 = 行数×86 次同步 localStorage → 卡死。
+  var _sel = (typeof curColSel==='function') ? curColSel() : null;
+  var colHidden = new Array(86);
+  for (var cc=0; cc<86; cc++){
+    colHidden[cc] = WON_NEVER_HIDE_COLS.has(cc) ? false
+                    : (!!hidden[cc] || (_sel ? curHiddenForSel(cc,'won',_sel) : false));
+  }
   // 单列可见性：一次性取全部 td/col，避免 86 次 querySelectorAll 重复遍历大表格
   var cells = tbl.querySelectorAll('td[data-col], col[data-col]');
   for (var i=0, len=cells.length; i<len; i++){
     var el=cells[i];
     var c=parseInt(el.getAttribute('data-col'),10);
     if (WON_NEVER_HIDE_COLS.has(c)) continue;
-    var want=!!hidden[c] || (hasCurHidden && curHiddenFor(c,'won'));
-    el.classList.toggle('col-hidden',want);
+    el.classList.toggle('col-hidden', !!colHidden[c]);
   }
   // 组头单一事实源：仅当组内全部子列都被隐藏时一级表头才隐藏；
   // 否则一级表头保持原位显示，colspan 自动收缩为剩余可见子列数（3→2→1），
@@ -37708,7 +37722,7 @@ function syncWonColVisibility(){
     var vis=0;
     g.c.forEach(function(c){
       if (WON_NEVER_HIDE_COLS.has(c)) { vis++; return; }
-      if (!hidden[c] && !(hasCurHidden && curHiddenFor(c,'won'))) vis++;
+      if (!colHidden[c]) vis++;
     });
     var th=tbl.querySelector('thead th[data-col="'+first+'"]');
     if(th){
@@ -45476,22 +45490,27 @@ function switchView(name) {
   if (name === 'won') {
     if (typeof renderWonThead === 'function' && typeof loadWon === 'function') {
       // ★ 根因修复：签约项目是 86 列大表，每次切标签都整表重建（renderWonThead+applyWonLang
-      // 内部 renderWonData）是点击卡顿 3 秒的主因；其实表格只是 display:none 藏起、DOM 仍在。
+      // 内部 renderWonData）是点击卡顿的主因；其实表格只是 display:none 藏起、DOM 仍在。
       // 故：已渲染过 且 语言未变 且 数据未失效 时，直接复用现有 DOM，零重建 → 标签切换秒开。
       var _stale = !!(window._viewLangStale && window._viewLangStale.won);
       var _hasCache = !!(typeof globalWonData !== 'undefined' && globalWonData && globalWonData.length);
       var _everRendered = !!window.__wonRenderedOnce;
       var _dataExpired = !_hasCache || needReloadView('won');
       if (_everRendered && !_stale && !_dataExpired) {
-        // 已渲染且数据/语言均新鲜：表格仍保留在 DOM，无需重建，立即显示
+        // 快速路径：已渲染且数据/语言均新鲜 → 表格仍保留在 DOM，无需重建，立即显示
         markViewLoaded('won');
-      } else if (_everRendered && !_stale && _dataExpired) {
+      } else if (_stale && _hasCache) {
+        // 仅语言变化：用缓存数据按当前语言重渲染（不 fetch），与原行为一致
+        renderWonThead(); applyWonLang();
+        window._viewLangStale.won = false;
+        window.__wonRenderedOnce = true;
+        markViewLoaded('won');
+      } else if (_everRendered && _dataExpired) {
         // 仅数据失效（已渲染、语言未变）：直接拉取并在回调里渲染，不再先渲染旧缓存（避免两次整表重建）
         loadWon(); markViewLoaded('won');
       } else {
-        // 首次渲染 或 仅语言失效：用当前语言渲染（有缓存用缓存，无缓存则 loadWon 拉取）
+        // 首次渲染：用当前语言渲染（无缓存时先出空表），再按需拉取
         renderWonThead(); applyWonLang();
-        if (window._viewLangStale) window._viewLangStale.won = false;
         window.__wonRenderedOnce = true;
         if (_dataExpired) loadWon();
         markViewLoaded('won');
