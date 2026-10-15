@@ -4326,11 +4326,8 @@ var WL_FLOW_IMG = {
       .fin-debug{font-size:11px;color:#c00;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%;flex:0 1 auto;}
       /* 我们的控件移动到 Univer 工具栏最左侧后，去掉多余外边距 */
       .univer-toolbar-container .fin-toolbar2{margin:0 8px 0 0;}
-      /* ★股东权益（FIN-EQUITY-20261015）：整条 Univer 自带工具栏（含字体/字号/数字格式等「展开」下拉）
-         被搬到表格上方 #eq_inline 这一行里（用户 2026-10-15：和表格彼此分开、排成一行）。
-         overflow:visible 是硬要求——否则下拉浮层会被裁掉。 */
-      #eq_inline{flex-wrap:nowrap !important;overflow:visible !important;align-items:center;}
-      #eq_inline > .univer-toolbar-container{flex:1 1 auto;min-width:0;margin:0;}
+      /* ★股东权益（FIN-EQUITY-20261015）：#eq_inline（币种下拉）由 JS 挂进 Excel 自带工具栏
+         最左侧（与财务 .fin-toolbar2 完全同机制）；Univer 工具栏保留在 Excel 里面的表头位置。 */
       /* 用户 2026-10-15 要求：股东权益选中工作簿标签 = 黄色背景（与越南财务报表同规则） */
       #equity_container .univer-slide-tab-active{background:#FFFF00 !important;}
       /* Univer 自带工具栏（第三行）：强制靠左、不换行 */
@@ -24294,13 +24291,15 @@ var PROD_EQUIP_FAULT_KB = {
         <span id="eq_status" style="font-size:12px;color:#666;"></span>
       </div>
       <div id="eq_toolbar" style="margin:10px 0;">
-        <!-- ★用户 2026-10-15（第四次调整）：表格上方【只有这一行】——
-             保存 / 导出 xlsx（最前面，独立按钮）+ 币种下拉 + Univer 自带的那些「展开」下拉
-             （字体 / 字号 / 数字格式 …）。整条 Univer 工具栏由 JS 搬进 #eq_inline，
-             与表格彼此分开。 -->
-        <div id="eq_inline" class="fin-toolbar2" style="display:flex;gap:8px;align-items:center;flex-wrap:nowrap;overflow:visible;">
+        <!-- ★用户 2026-10-15（第五次调整，照「越南财务报表」的做法）：
+             保存 / 导出 xlsx 留在上面这条按钮行；币种下拉(#eq_inline)由 JS 挂进 Excel
+             自带工具栏最左侧；字体/字号/数字格式那些「展开」下拉跟着 Univer 工具栏
+             留在 Excel 里面的表头位置（不再搬到表格外）。 -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
           <button class="fin-btn" data-i18n="fin_btn_save" onclick="window.__eq && window.__eq.save(true)">保存</button>
           <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
+        </div>
+        <div id="eq_inline" class="fin-toolbar2">
           <select id="eq_cur" onchange="window.__eq && window.__eq.setCurrency(this.value)"
                   style="height:28px;border:1px solid #c8ced6;border-radius:6px;padding:0 6px;background:#fff;margin-right:8px;">
             <option value="VND">VND ₫</option>
@@ -24577,29 +24576,10 @@ var PROD_EQUIP_FAULT_KB = {
     });
     }
 
-    /* ---------- 工具栏归位（用户 2026-10-15 第四次调整）----------
-       ① 【币种下拉】插到 Univer 自带工具栏最左侧（原契约不变）；
-       ② 【整条 Univer 自带工具栏】——也就是字体 / 字号 / 数字格式那几个「展开」下拉——
-          从表格里搬到表格上方 #eq_inline 那一行里，排成一行、与表格彼此分开；
-          保存 / 导出 xlsx 保持在这一行的最前面。 */
-    /* React 仍按「原父节点」来管理工具栏 DOM。我们把它搬走后，React 若重新挂载/卸载
-       会调用 原父.removeChild(toolbar) 抛 NotFoundError，这里给原父节点打一层容错补丁。 */
-    function safeDom(node){
-      if (!node || node.__eqSafeDom) return;
-      try {
-        var _rc = node.removeChild.bind(node);
-        node.removeChild = function(c){
-          try { if (c && c.parentNode !== node) return c; } catch(e){}
-          return _rc(c);
-        };
-        var _ib = node.insertBefore.bind(node);
-        node.insertBefore = function(c, ref){
-          try { if (ref && ref.parentNode !== node) return node.appendChild(c); } catch(e){}
-          return _ib(c, ref);
-        };
-        node.__eqSafeDom = true;
-      } catch(e){}
-    }
+    /* ---------- 工具栏归位（用户 2026-10-15 第五次调整：照「越南财务报表」的做法）----------
+       ① 【币种下拉】(#eq_inline) 挂到 Excel 自带工具栏最左侧（与财务 fin_mountToolbar2 同机制）；
+       ② 字体 / 字号 / 数字格式那些「展开」下拉跟着 Univer 工具栏【留在 Excel 里面的表头位置】，
+          不再搬到表格外面；保存 / 导出 xlsx 留在表格上方的按钮行里。 */
     /* 隐藏 Univer 自带的「⋮」溢出收纳按钮：它一出现就会把那几个「展开」下拉收进去藏起来 */
     function eqHideMore(){
       try {
@@ -24615,22 +24595,10 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function mountToolbar(){
       var sel = document.getElementById('eq_cur');
-      var bar = document.getElementById('eq_inline');
       var host = document.querySelector('#equity_container .univer-toolbar-container');
-      if (!host) return;
-      /* ① 币种下拉 → 工具栏最左侧 */
-      if (sel && (sel.parentElement !== host || host.firstChild !== sel)){
+      if (!sel || !host) return;
+      if (sel.parentElement !== host || host.firstChild !== sel){
         try { host.insertBefore(sel, host.firstChild); } catch(e){}
-      }
-      /* ② 整条工具栏 → 表格上方那一行（追加到 保存/导出 之后） */
-      if (bar && host.parentElement !== bar){
-        try {
-          safeDom(host.parentElement);
-          bar.appendChild(host);
-          /* 工具栏搬走后表格区域变高：让 Univer 重新量一次尺寸（ResizeObserver 不会自己触发） */
-          setTimeout(function(){ try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 60);
-          setTimeout(function(){ try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 400);
-        } catch(e){}
       }
       eqHideMore();
     }
@@ -24641,9 +24609,6 @@ var PROD_EQUIP_FAULT_KB = {
         var box = document.getElementById('equity_container'); if (!box) return;
         window.__eqToolbarObs = new MutationObserver(function(){ try { mountToolbar(); } catch(e){} });
         window.__eqToolbarObs.observe(box, { childList: true, subtree: true });
-        /* 工具栏搬走后它自己的 DOM 变动（切表、展开下拉）也要盯住，好在「⋮」冒出来时立刻按掉 */
-        var bar2 = document.getElementById('eq_inline');
-        if (bar2) window.__eqToolbarObs.observe(bar2, { childList: true, subtree: true });
       } catch(e){}
     }
 

@@ -91,15 +91,18 @@ for k, n in (('fin_btn_report', '查报表'), ('fin_btn_sort_asc', '升序'), ('
              ('fin_merge_group_btn_on', '恢复原显示顺序')):
     chk(k not in sec, "★已删按钮：「%s」不在工具栏" % n)
 chk('id="eq_cur"' in sec and 'id="eq_inline"' in sec, "币种下拉与按钮组容器存在")
-# ★保存/导出必须是这一行最前面的独立按钮（用户 2026-10-15 第三次调整）
+# ★用户 2026-10-15 第五次调整（照越南财务报表的做法）：
+#   保存 / 导出 xlsx 留在表格上方的按钮行；只有币种下拉那组 #eq_inline 会被挂进 Excel 工具栏。
 i_sel = sec.find('id="eq_cur"')
 i_save = sec.find('fin_btn_save')
 i_exp = sec.find('fin_btn_export')
 chk(i_save >= 0 and i_exp > i_save, "DOM 顺序：保存 在 导出 xlsx 之前")
-chk(i_sel > i_exp, "DOM 顺序：币种下拉排在 保存/导出 之后（挂走后行首只剩这两个按钮）")
-chk('overflow:visible' in sec, "★#eq_inline 用 overflow:visible（下拉浮层不被裁切）")
+chk(i_sel > i_exp, "DOM 顺序：币种下拉组 #eq_inline 排在按钮行之后")
+_m = re.search(r'<div id="eq_inline".*?</div>', sec, re.S)
+chk(_m is not None and 'fin_btn_save' not in _m.group(0) and 'fin_btn_export' not in _m.group(0),
+    "★保存/导出不在 #eq_inline 里（只有币种下拉挂进 Excel 工具栏）")
 
-print("6b) 币种下拉挂 Univer 工具栏最左侧 + 整条工具栏搬到表格上方一行 + 隐藏 $/漏斗/保护图标")
+print("6b) 币种下拉挂 Excel 自带工具栏最左侧 + Univer 工具栏留在 Excel 表内表头 + 隐藏 $/漏斗/保护图标")
 eqblk = block('股东权益报表引擎（FIN-EQUITY-20261015）', 'window.__eqSwitchWrapped')
 if not eqblk:
     try:
@@ -115,15 +118,11 @@ chk("'sheet.command.add-range-protection-from-toolbar': { hidden: true }" in eqb
 chk(re.search(r"querySelector\('#equity_container \.univer-toolbar-container'\)", eqblk) is not None,
     "找到 Univer 工具栏宿主 .univer-toolbar-container")
 chk(re.search(r"host\.insertBefore\(sel, host\.firstChild\)", eqblk) is not None,
-    "★币种下拉插到工具栏最左侧（保存/导出不进工具栏）")
-# ★用户 2026-10-15 第四次调整：整条 Univer 工具栏（字体/字号/数字格式那些「展开」下拉）
-#   必须搬到表格上方 #eq_inline 一行里，与表格彼此分开。
-chk(re.search(r"var bar = document\.getElementById\('eq_inline'\)", eqblk) is not None,
-    "★工具栏搬移目标是表格上方那一行 #eq_inline")
-chk(re.search(r"bar\.appendChild\(host\)", eqblk) is not None,
-    "★整条 .univer-toolbar-container 被 appendChild 到 #eq_inline（展开下拉都在上面一行）")
-chk("function safeDom(node)" in eqblk and "node.__eqSafeDom" in eqblk,
-    "★搬走后给原父节点打容错补丁（React 卸载不再抛 NotFoundError）")
+    "★币种下拉插到 Excel 自带工具栏最左侧（与财务 fin_mountToolbar2 同机制）")
+# ★用户 2026-10-15 第五次调整（照财务报表）：Univer 自带工具栏（字体/字号/数字格式那些「展开」下拉）
+#   必须留在 Excel 里面的表头位置，不许再被搬出到表格外。
+chk("bar.appendChild(host)" not in eqblk and "function safeDom(node)" not in eqblk,
+    "★Univer 工具栏不被搬出 Excel（留在表内表头，照财务做法）")
 chk("more-function-single" in eqblk, "★隐藏 Univer 自带「⋮」收纳按钮（展开下拉不会被藏起来）")
 chk("new MutationObserver(" in eqblk, "DOM 变动自动重挂（切表后不掉下来）")
 
