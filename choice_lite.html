@@ -24655,20 +24655,53 @@ var PROD_EQUIP_FAULT_KB = {
     inited = true;
     st('正在加载表格引擎…');
     try {
-      var [presetsMod, coreMod, filterMod, filterUiMod, sortMod, sortUiMod] = await Promise.all([
-        import('@univerjs/presets'),
-        import('@univerjs/presets/preset-sheets-core'),
-        import('@univerjs/sheets-filter'),
-        import('@univerjs/sheets-filter-ui'),
-        import('@univerjs/sheets-sort'),
-        import('@univerjs/sheets-sort-ui')
+      /* ★locale 必须自己带上：Univer 0.5.5 的 LocaleService 在没拿到 locales 时会直接抛
+         "[LocaleService]: Locale not initialized"（2026-10-15 实测）。这里与财务那套
+         fin_initUniver 用【完全相同】的模块清单与合并方式（三语 + filter/sort 的 locale）。 */
+      var _impOpt = function(s){ return import(s).catch(function(){ return null; }); };
+      var m = await Promise.all([
+        import('@univerjs/presets'),                                          // 0
+        import('@univerjs/presets/preset-sheets-core'),                       // 1
+        _impOpt('@univerjs/presets/preset-sheets-core/locales/en-US'),        // 2
+        _impOpt('@univerjs/presets/preset-sheets-core/locales/zh-CN'),        // 3
+        _impOpt('@univerjs/presets/preset-sheets-core/locales/vi-VN'),        // 4
+        import('@univerjs/sheets-filter'),                                    // 5
+        import('@univerjs/sheets-filter-ui'),                                 // 6
+        import('@univerjs/sheets-sort'),                                      // 7
+        import('@univerjs/sheets-sort-ui'),                                   // 8
+        _impOpt('@univerjs/sheets-filter-ui/locale/en-US'),                   // 9
+        _impOpt('@univerjs/sheets-sort/locale/en-US'),                        // 10
+        _impOpt('@univerjs/sheets-sort-ui/locale/en-US'),                     // 11
+        _impOpt('@univerjs/sheets-filter-ui/locale/zh-CN'),                   // 12
+        _impOpt('@univerjs/sheets-sort/locale/zh-CN'),                        // 13
+        _impOpt('@univerjs/sheets-sort-ui/locale/zh-CN'),                     // 14
+        _impOpt('@univerjs/sheets-filter-ui/locale/vi-VN'),                   // 15
+        _impOpt('@univerjs/sheets-sort/locale/vi-VN'),                        // 16
+        _impOpt('@univerjs/sheets-sort-ui/locale/vi-VN')                      // 17
       ]);
-      presets = presetsMod;
+      presets = m[0];
+      var _merge = presets.merge || function(a, b){ return Object.assign({}, a, b); };
+      function mergeL(base, mods){
+        var r = _merge({}, base || {});
+        mods.forEach(function(x){ var d = (x && (x.default || x)) || {}; if (d) r = _merge(r, d); });
+        return r;
+      }
+      var enL = (m[2] && (m[2].default || m[2])) || {};
+      var zhL = (m[3] && (m[3].default || m[3])) || {};
+      var viL = (m[4] && (m[4].default || m[4])) || {};
+      var loc = mergeL(enL, [m[9], m[10], m[11]]);
+      var zhLoc = mergeL(zhL, [m[12], m[13], m[14]]);
+      var viLoc = mergeL(viL, [m[15], m[16], m[17]]);
+      var lt = presets.LocaleType || {};
+      var L = lang();
+      var initLocale = (L === 'zh') ? lt.ZH_CN : (L === 'vi') ? lt.VI_VN : lt.EN_US;
       var res = presets.createUniver({
         theme: presets.defaultTheme,
-        presets: [ coreMod.UniverSheetsCorePreset({ container: 'equity_container' }) ],
-        plugins: [ filterMod.UniverSheetsFilterPlugin, filterUiMod.UniverSheetsFilterUIPlugin,
-                   sortMod.UniverSheetsSortPlugin, sortUiMod.UniverSheetsSortUIPlugin ]
+        locale: initLocale,
+        locales: (lt.EN_US ? { [lt.EN_US]: loc, [lt.ZH_CN]: zhLoc, [lt.VI_VN]: viLoc } : undefined),
+        presets: [ m[1].UniverSheetsCorePreset({ container: 'equity_container' }) ],
+        plugins: [ m[5].UniverSheetsFilterPlugin, m[6].UniverSheetsFilterUIPlugin,
+                   m[7].UniverSheetsSortPlugin, m[8].UniverSheetsSortUIPlugin ]
       });
       univer = res.univer;
       api = res.univerAPI || null;
