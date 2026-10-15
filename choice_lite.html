@@ -20430,7 +20430,11 @@ var PROD_EQUIP_FAULT_KB = {
         var rc = bar.getBoundingClientRect();
         if (!rc.width) return;
         var snap = null; try { snap = fin_currentSnapshot(); } catch(e){}
-        var sid = ''; try { sid = fin_curSheetId(); } catch(e){}
+        /* ★FIN-STATBAR-SID-20261016：修"计数有、总计/平均/最大/最小没有"的 BUG。
+           旧写法用 fin_curSheetId 永远返回 finLastSnapshot.sheetOrder[0]（第一张表），
+           用户在第 2+ 张表选数字时，cells 拿到的是第一张表的数据 → row 为空 → 只计数、不求和。
+           改用 fin_activeSheetId() 取真实活动工作表 id。 */
+        var sid = ''; try { sid = fin_activeSheetId(); } catch(e){}
         var cells = (snap && snap.sheets && snap.sheets[sid] && snap.sheets[sid].cellData) || null;
         /* ★FIN-CN-CHECK-GRAY-20261015（用户 2026-10-15 要求）：中国报表里【勾了核销的行】
            整行不参与状态栏统计 —— 求和只加未勾选的金额，"计数"也按未勾选行算。
