@@ -1,0 +1,57 @@
+#!/bin/sh
+# 「锁死」契约检查（git pre-push 钩子）—— 第二道闸门
+#
+# 为什么还要 pre-push：
+#   pre-commit 可以用 `git commit --no-verify` 绕过；push 是代码离开本机的最后一道口子，
+#   这里【再跑一遍】同样的硬锁脚本，绕过提交的人在这里仍会被拦住。
+#   （真要绕过两条闸门得连着两次 --no-verify，那属于明知故犯，需再靠 GitHub 分支保护兜底。）
+#
+# 跑的就是 pre-commit 里那一份【硬锁】列表，逻辑完全一致，不再重复维护第二份规则：
+#   check_modal_format.py            —— 模态框放大态 .mmax 几何唯一、入口唯一
+#   check_print_logic.py             —— 打印逻辑（甘特两栏/一页装下、智能报告块级流、打印标记生命周期）
+#   check_fin_hi_lock.py             —— FIN-HI-LOCK-20261011（财务屏幕高亮四条不变量）
+#   check_fin_excel_keys_lock.py     —— FIN-EXCEL-KEYS-LOCK-20261011（Univer Excel 键盘补丁）
+#   check_fin_snap_cache.py          —— FIN-SNAP-CACHE-20261011 + FIN-SNAP-FP-20261015（快照缓存/指纹）
+#   check_fin_no_trans_lock.py       —— FIN-NO-TRANS-20261013（品牌名不翻译）
+#   check_fin_formula_lock.py        —— FIN-FORMULA-STACK-20261013（sheets-formula 爆栈防护）
+#   check_fin_cn_lock.py             —— FIN-CN-STAT-LOCK-20261013（中国报表统计栏 + 保存不丢 ①~⑦）
+#   check_fin_cn_hide_checked_lock.py—— FIN-CN-HIDE-CHECKED-20261015（隐藏/恢复核销记录按钮）
+#   check_fin_merge_cn_blue_lock.py  —— FIN-MERGE-CN-BLUE-GUARD-20261015（合并报表中国区块蓝字守卫）
+#   check_fin_keep_sheet_lock.py     —— FIN-KEEP-SHEET-20261015（重建后留在原来看的那张工作表）
+#
+# 软告警（生产数据一致性巡检）不在这里跑：它们按数据库现状报警，不该挡住推送。
+# 激活方式（本仓库已用 core.hooksPath=.githooks 启用）：git config core.hooksPath .githooks
+set -e
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[ -n "$ROOT" ] || ROOT="$(cd "$HERE/.." && pwd)"
+cd "$ROOT"
+
+if command -v python >/dev/null 2>&1; then
+  PY=python
+elif command -v python3 >/dev/null 2>&1; then
+  PY=python3
+else
+  echo "未找到 python，跳过契约检查（请安装 Python 后重试）。"
+  exit 0
+fi
+
+rc=0
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py; do
+  if [ -f "$f" ]; then
+    echo "— 契约检查（硬锁·push）：$f"
+    if ! PYTHONIOENCODING=utf-8 "$PY" "$f" >/dev/null 2>&1; then
+      echo "✗ 推送被拦截：$f 未通过（契约被破坏），请修复后再推送。"
+      PYTHONIOENCODING=utf-8 "$PY" "$f" || true
+      rc=1
+    fi
+  fi
+done
+
+if [ "$rc" -ne 0 ]; then
+  echo ""
+  echo "【锁死契约被破坏】推送已取消。修复办法：git status 看改了什么，改回契约要求的形式再提交；"
+  echo "                  拿不准就用安全点回滚：git checkout <标签> -- choice_lite.html（git tag 看标签列表）。"
+fi
+exit $rc
