@@ -1250,6 +1250,10 @@ function _ovLoadChartLib(cb){
       border-radius:6px; cursor:pointer; transition:all .2s ease;
     }
     .icon-btn:disabled { opacity:.3; cursor:not-allowed; transform:none; box-shadow:none; }
+    /* ★2026-10-15：操作列图标按钮里的矢量图标统一尺寸（复制按钮由 emoji 换成 SVG，
+       stroke 走 currentColor → 跟随 .icon-copy 的颜色与 hover 反白）。
+       注意：生产模块 .prod-table td.pe-op .icon-btn svg 是 18px，选择器更具体，不受影响。 */
+    .icon-btn svg { width:16px; height:16px; display:block; }
     .icon-edit { color:#E53935; }
     .icon-edit:hover:not(:disabled) { background:#E53935; color:#fff; border-color:#E53935; transform:translateY(-1px); box-shadow:0 4px 8px rgba(211,47,47,.3); }
     .icon-del { color:#d9534f; }
@@ -1494,6 +1498,9 @@ function _ovLoadChartLib(cb){
   .ad-view-cell { text-align:center; white-space:nowrap; }
   .ad-view-btn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border-radius:50%; background:#E53935; color:#fff; border:none; cursor:pointer; font-size:14px; line-height:1; transition:background .15s; }
   .ad-view-btn:hover { background:#C62828; }
+  /* ★2026-10-15：该按钮原来内嵌彩色 emoji 🔍，不吃这里的 color:#fff ——
+     换成矢量放大镜后走 currentColor，红底白图标才真正生效；尺寸与 .icon-btn svg 对齐。 */
+  .ad-view-btn svg { width:16px; height:16px; display:block; }
   /* 补充协议摘要查看模态框（只读，不编辑） */
   .addm-sum-overlay { display:none; position:fixed; top:56px; left:0; right:0; bottom:0; background:rgba(40,30,15,.5); z-index:1100; justify-content:center; align-items:flex-start; padding:10px; overflow:hidden; }
   .addm-sum-overlay.show { display:flex; }
@@ -37233,9 +37240,14 @@ function renderWonData(list) {
     row += wonCell('', 'won-data col-hidden');
     row += wonCell('', 'won-data col-hidden');
     row += wonCell(p.doc_addendum_cnt || '', 'won-data');
-    // P5 查看合同增补明细：仅显示一个橙色 🔍 按钮，点击打开补充协议摘要查看模态框（只读）
+    // P5 查看合同增补明细：仅显示一个红色圆形查看按钮，点击打开补充协议摘要查看模态框（只读）
+    // ★2026-10-15 统一风格：内嵌的彩色 emoji 🔍 换成矢量放大镜（同 .icon-btn 那四个按钮的几何），
+    //   否则同一行里 4 个 SVG + 1 个彩色 emoji 会很跳，而且 emoji 不吃红底白图标的 color:#fff。
     var _adTitle = (typeof T==='function') ? (T().addm_view||'查看') : '查看';
-    row += '<td class="won-data ad-view-cell"><button type="button" class="ad-view-btn" onclick="openAddendumSummary('+p.id+')" title="'+_adTitle+'">🔍</button></td>';
+    row += '<td class="won-data ad-view-cell"><button type="button" class="ad-view-btn" onclick="openAddendumSummary('+p.id+')" title="'+_adTitle+'" aria-label="'+_adTitle+'">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<circle cx="11" cy="11" r="8"/>'
+      + '<line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button></td>';
     row += wonCell(buDisplay(p.doc_remark), 'won-data');
     row += wonCell(p.salesperson || p.salesperson_name || '', 'won-data');
 
@@ -37245,13 +37257,44 @@ function renderWonData(list) {
     // ★ 行内按钮统一全部渲染；显隐完全由 WON-D2/D3/D4/C1 权限决策控制（applyRowPerms 兜底隐藏），
     //   不再按 canWriteRow 在行生成阶段阉割，避免"权限保留默认但按钮仍不出现"。
     //   实际操作的写权限仍由服务端 canModifyRow + permGate 守卫。
-    var editBtn = '<button type="button" class="icon-btn icon-edit" onclick="openWonModal(' + p.id + ')" aria-label="edit">&#9998;</button>';
-    var delBtn = '<button type="button" class="icon-btn icon-del" onclick="delWon(' + p.id + ')" aria-label="delete">&#10006;</button>';
+    /* ★2026-10-15 用户要求「统一风格」：操作列四个按钮全部换成矢量 SVG 图标。
+       —— 之前四个图案风格各异，且其中两个是彩色 emoji：
+           查看=🔍(emoji) / 复制=📋(emoji) / 编辑=✎(文字字形) / 删除=✖(文字字形)；
+           彩色 emoji 不吃 CSS color，.icon-report(蓝) 与 .icon-copy(紫) 的颜色和
+           hover 反白全部失效，四个按钮看起来"三个样式"。
+       —— 现在统一为同一款 SVG 几何（与生产模块 PROD_OP_ICON_* 完全一致：
+           viewBox 0 0 24 24 / fill none / stroke-width 2 / round 端点 /
+           stroke=currentColor），于是颜色跟随各自 .icon-xx、hover 反白、
+           上移 1px 与投影全都一致。
+       —— 顺带把 title/aria-label 补全并三语化（edit/del 原先写死英文 aria-label）。 */
+    var editBtn = '<button type="button" class="icon-btn icon-edit" onclick="openWonModal(' + p.id + ')" title="'+editTitle+'" aria-label="'+editTitle+'">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>'
+      + '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+    var delBtn = '<button type="button" class="icon-btn icon-del" onclick="delWon(' + p.id + ')" title="'+delTitle+'" aria-label="'+delTitle+'">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<polyline points="3 6 5 6 21 6"/>'
+      + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
     var _rptDict = (typeof I18N!=='undefined' && I18N[CUR_LANG]) ? I18N[CUR_LANG] : {};
     var reportTitle = _rptDict.btn_report || '查看报告';
     var copyTitle = _rptDict.btn_copy || '复制项目';
-    var reportBtn = '<button type="button" class="icon-btn icon-report" onclick="openProjectReport('+p.id+')" title="'+reportTitle+'">&#128269;</button>';
-    var copyBtn = '<button type="button" class="icon-btn icon-copy" onclick="openCopyProject('+p.id+')" title="'+copyTitle+'">&#128203;</button>';
+    /* ★2026-10-15（用户指定）：查看报告按钮由「放大镜」换成「文档」图标 ——
+       该按钮打开的是智能报告弹窗，文档图标比放大镜更贴切（放大镜容易被误读成"搜索/筛选"）。
+       取 Feather/Lucide file-text 标准几何（折角 + 内容行），与同排其它图标同一套参数：
+       viewBox 0 0 24 24 / fill none / stroke-width 2 / round 端点 / stroke=currentColor
+       → 仍跟随 .icon-report 的蓝色与 hover 反白。 */
+    var reportBtn = '<button type="button" class="icon-btn icon-report" onclick="openProjectReport('+p.id+')" title="'+reportTitle+'" aria-label="'+reportTitle+'">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+      + '<polyline points="14 2 14 8 20 8"/>'
+      + '<line x1="16" y1="13" x2="8" y2="13"/>'
+      + '<line x1="16" y1="17" x2="8" y2="17"/>'
+      + '<polyline points="10 9 9 9 8 9"/></svg></button>';
+    var copyBtn = '<button type="button" class="icon-btn icon-copy" onclick="openCopyProject('+p.id+')" title="'+copyTitle+'" aria-label="'+copyTitle+'">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>'
+      + '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
+      + '</svg></button>';
     // ★ 操作列不再显示"上移/下移"（↑/↓）箭头按钮，仅保留 查看报告 / 复制 / 编辑 / 删除
     var btns = '<div class="won-actions">' + reportBtn + copyBtn + editBtn + delBtn + '</div>';
     row += '<td class="won-data">' + btns + '</td>';
@@ -53304,152 +53347,367 @@ window.CommissionModal={open:open,close:close,applyLang:applyLang,addPayRow:addP
 // 项目综合报告在新窗口打开时使用的独立 CSS（避免依赖当前页的 <style>）
 var PROJECT_REPORT_CSS = 'body{font-family:Segoe UI,Microsoft YaHei,sans-serif;margin:0;padding:20px;background:#f5f5f5;} .rpt-modal{background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;margin:0 auto;} .rpt-head{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;background:linear-gradient(135deg,#D32F2F,#E53935);color:#fff;} .rpt-head h3{margin:0;font-size:13.2px;font-weight:700;} .rpt-body{padding:20px 24px;overflow-y:auto;} .rpt-foot{display:flex;justify-content:space-between;align-items:center;padding:12px 22px;border-top:2px solid #FBE9E7;background:#fdfaf5;} .rpt-btn{padding:7px 18px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;} .rpt-btn-outline{background:white;color:#D32F2F;border:1px solid #F0C4C4;} .rpt-btn-outline:hover{background:#FBE9E7;} .rpt-sec{margin-bottom:16px;padding:14px 16px;border:1px solid #f3e0c8;border-radius:10px;background:#fdf8f1;} .rpt-sec-title{font-size:13px;font-weight:700;color:#D32F2F;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #FBE9E7;display:flex;align-items:center;gap:6px;} .rpt-row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px dashed #f5e8d8;} .rpt-row:last-child{border-bottom:none;} .rpt-row .k{color:#8a7050;} .rpt-row .v{color:#3a2a1a;font-weight:600;text-align:right;} .rpt-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;} .rpt-badge-yes{background:#e6f6ee;color:#27ae60;} .rpt-badge-no{background:#f2f2f2;color:#888;} .rpt-prog{height:8px;background:#FBE9E7;border-radius:4px;overflow:hidden;margin-top:6px;flex:1;} .rpt-prog>div{height:100%;border-radius:4px;transition:width .6s ease;} .rpt-tbl{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px;} .rpt-tbl th{background:#FBE9E7;color:#B71C1C;font-weight:700;padding:6px 8px;text-align:center;border:1px solid #F0C4C4;} .rpt-tbl td{padding:5px 8px;border:1px solid #FBE9E7;text-align:center;white-space:nowrap;} .rpt-tbl tr:nth-child(even) td{background:#fdf8f1;} .rpt-pos{color:#27ae60;font-weight:700;} .rpt-neg{color:#e74c3c;font-weight:700;}';
 
+/* ===================== 项目综合报告 v2：纯读取辅助（rpt_*，全部只读、不写库） ===================== */
+var RPT_I18N = {
+  zh: {
+    rpt_sec3:'③ 客户付款', rpt_pay_paid:'已付', rpt_pay_plan:'计划', rpt_bills:'笔',
+    rpt_contract_total:'合同总额', rpt_paid_total:'已付', rpt_unpaid_total:'未付',
+    rpt_pay_table_title:'付款明细（仅已实付）',
+    rpt_col_date:'付款日', rpt_col_cat:'类别', rpt_col_usage:'用途', rpt_col_actual:'实付金额', rpt_col_method:'付款方式',
+    rpt_no_pay_detail:'无付款明细',
+    rpt_sec4:'④ 生产与人员', rpt_kpi_out7:'近 7 天产出（片）', rpt_kpi_out30:'近 30 天产出（片）',
+    rpt_kpi_out:'已出库片数', rpt_kpi_avg_workers:'平均每天人数', rpt_kpi_reg_days:'登记日',
+    rpt_prod_progress:'生产进度', rpt_tbl_demand:'需求（片）', rpt_tbl_produced:'已生产（片）', rpt_tbl_gap:'缺口（片）',
+    rpt_no_prod:'暂无生产记录',
+    rpt_sec5:'⑤ 安装进度', rpt_inst_progress:'安装进度', rpt_installed:'已安装（片）', rpt_no_inst:'未录入安装数据',
+    rpt_sec6:'⑥ 设备与故障', rpt_fault_total:'故障总次数', rpt_fault_down:'累计停机', rpt_fault_down_hours:'小时',
+    rpt_fault_workdays:'个工作日（8h/班）', rpt_fault_incomplete:'未完成条数', rpt_fault_top3:'TOP3 故障设备',
+    rpt_fault_equip:'设备', rpt_fault_count:'故障次数', rpt_no_fault:'无故障记录',
+    rpt_loading:'正在汇总数据…', rpt_popup_blocked:'请允许浏览器弹窗以打开报告',
+    th_spec:'规格(长×宽×高 mm)'
+  },
+  en: {
+    rpt_sec3:'③ Customer Payments', rpt_pay_paid:'Paid', rpt_pay_plan:'Planned', rpt_bills:'bills',
+    rpt_contract_total:'Contract Total', rpt_paid_total:'Paid', rpt_unpaid_total:'Unpaid',
+    rpt_pay_table_title:'Payment Details (actual only)',
+    rpt_col_date:'Date', rpt_col_cat:'Category', rpt_col_usage:'Purpose', rpt_col_actual:'Actual Paid', rpt_col_method:'Method',
+    rpt_no_pay_detail:'No payment details',
+    rpt_sec4:'④ Production & Personnel', rpt_kpi_out7:'Output last 7 days (pcs)', rpt_kpi_out30:'Output last 30 days (pcs)',
+    rpt_kpi_out:'Pieces out (delivered)', rpt_kpi_avg_workers:'Avg. workers/day', rpt_kpi_reg_days:'registered days',
+    rpt_prod_progress:'Production Progress', rpt_tbl_demand:'Demand (pcs)', rpt_tbl_produced:'Produced (pcs)', rpt_tbl_gap:'Gap (pcs)',
+    rpt_no_prod:'No production records',
+    rpt_sec5:'⑤ Installation Progress', rpt_inst_progress:'Installation Progress', rpt_installed:'Installed (pcs)', rpt_no_inst:'No installation data',
+    rpt_sec6:'⑥ Equipment & Faults', rpt_fault_total:'Total Faults', rpt_fault_down:'Total Downtime', rpt_fault_down_hours:'hrs',
+    rpt_fault_workdays:'workdays (8h/shift)', rpt_fault_incomplete:'Incomplete', rpt_fault_top3:'TOP3 Faulty Equipment',
+    rpt_fault_equip:'Equipment', rpt_fault_count:'Faults', rpt_no_fault:'No fault records',
+    rpt_loading:'Summarizing data…', rpt_popup_blocked:'Please allow pop-ups to open the report',
+    th_spec:'Spec (L×W×H mm)'
+  },
+  vi: {
+    rpt_sec3:'③ Thanh toán của khách hàng', rpt_pay_paid:'Đã trả', rpt_pay_plan:'Kế hoạch', rpt_bills:'khoản',
+    rpt_contract_total:'Tổng hợp đồng', rpt_paid_total:'Đã trả', rpt_unpaid_total:'Chưa trả',
+    rpt_pay_table_title:'Chi tiết thanh toán (thực trả)',
+    rpt_col_date:'Ngày', rpt_col_cat:'Loại', rpt_col_usage:'Mục đích', rpt_col_actual:'Thực trả', rpt_col_method:'Phương thức',
+    rpt_no_pay_detail:'Không có chi tiết thanh toán',
+    rpt_sec4:'④ Sản xuất & Nhân sự', rpt_kpi_out7:'Sản lượng 7 ngày gần (tấm)', rpt_kpi_out30:'Sản lượng 30 ngày gần (tấm)',
+    rpt_kpi_out:'Số tấm đã xuất', rpt_kpi_avg_workers:'TB nhân công/ngày', rpt_kpi_reg_days:'ngày đăng ký',
+    rpt_prod_progress:'Tiến độ sản xuất', rpt_tbl_demand:'Nhu cầu (tấm)', rpt_tbl_produced:'Đã SX (tấm)', rpt_tbl_gap:'Thiếu hụt (tấm)',
+    rpt_no_prod:'Chưa có dữ liệu sản xuất',
+    rpt_sec5:'⑤ Tiến độ lắp đặt', rpt_inst_progress:'Tiến độ lắp đặt', rpt_installed:'Đã lắp (tấm)', rpt_no_inst:'Chưa có dữ liệu lắp đặt',
+    rpt_sec6:'⑥ Thiết bị & Sự cố', rpt_fault_total:'Tổng số sự cố', rpt_fault_down:'Tổng thời gian dừng', rpt_fault_down_hours:'giờ',
+    rpt_fault_workdays:'ngày công (8h/ca)', rpt_fault_incomplete:'Chưa hoàn thành', rpt_fault_top3:'TOP3 thiết bị sự cố',
+    rpt_fault_equip:'Thiết bị', rpt_fault_count:'Số sự cố', rpt_no_fault:'Không có sự cố',
+    rpt_loading:'Đang tổng hợp dữ liệu…', rpt_popup_blocked:'Vui lòng cho phép cửa sổ pop-up để mở báo cáo',
+    th_spec:'Quy cách (D×R×C mm)'
+  }
+};
+var RPT_CSS_EXTRA = '.rpt-loading{padding:60px 20px;text-align:center;color:#888;font-size:14px;}'
+  + '.rpt-kpi-row{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 10px;}'
+  + '.rpt-kpi{flex:1 1 160px;min-width:140px;background:#f7f9fb;border:1px solid #e3e9ef;border-radius:8px;padding:10px 12px;box-sizing:border-box;}'
+  + '.rpt-kpi-v{font-size:18px;font-weight:700;color:#D32F2F;line-height:1.25;word-break:break-word;}'
+  + '.rpt-kpi-l{font-size:11px;color:#667;margin-top:3px;}'
+  + '.rpt-fx{font-size:11px;color:#888;font-weight:400;}'
+  + '.rpt-sub{font-size:12px;font-weight:700;color:#444;margin:8px 0 4px;}'
+  + '.rpt-spec-tbl,.rpt-pay-tbl{font-size:12px;}'
+  + '.rpt-spec-tbl td,.rpt-pay-tbl td{padding:4px 8px;}'
+  + '.rpt-note{font-size:12px;color:#999;padding:4px 0;}'
+  + '@media print{.rpt-foot .rpt-btn{display:none;}.rpt-sec{page-break-inside:avoid;}}';
+
+function rpt_todayYmd(){
+  var d=new Date(); var y=d.getFullYear(),m=('0'+(d.getMonth()+1)).slice(-2),dd=('0'+d.getDate()).slice(-2);
+  return y+'-'+m+'-'+dd;
+}
+function rpt_ymdAddDays(ymd,delta){
+  var dt=new Date(String(ymd).replace(/-/g,'/'));
+  dt.setDate(dt.getDate()+delta);
+  var y=dt.getFullYear(),m=('0'+(dt.getMonth()+1)).slice(-2),dd=('0'+dt.getDate()).slice(-2);
+  return y+'-'+m+'-'+dd;
+}
+/* 把 {rmb,usd,vnd} 折算成 VND（用项目自身汇率） */
+function rpt_toVnd(o, rr, ru){
+  o=o||{}; return (+o.vnd||0)+((+o.rmb||0)*(+rr||0))+((+o.usd||0)*(+ru||0));
+}
+/* 主显 VND + 括号附 RMB/USD 折算（汇率缺失则该处显示 —）；不含 VND 时仅显示数字 */
+function rpt_moneyHtml(vnd, rr, ru){
+  var main=(Math.round(vnd||0)).toLocaleString('en-US');
+  if(!(vnd>0)) return main;
+  var rmb=(+rr>0)?(vnd/(+rr)):null;
+  var usd=(+ru>0)?(vnd/(+ru)):null;
+  if(rmb==null||usd==null) return main+' <span class="rpt-fx">（—）</span>';
+  return main+' <span class="rpt-fx">（RMB '+Math.round(rmb).toLocaleString('en-US')+' / USD '+Math.round(usd).toLocaleString('en-US')+'）</span>';
+}
+function rpt_num(n){ return (Math.round(n||0)).toLocaleString('en-US'); }
+/* 近 N 天产出总片数（含今天，往回 N-1 天） */
+function rpt_recentOutput(f, days){
+  var prod=f.production||{}; var today=rpt_todayYmd(); var cut=rpt_ymdAddDays(today,-(days-1));
+  var total=0;
+  for(var d in prod){ if(!prod.hasOwnProperty(d)) continue; var ymd=dmyToYmd(d); if(!ymd||ymd<cut||ymd>today) continue;
+    var rec=prod[d]; if(!rec||!rec.lines) continue;
+    for(var n in rec.lines){ if(!rec.lines.hasOwnProperty(n)) continue; var add={}; prod_lineAddQty(rec.lines[n],add); for(var s in add) total+=(+add[s]||0); }
+  }
+  return total;
+}
+/* 各规格累计已生产（片） */
+function rpt_producedBySpec(f){
+  var per={}; var prod=f.production||{};
+  for(var d in prod){ if(!prod.hasOwnProperty(d)) continue; var rec=prod[d]; if(!rec||!rec.lines) continue;
+    for(var n in rec.lines){ if(!rec.lines.hasOwnProperty(n)) continue; var add={}; prod_lineAddQty(rec.lines[n],add); for(var s in add){ per[s]=(per[s]||0)+(+add[s]||0); } }
+  }
+  return per;
+}
+/* 各规格累计出库（片） */
+function rpt_outBySpec(f){ return prod_houseOutBySpec(f)||{}; }
+/* 各规格需求（片）= 合同规格矩阵 total */
+function rpt_demandBySpec(){
+  var mm=prod_slatsMatrix(); var out={};
+  Object.keys(mm.specs).forEach(function(k){ out[k]=mm.specs[k].total||0; });
+  return out;
+}
+/* 各规格已安装（片）：遍历 houseOrder × 栋数，沿用安装模块 Math.min(每栋需求,已安装) 封顶口径 */
+function rpt_installedBySpec(f){
+  var mm=prod_slatsMatrix(); var workers=(f.installation&&f.installation.workers)||{}; var res={};
+  mm.houseOrder.forEach(function(h){
+    if(!h||h==='—') return;
+    var bc=prod_buildingCountForHouse(h)||0; if(!bc) return;
+    Object.keys(mm.specs).forEach(function(sp){
+      if(!mm.specs.hasOwnProperty(sp)) return;
+      var total=mm.specs[sp].houses[h]||0; if(!total) return;
+      var perDemand=Math.round(total/bc); if(perDemand<=0) return;
+      for(var b=1;b<=bc;b++){ var inst=inst_bldgSpecInstalled(workers,h,b,sp); res[sp]=(res[sp]||0)+Math.min(perDemand, inst); }
+    });
+  });
+  return res;
+}
+/* 平均每天人数（含 0 人日；排除 holiday==='yes'） */
+function rpt_avgWorkers(f){
+  var w=f.workers||{}; var days=0,total=0;
+  for(var d in w){ if(!w.hasOwnProperty(d)) continue; var rec=w[d]; if(!rec||typeof rec!=='object') continue; if(rec.holiday==='yes') continue;
+    var sum=0; PROD_WORKERS.forEach(function(k){ sum+=(+rec[k[0]]||0); }); total+=sum; days++; }
+  return {avg: days>0? total/days : 0, days:days, total:total};
+}
+/* 客户付款：解析 cust_view_detail，回退主表 cust_paid_* / cust_unpaid_* */
+function rpt_custPay(p){
+  var rr=(+p.rate_rmb_vnd||0), ru=(+p.rate_usd_vnd||0);
+  var out={ok:false, rows:[], planned:0, paid:0, planVnd:0, actualVnd:0, fallback:false};
+  var parsed=null;
+  try{ if(p.cust_view_detail){ parsed=(typeof p.cust_view_detail==='string')?JSON.parse(p.cust_view_detail):p.cust_view_detail; } }catch(e){ parsed=null; }
+  if(parsed && parsed.rows && parsed.rows.length){
+    out.ok=true; out.rows=parsed.rows; out.planned=parsed.rows.length;
+    out.paid=parsed.rows.filter(function(r){ var a=r&&r.actual; return a&&((+a.rmb||0)||(+a.usd||0)||(+a.vnd||0)); }).length;
+    parsed.rows.forEach(function(r){ out.planVnd+=rpt_toVnd(r.plan,rr,ru); out.actualVnd+=rpt_toVnd(r.actual,rr,ru); });
+  } else {
+    out.fallback=true;
+    out.planVnd = rpt_toVnd({rmb:p.cust_paid_rmb,usd:p.cust_paid_usd,vnd:p.cust_paid_vnd},rr,ru)
+               + rpt_toVnd({rmb:p.cust_unpaid_rmb,usd:p.cust_unpaid_usd,vnd:p.cust_unpaid_vnd},rr,ru);
+    out.actualVnd = rpt_toVnd({rmb:p.cust_paid_rmb,usd:p.cust_paid_usd,vnd:p.cust_paid_vnd},rr,ru);
+  }
+  return out;
+}
+/* 故障统计：总次数 / 累计停机小时 / 未完成条数（down 为空）/ TOP3 设备 */
+function rpt_faultStats(f){
+  var faults=((f.equipment&&f.equipment.faults)||[]).slice();
+  var down=0, incomplete=0, byEq={};
+  faults.forEach(function(r){
+    if(!r) return;
+    var dn=parseFloat(r.down); if(!isNaN(dn)&&dn>0) down+=dn; else if(String(r.down||'').trim()==='') incomplete++;
+    var eq=String(r.equip||'').trim(); if(eq){ byEq[eq]=(byEq[eq]||0)+1; }
+  });
+  var top=Object.keys(byEq).map(function(k){return {eq:k,cnt:byEq[k]};}).sort(function(a,b){return b.cnt-a.cnt;}).slice(0,3);
+  return {total:faults.length, down:down, incomplete:incomplete, top:top};
+}
+
 function openProjectReport(id) {
   window.__rptOpener = function(){ openProjectReport(id); };
   if (!permGuard('WON-D4')) return;
   var p = globalWonData.find(function(x){return x.id===id;});
   var _Lrpt = (window.CUR_LANG || CUR_LANG || 'zh');
   if (!p) { var t=(typeof I18N!=='undefined' && I18N[_Lrpt])?I18N[_Lrpt]:{}; showAlert(t.rpt_not_found||'Project not found'); return; }
-  var t = (typeof I18N!=='undefined' && I18N[_Lrpt]) ? I18N[_Lrpt] : {};
-  var rpt = function(k){return (t[k]!==undefined)?t[k]:k;};
-
-  // 元信息
-  document.getElementById('rptTitle').textContent = '📊 ' + rpt('rpt_title');
-  document.getElementById('rptMeta').textContent = (p.contract_no||'') + ' · ' + (p.customer||'');
-  document.getElementById('rptPrintLabel').textContent = rpt('rpt_print');
-  document.getElementById('rptCloseLabel').textContent = rpt('rpt_close');
-  document.getElementById('rptFootMeta').textContent = rpt('rpt_title') + ' · ' + (p.contract_no||'');
-
-  var html = '';
-
-  // WON-P345 权限联动：隐藏时报告同步隐藏 ③④⑤ 三个区块，⑥ 顺位改为 ③
-  // （服务端已剥离 p3/p4/p5 字段，这里仅控制区块显隐与编号）
-  var p345Hide = (typeof wonP345Hidden === 'function') ? wonP345Hidden() : false;
-
-  // ① 合同基本信息
-  html += '<div class="rpt-sec"><div class="rpt-sec-title">① '+rpt('rpt_sec1')+'</div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_contract_no')+'</span><span class="v">'+(p.contract_no||'—')+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_customer')+'</span><span class="v">'+(p.customer||'—')+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_sign_date')+'</span><span class="v">'+(p.contract_date||'—')+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_parties')+'</span><span class="v">'+(p.signing_parties||'—')+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_currency')+'</span><span class="v">'+(p.contract_currency||'—')+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_rate_rmb_vnd')+'</span><span class="v">'+(p.rate_rmb_vnd||'—')+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_rate_usd_vnd')+'</span><span class="v">'+(p.rate_usd_vnd||'—')+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_incoterm')+'</span><span class="v">'+(p.incoterm||'—')+'</span></div>';
-  var incTxt = includeInstallDisplay(p.include_install);
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_include_install')+'</span><span class="v"><span class="rpt-badge '+(incTxt===rpt('inc_yes')||incTxt==='Yes'||incTxt==='Có'?'rpt-badge-yes':'rpt-badge-no')+'">'+incTxt+'</span></span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_salesperson')+'</span><span class="v">'+(p.salesperson||'—')+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_payment_terms')+'</span><span class="v">'+(paymentTermsDisplay(p)||'—')+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_bu')+'</span><span class="v">'+buDisplay(p.doc_remark)+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_vat')+'</span><span class="v">'+(rpt('rpt_rmb')+': '+(p.vat_rmb||0).toLocaleString()+' / '+rpt('rpt_usd')+': '+(p.vat_usd||0).toLocaleString()+' / '+rpt('rpt_vnd')+': '+(p.vat_vnd||0).toLocaleString())+'</span></div>';
-  html += '</div>';
-
-  // ①‑b 质保金信息（优先读主模态框实时值，否则回退主表字段）
-  var mwRpt = getMainWarrantyState();
-  var wrRpt = mwRpt ? mwRpt.rmb : (Number(p.warranty_rmb)||0);
-  var wuRpt = mwRpt ? mwRpt.usd : (Number(p.warranty_usd)||0);
-  var wvRpt = mwRpt ? mwRpt.vnd : (Number(p.warranty_vnd)||0);
-  var wsRpt = mwRpt ? mwRpt.start : (p.warranty_start||'');
-  var weRpt = mwRpt ? mwRpt.end   : (p.warranty_end||'');
-  var hasWRpt = (wrRpt>0 || wuRpt>0 || wvRpt>0 || wsRpt || weRpt);
-  html += '<div class="rpt-sec"><div class="rpt-sec-title">①‑b '+rpt('rpt_warranty_sec')+'</div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_has_warranty')+'</span><span class="v"><span class="rpt-badge '+(hasWRpt?'rpt-badge-yes':'rpt-badge-no')+'">'+(hasWRpt?rpt('cp_yes'):rpt('cp_no'))+'</span></span></div>';
-  if (hasWRpt) {
-    html += '<div class="rpt-row"><span class="k">'+rpt('rpt_warranty_amt')+'</span><span class="v">RMB: '+(wrRpt?wrRpt.toLocaleString():'0')+' / USD: '+(wuRpt?wuRpt.toLocaleString():'0')+' / VND: '+(wvRpt?wvRpt.toLocaleString():'0')+'</span></div>';
-    html += '<div class="rpt-row"><span class="k">'+rpt('rpt_warranty_period')+'</span><span class="v">'+(wsRpt||'—')+' ~ '+(weRpt||'—')+'</span></div>';
-  }
-  html += '</div>';
-
-  // ② 客户付款进度
-  var cPaid = (p.cust_paid_rmb||0)+(p.cust_paid_usd||0)*((+p.rate_usd_vnd)||1)/100;
-  var cUnpaid = (p.cust_unpaid_rmb||0)+(p.cust_unpaid_usd||0)*((+p.rate_usd_vnd)||1)/100;
-  var cTotal = cPaid + cUnpaid;
-  var cPct = cTotal>0 ? (cPaid/cTotal*100).toFixed(1) : 0;
-  html += '<div class="rpt-sec"><div class="rpt-sec-title">② '+rpt('rpt_sec2')+'</div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_paid')+' (RMB/USD/VND)</span><span class="v">'+(p.cust_paid_rmb||0).toLocaleString()+' / '+(p.cust_paid_usd||0).toLocaleString()+' / '+(p.cust_paid_vnd||0).toLocaleString()+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_unpaid')+' (RMB/USD/VND)</span><span class="v">'+(p.cust_unpaid_rmb||0).toLocaleString()+' / '+(p.cust_unpaid_usd||0).toLocaleString()+' / '+(p.cust_unpaid_vnd||0).toLocaleString()+'</span></div>';
-  html += '<div class="rpt-row"><span class="k">'+rpt('rpt_progress')+'</span><span class="v" style="display:flex;align-items:center;gap:8px;width:60%;justify-content:flex-end;"><span style="min-width:40px;">'+cPct+'%</span><div class="rpt-prog"><div style="width:'+cPct+'%;background:linear-gradient(90deg,#E53935,#EF5350);"></div></div></span></div>';
-  html += '</div>';
-
-  // ③④⑤ P3/P4/P5 区块：WON-P345 隐藏时整块不渲染
-  if (!p345Hide) {
-    // ③ GS→AGI 佣金
-    html += '<div class="rpt-sec"><div class="rpt-sec-title">③ '+rpt('rpt_sec3')+'</div>';
-    html += '<div class="rpt-row"><span class="k">'+rpt('rpt_comm_pct')+'</span><span class="v">'+(p.gs_comm_pct||0)+'%</span></div>';
-    html += '<div class="rpt-row"><span class="k">'+rpt('rpt_comm_amt')+' (RMB/USD/VND)</span><span class="v">'+(p.gs_comm_rmb||0).toLocaleString()+' / '+(p.gs_comm_usd||0).toLocaleString()+' / '+(p.gs_comm_vnd||0).toLocaleString()+'</span></div>';
-    html += '<div class="rpt-row"><span class="k">'+rpt('rpt_paid')+' (RMB/USD/VND)</span><span class="v">'+(p.gs_paid_rmb||0).toLocaleString()+' / '+(p.gs_paid_usd||0).toLocaleString()+' / '+(p.gs_paid_vnd||0).toLocaleString()+'</span></div>';
-    html += '<div class="rpt-row"><span class="k">'+rpt('rpt_unpaid')+' (RMB/USD/VND)</span><span class="v">'+(p.gs_unpaid_rmb||0).toLocaleString()+' / '+(p.gs_unpaid_usd||0).toLocaleString()+' / '+(p.gs_unpaid_vnd||0).toLocaleString()+'</span></div>';
-    html += '</div>';
-
-    // ④ AGI→GS 合同执行
-    html += '<div class="rpt-sec"><div class="rpt-sec-title">④ '+rpt('rpt_sec4')+'</div>';
-    html += '<div class="rpt-row"><span class="k">'+rpt('rpt_payable')+' (RMB/USD/VND)</span><span class="v">'+(p.agi_payable_rmb||0).toLocaleString()+' / '+(p.agi_payable_usd||0).toLocaleString()+' / '+(p.agi_payable_vnd||0).toLocaleString()+'</span></div>';
-    html += '<div class="rpt-row"><span class="k">'+rpt('rpt_paid')+' (RMB/USD/VND)</span><span class="v">'+(p.agi_paid_rmb||0).toLocaleString()+' / '+(p.agi_paid_usd||0).toLocaleString()+' / '+(p.agi_paid_vnd||0).toLocaleString()+'</span></div>';
-    html += '<div class="rpt-row"><span class="k">'+rpt('rpt_unpaid')+' (RMB/USD/VND)</span><span class="v">'+(p.agi_unpaid_rmb||0).toLocaleString()+' / '+(p.agi_unpaid_usd||0).toLocaleString()+' / '+(p.agi_unpaid_vnd||0).toLocaleString()+'</span></div>';
-    html += '</div>';
-
-    // ⑤ 补充协议
-    html += '<div class="rpt-sec"><div class="rpt-sec-title">⑤ '+rpt('rpt_sec5')+'</div>';
-    var suppCount = (p.doc_addendum_cnt)||0;
-    if (suppCount>0) {
-      html += '<div class="rpt-row"><span class="k">'+rpt('rpt_supp_count')+'</span><span class="v">'+suppCount+'</span></div>';
-      // 尝试解析 supp_summary
-      try {
-        var supp = (typeof p.supp_summary==='string') ? JSON.parse(p.supp_summary) : (p.supp_summary||[]);
-        if (supp.length) {
-          supp.forEach(function(s,i){
-            html += '<div class="rpt-supp-item">#'+(i+1)+' · '+(s.date||'')+' · '+(tlPick(s.desc||s.description||'')||'')+' · RMB:'+((s.amt_rmb||s.amount_rmb||0).toLocaleString())+'</div>';
-          });
-        }
-      } catch(e) {}
-    } else {
-      html += '<div class="rpt-row"><span class="k">'+rpt('rpt_no_supp')+'</span><span class="v">—</span></div>';
-    }
-    html += '</div>';
-  }
-
-  // ⑥ 预算 vs 实际对比（P345 隐藏时编号顺位改为 ③）
-  html += '<div class="rpt-sec"><div class="rpt-sec-title">'+(p345Hide?'③':'⑥')+' '+rpt('rpt_sec6')+'</div>';
-  html += '<table class="rpt-tbl"><thead><tr><th>'+rpt('rpt_fb')+'</th><th>'+rpt('rpt_budget')+' (RMB)</th><th>'+rpt('rpt_actual')+' (RMB)</th><th>'+rpt('rpt_diff')+' (RMB)</th></tr></thead><tbody>';
-  var rows = [
-    [rpt('rpt_fb'), p.fb_budget_rmb||0, p.fb_actual_rmb||0],
-    [rpt('rpt_cc'), p.cc_budget_rmb||0, p.cc_actual_rmb||0],
-    [rpt('rpt_inst'), p.inst_budget_rmb||0, p.inst_actual_rmb||0]
-  ];
-  rows.forEach(function(r){
-    var diff = r[2]-r[1];
-    var cls = diff<0 ? 'rpt-pos' : (diff>0 ? 'rpt-neg' : '');
-    var sign = diff<0 ? ' '+rpt('rpt_diff_pos') : (diff>0 ? ' '+rpt('rpt_diff_neg') : '');
-    html += '<tr><td style="text-align:left;font-weight:600;">'+r[0]+'</td><td>'+(r[1]).toLocaleString()+'</td><td>'+(r[2]).toLocaleString()+'</td><td class="'+cls+'">'+(diff>=0?'+':'')+diff.toLocaleString()+sign+'</td></tr>';
-  });
-  // VND 行
-  html += '<tr><td colspan="4" style="background:#FBE9E7;font-weight:700;color:#B71C1C;text-align:left;">'+rpt('rpt_vnd')+'</td></tr>';
-  var rowsV = [
-    [rpt('rpt_fb'), p.fb_budget_vnd||0, p.fb_actual_vnd||0],
-    [rpt('rpt_cc'), p.cc_budget_vnd||0, p.cc_actual_vnd||0],
-    [rpt('rpt_inst'), p.inst_budget_vnd||0, p.inst_actual_vnd||0]
-  ];
-  rowsV.forEach(function(r){
-    var diff = r[2]-r[1];
-    var cls = diff<0 ? 'rpt-pos' : (diff>0 ? 'rpt-neg' : '');
-    var sign = diff<0 ? ' '+rpt('rpt_diff_pos') : (diff>0 ? ' '+rpt('rpt_diff_neg') : '');
-    html += '<tr><td style="text-align:left;">'+r[0]+'</td><td>'+(r[1]).toLocaleString()+'</td><td>'+(r[2]).toLocaleString()+'</td><td class="'+cls+'">'+(diff>=0?'+':'')+diff.toLocaleString()+sign+'</td></tr>';
-  });
-  html += '</tbody></table></div>';
-
-  // ★ 项目综合报告改为新窗口/新标签页打开，不遮挡当前主页
+  var dic = (typeof I18N!=='undefined' && I18N[_Lrpt]) ? I18N[_Lrpt] : {};
+  var rpt = function(k){ if(RPT_I18N[_Lrpt] && RPT_I18N[_Lrpt][k]!==undefined) return RPT_I18N[_Lrpt][k]; if(dic[k]!==undefined) return dic[k]; return k; };
   var _rptEsc = function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
-  var _rptTitle = _rptEsc('📊 ' + rpt('rpt_title') + ' · ' + (p.contract_no||'') + ' · ' + (p.customer||''));
-  var _rptHead = _rptEsc(rpt('rpt_title'));
-  var _rptSub = _rptEsc((p.contract_no||'') + ' · ' + (p.customer||''));
-  var _rptFoot = _rptEsc(rpt('rpt_title') + ' · ' + (p.contract_no||''));
-  var _rptModal = '<div class="rpt-modal"><div class="rpt-head"><h3>' + _rptHead + '</h3><span>' + _rptSub + '</span></div><div class="rpt-body">' + html + '</div><div class="rpt-foot"><span>' + _rptFoot + '</span><div><button class="rpt-btn rpt-btn-outline" onclick="window.print()">🖨 ' + _rptEsc(rpt('rpt_print')) + '</button></div></div></div>';
-  var _rptDoc = '<!DOCTYPE html><html lang="' + _Lrpt + '"><head><meta charset="utf-8"><title>' + _rptTitle + '</title><style>' + PROJECT_REPORT_CSS + '</style></head><body>' + _rptModal + '</body></html>';
+
+  // 先同步打开窗口并写过渡页（防弹窗拦截 + 避免闪烁）
   var _rptWin = window.open('', '_blank');
-  if (!_rptWin) { showAlert(t.popup_blocked || '请允许弹窗以打开报告'); return; }
+  if (!_rptWin) { showAlert(rpt('rpt_popup_blocked')); return; }
+  var _loadingDoc = '<!DOCTYPE html><html lang="'+_Lrpt+'"><head><meta charset="utf-8"><title>'+_rptEsc(rpt('rpt_title'))+'</title><style>'+PROJECT_REPORT_CSS+RPT_CSS_EXTRA+'</style></head><body><div class="rpt-loading">'+rpt('rpt_loading')+'</div></body></html>';
   _rptWin.document.open();
-  _rptWin.document.write(_rptDoc);
+  _rptWin.document.write(_loadingDoc);
   _rptWin.document.close();
+
+  function _buildDoc(htmlBody){
+    var _rptTitle=_rptEsc('📊 '+rpt('rpt_title')+' · '+(p.contract_no||'')+' · '+(p.customer||''));
+    var _rptHead=_rptEsc(rpt('rpt_title'));
+    var _rptSub=_rptEsc((p.contract_no||'')+' · '+(p.customer||''));
+    var _rptFoot=_rptEsc(rpt('rpt_title')+' · '+(p.contract_no||''));
+    var _modal='<div class="rpt-modal"><div class="rpt-head"><h3>'+_rptHead+'</h3><span>'+_rptSub+'</span></div><div class="rpt-body">'+htmlBody+'</div><div class="rpt-foot"><span>'+_rptFoot+'</span><div><button class="rpt-btn rpt-btn-outline" onclick="window.print()">🖨 '+_rptEsc(rpt('rpt_print'))+'</button></div></div></div>';
+    return '<!DOCTYPE html><html lang="'+_Lrpt+'"><head><meta charset="utf-8"><title>'+_rptTitle+'</title><style>'+PROJECT_REPORT_CSS+RPT_CSS_EXTRA+'</style></head><body>'+_modal+'</body></html>';
+  }
+
+  function _render(f){
+    var rr=(+p.rate_rmb_vnd||0), ru=(+p.rate_usd_vnd||0);
+    var html='';
+
+    // ① 合同基本信息（沿用现有逻辑原样）
+    html+='<div class="rpt-sec"><div class="rpt-sec-title">① '+rpt('rpt_sec1')+'</div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_contract_no')+'</span><span class="v">'+(p.contract_no||'—')+'</span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_customer')+'</span><span class="v">'+(p.customer||'—')+'</span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_sign_date')+'</span><span class="v">'+(p.contract_date||'—')+'</span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_parties')+'</span><span class="v">'+(p.signing_parties||'—')+'</span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_currency')+'</span><span class="v">'+(p.contract_currency||'—')+'</span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_rate_rmb_vnd')+'</span><span class="v">'+(p.rate_rmb_vnd||'—')+'</span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_rate_usd_vnd')+'</span><span class="v">'+(p.rate_usd_vnd||'—')+'</span></div>';
+html+='<div class="rpt-row"><span class="k">'+rpt('rpt_incoterm')+'</span><span class="v">'+(p.incoterm||'—')+'</span></div>';
+    var incTxt=includeInstallDisplay(p.include_install);
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_include_install')+'</span><span class="v"><span class="rpt-badge '+(incTxt===rpt('inc_yes')||incTxt==='Yes'||incTxt==='Có'?'rpt-badge-yes':'rpt-badge-no')+'">'+incTxt+'</span></span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_salesperson')+'</span><span class="v">'+(p.salesperson||'—')+'</span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_payment_terms')+'</span><span class="v">'+(paymentTermsDisplay(p)||'—')+'</span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_bu')+'</span><span class="v">'+buDisplay(p.doc_remark)+'</span></div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_vat')+'</span><span class="v">'+(rpt('rpt_rmb')+': '+(p.vat_rmb||0).toLocaleString()+' / '+rpt('rpt_usd')+': '+(p.vat_usd||0).toLocaleString()+' / '+rpt('rpt_vnd')+': '+(p.vat_vnd||0).toLocaleString())+'</span></div>';
+    html+='</div>';
+
+    // ② 质保金（优先读主模态框实时值，否则回退主表字段）
+    var mwRpt=getMainWarrantyState();
+    var wrRpt=mwRpt?mwRpt.rmb:(Number(p.warranty_rmb)||0);
+    var wuRpt=mwRpt?mwRpt.usd:(Number(p.warranty_usd)||0);
+    var wvRpt=mwRpt?mwRpt.vnd:(Number(p.warranty_vnd)||0);
+    var wsRpt=mwRpt?mwRpt.start:(p.warranty_start||'');
+    var weRpt=mwRpt?mwRpt.end:(p.warranty_end||'');
+    var hasWRpt=(wrRpt>0||wuRpt>0||wvRpt>0||wsRpt||weRpt);
+    html+='<div class="rpt-sec"><div class="rpt-sec-title">② '+rpt('rpt_warranty_sec')+'</div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_has_warranty')+'</span><span class="v"><span class="rpt-badge '+(hasWRpt?'rpt-badge-yes':'rpt-badge-no')+'">'+(hasWRpt?rpt('cp_yes'):rpt('cp_no'))+'</span></span></div>';
+    if(hasWRpt){
+      html+='<div class="rpt-row"><span class="k">'+rpt('rpt_warranty_amt')+'</span><span class="v">RMB: '+(wrRpt?wrRpt.toLocaleString():'0')+' / USD: '+(wuRpt?wuRpt.toLocaleString():'0')+' / VND: '+(wvRpt?wvRpt.toLocaleString():'0')+'</span></div>';
+      html+='<div class="rpt-row"><span class="k">'+rpt('rpt_warranty_period')+'</span><span class="v">'+(wsRpt||'—')+' ~ '+(weRpt||'—')+'</span></div>';
+    }
+    html+='</div>';
+
+    // ③ 客户付款
+    var cp=rpt_custPay(p);
+    var cpPct = cp.planVnd>0 ? (cp.actualVnd/cp.planVnd*100).toFixed(1) : '0.0';
+    html+='<div class="rpt-sec"><div class="rpt-sec-title">③ '+rpt('rpt_sec3')+'</div>';
+    html+='<div class="rpt-kpi-row">'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+cp.paid+' / '+cp.planned+'</div><div class="rpt-kpi-l">'+rpt('rpt_pay_paid')+' / '+rpt('rpt_pay_plan')+' （'+rpt('rpt_bills')+'）</div></div>'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+rpt_moneyHtml(cp.planVnd,rr,ru)+'</div><div class="rpt-kpi-l">'+rpt('rpt_contract_total')+'</div></div>'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+rpt_moneyHtml(cp.actualVnd,rr,ru)+'</div><div class="rpt-kpi-l">'+rpt('rpt_paid_total')+'</div></div>'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+rpt_moneyHtml(cp.planVnd-cp.actualVnd,rr,ru)+'</div><div class="rpt-kpi-l">'+rpt('rpt_unpaid_total')+'</div></div>'
+        + '</div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_progress')+'</span><span class="v" style="display:flex;align-items:center;gap:8px;width:60%;justify-content:flex-end;"><span style="min-width:40px;">'+cpPct+'%</span><div class="rpt-prog"><div style="width:'+cpPct+'%;background:linear-gradient(90deg,#E53935,#EF5350);"></div></div></span></div>';
+    if(cp.ok){
+      html+='<div class="rpt-sub">'+rpt('rpt_pay_table_title')+'</div>';
+      html+='<table class="rpt-tbl rpt-pay-tbl"><thead><tr><th>'+rpt('rpt_col_date')+'</th><th>'+rpt('rpt_col_cat')+'</th><th>'+rpt('rpt_col_usage')+'</th><th>'+rpt('rpt_col_actual')+'</th><th>'+rpt('rpt_col_method')+'</th></tr></thead><tbody>';
+      cp.rows.forEach(function(r){
+        if(!r) return; var a=r.actual||{}; var av=rpt_toVnd(a,rr,ru);
+        if(!((+a.rmb||0)||(+a.usd||0)||(+a.vnd||0))) return;
+        html+='<tr><td>'+(r.actualDate||r.planDate||'—')+'</td><td>'+(r.cat||'—')+'</td><td>'+_rptEsc(r.usage||'—')+'</td><td>'+rpt_moneyHtml(av,rr,ru)+'</td><td>'+(r.method||'—')+'</td></tr>';
+      });
+      html+='</tbody></table>';
+    } else {
+      html+='<div class="rpt-row"><span class="k">'+rpt('rpt_no_pay_detail')+'</span><span class="v">—</span></div>';
+    }
+    html+='</div>';
+
+    // ④ 生产与人员
+    var prodBySpec=rpt_producedBySpec(f);
+    var outBySpec=rpt_outBySpec(f);
+    var demandBySpec=rpt_demandBySpec();
+    var outTotal=0; for(var k1 in outBySpec){ if(outBySpec.hasOwnProperty(k1)) outTotal+=(+outBySpec[k1]||0); }
+    var prodTotal=0; for(var k2 in prodBySpec){ if(prodBySpec.hasOwnProperty(k2)) prodTotal+=(+prodBySpec[k2]||0); }
+    var demandTotal=0; for(var k3 in demandBySpec){ if(demandBySpec.hasOwnProperty(k3)) demandTotal+=(+demandBySpec[k3]||0); }
+    var prodPct = demandTotal>0 ? (prodTotal/demandTotal*100).toFixed(1) : '0.0';
+    var aw=rpt_avgWorkers(f);
+    var out7=rpt_recentOutput(f,7), out30=rpt_recentOutput(f,30);
+    var specKeys=Object.keys(demandBySpec).sort(typeof prod_specSortCmp==='function'?prod_specSortCmp:function(a,b){return a.localeCompare(b);});
+    html+='<div class="rpt-sec"><div class="rpt-sec-title">④ '+rpt('rpt_sec4')+'</div>';
+    html+='<div class="rpt-kpi-row">'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+rpt_num(out7)+'</div><div class="rpt-kpi-l">'+rpt('rpt_kpi_out7')+'</div></div>'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+rpt_num(out30)+'</div><div class="rpt-kpi-l">'+rpt('rpt_kpi_out30')+'</div></div>'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+rpt_num(outTotal)+'</div><div class="rpt-kpi-l">'+rpt('rpt_kpi_out')+'</div></div>'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+aw.avg.toFixed(1)+'</div><div class="rpt-kpi-l">'+rpt('rpt_kpi_avg_workers')+'（'+aw.days+' '+rpt('rpt_kpi_reg_days')+'）</div></div>'
+        + '</div>';
+    html+='<div class="rpt-row"><span class="k">'+rpt('rpt_prod_progress')+'</span><span class="v" style="display:flex;align-items:center;gap:8px;width:60%;justify-content:flex-end;"><span style="min-width:40px;">'+prodPct+'%</span><div class="rpt-prog"><div style="width:'+prodPct+'%;background:linear-gradient(90deg,#2E9CC6,#3FB6E0);"></div></div></span></div>';
+    if(specKeys.length){
+      html+='<table class="rpt-tbl rpt-spec-tbl"><thead><tr><th>'+rpt('th_spec')+'</th><th>'+rpt('rpt_tbl_demand')+'</th><th>'+rpt('rpt_tbl_produced')+'</th><th>'+rpt('rpt_tbl_gap')+'</th></tr></thead><tbody>';
+      specKeys.forEach(function(sk){
+        var dem=demandBySpec[sk]||0, pr=prodBySpec[sk]||0, gap=dem-pr;
+        html+='<tr><td style="text-align:left">'+_rptEsc(sk)+'</td><td>'+rpt_num(dem)+'</td><td>'+rpt_num(pr)+'</td><td>'+rpt_num(gap)+'</td></tr>';
+      });
+      html+='</tbody></table>';
+      if(prodTotal===0) html+='<div class="rpt-note">'+rpt('rpt_no_prod')+'</div>';
+    } else {
+      html+='<div class="rpt-row"><span class="k">'+rpt('rpt_no_prod')+'</span><span class="v">—</span></div>';
+    }
+    html+='</div>';
+
+    // ⑤ 安装进度
+    var instBySpec=rpt_installedBySpec(f);
+    var instTotal=0; for(var k4 in instBySpec){ if(instBySpec.hasOwnProperty(k4)) instTotal+=(+instBySpec[k4]||0); }
+    var instPct = demandTotal>0 ? (instTotal/demandTotal*100).toFixed(1) : '0.0';
+    html+='<div class="rpt-sec"><div class="rpt-sec-title">⑤ '+rpt('rpt_sec5')+'</div>';
+    if(p.include_install==='no'){
+      html+='<div class="rpt-row"><span class="k">'+rpt('rpt_no_inst')+'</span><span class="v">—</span></div>';
+    } else {
+      html+='<div class="rpt-row"><span class="k">'+rpt('rpt_inst_progress')+'</span><span class="v" style="display:flex;align-items:center;gap:8px;width:60%;justify-content:flex-end;"><span style="min-width:40px;">'+instPct+'%</span><div class="rpt-prog"><div style="width:'+instPct+'%;background:linear-gradient(90deg,#7BB33E,#9ACD5A);"></div></div></span></div>';
+      if(specKeys.length){
+        html+='<table class="rpt-tbl rpt-spec-tbl"><thead><tr><th>'+rpt('th_spec')+'</th><th>'+rpt('rpt_tbl_demand')+'</th><th>'+rpt('rpt_installed')+'</th><th>'+rpt('rpt_tbl_gap')+'</th></tr></thead><tbody>';
+        specKeys.forEach(function(sk){
+          var dem=demandBySpec[sk]||0, ins=instBySpec[sk]||0, gap=dem-ins;
+          html+='<tr><td style="text-align:left">'+_rptEsc(sk)+'</td><td>'+rpt_num(dem)+'</td><td>'+rpt_num(ins)+'</td><td>'+rpt_num(gap)+'</td></tr>';
+        });
+        html+='</tbody></table>';
+      }
+      if(instTotal===0) html+='<div class="rpt-note">'+rpt('rpt_no_inst')+'</div>';
+    }
+    html+='</div>';
+
+    // ⑥ 设备与故障
+    var fs=rpt_faultStats(f);
+    var workdays=(fs.down/8);
+    html+='<div class="rpt-sec"><div class="rpt-sec-title">⑥ '+rpt('rpt_sec6')+'</div>';
+    html+='<div class="rpt-kpi-row">'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+rpt_num(fs.total)+'</div><div class="rpt-kpi-l">'+rpt('rpt_fault_total')+'</div></div>'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+rpt_num(fs.down)+'</div><div class="rpt-kpi-l">'+rpt('rpt_fault_down')+'（'+rpt('rpt_fault_down_hours')+'）≈'+workdays.toFixed(1)+' '+rpt('rpt_fault_workdays')+'</div></div>'
+        + '<div class="rpt-kpi"><div class="rpt-kpi-v">'+rpt_num(fs.incomplete)+'</div><div class="rpt-kpi-l">'+rpt('rpt_fault_incomplete')+'</div></div>'
+        + '</div>';
+    if(fs.top.length){
+      html+='<div class="rpt-sub">'+rpt('rpt_fault_top3')+'</div>';
+      html+='<table class="rpt-tbl"><thead><tr><th>'+rpt('rpt_fault_equip')+'</th><th>'+rpt('rpt_fault_count')+'</th></tr></thead><tbody>';
+      fs.top.forEach(function(t){
+        var it=prod_equipItem(t.eq); var nm = it ? (it[_Lrpt]||it.zh) : t.eq;
+        html+='<tr><td style="text-align:left">'+_rptEsc(nm)+'</td><td>'+t.cnt+'</td></tr>';
+      });
+      html+='</tbody></table>';
+    } else {
+      html+='<div class="rpt-row"><span class="k">'+rpt('rpt_no_fault')+'</span><span class="v">—</span></div>';
+    }
+    html+='</div>';
+
+    // 一次性写完整文档（覆盖过渡页，不闪）
+    _rptWin.document.open();
+    _rptWin.document.write(_buildDoc(html));
+    _rptWin.document.close();
+  }
+
+  // 只读取数：本地 + 服务端合并（不写库、不推服务端、不触发本地为种子回传）
+  var localF = prod_get(id);
+  var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : '';
+  var serverP = me
+    ? fetch('/api/prod-factory/'+encodeURIComponent(id)+'?me='+encodeURIComponent(me)).then(function(r){return r.ok?r.json():null;}).then(function(d){return (d&&d.ok&&d.data)?d.data:null;}).catch(function(){return null;})
+    : Promise.resolve(null);
+  serverP.then(function(serverF){
+    var f = localF;
+    if(serverF){ try{ f = prod_mergeFactory(localF, serverF); }catch(e){ f = localF; } }
+    // 矩阵/安装依赖 PROD_CUR（与 INST_CUR），临时设置后还原，避免影响当前工厂视图
+    var _pc = (typeof PROD_CUR!=='undefined')?PROD_CUR:null;
+    var _ic = (typeof INST_CUR!=='undefined')?INST_CUR:null;
+    try{
+      if(typeof PROD_CUR!=='undefined') PROD_CUR=id;
+      if(typeof INST_CUR!=='undefined') INST_CUR=id;
+      _render(f);
+    } finally {
+      if(typeof PROD_CUR!=='undefined') PROD_CUR=_pc;
+      if(typeof INST_CUR!=='undefined') INST_CUR=_ic;
+    }
+  });
 }
 
 function closeProjectReport() {
