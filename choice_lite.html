@@ -24794,6 +24794,7 @@ var PROD_EQUIP_FAULT_KB = {
       api = res.univerAPI || null;
       ready = true;
       try { eqExcelKeysBind(); } catch(e){}   /* ★Excel 键盘行为补丁（EQ-EXCEL-KEYS） */
+      try { eqPatchPermissionService(); } catch(e){}   /* ★权限点放行：右键「插入行」等编辑命令不再被静默拦下 */
     } catch(e){
       inited = false;
       st('引擎加载失败：' + e.message);
@@ -24848,6 +24849,63 @@ var PROD_EQUIP_FAULT_KB = {
        ========================================================================= */
     var EQ_EDGE_SCAN = 4000;
     var eqPrevCur = null, eqLastKeyAt = 0;
+
+    /* ★Univer 0.5.5 权限点补丁（照财务 fin_patchPermissionService 移植，2026-10-16）。
+       现象：右键行号 →「在上方/下方插入行」点了完全没反应。
+       根因：这类编辑命令受 IPermissionService 的权限点守卫，而纯净 workbook 里
+       这些权限点【根本没注册】→ composePermission$ 收到缺失的 id → 命令被静默拦下。
+       做法：缺失的权限点用「兜底点」占位（value=true = 放行）；同步版缺失直接放行。 */
+    function eqPatchPermissionService(){
+      try {
+        if (!coreMod || !univer || typeof univer.__getInjector !== 'function') return false;
+        var token = coreMod.IPermissionService;
+        if (!token) return false;                       /* @univerjs/core 没导入成功 */
+        var inj = univer.__getInjector();
+        var perm = (inj && typeof inj.get === 'function') ? inj.get(token) : null;
+        if (!perm) return false;
+        if (perm.__eqPermSafe) return true;             /* 幂等：只装一次 */
+        var origAsync = perm.composePermission$;
+        var origSync = perm.composePermission;
+        if (typeof origAsync !== 'function' || typeof origSync !== 'function') return false;
+        var FALLBACK_ID = '__eq_perm_fallback__';
+        function fallbackId(self){
+          try {
+            if (!self.getPermissionPoint$(FALLBACK_ID)) {
+              self.addPermissionPoint({ id: FALLBACK_ID, value: true });
+            }
+          } catch(e){}
+          return self.getPermissionPoint$(FALLBACK_ID) ? FALLBACK_ID : null;
+        }
+        /* 异步版：缺失的 id 用兜底 id 占位后再交给原实现（入参个数=输出数组长度，语义不变） */
+        perm.composePermission$ = function(ids){
+          var self = this;
+          var list = ids || [];
+          var safe = null;
+          for (var i = 0; i < list.length; i++){
+            if (self.getPermissionPoint$(list[i])) {
+              if (safe) safe.push(list[i]);
+            } else {
+              if (!safe) safe = list.slice(0, i);
+              var fb = fallbackId(self);
+              if (!fb) return origAsync.call(self, list);
+              safe.push(fb);
+            }
+          }
+          if (!safe) return origAsync.call(self, list);   /* 全都在 → 完全走原实现 */
+          return origAsync.call(self, safe);
+        };
+        /* 同步版：取不到就直接给「放行」对象，绝不 throw */
+        perm.composePermission = function(ids){
+          var self = this;
+          return (ids || []).map(function(id){
+            var p = self.getPermissionPoint(id);
+            return p || { id: id, value: true };
+          });
+        };
+        perm.__eqPermSafe = true;
+        return true;
+      } catch(e){ return false; }
+    }
 
     function eqSheetObj(){
       try { var wb = api && api.getActiveWorkbook && api.getActiveWorkbook();

@@ -198,6 +198,14 @@ chk("eqRenameSheets(s, function(d){ return d.vi; })" in eqblk,
     "★payload 存盘前把表名还原成越文（文件=唯一事实源）")
 chk("transOf(cell.v, 'vi')" in eqblk, "★payload 存盘前把翻译过的文字还原成越文原文")
 
+print("15) 权限点放行（2026-10-16 修「右键插入行点了没反应」）")
+chk("function eqPatchPermissionService" in eqblk, "★必须有 eqPatchPermissionService 权限点补丁")
+chk("IPermissionService" in eqblk, "★用 @univerjs/core 的 IPermissionService token（与财务单一模块实例一致）")
+chk("perm.__eqPermSafe" in eqblk, "★补丁幂等（只装一次）")
+chk("id: FALLBACK_ID, value: true" in eqblk, "★缺失权限点用兜底点占位（value=true=放行）")
+chk(re.search(r"perm\.composePermission = function\(ids\)\{.*value: true.*\}", eqblk, re.S) is not None,
+    "★同步版 composePermission 缺失点直接放行（绝不 throw）")
+
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")
 sys.exit(0 if ok else 1)
