@@ -34755,9 +34755,17 @@ function applyRowPerms(tbodyId, map){
   if (typeof authUser === 'undefined' || !authUser) return;
   var tb = document.getElementById(tbodyId);
   if (!tb) return;
+  var bidVisible = {};
+  var selArr = [];
   map.forEach(function(it){
-    if (!permVisible(it.bid)) {
-      tb.querySelectorAll(it.sel).forEach(function(b){ b.style.display = 'none'; });
+    bidVisible[it.bid] = permVisible(it.bid);
+    selArr.push(it.sel);
+  });
+  tb.querySelectorAll(selArr.join(',')).forEach(function(b){
+    for(var i=0;i<map.length;i++){
+      if(b.classList.contains(map[i].sel.slice(1)) && !bidVisible[map[i].bid]){
+        b.style.display = 'none'; break;
+      }
     }
   });
 }
@@ -37324,24 +37332,7 @@ function renderWonData(list) {
   if (typeof syncWonColVisibility === 'function') syncWonColVisibility();
 }
 
-// ==================== WON 渲染包装器：任何 tbody 再生后自动按权限隐藏行内按钮 ====================
-// 背景：renderWonData 内部虽已调用 applyRowPerms，但存在多处直接调用 renderWonData 重新生成 tbody。
-// 排序/搜索/语言切换/清空后必须确保行内按钮按最新权限重新隐藏，否则会出现"选了隐藏仍显示"。
-// 这里挂同步钩子（setTimeout 0：等调用方把 innerHTML 写入 DOM 后再执行），未来新增调用点自动安全。
-(function(){
-  var _orig = renderWonData;
-  renderWonData = function(list){
-    _orig(list);
-    if (typeof applyRowPerms === 'function') setTimeout(function(){
-      applyRowPerms('wonTbody', [
-        { bid: 'WON-D2', sel: '.icon-edit' },
-        { bid: 'WON-D3', sel: '.icon-del' },
-        { bid: 'WON-D4', sel: '.icon-report' },
-        { bid: 'WON-C1', sel: '.icon-copy' }
-      ]);
-    }, 0);
-  };
-})();
+
 
 // ===== 项目行上下移动（按方向 + 重排 No. 列为 1,2,3...）=====
 // dir: 'up' 上移 / 'down' 下移；边界保护：首行不可上移、末行不可下移
@@ -37695,13 +37686,15 @@ function syncWonColVisibility(){
   hidden[78]=1; hidden[79]=1; hidden[80]=1;
   // ★ 永久隐藏：废弃字段 + P3/P4（与编辑弹窗无法对应的列，用于美化总表；不受折叠/权限影响）
   WON_FORCED_HIDE_COLS.forEach(function(c){ hidden[c]=1; });
-  for (var c=0;c<86;c++){   // ⚠️ V45：总列 86（省份 +1、合同两列 +2；含操作列 85）
+  var hasCurHidden = typeof curHiddenFor==='function';
+  // 单列可见性：一次性取全部 td/col，避免 86 次 querySelectorAll 重复遍历大表格
+  var cells = tbl.querySelectorAll('td[data-col], col[data-col]');
+  for (var i=0, len=cells.length; i<len; i++){
+    var el=cells[i];
+    var c=parseInt(el.getAttribute('data-col'),10);
     if (WON_NEVER_HIDE_COLS.has(c)) continue;
-    var want=!!hidden[c] || (typeof curHiddenFor==='function' && curHiddenFor(c,'won'));
-    tbl.querySelectorAll('[data-col="'+c+'"]').forEach(function(el){
-      if (el.tagName==='TH') return;   // 一级表头绝不随单列隐藏，统一由下方组头逻辑处理
-      el.classList.toggle('col-hidden',want);
-    });
+    var want=!!hidden[c] || (hasCurHidden && curHiddenFor(c,'won'));
+    el.classList.toggle('col-hidden',want);
   }
   // 组头单一事实源：仅当组内全部子列都被隐藏时一级表头才隐藏；
   // 否则一级表头保持原位显示，colspan 自动收缩为剩余可见子列数（3→2→1），
@@ -37713,7 +37706,7 @@ function syncWonColVisibility(){
     var vis=0;
     g.c.forEach(function(c){
       if (WON_NEVER_HIDE_COLS.has(c)) { vis++; return; }
-      if (!hidden[c] && !(typeof curHiddenFor==='function' && curHiddenFor(c,'won'))) vis++;
+      if (!hidden[c] && !(hasCurHidden && curHiddenFor(c,'won'))) vis++;
     });
     var th=tbl.querySelector('thead th[data-col="'+first+'"]');
     if(th){
