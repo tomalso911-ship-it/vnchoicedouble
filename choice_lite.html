@@ -28649,7 +28649,9 @@ function sweepI18n(root) {
   if (document.getElementById('slatsSpecTable')) refreshSlatsSelectOptions();
 }
 window.sweepI18n = sweepI18n;
-function fmtMoney(n, c) { var v=Math.round(Number(n)||0); if(c==='RMB'||c==='rmb') return '¥'+v.toLocaleString('en-US'); if(c==='USD'||c==='usd') return '$'+v.toLocaleString('en-US'); if(c==='VND'||c==='vnd') return '₫'+v.toLocaleString('en-US'); return v.toLocaleString('en-US'); }
+/* 纯字符串千分位（不依赖 Intl/ICU）：用于大表渲染，避免 Number.toLocaleString 的高频开销 */
+function fmtThousands(v){ v=Math.round(Number(v)||0); var s=String(v); var neg=(s.charAt(0)==='-'); if(neg) s=s.slice(1); return (neg?'-':'') + s.replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function fmtMoney(n, c) { var v=Math.round(Number(n)||0); if(c==='RMB'||c==='rmb') return '¥'+fmtThousands(v); if(c==='USD'||c==='usd') return '$'+fmtThousands(v); if(c==='VND'||c==='vnd') return '₫'+fmtThousands(v); return fmtThousands(v); }
 function stripToNumber(str) { return parseInt(String(str||'').replace(/[^0-9-]/g,'')||'0',10); }
 
 // ===== 货币符号 → 纯数字 =====
@@ -37192,8 +37194,8 @@ function renderWonData(list) {
     row += wonCell(p.contract_currency || '', 'won-data');
     var rmbVnd = moneyToNumber(p.rate_rmb_vnd);
     var usdVnd = moneyToNumber(p.rate_usd_vnd);
-    row += wonCell(rmbVnd ? rmbVnd.toLocaleString('en-US') : '', 'won-data');
-    row += wonCell(usdVnd ? usdVnd.toLocaleString('en-US') : '', 'won-data');
+    row += wonCell(rmbVnd ? fmtThousands(rmbVnd) : '', 'won-data');
+    row += wonCell(usdVnd ? fmtThousands(usdVnd) : '', 'won-data');
     row += wonCell(p.incoterm || '', 'won-data');
     // ★ V45：设备合同/安装合同列（上传 PDF 后显示 查看/下载，三语）
     row += wonDocCell(p.doc_equip);
@@ -45473,15 +45475,27 @@ function switchView(name) {
   // 进入 Won 视图时确保数据已渲染
   if (name === 'won') {
     if (typeof renderWonThead === 'function' && typeof loadWon === 'function') {
-      renderWonThead(); applyWonLang();
-      // 语言切换留下的轻标：applyWonLang（此刻视图已 active）已用缓存数据重渲染行，
-      // 直接标记已加载，跳过 loadWon 的重新 fetch（消除切标签页时的网络等待）
-      var _stale = (window._viewLangStale && window._viewLangStale.won);
-      var _hasCache = (typeof globalWonData !== 'undefined' && globalWonData && globalWonData.length);
-      if (_stale && _hasCache) {
-        window._viewLangStale.won = false;
+      // ★ 根因修复：签约项目是 86 列大表，每次切标签都整表重建（renderWonThead+applyWonLang
+      // 内部 renderWonData）是点击卡顿 3 秒的主因；其实表格只是 display:none 藏起、DOM 仍在。
+      // 故：已渲染过 且 语言未变 且 数据未失效 时，直接复用现有 DOM，零重建 → 标签切换秒开。
+      var _stale = !!(window._viewLangStale && window._viewLangStale.won);
+      var _hasCache = !!(typeof globalWonData !== 'undefined' && globalWonData && globalWonData.length);
+      var _everRendered = !!window.__wonRenderedOnce;
+      var _dataExpired = !_hasCache || needReloadView('won');
+      if (_everRendered && !_stale && !_dataExpired) {
+        // 已渲染且数据/语言均新鲜：表格仍保留在 DOM，无需重建，立即显示
         markViewLoaded('won');
-      } else if (needReloadView('won')) { loadWon(); markViewLoaded('won'); }
+      } else if (_everRendered && !_stale && _dataExpired) {
+        // 仅数据失效（已渲染、语言未变）：直接拉取并在回调里渲染，不再先渲染旧缓存（避免两次整表重建）
+        loadWon(); markViewLoaded('won');
+      } else {
+        // 首次渲染 或 仅语言失效：用当前语言渲染（有缓存用缓存，无缓存则 loadWon 拉取）
+        renderWonThead(); applyWonLang();
+        if (window._viewLangStale) window._viewLangStale.won = false;
+        window.__wonRenderedOnce = true;
+        if (_dataExpired) loadWon();
+        markViewLoaded('won');
+      }
     }
   }
   // 进入生产管理视图时渲染现场工厂列表
