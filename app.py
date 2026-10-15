@@ -9869,6 +9869,363 @@ def api_demo_clear():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+# ============================================================================
+#                   股东权益报表（Univer）· 独立数据源
+#   ★FIN-EQUITY-20261015（用户 2026-10-15 要求）：
+#     · 文件      ：finance_data/equity_report.xlsx（5 张表，平级）
+#     · 快照缓存  ：equity_report.snapshot.<key>.json（与越南/中国同构）
+#     · 每日备份  ：finance_data/backups/equity_report_<date>.xlsx.bak（滚动 30 份）
+#     · 接口      ：/api/finance/equity-report[/snapshot|/save]
+#     · 表名三语  ：finance_data/fin_sheet_titles_eq.json（与越南/中国分开，互不覆盖）
+#     · 基准币种  ：VND（文件永远存 VND 原值；RMB/USD 只在屏幕上换算，保存时还原）
+#     ★绝不做「重导/上传」接口（用户明确要求：不需要重导按钮）
+#     ★绝不改动 vn_report.xlsx / cn_report.xlsx / merge_report.xlsx
+# ============================================================================
+EQ_REPORT = os.path.join(FIN_DIR, "equity_report.xlsx")
+EQ_SNAP_KEY = os.path.join(FIN_DIR, "equity_report.snapshot.key")
+EQ_SNAP_PREFIX = "equity_report.snapshot."
+EQ_TITLES_PATH = os.path.join(FIN_DIR, "fin_sheet_titles_eq.json")
+_EQ_SNAP_LOCK = _fthreading.Lock()
+
+# 5 张表的定义：(越文表名, 中文表名, 英文表名, [表头(越文)], [金额列 0基], 是否有日期列)
+# ★★文件里的工作表名【固定用越文】：总投资数据表的跨表公式 =SUM('Đầu tư Trung Quốc'!D6:D1005)
+#    引用的是表名，表名一变公式立刻断成 #REF!。语言切换只在【显示层】替换（前端 + 表名映射），
+#    文件本身永远不动。
+EQ_SHEET_DEFS = [
+    {
+        "key": "total",
+        "vi": "Tổng đầu tư", "zh": "总投资数据", "en": "Total Investment",
+        "headers": ["Hạng mục", "Số tiền (VND)", "Tỷ lệ (%)", "Ghi chú"],
+        "amt_cols": [1], "date_col": None,
+    },
+    {
+        "key": "cn",
+        "vi": "Đầu tư Trung Quốc", "zh": "中国投资数据", "en": "China Investment",
+        "headers": ["Ngày", "Hạng mục", "Nhà đầu tư", "Số tiền (VND)",
+                    "Đã thu hồi", "Còn lại", "Số chứng từ", "Ghi chú"],
+        "amt_cols": [3, 4, 5], "date_col": 0,
+    },
+    {
+        "key": "vn",
+        "vi": "Đầu tư Việt Nam", "zh": "越南投资数据", "en": "Vietnam Investment",
+        "headers": ["Ngày", "Hạng mục", "Nhà đầu tư", "Số tiền (VND)",
+                    "Đã thu hồi", "Còn lại", "Số chứng từ", "Ghi chú"],
+        "amt_cols": [3, 4, 5], "date_col": 0,
+    },
+    {
+        "key": "holders",
+        "vi": "Cơ cấu cổ đông", "zh": "股东结构", "en": "Shareholder Structure",
+        "headers": ["Tên cổ đông", "Mã số thuế", "Vốn góp (VND)", "Tỷ lệ (%)",
+                    "Ngày góp vốn", "Trạng thái", "Liên hệ", "Ghi chú"],
+        "amt_cols": [2], "date_col": 4,
+    },
+    {
+        "key": "dividend",
+        "vi": "Cổ tức", "zh": "分红记录", "en": "Dividend Records",
+        "headers": ["Ngày chia", "Cổ đông", "Cơ sở chia", "Số tiền cổ tức",
+                    "Thuế suất (%)", "Thực nhận", "Số chứng từ", "Ghi chú"],
+        "amt_cols": [2, 3, 5], "date_col": 0,
+    },
+]
+EQ_DATA_ROW0 = 6        # 数据区首行（1 基，表头在第 5 行）
+EQ_DATA_ROW1 = 1005     # 数据区末行
+EQ_TOTAL_ROW = 1006     # 合计行
+
+
+def _eq_make_seed_xlsx(path):
+    """生成股东权益种子文件：5 张表 + 越文表头 + 公式 + 底部合计行（幂等：已存在就不动）。"""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+
+    head_font = Font(bold=True, color="FFFFFF")
+    head_fill = PatternFill("solid", fgColor="1F4E79")
+    title_font = Font(bold=True, size=14)
+    money_fmt = '#,##0'
+
+    for d in EQ_SHEET_DEFS:
+        ws = wb.create_sheet(d["vi"])
+        if d["key"] == "total":
+            ws.cell(row=1, column=1, value="SỔ THEO DÕI QUYỀN LỢI CỔ ĐÔNG").font = title_font
+            ws.cell(row=2, column=1, value="Tiền tệ cơ sở: VND (Đơn vị: đồng)")
+        else:
+            ws.cell(row=1, column=1, value=d["vi"]).font = title_font
+            ws.cell(row=2, column=1, value="Tiền tệ cơ sở: VND (Đơn vị: đồng)")
+
+        # 第 4 行：表头（第 5 行是列标题，与越南报表版式一致）
+        for ci, h in enumerate(d["headers"], start=1):
+            c = ws.cell(row=5, column=ci, value=h)
+            c.font = head_font
+            c.fill = head_fill
+            c.alignment = Alignment(horizontal="center", vertical="center")
+        for ci in range(1, len(d["headers"]) + 1):
+            ws.column_dimensions[get_column_letter(ci)].width = 18
+
+        if d["key"] == "total":
+            # ★汇总头：中国 / 越南 / 合计 / 占比（公式固定引用【越文】表名）
+            rows = [
+                ("Đầu tư Trung Quốc (中国投资)", "=SUM('Đầu tư Trung Quốc'!D%(a)d:D%(b)d)" % {"a": EQ_DATA_ROW0, "b": EQ_DATA_ROW1}),
+                ("Đầu tư Việt Nam (越南投资)", "=SUM('Đầu tư Việt Nam'!D%(a)d:D%(b)d)" % {"a": EQ_DATA_ROW0, "b": EQ_DATA_ROW1}),
+                ("Tổng cộng (总投资合计)", "=B6+B7"),
+            ]
+            for ri, (label, formula) in enumerate(rows, start=6):
+                ws.cell(row=ri, column=1, value=label)
+                c = ws.cell(row=ri, column=2, value=formula)
+                c.number_format = money_fmt
+            # 占比：B8 是合计行
+            ws.cell(row=6, column=3, value="=IF($B$8,B6/$B$8*100,0)")
+            ws.cell(row=7, column=3, value="=IF($B$8,B7/$B$8*100,0)")
+            ws.cell(row=8, column=1, value="Tổng cộng (总投资合计)").font = Font(bold=True)
+            ws.cell(row=8, column=2, value="=B6+B7").number_format = money_fmt
+            ws.cell(row=8, column=3, value="=IF($B$8,B8/$B$8*100,0)")
+            # 第 9 行空行；第 10 行起：空明细区（同一套 4 列，用户自由录）
+            ws.cell(row=10, column=1, value="(Khu vực ghi chú chi tiết / 明细区 / Detail area)")
+        else:
+            # 明细表：未回收 = 金额 - 已回收
+            amt = d["amt_cols"]
+            for r in range(EQ_DATA_ROW0, EQ_DATA_ROW1 + 1):
+                if d["key"] == "cn" or d["key"] == "vn":
+                    ws.cell(row=r, column=6, value="=IF(D%d,E%d-D%d,0)" % (r, r, r)).number_format = money_fmt
+                elif d["key"] == "dividend":
+                    ws.cell(row=r, column=6, value="=IF(D%d,D%d*(1-N(E%d)/100),0)" % (r, r, r)).number_format = money_fmt
+                elif d["key"] == "holders":
+                    ws.cell(row=r, column=4, value="=IF($C$%d,C%d/$C$%d*100,0)" % (EQ_TOTAL_ROW, r, EQ_TOTAL_ROW))
+            # 合计行
+            ws.cell(row=EQ_TOTAL_ROW, column=1, value="TỔNG CỘNG").font = Font(bold=True)
+            for ci in amt:
+                L = get_column_letter(ci + 1)
+                c = ws.cell(row=EQ_TOTAL_ROW, column=ci + 1,
+                            value="=SUM(%(L)s%(a)s:%(L)s%(b)s)" % {"L": L, "a": EQ_DATA_ROW0, "b": EQ_DATA_ROW1})
+                c.number_format = money_fmt
+                c.font = Font(bold=True)
+            if d["key"] == "holders":
+                ws.cell(row=EQ_TOTAL_ROW, column=4, value="=SUM(D%d:D%d)" % (EQ_DATA_ROW0, EQ_DATA_ROW1))
+            for ci in amt:
+                for r in range(EQ_DATA_ROW0, EQ_DATA_ROW1 + 1):
+                    ws.cell(row=r, column=ci + 1).number_format = money_fmt
+            if d["date_col"] is not None:
+                for r in range(EQ_DATA_ROW0, EQ_DATA_ROW1 + 1):
+                    ws.cell(row=r, column=d["date_col"] + 1).number_format = FIN_DATE_FMT
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp.xlsx"
+    wb.save(tmp)
+    os.replace(tmp, path)
+
+
+def _eq_seed_if_missing():
+    if not os.path.isfile(EQ_REPORT):
+        try:
+            _eq_make_seed_xlsx(EQ_REPORT)
+            sys.stderr.write("[fin-eq] seed created: %s\n" % EQ_REPORT)
+            sys.stderr.flush()
+        except Exception as e:
+            sys.stderr.write("[fin-eq] seed failed: %s\n" % e)
+            sys.stderr.flush()
+
+
+def _eq_report_key():
+    """缓存键 = mtime(ns) + size + 路径（与越南/中国同机制：改了文件必然失效）。"""
+    try:
+        st = os.stat(EQ_REPORT)
+    except OSError:
+        return None
+    return "%d:%d:%s" % (st.st_mtime_ns, st.st_size, EQ_REPORT)
+
+
+def _eq_cache_name(key):
+    """快照文件名由缓存键派生：源文件一变名字就变，旧文件永远不会被覆盖。"""
+    return "%s%s.json" % (EQ_SNAP_PREFIX, hashlib.sha1(key.encode("utf-8")).hexdigest()[:16])
+
+
+def _eq_cache_valid():
+    if not (os.path.isfile(EQ_SNAP_KEY) and os.path.isfile(EQ_REPORT)):
+        return False
+    try:
+        with open(EQ_SNAP_KEY, encoding="utf-8") as fh:
+            key = (fh.read() or "").strip()
+    except Exception:
+        return False
+    if not key or key != _eq_report_key():
+        return False
+    return os.path.isfile(os.path.join(FIN_DIR, _eq_cache_name(key)))
+
+
+def _eq_cache_current():
+    try:
+        with open(EQ_SNAP_KEY, encoding="utf-8") as fh:
+            key = (fh.read() or "").strip()
+    except Exception:
+        return None, None
+    if not key:
+        return None, None
+    p = os.path.join(FIN_DIR, _eq_cache_name(key))
+    return (key, p) if os.path.isfile(p) else (None, None)
+
+
+def _eq_cache_build(force=False):
+    """xlsx → Univer 快照并落盘（原子就位：先写 .part，再切键文件）。"""
+    key = _eq_report_key()
+    if key is None:
+        return False, "not initialized"
+    with _EQ_SNAP_LOCK:
+        if not force and _eq_cache_valid():
+            return True, "hit"
+        try:
+            sys.path.insert(0, BASE_DIR)
+            import univer_convert
+            snap = univer_convert.xlsx_to_univer(EQ_REPORT, snap_id="equity-report")
+            snap["id"] = "equity-report"
+        except Exception as e:
+            return False, "convert failed: %s" % e
+        path = os.path.join(FIN_DIR, _eq_cache_name(key))
+        part = path + ".part"
+        try:
+            with open(part, "w", encoding="utf-8") as fh:
+                json.dump(snap, fh, ensure_ascii=False)
+            os.replace(part, path)
+            with open(EQ_SNAP_KEY, "w", encoding="utf-8") as fh:
+                fh.write(key)
+        except Exception as e:
+            return False, "write failed: %s" % e
+        # 滚动清理：只保留最近 3 份
+        try:
+            keep = _eq_cache_name(key)
+            for fn in os.listdir(FIN_DIR):
+                if fn.startswith(EQ_SNAP_PREFIX) and fn.endswith(".json") and fn != keep:
+                    try:
+                        os.remove(os.path.join(FIN_DIR, fn))
+                    except OSError:
+                        pass
+        except Exception:
+            pass
+        return True, "built"
+
+
+def _eq_cache_invalidate():
+    try:
+        if os.path.isfile(EQ_SNAP_KEY):
+            os.remove(EQ_SNAP_KEY)
+    except OSError:
+        pass
+
+
+def _eq_daily_backup():
+    """每日一份备份，滚动保留 30 份。"""
+    today = _fdt.date.today().strftime("%Y-%m-%d")
+    bpath = os.path.join(FIN_BACKUP_DIR, "equity_report_%s.xlsx.bak" % today)
+    if not os.path.isfile(bpath) and os.path.isfile(EQ_REPORT):
+        try:
+            shutil.copyfile(EQ_REPORT, bpath)
+        except Exception as e:
+            sys.stderr.write("[fin-eq] backup failed: %s\n" % e)
+    try:
+        baks = sorted([f for f in os.listdir(FIN_BACKUP_DIR)
+                       if f.startswith("equity_report_") and f.endswith(".xlsx.bak")])
+        for f in baks[:-30]:
+            try:
+                os.remove(os.path.join(FIN_BACKUP_DIR, f))
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+
+@app.route("/api/finance/equity-report", methods=["GET"])
+def fin_eq_get_report():
+    """下载 equity_report.xlsx（导出用）。"""
+    _eq_seed_if_missing()
+    if not os.path.isfile(EQ_REPORT):
+        return jsonify({"error": "not initialized"}), 404
+    return send_from_directory(FIN_DIR, "equity_report.xlsx",
+                               mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                               as_attachment=True, download_name="equity_report.xlsx")
+
+
+@app.route("/api/finance/equity-report/snapshot", methods=["GET"])
+def fin_eq_get_snapshot():
+    """返回股东权益报表的 Univer 快照（命中缓存直发，conditional=True 支持 304）。"""
+    _eq_seed_if_missing()
+    if not os.path.isfile(EQ_REPORT):
+        return jsonify({"error": "not initialized"}), 404
+    _key, _path = _eq_cache_current()
+    if _path is None:
+        ok, detail = _eq_cache_build(force=True)
+        if not ok:
+            return jsonify({"error": detail}), 500
+        _key, _path = _eq_cache_current()
+        if _path is None:
+            return jsonify({"error": "cache unavailable"}), 500
+    resp = send_from_directory(FIN_DIR, os.path.basename(_path),
+                               mimetype="application/json", conditional=True)
+    resp.headers["Content-Type"] = "application/json; charset=utf-8"
+    resp.headers["X-Fin-Snap-Cache"] = "hit"
+    return resp
+
+
+@app.route("/api/finance/equity-report/save", methods=["POST"])
+def fin_eq_save_snapshot():
+    """接收 Univer 快照写回 equity_report.xlsx。
+    ★与越南/中国同一套：先写 .tmp.xlsx（原子 os.replace）→ 每日备份 → 丢掉旧快照缓存。
+    ★币种换算值【不会】被写进来：前端在保存前会把 RMB/USD 显示值乘回 VND 原值。"""
+    data = request.get_json(force=False, silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid json"}), 400
+    _eq_seed_if_missing()
+    try:
+        sys.path.insert(0, BASE_DIR)
+        import univer_convert
+        tmp = EQ_REPORT + ".tmp.xlsx"
+        univer_convert.univer_to_xlsx(data, tmp)
+        try:
+            _n_dt = _fin_force_date_fmt(tmp)
+            if _n_dt:
+                sys.stderr.write("[fin-datefmt] eq 保存：%d 个日期格已强制成 %s\n" % (_n_dt, FIN_DATE_FMT))
+                sys.stderr.flush()
+        except Exception as _dfe:
+            sys.stderr.write("[fin-datefmt] eq 保存归一化失败: %s\n" % _dfe)
+        try:
+            os.replace(tmp, EQ_REPORT)
+        except OSError:
+            with open(EQ_REPORT, "wb") as fh:
+                fh.write(open(tmp, "rb").read())
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        _eq_daily_backup()
+        _eq_cache_invalidate()
+    except Exception as e:
+        import traceback
+        sys.stderr.write("[fin_eq_save_snapshot] ERROR: %s\n%s\n" % (e, traceback.format_exc()))
+        sys.stderr.flush()
+        return jsonify({"error": "convert failed: %s" % e}), 500
+    return jsonify({"ok": True, "saved_at": _fdt.datetime.now().isoformat(timespec="seconds")})
+
+
+@app.route("/api/finance/equity-sheet-titles", methods=["GET"])
+def fin_eq_sheet_titles():
+    """股东权益 5 张表的三语表名（越/中/英）。★写死在 EQ_SHEET_DEFS 里，与文件里的越文表名一一对应。"""
+    out = {}
+    for d in EQ_SHEET_DEFS:
+        out[d["vi"]] = {"vi": d["vi"], "zh": d["zh"], "en": d["en"]}
+    # 若本地存过映射（用户改过名），以本地文件为准
+    if os.path.isfile(EQ_TITLES_PATH):
+        try:
+            with open(EQ_TITLES_PATH, encoding="utf-8") as fh:
+                saved = json.load(fh) or {}
+            for k, v in saved.items():
+                if isinstance(v, dict):
+                    out[k] = v
+        except Exception:
+            pass
+    return jsonify({"ok": True, "kind": "eq", "titles": out,
+                    "order": [d["vi"] for d in EQ_SHEET_DEFS]})
+
+
 if __name__ == "__main__":
     import logging
     import socket

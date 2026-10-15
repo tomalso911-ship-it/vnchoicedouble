@@ -24277,13 +24277,529 @@ var PROD_EQUIP_FAULT_KB = {
     </div>
   </section>
 
-  <!-- 股东权益（占位） -->
+  <!-- ★股东权益（FIN-EQUITY-20261015）：独立视图 + 第二套 Univer 实例（不复用财务那套单例）。
+       数据源 = finance_data/equity_report.xlsx（5 张表：总投资 / 中国投资 / 越南投资 / 股东结构 / 分红记录）。
+       界面与工具栏照搬「越南财务报表」；★没有「重导」按钮（用户明确要求）；改动后 0.7s 自动落盘。 -->
   <section class="view" id="view-equity">
-    <div class="approvals-page">
-      <div class="page-header"><h2>股东权益</h2></div>
-      <p>股东权益模块开发中，敬请期待。</p>
+    <div class="approvals-page" style="padding:10px 12px;">
+      <div class="page-header" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h2 style="margin:0;" data-i18n="nav_equity">股东权益</h2>
+        <span id="eq_status" style="font-size:12px;color:#666;"></span>
+      </div>
+      <div id="eq_toolbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0;">
+        <button class="fin-btn" data-i18n="fin_btn_report" onclick="window.__eq && window.__eq.openReport()">查报表</button>
+        <button class="fin-btn" data-i18n="fin_merge_group_btn_on" onclick="window.__eq && window.__eq.restore()">恢复原显示顺序</button>
+        <button class="fin-btn" data-i18n="fin_btn_sort_asc" onclick="window.__eq && window.__eq.sort(1)">升序</button>
+        <button class="fin-btn" data-i18n="fin_btn_sort_desc" onclick="window.__eq && window.__eq.sort(-1)">降序</button>
+        <select id="eq_cur" onchange="window.__eq && window.__eq.setCurrency(this.value)"
+                style="height:28px;border:1px solid #c8ced6;border-radius:6px;padding:0 6px;">
+          <option value="VND">VND ₫</option>
+          <option value="RMB">RMB ¥</option>
+          <option value="USD">USD $</option>
+        </select>
+        <button class="fin-btn" data-i18n="fin_btn_ins_rows" onclick="window.__eq && window.__eq.insertRow()">在下方插入行</button>
+        <button class="fin-btn" data-i18n="fin_btn_save" onclick="window.__eq && window.__eq.save(true)">保存</button>
+        <button class="fin-btn" data-i18n="fin_btn_load" onclick="window.__eq && window.__eq.load()">载入/刷新报表</button>
+        <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
+      </div>
+      <div id="equity_container" style="width:100%;height:calc(100vh - 250px);min-height:420px;"></div>
     </div>
   </section>
+
+  <!-- 查报表（年月筛选）浮层 -->
+  <div id="eq_rpt_pop" style="display:none;position:fixed;z-index:9998;background:#fff;border:1px solid #ccd3dc;
+       border-radius:10px;box-shadow:0 8px 26px rgba(0,0,0,.18);padding:14px 16px;min-width:250px;">
+    <div style="font-weight:700;margin-bottom:10px;" data-i18n="fin_rpt_title">查报表</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+      <span style="width:52px;font-size:13px;" data-i18n="fin_rpt_year">年份</span>
+      <select id="eq_rpt_year" style="flex:1;height:28px;"></select>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+      <span style="width:52px;font-size:13px;" data-i18n="fin_rpt_month">月份</span>
+      <select id="eq_rpt_month" style="flex:1;height:28px;"></select>
+    </div>
+    <div style="font-size:11px;color:#888;margin-bottom:10px;" data-i18n="fin_rpt_note0">选择0表示只看年度报告！</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <button class="fin-btn" data-i18n="fin_rpt_cancel" onclick="window.__eq && window.__eq.closeReport()">取消</button>
+    <button class="fin-btn" data-i18n="fin_rpt_ok" onclick="window.__eq && window.__eq.applyReport()">确认</button>
+    </div>
+    </div>
+
+    <!-- ==========================================================================
+     ★股东权益报表引擎（FIN-EQUITY-20261015）
+     独立的第二套 Univer 实例：不碰财务那套 fin* 单例（finUniver / finSheet / finUniverAPI），
+     两边可以同时活着、互不影响。数据源 /api/finance/equity-report。
+     ★契约（改动前先看 check_equity_lock.py）：
+       ① 5 张表（越文表名固定，公式才不会断）；表名/表头/单元格走三语自动翻译；
+       ② 基准币种 VND：文件永远存 VND 原值，RMB/USD 只在屏幕上换算，保存前乘回；
+       ③ 无「重导」入口；④ 用户录入后 0.7s 自动落盘；⑤ 查报表按年月隐藏行（rowData.hd）。
+     ========================================================================== -->
+    <script type="module">
+    (function(){
+    var API = '/api/finance/equity-report';
+    /* 与后端 EQ_SHEET_DEFS 一一对应（0 基列；越文表名 = 文件里的真实表名） */
+    var SHEETS = [
+    { vi:'Tổng đầu tư',       zh:'总投资数据',    en:'Total Investment',      amt:[1],       date:null },
+    { vi:'Đầu tư Trung Quốc', zh:'中国投资数据',  en:'China Investment',      amt:[3,4,5],   date:0 },
+    { vi:'Đầu tư Việt Nam',   zh:'越南投资数据',  en:'Vietnam Investment',    amt:[3,4,5],   date:0 },
+    { vi:'Cơ cấu cổ đông',    zh:'股东结构',      en:'Shareholder Structure', amt:[2],       date:4 },
+    { vi:'Cổ tức',            zh:'分红记录',      en:'Dividend Records',      amt:[2,3,5],   date:0 }
+    ];
+    var R_HEAD = 4, R_DATA0 = 5, R_DATA1 = 1004, R_TOTAL = 1005;   // 0 基（Excel 第 5 / 6..1005 / 1006 行）
+
+    var univer = null, api = null, sheet = null, presets = null;
+    var inited = false, loading = false, ready = false;
+    var snap = null, view = null;
+    var cur = 'VND', rate = 1, filter = null, sortDir = 0;
+    var dirty = false, saving = false, saveTimer = null, progUntil = 0;
+    var trans = {}, pending = {};
+
+    function lang(){
+    try { return (window.CUR_LANG || localStorage.getItem('lang') || 'vi').toLowerCase(); } catch(e){ return 'vi'; }
+    }
+    function st(msg){ var el = document.getElementById('eq_status'); if (el) el.textContent = msg || ''; }
+    function isNum(v){ return typeof v === 'number' && isFinite(v); }
+    /* ★三语表名都能认：界面把表名翻成中文/英文后，仍要能找到列定义（金额列/日期列），
+       否则查报表、排序、币种换算会全部失效。 */
+    function sheetDef(name){
+      if (!name) return null;
+      for (var i=0;i<SHEETS.length;i++){
+        var d = SHEETS[i];
+        if (d.vi === name || d.zh === name || d.en === name) return d;
+      }
+      return null;
+    }
+
+    /* ---------- 三语：翻译缓存 + 请求 ---------- */
+    function loadTrans(){
+    try { trans = JSON.parse(localStorage.getItem('eq_trans_cache_v1') || '{}') || {}; } catch(e){ trans = {}; }
+    }
+    function saveTrans(){
+    try { localStorage.setItem('eq_trans_cache_v1', JSON.stringify(trans)); } catch(e){}
+    }
+    function needTrans(t){
+    if (!t || typeof t !== 'string') return false;
+    if (/^[\d\s.,:;+\-/%()₫¥$]+$/.test(t)) return false;
+    if (t.length > 160) return false;
+    if (/^[\u4e00-\u9fa5\s]+$/.test(t) && lang() === 'zh') return false;
+    return true;
+    }
+    function transOf(text, target){
+    var rec = trans[text];
+    if (rec && rec[target]) return rec[target];
+    return null;
+    }
+    function requestTrans(text, target, cb){
+    if (!text || !target) return;
+    if (trans[text] && trans[text][target]) { cb && cb(trans[text][target]); return; }
+    var key = text + '|' + target;
+    if (pending[key]) { cb && cb(null); return; }
+    pending[key] = true;
+    fetch('/api/translate?q=' + encodeURIComponent(text) + '&target=' + target)
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        delete pending[key];
+        if (!j || !j.ok || !j.text) { cb && cb(null); return; }
+        var rec = trans[text] || {};
+        rec[target] = j.text; rec.vi = rec.vi || text;
+        trans[text] = rec; if (!trans[j.text]) trans[j.text] = rec;
+        saveTrans();
+        cb && cb(j.text);
+      })
+      .catch(function(){ delete pending[key]; cb && cb(null); });
+    }
+    /* 把整份快照里的文字翻成当前语言（含表头、表名在别处处理） */
+    function seedAndApply(v, cb){
+    var jobs = 0, done = 0, fired = false;
+    function fin(){ if (fired) return; fired = true; cb && cb(); }
+    var L = lang();
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var cd = (v.sheets[sid] || {}).cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {};
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck]; if (!cell || cell.f !== undefined) return;
+          var t = cell.v;
+          if (!needTrans(t)) return;
+          var known = (L === 'vi') ? t : transOf(t, L);
+          if (L !== 'vi' && !known){
+            jobs++;
+            requestTrans(t, L, function(){ done++; if (done >= jobs) fin(); });
+          }
+          });
+          });
+          });
+          if (!jobs) { fin(); return; }
+          /* 兜底：网络慢也不能卡住渲染 */
+          setTimeout(fin, 2500);
+    }
+    function applyTrans(v){
+    var L = lang(); if (L === 'vi') return;
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var cd = (v.sheets[sid] || {}).cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {};
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck]; if (!cell || cell.f !== undefined) return;
+          var t = transOf(cell.v, L);
+          if (t) cell.v = t;
+        });
+      });
+    });
+    }
+    /* ★表名三语：改名的同时把公式里引用的【旧表名】一起换掉，否则跨表公式会断成 #REF!
+     （Excel 重命名工作表时也是这么做的） */
+    function applyTitles(v){
+    var L = lang();
+    var map = {};
+    SHEETS.forEach(function(d){ map[d.vi] = (L === 'zh') ? d.zh : (L === 'en') ? d.en : d.vi; });
+    var sids = v.sheetOrder || Object.keys(v.sheets || {});
+    sids.forEach(function(sid){
+      var sh = v.sheets[sid]; if (!sh) return;
+      var old = sh.name;
+      var neu = map[old];
+      if (!neu || neu === old) return;
+      sh.name = neu;
+      var cd = sh.cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {};
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck];
+          if (cell && typeof cell.f === 'string' && cell.f.indexOf("'" + old + "'") >= 0){
+            cell.f = cell.f.split("'" + old + "'").join("'" + neu + "'");
+          }
+        });
+      });
+    });
+    }
+
+    /* ---------- 日期：识别 Excel 序列号 / 文本 ---------- */
+    function dateOf(v){
+    if (isNum(v)) {
+      var d = new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 86400000);
+      return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 };
+    }
+    if (typeof v === 'string'){
+      var s = v.trim();
+      var m1 = s.match(/^(\d{4})[-/](\d{1,2})/);
+      if (m1) return { y: parseInt(m1[1],10), m: parseInt(m1[2],10) };
+      var m2 = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (m2) return { y: parseInt(m2[3],10), m: parseInt(m2[2],10) };
+    }
+    return null;
+    }
+    function applyFilter(v){
+    if (!filter) return;
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var sh = v.sheets[sid]; if (!sh) return;
+      var d = sheetDef(nameOfSid(v, sid)); if (!d || d.date === null) return;
+      var cd = sh.cellData || {};
+      sh.rowData = sh.rowData || {};
+      Object.keys(cd).forEach(function(rk){
+        var r = parseInt(rk, 10);
+        if (r < R_DATA0 || r > R_DATA1) return;
+        var cell = (cd[rk] || {})[d.date];
+        var dt = cell ? dateOf(cell.v) : null;
+        var keep = dt && ((!filter.year || dt.y === filter.year) && (!filter.month || dt.m === filter.month));
+        if (!keep){
+          sh.rowData[rk] = sh.rowData[rk] || {};
+          sh.rowData[rk].hd = 1;
+        }
+      });
+    });
+    }
+    function nameOfSid(v, sid){ var sh = v.sheets[sid]; return sh ? sh.name : ''; }
+    function applySort(v){
+    if (!sortDir) return;
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var sh = v.sheets[sid]; if (!sh) return;
+      var d = sheetDef(nameOfSid(v, sid)); if (!d || d.date === null) return;
+      var cd = sh.cellData || {};
+      var rows = [];
+      for (var r = R_DATA0; r <= R_DATA1; r++) if (cd[r]) rows.push(r);
+      rows.sort(function(a, b){
+        var da = dateOf((cd[a] || {})[d.date] ? cd[a][d.date].v : null);
+        var db = dateOf((cd[b] || {})[d.date] ? cd[b][d.date].v : null);
+        var ka = da ? da.y * 100 + da.m : 0, kb = db ? db.y * 100 + db.m : 0;
+        return (ka - kb) * sortDir;
+      });
+      var src = rows.map(function(r){ return cd[r]; });
+      for (var i = 0; i < rows.length; i++) cd[rows[i]] = src[i];
+    });
+    }
+
+    /* ---------- 币种：只改显示，保存时乘回 ---------- */
+    function readRate(code){
+    if (code === 'RMB'){
+      var a = document.getElementById('w_rate_rmb_vnd');
+      var v1 = a ? parseFloat(a.value) : 0;
+      return v1 > 0 ? v1 : 3500;
+    }
+    if (code === 'USD'){
+      var b = document.getElementById('w_rate_usd_vnd');
+      var v2 = b ? parseFloat(b.value) : 0;
+      return v2 > 0 ? v2 : 25000;
+    }
+    return 1;
+    }
+    function moneyPattern(code){ return code === 'RMB' ? '#,##0"¥"' : code === 'USD' ? '#,##0"$"' : '#,##0"₫"'; }
+    function applyCurrency(v){
+    if (cur === 'VND') return;
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var sh = v.sheets[sid]; if (!sh) return;
+      var d = sheetDef(nameOfSid(v, sid)); if (!d) return;
+      var cd = sh.cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {};
+        d.amt.forEach(function(c){
+          var cell = row[String(c)];
+          if (!cell || cell.f !== undefined) return;
+          if (isNum(cell.v)) cell.v = Math.round(cell.v / rate * 100) / 100;
+        });
+      });
+    });
+    }
+    function fmtCurrency(){
+    if (!api || !sheet) return;
+    var sid = null;
+    try { sid = sheet.getSheetId ? sheet.getSheetId() : null; } catch(e){}
+    if (!sid) return;
+    var v = snap; if (!v) return;
+    Object.keys(v.sheets || {}).forEach(function(s){
+      var sh = v.sheets[s]; var d = sheetDef(sh.name); if (!d) return;
+      var cd = sh.cellData || {};
+      var vals = [];
+      /* ★只对【真实存在】的金额格套格式：空表也一次性灌 1000 行会把命令撑爆 */
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {};
+        d.amt.forEach(function(c){
+          var cell = row[String(c)];
+          if (cell && cell.v !== undefined && cell.v !== null && cell.v !== ''){
+            vals.push({ row: parseInt(rk, 10), col: c, pattern: moneyPattern(cur) });
+          }
+        });
+      });
+      if (!vals.length) return;
+      try {
+        progUntil = Date.now() + 800;
+        api.executeCommand('sheet.command.numfmt.set.numfmt', { unitId:'equity-report', subUnitId:s, values:vals });
+      } catch(e){}
+    });
+    }
+
+    /* ---------- 渲染 ---------- */
+    function buildView(){
+    var v = JSON.parse(JSON.stringify(snap || {}));
+    v.id = 'equity-report';
+    applyTrans(v);
+    applyTitles(v);       /* ★必须在 applyFilter/applySort 之前：它们靠表名找列定义 */
+    applySort(v);
+    applyFilter(v);
+    applyCurrency(v);
+    return v;
+    }
+    function render(){
+    if (!univer) return;
+    var v = buildView();
+    try { if (sheet && api && typeof api.disposeUnit === 'function') api.disposeUnit(sheet.getUnitId()); } catch(e){}
+    var TYPE = (presets && presets.UniverInstanceType && presets.UniverInstanceType.UNIVER_SHEET) || 2;
+    sheet = univer.createUnit(TYPE, v);
+    view = v;
+    setTimeout(fmtCurrency, 300);
+    st('已载入 · ' + (v.sheetOrder || []).length + ' 张表 · ' + cur);
+    }
+
+    /* ---------- 保存 ---------- */
+    function payload(){
+    var s = null;
+    try { s = sheet && sheet.getSnapshot ? sheet.getSnapshot() : null; } catch(e){}
+    if (!s) return null;
+    /* ★币种还原：屏幕上除以过汇率，这里乘回去，文件里永远只剩 VND 原值 */
+    if (cur !== 'VND'){
+      Object.keys(s.sheets || {}).forEach(function(sid){
+        var sh = s.sheets[sid]; if (!sh) return;
+        var d = sheetDef(sh.name); if (!d) return;
+        var cd = sh.cellData || {};
+        Object.keys(cd).forEach(function(rk){
+          var row = cd[rk] || {};
+          d.amt.forEach(function(c){
+            var cell = row[String(c)];
+            if (cell && cell.f === undefined && isNum(cell.v)) cell.v = Math.round(cell.v * rate);
+          });
+        });
+      });
+    }
+    return s;
+    }
+    async function save(manual){
+    if (saving || !sheet) return;
+    var p = payload(); if (!p) { st('没有可保存的内容'); return; }
+    saving = true;
+    if (manual) st('保存中…');
+    try {
+      var r = await fetch(API + '/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(p) });
+      var j = await r.json();
+      if (j && j.ok){ dirty = false; st('已保存 ' + (j.saved_at || '')); }
+      else { st('保存失败：' + ((j && j.error) || r.status)); }
+    } catch(e){ st('保存失败：' + e.message); }
+    finally { saving = false; }
+    }
+    function scheduleSave(){
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){ saveTimer = null; if (dirty) save(false); }, 700);
+    }
+
+    /* ---------- 初始化 ---------- */
+    async function init(){
+    if (inited) return;
+    inited = true;
+    st('正在加载表格引擎…');
+    try {
+      var [presetsMod, coreMod, filterMod, filterUiMod, sortMod, sortUiMod] = await Promise.all([
+        import('@univerjs/presets'),
+        import('@univerjs/presets/preset-sheets-core'),
+        import('@univerjs/sheets-filter'),
+        import('@univerjs/sheets-filter-ui'),
+        import('@univerjs/sheets-sort'),
+        import('@univerjs/sheets-sort-ui')
+      ]);
+      presets = presetsMod;
+      var res = presets.createUniver({
+        theme: presets.defaultTheme,
+        presets: [ coreMod.UniverSheetsCorePreset({ container: 'equity_container' }) ],
+        plugins: [ filterMod.UniverSheetsFilterPlugin, filterUiMod.UniverSheetsFilterUIPlugin,
+                   sortMod.UniverSheetsSortPlugin, sortUiMod.UniverSheetsSortUIPlugin ]
+      });
+      univer = res.univer;
+      api = res.univerAPI || null;
+      ready = true;
+    } catch(e){
+      inited = false;
+      st('引擎加载失败：' + e.message);
+      console.error('[equity] init', e);
+      return;
+    }
+    await load();
+    bindChange();
+    }
+    async function load(){
+    if (loading) return;
+    if (!univer) { await init(); return; }
+    loading = true;
+    st('正在载入报表…');
+    try {
+      var r = await fetch(API + '/snapshot', { cache:'no-store' });
+      if (!r.ok) { st('报表未初始化（HTTP ' + r.status + '）'); loading = false; return; }
+      snap = await r.json();
+      loadTrans();
+      seedAndApply(snap, function(){ render(); loading = false; });
+    } catch(e){
+      st('载入失败：' + e.message);
+      loading = false;
+    }
+    }
+    function bindChange(){
+    if (!api || typeof api.onCommandExecuted !== 'function') return;
+    if (window.__eqBound) return;
+    window.__eqBound = true;
+    api.onCommandExecuted(function(cmd){
+      try {
+        var id = cmd && cmd.id ? String(cmd.id) : '';
+        if (id.indexOf('numfmt') >= 0) return;               // 我们自己的格式化不脏
+        if (Date.now() < progUntil) return;                  // 程序写入窗口
+        dirty = true;
+        scheduleSave();
+      } catch(e){}
+    });
+    }
+
+    /* ---------- 对外 API ---------- */
+    var pub = {
+    ensure: function(){ if (!inited) init(); },
+    load: function(){ load(); },
+    save: function(m){ save(!!m); },
+    exportXlsx: function(){ window.location.href = API; },
+    setCurrency: function(code){
+      cur = code || 'VND';
+      rate = readRate(cur);
+      render();
+    },
+    openReport: function(){
+      var pop = document.getElementById('eq_rpt_pop'); if (!pop) return;
+      var ys = document.getElementById('eq_rpt_year'), ms = document.getElementById('eq_rpt_month');
+      if (ys && !ys.options.length){
+        var y0 = 2020, y1 = new Date().getFullYear() + 1;
+        ys.innerHTML = '<option value="0">—</option>';
+        for (var y = y1; y >= y0; y--) ys.innerHTML += '<option value="' + y + '">' + y + '</option>';
+        ms.innerHTML = '<option value="0">0</option>';
+        for (var m = 1; m <= 12; m++) ms.innerHTML += '<option value="' + m + '">' + m + '</option>';
+      }
+      var btn = document.getElementById('eq_btn_report');
+      var rect = btn ? btn.getBoundingClientRect() : { left: 20, bottom: 120 };
+      pop.style.left = Math.max(8, Math.min(rect.left, (window.innerWidth || 1200) - 280)) + 'px';
+      pop.style.top = (rect.bottom + 6) + 'px';
+      pop.style.display = 'block';
+    },
+    closeReport: function(){ var p = document.getElementById('eq_rpt_pop'); if (p) p.style.display = 'none'; },
+    applyReport: function(){
+      var y = parseInt((document.getElementById('eq_rpt_year') || {}).value || '0', 10);
+      var m = parseInt((document.getElementById('eq_rpt_month') || {}).value || '0', 10);
+      filter = (y || m) ? { year: y || 0, month: m || 0 } : null;
+      pub.closeReport();
+      render();
+    },
+    restore: function(){ filter = null; sortDir = 0; render(); },
+    sort: function(dir){ sortDir = dir; render(); },
+    insertRow: function(){
+      if (!api || !sheet) return;
+      var sid = null; try { sid = sheet.getSheetId(); } catch(e){}
+      if (!sid) return;
+      var row = 0;
+      try {
+        var wb = api.getActiveWorkbook && api.getActiveWorkbook();
+        var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+        var rng = sh && sh.getActiveRange && sh.getActiveRange();
+        if (rng && typeof rng.getRow === 'function') row = rng.getRow();
+      } catch(e){}
+      try {
+        api.executeCommand('sheet.command.insert-row', {
+          unitId: 'equity-report', subUnitId: sid,
+          range: { startRow: row + 1, endRow: row + 1, startColumn: 0, endColumn: 9 }
+        });
+      } catch(e){ console.warn('[equity] insert-row', e); }
+    }
+    };
+    window.__eq = pub;
+
+    /* ★ 顶部「股东权益」标签 → 懒加载本引擎（不改 switchView 内部实现） */
+    try {
+    var _sv = window.switchView;
+    if (typeof _sv === 'function' && !window.__eqSwitchWrapped){
+      window.__eqSwitchWrapped = true;
+      window.switchView = function(name){
+        var out = _sv.apply(this, arguments);
+        try { if (name === 'equity') setTimeout(function(){ pub.ensure(); }, 50); } catch(e){}
+        return out;
+      };
+    }
+    } catch(e){}
+
+    /* ★语言切换：整块重渲染（表名/表头/单元格全部跟翻） */
+    window.addEventListener('app:langchange', function(){
+    try {
+      var v = document.getElementById('view-equity');
+      if (!v || v.style.display === 'none') return;
+      if (typeof sweepI18n === 'function') sweepI18n(v);
+      if (univer) load();
+    } catch(e){}
+    });
+
+    /* 关页面前把最后一次改动顶上去 */
+    window.addEventListener('beforeunload', function(){
+    try { if (dirty) { var p = payload(); if (p) navigator.sendBeacon(API + '/save', new Blob([JSON.stringify(p)], { type:'application/json' })); } } catch(e){}
+    });
+    })();
+    </script>
 </div>
 
 <!-- ==================== 个人佣金：闲置模糊化遮罩（隐私屏保） ====================
