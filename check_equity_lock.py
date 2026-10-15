@@ -80,12 +80,33 @@ chk("container: 'equity_container'" in html, "createUniver 指向 equity_contain
 chk("'equity-report'" in html and "v.id = 'equity-report'" in html, "unitId = equity-report")
 chk("univer.createUnit(" in html, "用 createUnit 建单元（与财务同构）")
 
-print("6) 工具栏：无重导，有保存/导出/查报表")
+print("6) 工具栏：用户 2026-10-15 拍板 —— 只留 币种下拉 + 保存 + 导出")
 sec = block('id="view-equity"', 'id="equity_container"')
 chk(sec != "", "定位到股东权益视图区块")
 chk('fin_btn_reimport' not in sec, "★工具栏没有「重导」按钮")
-for k, n in (('fin_btn_save', '保存'), ('fin_btn_export', '导出 xlsx'), ('fin_btn_report', '查报表')):
+for k, n in (('fin_btn_save', '保存'), ('fin_btn_export', '导出 xlsx')):
     chk(k in sec, "工具栏有「%s」按钮" % n)
+for k, n in (('fin_btn_report', '查报表'), ('fin_btn_sort_asc', '升序'), ('fin_btn_sort_desc', '降序'),
+             ('fin_btn_ins_rows', '在下方插入行'), ('fin_btn_load', '载入/刷新报表'),
+             ('fin_merge_group_btn_on', '恢复原显示顺序')):
+    chk(k not in sec, "★已删按钮：「%s」不在工具栏" % n)
+chk('id="eq_cur"' in sec and 'id="eq_cur_wrap"' in sec, "币种下拉存在（待挂到 Univer 工具栏最左侧）")
+
+print("6b) 币种下拉挂到 Univer 工具栏最左侧 + 隐藏自带 $ 按钮")
+eqblk = block('股东权益报表引擎（FIN-EQUITY-20261015）', 'window.__eqSwitchWrapped')
+if not eqblk:
+    try:
+        i = html.index('股东权益报表引擎（FIN-EQUITY-20261015）')
+        j = html.index('</script>', i)
+        eqblk = html[i:j]
+    except ValueError:
+        eqblk = ""
+chk(eqblk != "", "定位到股东权益引擎脚本块")
+chk("'sheet.command.numfmt.set.currency': { hidden: true }" in eqblk, "★Univer 自带 $ 按钮已隐藏（与财务同机制）")
+chk(re.search(r"querySelector\('#equity_container \.univer-toolbar-container'\)", eqblk) is not None,
+    "找到 Univer 工具栏宿主 .univer-toolbar-container")
+chk(re.search(r"host\.insertBefore\(wrap, host\.firstChild\)", eqblk) is not None, "下拉插到工具栏最左侧")
+chk("new MutationObserver(" in eqblk, "DOM 变动自动重挂（切表后不掉下来）")
 
 print("7) 自动保存 0.7s + 手动保存")
 chk(re.search(r"saveTimer = setTimeout\(function\(\)\{ saveTimer = null; if \(dirty\) save\(false\); \}, 700\)", html) is not None,

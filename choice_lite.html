@@ -24287,43 +24287,24 @@ var PROD_EQUIP_FAULT_KB = {
         <span id="eq_status" style="font-size:12px;color:#666;"></span>
       </div>
       <div id="eq_toolbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0;">
-        <button class="fin-btn" data-i18n="fin_btn_report" onclick="window.__eq && window.__eq.openReport()">查报表</button>
-        <button class="fin-btn" data-i18n="fin_merge_group_btn_on" onclick="window.__eq && window.__eq.restore()">恢复原显示顺序</button>
-        <button class="fin-btn" data-i18n="fin_btn_sort_asc" onclick="window.__eq && window.__eq.sort(1)">升序</button>
-        <button class="fin-btn" data-i18n="fin_btn_sort_desc" onclick="window.__eq && window.__eq.sort(-1)">降序</button>
-        <select id="eq_cur" onchange="window.__eq && window.__eq.setCurrency(this.value)"
-                style="height:28px;border:1px solid #c8ced6;border-radius:6px;padding:0 6px;">
-          <option value="VND">VND ₫</option>
-          <option value="RMB">RMB ¥</option>
-          <option value="USD">USD $</option>
-        </select>
-        <button class="fin-btn" data-i18n="fin_btn_ins_rows" onclick="window.__eq && window.__eq.insertRow()">在下方插入行</button>
+        <!-- ★用户 2026-10-15 要求：查报表/恢复原显示顺序/升序/降序/插入行/载入刷新 6 个按钮全部删除；
+             只留 币种下拉（挂到 Univer 自带工具栏最左侧）+ 保存 + 导出。 -->
+        <span id="eq_cur_wrap" class="eq-cur-wrap" style="margin-right:8px;display:inline-flex;align-items:center;">
+          <select id="eq_cur" onchange="window.__eq && window.__eq.setCurrency(this.value)"
+                  style="height:28px;border:1px solid #c8ced6;border-radius:6px;padding:0 6px;background:#fff;">
+            <option value="VND">VND ₫</option>
+            <option value="RMB">RMB ¥</option>
+            <option value="USD">USD $</option>
+          </select>
+        </span>
         <button class="fin-btn" data-i18n="fin_btn_save" onclick="window.__eq && window.__eq.save(true)">保存</button>
-        <button class="fin-btn" data-i18n="fin_btn_load" onclick="window.__eq && window.__eq.load()">载入/刷新报表</button>
         <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
       </div>
       <div id="equity_container" style="width:100%;height:calc(100vh - 250px);min-height:420px;"></div>
     </div>
   </section>
 
-  <!-- 查报表（年月筛选）浮层 -->
-  <div id="eq_rpt_pop" style="display:none;position:fixed;z-index:9998;background:#fff;border:1px solid #ccd3dc;
-       border-radius:10px;box-shadow:0 8px 26px rgba(0,0,0,.18);padding:14px 16px;min-width:250px;">
-    <div style="font-weight:700;margin-bottom:10px;" data-i18n="fin_rpt_title">查报表</div>
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
-      <span style="width:52px;font-size:13px;" data-i18n="fin_rpt_year">年份</span>
-      <select id="eq_rpt_year" style="flex:1;height:28px;"></select>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
-      <span style="width:52px;font-size:13px;" data-i18n="fin_rpt_month">月份</span>
-      <select id="eq_rpt_month" style="flex:1;height:28px;"></select>
-    </div>
-    <div style="font-size:11px;color:#888;margin-bottom:10px;" data-i18n="fin_rpt_note0">选择0表示只看年度报告！</div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
-    <button class="fin-btn" data-i18n="fin_rpt_cancel" onclick="window.__eq && window.__eq.closeReport()">取消</button>
-    <button class="fin-btn" data-i18n="fin_rpt_ok" onclick="window.__eq && window.__eq.applyReport()">确认</button>
-    </div>
-    </div>
+  <!-- 查报表（年月筛选）浮层：UI 入口已按用户 2026-10-15 要求移除，函数保留（openReport 不再被按钮触发） -->
 
     <!-- ==========================================================================
      ★股东权益报表引擎（FIN-EQUITY-20261015）
@@ -24587,6 +24568,25 @@ var PROD_EQUIP_FAULT_KB = {
     });
     }
 
+    /* ---------- 把币种下拉挂到 Univer 自带工具栏最左侧（照搬财务 fin_mountToolbar2） ---------- */
+    function mountToolbar(){
+      var wrap = document.getElementById('eq_cur_wrap');
+      var host = document.querySelector('#equity_container .univer-toolbar-container');
+      if (!wrap || !host) return;
+      if (wrap.parentElement !== host || host.firstChild !== wrap){
+        host.insertBefore(wrap, host.firstChild);
+      }
+    }
+    function watchToolbar(){
+      try { mountToolbar(); } catch(e){}
+      try {
+        if (window.__eqToolbarObs) return;
+        var box = document.getElementById('equity_container'); if (!box) return;
+        window.__eqToolbarObs = new MutationObserver(function(){ try { mountToolbar(); } catch(e){} });
+        window.__eqToolbarObs.observe(box, { childList: true, subtree: true });
+      } catch(e){}
+    }
+
     /* ---------- 渲染 ---------- */
     function buildView(){
     var v = JSON.parse(JSON.stringify(snap || {}));
@@ -24606,6 +24606,10 @@ var PROD_EQUIP_FAULT_KB = {
     sheet = univer.createUnit(TYPE, v);
     view = v;
     setTimeout(fmtCurrency, 300);
+    /* ★币种下拉挂到 Univer 工具栏最左侧：渲染后多试几次（Univer 工具栏是异步挂出来的） */
+    setTimeout(watchToolbar, 200);
+    setTimeout(watchToolbar, 600);
+    setTimeout(watchToolbar, 1400);
     st('已载入 · ' + (v.sheetOrder || []).length + ' 张表 · ' + cur);
     }
 
@@ -24695,11 +24699,20 @@ var PROD_EQUIP_FAULT_KB = {
       var lt = presets.LocaleType || {};
       var L = lang();
       var initLocale = (L === 'zh') ? lt.ZH_CN : (L === 'vi') ? lt.VI_VN : lt.EN_US;
+      /* ★用户 2026-10-15 要求：删掉 Univer 自带的「$」货币按钮 —— 币种换算由我们自己的
+         VND₫/RMB¥/USD$ 下拉负责（挂到工具栏最左侧）。机制与财务 fin_initUniver 相同：
+         通过 menu 配置把该命令的菜单项隐藏。 */
+      var eqMenuCfg = {
+        'sheet.command.numfmt.set.currency': { hidden: true }   // 内置货币 $（已改用左侧币种下拉）
+      };
+      var canMenu = !!(presets.FUniver && presets.FUniver.prototype && typeof presets.FUniver.prototype.createMenu === 'function');
+      var coreOpts = { container: 'equity_container' };
+      if (canMenu) coreOpts.menu = eqMenuCfg;
       var res = presets.createUniver({
         theme: presets.defaultTheme,
         locale: initLocale,
         locales: (lt.EN_US ? { [lt.EN_US]: loc, [lt.ZH_CN]: zhLoc, [lt.VI_VN]: viLoc } : undefined),
-        presets: [ m[1].UniverSheetsCorePreset({ container: 'equity_container' }) ],
+        presets: [ m[1].UniverSheetsCorePreset(coreOpts) ],
         plugins: [ m[5].UniverSheetsFilterPlugin, m[6].UniverSheetsFilterUIPlugin,
                    m[7].UniverSheetsSortPlugin, m[8].UniverSheetsSortUIPlugin ]
       });
