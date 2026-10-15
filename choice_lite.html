@@ -24337,6 +24337,7 @@ var PROD_EQUIP_FAULT_KB = {
     var R_HEAD = 4, R_DATA0 = 5, R_DATA1 = 1004, R_TOTAL = 1005;   // 0 基（Excel 第 5 / 6..1005 / 1006 行）
 
     var univer = null, api = null, sheet = null, presets = null;
+    var coreMod = null;
     var inited = false, loading = false, ready = false;
     var snap = null, view = null;
     var cur = 'VND', rate = 1, filter = null, sortDir = 0;
@@ -24706,9 +24707,12 @@ var PROD_EQUIP_FAULT_KB = {
         _impOpt('@univerjs/sheets-sort-ui/locale/zh-CN'),                     // 14
         _impOpt('@univerjs/sheets-filter-ui/locale/vi-VN'),                   // 15
         _impOpt('@univerjs/sheets-sort/locale/vi-VN'),                        // 16
-        _impOpt('@univerjs/sheets-sort-ui/locale/vi-VN')                      // 17
+        _impOpt('@univerjs/sheets-sort-ui/locale/vi-VN'),                     // 17
+        // ★只为拿 LocaleService 这个 DI token（切系统语言时运行时换界面语言用）
+        _impOpt('@univerjs/core')                                             // 18
       ]);
       presets = m[0];
+      coreMod = m[18] || null;
       var _merge = presets.merge || function(a, b){ return Object.assign({}, a, b); };
       function mergeL(base, mods){
         var r = _merge({}, base || {});
@@ -25236,17 +25240,43 @@ var PROD_EQUIP_FAULT_KB = {
           它在 createUniver 时就定死了——只有【整个实例重建】才会跟随系统语言切换；
        ② 工作簿内容（表名/表头/单元格文字）由 load()→seedAndApply→applyTrans 按新语言
           重新走 /api/translate 翻译（带 localStorage 缓存，切回旧语言秒显示）。 */
+    /* ★运行时切换 Univer 界面语言（工具栏悬停提示等 UI 文案）。
+       为什么优先用它、而不是销毁实例重建：销毁+硬清容器会让 React 在自己还在调度时
+       发现「要删的节点已经不是容器的孩子」→ NotFoundError: Failed to execute 'removeChild'
+       （用户 2026-10-16 实测报错来源）。locale$ 变化后 UI 组件自己重渲染，零 DOM 冲突。 */
+    function eqSetUiLocale(){
+      try {
+        if (!coreMod || !univer || !presets) return false;
+        var inj = null;
+        if (typeof univer.__getInjector === 'function') inj = univer.__getInjector();
+        else if (typeof univer.getInjector === 'function') inj = univer.getInjector();
+        if (!inj || typeof inj.get !== 'function') return false;
+        var LS = coreMod.LocaleService;
+        var ls = LS ? inj.get(LS) : null;
+        if (!ls || typeof ls.setLocale !== 'function') return false;
+        var lt = presets.LocaleType || {};
+        var L2 = lang();
+        var target = (L2 === 'zh') ? lt.ZH_CN : (L2 === 'vi') ? lt.VI_VN : lt.EN_US;
+        if (!target) return false;
+        ls.setLocale(target);
+        return true;
+      } catch(e){ return false; }
+    }
     function rebuildForLang(){
+      /* ① 优先：只换界面语言（locale$→UI 组件自渲染）+ 数据按新语言重翻（表名/表头/单元格） */
+      if (eqSetUiLocale()) { try { load(); } catch(e){} return; }
+      /* ② 兜底：实在拿不到 LocaleService 才整实例重建。
+            ★不再手动 innerHTML 硬清（那是 React removeChild 报错的根因），
+              交给 Univer/React 自己卸载完再重建。 */
       try { if (dirty) save(false); } catch(e){}                       /* 未保存的改动先顶上去 */
-      /* 币种下拉此刻挂在 Univer 工具栏里（容器内部），先接回 #eq_inline，不然会被一起清掉 */
+      /* 币种下拉此刻挂在 Univer 工具栏里（容器内部），先接回 #eq_inline，不然会被一起卸掉 */
       try {
         var sel0 = document.getElementById('eq_cur'), bar0 = document.getElementById('eq_inline');
         if (sel0 && bar0 && sel0.parentElement !== bar0) bar0.appendChild(sel0);
       } catch(e){}
       try { if (univer && typeof univer.dispose === 'function') univer.dispose(); } catch(e){}
-      try { var box = document.getElementById('equity_container'); if (box) box.innerHTML = ''; } catch(e){}
       univer = null; api = null; sheet = null; ready = false; inited = false; loading = false;
-      setTimeout(function(){ try { init(); } catch(e){} }, 80);
+      setTimeout(function(){ try { init(); } catch(e){} }, 400);
     }
 
     /* ---------- 对外 API ---------- */

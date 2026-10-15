@@ -177,9 +177,15 @@ chk("tagName === 'SELECT'" in eqblk and "tagName === 'INPUT'" in eqblk,
     "★币种下拉/公式栏等表单元素不接管（页面其它输入不受影响）")
 
 print("13) 三语随系统切换（用户 2026-10-16 要求：悬停提示 + 工作簿内容）")
-chk("function rebuildForLang" in eqblk, "★语言切换 = 整实例重建 rebuildForLang（locale 只有重建才会换）")
-chk("univer.dispose()" in eqblk and "box.innerHTML = ''" in eqblk, "★重建前先 dispose 旧实例并清容器")
-chk("bar0.appendChild(sel0)" in eqblk, "★重建前把币种下拉接回 #eq_inline（否则随容器被清掉）")
+chk("function rebuildForLang" in eqblk, "★语言切换 = rebuildForLang（悬停提示随系统语言）")
+chk("function eqSetUiLocale" in eqblk and "ls.setLocale(target)" in eqblk,
+    "★优先走 LocaleService.setLocale 运行时换界面语言（不销毁实例）")
+chk("_impOpt('@univerjs/core')" in eqblk and "coreMod.LocaleService" in eqblk,
+    "★引入 @univerjs/core 拿 LocaleService DI token（单一模块实例）")
+chk("bar0.appendChild(sel0)" in eqblk, "★兜底重建前把币种下拉接回 #eq_inline（否则随容器被卸掉）")
+# ★禁止再手动硬清容器：那会让 React 在自己的调度里发现「要删的节点已不是容器的孩子」
+#   → NotFoundError: Failed to execute 'removeChild'（用户 2026-10-16 实测报错）
+chk("box.innerHTML = ''" not in eqblk, "★不得手动 innerHTML 硬清容器（React removeChild 报错根因）")
 chk("__eqStaleLocale" in eqblk, "★在其它页切语言 → 打标记，切回股东权益时补重建")
 chk("if (dirty) save(false)" in eqblk, "★重建前先顶上未保存的改动")
 
