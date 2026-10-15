@@ -70,6 +70,40 @@
 #                                 ⑥ 归一化必须原子落盘 _cn_ws_save_atomic（禁止就地 wb.save）
 #                                    ⑦ 前端三块对账 FIN-CN-TRI-CONSIST（基准块被污染后能自愈）
 #
+#   12) check_fin_cn_hide_checked_lock.py —— 中国报表「隐藏核销记录」按钮锁死区
+#                                 （FIN-CN-HIDE-CHECKED-20261015）：
+#                                 ① 三语 key fin_btn_hide_checked / fin_btn_show_checked 各 3 份
+#                                 ② 按钮 id=fin_cn_hide_checked_btn，位置在「查报表」与「导出 xlsx」之间
+#                                 ③ 仅中国报表显示（fin_applyReadonlyUI 按 isCn 显隐）+ 刷新文案
+#                                 ④ 调用必须在 fin_rptHideInView 之前（后跑者优先）
+#                                 ⑤ 只写显示快照 rowData[行].hd=1（克隆），恢复 delete .hd，
+#                                    ★绝不碰 cellData、绝不删数据
+#
+#   13) check_fin_merge_cn_blue_lock.py —— 合并报表「中国区块蓝字守卫」锁死区
+#                                 （FIN-MERGE-CN-BLUE-GUARD-20261015）：
+#                                 ① 只在合并报表 + 「中国成本独立显示」分组状态生效
+#                                 ② 中国区块行号取 __FIN_MERGE_CN_ROWBASE/ROWS（AN 列已被裁掉）
+#                                 ③ ★红高亮行整行不碰（按 finHiState + 红字两条判），
+#                                    用户 2026-10-15 选 A：保留"离今天最近那一行"的红高亮
+#                                 ④ 静默写入（finHiApplying + finHiQuietUntil），只换字色 cl
+#                                 ⑤ 必须排在高亮之后兜底调用（载入块 + 2 秒轮询 + 两条重建路径）
+#                                 ⑥ 两条重建路径（fin_loadReport / fin_applySnapshot）
+#                                    必须清空陈旧高亮坐标 finHiState（否则撤高亮按旧行号
+#                                    把分组后的中国行写成黑色 = 2026-10-15 的 BUG 根因）
+#
+#   14) check_fin_keep_sheet_lock.py —— 「重建后留在用户原来看的那张工作表」锁死区
+#                                 （FIN-KEEP-SHEET-20261015，用户 2026-10-15 要求）：
+#                                 ① fin_reload 必须【先记后重建】：fin_captureSheetState()
+#                                    在 fin_applySnapshot(snap) 之前
+#                                 ② 重建后必须 fin_restoreSheetState(keepSheet) 且补 ≥3 次
+#                                    （首帧渲染会把表/滚动再跳一次）
+#                                 ③ 合并报表强切「中国区块」只能由按钮触发：
+#                                    __FIN_MERGE_FOCUS_CN 在 fin_mergeToggleCnGroup 置位、
+#                                    在 fin_applySnapshot 消费并清零；查报表/复位/刷新不许强切
+#                                 ④ 有强切标记时 fin_reload 的恢复必须让位
+#                                 ⑤ 查报表确认必须仍走 fin_reload({keepFilter:true})
+#                                 ⑥ 语言切换路径的 FIN-KEEP-SHEET-20261012 恢复不得被删
+#
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
 #   但会在提交时打印，便于及时发现并修复。CI 中建议作为独立步骤做硬阻断。
@@ -97,7 +131,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then

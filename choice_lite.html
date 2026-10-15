@@ -17000,6 +17000,12 @@ var PROD_EQUIP_FAULT_KB = {
           <button class="fin-btn" data-i18n="fin_btn_load" onclick="fin_loadOrReload()">载入/刷新报表</button>
           <button class="fin-btn" data-i18n="fin_btn_save" onclick="fin_autoSave()">保存</button>
           <button class="fin-btn" data-i18n="fin_btn_report" onclick="fin_rptQueryPop(this)">查报表</button>
+          <!-- ★FIN-CN-HIDE-CHECKED-20261015（用户 2026-10-15 要求）：插在「查报表」与「导出 xlsx」之间。
+               只在中国报表显示（见 fin_applyReadonlyUI）；
+               点「隐藏核销记录」→ AC 列勾了核销的行整行隐藏，按钮变「恢复核销记录」；
+               点「恢复核销记录」→ 那些行原样重现，按钮变回「隐藏核销记录」。 -->
+          <button class="fin-btn" id="fin_cn_hide_checked_btn" style="display:none"
+                  data-i18n="fin_btn_hide_checked" onclick="fin_cnToggleHideChecked()">隐藏核销记录</button>
           <button class="fin-btn" data-i18n="fin_btn_export" onclick="fin_exportLocal()">导出 xlsx</button>
           <button class="fin-btn" id="fin_reimport_btn" data-i18n="fin_btn_reimport" onclick="document.getElementById('fin_reimport_file').click()">重导</button>
           <!-- ★FIN-MERGE-CN-GROUP-20261014（用户 2026-10-14 要求）：只在「合并财务总报表」显示，
@@ -18757,6 +18763,9 @@ var PROD_EQUIP_FAULT_KB = {
         var keep = fin_captureSheetState();        // ★先记下"用户正在看的表 + 滚动位置"
         var snapshot = fin_buildViewFor(base, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
         // ★查报表筛选：语言切换后保持「隐藏其它日期行 + 汇总表本期数值/本期文字」
+        /* ★FIN-CN-HIDE-CHECKED-20261015：必须【先】跑本函数、再跑 fin_rptHideInView
+           （后跑者优先），这样「恢复核销记录」时不会把查报表隐藏的日期行放出来。 */
+        try { fin_cnHideCheckedInView(snapshot, base); } catch(e){}
         try { fin_rptHideInView(snapshot, base); } catch(e){}
         try { fin_rptApplySummary(snapshot, base); } catch(e){}
         finLastView = snapshot;
@@ -18883,6 +18892,11 @@ var PROD_EQUIP_FAULT_KB = {
         finDirtyGen++;                         // ★改动代数 +1（供"保存期间是否又有改动"判定）
         try { finCnMarkDirty(); } catch(e){}   // ★中国报表：勾选核销也立刻自动保存
         fin_setStatusKey('fin_status_dirty');
+        /* ★FIN-CN-CHECK-GRAY-20261015：勾选/取消核销后【立即】把该行的字色刷成
+           灰+斜体 / 复原蓝+非斜体（force=true 绕过 200ms 节流，不等兜底轮询那 2 秒）。 */
+        try { finCnBluePass(true); } catch(e){}
+        /* 状态栏的求和/计数要跟着"已勾选行不计入"立即变（否则要等下次选区变化才刷新）。 */
+        try { fin_statSchedule(); } catch(e){}
       }, 80);
       return n;
     }
@@ -20399,6 +20413,19 @@ var PROD_EQUIP_FAULT_KB = {
         var snap = null; try { snap = fin_currentSnapshot(); } catch(e){}
         var sid = ''; try { sid = fin_curSheetId(); } catch(e){}
         var cells = (snap && snap.sheets && snap.sheets[sid] && snap.sheets[sid].cellData) || null;
+        /* ★FIN-CN-CHECK-GRAY-20261015（用户 2026-10-15 要求）：中国报表里【勾了核销的行】
+           整行不参与状态栏统计 —— 求和只加未勾选的金额，"计数"也按未勾选行算。
+           只在中国报表生效；越南/合并报表不受影响。 */
+        var cnCheckedRows = null;
+        try {
+          if (fin_isCn() && cells){
+            cnCheckedRows = {};
+            for (var _ark in cells){
+              var _ac = cells[_ark] && cells[_ark][String(FIN_CHECK_COL)];
+              if (_ac && typeof _ac.v === 'string' && _ac.v.indexOf(FIN_CHECK_ON) >= 0) cnCheckedRows[_ark] = 1;
+            }
+          }
+        } catch(e){ cnCheckedRows = null; }
         /* ★选区来源优先级（FIN-STATBAR-SEL3-20261013，用户要求「拉选多个数据就能统计多少个」）：
            ① 命令流记下的选区（鼠标按下/拖动时引擎必发 sheet.operation.set-selections，含 Ctrl 多选）
               —— 与当前工作表一致、且比门面给的【更大】时以它为准；
@@ -20429,6 +20456,8 @@ var PROD_EQUIP_FAULT_KB = {
               var _key = rr + ',' + cc;
               if (seen[_key]) continue;                     // 同一格只统计一次
               seen[_key] = 1;
+              /* ★已勾选核销的行 → 整行不计入求和/计数（FIN-CN-CHECK-GRAY-20261015） */
+              if (cnCheckedRows && cnCheckedRows[String(rr)]) continue;
               var cell = row[String(cc)];
               var v = cell && cell.v;
               if (v === undefined || v === null) continue;
@@ -21288,6 +21317,13 @@ var PROD_EQUIP_FAULT_KB = {
       finLoading = true;
       try {
         fin_disposeUnit();   // 防止重复创建单元导致重影
+        /* ★FIN-HI-STALE-STATE-20261015：旧单元已销毁 → 必须清空高亮坐标。
+           不清的后果（实测 BUG）：合并报表「中国成本独立显示」会把中国行整段挪到最下方，
+           行号全变；下一轮 finHiRecompute 拿【旧布局的行号】去 finHiRevertRow 还原样式，
+           而还原基线（finHiOriginal）取的是原始快照的同一行号 —— 两个行号已经不是同一行，
+           于是往中国行上写出「显式黑 + 不加粗」，屏幕上中国记录就有一两行莫名其妙变黑。
+           单元是【重建】的，新单元本来就是干净快照，没有任何旧高亮需要撤 → 直接清空最安全。 */
+        finHiState = {};
         var UNIT_SHEET = (finPresets && finPresets.UniverInstanceType && finPresets.UniverInstanceType.UNIVER_SHEET) || 2;
         // ★先用【原始完整快照】播三语种（表名/三语块/翻译缓存），再生成"当前语言"的显示快照
         /* ★每次加载前把「当前报表种类」的显示窗口/表名兜底装上：
@@ -21299,6 +21335,7 @@ var PROD_EQUIP_FAULT_KB = {
         finCnSeedCheckGlossary();   // ★中国报表：核销列的表头/勾选符号先入缓存（不翻译、随语言原样）
         finLastView = fin_buildViewFor(snapshot, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
         finLastView.id = fin_cfg().unitId;   // ★按报表种类认领单元 id（切标签时互不串台）
+        try { fin_cnHideCheckedInView(finLastView, snapshot); } catch(e){}  // ★隐藏已核销行（先跑）
         try { fin_rptHideInView(finLastView, snapshot); } catch(e){}   // ★查报表筛选：首屏/重载同一口径
         try { fin_rptApplySummary(finLastView, snapshot); } catch(e){} // ★查报表：汇总表按期间重算（甲方案）
         /* ★FIN-MERGE-CN-GROUP-20261014：合并报表的「中国成本独立显示」→ 中国行整体挪到最下方。
@@ -21324,6 +21361,9 @@ var PROD_EQUIP_FAULT_KB = {
       if (FIN_KIND === 'merge' && FIN_MERGE_CN_GROUP) {
         setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 700);
         setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 1700);
+        /* ★FIN-MERGE-CN-BLUE-GUARD-20261015：分组视图重建后立刻补蓝（再兜底一次） */
+        setTimeout(function(){ try { finMergeCnBlueGuard(); } catch(e){} }, 900);
+        setTimeout(function(){ try { finMergeCnBlueGuard(); } catch(e){} }, 1900);
       }
       setTimeout(function(){ try { fin_captureEditBase(); } catch(e){} }, 1400);
       // 加载后：先清掉历史泄漏到文件里的高亮红（若有），再重新计算高亮。
@@ -21333,6 +21373,9 @@ var PROD_EQUIP_FAULT_KB = {
           var _cleaned = finHiCleanup();
           finHiRecompute();
           if (_cleaned > 0) fin_markDirty();
+          /* ★FIN-MERGE-CN-BLUE-GUARD-20261015：必须排在高亮之后（先拿到本轮的红色高亮行号，
+             才知道哪一行要跳过）→ 合并分组视图下把中国区块补回蓝字。 */
+          try { finMergeCnBlueGuard(); } catch(e){}
         } catch(e){ console.warn('[hi] init', e); }
       }, 700);
       // ★加载途中用户切了报表（例如首屏越南还没load完就点了「中国财务报表」）：
@@ -21378,6 +21421,9 @@ var PROD_EQUIP_FAULT_KB = {
           if (!finReady || !finSheet) return;
           console.log('[hi] poll');
           try { finHiRecompute(); } catch(e){ console.warn('[hi] poll error', e); }
+          /* ★FIN-MERGE-CN-BLUE-GUARD-20261015：每轮兜底补蓝 —— 万一某次撤高亮把中国行写黑，
+             这里 2 秒内就能自己修回来（只作用于合并分组视图，其它报表直接返回 0）。 */
+          try { finMergeCnBlueGuard(); } catch(e){}
         }, 2000);
         // 暴露手动触发，方便调试
         window.finHiForceRecompute = finHiRecompute;
@@ -21794,15 +21840,19 @@ var PROD_EQUIP_FAULT_KB = {
          · 只写【样式】不写值（与高亮同款写法），并复用高亮的静默窗口机制
            （finHiApplying + finHiQuietUntil）→ 绝不标脏、绝不触发自动保存。 */
     var FIN_CN_BLUE = '#0000FF';
+    /* ★核销灰（FIN-CN-CHECK-GRAY-20261015，用户 2026-10-15 要求）：
+       AC 列勾了核销的行 → 整行字色灰 + 斜体；未勾选 → 蓝 + 非斜体（核销格本身保持黑色）。
+       灰色与生产模块"冰冻锁死格"的 #9aa4b2 一致，也与 app.py 的 CN_TEXT_GRAY 完全一致。 */
+    var FIN_CN_GRAY = '#9AA4B2';
     var FIN_CN_TOTAL_LABELS = { 'TỔNG CỘNG': 1, '全部的': 1, 'TOTAL': 1, '合计': 1, '总计': 1 };
     var finCnBlueTimer = null, finCnBlueAt = 0;
 
-    function finCnBluePass(){
+    function finCnBluePass(force){
       try {
         if (!fin_isCn()) return 0;                       // ★只在中国报表生效
         if (!finReady || !finUniverAPI || !finSheet) return 0;
         if (finHiApplying) return 0;                     // 高亮正在写样式，不插队
-        if (Date.now() < finCnBlueAt) return 0;           // 节流 200ms
+        if (!force && Date.now() < finCnBlueAt) return 0; // 节流 200ms（勾选核销后 force 立即重绘）
         var snap = fin_currentSnapshot();
         if (!snap || !snap.sheetOrder || !snap.sheetOrder.length) return 0;
         var sid = snap.sheetOrder[0];
@@ -21823,10 +21873,16 @@ var PROD_EQUIP_FAULT_KB = {
             if (typeof tv === 'string' && FIN_CN_TOTAL_LABELS[tv.trim().toUpperCase()]){ isTotal = true; break; }
           }
           if (isTotal) continue;
+          /* ★这一行勾了核销没有？（读 AC 列）勾了 → 灰+斜体；没勾 → 蓝+非斜体。 */
+          var _acCell = row[String(FIN_CHECK_COL)];
+          var _acV = _acCell && _acCell.v;
+          var _checked = (typeof _acV === 'string' && _acV.indexOf(FIN_CHECK_ON) >= 0);
+          var _wantRgb = _checked ? FIN_CN_GRAY : FIN_CN_BLUE;
+          var _wantIt = _checked ? 1 : 0;
           for (var ck in row){
             var c = parseInt(ck, 10);
             if (isNaN(c) || c > FIN_VIEW_MAXCOL) continue;
-            if (c === FIN_CHECK_COL) continue;           // 核销列（☐）没有字色，不动
+            if (c === FIN_CHECK_COL) continue;           // ★核销格本身保持黑色原样，不动
             var cell = row[ck];
             if (!cell) continue;
             var v = cell.v;
@@ -21834,11 +21890,17 @@ var PROD_EQUIP_FAULT_KB = {
             var st = fin_cellStyle(snap, cell) || {};
             var cl = st.cl, rgb = (cl && typeof cl === 'object') ? cl.rgb : cl;
             rgb = String(rgb || '').toUpperCase();
-            if (rgb.indexOf('0000FF') >= 0) continue;     // 已经是蓝字
             if (rgb.indexOf('FF0000') >= 0) continue;     // 红（高亮残留）交给高亮逻辑处理
+            var _curIt = (st.it === 1 || st.it === true) ? 1 : 0;
+            if (_checked){
+              if (rgb.indexOf('9AA4B2') >= 0 && _curIt === 1) continue;   // 已是灰+斜体
+            } else {
+              if (rgb.indexOf('0000FF') >= 0 && _curIt === 0) continue;   // 已是蓝字、且非斜体
+            }
             var ns = {};
             for (var k in st){ if (Object.prototype.hasOwnProperty.call(st, k)) ns[k] = st[k]; }
-            ns.cl = { rgb: FIN_CN_BLUE };
+            ns.cl = { rgb: _wantRgb };
+            ns.it = _wantIt;                              // 斜体开关（1=斜体，0=正常）
             map[r] = map[r] || {};
             map[r][c] = { s: ns };                        // ★只写样式，绝不写值
             n++;
@@ -22256,6 +22318,120 @@ var PROD_EQUIP_FAULT_KB = {
           if (rd && hiddenHere){ sh.rowData = rd; finRptHidden += hiddenHere; }
         }
       } catch(e){ console.warn('[fin] rptHide', e); }
+    }
+
+    /* ===== 中国报表：隐藏/恢复「已核销」记录（FIN-CN-HIDE-CHECKED-20261015）=====
+       用户 2026-10-15 要求：工具栏「查报表」与「导出 xlsx」之间加一个按钮 ——
+         点「隐藏核销记录」→ AC 列勾了核销的那些行【整行隐藏】，按钮变「恢复核销记录」；
+         点「恢复核销记录」→ 那些行原样重现，按钮变回「隐藏核销记录」。
+       ★机制与「查报表」完全一致：只写【显示快照】的 rowData[行].hd = 1（Excel 式隐藏行），
+         不删任何数据、不移动公式、表头/合计行永不隐藏、不写盘、不发任何请求。
+       ★只在中国报表（fin_isCn）生效 —— 越南 / 合并报表绝不触发。
+       ★与「查报表」的日期筛选共存：调用顺序必须是【本函数先跑、fin_rptHideInView 后跑】，
+         这样关掉本功能时不会把查报表隐藏的行放出来（后跑者说了算）。 */
+    var finCnHideChecked = false;      // true = 已隐藏「已核销」行
+    var finCnHiddenRows = {};          // "sid:行" → {sid,r}：本功能【亲手】隐藏过的行，用于精准还原
+    var finCnHiddenCount = 0;          // 本次隐藏了几行（诊断用）
+
+    /* 找出显示快照里 AC 列勾了核销的数据行 → { 行号: 工作表id } */
+    function fin_cnCheckedRowsIn(view){
+      var out = null;
+      try {
+        if (!fin_isCn() || !view || !view.sheets) return null;
+        var order = view.sheetOrder || [];
+        for (var i = 0; i < order.length; i++){
+          var sid = order[i], sh = view.sheets[sid];
+          if (!sh) continue;
+          var cd = sh.cellData || {};
+          for (var rk in cd){
+            var r = parseInt(rk, 10);
+            if (isNaN(r) || r < 4) continue;              // 0 基第 4 行 = Excel 第 5 行 = 第一条数据行
+            var ac = (cd[rk] || {})[String(FIN_CHECK_COL)];
+            var av = ac && ac.v;
+            if (typeof av !== 'string' || av.indexOf(FIN_CHECK_ON) < 0) continue;
+            if (!out) out = {};
+            out[r] = sid;
+          }
+        }
+      } catch(e){ console.warn('[fin-cn] checkedRows', e); }
+      return out;
+    }
+
+    /* 把「已核销」行标记为隐藏 / 取消隐藏（幂等；只碰 rowData，绝不碰 cellData）
+       ★为什么要记 finCnHiddenRows：用户在"隐藏中"把某行【取消勾选】后，那一行不再出现在
+         勾选集合里 —— 若只按"当前勾选集合"收尾，它上一次留下的 hd 就没人清，会一直藏着。
+         所以本功能对自己隐藏过的行逐一登记，先"还原本功能曾隐藏、现在不该隐藏"的行，再隐藏新集合。 */
+    function fin_cnHideCheckedInView(view, base){
+      finCnHiddenCount = 0;
+      if (!fin_isCn() || !view || !view.sheets) return;
+      var hit = fin_cnCheckedRowsIn(view) || {};
+      var want = {};                                    // "sid:行" → {sid,r}
+      if (finCnHideChecked){
+        for (var rk0 in hit){
+          want[hit[rk0] + ':' + rk0] = { sid: hit[rk0], r: parseInt(rk0, 10) };
+        }
+      }
+      try {
+        /* ① 还原本功能"曾经隐藏、现在不该隐藏"的行（关掉功能、或该行已被取消勾选） */
+        for (var k in finCnHiddenRows){
+          if (want[k]) continue;
+          var it = finCnHiddenRows[k];
+          var sh0 = view.sheets[it.sid];
+          if (sh0){
+            var src0 = sh0.rowData || {};
+            var c0 = src0[String(it.r)];
+            if (c0 && typeof c0 === 'object' && c0.hd){
+              var rd0 = fin_rptCloneRowData(src0);
+              delete rd0[String(it.r)].hd;
+              if (!Object.keys(rd0[String(it.r)]).length) delete rd0[String(it.r)];
+              sh0.rowData = rd0;
+            }
+          }
+          delete finCnHiddenRows[k];
+        }
+        /* ② 隐藏"当前所有已核销行" */
+        for (var k2 in want){
+          var it2 = want[k2], sh2 = view.sheets[it2.sid];
+          if (!sh2) continue;
+          var src2 = sh2.rowData || {};
+          var c2 = src2[String(it2.r)];
+          if (!(c2 && typeof c2 === 'object' && c2.hd)){
+            var rd2 = fin_rptCloneRowData(src2);
+            var c3 = rd2[String(it2.r)];
+            if (!c3 || typeof c3 !== 'object') c3 = {};
+            c3.hd = 1;
+            rd2[String(it2.r)] = c3;
+            sh2.rowData = rd2;
+          }
+          finCnHiddenRows[k2] = it2;
+          finCnHiddenCount++;
+        }
+      } catch(e){ console.warn('[fin-cn] hideCheckedInView', e); }
+    }
+
+    /* 按钮文案跟着状态走（同时改 data-i18n，切语言时 sweepI18n 按新键重刷三语） */
+    function fin_cnHideCheckedBtnLabel(){
+      try {
+        var b = document.getElementById('fin_cn_hide_checked_btn');
+        if (!b) return;
+        var key = finCnHideChecked ? 'fin_btn_show_checked' : 'fin_btn_hide_checked';
+        b.setAttribute('data-i18n', key);
+        b.textContent = fin_L(key);
+        b.title = fin_L(key);
+      } catch(e){}
+    }
+
+    /* 工具栏按钮：隐藏 / 恢复「已核销」记录 */
+    function fin_cnToggleHideChecked(){
+      try {
+        if (!fin_isCn()) return;
+        finCnHideChecked = !finCnHideChecked;
+        fin_cnHideCheckedBtnLabel();
+        /* 走「按当前语言重建显示单元」那条路：只读快照、不写盘、保留滚动位置与未保存的录入；
+           重建时 fin_cnHideCheckedInView 会按新状态重新标 hd。 */
+        if (typeof fin_applyLangView === 'function') fin_applyLangView();
+        else if (typeof fin_loadOrReload === 'function') fin_loadOrReload();
+      } catch(e){ console.warn('[fin-cn] toggleHideChecked', e); }
     }
 
     /* ===== 查报表 · 汇总表按期间重算（甲方案，2026-10-13 用户选定）=====
@@ -23106,6 +23282,9 @@ var PROD_EQUIP_FAULT_KB = {
 
     function fin_applySnapshot(snap){
       fin_disposeUnit();
+      /* ★FIN-HI-STALE-STATE-20261015：同 fin_loadReport —— 旧单元已销毁，清空旧高亮坐标，
+         避免用「旧布局行号」去撤高亮时把（合并分组后）中国行写成黑色。 */
+      finHiState = {};
       // 【必须复用同一个 unitId】（服务端快照自带 'vn-report'）。
       // Univer 的权限点是按 unitId 注册的；若每次换成 'vn-report-<时间戳>'，
       // 旧单元被真正移除后，仍残留的权限校验（形如 1.1_vn-report）会查不到权限点，
@@ -23140,8 +23319,18 @@ var PROD_EQUIP_FAULT_KB = {
       /* ★FIN-MERGE-CN-GROUP-20261014：分组状态下重建完成 → 【强行】切到「Chi thực tế（实际支出）」，
          否则用户停在第 1 张表（SUMMARY）上，看不到"中国行已沉到最下方"。跑两次兜底（切表是异步的）。 */
       if (FIN_KIND === 'merge' && FIN_MERGE_CN_GROUP) {
-        setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 700);
-        setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 1700);
+        /* ★FIN-MERGE-CN-BLUE-GUARD-20261015：载入/刷新重建后补蓝（载入/刷新走的就是本函数） */
+        setTimeout(function(){ try { finMergeCnBlueGuard(); } catch(e){} }, 900);
+        setTimeout(function(){ try { finMergeCnBlueGuard(); } catch(e){} }, 1900);
+        /* ★FIN-KEEP-SHEET-20261015：只有「点按钮切换分组」那一次才强切到中国区块
+           （__FIN_MERGE_FOCUS_CN 由 fin_mergeToggleCnGroup 置位，用一次就清）。
+           查报表 / 复位 / 载入刷新走这里时【不强切表】—— 由 fin_reload 恢复用户原来看的那张表，
+           否则用户刚选好年月确认就被弹到别的表上。 */
+        if (window.__FIN_MERGE_FOCUS_CN){
+          window.__FIN_MERGE_FOCUS_CN = false;
+          setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 700);
+          setTimeout(function(){ try { fin_mergeFocusCnSheet(); } catch(e){} }, 1700);
+        }
       }
     }
 
@@ -23448,6 +23637,11 @@ var PROD_EQUIP_FAULT_KB = {
         var mg = document.getElementById('fin_merge_group_btn');
         if (mg) mg.style.display = isMerge ? '' : 'none';
         try { fin_mergeGroupBtnLabel(); } catch(e){}
+        /* ★FIN-CN-HIDE-CHECKED-20261015：隐藏/恢复「已核销」记录的按钮 ——
+           只在中国报表出现（越南/合并报表没有核销列），文案按当前状态 + 当前语言刷新。 */
+        var hc = document.getElementById('fin_cn_hide_checked_btn');
+        if (hc) hc.style.display = isCn ? '' : 'none';
+        try { fin_cnHideCheckedBtnLabel(); } catch(e){}
       } catch(e){}
     }
 
@@ -23543,6 +23737,9 @@ var PROD_EQUIP_FAULT_KB = {
       if (!finReady) { fin_setStatusKey('fin_status_not_loaded'); return; }
       FIN_MERGE_CN_GROUP = !FIN_MERGE_CN_GROUP;
       fin_mergeGroupBtnLabel();
+      /* ★FIN-KEEP-SHEET-20261015：这一次重建【要】强切到中国区块（本按钮的既有行为），
+         置位后由 fin_applySnapshot 消费并清零；查报表/复位/刷新没有这个标记 → 留在原表。 */
+      window.__FIN_MERGE_FOCUS_CN = true;
       try { fin_reload(); } catch(e){ try { fin_loadReport(); } catch(e2){} }
     }
 
@@ -23568,6 +23765,77 @@ var PROD_EQUIP_FAULT_KB = {
         setTimeout(function(){ try { finScrollTo(row, 0); } catch(e){} }, 280);
         return true;
       } catch(e){ return false; }
+    }
+
+    /* ============★ 合并报表：中国区块「蓝字守卫」（FIN-MERGE-CN-BLUE-GUARD-20261015）★============
+       用户 2026-10-15 要求：「中国成本记录那一块，必须全是蓝字」。
+       背景（实测）：高亮机制（FIN-HI-LOCK）在【撤高亮】时是按行号去原始快照取原样式的。
+       合并报表「中国成本独立显示」把中国行整段挪到最下方、行号全变 → 行号错位 → 撤销时
+       往中国行上写了「显式黑」，屏幕上就有几行中国记录变黑且再也不会自己变回来
+       （越南/中国两个标签页有 finCnBluePass 兜底补蓝，合并标签页是只读视图，没有这一层）。
+       本函数就是给合并标签页补上这层兜底：把中国区块里【不是红高亮、也不是蓝字】的格子补成蓝字。
+       ★边界（一条都不能少）：
+         · 只在合并报表 + 分组状态（FIN_KIND==='merge' && FIN_MERGE_CN_GROUP）生效；
+         · 中国区块的行号来自 fin_mergeApplyCnGroup 记下的 __FIN_MERGE_CN_ROWBASE/ROWS，
+           ★不靠 AN 列标记（合并视图只显示 A–J 十列，AN 早被裁掉）；
+         · ★红高亮行整行不碰（用户 2026-10-15 明确选 A：保留"离今天最近那一行"的红高亮）；
+         · 越南区块一个字不碰；空单元格不写（没有可见字色）；
+         · 只写【样式】不写值，静默写入（finHiApplying + finHiQuietUntil），绝不写盘。 */
+    function finMergeCnBlueGuard(){
+      try {
+        if (FIN_KIND !== 'merge' || !FIN_MERGE_CN_GROUP) return 0;
+        if (!finReady || !finUniverAPI || !finSheet) return 0;
+        if (finHiApplying) return 0;                       // 高亮正在写样式，不插队
+        var base = window.__FIN_MERGE_CN_ROWBASE, cnt = window.__FIN_MERGE_CN_ROWS;
+        if (typeof base !== 'number' || typeof cnt !== 'number' || cnt <= 0) return 0;
+        var idx = fin_mergeCnSheetIndex();
+        if (idx < 0) return 0;
+        var sid = (finLastView && finLastView.sheetOrder) ? finLastView.sheetOrder[idx] : null;
+        if (!sid) return 0;
+        var snap = fin_currentSnapshot();
+        var sh = snap && snap.sheets && snap.sheets[sid];
+        if (!sh) return 0;
+        var cd = sh.cellData || {};
+        var hiRows = [];
+        ((finHiState && finHiState[sid]) || []).forEach(function(h){
+          if (h && typeof h.row === 'number') hiRows.push(h.row);
+        });
+        var map = {}, n = 0;
+        for (var r = base; r < base + cnt; r++){
+          if (hiRows.indexOf(r) >= 0) continue;            // ★红高亮行：整行不动
+          var row = cd[String(r)];
+          if (!row) continue;
+          for (var ck in row){
+            var c = parseInt(ck, 10);
+            if (isNaN(c) || c > FIN_VIEW_MAXCOL) continue;
+            var cell = row[ck];
+            if (!cell) continue;
+            var v = cell.v;
+            if (v === undefined || v === null || v === '') continue;   // 空格子没有可见字色
+            var st = fin_cellStyle(snap, cell) || {};
+            var cl = st.cl, rgb = (cl && typeof cl === 'object') ? cl.rgb : cl;
+            rgb = String(rgb || '').toUpperCase();
+            if (rgb.indexOf('FF0000') >= 0) continue;      // 红（高亮残留/正在高亮）不覆盖
+            if (rgb.indexOf('0000FF') >= 0) continue;      // 已是蓝字，跳过（幂等）
+            var ns = {};
+            for (var k in st){ if (Object.prototype.hasOwnProperty.call(st, k)) ns[k] = st[k]; }
+            ns.cl = { rgb: FIN_CN_BLUE };                  // 只换字色：粗体/边框/数字格式原样保留
+            map[r] = map[r] || {};
+            map[r][c] = { s: ns };
+            n++;
+          }
+        }
+        if (!n) return 0;
+        finHiApplying = true;                              // ★静默：与高亮/中国报表补蓝同一套机制
+        try {
+          finHiQuietUntil = Date.now() + ((typeof FIN_HI_LOCK !== 'undefined' && FIN_HI_LOCK.quietMs) ? FIN_HI_LOCK.quietMs : 600);
+          finExecSilent('sheet.command.set-range-values', { unitId: fin_unitId(), subUnitId: sid, value: map });
+        } catch(e){ console.warn('[merge-cn-blue] exec', e); }
+        finHiApplying = false;
+        finHiQuietUntil = Date.now() + ((typeof FIN_HI_LOCK !== 'undefined' && FIN_HI_LOCK.quietMs) ? FIN_HI_LOCK.quietMs : 600);
+        console.log('[merge-cn-blue] 中国区块补蓝', n, '格');
+        return n;
+      } catch(e){ console.warn('[merge-cn-blue] guard', e); return 0; }
     }
 
     function fin_sortByColumn(dir){
@@ -23614,10 +23882,28 @@ var PROD_EQUIP_FAULT_KB = {
         var maxR0 = fin_maxDataRow(snap, sid0);
         finRowOrder = [];
         for (var i = 1; i <= maxR0; i++) finRowOrder.push(i);
+        /* ★FIN-KEEP-SHEET-20261015（用户 2026-10-15 要求：「查报表」确认后不许跳表）：
+           先记下"用户正在看的那张工作表 + 滚动位置 + 选区"。重建单元时 Univer 默认回到
+           第 1 张工作表 —— 这就是「查报表选好年月点确认，整张表跳到主表」的原因
+           （越南财务报表 / 合并报表同因；中国报表只有一张表所以看不出来）。 */
+        var keepSheet = null;
+        try { keepSheet = fin_captureSheetState(); } catch(e){ keepSheet = null; }
         fin_applySnapshot(snap);
         finFilterActive = false;
         finDateSortDir = 1;
         fin_updateDateSortBtn();
+        /* ★恢复"表 + 滚动位置 + 选区"：多补几次，防止首帧渲染后又跳回第一张表
+           （与语言切换 FIN-KEEP-SHEET-20261012 同一套机制）。
+           ★例外：合并报表刚点过「中国成本独立显示 / 恢复原显示顺序」时，
+             __FIN_MERGE_FOCUS_CN 让 fin_mergeFocusCnSheet() 接管（那是该按钮的既有行为），
+             这里就不抢它的焦点。 */
+        if (!window.__FIN_MERGE_FOCUS_CN){
+          var restoreSheet = function(){ try { fin_restoreSheetState(keepSheet); } catch(e){} };
+          restoreSheet();
+          setTimeout(restoreSheet, 120);
+          setTimeout(restoreSheet, 420);
+          setTimeout(restoreSheet, 950);
+        }
         setTimeout(function(){ fin_normalizeDates(finLastView || snap); }, 400);
         // ★复位后同样重放当前币种
         setTimeout(function(){ try { fin_reapplyCurrency(true); } catch(e){} }, 900);
@@ -26927,6 +27213,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     fin_dk_total:"合计", fin_dk_no_data:"暂无数据",
     fin_cn_hint:"与越南报表同一套表格逻辑；Excel 里只有「实际支出」一张表。改动后请点「保存」。", fin_title_save_cn:"手动保存到服务器（中国报表：不会自动保存）", fin_title_save_ro:"只读模式：请使用「重导」上传新的 xlsx 更新报表",
     fin_btn_load:"载入/刷新报表", fin_btn_save:"保存", fin_btn_snapshot:"快照", fin_btn_export:"导出 xlsx", fin_btn_reimport:"重导", fin_merge_group_btn:"中国成本独立显示", fin_merge_group_btn_on:"恢复原显示顺序", fin_merge_cn_section:"中国成本记录", fin_btn_filter:"筛选", fin_btn_sort_asc:"升序", fin_btn_sort_desc:"降序",     fin_btn_restore:"复原", fin_btn_date_fmt:"按日-月-年排序", fin_btn_ins_rows:"在下方插入行", fin_btn_ins_rows_above:"在上方插入行",
+    fin_btn_hide_checked:"隐藏核销记录", fin_btn_show_checked:"恢复核销记录",
     fin_btn_report:"查报表", fin_rpt_title:"查报表", fin_rpt_year:"年份", fin_rpt_month:"月份", fin_rpt_note0:"选择0表示只看年度报告！", fin_rpt_ok:"确认", fin_rpt_cancel:"取消", fin_rpt_restore:"恢复",
     fin_status_rpt_filtered:"已筛选：", fin_status_rpt_empty:"该年份/月份没有记录：",
     fin_rpt_period_line:"{p} 发生额 · 余额截至 {e}", fin_rpt_period_remark:"截至 {e}",
@@ -27749,6 +28036,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     fin_dk_total:"Total", fin_dk_no_data:"No data",
     fin_cn_hint:"Same table logic as the Vietnam report; the Excel contains only the \u201cActual Payments\u201d sheet. Click Save after editing.", fin_title_save_cn:"Save to the server manually (China report: no auto-save)", fin_title_save_ro:"Read-only: use Re-import to upload a new xlsx",
     fin_btn_load:"Load / Refresh", fin_btn_save:"Save", fin_btn_snapshot:"Snapshot", fin_btn_export:"Export xlsx", fin_btn_reimport:"Re-import", fin_merge_group_btn:"Show China Costs Separately", fin_merge_group_btn_on:"Restore Original Order", fin_merge_cn_section:"China Cost Records", fin_btn_filter:"Filter", fin_btn_sort_asc:"Asc", fin_btn_sort_desc:"Desc", fin_btn_restore:"Restore", fin_btn_date_fmt:"Sort by day-month-year", fin_btn_ins_rows:"Insert rows below", fin_btn_ins_rows_above:"Insert rows above",
+    fin_btn_hide_checked:"Hide write-off records", fin_btn_show_checked:"Show write-off records",
     fin_btn_report:"Query Report", fin_rpt_title:"Query Report", fin_rpt_year:"Year", fin_rpt_month:"Month", fin_rpt_note0:"Choose 0 to view the annual report only!", fin_rpt_ok:"Confirm", fin_rpt_cancel:"Cancel", fin_rpt_restore:"Restore",
     fin_status_rpt_filtered:"Filtered: ", fin_status_rpt_empty:"No records for ",
     fin_rpt_period_line:"{p} movements · balances as of {e}", fin_rpt_period_remark:"As of {e}",
@@ -28569,6 +28857,7 @@ crm_yes:"Có", crm_no_yes:"Không", lostRestore:"Chuyển về Dự án Tiềm n
     fin_dk_total:"Tổng cộng", fin_dk_no_data:"Chưa có dữ liệu",
     fin_cn_hint:"Cùng logic bảng như báo cáo Việt Nam; Excel chỉ có một sheet \u201cChi thực tế\u201d. Nhớ bấm Lưu sau khi nhập.", fin_title_save_cn:"Lưu thủ công lên máy chủ (báo cáo Trung Quốc: không tự động lưu)", fin_title_save_ro:"Chế độ chỉ đọc: dùng Nhập lại để tải xlsx mới",
     fin_btn_load:"Tải lại báo cáo", fin_btn_save:"Lưu", fin_btn_snapshot:"Ảnh chụp", fin_btn_export:"Xuất xlsx", fin_btn_reimport:"Nhập lại", fin_merge_group_btn:"Hiển thị riêng chi phí Trung Quốc", fin_merge_group_btn_on:"Khôi phục thứ tự ban đầu", fin_merge_cn_section:"Chi phí Trung Quốc", fin_btn_filter:"Lọc", fin_btn_sort_asc:"Tăng", fin_btn_sort_desc:"Giảm", fin_btn_restore:"Khôi phục", fin_btn_date_fmt:"Sắp xếp theo ngày-tháng-năm", fin_btn_ins_rows:"Chèn dòng bên dưới", fin_btn_ins_rows_above:"Chèn dòng bên trên",
+    fin_btn_hide_checked:"Ẩn bản ghi đã xác nhận", fin_btn_show_checked:"Hiện bản ghi đã xác nhận",
     fin_btn_report:"Tra cứu báo cáo", fin_rpt_title:"Tra cứu báo cáo", fin_rpt_year:"Năm", fin_rpt_month:"Tháng", fin_rpt_note0:"Chọn 0 nghĩa là chỉ xem báo cáo theo năm!", fin_rpt_ok:"Xác nhận", fin_rpt_cancel:"Hủy", fin_rpt_restore:"Khôi phục",
     fin_status_rpt_filtered:"Đã lọc: ", fin_status_rpt_empty:"Không có dữ liệu cho ",
     fin_rpt_period_line:"Phát sinh {p} · số dư đến {e}", fin_rpt_period_remark:"Đến {e}",

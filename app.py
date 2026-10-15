@@ -4228,6 +4228,15 @@ CN_CHECK_OFF = "☐"
 # 中国报表【数据区】字体颜色（用户要求：除"屏幕高亮的红色加粗行"外，其余行都是蓝色）。
 # 纯蓝；想换成柔和的 Office 蓝就改成 "FF0070C0"。
 CN_TEXT_BLUE = "FF0000FF"
+# ★核销勾选行的字色（FIN-CN-CHECK-GRAY-20261015，用户 2026-10-15 要求）：
+#   AC 列勾了核销的行 → 整行（A..AB）字体【灰色 + 斜体】，并从合计里剔除；
+#   未勾选 → 恢复数据区蓝色、非斜体。
+#   灰色沿用生产模块"冰冻锁死格"的 #9aa4b2（用户原话："像锁死的颜色"），保持一致。
+CN_TEXT_GRAY = "FF9AA4B2"
+# 合计行（第 3 行 + 底部 TỔNG CỘNG 行）公式：全部合计 − 已勾选核销的合计。
+# ★为什么是「SUM 减 SUMIF(已勾选)」而不是「SUMIF(未勾选)」：
+#   AC 列偶发为空的格子会被当成"未勾选"，不会漏计（更保守）。
+CN_TOTAL_ROW = CN_FIRST_DATA_ROW + CN_SEED_ROWS       # 205 = 底部「TỔNG CỘNG」合计行
 
 # ============ 中国报表：默认人民币符号 + 黑色网格线（FIN-CN-MONEY-20261013）============
 # 用户要求：① 中国财务报表里金额显示【人民币符号】，默认货币就是 RMB（越南报表仍是越南盾）；
@@ -4285,16 +4294,19 @@ def _cn_make_seed_xlsx(path):
         ac = ws["AC%d" % r]
         ac.value = CN_CHECK_OFF
         ac.alignment = center          # ★勾选框水平+垂直居中（用户要求"选择框左右居中"）
-    tot = last + 1
-    _sum = "=SUM(E%d:E%d)" % (CN_FIRST_DATA_ROW, last)
+    tot = last + 1                     # 205 = 底部「TỔNG CỘNG」合计行
     ws["C%d" % tot] = "TỔNG CỘNG"
-    ws["E%d" % tot] = _sum
     ws["M%d" % tot] = "全部的"
-    ws["O%d" % tot] = _sum
     ws["W%d" % tot] = "TOTAL"
-    ws["Y%d" % tot] = _sum
+    # ★FIN-CN-CHECK-GRAY-20261015：合计公式一律「剔除已勾选核销」，顶部第 3 行与底部合计行同口径
+    for _c in ("E", "O", "Y"):
+        _f = _cn_total_formula(_c)
+        ws["%s%d" % (_c, tot)] = _f
+        ws["%s3" % _c] = _f
     for col in CN_MONEY_COLS:
         ws["%s%d" % (col, tot)].number_format = CN_MONEY_FMT       # 合计行也带 ¥
+    for col in ("E", "O", "Y"):
+        ws["%s3" % col].number_format = CN_MONEY_FMT               # 顶部合计行也带 ¥
     _cn_apply_borders(ws, 1, tot)      # ★黑色网格线（标题行 ~ 合计行）
     for col, w in (("A", 11.7), ("B", 11.3), ("C", 34.8), ("D", 11.7), ("E", 20.3), ("AC", 10)):
         ws.column_dimensions[col].width = w
@@ -4432,7 +4444,11 @@ def _cn_normalize_text_color():
     ★范围：第 CN_FIRST_DATA_ROW..CN_FIRST_DATA_ROW+CN_SEED_ROWS-1 行 × A..AB 列
       （AC 核销列保持黑色；表头行、合计行不动。
         要连表头/合计行一起变蓝，把下面的 first/last 调一下即可。）
-    幂等：已经蓝色的格子跳过；没改动就完全不重写文件（避免白动 mtime）。"""
+    ★FIN-CN-CHECK-GRAY-20261015（用户 2026-10-15 要求）：本函数同时负责"核销灰"——
+        该行 AC 列 = ☑ → 灰（CN_TEXT_GRAY）+ 斜体；否则 → 蓝（CN_TEXT_BLUE）+ 非斜体。
+      这样做的好处：无论用户是在 App 里勾选、在 Excel 里勾选、还是从别处粘贴带黑样式进来，
+      只要走一次保存/启动归一化，文件里的颜色就自动是对的（幂等）。
+    幂等：颜色和斜体都已是目标值的格子跳过；没改动就完全不重写文件（避免白动 mtime）。"""
     if not os.path.isfile(CN_REPORT):
         return False
     try:
@@ -4446,25 +4462,81 @@ def _cn_normalize_text_color():
         #   用户往里录/粘贴数据后行数可能超过 204；种子末尾的那一行是合计行，必须排除。
         last = max(CN_FIRST_DATA_ROW + CN_SEED_ROWS - 1, ws.max_row)
         max_col = CN_CHECK_COL - 1        # A..AB（AC 核销列不动）
-        want = CN_TEXT_BLUE.lstrip('#').upper()[-6:]
+        want_blue = CN_TEXT_BLUE.lstrip('#').upper()[-6:]
+        want_gray = CN_TEXT_GRAY.lstrip('#').upper()[-6:]
         changed = 0
         for row in ws.iter_rows(min_row=first, max_row=last, min_col=1, max_col=max_col):
             if _cn_is_total_row(row):
                 continue                  # ★合计行不蓝化（表头行/标题行本来就不在这个范围内）
+            # 这一行勾了核销没有？（读 AC 列）
+            acv = ws.cell(row=row[0].row, column=CN_CHECK_COL).value
+            checked = isinstance(acv, str) and (CN_CHECK_ON in acv)
+            want = want_gray if checked else want_blue
+            want_it = bool(checked)
             for cell in row:
-                cur = getattr(getattr(cell.font, 'color', None), 'rgb', None)
-                if isinstance(cur, str) and cur.lstrip('#').upper()[-6:] == want:
+                f = cell.font
+                cur = getattr(getattr(f, 'color', None), 'rgb', None)
+                cur_ok = isinstance(cur, str) and cur.lstrip('#').upper()[-6:] == want
+                it_ok = (bool(f.italic) == want_it)
+                if cur_ok and it_ok:
                     continue
-                nf = _cp(cell.font)
-                nf.color = Color(rgb=CN_TEXT_BLUE)
+                nf = _cp(f)
+                nf.color = Color(rgb=(CN_TEXT_GRAY if checked else CN_TEXT_BLUE))
+                nf.italic = want_it
                 cell.font = nf
                 changed += 1
         if changed:
             _cn_ws_save_atomic(wb)
-            sys.stderr.write("[fin-cn] 数据区 %d 个单元格字体已设为蓝色\n" % changed)
+            sys.stderr.write("[fin-cn] 数据区 %d 个单元格字体已归一化（未勾选蓝 / 勾选灰+斜体）\n" % changed)
         return changed > 0
     except Exception as e:
-        sys.stderr.write("[fin-cn] 数据区蓝色处理失败: %s\n" % e)
+        sys.stderr.write("[fin-cn] 数据区字色处理失败: %s\n" % e)
+        return False
+
+
+def _cn_total_formula(col_letter):
+    """合计格公式（FIN-CN-CHECK-GRAY-20261015）：全部合计 − 已勾选核销的合计。
+    =SUM(E5:E204)-SUMIF($AC$5:$AC$204,"☑",E5:E204)
+    ★Univer 0.5.5 的公式引擎（@univerjs/engine-formula）实现了 SUM 与 SUMIF，
+      所以公式在网页里也能算出正确的"剔除已勾选"合计（2026-10-15 实测确认）。"""
+    from openpyxl.utils import get_column_letter as _gcl
+    r0, r1 = CN_FIRST_DATA_ROW, CN_FIRST_DATA_ROW + CN_SEED_ROWS - 1
+    ac = _gcl(CN_CHECK_COL)
+    return ('=SUM({c}{r0}:{c}{r1})-SUMIF(${ac}${r0}:${ac}${r1},"{on}",{c}{r0}:{c}{r1})'
+            .format(c=col_letter, ac=ac, r0=r0, r1=r1, on=CN_CHECK_ON))
+
+
+def _cn_normalize_total_formula():
+    """把【顶部合计行（第 3 行）】与【底部 TỔNG CỘNG 行（第 205 行）】的支出合计改成
+    "剔除已勾选核销"的公式（三语块 E / O / Y 都写）。幂等：已是目标公式就跳过。
+
+    ★为什么必须落进文件、而且每次保存后都要重跑：
+      前端保存 payload 是「保留文件原样式、只更新值」，且合计格是公式格 —— 必须由服务端
+      在文件里把它钉死，否则一次"把换算后的人民币值写进合计格"就会把公式冲掉。
+    返回 True 表示动过文件。"""
+    if not os.path.isfile(CN_REPORT):
+        return False
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(CN_REPORT)
+        ws = wb[CN_SHEET_NAME] if CN_SHEET_NAME in wb.sheetnames else wb[wb.sheetnames[0]]
+        changed = 0
+        for r in (3, CN_TOTAL_ROW):
+            for col in ("E", "O", "Y"):            # 只处理【支出】列（收入不参与剔除）
+                want = _cn_total_formula(col)
+                cell = ws["%s%d" % (col, r)]
+                if cell.value != want:
+                    cell.value = want
+                    changed += 1
+                if (cell.number_format or "").strip() != CN_MONEY_FMT:
+                    cell.number_format = CN_MONEY_FMT
+                    changed += 1
+        if changed:
+            _cn_ws_save_atomic(wb)
+            sys.stderr.write("[fin-cn] 合计公式 %d 处已改为「剔除已勾选核销」\n" % changed)
+        return changed > 0
+    except Exception as e:
+        sys.stderr.write("[fin-cn] 合计公式处理失败: %s\n" % e)
         return False
 
 
@@ -4688,7 +4760,8 @@ def _cn_normalize_style():
     返回 True 表示动过文件（调用方据此让快照缓存失效）。"""
     changed = False
     for fn, tag in ((_cn_normalize_ac_align, "核销列居中"),
-                    (_cn_normalize_text_color, "数据区蓝色"),
+                    (_cn_normalize_text_color, "数据区字色（未勾选蓝/勾选灰+斜体）"),
+                    (_cn_normalize_total_formula, "合计公式剔除已勾选核销"),
                     (_cn_normalize_money_fmt, "金额人民币符号"),
                     (_cn_normalize_border, "黑色网格线"),
                     (_cn_normalize_date_fmt, "日期格式 dd-mm-yyyy")):
