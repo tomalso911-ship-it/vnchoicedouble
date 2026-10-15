@@ -217,6 +217,20 @@ chk("function eq_statLabels" in eqblk and "计数" in eqblk and "Count" in eqblk
     "★标签三语：中/英/越")
 chk("eq_statIsDate" in eqblk, "★日期格（数字格式含日期 token）不计入数字统计")
 
+print("17) 多实例隔离：右键插入行作用于【当前表格】（2026-10-16 修插到财务报表）")
+chk("function eq_bindContextMenuOnce" in eqblk, "★权益必须有自己的右键菜单接管 eq_bindContextMenuOnce")
+chk("function eq_containerOf" in eqblk and "equity_container" in eqblk,
+    "★eq_containerOf：只认 equity_container 内的右键（不碰财务报表的菜单）")
+chk("eqActive" in eqblk and "if (!eqActive) return" in eqblk,
+    "★eqActive 守护：只在权益容器内右键才接管菜单（否则越过界去改财务报表）")
+chk("function eq_insertRows" in eqblk, "★eq_insertRows：权益自己的插入逻辑")
+chk("unitId: 'equity-report'" in eqblk and "eqSubUnitId(sheet)" in eqblk,
+    "★eq_insertRows 显式带 unitId:'equity-report'（多实例下这是修插到财务报表的关键）")
+# 反向断言：财务侧必须也加容器作用域，否则它会在权益页右键时把权益菜单接管去插财务报表
+chk("function fin_containerOf" in html and "univer_container" in html,
+    "★财务侧 fin_containerOf：只认 univer_container（反制：财务的补丁不得再接管权益菜单）")
+chk("if (!finActive) return" in html, "★财务侧 finPatchInsertRowMenu 必须被 finActive 守护（反制跨实例串台）")
+
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")
 sys.exit(0 if ok else 1)

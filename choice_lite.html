@@ -4318,6 +4318,12 @@ var WL_FLOW_IMG = {
       .fin-menu-ins-item{display:flex !important;align-items:center;gap:6px;cursor:pointer;}
       .fin-menu-ins-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
       .fin-menu-ins-icon svg{width:16px;height:16px;}
+      /* 股东权益右键「插入行」菜单补丁（EQ-INS-ROWS-MENU-20261016）：复用同样的观感，避免重复 */
+      .eq-menu-ins-item{display:flex !important;align-items:center;gap:6px;cursor:pointer;}
+      .eq-menu-ins-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+      .eq-menu-ins-icon svg{width:16px;height:16px;}
+      .eq-menu-ins-input{width:38px;height:18px;border:1px solid #c9d4e0;border-radius:4px;font-size:11px;
+        padding:0 4px;background:#fff;cursor:text;}
       .fin-menu-ins-lbl{flex:0 0 auto;}
       .fin-menu-ins-input{width:46px;height:22px;border:1px solid #dfe6ee;border-radius:4px;font-size:12px;padding:0 4px;text-align:center;box-sizing:border-box;background:#fff;color:#333;flex:0 0 auto;}
       .fin-menu-ins-input:focus{outline:none;border-color:#E53935;}
@@ -20698,6 +20704,18 @@ var PROD_EQUIP_FAULT_KB = {
        一旦「插入」子菜单挂载出来就立刻补丁。 */
     var fin_menuObs = null, fin_menuObsTimer = null, fin_menuObsStopTimer = null;
     var fin_menuInsRounds = 0, fin_menuInsPatched = 0;
+    var finActive = false;   /* 当前右键是否发生在【财务报表】容器内（多实例隔离用） */
+    /* ★右键目标是否在财务报表容器里（多实例：防止权益页右键时财务补丁误接管权益菜单） */
+    function fin_containerOf(e){
+      try {
+        var t = (e && e.target) || null;
+        while (t && t !== document.body){
+          if (t.id === 'univer_container' || (t.classList && t.classList.contains('univer-container'))) return t;
+          t = t.parentNode;
+        }
+      } catch(_){}
+      return null;
+    }
     function fin_menuWatchStart(){
       try {
         if (fin_menuObs) return;
@@ -20732,7 +20750,11 @@ var PROD_EQUIP_FAULT_KB = {
         console.log('[fin-ins] 这 15 秒内没看到「插入」子菜单 —— 若你确实悬停「插入」并看到了两项，请把这条消息发我');
       }
     }
-    function fin_onContextMenu(){
+    function fin_onContextMenu(e){
+      /* ★多实例隔离：只有右键发生在财务报表容器里，才接管菜单。
+         否则（在权益页右键）一律跳过 —— 否则财务补丁会接管权益的菜单并插到财务报表里。 */
+      finActive = !!(fin_containerOf(e) || (e && e.target && (e.target.id === 'univer_container' || (e.target.classList && e.target.classList.contains('univer-container')))));
+      if (!finActive) return;
       // ① 立刻试几次（子菜单若已挂载过就能马上命中）
       [0, 40, 120, 260].forEach(function(d, idx){
         setTimeout(function(){ finPatchInsertRowMenu(idx === 3); }, d);
@@ -20750,8 +20772,8 @@ var PROD_EQUIP_FAULT_KB = {
       window.__finCtxMenuBound = true;
       document.addEventListener('contextmenu', fin_onContextMenu, true);
       document.addEventListener('mousedown', function(e){
-        // 右键 → 起菜单补丁流程
-        if (e && e.button === 2){ fin_onContextMenu(); return; }
+        // 右键 → 起菜单补丁流程（把事件透传，用于判定容器归属）
+        if (e && e.button === 2){ fin_onContextMenu(e); return; }
         // 左键：若焦点还停在我们注入的行数输入框上（它在 Univer 容器之外），
         // Univer 会按 e.target 忽略 Ctrl+Z/Ctrl+Y → 这里主动把焦点交还表格。
         try {
@@ -20856,6 +20878,7 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function finPatchInsertRowMenu(verbose){
       try {
+        if (!finActive) return;            /* ★多实例隔离：只在财务报表容器内右键才接管 */
         if (!finUniverAPI) return;
         var before = null, after = null;
         var pair = fin_menuRowInsPair();
@@ -24809,6 +24832,7 @@ var PROD_EQUIP_FAULT_KB = {
       try { eqExcelKeysBind(); } catch(e){}   /* ★Excel 键盘行为补丁（EQ-EXCEL-KEYS） */
       try { eqPatchPermissionService(); } catch(e){}   /* ★权限点放行：右键「插入行」等编辑命令不再被静默拦下 */
       try { eq_statBind(); } catch(e){}                /* ★底部统计栏（计数/总计/平均/最大/最小）*/
+      try { eq_bindContextMenuOnce(); } catch(e){}    /* ★右键「插入行」菜单补丁：限定在权益容器内，插入作用于当前表格 */
     } catch(e){
       inited = false;
       st('引擎加载失败：' + e.message);
@@ -25201,6 +25225,261 @@ var PROD_EQUIP_FAULT_KB = {
       }, 800);
       setTimeout(function(){ try { clearInterval(_eqStatBooter); } catch(e){} }, 90000);
     } catch(e){}
+
+    /* ============ ★股东权益右键「插入行」菜单补丁（EQ-INS-ROWS-MENU-20261016）============
+       ★多实例隔离（用户反馈：在权益表插入行，却作用到了财务报表）：
+         财务页挂了 document 级 contextmenu 监听，会接管「插入行」菜单并调用财务的插入
+         （带财务 unitId）→ 在权益页右键时，原本应插在权益表，却插到了财务报表。
+         ① 财务侧已加容器作用域（只接管 univer_container 内的右键）；
+         ② 这里权益侧自己接管 equity_container 内的右键，调 eq_insertRows（显式带 equity-report unitId），
+            保证插在当前（权益）表格。菜单项文案三语，随 Univer 菜单语言。 */
+    var eqMenuObs = null, eqMenuObsTimer = null, eqMenuObsStopTimer = null;
+    var eqMenuInsRounds = 0, eqMenuInsPatched = 0, eqActive = false;
+    function eq_containerOf(e){
+      try {
+        var t = (e && e.target) || null;
+        while (t && t !== document.body){
+          if (t.id === 'equity_container' || (t.classList && t.classList.contains('univer-container'))) return t;
+          t = t.parentNode;
+        }
+      } catch(_){}
+      return null;
+    }
+    var EQ_ROW_WORD = /(行|row|dòng)/i;
+    var EQ_COL_WORD = /(列|col|cột)/i;
+    var EQ_BEFORE_WORD = /(上方|above|before|trên|phía\s*trên|bên\s*trên)/i;
+    function eq_menuRowInsPair(){
+      try {
+        var cands = document.querySelectorAll('li, [role="menuitem"]');
+        var groups = [];
+        for (var i = 0; i < cands.length; i++){
+          var el = cands[i];
+          if (el.classList && el.classList.contains('eq-menu-ins-item')) continue;   /* 我们自己注入的 */
+          var p = el.parentNode;
+          if (!p) continue;
+          var g = null;
+          for (var k = 0; k < groups.length; k++){ if (groups[k].p === p){ g = groups[k]; break; } }
+          if (!g){ g = { p: p, els: [] }; groups.push(g); }
+          g.els.push(el);
+        }
+        for (var m = 0; m < groups.length; m++){
+          var els = groups[m].els;
+          if (els.length !== 2) continue;
+          var a = els[0], b = els[1];
+          var ta = (a.textContent || '').replace(/\s+/g, '');
+          var tb = (b.textContent || '').replace(/\s+/g, '');
+          if (!ta || !tb) continue;
+          if (!EQ_ROW_WORD.test(ta) || !EQ_ROW_WORD.test(tb)) continue;
+          if (EQ_COL_WORD.test(ta) || EQ_COL_WORD.test(tb)) continue;
+          if (EQ_BEFORE_WORD.test(tb) && !EQ_BEFORE_WORD.test(ta)) return [b, a];
+          return [a, b];
+        }
+      } catch(e){}
+      return null;
+    }
+    function eq_menuIconOf(li){
+      try {
+        var ic = li.querySelector('svg') || li.querySelector('i');
+        if (ic) return ic.cloneNode(true);
+        for (var i = 0; i < li.children.length; i++){
+          var c = li.children[i];
+          if (!(c.textContent || '').trim()) return c.cloneNode(true);
+        }
+      } catch(e){}
+      return null;
+    }
+    function eq_univerLangKey(){
+      try {
+        if (univer && univer.__getInjector && presets && presets.LocaleService){
+          var ls = univer.__getInjector().get(presets.LocaleService);
+          var cur = (ls && ls.getLocale) ? String(ls.getLocale() || '').toLowerCase() : '';
+          if (cur.indexOf('zh') === 0) return 'zh';
+          if (cur.indexOf('vi') === 0) return 'vi';
+          if (cur.indexOf('en') === 0) return 'en';
+        }
+      } catch(e){}
+      return null;
+    }
+    function eq_insRowsText(key, dflt){
+      var L = eq_univerLangKey() || (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'zh');
+      try { var d = window.I18N && window.I18N[L]; if (d && d[key]) return d[key]; } catch(e){}
+      return dflt;
+    }
+    function eq_menuInsRefresh(){
+      try {
+        var nodes = document.querySelectorAll('.eq-menu-ins-lbl');
+        for (var i = 0; i < nodes.length; i++){
+          var kind = (nodes[i].getAttribute('data-kind') === 'above') ? 'above' : 'below';
+          nodes[i].textContent = (kind === 'above')
+            ? eq_insRowsText('fin_btn_ins_rows_above', '在上方插入行')
+            : eq_insRowsText('fin_btn_ins_rows', '在下方插入行');
+        }
+        var inps = document.querySelectorAll('.eq-menu-ins-input');
+        for (var j = 0; j < inps.length; j++) inps[j].setAttribute('title', eq_insRowsText('fin_title_ins_rows', ''));
+      } catch(e){}
+    }
+    function eqPatchInsertRowItem(li, kind){
+      if (!li) return;
+      kind = (kind === 'above') ? 'above' : 'below';
+      if (li.__eqMenuPatched){ eq_menuInsRefresh(); return; }
+      var host = li.parentNode;
+      if (!host) return;
+      li.__eqMenuPatched = true;
+      eqMenuInsPatched++;
+      var labelKey = (kind === 'above') ? 'fin_btn_ins_rows_above' : 'fin_btn_ins_rows';
+      var labelDflt = (kind === 'above') ? '在上方插入行' : '在下方插入行';
+      var mine = document.createElement('li');
+      mine.className = (li.className || '') + ' eq-menu-ins-item';
+      mine.setAttribute('role', 'menuitem');
+      mine.setAttribute('data-kind', kind);
+      var icon = eq_menuIconOf(li);
+      if (icon){
+        var iw = document.createElement('span');
+        iw.className = 'eq-menu-ins-icon';
+        iw.setAttribute('aria-hidden', 'true');
+        iw.appendChild(icon);
+        mine.appendChild(iw);
+      }
+      var lbl = document.createElement('span');
+      lbl.className = 'eq-menu-ins-lbl';
+      lbl.setAttribute('data-kind', kind);
+      lbl.textContent = eq_insRowsText(labelKey, labelDflt);
+      var inp = document.createElement('input');
+      inp.className = 'eq-menu-ins-input';
+      inp.type = 'text';
+      inp.inputMode = 'numeric';
+      inp.value = '1';
+      inp.maxLength = 3;
+      inp.setAttribute('title', eq_insRowsText('fin_title_ins_rows', ''));
+      mine.appendChild(lbl);
+      mine.appendChild(inp);
+      li.style.display = 'none';
+      host.insertBefore(mine, li.nextSibling);
+      ['pointerdown','mousedown','mouseup','click','dblclick','keydown','keyup','keypress'].forEach(function(ev){
+        inp.addEventListener(ev, function(e){
+          e.stopPropagation();
+          if (ev === 'keydown' && (e.key === 'Enter' || e.keyCode === 13)){
+            e.preventDefault();
+            eq_menuInsertRows(inp, kind);
+          }
+        }, true);
+      });
+      mine.addEventListener('click', function(e){
+        if (e.target === inp) return;
+        e.preventDefault();
+        e.stopPropagation();
+        eq_menuInsertRows(inp, kind);
+      }, true);
+    }
+    function eqPatchInsertRowMenu(){
+      try {
+        if (!eqActive) return;            /* ★多实例隔离：只在权益容器内右键才接管 */
+        if (!api) return;
+        var before = null, after = null;
+        var pair = eq_menuRowInsPair();
+        if (pair){ before = pair[0]; after = pair[1]; }
+        if (before) eqPatchInsertRowItem(before, 'above');
+        if (after) eqPatchInsertRowItem(after, 'below');
+      } catch(e){}
+    }
+    /* ★插入 N 行：显式带 unitId:'equity-report'（这是修复「插到财务报表」的关键），
+       below=true → 选区最后一行下方；false → 第一行上方。走 Univer 门面 API，可撤销/重做。 */
+    function eq_insertRows(nOpt, below){
+      if (!api || !sheet) return;
+      try {
+        var n = parseInt(nOpt, 10);
+        if (!(n >= 1)) n = 1;
+        if (n > 200) n = 200;
+        var sid = eqSubUnitId(sheet) || eqSubUnitId(eqSheetObj());
+        if (!sid) return;
+        var at = 0;
+        try {
+          var wb = api.getActiveWorkbook && api.getActiveWorkbook();
+          var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+          var rng = sh && sh.getActiveRange && sh.getActiveRange();
+          if (rng && typeof rng.getRow === 'function') at = rng.getRow();
+        } catch(e){}
+        var D = presets && presets.Direction;
+        var dir = below ? ((D && D.DOWN != null) ? D.DOWN : 1) : ((D && D.UP != null) ? D.UP : 0);
+        api.executeCommand('sheet.command.insert-row', {
+          unitId: 'equity-report', subUnitId: sid,
+          range: { startRow: at, endRow: at + n - 1, startColumn: 0, endColumn: 9 },
+          direction: dir
+        });
+        dirty = true; scheduleSave();     /* 插入算数据改动，走自动保存 */
+      } catch(e){ console.warn('[equity] insert-row', e); }
+    }
+    function eq_menuInsertRows(inp, kind){
+      var n = parseInt(String((inp && inp.value) || '1').replace(/[^0-9]/g, ''), 10);
+      if (!(n >= 1)) n = 1;
+      eq_closeUniverMenu();
+      var below = (kind !== 'above');
+      eq_insertRows(n, below);
+      try { if (inp && inp.blur) inp.blur(); } catch(e){}
+      eq_focusSheet();
+    }
+    function eq_closeUniverMenu(){
+      try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true })); } catch(e){}
+      try { document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); } catch(e){}
+    }
+    function eq_focusSheet(){
+      try { var c = document.getElementById('equity_container'); if (c && c.focus) c.focus(); } catch(e){}
+    }
+    function eq_onContextMenu(e){
+      eqActive = !!(eq_containerOf(e) || (e && e.target && (e.target.id === 'equity_container' || (e.target.classList && e.target.classList.contains('univer-container')))));
+      if (!eqActive) return;
+      [0, 40, 120, 260].forEach(function(d){ setTimeout(function(){ eqPatchInsertRowMenu(); }, d); });
+      eqMenuInsRounds++;
+      eq_menuWatchStart();
+      if (eqMenuObsStopTimer) clearTimeout(eqMenuObsStopTimer);
+      eqMenuObsStopTimer = setTimeout(eq_menuWatchStop, 15000);
+      eq_menuInsRefresh();
+    }
+    function eq_menuWatchStart(){
+      try {
+        if (eqMenuObs) return;
+        if (!window.MutationObserver) return;
+        eqMenuObs = new MutationObserver(function(muts){
+          var hit = false;
+          for (var i = 0; i < muts.length && !hit; i++){
+            var added = muts[i].addedNodes;
+            for (var j = 0; j < added.length; j++){
+              var n = added[j];
+              if (!n || n.nodeType !== 1) continue;
+              var cn = String(n.className || '');
+              if (/menu/i.test(cn) || n.tagName === 'LI' || n.tagName === 'UL'){ hit = true; break; }
+            }
+          }
+          if (!hit || eqMenuObsTimer) return;
+          eqMenuObsTimer = setTimeout(function(){ eqMenuObsTimer = null; eqPatchInsertRowMenu(); }, 30);
+        });
+        eqMenuObs.observe(document.body, { childList: true, subtree: true });
+      } catch(e){ eqMenuObs = null; }
+    }
+    function eq_menuWatchStop(){
+      try { if (eqMenuObs) eqMenuObs.disconnect(); } catch(e){}
+      eqMenuObs = null;
+      if (eqMenuObsTimer){ clearTimeout(eqMenuObsTimer); eqMenuObsTimer = null; }
+      if (eqMenuObsStopTimer){ clearTimeout(eqMenuObsStopTimer); eqMenuObsStopTimer = null; }
+    }
+    function eq_bindContextMenuOnce(){
+      if (window.__eqCtxMenuBound) return;
+      window.__eqCtxMenuBound = true;
+      document.addEventListener('contextmenu', eq_onContextMenu, true);
+      document.addEventListener('mousedown', function(e){
+        if (e && e.button === 2){ eq_onContextMenu(e); return; }
+        try {
+          var a = document.activeElement;
+          if (a && a.classList && a.classList.contains('eq-menu-ins-input')){
+            var box = a.closest ? a.closest('.eq-menu-ins-item') : null;
+            if (!box || !box.contains(e.target)){
+              a.blur();
+              setTimeout(function(){ eq_focusSheet(); }, 0);
+            }
+          }
+        } catch(_e){}
+      }, true);
+    }
 
     function eqSheetObj(){
       try { var wb = api && api.getActiveWorkbook && api.getActiveWorkbook();
