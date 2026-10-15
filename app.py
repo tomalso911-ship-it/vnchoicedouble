@@ -6030,16 +6030,45 @@ def index():
 
 # ===== 精简版前端：仅 登录页 + 看板 + 签约项目（choice_lite.html） =====
 
+# ★PERF(Option 3)：压缩产物由构建脚本生成，源文件 choice_lite.html 保持不变。
+LITE_SRC = os.path.join(BASE_DIR, "choice_lite.html")
+LITE_MIN = os.path.join(BASE_DIR, "choice_lite.min.html")
+
+
+def _lite_serve_path():
+    """优先服务压缩产物 choice_lite.min.html；产物缺失或比源文件旧时回退源文件。"""
+    try:
+        if (os.path.exists(LITE_MIN) and os.path.getsize(LITE_MIN) > 0
+                and os.path.getmtime(LITE_MIN) >= os.path.getmtime(LITE_SRC)):
+            return LITE_MIN
+    except OSError:
+        pass
+    return LITE_SRC
+
+
+def _lite_build_min_if_stale():
+    """启动时若压缩产物缺失/过期则重建（失败则静默回退源文件）。"""
+    try:
+        if os.path.exists(LITE_MIN) and os.path.getmtime(LITE_MIN) >= os.path.getmtime(LITE_SRC):
+            return
+        import subprocess
+        import sys as _sys
+        subprocess.run([_sys.executable, os.path.join(BASE_DIR, "build_lite_min.py")],
+                       cwd=BASE_DIR, timeout=300,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
 
 @app.route("/lite")
 def index_lite():
     """精简版页面：页签只保留「看板 / 签约项目」，表格样式与主站一致。
     与 index() 同机制：本机模式下把 CLOUD_ONLY 置空，所有接口走 localhost。
 
-    缓存令牌：以 choice_lite.html 内容 MD5 作为版本号，URL 自动带 ?v=<hash>。
+    缓存令牌：以实际服务文件的内容 MD5 作为版本号，URL 自动带 ?v=<hash>。
     文件内容一变 → hash 变 → URL 变 → 浏览器必然重新拉取并执行最新脚本，
     彻底避免「改了代码却看到旧版 / 旧 DOM」（含 bfcache 恢复旧页面的情况）。"""
-    src = os.path.join(BASE_DIR, "choice_lite.html")
+    src = _lite_serve_path()
     try:
         with io.open(src, "rb") as fb:
             raw = fb.read()
@@ -9783,6 +9812,10 @@ if __name__ == "__main__":
 
     # 中国财务报表：文件/表名映射缺失时补一份种子（幂等；中国报表只有「实际支出」一张表）
     _cn_seed_if_missing()
+
+    # ★PERF(Option 3)：启动时按需生成精简版压缩产物（源文件 choice_lite.html 不动；
+    #   产物缺失或比源文件旧时重建；失败则静默回退源文件，不影响服务）。
+    _lite_build_min_if_stale()
 
     def _port_in_use(port, host="127.0.0.1", timeout=0.5):
         """端口占用预检（Windows 安全版）。
