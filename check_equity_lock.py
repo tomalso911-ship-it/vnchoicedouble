@@ -149,6 +149,29 @@ print("11) 前后端 5 张表一一对应")
 for n in NAMES:
     chk(("vi:'%s'" % n) in html, "前端 SHEETS 定义 %s" % n)
 
+print("12) Excel 键盘行为补丁（EQ-EXCEL-KEYS，用户 2026-10-15 要求）")
+for pat, name in (
+    ("function eqExcelKeysBind", "主入口 eqExcelKeysBind"),
+    ("__eqExcelKeysBound", "幂等守卫 __eqExcelKeysBound"),
+    ("sheet.operation.set-cell-edit-visible", "★单击打字直接进入编辑（与双击同一条 operation）"),
+    ("execCommand('insertText'", "★打进的字符经 .univer-editor 宿主走 Univer 原生 input 流"),
+    ("function eqTypeToEdit", "eqTypeToEdit"),
+    ("function eqGotoCell", "eqGotoCell"),
+    ("function eqSheetSize", "eqSheetSize（边界唯一来源）"),
+    ("function eqDataEdge", "eqDataEdge（Ctrl+方向键数据边界）"),
+    ("function eqEnsureVisible", "eqEnsureVisible（选区跟随滚动）"),
+    ("function eqIsEditingCell", "eqIsEditingCell（编辑态/浏览态区分）"),
+    ("doc.command.delete-right", "编辑态 Delete = 删除光标右侧字符"),
+    ("k === 'Enter'", "★Enter = Excel 语义（非编辑态移动选区，不进入编辑）"),
+    ("eqExcelKeysBind();", "init() 里已接线"),
+):
+    chk(pat in eqblk, name)
+chk(re.search(r"addEventListener\('keydown', function\(e\)\{", eqblk) is not None
+    and re.search(r"\}\s*,\s*true\s*\)\s*;", eqblk) is not None,
+    "★keydown 挂 window 捕获阶段（先于 Univer 拿到原始选区）")
+chk("tagName === 'SELECT'" in eqblk and "tagName === 'INPUT'" in eqblk,
+    "★币种下拉/公式栏等表单元素不接管（页面其它输入不受影响）")
+
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")
 sys.exit(0 if ok else 1)
