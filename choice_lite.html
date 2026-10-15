@@ -24780,9 +24780,11 @@ var PROD_EQUIP_FAULT_KB = {
     function render(){
     if (!univer) return;
     /* ★EQ-KEEP-ACTIVE-SHEET-20261016：重建前记住当前活动工作表（按 id / 序位），
-       否则按币种重建后新单元的活动表默认是第一张 —— 用户点「中国投资数据」会被弹回「总投资数据」。 */
+       否则按币种重建后新单元的活动表默认是第一张 —— 用户点「中国投资数据」会被弹回「总投资数据」。
+       ★必须用 eqSheetObj()（workbook 的当前活动表）：全局 sheet 变量是上次 createUnit 的返回值，
+         用户点了标签页后它是【旧的】，拿它当 prev 就还是第一张。 */
     var prevSid = '';
-    try { prevSid = eqSubUnitId(sheet) || ''; } catch(e){}
+    try { prevSid = eqSubUnitId(eqSheetObj() || sheet) || ''; } catch(e){}
     var prevIdx = -1;
     try { prevIdx = ((view && view.sheetOrder) || []).indexOf(prevSid); } catch(e){}
     var v = buildView();
