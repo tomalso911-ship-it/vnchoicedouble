@@ -24287,17 +24287,17 @@ var PROD_EQUIP_FAULT_KB = {
         <span id="eq_status" style="font-size:12px;color:#666;"></span>
       </div>
       <div id="eq_toolbar" style="margin:10px 0;">
-        <!-- ★用户 2026-10-15（第二次精简）：查报表/恢复原显示顺序/升序/降序/插入行/载入刷新 6 个按钮已删；
-             剩下的 币种下拉 + 保存 + 导出 整组挂进 Univer 自带工具栏最左侧，与它并成【一行】。 -->
-        <div id="eq_inline" class="fin-toolbar2" style="display:flex;gap:6px;align-items:center;">
-          <button class="fin-btn" data-i18n="fin_btn_save" onclick="window.__eq && window.__eq.save(true)">保存</button>
-          <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
+        <!-- ★用户 2026-10-15（第三次调整）：保存 / 导出 xlsx 是独立按钮，留在表格上方的这一行，
+             与表格分开；只有币种下拉挂进 Univer 自带工具栏最左侧。 -->
+        <div id="eq_inline" class="fin-toolbar2" style="display:flex;gap:8px;align-items:center;">
           <select id="eq_cur" onchange="window.__eq && window.__eq.setCurrency(this.value)"
                   style="height:28px;border:1px solid #c8ced6;border-radius:6px;padding:0 6px;background:#fff;margin-right:8px;">
             <option value="VND">VND ₫</option>
             <option value="RMB">RMB ¥</option>
             <option value="USD">USD $</option>
           </select>
+          <button class="fin-btn" data-i18n="fin_btn_save" onclick="window.__eq && window.__eq.save(true)">保存</button>
+          <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
         </div>
       </div>
       <div id="equity_container" style="width:100%;height:calc(100vh - 250px);min-height:420px;"></div>
@@ -24568,21 +24568,14 @@ var PROD_EQUIP_FAULT_KB = {
     });
     }
 
-    /* ---------- 把「保存 / 导出 / 币种下拉」三个【独立】节点依次挂到 Univer 自带工具栏最开头
-       （★用户 2026-10-15：保存和导出是单独的按钮，放到最开始的位置；
-         不打包成一组 —— 整组塞进去会被 .fin-toolbar2 的 overflow 裁掉半截） ---------- */
+    /* ---------- 只把【币种下拉】挂到 Univer 自带工具栏最左侧；
+       ★保存 / 导出 xlsx 留在表格上方的独立一行（用户 2026-10-15：和表格彼此分开） ---------- */
     function mountToolbar(){
-      var group = document.getElementById('eq_inline');
+      var sel = document.getElementById('eq_cur');
       var host = document.querySelector('#equity_container .univer-toolbar-container');
-      if (!group || !host) return;
-      var nodes = [];
-      for (var k = 0; k < group.children.length; k++) nodes.push(group.children[k]);
-      /* 逆序逐个 insertBefore(firstChild) → 最终顺序 = [保存][导出 xlsx][VND ∨] | Univer 图标 */
-      for (var i = nodes.length - 1; i >= 0; i--){
-        var n = nodes[i];
-        if (n.parentElement !== host || host.firstChild !== n){
-          host.insertBefore(n, host.firstChild);
-        }
+      if (!sel || !host) return;
+      if (sel.parentElement !== host || host.firstChild !== sel){
+        host.insertBefore(sel, host.firstChild);
       }
     }
     function watchToolbar(){
