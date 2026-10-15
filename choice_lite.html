@@ -53364,6 +53364,7 @@ var RPT_I18N = {
     rpt_fault_workdays:'个工作日（8h/班）', rpt_fault_incomplete:'未完成条数', rpt_fault_top3:'TOP3 故障设备',
     rpt_fault_equip:'设备', rpt_fault_count:'故障次数', rpt_no_fault:'无故障记录',
     rpt_loading:'正在汇总数据…', rpt_popup_blocked:'请允许浏览器弹窗以打开报告',
+    rpt_close:'关闭', rpt_lang_zh:'中', rpt_lang_en:'EN', rpt_lang_vi:'VI',
     th_spec:'规格(长×宽×高 mm)'
   },
   en: {
@@ -53381,6 +53382,7 @@ var RPT_I18N = {
     rpt_fault_workdays:'workdays (8h/shift)', rpt_fault_incomplete:'Incomplete', rpt_fault_top3:'TOP3 Faulty Equipment',
     rpt_fault_equip:'Equipment', rpt_fault_count:'Faults', rpt_no_fault:'No fault records',
     rpt_loading:'Summarizing data…', rpt_popup_blocked:'Please allow pop-ups to open the report',
+    rpt_close:'Close', rpt_lang_zh:'中', rpt_lang_en:'EN', rpt_lang_vi:'VI',
     th_spec:'Spec (L×W×H mm)'
   },
   vi: {
@@ -53398,6 +53400,7 @@ var RPT_I18N = {
     rpt_fault_workdays:'ngày công (8h/ca)', rpt_fault_incomplete:'Chưa hoàn thành', rpt_fault_top3:'TOP3 thiết bị sự cố',
     rpt_fault_equip:'Thiết bị', rpt_fault_count:'Số sự cố', rpt_no_fault:'Không có sự cố',
     rpt_loading:'Đang tổng hợp dữ liệu…', rpt_popup_blocked:'Vui lòng cho phép cửa sổ pop-up để mở báo cáo',
+    rpt_close:'Đóng', rpt_lang_zh:'中', rpt_lang_en:'EN', rpt_lang_vi:'VI',
     th_spec:'Quy cách (D×R×C mm)'
   }
 };
@@ -53411,7 +53414,11 @@ var RPT_CSS_EXTRA = '.rpt-loading{padding:60px 20px;text-align:center;color:#888
   + '.rpt-spec-tbl,.rpt-pay-tbl{font-size:12px;}'
   + '.rpt-spec-tbl td,.rpt-pay-tbl td{padding:4px 8px;}'
   + '.rpt-note{font-size:12px;color:#999;padding:4px 0;}'
-  + '@media print{.rpt-foot .rpt-btn{display:none;}.rpt-sec{page-break-inside:avoid;}}';
+  + '.rpt-head-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0;} .rpt-head-left h3{white-space:nowrap;} .rpt-head-left span{opacity:.92;font-size:12px;}'
+  + '.rpt-head-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}'
+  + '.rpt-lang{padding:4px 9px;border-radius:6px;font-size:11px;background:#fff;color:#D32F2F;border:1px solid #F0C4C4;cursor:pointer;font-weight:600;line-height:1;}'
+  + '.rpt-lang:hover,.rpt-lang-active{background:#FBE9E7;}'
+  + '@media print{.rpt-foot .rpt-btn{display:none;}.rpt-head-actions{display:none;}.rpt-sec{page-break-inside:avoid;}}';
 
 function rpt_todayYmd(){
   var d=new Date(); var y=d.getFullYear(),m=('0'+(d.getMonth()+1)).slice(-2),dd=('0'+d.getDate()).slice(-2);
@@ -53516,8 +53523,9 @@ function rpt_faultStats(f){
   return {total:faults.length, down:down, incomplete:incomplete, top:top};
 }
 
-function openProjectReport(id) {
+function openProjectReport(id, reuseWin) {
   window.__rptOpener = function(){ openProjectReport(id); };
+  window.__rptSetLang = function(lang, pid){ if(typeof setLang==='function') setLang(lang); openProjectReport(pid, (window.__rptWinMap && window.__rptWinMap[pid]) || null); };
   if (!permGuard('WON-D4')) return;
   var p = globalWonData.find(function(x){return x.id===id;});
   var _Lrpt = (window.CUR_LANG || CUR_LANG || 'zh');
@@ -53527,8 +53535,10 @@ function openProjectReport(id) {
   var _rptEsc = function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
 
   // 先同步打开窗口并写过渡页（防弹窗拦截 + 避免闪烁）
-  var _rptWin = window.open('', '_blank');
+  var _rptWin = (reuseWin && !reuseWin.closed) ? reuseWin : window.open('', '_blank');
   if (!_rptWin) { showAlert(rpt('rpt_popup_blocked')); return; }
+  window.__rptWinMap = window.__rptWinMap || {};
+  window.__rptWinMap[id] = _rptWin;
   var _loadingDoc = '<!DOCTYPE html><html lang="'+_Lrpt+'"><head><meta charset="utf-8"><title>'+_rptEsc(rpt('rpt_title'))+'</title><style>'+PROJECT_REPORT_CSS+RPT_CSS_EXTRA+'</style></head><body><div class="rpt-loading">'+rpt('rpt_loading')+'</div></body></html>';
   _rptWin.document.open();
   _rptWin.document.write(_loadingDoc);
@@ -53539,7 +53549,11 @@ function openProjectReport(id) {
     var _rptHead=_rptEsc(rpt('rpt_title'));
     var _rptSub=_rptEsc((p.contract_no||'')+' · '+(p.customer||''));
     var _rptFoot=_rptEsc(rpt('rpt_title')+' · '+(p.contract_no||''));
-    var _modal='<div class="rpt-modal"><div class="rpt-head"><h3>'+_rptHead+'</h3><span>'+_rptSub+'</span></div><div class="rpt-body">'+htmlBody+'</div><div class="rpt-foot"><span>'+_rptFoot+'</span><div><button class="rpt-btn rpt-btn-outline" onclick="window.print()">🖨 '+_rptEsc(rpt('rpt_print'))+'</button></div></div></div>';
+    var _langBtns='<button type="button" class="rpt-btn rpt-lang'+(_Lrpt==='zh'?' rpt-lang-active':'')+'" onclick="if(window.opener&&window.opener.__rptSetLang)window.opener.__rptSetLang(\'zh\','+id+')">'+_rptEsc(rpt('rpt_lang_zh'))+'</button>'
+                +'<button type="button" class="rpt-btn rpt-lang'+(_Lrpt==='en'?' rpt-lang-active':'')+'" onclick="if(window.opener&&window.opener.__rptSetLang)window.opener.__rptSetLang(\'en\','+id+')">'+_rptEsc(rpt('rpt_lang_en'))+'</button>'
+                +'<button type="button" class="rpt-btn rpt-lang'+(_Lrpt==='vi'?' rpt-lang-active':'')+'" onclick="if(window.opener&&window.opener.__rptSetLang)window.opener.__rptSetLang(\'vi\','+id+')">'+_rptEsc(rpt('rpt_lang_vi'))+'</button>';
+    var _closeBtn='<button type="button" class="rpt-btn rpt-btn-outline" onclick="window.close()">'+_rptEsc(rpt('rpt_close'))+'</button>';
+    var _modal='<div class="rpt-modal"><div class="rpt-head"><div class="rpt-head-left"><h3>'+_rptHead+'</h3><span>'+_rptSub+'</span></div><div class="rpt-head-actions">'+_langBtns+_closeBtn+'</div></div><div class="rpt-body">'+htmlBody+'</div><div class="rpt-foot"><span>'+_rptFoot+'</span><div><button class="rpt-btn rpt-btn-outline" onclick="window.print()">🖨 '+_rptEsc(rpt('rpt_print'))+'</button></div></div></div>';
     return '<!DOCTYPE html><html lang="'+_Lrpt+'"><head><meta charset="utf-8"><title>'+_rptTitle+'</title><style>'+PROJECT_REPORT_CSS+RPT_CSS_EXTRA+'</style></head><body>'+_modal+'</body></html>';
   }
 
