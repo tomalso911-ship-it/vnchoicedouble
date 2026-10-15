@@ -28,6 +28,8 @@
 #                                 ③ 写缓存必须原子（.tmp + os.replace），且先数据文件后键文件
 #                                 ④ GET 必须走缓存判定，不得再直接 xlsx_to_univer
 #                                 ⑤ 出缓存必须 conditional=True（重复加载退化为 304）
+#                                 ⑥ 必须带内容指纹 .fp 并逐次校验（FIN-SNAP-FP-20261015）
+#                                    —— 防"绕过转换器手改快照再被命中下发"（#VALUE! 血案）
 #
 #   7) check_fin_no_trans_lock.py —— 财务「品牌名不翻译」锁死区（FIN-NO-TRANS-20261013）：
 #                                 ① 前端 FIN_NO_TRANS / fin_hasNoTrans（大小写无关子串匹配）

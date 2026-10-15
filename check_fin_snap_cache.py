@@ -25,6 +25,11 @@
   ④ GET 必须走缓存判定（_fin_cache_current / _fin_cache_build），不得再直接调用
      univer_convert.xlsx_to_univer（那就是「每次刷新都重新加载」的原始 BUG）。
   ⑤ 出缓存必须带 conditional=True，让重复加载退化为 304。
+  ⑥ 缓存【必须带内容指纹】（FIN-SNAP-FP-20261015）：快照落盘后把 sha256 写进 .fp，
+     判定缓存时重新比对；缺指纹/对不上（被手改、半截、损坏）一律判未命中、从 xlsx 重转。
+     ★血案：2026-10-15 一次性脚本直接把 off-by-one 的余额公式烘焙进快照 JSON，
+       缓存键只比 xlsx 的 mtime+size → 手改内容照样命中下发，
+       前端 #VALUE! 怎么改 choice_lite.html 都修不掉。
 
 用法：
   python3 check_fin_snap_cache.py [path/to/app.py]
@@ -167,6 +172,35 @@ def check_app(path):
         if not re.search(r"send_from_directory\(\s*FIN_DIR\s*,", get):
             errors.append("不变量⑤被破坏：fin_get_snapshot 不再发送缓存文件")
 
+    # ---- ⑥ 内容指纹（FIN-SNAP-FP-20261015）:防"绕过转换器手改缓存"再被下发 ----
+    if not re.search(r"^FIN_SNAP_FP\s*=", code, re.M):
+        errors.append("不变量⑥被破坏：找不到 FIN_SNAP_FP 定义"
+                      "（快照必须带内容指纹，否则手改过的缓存会被当成有效数据下发）")
+    cur = py_body(code, "_fin_cache_current")
+    if cur is None:
+        errors.append("不变量⑥被破坏：找不到 _fin_cache_current()")
+    elif "_fin_snap_fp_ok(" not in cur:
+        errors.append("不变量⑥被破坏：_fin_cache_current 不再校验快照内容指纹（缺 _fin_snap_fp_ok()）"
+                      "→ 手改/损坏的快照会被判为命中并下发")
+    if py_body(code, "_fin_snap_fp_ok") is None:
+        errors.append("不变量⑥被破坏：找不到 _fin_snap_fp_ok()")
+    if py_body(code, "_fin_snap_sha256") is None:
+        errors.append("不变量⑥被破坏：找不到 _fin_snap_sha256()")
+    if build is not None:
+        if "_fin_snap_sha256(" not in build:
+            errors.append("不变量⑥被破坏：_fin_cache_build 不再计算快照指纹（缺 _fin_snap_sha256()）")
+        m_fp = re.search(r"os\.replace\(\s*tmp_fp\s*,\s*FIN_SNAP_FP\s*\)", build)
+        if m_fp is None:
+            errors.append("不变量⑥被破坏：指纹文件不再原子就位（缺 os.replace(tmp_fp, FIN_SNAP_FP)）")
+        elif i_snap >= 0 and m_fp.start() < i_snap:
+            errors.append("不变量⑥被破坏：指纹写在快照【之前】（必须先快照、再指纹、最后切键）")
+        elif m_key is not None and m_fp.start() > m_key.start():
+            errors.append("不变量⑥被破坏：指纹写在键文件【之后】"
+                          "（否则可能「有键但没对得上的指纹」→ 每次 GET 都白重建）")
+    if inv is not None and "os.remove(FIN_SNAP_FP)" not in inv:
+        errors.append("不变量⑥被破坏：_fin_cache_invalidate 不再删除指纹文件"
+                      "（源文件改了、指纹还在，会误判有效）")
+
     # ---- ② 三个写入点 ----
     for nm in WRITE_POINTS:
         body = py_body(code, nm)
@@ -225,9 +259,16 @@ CASES = [
                                "            shutil.copyfile(part, path)")),
     ("③ 键文件写在快照之前", _rep(
         "            os.replace(part, path)          # 新文件名，不可能撞上正被读的旧文件\n"
+        "            # ★写内容指纹（FIN-SNAP-FP-20261015）：键切换前落好，保证「有键必有对得上的指纹」\n"
+        "            with open(tmp_fp, \"w\", encoding=\"utf-8\") as fh:\n"
+        "                fh.write(_fin_snap_sha256(path))\n"
+        "            os.replace(tmp_fp, FIN_SNAP_FP)\n"
         "            with open(tmp_key, \"w\", encoding=\"utf-8\") as fh:\n"
         "                fh.write(key)\n"
         "            os.replace(tmp_key, FIN_SNAP_KEY)   # 键文件最后才切（它从不对外发送）\n",
+        "            with open(tmp_fp, \"w\", encoding=\"utf-8\") as fh:\n"
+        "                fh.write(_fin_snap_sha256(path))\n"
+        "            os.replace(tmp_fp, FIN_SNAP_FP)\n"
         "            with open(tmp_key, \"w\", encoding=\"utf-8\") as fh:\n"
         "                fh.write(key)\n"
         "            os.replace(tmp_key, FIN_SNAP_KEY)   # 键文件最后才切（它从不对外发送）\n"
@@ -246,6 +287,19 @@ CASES = [
     ("⑤ 不再发送缓存文件", _rep(
         "    resp = send_from_directory(FIN_DIR, os.path.basename(_snap_path),\n",
         "    resp = jsonify({})\n    return resp\n")),
+
+    ("⑥ 判定缓存不再校验内容指纹（手改的缓存会被下发）", _rep(
+        "    if not _fin_snap_fp_ok(path):\n        return key, None          # ★被手改/半截/损坏 → 判未命中，重新转换\n",
+        "")),
+    ("⑥ 构建时不再写指纹", _rep(
+        "            with open(tmp_fp, \"w\", encoding=\"utf-8\") as fh:\n"
+        "                fh.write(_fin_snap_sha256(path))\n"
+        "            os.replace(tmp_fp, FIN_SNAP_FP)\n",
+        "")),
+    ("⑥ 失效时不再删指纹", _rep(
+        "    try:\n        os.remove(FIN_SNAP_FP)      # ★内容指纹一并作废（FIN-SNAP-FP-20261015）\n"
+        "    except OSError:\n        pass\n",
+        "")),
 ]
 
 
@@ -300,7 +354,7 @@ def main():
     for w in warnings:
         print("  ! 警告: %s" % w)
     if not errors:
-        print("✓ 通过：财务快照缓存锁定契约未被破坏（%s 五条不变量全在）" % DOC_ID)
+        print("✓ 通过：财务快照缓存锁定契约未被破坏（%s 六条不变量全在）" % DOC_ID)
         return 0
     for e in errors:
         print("  ✗ 违规: %s" % e)

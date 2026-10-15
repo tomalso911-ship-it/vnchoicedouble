@@ -3626,6 +3626,19 @@ FIN_SNAP_KEY = os.path.join(FIN_DIR, "vn_report.snapshot.key")
 FIN_SNAP_PREFIX = "vn_report.snapshot."
 _FIN_SNAP_LOCK = _fthreading.Lock()
 
+# ---- ★FIN-SNAP-FP-20261015：快照文件的【内容指纹】 ---------------------------------
+# 为什么必须有（2026-10-15 实际事故的根因）：
+#   缓存"是否有效"原先只看【源 xlsx 的 mtime + size】。只要 xlsx 没动，磁盘上那份 JSON
+#   就算被【绕过转换器手改】过也照样命中并被下发 —— 实测：一次性脚本 _fin_bake_formulas.py
+#   把带 off-by-one 的余额公式（A1 记法被当 0 基用）直接烘焙进了 vn_report.snapshot.*.json，
+#   于是 #VALUE! 被当成"文件内容"发给每个浏览器，改前端 choice_lite.html 完全无效。
+# 做法：转换完成、快照原子就位后，把该文件的 sha256 写进 .fp 文件；每次 GET 判定缓存时
+#   重新算一遍 sha256 比对：缺 .fp / 对不上（被手改、被截断、损坏）一律判【未命中】，
+#   从 xlsx 重新转换 —— 坏快照永远下发不出去。代价：每次 GET 多一次 ~10MB 的顺序读+哈希
+#   （约 20ms），远小于重新解析 xlsx 的 4~5s。
+# ★不变量：只要有人用转换器以外的方式写 vn_report.snapshot.*.json，下次请求就会自动纠正。
+FIN_SNAP_FP = os.path.join(FIN_DIR, "vn_report.snapshot.fp")
+
 
 def _fin_report_key():
     """缓存键 = 源 xlsx 的 mtime(ns) + 大小 + 路径；文件不存在返回 None。"""
@@ -3650,8 +3663,36 @@ def _fin_cache_files():
         return []
 
 
+def _fin_snap_sha256(path):
+    """快照文件的 sha256（分块读，避免一次性吃进十几 MB）。读不出返回 ''。"""
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            while True:
+                chunk = fh.read(1 << 20)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return ""
+
+
+def _fin_snap_fp_ok(path):
+    """快照内容是否与 .fp 记录一致。缺 .fp / 内容变了 / 读不出 → False（视为未命中）。"""
+    try:
+        with open(FIN_SNAP_FP, "r", encoding="utf-8") as fh:
+            want = fh.read().strip()
+    except OSError:
+        return False
+    if not want:
+        return False
+    return _fin_snap_sha256(path) == want
+
+
 def _fin_cache_current():
-    """返回 (当前键, 当前可用的快照绝对路径或 None)。"""
+    """返回 (当前键, 当前可用的快照绝对路径或 None)。
+    ★可用 = 键匹配 + 文件在 + 【内容指纹对得上】（FIN-SNAP-FP-20261015，防手改/损坏）。"""
     key = _fin_report_key()
     if key is None:
         return None, None
@@ -3663,7 +3704,11 @@ def _fin_cache_current():
     if got != key:
         return key, None
     path = os.path.join(FIN_DIR, _fin_cache_name(key))
-    return key, (path if os.path.isfile(path) else None)
+    if not os.path.isfile(path):
+        return key, None
+    if not _fin_snap_fp_ok(path):
+        return key, None          # ★被手改/半截/损坏 → 判未命中，重新转换
+    return key, path
 
 
 def _fin_cache_valid():
@@ -3676,6 +3721,10 @@ def _fin_cache_invalidate():
     删不掉的（正被某个响应读着）留到下次 _fin_cache_build 里再清，不影响正确性。"""
     try:
         os.remove(FIN_SNAP_KEY)
+    except OSError:
+        pass
+    try:
+        os.remove(FIN_SNAP_FP)      # ★内容指纹一并作废（FIN-SNAP-FP-20261015）
     except OSError:
         pass
     for fn in _fin_cache_files():
@@ -3704,15 +3753,20 @@ def _fin_cache_build(force=False):
         path = os.path.join(FIN_DIR, _fin_cache_name(key))
         part = path + ".part"
         tmp_key = FIN_SNAP_KEY + ".tmp"
+        tmp_fp = FIN_SNAP_FP + ".tmp"
         try:
             with open(part, "w", encoding="utf-8") as fh:
                 json.dump(snap, fh, ensure_ascii=False, separators=(",", ":"))
             os.replace(part, path)          # 新文件名，不可能撞上正被读的旧文件
+            # ★写内容指纹（FIN-SNAP-FP-20261015）：键切换前落好，保证「有键必有对得上的指纹」
+            with open(tmp_fp, "w", encoding="utf-8") as fh:
+                fh.write(_fin_snap_sha256(path))
+            os.replace(tmp_fp, FIN_SNAP_FP)
             with open(tmp_key, "w", encoding="utf-8") as fh:
                 fh.write(key)
             os.replace(tmp_key, FIN_SNAP_KEY)   # 键文件最后才切（它从不对外发送）
         except OSError as e:
-            for p in (part, tmp_key):
+            for p in (part, tmp_key, tmp_fp):
                 try:
                     os.remove(p)
                 except OSError:
@@ -5320,15 +5374,181 @@ def _fin_cn_totals(path):
             pass
 
 
+# ---- ★FIN-DASH2-20261015：财务报告看板（资金流向仪表盘）的数据 -------------------------
+# 数据源：「TỔNG HỢP」工作表（三语并列布局）
+#   基准块 A–D（英文/越南文同格，B 列形如 'Cash and Bank Balance/Tồn quỹ TM + NH'）
+#   中文块 K–N（L 列中文标签）   英文块 U–X（V 列英文标签）
+# 行布局（财务表固定，勿改）：
+#   4  报表标题     5  截至日期     7  表头
+#   8  现金及银行余额合计 = SUM(C9:C13)
+#   9..13   各账户：VPbank / MBbank / ACBbank / Cash 1 / Cash 2
+#   14 收入合计 = SUM(C15:C18)      15..18 收入明细：内部 / 股东实收 / Dabaco 押金 / 其他
+#   19 支出合计 = SUM(C20:C21)      20..21 支出明细：内部支出 / 实际支出
+#   22 期末余额 = C14 - C19
+# ★★注意：C22 是【收入 − 支出的净额】，不是 C8 的"现金 + 银行余额"。
+#   仪表盘的勾稽等式用的是 C22；C8 单独作为"真实账面余额"呈现，两者绝不能混。
+_FIN_DK_ROW_TITLE, _FIN_DK_ROW_ASOF, _FIN_DK_ROW_BAL = 4, 5, 8
+_FIN_DK_BAL_ROWS = (9, 13)
+_FIN_DK_ROW_RECV, _FIN_DK_RECV_ROWS = 14, (15, 18)
+_FIN_DK_ROW_PAY, _FIN_DK_PAY_ROWS = 19, (20, 21)
+_FIN_DK_ROW_END = 22
+_FIN_DK_C_AMT = 3          # 基准块金额列 C
+_FIN_DK_C_LZH, _FIN_DK_C_LEN = 12, 22      # 中文块标签 L / 英文块标签 V
+
+
+def _fin_dk_txt(ws, r, c):
+    v = ws.cell(r, c).value
+    return v.replace("\n", " ").strip() if isinstance(v, str) else ""
+
+
+def _fin_dk_label(ws, r):
+    """三语标签：'EN/VI' 同格的基准列拆开；中文取 L、英文取 V，均取 '/' 前半。"""
+    b = _fin_dk_txt(ws, r, 2)
+    l = _fin_dk_txt(ws, r, _FIN_DK_C_LZH)
+    e = _fin_dk_txt(ws, r, _FIN_DK_C_LEN)
+    if "/" in b:
+        en0, vi0 = b.split("/", 1)
+    else:
+        en0, vi0 = b, b
+    zh = (l.split("/")[0] if l else en0).strip()
+    en = (e.split("/")[0] if e else en0).strip()
+    vi = vi0.strip()
+    return {"zh": zh or en, "en": en or zh, "vi": vi or en}
+
+
+def _fin_dk_amt(ws, wb, r):
+    v = ws.cell(r, _FIN_DK_C_AMT).value
+    if isinstance(v, str) and v.startswith("="):
+        v = _fin_eval_formula(v, wb, "TỔNG HỢP", {})
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def _fin_dk_iso(txt):
+    """'As of Oct 09, 2026' / '截至2026年10月9日' → '2026-10-09'；解析不出返回 None。"""
+    if not txt:
+        return None
+    m = re.search(r"(\d{4})\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})", txt)
+    if m:
+        return "%04d-%02d-%02d" % (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    m = re.search(r"([A-Za-z]{3,9})\.?\s+(\d{1,2})\s*,?\s+(\d{4})", txt)
+    if m:
+        mon = ["jan", "feb", "mar", "apr", "may", "jun",
+               "jul", "aug", "sep", "oct", "nov", "dec"]
+        k = m.group(1)[:3].lower()
+        if k in mon:
+            return "%04d-%02d-%02d" % (int(m.group(3)), mon.index(k) + 1, int(m.group(2)))
+    return None
+
+
+def _fin_dash_data(path):
+    """财务看板数据（只读，越南 / 合并各一份）。失败返回 None。
+       返回：title(三语) / asOf(+Iso) / balanceTotal(真实账面 C8) / accounts[] /
+             receipts{total,items[]} / payments{total,items[]} / ending(C22 净额) /
+             opening(倒推期初) / checks[](勾稽校验，逐项父子合计自检)。"""
+    try:
+        wb = openpyxl.load_workbook(path, data_only=False)
+    except Exception:
+        return None
+    try:
+        if "TỔNG HỢP" not in wb.sheetnames:
+            return None
+        ws = wb["TỔNG HỢP"]
+
+        def _items(a, b):
+            out = []
+            for r in range(a, b + 1):
+                lab = _fin_dk_label(ws, r)
+                out.append({"v": _fin_dk_amt(ws, wb, r),
+                            "zh": lab["zh"], "en": lab["en"], "vi": lab["vi"]})
+            return out
+
+        accounts = _items(*_FIN_DK_BAL_ROWS)
+        recv_items = _items(*_FIN_DK_RECV_ROWS)
+        pay_items = _items(*_FIN_DK_PAY_ROWS)
+        bal = _fin_dk_amt(ws, wb, _FIN_DK_ROW_BAL)
+        recv = _fin_dk_amt(ws, wb, _FIN_DK_ROW_RECV)
+        pay = _fin_dk_amt(ws, wb, _FIN_DK_ROW_PAY)
+        end = _fin_dk_amt(ws, wb, _FIN_DK_ROW_END)
+
+        def _s(items):
+            vs = [i["v"] for i in items if isinstance(i["v"], (int, float))]
+            return sum(vs) if vs else None
+
+        checks = []
+
+        def _chk(key, expect, actual):
+            ok = (expect is not None and actual is not None
+                  and abs(float(expect) - float(actual)) < 0.5)
+            checks.append({"k": key, "ok": ok, "expect": expect, "actual": actual})
+
+        _chk("bal", _s(accounts), bal)
+        _chk("recv", _s(recv_items), recv)
+        _chk("pay", _s(pay_items), pay)
+        _chk("end", (recv - pay) if (recv is not None and pay is not None) else None, end)
+
+        asof = _fin_dk_txt(ws, _FIN_DK_ROW_ASOF, 1) or _fin_dk_txt(ws, _FIN_DK_ROW_BAL, 4)
+        return {
+            "title": {"zh": _fin_dk_txt(ws, _FIN_DK_ROW_TITLE, 11),
+                      "en": _fin_dk_txt(ws, _FIN_DK_ROW_TITLE, 1),
+                      "vi": _fin_dk_txt(ws, _FIN_DK_ROW_TITLE, 1)},
+            "asOf": asof,
+            "asOfIso": _fin_dk_iso(asof) or _fin_dk_iso(_fin_dk_txt(ws, _FIN_DK_ROW_ASOF, 11)),
+            "balanceTotal": bal,
+            "accounts": accounts,
+            "receipts": {"total": recv, "items": recv_items},
+            "payments": {"total": pay, "items": pay_items},
+            "ending": end,
+            # 期初：报表是"累计净额"口径（C22 = C14 - C19），故倒推期初 = 期末 - 收入 + 支出
+            "opening": (end - recv + pay) if (end is not None and recv is not None
+                                             and pay is not None) else 0,
+            "checks": checks,
+            "checksOk": all(c["ok"] for c in checks),
+        }
+    except Exception:
+        return None
+    finally:
+        try:
+            wb.close()
+        except Exception:
+            pass
+
+
+def _fin_summary_rev():
+    """看板数据的版本号 = 三份源 xlsx 的 mtime_ns + 字节数 拼接（纯 os.stat，不读 xlsx）。
+    ★FIN-DASH2-REV-20261015（用户 2026-10-15 要求「下载后，除非数据有变化，否则不要重复下载」）：
+      前端切回看板标签时只探这个版本号（几十字节）；rev 没变就继续用本地缓存，
+      绝不再把整份汇总 JSON 重新下载一遍。任何一份报表被改写（mtime/size 变）→ rev 变 → 自动重下。"""
+    parts = []
+    for p in (FIN_REPORT, CN_REPORT, MERGE_REPORT):
+        try:
+            st = os.stat(p)
+            parts.append("%d.%d" % (int(st.st_mtime_ns), int(st.st_size)))
+        except OSError:
+            parts.append("0.0")
+    return "|".join(parts)
+
+
 @app.route("/api/finance/summary", methods=["GET"])
 def fin_summary():
-    """财务报告看板：汇总越南 / 中国 / 合并三份报表的关键数字（纯只读，不写任何文件）。"""
+    """财务报告看板：汇总越南 / 中国 / 合并三份报表的关键数字（纯只读，不写任何文件）。
+    ★FIN-DASH2-20261015：额外返回 dash.vn / dash.merge —— 资金流向仪表盘所需的
+      「期初/收入/支出/期末 + 各账户与明细 + 截至日期 + 勾稽校验」，越南与合并各自独立一份。
+      原有键（vn/cn/merge/chinaDelta）保持不变，老前端不受影响。
+    ★FIN-DASH2-REV-20261015：① 响应里多一个 rev（= 三份 xlsx 的版本号）；
+      ② 带 ?rev=1 时【只回 rev】——供前端做「没变就不重复下载」的轻量校验。"""
+    if (request.args.get("rev") or "").strip() == "1":
+        resp = jsonify({"ok": True, "rev": _fin_summary_rev()})
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
     vn = _fin_tonghop_summary(FIN_REPORT) or {}
     cn = _fin_cn_totals(CN_REPORT) or {"actual": None, "records": 0}
     mg = _fin_tonghop_summary(MERGE_REPORT) or {}
     mv, vv = mg.get("actual"), vn.get("actual")
     delta = (mv - vv) if isinstance(mv, (int, float)) and isinstance(vv, (int, float)) else None
-    return jsonify({"ok": True, "vn": vn, "cn": cn, "merge": mg, "chinaDelta": delta})
+    return jsonify({"ok": True, "rev": _fin_summary_rev(),
+                    "vn": vn, "cn": cn, "merge": mg, "chinaDelta": delta,
+                    "dash": {"vn": _fin_dash_data(FIN_REPORT),
+                             "merge": _fin_dash_data(MERGE_REPORT)}})
 
 
 # ===================== API：CRM 报价单 PDF 上传 =====================
