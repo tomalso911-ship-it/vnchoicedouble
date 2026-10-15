@@ -206,6 +206,17 @@ chk("id: FALLBACK_ID, value: true" in eqblk, "★缺失权限点用兜底点占�
 chk(re.search(r"perm\.composePermission = function\(ids\)\{.*value: true.*\}", eqblk, re.S) is not None,
     "★同步版 composePermission 缺失点直接放行（绝不 throw）")
 
+print("16) 底部统计栏 计数/总计/平均/最大/最小（2026-10-16 照搬财务 FIN-STATBAR）")
+chk("id=\"eq_statbar\" class=\"eq-statbar\"" in html, "★HTML 里 #eq_statbar 放在 #equity_container 内部")
+chk("function eq_statCompute" in eqblk, "★eq_statCompute：选区实时统计")
+chk("function eq_getSelectionRanges" in eqblk and "function eq_statScanRanges" in eqblk,
+    "★同时监听门面选区与命令流 set-selections（拉选多个格子时计数正确）")
+chk("var seen = {};" in eqblk and "if (seen[key]) continue" in eqblk,
+    "★格级去重（Univer selections 会带整块+锚点，不去重锚点会算两次）")
+chk("function eq_statLabels" in eqblk and "计数" in eqblk and "Count" in eqblk and "Đếm" in eqblk,
+    "★标签三语：中/英/越")
+chk("eq_statIsDate" in eqblk, "★日期格（数字格式含日期 token）不计入数字统计")
+
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")
 sys.exit(0 if ok else 1)
