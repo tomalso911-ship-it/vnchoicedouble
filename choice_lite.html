@@ -24369,14 +24369,31 @@ var PROD_EQUIP_FAULT_KB = {
     <script type="module">
     (function(){
     var API = '/api/finance/equity-report';
-    /* 与后端 EQ_SHEET_DEFS 一一对应（0 基列；越文表名 = 文件里的真实表名） */
+    /* ★EQ-STRUCT-20261016（用户 2026-10-16 要求）：去掉固定表头 / 固定金额列，字段由用户自己在表格里定义。
+       这里只保留 5 张表的【表名】（用于标签三语切换 + 文件里的真实表名）；不再写死金额列/日期列。
+       越文表名 = 文件里的真实工作表名（改动会导致跨表公式断链，勿动）。 */
     var SHEETS = [
-    { vi:'Tổng đầu tư',       zh:'总投资数据',    en:'Total Investment',      amt:[1],       date:null },
-    { vi:'Đầu tư Trung Quốc', zh:'中国投资数据',  en:'China Investment',      amt:[3,4,5],   date:0 },
-    { vi:'Đầu tư Việt Nam',   zh:'越南投资数据',  en:'Vietnam Investment',    amt:[3,4,5],   date:0 },
-    { vi:'Cơ cấu cổ đông',    zh:'股东结构',      en:'Shareholder Structure', amt:[2],       date:4 },
-    { vi:'Cổ tức',            zh:'分红记录',      en:'Dividend Records',      amt:[2,3,5],   date:0 }
+    { vi:'Tổng đầu tư',       zh:'总投资数据',    en:'Total Investment' },
+    { vi:'Đầu tư Trung Quốc', zh:'中国投资数据',  en:'China Investment' },
+    { vi:'Đầu tư Việt Nam',   zh:'越南投资数据',  en:'Vietnam Investment' },
+    { vi:'Cơ cấu cổ đông',    zh:'股东结构',      en:'Shareholder Structure' },
+    { vi:'Cổ tức',            zh:'分红记录',      en:'Dividend Records' }
     ];
+    /* ★EQ-MONEY-COLS-20261016：哪些列是「钱」（带货币符号 + 参与汇率换算）。
+       键可用 中/越/英 任一表名；值 = 列号数组（0 基，A=0）。
+       ★未列出的列 = 普通数字：只加千位符，不加符号、不换算（比例%/编号等）。
+       ★用户会陆续指定，指定后只改这里即可，无需动其它代码。 */
+    var EQ_MONEY_COLS = {
+    '总投资数据':   [1],
+    '中国投资数据': [3, 4, 5],
+    '越南投资数据': [3, 4, 5],
+    '股东结构':     [2],
+    '分红记录':     [2, 3, 5]
+    };
+    /* ★日期列（仅用于「查报表筛选 / 排序」；用户新结构确定后更新）。缺省 = 该表无日期列。 */
+    var EQ_DATE_COLS = {
+    '中国投资数据': 0, '越南投资数据': 0, '股东结构': 4, '分红记录': 0
+    };
     var R_HEAD = 4, R_DATA0 = 5, R_DATA1 = 1004, R_TOTAL = 1005;   // 0 基（Excel 第 5 / 6..1005 / 1006 行）
 
     var univer = null, api = null, sheet = null, presets = null;
@@ -24411,6 +24428,22 @@ var PROD_EQUIP_FAULT_KB = {
       }
       return null;
     }
+    /* ★EQ-STRUCT-20261016：配置对象按表名（中/越/英任一）取值；找不到返回 null。 */
+    function eqCfgBySheet(cfg, name){
+      try {
+        var d = sheetDef(name); if (!d || !cfg) return null;
+        for (var k in cfg){ if (!cfg.hasOwnProperty(k)) continue;
+          var dk = sheetDef(k);
+          if (dk && dk.vi === d.vi) return cfg[k];
+        }
+      } catch(e){}
+      return null;
+    }
+    /* 钱列（0 基列号数组）。 */
+    function eqMoneyCols(name){ var a = eqCfgBySheet(EQ_MONEY_COLS, name); return a || []; }
+    function eqIsMoneyCol(name, c){ return eqMoneyCols(name).indexOf(c) >= 0; }
+    /* 日期列（0 基列号；无则 null）。 */
+    function eqDateCol(name){ var c = eqCfgBySheet(EQ_DATE_COLS, name); return (c === undefined || c === null) ? null : c; }
 
     /* ---------- 三语：翻译缓存 + 请求 ---------- */
     function loadTrans(){
@@ -24553,13 +24586,13 @@ var PROD_EQUIP_FAULT_KB = {
     if (!filter) return;
     Object.keys(v.sheets || {}).forEach(function(sid){
       var sh = v.sheets[sid]; if (!sh) return;
-      var d = sheetDef(nameOfSid(v, sid)); if (!d || d.date === null) return;
+      var dcol = eqDateCol(nameOfSid(v, sid)); if (dcol === null) return;   /* ★EQ-STRUCT：日期列按配置 */
       var cd = sh.cellData || {};
       sh.rowData = sh.rowData || {};
       Object.keys(cd).forEach(function(rk){
         var r = parseInt(rk, 10);
         if (r < R_DATA0 || r > R_DATA1) return;
-        var cell = (cd[rk] || {})[d.date];
+        var cell = (cd[rk] || {})[dcol];
         var dt = cell ? dateOf(cell.v) : null;
         var keep = dt && ((!filter.year || dt.y === filter.year) && (!filter.month || dt.m === filter.month));
         if (!keep){
@@ -24574,13 +24607,13 @@ var PROD_EQUIP_FAULT_KB = {
     if (!sortDir) return;
     Object.keys(v.sheets || {}).forEach(function(sid){
       var sh = v.sheets[sid]; if (!sh) return;
-      var d = sheetDef(nameOfSid(v, sid)); if (!d || d.date === null) return;
+      var dcol = eqDateCol(nameOfSid(v, sid)); if (dcol === null) return;   /* ★EQ-STRUCT：日期列按配置 */
       var cd = sh.cellData || {};
       var rows = [];
       for (var r = R_DATA0; r <= R_DATA1; r++) if (cd[r]) rows.push(r);
       rows.sort(function(a, b){
-        var da = dateOf((cd[a] || {})[d.date] ? cd[a][d.date].v : null);
-        var db = dateOf((cd[b] || {})[d.date] ? cd[b][d.date].v : null);
+        var da = dateOf((cd[a] || {})[dcol] ? cd[a][dcol].v : null);
+        var db = dateOf((cd[b] || {})[dcol] ? cd[b][dcol].v : null);
         var ka = da ? da.y * 100 + da.m : 0, kb = db ? db.y * 100 + db.m : 0;
         return (ka - kb) * sortDir;
       });
@@ -24627,11 +24660,11 @@ var PROD_EQUIP_FAULT_KB = {
           var _f = readRate(oldCur);
           Object.keys(ls.sheets || {}).forEach(function(sid){
             var sh = ls.sheets[sid]; if (!sh) return;
-            var d = sheetDef(nameOfSid(ls, sid)); if (!d) return;
+            var mc = eqMoneyCols(nameOfSid(ls, sid));   /* ★EQ-STRUCT：钱列按配置 */
             var cd = sh.cellData || {};
             Object.keys(cd).forEach(function(rk){
               var row = cd[rk] || {};
-              d.amt.forEach(function(c){
+              mc.forEach(function(c){
                 var cell = row[String(c)];
                 if (cell && cell.f === undefined && isNum(cell.v)) cell.v = Math.round(cell.v * _f);
               });
@@ -24677,14 +24710,40 @@ var PROD_EQUIP_FAULT_KB = {
     if (cur === 'VND') return;
     Object.keys(v.sheets || {}).forEach(function(sid){
       var sh = v.sheets[sid]; if (!sh) return;
-      var d = sheetDef(nameOfSid(v, sid)); if (!d) return;
+      var mc = eqMoneyCols(nameOfSid(v, sid));   /* ★EQ-STRUCT：只换算钱列 */
       var cd = sh.cellData || {};
       Object.keys(cd).forEach(function(rk){
         var row = cd[rk] || {};
-        d.amt.forEach(function(c){
+        mc.forEach(function(c){
           var cell = row[String(c)];
           if (!cell || cell.f !== undefined) return;
           if (isNum(cell.v)) cell.v = Math.round(cell.v / rate * 100) / 100;
+        });
+      });
+    });
+    }
+    /* ★EQ-NUM-FMT-20261016：在【构建视图】阶段就把数字格式写进单元格，保证所有已存在的数据
+       一建表就带格式（金额列=币种符号+千位符；其余数字格=千位符；日期列跳过），不依赖
+       后续 set.numfmt 命令的时机。 */
+    function applyNumFmt(v){
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var sh = v.sheets[sid]; if (!sh) return;
+      var name = nameOfSid(v, sid);
+      var cd = sh.cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {};
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck]; if (!cell || cell.v === undefined || cell.v === null || cell.v === '') return;
+          var c = parseInt(ck, 10);
+          if (!isNum(cell.v)) return;                  // 只处理数字格
+          var isMoney = eqIsMoneyCol(name, c);         /* ★EQ-STRUCT：钱列按配置 */
+          if (!isMoney){
+            if (c === eqDateCol(name)) return;         // 日期列保留原格式
+            if (cell.f !== undefined) return;          // 普通数字列的公式格不动
+          }
+          var pat = isMoney ? moneyPattern(cur) : '#,##0';
+          if (cell.s && typeof cell.s === 'object'){ cell.s.n = cell.s.n || {}; cell.s.n.pattern = pat; }
+          else { cell.s = { n: { pattern: pat } }; }
         });
       });
     });
@@ -24693,7 +24752,10 @@ var PROD_EQUIP_FAULT_KB = {
     if (!api || !sheet) return;
     var v = snap; if (!v) return;
     /* ★EQ-CUR-FMT-20261016：用 workbook.getSheets() 取真实工作表 id，不再依赖 snapshot 的 key
-       与 getSheetId 是否一致；金额格套货币符号。 */
+       与 getSheetId 是否一致；金额格套货币符号。
+       ★EQ-NUM-FMT-20261016：用户要求「所有数值默认带千位分隔符」。做法：
+         金额列用 moneyPattern（币种符号 + 千位符）；其他数字格用 '#,##0'（仅千位符，不含货币符号）。
+         日期列（SHEETS[].date）保留原样，不被数字格式覆盖。 */
     try {
       var wb = api.getActiveWorkbook && api.getActiveWorkbook();
       var sheets = (wb && wb.getSheets && wb.getSheets()) || [];
@@ -24706,24 +24768,38 @@ var PROD_EQUIP_FAULT_KB = {
           Object.keys(v.sheets || {}).forEach(function(s){ if (v.sheets[s] && v.sheets[s].name === name) snapSheet = v.sheets[s]; });
         }
         if (!snapSheet) return;
-        var d = sheetDef(snapSheet.name); if (!d) return;
+        var sname = snapSheet.name;
         var cd = snapSheet.cellData || {};
-        var vals = [];
-        /* ★只对【真实存在】的金额格套格式：空表也一次性灌 1000 行会把命令撑爆 */
+        var moneyVals = [], numVals = [];
+        /* ★只对【真实存在】的格套格式：空表也一次性灌 1000 行会把命令撑爆 */
         Object.keys(cd).forEach(function(rk){
           var row = cd[rk] || {};
-          d.amt.forEach(function(c){
-            var cell = row[String(c)];
-            if (cell && cell.v !== undefined && cell.v !== null && cell.v !== ''){
-              vals.push({ row: parseInt(rk, 10), col: c, pattern: moneyPattern(cur) });
+          var r = parseInt(rk, 10);
+          Object.keys(row).forEach(function(ck){
+            var cell = row[ck]; if (!cell || cell.v === undefined || cell.v === null || cell.v === '') return;
+            var c = parseInt(ck, 10);
+            var isNum = (typeof cell.v === 'number' && isFinite(cell.v));
+            if (!isNum) return;
+            if (eqIsMoneyCol(sname, c)){                  /* ★EQ-STRUCT：钱列按配置 */
+              moneyVals.push({ row: r, col: c, pattern: moneyPattern(cur) });
+            } else if (c !== eqDateCol(sname) && !cell.s){
+              /* 非钱列、非日期列、且还没有格式的数字格 → 默认千位分隔符 */
+              numVals.push({ row: r, col: c, pattern: '#,##0' });
             }
           });
         });
-        if (!vals.length) return;
-        try {
-          progUntil = Date.now() + 800;
-          api.executeCommand('sheet.command.numfmt.set.numfmt', { unitId:'equity-report', subUnitId:sid, values:vals });
-        } catch(e){}
+        if (numVals.length){
+          try {
+            progUntil = Date.now() + 800;
+            api.executeCommand('sheet.command.numfmt.set.numfmt', { unitId:'equity-report', subUnitId:sid, values:numVals });
+          } catch(e){}
+        }
+        if (moneyVals.length){
+          try {
+            progUntil = Date.now() + 800;
+            api.executeCommand('sheet.command.numfmt.set.numfmt', { unitId:'equity-report', subUnitId:sid, values:moneyVals });
+          } catch(e){}
+        }
       });
     } catch(e){}
     }
@@ -24775,6 +24851,7 @@ var PROD_EQUIP_FAULT_KB = {
     applySort(v);
     applyFilter(v);
     applyCurrency(v);
+    applyNumFmt(v);   /* ★EQ-NUM-FMT-20261016：所有数字格默认带千位符/货币符号（作用于全部数据） */
     return v;
     }
     function render(){
@@ -24788,11 +24865,17 @@ var PROD_EQUIP_FAULT_KB = {
     var prevIdx = -1;
     try { prevIdx = ((view && view.sheetOrder) || []).indexOf(prevSid); } catch(e){}
     var v = buildView();
-    try { if (sheet && api && typeof api.disposeUnit === 'function') api.disposeUnit(sheet.getUnitId()); } catch(e){}
+    /* ★EQ-RENDER-UNIT-20261016：buildView 始终把 v.id 写死成 'equity-report'，所以单元 id 固定。
+       用固定 id 销毁，比依赖 sheet.getUnitId() 更稳（一旦 sheet 被错赋成 Worksheet，
+       拿到的就是工作表 id，disposeUnit 删不掉真单元 → 重建报同名单元冲突）。 */
+    try { if (api && typeof api.disposeUnit === 'function') api.disposeUnit('equity-report'); } catch(e){}
     var TYPE = (presets && presets.UniverInstanceType && presets.UniverInstanceType.UNIVER_SHEET) || 2;
-    sheet = univer.createUnit(TYPE, v);
+    sheet = univer.createUnit(TYPE, v);   /* ★sheet 永远是工作簿 unit（payload()/eqCaptureLiveToSnap() 靠它 getSnapshot()） */
     view = v;
-    /* ★恢复之前活动的工作表 */
+    /* ★恢复之前活动的工作表。
+       ★★关键修复：此处【绝不能用 sh2 覆盖全局 sheet】—— 否则 sheet 变成 Worksheet，
+         下一次 render() 的 dispose 拿不到单元 id，重建必然报
+         "cannot create a unit with the same unit id: equity-report"。 */
     try {
       var wb = api && api.getActiveWorkbook && api.getActiveWorkbook();
       if (wb){
@@ -24801,9 +24884,8 @@ var PROD_EQUIP_FAULT_KB = {
         else if (prevIdx >= 0 && v.sheetOrder && v.sheetOrder[prevIdx]) target = v.sheetOrder[prevIdx];
         if (target && typeof wb.setActiveSheet === 'function'){
           var curId = null;
-          try { curId = sheet && sheet.getSheetId ? sheet.getSheetId() : null; } catch(e){}
+          try { var _as = wb.getActiveSheet && wb.getActiveSheet(); curId = _as && _as.getSheetId ? _as.getSheetId() : null; } catch(e){}
           if (curId !== target) wb.setActiveSheet(target);
-          try { var sh2 = wb.getActiveSheet && wb.getActiveSheet(); if (sh2) sheet = sh2; } catch(e){}
         }
       }
     } catch(e){}
@@ -24825,11 +24907,11 @@ var PROD_EQUIP_FAULT_KB = {
     if (cur !== 'VND'){
       Object.keys(s.sheets || {}).forEach(function(sid){
         var sh = s.sheets[sid]; if (!sh) return;
-        var d = sheetDef(sh.name); if (!d) return;
+        var mc = eqMoneyCols(sh.name);   /* ★EQ-STRUCT：只把钱列乘回 VND 基 */
         var cd = sh.cellData || {};
         Object.keys(cd).forEach(function(rk){
           var row = cd[rk] || {};
-          d.amt.forEach(function(c){
+          mc.forEach(function(c){
             var cell = row[String(c)];
             if (cell && cell.f === undefined && isNum(cell.v)) cell.v = Math.round(cell.v * rate);
           });

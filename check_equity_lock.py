@@ -11,7 +11,8 @@
 
 契约（任何重构不得破坏）：
   ① 后端 EQ_SHEET_DEFS 必须 5 张表，且每张都有 vi/zh/en 三语表名；
-  ② 文件里的表名固定【越文】：总投资表的跨表公式必须引用越文表名（切语言才不会 #REF!）；
+  ② 文件里的表名固定【越文】（用户自定义的跨表公式必须引用越文表名，切语言才不会 #REF!）；
+     ★EQ-STRUCT-20261016（用户 2026-10-16 要求）：不再写死表头/金额列，种子=5 张空表，字段用户自定；
   ③ 后端必须有 snapshot(GET) / save(POST) / 下载(GET)，且★绝不能有 equity 的 init「重导」路由；
   ④ 前端 #view-equity 不得再是占位页，必须有 #equity_container；
   ⑤ createUniver 的 container 必须是 equity_container，unitId 必须是 equity-report；
@@ -60,9 +61,12 @@ for zh in ('总投资数据', '中国投资数据', '越南投资数据', '股�
 for en in ('Total Investment', 'China Investment', 'Vietnam Investment', 'Shareholder Structure', 'Dividend Records'):
     chk(en in py, "后端含英文表名 %s" % en)
 
-print("2) 后端：跨表公式引用【越文】表名")
-chk("=SUM('Đầu tư Trung Quốc'!" in py, "总投资 → 中国投资 公式引用越文表名")
-chk("=SUM('Đầu tư Việt Nam'!" in py, "总投资 → 越南投资 公式引用越文表名")
+print("2) 后端：种子 = 5 张【空表】（★EQ-STRUCT-20261016：不再写固定表头/数据/公式）")
+chk("def _eq_make_seed_xlsx" in py, "存在 _eq_make_seed_xlsx")
+chk("不写表头、不写数据、不写公式" in py, "★种子 = 仅 5 张空表（注释声明）")
+chk("head_fill" not in py, "★种子不再写固定表头样式（越文表头已删）")
+chk("EQ_SEED_VER" in py and "EQ_SEED_MARK" in py,
+    "★种子版本标记：升级即清空重建（_eq_seed_if_missing）")
 
 print("3) 后端接口：snapshot / save / 下载；★无重导")
 for pat, name in (('/api/finance/equity-report/snapshot', 'GET snapshot'),
@@ -259,6 +263,35 @@ chk("EQ-TRANS-RERENDER-20261016" in eqblk,
     "★译文到位后必须补一次重渲染（EQ-TRANS-RERENDER-20261016）")
 chk("EQ-CUR-FMT-20261016" in eqblk,
     "★新录入数字后立刻套上当前币种符号（EQ-CUR-FMT-20261016）")
+
+print("21) 所有数字格默认带千位分隔符，金额列额外带货币符号（2026-10-16）")
+chk("EQ-NUM-FMT-20261016" in eqblk,
+    "★fmtCurrency 必须带 EQ-NUM-FMT-20261016 标记，说明所有数值默认套千位分隔符")
+chk("'#,##0'" in eqblk,
+    "★非金额数字格必须应用 '#,##0' 默认千位分隔符")
+chk("eqDateCol(sname)" in eqblk,
+    "★日期列通过 eqDateCol 配置跳过（不再写死 d.date）")
+chk("function applyNumFmt" in eqblk and "applyNumFmt(v)" in eqblk,
+    "★必须在 buildView 阶段把数字格式写进单元格，保证全部已有数据一建表就带格式（不依赖 set.numfmt 时机）")
+
+print("22) render 重建不得把 sheet 错赋成 Worksheet（否则下次 dispose 删不掉单元 → 同名冲突）")
+chk("EQ-RENDER-UNIT-20261016" in eqblk,
+    "★render 必须带 EQ-RENDER-UNIT-20261016 标记，说明已修同名单元冲突")
+chk("if (sh2) sheet = sh2" not in eqblk,
+    "★render 不得再出现 'if (sh2) sheet = sh2'（把全局 sheet 赋成 Worksheet 会毁掉 getSnapshot/dispose）")
+chk("api.disposeUnit('equity-report')" in eqblk,
+    "★render 必须用固定 unitId 'equity-report' 销毁旧单元，避免依赖 sheet.getUnitId()")
+
+print("23) 去掉固定结构：钱列/日期列可配置 + 不再写死 amt/date（2026-10-16 用户要求）")
+chk("EQ-STRUCT-20261016" in eqblk, "★前端带 EQ-STRUCT-20261016 标记（结构去固定化）")
+chk("var EQ_MONEY_COLS" in eqblk and "function eqMoneyCols" in eqblk and "function eqIsMoneyCol" in eqblk,
+    "★钱列改为 EQ_MONEY_COLS 可配置（eqMoneyCols / eqIsMoneyCol）")
+chk("var EQ_DATE_COLS" in eqblk and "function eqDateCol" in eqblk,
+    "★日期列改为 EQ_DATE_COLS 可配置（eqDateCol）")
+chk("d.amt" not in eqblk and "d.date" not in eqblk,
+    "★不再使用写死的 d.amt / d.date（全部改走配置）")
+chk("eqMoneyCols(nameOfSid" in eqblk or "eqMoneyCols(sh.name)" in eqblk,
+    "★换算/保存乘回都按 eqMoneyCols 的钱列执行")
 
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")

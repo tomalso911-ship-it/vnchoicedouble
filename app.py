@@ -9885,6 +9885,9 @@ EQ_REPORT = os.path.join(FIN_DIR, "equity_report.xlsx")
 EQ_SNAP_KEY = os.path.join(FIN_DIR, "equity_report.snapshot.key")
 EQ_SNAP_PREFIX = "equity_report.snapshot."
 EQ_TITLES_PATH = os.path.join(FIN_DIR, "fin_sheet_titles_eq.json")
+# ★EQ-STRUCT-20261016：种子版本标记。版本变了就【清空重建】种子文件（用户要求去掉固定表头/结构）。
+EQ_SEED_VER = "v2-empty-20261016"
+EQ_SEED_MARK = os.path.join(FIN_DIR, "equity_report.seed.ver")
 _EQ_SNAP_LOCK = _fthreading.Lock()
 
 # 5 张表的定义：(越文表名, 中文表名, 英文表名, [表头(越文)], [金额列 0基], 是否有日期列)
@@ -9933,82 +9936,15 @@ EQ_TOTAL_ROW = 1006     # 合计行
 
 
 def _eq_make_seed_xlsx(path):
-    """生成股东权益种子文件：5 张表 + 越文表头 + 公式 + 底部合计行（幂等：已存在就不动）。"""
+    """★EQ-STRUCT-20261016（用户 2026-10-16 要求）：种子 = 仅 5 张【空表】。
+       只创建工作表（用固定越文表名，保证标签映射可用）；
+       ★不写表头、不写数据、不写公式、不设固定金额列 —— 字段完全由用户自己在表格里定义。"""
     import openpyxl
-    from openpyxl.styles import Font, Alignment, PatternFill
-    from openpyxl.utils import get_column_letter
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
-
-    head_font = Font(bold=True, color="FFFFFF")
-    head_fill = PatternFill("solid", fgColor="1F4E79")
-    title_font = Font(bold=True, size=14)
-    money_fmt = '#,##0'
-
     for d in EQ_SHEET_DEFS:
-        ws = wb.create_sheet(d["vi"])
-        if d["key"] == "total":
-            ws.cell(row=1, column=1, value="SỔ THEO DÕI QUYỀN LỢI CỔ ĐÔNG").font = title_font
-            ws.cell(row=2, column=1, value="Tiền tệ cơ sở: VND (Đơn vị: đồng)")
-        else:
-            ws.cell(row=1, column=1, value=d["vi"]).font = title_font
-            ws.cell(row=2, column=1, value="Tiền tệ cơ sở: VND (Đơn vị: đồng)")
-
-        # 第 4 行：表头（第 5 行是列标题，与越南报表版式一致）
-        for ci, h in enumerate(d["headers"], start=1):
-            c = ws.cell(row=5, column=ci, value=h)
-            c.font = head_font
-            c.fill = head_fill
-            c.alignment = Alignment(horizontal="center", vertical="center")
-        for ci in range(1, len(d["headers"]) + 1):
-            ws.column_dimensions[get_column_letter(ci)].width = 18
-
-        if d["key"] == "total":
-            # ★汇总头：中国 / 越南 / 合计 / 占比（公式固定引用【越文】表名）
-            rows = [
-                ("Đầu tư Trung Quốc (中国投资)", "=SUM('Đầu tư Trung Quốc'!D%(a)d:D%(b)d)" % {"a": EQ_DATA_ROW0, "b": EQ_DATA_ROW1}),
-                ("Đầu tư Việt Nam (越南投资)", "=SUM('Đầu tư Việt Nam'!D%(a)d:D%(b)d)" % {"a": EQ_DATA_ROW0, "b": EQ_DATA_ROW1}),
-                ("Tổng cộng (总投资合计)", "=B6+B7"),
-            ]
-            for ri, (label, formula) in enumerate(rows, start=6):
-                ws.cell(row=ri, column=1, value=label)
-                c = ws.cell(row=ri, column=2, value=formula)
-                c.number_format = money_fmt
-            # 占比：B8 是合计行
-            ws.cell(row=6, column=3, value="=IF($B$8,B6/$B$8*100,0)")
-            ws.cell(row=7, column=3, value="=IF($B$8,B7/$B$8*100,0)")
-            ws.cell(row=8, column=1, value="Tổng cộng (总投资合计)").font = Font(bold=True)
-            ws.cell(row=8, column=2, value="=B6+B7").number_format = money_fmt
-            ws.cell(row=8, column=3, value="=IF($B$8,B8/$B$8*100,0)")
-            # 第 9 行空行；第 10 行起：空明细区（同一套 4 列，用户自由录）
-            ws.cell(row=10, column=1, value="(Khu vực ghi chú chi tiết / 明细区 / Detail area)")
-        else:
-            # 明细表：未回收 = 金额 - 已回收
-            amt = d["amt_cols"]
-            for r in range(EQ_DATA_ROW0, EQ_DATA_ROW1 + 1):
-                if d["key"] == "cn" or d["key"] == "vn":
-                    ws.cell(row=r, column=6, value="=IF(D%d,E%d-D%d,0)" % (r, r, r)).number_format = money_fmt
-                elif d["key"] == "dividend":
-                    ws.cell(row=r, column=6, value="=IF(D%d,D%d*(1-N(E%d)/100),0)" % (r, r, r)).number_format = money_fmt
-                elif d["key"] == "holders":
-                    ws.cell(row=r, column=4, value="=IF($C$%d,C%d/$C$%d*100,0)" % (EQ_TOTAL_ROW, r, EQ_TOTAL_ROW))
-            # 合计行
-            ws.cell(row=EQ_TOTAL_ROW, column=1, value="TỔNG CỘNG").font = Font(bold=True)
-            for ci in amt:
-                L = get_column_letter(ci + 1)
-                c = ws.cell(row=EQ_TOTAL_ROW, column=ci + 1,
-                            value="=SUM(%(L)s%(a)s:%(L)s%(b)s)" % {"L": L, "a": EQ_DATA_ROW0, "b": EQ_DATA_ROW1})
-                c.number_format = money_fmt
-                c.font = Font(bold=True)
-            if d["key"] == "holders":
-                ws.cell(row=EQ_TOTAL_ROW, column=4, value="=SUM(D%d:D%d)" % (EQ_DATA_ROW0, EQ_DATA_ROW1))
-            for ci in amt:
-                for r in range(EQ_DATA_ROW0, EQ_DATA_ROW1 + 1):
-                    ws.cell(row=r, column=ci + 1).number_format = money_fmt
-            if d["date_col"] is not None:
-                for r in range(EQ_DATA_ROW0, EQ_DATA_ROW1 + 1):
-                    ws.cell(row=r, column=d["date_col"] + 1).number_format = FIN_DATE_FMT
+        wb.create_sheet(d["vi"])
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + ".tmp.xlsx"
@@ -10016,15 +9952,40 @@ def _eq_make_seed_xlsx(path):
     os.replace(tmp, path)
 
 
+def _eq_seed_ver():
+    try:
+        with open(EQ_SEED_MARK, encoding="utf-8") as fh:
+            return (fh.read() or "").strip()
+    except Exception:
+        return ""
+
+
 def _eq_seed_if_missing():
-    if not os.path.isfile(EQ_REPORT):
+    """文件缺失、或种子版本升级（本次要求：清空重建）→ 重建空种子。
+       重建前先把旧文件另存一份到备份目录（防误删）。"""
+    need = (not os.path.isfile(EQ_REPORT)) or (_eq_seed_ver() != EQ_SEED_VER)
+    if not need:
+        return
+    try:
+        if os.path.isfile(EQ_REPORT):
+            try:
+                import shutil
+                _bn = "equity_report_pre_clear_%s.xlsx.bak" % _fdt.datetime.now().strftime("%Y%m%d_%H%M%S")
+                shutil.copy2(EQ_REPORT, os.path.join(FIN_BACKUP_DIR, _bn))
+            except Exception:
+                pass
+        _eq_make_seed_xlsx(EQ_REPORT)
+        _eq_cache_invalidate()
         try:
-            _eq_make_seed_xlsx(EQ_REPORT)
-            sys.stderr.write("[fin-eq] seed created: %s\n" % EQ_REPORT)
-            sys.stderr.flush()
-        except Exception as e:
-            sys.stderr.write("[fin-eq] seed failed: %s\n" % e)
-            sys.stderr.flush()
+            with open(EQ_SEED_MARK, "w", encoding="utf-8") as fh:
+                fh.write(EQ_SEED_VER)
+        except Exception:
+            pass
+        sys.stderr.write("[fin-eq] seed rebuilt (empty sheets): %s\n" % EQ_REPORT)
+        sys.stderr.flush()
+    except Exception as e:
+        sys.stderr.write("[fin-eq] seed failed: %s\n" % e)
+        sys.stderr.flush()
 
 
 def _eq_report_key():
@@ -10242,6 +10203,9 @@ if __name__ == "__main__":
 
     # 中国财务报表：文件/表名映射缺失时补一份种子（幂等；中国报表只有「实际支出」一张表）
     _cn_seed_if_missing()
+
+    # 股东权益：文件缺失 或 种子版本升级 → 清空重建（★EQ-STRUCT-20261016：5 张空表，字段用户自定）
+    _eq_seed_if_missing()
 
     # ★PERF(Option 3)：启动时按需生成精简版压缩产物（源文件 choice_lite.html 不动；
     #   产物缺失或比源文件旧时重建；失败则静默回退源文件，不影响服务）。
