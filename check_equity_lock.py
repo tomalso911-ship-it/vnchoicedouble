@@ -33,6 +33,10 @@ except Exception:
 
 html = open("choice_lite.html", encoding="utf-8", errors="replace").read()
 py = open("app.py", encoding="utf-8", errors="replace").read()
+try:
+    uc = open("univer_convert.py", encoding="utf-8", errors="replace").read()
+except Exception:
+    uc = ""
 ok = True
 NAMES = ['Tổng đầu tư', 'Đầu tư Trung Quốc', 'Đầu tư Việt Nam', 'Cơ cấu cổ đông', 'Cổ tức']
 
@@ -292,6 +296,14 @@ chk("d.amt" not in eqblk and "d.date" not in eqblk,
     "★不再使用写死的 d.amt / d.date（全部改走配置）")
 chk("eqMoneyCols(nameOfSid" in eqblk or "eqMoneyCols(sh.name)" in eqblk,
     "★换算/保存乘回都按 eqMoneyCols 的钱列执行")
+
+print("24) 每张表默认 Z 列 × 50 行（2026-10-16 用户要求）")
+chk("EQ-GRID-20261016" in eqblk and "function eqEnsureGrid" in eqblk,
+    "★前端 eqEnsureGrid：每张表至少 Z 列(26) × 50 行")
+chk("eqEnsureGrid(snap)" in eqblk and "eqEnsureGrid(v)" in eqblk,
+    "★load() 与 buildView() 都要套网格下限")
+chk("EQ-GRID-20261016" in uc and "max(int(ws.max_row or 0), 50)" in uc,
+    "★后端 univer_convert 空白表默认 50 行 × 26 列（否则只显示 A1）")
 
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")

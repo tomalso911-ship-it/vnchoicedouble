@@ -9886,7 +9886,7 @@ EQ_SNAP_KEY = os.path.join(FIN_DIR, "equity_report.snapshot.key")
 EQ_SNAP_PREFIX = "equity_report.snapshot."
 EQ_TITLES_PATH = os.path.join(FIN_DIR, "fin_sheet_titles_eq.json")
 # ★EQ-STRUCT-20261016：种子版本标记。版本变了就【清空重建】种子文件（用户要求去掉固定表头/结构）。
-EQ_SEED_VER = "v2-empty-20261016"
+EQ_SEED_VER = "v3-empty-grid-20261016"
 EQ_SEED_MARK = os.path.join(FIN_DIR, "equity_report.seed.ver")
 _EQ_SNAP_LOCK = _fthreading.Lock()
 

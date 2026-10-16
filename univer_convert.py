@@ -136,8 +136,10 @@ def xlsx_to_univer(path, snap_id='vn-report'):
             'tabColor': '',
             'hidden': BN_FALSE,
             'freeze': {'xSplit': 0, 'ySplit': 0},
-            'rowCount': (max_r_used + 20) if max_r_used else (ws.max_row or 100),
-            'columnCount': (max_c_used + 8) if max_c_used else min(ws.max_column or 26, 100),
+            # ★EQ-GRID-20261016（用户要求）：空白表默认给 Z 列(26) × 50 行的可用网格，
+            #   否则空种子 max_row/max_column=1 → 前端只显示 A1，无法录入。
+            'rowCount': (max_r_used + 20) if max_r_used else max(int(ws.max_row or 0), 50),
+            'columnCount': (max_c_used + 8) if max_c_used else max(min(int(ws.max_column or 0), 100), 26),
             'defaultColumnWidth': 72,
             'defaultRowHeight': 24,
             'mergeData': merge_data,

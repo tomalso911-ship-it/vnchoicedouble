@@ -24843,9 +24843,22 @@ var PROD_EQUIP_FAULT_KB = {
     }
 
     /* ---------- 渲染 ---------- */
+    /* ★EQ-GRID-20261016（用户要求）：每张表默认至少 Z 列(26) × 50 行，方便从空白开始录入。
+       只放大不缩小：已有更多行/列数据的工作表不受影响。 */
+    function eqEnsureGrid(v){
+    try {
+      var MINC = 26, MINR = 50;
+      Object.keys((v && v.sheets) || {}).forEach(function(sid){
+        var sh = v.sheets[sid]; if (!sh) return;
+        var rc = parseInt(sh.rowCount, 10);    if (!isFinite(rc) || rc < MINR) sh.rowCount = MINR;
+        var cc = parseInt(sh.columnCount, 10); if (!isFinite(cc) || cc < MINC) sh.columnCount = MINC;
+      });
+    } catch(e){}
+    }
     function buildView(){
     var v = JSON.parse(JSON.stringify(snap || {}));
     v.id = 'equity-report';
+    eqEnsureGrid(v);      /* ★EQ-GRID：每张表默认 Z 列 × 50 行 */
     applyTrans(v);
     applyTitles(v);       /* ★必须在 applyFilter/applySort 之前：它们靠表名找列定义 */
     applySort(v);
@@ -25064,6 +25077,7 @@ var PROD_EQUIP_FAULT_KB = {
       var r = await fetch(API + '/snapshot', { cache:'no-store' });
       if (!r.ok) { st('报表未初始化（HTTP ' + r.status + '）'); loading = false; return; }
       snap = await r.json();
+      eqEnsureGrid(snap);          /* ★EQ-GRID：每张表默认 Z 列 × 50 行（写入 snap，保存也带上） */
       loadTrans();
       seedAndApply(snap, function(){ render(); loading = false; });
     } catch(e){
