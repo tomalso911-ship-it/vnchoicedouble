@@ -317,6 +317,11 @@ chk("var eqSelMoney" in eqblk and "function eqIsMoneyCell" in eqblk,
 chk("var sel = eqCurrentSelRange();" in eqblk, "★setCurrency 读取当前框选")
 chk("if (cur === 'VND' || cur === 'NONE') return;" in eqblk, "★「无」不换算")
 chk("if (code === 'NONE') return '#,##0';" in eqblk, "★moneyPattern('NONE') = 仅千位符")
+chk("EQ-NOLOOP-20261016" in eqblk and "c0.textContent !== txt" in eqblk,
+    "★必须「先比较再赋值」textContent（否则 MutationObserver ↔ mountToolbar 死循环卡死页面）")
+chk("if (window.__eqMounting) return;" in eqblk, "★mountToolbar 防重入")
+chk("Object.keys(scd).forEach" in eqblk,
+    "★框选登记只遍历真实存在的单元格（整列/整表框选也不卡死）")
 
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")

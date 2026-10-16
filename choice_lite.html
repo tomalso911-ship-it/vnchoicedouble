@@ -24857,28 +24857,39 @@ var PROD_EQUIP_FAULT_KB = {
       try {
         var sel = document.getElementById('eq_cur');
         var c0 = document.getElementById('eq_cur_cur');
-        if (c0) c0.textContent = eqCurLabel(code);
-        if (sel) sel.value = '';
+        var txt = eqCurLabel(code);
+        /* ★EQ-NOLOOP-20261016：必须先比较再赋值！textContent 即使赋同值也会替换文本节点
+           → 触发观察 #equity_container 的 MutationObserver → 再调 mountToolbar → 死循环卡死页面。 */
+        if (c0 && c0.textContent !== txt) c0.textContent = txt;
+        if (sel && sel.value !== '') sel.value = '';
       } catch(e){}
     }
     function eqUpdateCurLabels(){
       try {
         var o = document.getElementById('eq_cur_none');
-        if (o) o.textContent = eqCurNoneText();
+        var t = eqCurNoneText();
+        if (o && o.textContent !== t) o.textContent = t;   /* ★EQ-NOLOOP：同上，先比较 */
         eqSetCurDisplay(cur);
       } catch(e){}
     }
     function mountToolbar(){
-      var sel = document.getElementById('eq_cur');
-      var host = document.querySelector('#equity_container .univer-toolbar-container');
-      if (!sel || !host) return;
-      if (sel.parentElement !== host || host.firstChild !== sel){
-        try { host.insertBefore(sel, host.firstChild); } catch(e){}
-      }
-      eqHideMore();
-      eqUpdateCurLabels();
-      /* ★EQ-SHEET-CUR-20261016：工具栏归位时同步一次默认币种（切工作簿标签时触发） */
-      try { eqSyncCurToActiveSheet(); } catch(e){}
+      /* ★EQ-NOLOOP-20261016：防重入。mountToolbar 里的 DOM 写入会触发 MutationObserver
+         （观察 #equity_container）→ 又调 mountToolbar。除下面的「先比较再赋值」外，
+         再加一道同步防重入，双保险。 */
+      if (window.__eqMounting) return;
+      window.__eqMounting = true;
+      try {
+        var sel = document.getElementById('eq_cur');
+        var host = document.querySelector('#equity_container .univer-toolbar-container');
+        if (!sel || !host) return;
+        if (sel.parentElement !== host || host.firstChild !== sel){
+          try { host.insertBefore(sel, host.firstChild); } catch(e){}
+        }
+        eqHideMore();
+        eqUpdateCurLabels();
+        /* ★EQ-SHEET-CUR-20261016：工具栏归位时同步一次默认币种（切工作簿标签时触发） */
+        try { eqSyncCurToActiveSheet(); } catch(e){}
+      } finally { window.__eqMounting = false; }
     }
     function watchToolbar(){
       try { mountToolbar(); } catch(e){}
@@ -26303,14 +26314,22 @@ var PROD_EQUIP_FAULT_KB = {
             });
             eqSelMoney[skey] = eqSelMoney[skey] || {};
             var m = eqSelMoney[skey];
-            for (var rr = r0; rr <= r1; rr++){
-              for (var cc = c0; cc <= c1; cc++){
-                var cell = scd ? ((scd[String(rr)] || {})[String(cc)]) : null;
-                if (!cell || !isNum(cell.v)) continue;        /* 只登记数字格 */
-                var k = rr + ',' + cc;
-                if (code === 'NONE'){ if (m[k]){ delete m[k]; marked = true; } }
-                else if (!m[k]){ m[k] = 1; marked = true; }
-              }
+            /* ★EQ-SELCUR：只遍历【真实存在的单元格】（不按矩形逐格循环）——整列/整表框选也不会卡死。 */
+            if (scd){
+              Object.keys(scd).forEach(function(rk){
+                var rr = parseInt(rk, 10);
+                if (rr < r0 || rr > r1) return;
+                var row = scd[rk] || {};
+                Object.keys(row).forEach(function(ck){
+                  var cc = parseInt(ck, 10);
+                  if (cc < c0 || cc > c1) return;
+                  var cell = row[ck];
+                  if (!cell || !isNum(cell.v)) return;        /* 只登记数字格 */
+                  var k = rr + ',' + cc;
+                  if (code === 'NONE'){ if (m[k]){ delete m[k]; marked = true; } }
+                  else if (!m[k]){ m[k] = 1; marked = true; }
+                });
+              });
             }
           }
         }
