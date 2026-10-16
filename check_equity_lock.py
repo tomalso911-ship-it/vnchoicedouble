@@ -294,8 +294,8 @@ chk("var EQ_DATE_COLS" in eqblk and "function eqDateCol" in eqblk,
     "★日期列改为 EQ_DATE_COLS 可配置（eqDateCol）")
 chk("d.amt" not in eqblk and "d.date" not in eqblk,
     "★不再使用写死的 d.amt / d.date（全部改走配置）")
-chk("eqMoneyCols(nameOfSid" in eqblk or "eqMoneyCols(sh.name)" in eqblk,
-    "★换算/保存乘回都按 eqMoneyCols 的钱列执行")
+chk("eqIsMoneyCell(nm" in eqblk and "eqIsMoneyCell(name" in eqblk and "eqIsMoneyCell(sname" in eqblk,
+    "★换算/保存/格式化都按「钱格」（eqIsMoneyCell）执行")
 
 print("24) 每张表默认 Z 列 × 50 行（2026-10-16 用户要求）")
 chk("EQ-GRID-20261016" in eqblk and "function eqEnsureGrid" in eqblk,
@@ -304,6 +304,19 @@ chk("eqEnsureGrid(snap)" in eqblk and "eqEnsureGrid(v)" in eqblk,
     "★load() 与 buildView() 都要套网格下限")
 chk("EQ-GRID-20261016" in uc and "max(int(ws.max_row or 0), 50)" in uc,
     "★后端 univer_convert 空白表默认 50 行 × 26 列（否则只显示 A1）")
+
+print("25) 框选套币种 + 「无」选项（EQ-SELCUR-20261016）")
+chk("EQ-SELCUR-20261016" in eqblk, "★前端带 EQ-SELCUR-20261016 标记")
+chk('value="NONE"' in html and 'id="eq_cur_none"' in html, "★币种下拉新增「无」(NONE) 选项")
+chk("function eqSetCurDisplay" in eqblk and "function eqCurNoneText" in eqblk,
+    "★哨兵式下拉：eqSetCurDisplay + 三语「无」文案（无/Không/None）")
+chk("onCurChange: function" in eqblk and 'id="eq_cur_cur"' in html,
+    "★onCurChange + 哨兵 option：再选同一个币种也能触发")
+chk("var eqSelMoney" in eqblk and "function eqIsMoneyCell" in eqblk,
+    "★框选登记为钱格（eqSelMoney / eqIsMoneyCell）")
+chk("var sel = eqCurrentSelRange();" in eqblk, "★setCurrency 读取当前框选")
+chk("if (cur === 'VND' || cur === 'NONE') return;" in eqblk, "★「无」不换算")
+chk("if (code === 'NONE') return '#,##0';" in eqblk, "★moneyPattern('NONE') = 仅千位符")
 
 print()
 print("总体:", "全部通过 ✓" if ok else "有失败 ✗")

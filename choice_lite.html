@@ -24339,11 +24339,13 @@ var PROD_EQUIP_FAULT_KB = {
           <button class="fin-btn" data-i18n="fin_btn_export" onclick="window.__eq && window.__eq.exportXlsx()">导出 xlsx</button>
         </div>
         <div id="eq_inline" class="fin-toolbar2">
-          <select id="eq_cur" onchange="window.__eq && window.__eq.setCurrency(this.value)"
+          <select id="eq_cur" onchange="window.__eq && window.__eq.onCurChange(this)"
                   style="height:28px;border:1px solid #c8ced6;border-radius:6px;padding:0 6px;background:#fff;margin-right:8px;">
+            <option value="" disabled id="eq_cur_cur">VND ₫</option>
             <option value="VND">VND ₫</option>
             <option value="RMB">RMB ¥</option>
             <option value="USD">USD $</option>
+            <option value="NONE" id="eq_cur_none">无</option>
           </select>
         </div>
       </div>
@@ -24401,6 +24403,12 @@ var PROD_EQUIP_FAULT_KB = {
     var inited = false, loading = false, ready = false;
     var snap = null, view = null;
     var cur = 'VND', rate = 1, filter = null, sortDir = 0;
+    /* ★EQ-SELCUR-20261016：用户「框选单元格 → 选币种」时，被套上币种的额外「钱格」。
+       结构 { sid: { "行,列": 1 } }（行/列 0 基）。与 EQ_MONEY_COLS（配置钱列）合并生效：
+       这些格会带货币符号、参与汇率换算、保存时乘回 VND。会话内有效（本页签内存）。 */
+    var eqSelMoney = {};
+    try { eqSelMoney = JSON.parse(localStorage.getItem('eq_sel_money_v1') || '{}') || {}; } catch(e){ eqSelMoney = {}; }
+    function eqSaveSelMoney(){ try { localStorage.setItem('eq_sel_money_v1', JSON.stringify(eqSelMoney)); } catch(e){} }
     var eqLastActiveSheetName = '';   /* ★EQ-SHEET-CUR-20261016：用于切工作簿时按默认币种切换 */
     var dirty = false, saving = false, saveTimer = null, progUntil = 0;
     var trans = {}, pending = {};
@@ -24442,6 +24450,15 @@ var PROD_EQUIP_FAULT_KB = {
     /* 钱列（0 基列号数组）。 */
     function eqMoneyCols(name){ var a = eqCfgBySheet(EQ_MONEY_COLS, name); return a || []; }
     function eqIsMoneyCol(name, c){ return eqMoneyCols(name).indexOf(c) >= 0; }
+    /* ★EQ-SELCUR-20261016：把任意语言表名归一成稳定的键（越文表名），
+       这样 eqSelMoney 不随界面语言/快照 key 变化而丢。 */
+    function eqSheetKey(name){ var d = sheetDef(name); return d ? d.vi : (name || ''); }
+    /* ★EQ-SELCUR-20261016：某表某格是否算「钱格」= 配置钱列 ∪ 用户框选套过币种的格。 */
+    function eqIsMoneyCell(name, r, c){
+      if (eqIsMoneyCol(name, c)) return true;
+      var m = eqSelMoney[eqSheetKey(name)];
+      return !!(m && m[r + ',' + c]);
+    }
     /* 日期列（0 基列号；无则 null）。 */
     function eqDateCol(name){ var c = eqCfgBySheet(EQ_DATE_COLS, name); return (c === undefined || c === null) ? null : c; }
 
@@ -24636,7 +24653,11 @@ var PROD_EQUIP_FAULT_KB = {
     }
     return 1;
     }
-    function moneyPattern(code){ return code === 'RMB' ? '#,##0"¥"' : code === 'USD' ? '#,##0"$"' : '#,##0"₫"'; }
+    /* ★EQ-SELCUR-20261016：'NONE'（无）= 不带任何货币符号，仅千位符。 */
+    function moneyPattern(code){
+      if (code === 'NONE') return '#,##0';
+      return code === 'RMB' ? '#,##0"¥"' : code === 'USD' ? '#,##0"$"' : '#,##0"₫"';
+    }
     /* ★EQ-SHEET-CUR-20261016：根据工作表名返回默认币种。
        中国投资数据（中/英/越三名任一匹配）默认 RMB，其余默认 VND。 */
     function eqDefaultCurFor(sheetName){
@@ -24660,13 +24681,15 @@ var PROD_EQUIP_FAULT_KB = {
           var _f = readRate(oldCur);
           Object.keys(ls.sheets || {}).forEach(function(sid){
             var sh = ls.sheets[sid]; if (!sh) return;
-            var mc = eqMoneyCols(nameOfSid(ls, sid));   /* ★EQ-STRUCT：钱列按配置 */
+            var nm = nameOfSid(ls, sid);
             var cd = sh.cellData || {};
             Object.keys(cd).forEach(function(rk){
-              var row = cd[rk] || {};
-              mc.forEach(function(c){
-                var cell = row[String(c)];
-                if (cell && cell.f === undefined && isNum(cell.v)) cell.v = Math.round(cell.v * _f);
+              var row = cd[rk] || {}; var r = parseInt(rk, 10);
+              Object.keys(row).forEach(function(ck){
+                var cell = row[ck];
+                if (!cell || cell.f !== undefined || !isNum(cell.v)) return;
+                if (!eqIsMoneyCell(nm, r, parseInt(ck, 10))) return;   /* ★EQ-SELCUR：钱格（列 ∪ 框选） */
+                cell.v = Math.round(cell.v * _f);
               });
             });
           });
@@ -24688,9 +24711,8 @@ var PROD_EQUIP_FAULT_KB = {
           } catch(e){}
         }
         if (!name) return;
-        var sel = document.getElementById('eq_cur');
         if (name === eqLastActiveSheetName){
-          if (sel && sel.value !== cur) sel.value = cur;
+          eqSetCurDisplay(cur);
           return;
         }
         eqLastActiveSheetName = name;
@@ -24700,24 +24722,23 @@ var PROD_EQUIP_FAULT_KB = {
           cur = want;
           rate = readRate(cur);
           render();
-          if (sel) sel.value = cur;
-        } else if (sel && sel.value !== cur){
-          sel.value = cur;
         }
+        eqSetCurDisplay(cur);
       } catch(e){}
     }
     function applyCurrency(v){
-    if (cur === 'VND') return;
+    if (cur === 'VND' || cur === 'NONE') return;   /* ★EQ-SELCUR：VND=基准、NONE=不换算 */
     Object.keys(v.sheets || {}).forEach(function(sid){
       var sh = v.sheets[sid]; if (!sh) return;
-      var mc = eqMoneyCols(nameOfSid(v, sid));   /* ★EQ-STRUCT：只换算钱列 */
+      var nm = nameOfSid(v, sid);
       var cd = sh.cellData || {};
       Object.keys(cd).forEach(function(rk){
-        var row = cd[rk] || {};
-        mc.forEach(function(c){
-          var cell = row[String(c)];
-          if (!cell || cell.f !== undefined) return;
-          if (isNum(cell.v)) cell.v = Math.round(cell.v / rate * 100) / 100;
+        var row = cd[rk] || {}; var r = parseInt(rk, 10);
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck];
+          if (!cell || cell.f !== undefined || !isNum(cell.v)) return;
+          if (!eqIsMoneyCell(nm, r, parseInt(ck, 10))) return;   /* ★EQ-SELCUR：只换算钱格 */
+          cell.v = Math.round(cell.v / rate * 100) / 100;
         });
       });
     });
@@ -24731,12 +24752,12 @@ var PROD_EQUIP_FAULT_KB = {
       var name = nameOfSid(v, sid);
       var cd = sh.cellData || {};
       Object.keys(cd).forEach(function(rk){
-        var row = cd[rk] || {};
+        var row = cd[rk] || {}; var r = parseInt(rk, 10);
         Object.keys(row).forEach(function(ck){
           var cell = row[ck]; if (!cell || cell.v === undefined || cell.v === null || cell.v === '') return;
           var c = parseInt(ck, 10);
           if (!isNum(cell.v)) return;                  // 只处理数字格
-          var isMoney = eqIsMoneyCol(name, c);         /* ★EQ-STRUCT：钱列按配置 */
+          var isMoney = eqIsMoneyCell(name, r, c);  /* ★EQ-SELCUR：钱格（钱列 ∪ 框选） */
           if (!isMoney){
             if (c === eqDateCol(name)) return;         // 日期列保留原格式
             if (cell.f !== undefined) return;          // 普通数字列的公式格不动
@@ -24780,7 +24801,7 @@ var PROD_EQUIP_FAULT_KB = {
             var c = parseInt(ck, 10);
             var isNum = (typeof cell.v === 'number' && isFinite(cell.v));
             if (!isNum) return;
-            if (eqIsMoneyCol(sname, c)){                  /* ★EQ-STRUCT：钱列按配置 */
+            if (eqIsMoneyCell(sname, r, c)){              /* ★EQ-SELCUR：钱格（钱列 ∪ 框选） */
               moneyVals.push({ row: r, col: c, pattern: moneyPattern(cur) });
             } else if (c !== eqDateCol(sname) && !cell.s){
               /* 非钱列、非日期列、且还没有格式的数字格 → 默认千位分隔符 */
@@ -24821,6 +24842,32 @@ var PROD_EQUIP_FAULT_KB = {
         }
       } catch(e){}
     }
+    /* ★EQ-SELCUR-20261016：币种下拉。
+       为了让「再选同一个币种」也能触发（原生 select 选同值不发 change），
+       第 0 个 option 是【哨兵】：它显示当前币种、值恒为 ""，选完任何一项后把 select 复位到它。
+       于是每次选择（哪怕又是 VND）都会发 change。 */
+    function eqCurNoneText(){ var L = lang(); return (L === 'zh') ? '无' : (L === 'en') ? 'None' : 'Không'; }
+    function eqCurLabel(code){
+      if (code === 'RMB') return 'RMB ¥';
+      if (code === 'USD') return 'USD $';
+      if (code === 'NONE') return eqCurNoneText();
+      return 'VND ₫';
+    }
+    function eqSetCurDisplay(code){
+      try {
+        var sel = document.getElementById('eq_cur');
+        var c0 = document.getElementById('eq_cur_cur');
+        if (c0) c0.textContent = eqCurLabel(code);
+        if (sel) sel.value = '';
+      } catch(e){}
+    }
+    function eqUpdateCurLabels(){
+      try {
+        var o = document.getElementById('eq_cur_none');
+        if (o) o.textContent = eqCurNoneText();
+        eqSetCurDisplay(cur);
+      } catch(e){}
+    }
     function mountToolbar(){
       var sel = document.getElementById('eq_cur');
       var host = document.querySelector('#equity_container .univer-toolbar-container');
@@ -24829,6 +24876,7 @@ var PROD_EQUIP_FAULT_KB = {
         try { host.insertBefore(sel, host.firstChild); } catch(e){}
       }
       eqHideMore();
+      eqUpdateCurLabels();
       /* ★EQ-SHEET-CUR-20261016：工具栏归位时同步一次默认币种（切工作簿标签时触发） */
       try { eqSyncCurToActiveSheet(); } catch(e){}
     }
@@ -24917,16 +24965,18 @@ var PROD_EQUIP_FAULT_KB = {
     try { s = sheet && sheet.getSnapshot ? sheet.getSnapshot() : null; } catch(e){}
     if (!s) return null;
     /* ★币种还原：屏幕上除以过汇率，这里乘回去，文件里永远只剩 VND 原值 */
-    if (cur !== 'VND'){
+    if (cur !== 'VND' && cur !== 'NONE'){
       Object.keys(s.sheets || {}).forEach(function(sid){
         var sh = s.sheets[sid]; if (!sh) return;
-        var mc = eqMoneyCols(sh.name);   /* ★EQ-STRUCT：只把钱列乘回 VND 基 */
+        var nm = sh.name;
         var cd = sh.cellData || {};
         Object.keys(cd).forEach(function(rk){
-          var row = cd[rk] || {};
-          mc.forEach(function(c){
-            var cell = row[String(c)];
-            if (cell && cell.f === undefined && isNum(cell.v)) cell.v = Math.round(cell.v * rate);
+          var row = cd[rk] || {}; var r = parseInt(rk, 10);
+          Object.keys(row).forEach(function(ck){
+            var cell = row[ck];
+            if (!cell || cell.f !== undefined || !isNum(cell.v)) return;
+            if (!eqIsMoneyCell(nm, r, parseInt(ck, 10))) return;   /* ★EQ-SELCUR：钱格 */
+            cell.v = Math.round(cell.v * rate);
           });
         });
       });
@@ -25195,6 +25245,7 @@ var PROD_EQUIP_FAULT_KB = {
       return { cnt:'Đếm', sum:'Tổng', avg:'Trung bình', max:'Lớn nhất', min:'Nhỏ nhất', none:'Chưa chọn ô' };
     }
     function eq_statSym(){
+      if (cur === 'NONE') return '';   /* ★EQ-SELCUR：「无」不带符号 */
       if (cur === 'USD') return '$';
       if (cur === 'RMB') return '\u00a5';
       return '\u20ab';
@@ -25289,6 +25340,17 @@ var PROD_EQUIP_FAULT_KB = {
         }
       } catch(e){}
       return out;
+    }
+    /* ★EQ-SELCUR-20261016：取当前选区（单个 range）。与统计栏同一套来源优先级：
+       命令流 set-selections > 门面 getSelection。取不到返回 null。 */
+    function eqCurrentSelRange(){
+      try {
+        var sid = eqSubUnitId(eqSheetObj()) || '';
+        var ranges = eq_getSelectionRanges();
+        var cmdSel = (eqStatSel && eqStatSel.length && (!eqStatSelSid || !sid || eqStatSelSid === sid)) ? eqStatSel : null;
+        if (cmdSel && (typeof eq_statSize === 'function') && eq_statSize(cmdSel) > eq_statSize(ranges)) ranges = cmdSel;
+        return ranges.length ? ranges[0] : null;
+      } catch(e){ return null; }
     }
     function eq_statWholeRange(cells){
       try {
@@ -26211,20 +26273,63 @@ var PROD_EQUIP_FAULT_KB = {
     load: function(){ load(); },
     save: function(m){ save(!!m); },
     exportXlsx: function(){ window.location.href = API; },
-    /* ★币种切换（修「输入数字后点货币没符号 / 未保存录入被重建丢掉的 BUG」，2026-10-16）：
-       切换前先把屏幕上（含刚输入的）改动同步回 snap，并把"当前显示币种"乘回 VND 基，
-       保证 snap 永远是 VND 基 → applyCurrency 的 ÷rate 换算与 fmtCurrency 的货币符号都正确，
-       且不因整实例重建而丢弃未保存的录入。 */
+    /* ★EQ-SELCUR-20261016（用户 2026-10-16 要求）：
+       有框选（多格）→ 只作用于框选；没框选 → 作用于整表钱列。
+       · 框选的数字格会被登记成「钱格」（eqSelMoney），从此带货币符号 + 参与换算 + 保存乘回 VND；
+       · 选 'NONE'（无）→ 去掉符号、不换算，只保留千位符（回到 VND 原值显示）；
+       · 切换前先把屏幕（含刚录入）的改动乘回 VND 基，保证 snap 永远是 VND 基、不丢未保存录入。 */
     setCurrency: function(code){
       code = code || 'VND';
       var oldCur = cur;
-      if (code === oldCur) return;
+      /* ① 先按【旧币种】把屏幕改动并回 VND 基快照（不丢录入、不重复换算） */
+      eqCaptureLiveToSnap(oldCur);
+      /* ② 判定框选（必须是多格）→ 登记/取消登记为钱格 */
+      var marked = false;
+      try {
+        var sel = eqCurrentSelRange();
+        var sh = eqSheetObj();
+        var shn = '';
+        try { shn = (sh && sh.getName && sh.getName()) || (sh && sh.name) || ''; } catch(e){ shn = ''; }
+        if (sel && shn && snap && snap.sheets){
+          var r0 = Math.min(sel.startRow, sel.endRow), r1 = Math.max(sel.startRow, sel.endRow);
+          var c0 = Math.min(sel.startColumn, sel.endColumn), c1 = Math.max(sel.startColumn, sel.endColumn);
+          if (r0 !== r1 || c0 !== c1){                       /* 多格才算「框选」 */
+            var skey = eqSheetKey(shn);
+            /* 找到该表在 snap 里的 cellData（按越文名归一匹配） */
+            var scd = null;
+            Object.keys(snap.sheets).forEach(function(s){ if (scd) return;
+              var s2 = snap.sheets[s]; if (!s2) return;
+              if (eqSheetKey(s2.name) === skey) scd = s2.cellData || {};
+            });
+            eqSelMoney[skey] = eqSelMoney[skey] || {};
+            var m = eqSelMoney[skey];
+            for (var rr = r0; rr <= r1; rr++){
+              for (var cc = c0; cc <= c1; cc++){
+                var cell = scd ? ((scd[String(rr)] || {})[String(cc)]) : null;
+                if (!cell || !isNum(cell.v)) continue;        /* 只登记数字格 */
+                var k = rr + ',' + cc;
+                if (code === 'NONE'){ if (m[k]){ delete m[k]; marked = true; } }
+                else if (!m[k]){ m[k] = 1; marked = true; }
+              }
+            }
+          }
+        }
+      } catch(e){}
+      if (marked) eqSaveSelMoney();
+      /* ③ 无变化（同币种且没登记任何格）→ 不重建 */
+      if (code === oldCur && !marked) return;
       cur = code;
       rate = readRate(cur);
-      /* ★切换前 capture 屏幕改动并乘回 VND 基，保证 snap 永远是 VND 基，
-         重建不丢未保存录入、applyCurrency 的 ÷rate 换算与 fmtCurrency 的货币符号都正确。 */
-      eqCaptureLiveToSnap(oldCur);
       render();
+    },
+    /* ★EQ-SELCUR-20261016：下拉 change 入口。选完把 select 复位到哨兵（值 ""），
+       这样下次【再选同一个币种】也会触发 change（否则点 VND 永远没反应）。 */
+    onCurChange: function(sel){
+      try {
+        var code = (sel && sel.value) ? String(sel.value) : '';
+        if (code) pub.setCurrency(code);
+      } catch(e){}
+      finally { try { eqSetCurDisplay(cur); } catch(e){} }
     },
     openReport: function(){
       var pop = document.getElementById('eq_rpt_pop'); if (!pop) return;
