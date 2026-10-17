@@ -13,12 +13,11 @@ base = open(SRC, encoding='utf-8', errors='replace').read()
 
 CASES = [
     ('删掉剪贴板放行段', 'check_fin_excel_keys_lock.py',
-     'var finClipKey = (k === \'c\' || k === \'C\' || k === \'x\' || k === \'X\' || k === \'v\' || k === \'V\');\n'
-     '          if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) return;',
-     ''),
-    ('放行改成 preventDefault', 'check_fin_excel_keys_lock.py',
-     'if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) return;',
-     'if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) { e.preventDefault(); return; }'),
+     'if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) {',
+     'if (false) {'),
+    ('放行分支里加 preventDefault', 'check_fin_excel_keys_lock.py',
+     'return;   /* ★绝不 preventDefault / stopPropagation —— 放行给 Univer 自己的命令 */',
+     'e.preventDefault(); return;'),
     ('删掉拖拽自愈（buttons===0）', 'check_hscroll_lock.py',
      'if (e.buttons === 0){ if (bar.__hsEndDrag) bar.__hsEndDrag(); return; }',
      ''),
@@ -28,6 +27,15 @@ CASES = [
     ('去掉焦点归还', 'check_hscroll_lock.py',
      'cvf.focus({ preventScroll: true })',
      'cvf.focus()'),
+    ('删掉 execCommand 补写', 'check_fin_excel_keys_lock.py',
+     "ok = document.execCommand('copy');",
+     "ok = false;"),
+    ('Ctrl+C 不再调用 fin_clipWrite', 'check_fin_excel_keys_lock.py',
+     'try { fin_clipWrite(fin_clipMatrixText()); } catch(err){}',
+     'var _noop = 1;'),
+    ('fin_clipWrite 不归还焦点', 'check_fin_excel_keys_lock.py',
+     'if (prev && typeof prev.focus === function)'.replace('function', "'function'"),
+     "if (prev && typeof prev.focus === 'x')"),
 ]
 
 caught, missed = [], []

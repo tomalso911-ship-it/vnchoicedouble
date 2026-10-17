@@ -19517,6 +19517,103 @@ var PROD_EQUIP_FAULT_KB = {
          ★不能只判断「焦点是否在容器内」：Univer 的输入宿主 .univer-editor 是挂在 body 上的 portal，
            并不在 #univer_container 里面（实测 c.contains(activeElement) === false），
            所以必须认它这个类名；容器可见性则用来区分「当前不在财务页/标签页被隐藏」的情况。 */
+      /* ★★FIN-CLIP-EXEC-20261017（用户 2026-10-17：「Ctrl+C / Ctrl+X / Ctrl+V 还是不能实现」）★★
+         playwright + 真实 Chrome 在 #univer_container 上实测到的链路：
+           · keydown 到达、activeElement = DIV.univer-editor（焦点没问题）；
+           · Univer【自己】对 Ctrl+C / Ctrl+X 调了 preventDefault：defaultPrevented = true；
+           · 但 document 的 copy / cut 事件【一次都没触发】→ 它改走 navigator.clipboard.write()；
+           · 那个 Promise 被浏览器以 NotAllowedError 拒绝，又被本页顶部的
+             unhandledrejection「忽略噪声」分支静默吞掉（见文件前面的 clipboard 过滤）；
+           · 结果：剪贴板全程为空 → 复制/剪切看起来"完全没反应"，粘贴自然也粘不出东西。
+         修法：不阻止 Univer，只【自己再写一次剪贴板】——
+           用同步的 document.execCommand('copy')（在 keydown 的 user gesture 同步栈里必然允许，
+           不依赖 https/localhost 安全上下文，也不依赖 clipboard 权限）。
+           若 Univer 那边恰好成功，内容相同，写两次没有副作用；
+           若它被拒（现在的情况），我们就把内容真正放进了系统剪贴板。
+         ★本段不得拦截事件：不 preventDefault、不 stopPropagation。 */
+      function fin_clipMatrixText(){
+        try {
+          var sh = finSheetObj(); if (!sh) return '';
+          var ranges = fin_getSelectionRanges();
+          /* ★框选时门面 getSelection().getRanges() 这版常常只给"活动单元格"那一格，
+             改用命令流记下的真实选区（finStatSel = [[起行,起列,止行,止列], ...]）取更大的那个，
+             与统计栏（FIN-STATBAR-SEL3）同一口径。 */
+          try {
+            if (typeof finStatSel !== 'undefined' && finStatSel && finStatSel.length){
+              var sizeA = 0, sizeB = 0, k1;
+              for (k1 = 0; k1 < ranges.length; k1++){
+                sizeA += (ranges[k1].endRow - ranges[k1].startRow + 1) * (ranges[k1].endColumn - ranges[k1].startColumn + 1);
+              }
+              for (k1 = 0; k1 < finStatSel.length; k1++){
+                var cs = finStatSel[k1];
+                if (!cs || cs.length < 4) continue;
+                sizeB += (cs[2] - cs[0] + 1) * (cs[3] - cs[1] + 1);
+              }
+              if (sizeB > sizeA){
+                var conv = [];
+                for (k1 = 0; k1 < finStatSel.length; k1++){
+                  var c3 = finStatSel[k1];
+                  if (!c3 || c3.length < 4) continue;
+                  conv.push({ startRow: c3[0], startColumn: c3[1], endRow: c3[2], endColumn: c3[3] });
+                }
+                if (conv.length) ranges = conv;
+              }
+            }
+          } catch(err){}
+          if (!ranges.length) return '';
+          var lines = [];
+          for (var i = 0; i < ranges.length; i++){
+            var g = ranges[i];
+            var nr = g.endRow - g.startRow + 1, nc = g.endColumn - g.startColumn + 1;
+            if (!(nr > 0) || !(nc > 0) || nr * nc > 200000) continue;   // 防御：超大选区不构建
+            var rng = sh.getRange(g.startRow, g.startColumn, nr, nc);
+            var vals = (rng && typeof rng.getValues === 'function') ? rng.getValues() : null;
+            if (!vals) continue;
+            for (var r = 0; r < vals.length; r++){
+              var row = vals[r] || [];
+              var cells = [];
+              for (var c2 = 0; c2 < row.length; c2++){
+                var v = row[c2];
+                cells.push(v == null ? '' : String(v));
+              }
+              lines.push(cells.join('\t'));
+            }
+          }
+          return lines.join('\n');
+        } catch(err){ return ''; }
+      }
+      function fin_clipWrite(text){
+        if (text == null) return false;
+        /* 排障用：记录最近一次写入的返回值与长度（不影响功能；headless 里剪贴板读不出来时靠它定位） */
+        try { window.__finClipLast = { len: String(text).length, ok: null }; } catch(err){}
+        var prev = null;
+        try { prev = document.activeElement; } catch(err){}
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.cssText = 'position:fixed;left:-99999px;top:0;width:1px;height:1px;opacity:0;';
+          document.body.appendChild(ta);
+          var ok = false;
+          try {
+            ta.select();
+            ta.setSelectionRange(0, text.length);
+            ok = document.execCommand('copy');
+          } catch(err){ ok = false; }
+          try { document.body.removeChild(ta); } catch(err){}
+          try { if (window.__finClipLast) window.__finClipLast.ok = !!ok; } catch(err){}
+          if (!ok){
+            /* 兜底：安全上下文下走异步 API（不 await；失败也只是维持原状，不弹错） */
+            try { navigator.clipboard.writeText(text).catch(function(){}); } catch(err){}
+          }
+          return ok;
+        } catch(err){ return false; }
+        finally {
+          /* ★必须把焦点还给原来的元素：textarea.select() 会抢焦点，
+             不还回去的话后续方向键/回车都会打到 body 上（表格像"死"了一样）。 */
+          try { if (prev && typeof prev.focus === 'function') prev.focus({ preventScroll: true }); } catch(err){}
+        }
+      }
       function finIsUniverElem(el){
         try {
           if (!el || el.nodeType !== 1) return false;
@@ -19556,7 +19653,15 @@ var PROD_EQUIP_FAULT_KB = {
              这里显式放行，并由 check_fin_excel_keys_lock.py 不变量⑧ 静态校验；
              任何重构都不得在这三个键上加 preventDefault / stopPropagation，也不得删掉本段。 */
           var finClipKey = (k === 'c' || k === 'C' || k === 'x' || k === 'X' || k === 'v' || k === 'V');
-          if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) return;
+          if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) {
+            /* C / X：Univer 自己 preventDefault 了，但它的 navigator.clipboard.write() 被拒且被静默吞掉，
+               所以这里用同步 execCommand 把内容真正写进系统剪贴板（详见 fin_clipWrite 上方注释）。
+               V 不用管：Univer 走原生 paste 事件，剪贴板有内容就能粘。 */
+            if (k === 'c' || k === 'C' || k === 'x' || k === 'X'){
+              try { fin_clipWrite(fin_clipMatrixText()); } catch(err){}
+            }
+            return;   /* ★绝不 preventDefault / stopPropagation —— 放行给 Univer 自己的命令 */
+          }
 
           /* ① 编辑态：Delete = 删除光标右侧一个字符（Excel 行为）。
                 Univer 0.5.5 在编辑态对 Delete 完全不处理（实测无任何命令），

@@ -291,13 +291,36 @@ def check_html(path, bed_path=None):
         else:
             if not re.search(r"var\s+finClipKey\s*=\s*\(\s*k\s*===\s*'c'", bind):
                 errors.append("不变量⑧被破坏：finClipKey 不再覆盖 c/x/v 三键")
-            mclip = re.search(r"if\s*\(\s*e\.ctrlKey\s*&&\s*!e\.shiftKey\s*&&\s*!e\.altKey\s*&&\s*finClipKey\s*\)\s*([^\n]*)", bind)
+            mclip = re.search(r"if\s*\(\s*e\.ctrlKey\s*&&\s*!e\.shiftKey\s*&&\s*!e\.altKey\s*&&\s*finClipKey\s*\)\s*\{", bind)
             if not mclip:
                 errors.append("不变量⑧被破坏：Ctrl+C/X/V 没有显式放行"
-                              "（缺 `if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) return;`）")
-            elif "preventDefault" in mclip.group(1) or "stopPropagation" in mclip.group(1):
-                errors.append("不变量⑧被破坏：剪贴板三键分支里出现 preventDefault/stopPropagation"
-                              "（Ctrl+C/X/V 会彻底没反应）")
+                              "（缺 `if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) { ... return; }`）")
+            else:
+                # 分支体 = 从 `{` 到该分支第一个 `return;`（含）；
+                # 先把注释剥掉再查 —— 说明性注释里本来就会写到 "preventDefault" 这个词。
+                seg = bind[mclip.end():mclip.end() + 400]
+                mr = re.search(r"\breturn\s*;", seg)
+                body = seg[:mr.end()] if mr else seg
+                body = re.sub(r"/\*[\s\S]*?\*/", "", body)
+                body = re.sub(r"//[^\n]*", "", body)
+                if "preventDefault" in body or "stopPropagation" in body:
+                    errors.append("不变量⑧被破坏：剪贴板三键分支里出现 preventDefault/stopPropagation"
+                                  "（Ctrl+C/X/V 会彻底没反应）")
+        # ⑧-b 必须自己把内容真正写进剪贴板
+        #   实测：Univer 对 Ctrl+C/X 调了 preventDefault，却改走 navigator.clipboard.write()，
+        #   该 Promise 被 NotAllowedError 拒绝后被顶层"忽略噪声"分支吞掉 → 剪贴板恒为空。
+        if "function fin_clipWrite" not in bind:
+            errors.append("不变量⑧被破坏：找不到 fin_clipWrite（Univer 写剪贴板被拒后没人补写）")
+        if "function fin_clipMatrixText" not in bind:
+            errors.append("不变量⑧被破坏：找不到 fin_clipMatrixText（取不到选区数据，剪贴板会是空串）")
+        if "document.execCommand('copy')" not in bind:
+            errors.append("不变量⑧被破坏：fin_clipWrite 不再用同步 execCommand('copy')"
+                          "（只靠 navigator.clipboard 时，权限/安全上下文一限制复制就彻底失效）")
+        if "fin_clipWrite(fin_clipMatrixText())" not in bind:
+            errors.append("不变量⑧被破坏：Ctrl+C/X 分支没有调用 fin_clipWrite(fin_clipMatrixText())")
+        if "prev.focus({ preventScroll: true })" not in bind:
+            errors.append("不变量⑧被破坏：fin_clipWrite 不再归还焦点"
+                          "（textarea.select() 会抢焦点，之后方向键/回车全打到 body 上）")
 
     # ---- ⑥ 与验证床逐行一致 ----
     if bed_path and os.path.exists(bed_path):
