@@ -19538,6 +19538,26 @@ var PROD_EQUIP_FAULT_KB = {
            若 Univer 那边恰好成功，内容相同，写两次没有副作用；
            若它被拒（现在的情况），我们就把内容真正放进了系统剪贴板。
          ★本段不得拦截事件：不 preventDefault、不 stopPropagation。 */
+      /* 从实时快照里取单元格的 numfmt pattern（"₫"#,##0 / "$"#,##0.00 …）。
+         ★FIN-CLIP-FMT-20261017：复制必须还原「屏幕上看到的文本」，否则粘出去只有裸数字。 */
+      function fin_clipCellData(snap, sid, r, c){
+        try {
+          var s = snap && snap.sheets && snap.sheets[sid];
+          var cd = s && s.cellData;
+          var row = cd && cd[r];
+          return (row && row[c]) || null;
+        } catch(e){ return null; }
+      }
+      function fin_clipCellPattern(snap, sid, r, c){
+        try {
+          var cell = fin_clipCellData(snap, sid, r, c);
+          if (!cell) return '';
+          var st = cell.s;
+          if (typeof st === 'string') st = (snap && snap.styles && snap.styles[st]) || null;
+          var pat = st && st.n && st.n.pattern;
+          return (typeof pat === 'string') ? pat : '';
+        } catch(e){ return ''; }
+      }
       function fin_clipMatrixText(){
         try {
           var sh = finSheetObj(); if (!sh) return '';
@@ -19568,6 +19588,10 @@ var PROD_EQUIP_FAULT_KB = {
             }
           } catch(err){}
           if (!ranges.length) return '';
+          /* 实时快照：只为读 numfmt pattern（货币符号 / 千位分隔 / 小数位） */
+          var snap = null, sid = null;
+          try { snap = fin_currentSnapshot(); } catch(errSnap){ snap = null; }
+          try { sid = (sh && typeof sh.getSheetId === 'function') ? sh.getSheetId() : null; } catch(errSid){ sid = null; }
           var lines = [];
           for (var i = 0; i < ranges.length; i++){
             var g = ranges[i];
@@ -19580,8 +19604,22 @@ var PROD_EQUIP_FAULT_KB = {
               var row = vals[r] || [];
               var cells = [];
               for (var c2 = 0; c2 < row.length; c2++){
+                /* ★FIN-CLIP-FMT-20261017（用户 2026-10-17：「复制的时候，货币符号也必须复制！」）：
+                   以前直接 String(getValues()) → 复制出来是裸数字 799056508；
+                   现在按该格的 numfmt pattern 还原成屏幕上的写法 ₫799,056,508。 */
                 var v = row[c2];
-                cells.push(v == null ? '' : String(v));
+                var _r0 = g.startRow + r, _c0 = g.startColumn + c2;
+                var _pat = fin_clipCellPattern(snap, sid, _r0, _c0);
+                if (_pat && window.win_fmtNum){
+                  var _raw = v;
+                  try {
+                    var _cd = fin_clipCellData(snap, sid, _r0, _c0);
+                    if (_cd && _cd.v != null) _raw = _cd.v;
+                  } catch(errV){}
+                  cells.push(window.win_fmtNum(_raw, _pat));
+                } else {
+                  cells.push(v == null ? '' : String(v));
+                }
               }
               lines.push(cells.join('\t'));
             }
@@ -27964,6 +28002,42 @@ var PROD_EQUIP_FAULT_KB = {
          · 结束必须把焦点还原给原 activeElement（textarea.select() 会抢焦点，
            否则之后方向键/回车全打到 body 上，表格像"死了"一样）。
        检查：check_fin_excel_keys_lock.py 不变量⑧ 会同时校验财务与权益两处接线。 */
+    /* ============★★ 锁死区 ★★ CLIP-FMT-LOCK-20261017 ============
+       用户 2026-10-17（原话）：「复制的时候，货币符号也必须复制！」
+       作用：把数值按单元格的 numfmt pattern 还原成【屏幕上看到的文本】，
+             复制出去才有 ₫799,056,508 / ¥1,234.00，而不是裸数字 799056508。
+       规则：
+         · 只处理 number；字符串/布尔/空值原样返回；
+         · 货币符号取 pattern 开头的 "..."（本项目货币格式一律【符号在左】）；
+         · 小数位 = pattern 里 .0 / .00 的个数；
+         · 千位分隔始终加（屏幕上就是带千位符的）；
+         · ★负数按 Excel 语义：负号在最前，再跟货币符号 → -₫1,000（不是 ₫-1,000）；
+         · 日期/时间格式（pattern 含 y/m/d）与百分比（含 %）单独处理：
+           日期原样返回（值是序列号，加了千位符就变成错的），百分比按 ×100 后加 %。
+       ★任何重构都不得退化成"直接返回原始值"，否则又会退回裸数字。 */
+    window.win_fmtNum = function(v, pat){
+      if (v == null || v === '') return '';
+      if (typeof v !== 'number' || !isFinite(v)) return String(v);
+      if (!pat) return String(v);
+      var bare = String(pat).replace(/"[^"]*"/g, '');      /* 去掉引号里的字面量再判断类型 */
+      if (/^general$/i.test(String(pat).trim())) return String(v);   /* General：屏幕上就是原样数字 */
+      if (/[ymd]/i.test(bare)) return String(v);           /* 日期/时间：值是序列号，不能套数字格式 */
+      var sym = '';
+      var m = /^\s*"([^"]*)"/.exec(pat);
+      if (m) sym = m[1] || '';
+      var d = /\.(0+)/.exec(pat);
+      var digits = d ? d[1].length : 0;
+      if (/%/.test(bare)) return (v * 100).toFixed(digits) + '%';
+      var neg = v < 0;
+      var abs = Math.abs(v);
+      var body = digits > 0 ? abs.toFixed(digits) : String(Math.round(abs));
+      var parts = body.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      body = parts.join('.');
+      if (!sym) return (neg ? '-' : '') + body;
+      return (neg ? '-' : '') + sym + body;
+    };
+
     window.win_clipWrite = function(text){
       if (text == null) return false;
       try { window.__finClipLast = { len: String(text).length, ok: null }; } catch(err){}
@@ -28018,6 +28092,13 @@ var PROD_EQUIP_FAULT_KB = {
           var cur0 = eqActiveCell(); if (!cur0) return '';
           ranges.push({ startRow: cur0.row, startColumn: cur0.col, endRow: cur0.row, endColumn: cur0.col });
         }
+        /* 实时快照：只为读 numfmt pattern（货币符号 / 千位分隔 / 小数位） */
+        var snap = null, sid0 = null;
+        try {
+          var wb0 = (api && api.getActiveWorkbook) ? api.getActiveWorkbook() : null;
+          snap = (wb0 && typeof wb0.getSnapshot === 'function') ? wb0.getSnapshot() : null;
+          sid0 = (sh && typeof sh.getSheetId === 'function') ? sh.getSheetId() : null;
+        } catch(errSnap0){ snap = null; sid0 = null; }
         var lines = [];
         for (var a = 0; a < ranges.length; a++){
           var g = ranges[a];
@@ -28028,7 +28109,23 @@ var PROD_EQUIP_FAULT_KB = {
           if (!vals) continue;
           for (var r = 0; r < vals.length; r++){
             var row = vals[r] || [], cells = [];
-            for (var c = 0; c < row.length; c++){ var v = row[c]; cells.push(v == null ? '' : String(v)); }
+            for (var c = 0; c < row.length; c++){
+              /* ★EQ-CLIP-FMT-20261017：复制要带货币符号（用户 2026-10-17：
+                 「复制的时候，货币符号也必须复制！」），按该格 numfmt pattern 还原屏幕文本。 */
+              var v = row[c];
+              var _er = g.startRow + r, _ec = g.startColumn + c;
+              var _epat = '';
+              try {
+                var _esheet = snap && snap.sheets && snap.sheets[sid0];
+                var _erow = _esheet && _esheet.cellData && _esheet.cellData[_er];
+                var _ecell = _erow && _erow[_ec];
+                var _est = _ecell && _ecell.s;
+                if (typeof _est === 'string') _est = (snap.styles && snap.styles[_est]) || null;
+                if (_est && _est.n && _est.n.pattern) _epat = String(_est.n.pattern);
+                if (_ecell && _ecell.v != null) v = _ecell.v;
+              } catch(errP){}
+              cells.push((_epat && window.win_fmtNum) ? window.win_fmtNum(v, _epat) : (v == null ? '' : String(v)));
+            }
             lines.push(cells.join('\t'));
           }
         }

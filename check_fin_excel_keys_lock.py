@@ -347,16 +347,30 @@ def check_html(path, bed_path=None):
         if "EQ-CLIP-EDITSAFE-20261017" not in eqbind:
             errors.append("不变量⑧被破坏：权益「编辑态兜底」被删 —— "
                           "isEditingCell 一旦误判（两套实例的编辑层互相干扰），Ctrl+C/X 会完全跳过补写")
-        else:
-            idx_eq = eqbind.find("window.win_clipWrite(eq_clipMatrixText())")
-            mstart = eqbind.rfind("if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (k === 'c'",
-                                  0, idx_eq)
-            seg_eq = eqbind[mstart:idx_eq] if mstart >= 0 else ""
-            seg_eq = re.sub(r"/\*[\s\S]*?\*/", "", seg_eq)
-            seg_eq = re.sub(r"//[^\n]*", "", seg_eq)
-            if "preventDefault" in seg_eq or "stopPropagation" in seg_eq:
-                errors.append("不变量⑧被破坏：股东权益剪贴板分支里出现 preventDefault/stopPropagation"
-                              "（Ctrl+C/X 会被自己吞掉）")
+    if "window.win_fmtNum(v, _epat)" not in text:
+        errors.append("不变量⑧被破坏：权益复制不再套 numfmt 格式 —— "
+                      "粘出去会是裸数字，没有货币符号 / 千位分隔")
+
+    # ---- ⑧-d 复制必须还原屏幕显示文本（CLIP-FMT-LOCK-20261017）----
+    # 用户 2026-10-17：「复制的时候，货币符号也必须复制！」
+    if "window.win_fmtNum = function" not in text:
+        errors.append("不变量⑧被破坏：找不到 window.win_fmtNum"
+                      "（复制会退回裸数字 799056508，没有 ₫ / 千位分隔）")
+    if bind is not None and "window.win_fmtNum(_raw, _pat)" not in bind:
+        errors.append("不变量⑧被破坏：财务复制不再套 numfmt 格式"
+                      "（粘出去没有货币符号）")
+    if "function fin_clipCellPattern" not in text:
+        errors.append("不变量⑧被破坏：找不到 fin_clipCellPattern（取不到 numfmt pattern）")
+    if eqbind is not None and "window.win_clipWrite(eq_clipMatrixText())" in eqbind:
+        idx_eq = eqbind.find("window.win_clipWrite(eq_clipMatrixText())")
+        mstart = eqbind.rfind("if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (k === 'c'",
+                              0, idx_eq)
+        seg_eq = eqbind[mstart:idx_eq] if mstart >= 0 else ""
+        seg_eq = re.sub(r"/\*[\s\S]*?\*/", "", seg_eq)
+        seg_eq = re.sub(r"//[^\n]*", "", seg_eq)
+        if "preventDefault" in seg_eq or "stopPropagation" in seg_eq:
+            errors.append("不变量⑧被破坏：股东权益剪贴板分支里出现 preventDefault/stopPropagation"
+                          "（Ctrl+C/X 会被自己吞掉）")
 
     # ---- ⑥ 与验证床逐行一致 ----
     if bed_path and os.path.exists(bed_path):
