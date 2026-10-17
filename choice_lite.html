@@ -19549,6 +19549,15 @@ var PROD_EQUIP_FAULT_KB = {
           var k = e.key;
           var editing = finIsEditingCell();
 
+          /* ★★FIN-CLIP-PASS-LOCK-20261017（用户 2026-10-17：「Ctrl+C / Ctrl+X / Ctrl+V 又不能使用了」）★★
+             剪贴板三键【永不拦截】：一律原样交给 Univer 自己的复制 / 剪切 / 粘贴。
+             历史上它们反复失效，都是因为有人在这段键盘补丁里"顺手"把它们 preventDefault /
+             stopPropagation 掉了（补丁是 window 捕获阶段，抢在 Univer 之前，一拦就彻底没反应）。
+             这里显式放行，并由 check_fin_excel_keys_lock.py 不变量⑧ 静态校验；
+             任何重构都不得在这三个键上加 preventDefault / stopPropagation，也不得删掉本段。 */
+          var finClipKey = (k === 'c' || k === 'C' || k === 'x' || k === 'X' || k === 'v' || k === 'V');
+          if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) return;
+
           /* ① 编辑态：Delete = 删除光标右侧一个字符（Excel 行为）。
                 Univer 0.5.5 在编辑态对 Delete 完全不处理（实测无任何命令），
                 这里直接派发文档域的向前删除命令。 */
@@ -23620,6 +23629,11 @@ var PROD_EQUIP_FAULT_KB = {
           };
           window.addEventListener('pointermove', function(e){
             var s = bar.__hsState; if (!s || !s.dragging) return;
+            /* ★★自愈（FIN-HSCROLL-DRAGSAFE-20261017）：鼠标键已经松开却还在 dragging，
+               说明 pointerup 丢了（Univer 在 canvas 上 stopPropagation / 拖拽中途切窗/失焦）。
+               不在这里收尾的话，之后【每一次】鼠标移动都会 preventDefault 并滚动表格：
+               选区被搅乱、焦点被打断，Ctrl+C / Ctrl+X / Ctrl+V 就会"莫名其妙不能用"。 */
+            if (e.buttons === 0){ if (bar.__hsEndDrag) bar.__hsEndDrag(); return; }
             var g = bar.__hsGeom; var mv = Math.max(1, (g && g.mv) || 1);
             /* 按"滑块可移动像素"换算，滑块位置严格跟手 */
             hsPending = s.startFrac + (e.clientX - s.startX) / mv;
@@ -23627,13 +23641,26 @@ var PROD_EQUIP_FAULT_KB = {
             try { e.preventDefault(); } catch(_){}
           }, { passive: false });
           var endDrag = function(){
+            var was = !!(bar.__hsState && bar.__hsState.dragging);
             if (bar.__hsState) bar.__hsState.dragging = false;
             bar.classList.remove('fin-hs-drag');
             if (hsRaf){ cancelAnimationFrame(hsRaf); hsRaf = 0; }
             hsFlush();                                  /* 补最后一帧，避免松手位置差几像素 */
+            /* ★拖完把键盘焦点还给 Univer 的绘制区：Univer 的复制/粘贴/快捷键监听都绑在 canvas 上，
+               焦点停在 body（滚动条是 body 的直接子节点）时，Ctrl+C/V/X 会被"静默丢弃"。 */
+            if (was){
+              try {
+                var cvf = c.querySelector('canvas');
+                if (cvf && typeof cvf.focus === 'function') cvf.focus({ preventScroll: true });
+              } catch(_){}
+            }
           };
-          window.addEventListener('pointerup', endDrag);
-          window.addEventListener('pointercancel', endDrag);
+          bar.__hsEndDrag = endDrag;
+          /* 捕获阶段：Univer 若在 canvas 上 stopPropagation 了 pointerup，冒泡阶段我们根本收不到 */
+          window.addEventListener('pointerup', endDrag, true);
+          window.addEventListener('pointercancel', endDrag, true);
+          window.addEventListener('blur', endDrag);
+          document.addEventListener('visibilitychange', function(){ if (document.hidden) endDrag(); });
           /* 窗口缩放 / 页面滚动 → fixed 坐标要跟着容器走，否则条子"飘"在旧位置 */
           var relayout = function(){ if (bar.__hsLayout) bar.__hsLayout(); };
           window.addEventListener('resize', relayout);

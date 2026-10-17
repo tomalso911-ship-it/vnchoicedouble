@@ -35,6 +35,12 @@
      · .fin-hscroll.fin-hs-drag .fin-hscroll-thumb 必须 transition:none（拖拽严格跟手）；
      · thumb.onpointerdown 必须有可移动量守卫（mv < 2 不进拖拽）并加 fin-hs-drag 类，
        endDrag 必须移除该类。
+  ⑦ 拖拽自愈（FIN-HSCROLL-DRAGSAFE-20261017）
+     · pointerup / pointercancel 必须用【捕获阶段】监听，并挂 blur / visibilitychange；
+     · pointermove 里 e.buttons === 0（pointerup 丢了）时必须立即调用 bar.__hsEndDrag()；
+       ★否则 dragging 永久为 true，之后每一次鼠标移动都会 preventDefault + 滚动表格，
+         选区与焦点被打断，Ctrl+C / Ctrl+X / Ctrl+V 就"莫名其妙不能用"；
+     · endDrag 必须把焦点还给 Univer 的 canvas（快捷键监听都绑在它上面）。
 
 失败即 exit 1（已登记进 .githooks/pre-commit 与 .git/hooks/pre-commit 硬锁列表）。
 """
@@ -115,7 +121,19 @@ chk(".fin-hscroll.fin-hs-drag .fin-hscroll-thumb{transition:none;}" in src,
 chk("bar.classList.add('fin-hs-drag')" in blk, "pointerdown 加 fin-hs-drag 类")
 chk("bar.classList.remove('fin-hs-drag')" in blk, "endDrag 移除 fin-hs-drag 类")
 
-print("7) 接入点：财务报表 + 股东权益两处轮询都还在")
+print("7) 拖拽自愈（否则 pointerup 丢失后每次移动鼠标都 preventDefault → 快捷键失效）")
+chk("if (e.buttons === 0){ if (bar.__hsEndDrag) bar.__hsEndDrag(); return; }" in blk,
+    "★pointermove 里按键已松开（buttons===0）必须立即收尾拖拽")
+chk("bar.__hsEndDrag = endDrag" in blk, "endDrag 外置到 bar.__hsEndDrag（供自愈路径调用）")
+chk("window.addEventListener('pointerup', endDrag, true)" in blk,
+    "★pointerup 用【捕获阶段】（Univer 会 stopPropagation，冒泡阶段收不到）")
+chk("window.addEventListener('pointercancel', endDrag, true)" in blk, "pointercancel 捕获阶段收尾")
+chk("window.addEventListener('blur', endDrag)" in blk, "窗口失焦收尾")
+chk("if (document.hidden) endDrag();" in blk, "标签页隐藏收尾")
+chk("cvf.focus({ preventScroll: true })" in blk,
+    "★拖拽结束把焦点还给 Univer canvas（复制/粘贴/快捷键监听都绑在 canvas 上）")
+
+print("8) 接入点：财务报表 + 股东权益两处轮询都还在")
 chk("window.makeHScroll('univer_container'" in src, "财务报表 #univer_container 已接入")
 chk("window.makeHScroll('equity_container'" in src, "股东权益 #equity_container 已接入")
 

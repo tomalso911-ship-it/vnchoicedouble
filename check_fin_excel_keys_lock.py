@@ -32,6 +32,13 @@ Excel 键盘行为补丁「锁死」检查（lint / CI / git pre-commit 均可�
   ⑦ 代码内★锁死区★：契约常量 FIN_EXCEL_KEYS_LOCK（五个开关必须都为 true）与
      行为级自检 finExcelKeysLockCheck() 必须存在，且必须在 finExcelKeysBind() 末尾被调用。
      静态扫描看不出「实测前提被悄悄改掉」，这层自检会在浏览器里真的验证一遍。
+  ⑧ 剪贴板三键【永不拦截】（FIN-CLIP-PASS-LOCK-20261017）：
+     补丁挂在 window 捕获阶段、抢在 Univer 之前，一旦对 Ctrl+C / Ctrl+X / Ctrl+V
+     preventDefault 或 stopPropagation，复制/剪切/粘贴就彻底没反应
+     （2026-10-17 用户反复反馈的故障）。必须存在显式放行：
+       var finClipKey = (k === 'c' || ... 'v' || 'V');
+       if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) return;
+     且该分支内不得出现 preventDefault / stopPropagation。
 
 用法：
   python3 check_fin_excel_keys_lock.py [path/to/choice_lite.html] [path/to/_univer_kb_fix.html]
@@ -275,6 +282,23 @@ def check_html(path, bed_path=None):
     if bind is not None and not re.search(r"finExcelKeysLockCheck\s*\(\s*\)\s*;", bind):
         errors.append("不变量⑦被破坏：finExcelKeysBind 末尾不再调用 finExcelKeysLockCheck()")
 
+    # ---- ⑧ 剪贴板三键【永不拦截】（FIN-CLIP-PASS-LOCK-20261017） ----
+    # 补丁是 window 捕获阶段、抢在 Univer 之前；一旦在这三个键上 preventDefault/stopPropagation，
+    # 复制/剪切/粘贴就彻底没反应（用户 2026-10-17 反复反馈的故障）。这里锁死"显式放行"。
+    if bind is not None:
+        if "finClipKey" not in bind:
+            errors.append("不变量⑧被破坏：找不到 finClipKey 放行判定 —— Ctrl+C/X/V 会被键盘补丁吞掉")
+        else:
+            if not re.search(r"var\s+finClipKey\s*=\s*\(\s*k\s*===\s*'c'", bind):
+                errors.append("不变量⑧被破坏：finClipKey 不再覆盖 c/x/v 三键")
+            mclip = re.search(r"if\s*\(\s*e\.ctrlKey\s*&&\s*!e\.shiftKey\s*&&\s*!e\.altKey\s*&&\s*finClipKey\s*\)\s*([^\n]*)", bind)
+            if not mclip:
+                errors.append("不变量⑧被破坏：Ctrl+C/X/V 没有显式放行"
+                              "（缺 `if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) return;`）")
+            elif "preventDefault" in mclip.group(1) or "stopPropagation" in mclip.group(1):
+                errors.append("不变量⑧被破坏：剪贴板三键分支里出现 preventDefault/stopPropagation"
+                              "（Ctrl+C/X/V 会彻底没反应）")
+
     # ---- ⑥ 与验证床逐行一致 ----
     if bed_path and os.path.exists(bed_path):
         try:
@@ -311,7 +335,7 @@ def main():
     for w in warnings:
         print("  ! 警告: %s" % w)
     if not errors:
-        print("✓ 通过：Excel 键盘补丁锁定契约未被破坏（%s 七条不变量全在）" % DOC_ID)
+        print("✓ 通过：Excel 键盘补丁锁定契约未被破坏（%s 八条不变量全在）" % DOC_ID)
         sys.exit(0)
     for e in errors:
         print("  ✗ 违规: %s" % e)

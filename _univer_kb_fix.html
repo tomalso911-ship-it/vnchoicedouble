@@ -530,6 +530,15 @@ function finExcelKeysBind(){
       var k = e.key;
       var editing = finIsEditingCell();
 
+      /* ★★FIN-CLIP-PASS-LOCK-20261017（用户 2026-10-17：「Ctrl+C / Ctrl+X / Ctrl+V 又不能使用了」）★★
+         剪贴板三键【永不拦截】：一律原样交给 Univer 自己的复制 / 剪切 / 粘贴。
+         历史上它们反复失效，都是因为有人在这段键盘补丁里"顺手"把它们 preventDefault /
+         stopPropagation 掉了（补丁是 window 捕获阶段，抢在 Univer 之前，一拦就彻底没反应）。
+         这里显式放行，并由 check_fin_excel_keys_lock.py 不变量⑧ 静态校验；
+         任何重构都不得在这三个键上加 preventDefault / stopPropagation，也不得删掉本段。 */
+      var finClipKey = (k === 'c' || k === 'C' || k === 'x' || k === 'X' || k === 'v' || k === 'V');
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) return;
+
       /* ① 编辑态：Delete = 删除光标右侧一个字符（Excel 行为）。
             Univer 0.5.5 在编辑态对 Delete 完全不处理（实测无任何命令），
             这里直接派发文档域的向前删除命令。 */
