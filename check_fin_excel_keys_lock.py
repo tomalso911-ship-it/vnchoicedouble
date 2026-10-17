@@ -322,6 +322,32 @@ def check_html(path, bed_path=None):
             errors.append("不变量⑧被破坏：fin_clipWrite 不再归还焦点"
                           "（textarea.select() 会抢焦点，之后方向键/回车全打到 body 上）")
 
+    # ---- ⑧-c 股东权益那套键盘补丁【也必须接线】（EQ-CLIP-PASS-LOCK-20261017） ----
+    # 用户 2026-10-17 的根因就是：财务（finExcelKeysBind）与权益（eqExcelKeysBind）是两套
+    # 独立补丁，每次只修财务那套 → 股东权益表"一改就丢"。这里强制两套都存在补写入口。
+    if "window.win_clipWrite = function" not in text:
+        errors.append("不变量⑧被破坏：找不到全局 window.win_clipWrite"
+                      "（两套键盘补丁共用的写剪贴板入口，删了权益表复制会彻底失效）")
+    eqbind = fn_body(text, "eqExcelKeysBind")
+    if eqbind is None:
+        errors.append("不变量⑧被破坏：找不到 eqExcelKeysBind（股东权益键盘补丁被删除？）")
+    else:
+        if "function eq_clipMatrixText" not in text:
+            errors.append("不变量⑧被破坏：找不到 eq_clipMatrixText（权益表复制会取到空串）")
+        if "window.win_clipWrite(eq_clipMatrixText())" not in eqbind:
+            errors.append("不变量⑧被破坏：股东权益 Ctrl+C/X 没有接线 "
+                          "window.win_clipWrite(eq_clipMatrixText()) —— 权益表复制/剪切会没反应")
+        else:
+            idx_eq = eqbind.find("window.win_clipWrite(eq_clipMatrixText())")
+            mstart = eqbind.rfind("if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (k === 'c'",
+                                  0, idx_eq)
+            seg_eq = eqbind[mstart:idx_eq] if mstart >= 0 else ""
+            seg_eq = re.sub(r"/\*[\s\S]*?\*/", "", seg_eq)
+            seg_eq = re.sub(r"//[^\n]*", "", seg_eq)
+            if "preventDefault" in seg_eq or "stopPropagation" in seg_eq:
+                errors.append("不变量⑧被破坏：股东权益剪贴板分支里出现 preventDefault/stopPropagation"
+                              "（Ctrl+C/X 会被自己吞掉）")
+
     # ---- ⑥ 与验证床逐行一致 ----
     if bed_path and os.path.exists(bed_path):
         try:
