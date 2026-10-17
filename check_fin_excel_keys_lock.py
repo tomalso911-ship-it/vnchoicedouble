@@ -328,6 +328,13 @@ def check_html(path, bed_path=None):
     if "window.win_clipWrite = function" not in text:
         errors.append("不变量⑧被破坏：找不到全局 window.win_clipWrite"
                       "（两套键盘补丁共用的写剪贴板入口，删了权益表复制会彻底失效）")
+    # 编辑态判定必须按容器隔离（两套 Univer 实例同处一页，全局扫描会恒判"编辑中"）
+    if "FIN-EDIT-SCOPE-20261017" not in text:
+        errors.append("不变量⑧被破坏：finIsEditingCell 的容器作用域修复被删"
+                      "（全局扫描会让财务表恒判编辑中）")
+    if "EQ-EDIT-SCOPE-20261017" not in text:
+        errors.append("不变量⑧被破坏：eqIsEditingCell 的容器作用域修复被删"
+                      "（全局扫描会让权益表恒判编辑中）")
     eqbind = fn_body(text, "eqExcelKeysBind")
     if eqbind is None:
         errors.append("不变量⑧被破坏：找不到 eqExcelKeysBind（股东权益键盘补丁被删除？）")
@@ -337,6 +344,9 @@ def check_html(path, bed_path=None):
         if "window.win_clipWrite(eq_clipMatrixText())" not in eqbind:
             errors.append("不变量⑧被破坏：股东权益 Ctrl+C/X 没有接线 "
                           "window.win_clipWrite(eq_clipMatrixText()) —— 权益表复制/剪切会没反应")
+        if "EQ-CLIP-EDITSAFE-20261017" not in eqbind:
+            errors.append("不变量⑧被破坏：权益「编辑态兜底」被删 —— "
+                          "isEditingCell 一旦误判（两套实例的编辑层互相干扰），Ctrl+C/X 会完全跳过补写")
         else:
             idx_eq = eqbind.find("window.win_clipWrite(eq_clipMatrixText())")
             mstart = eqbind.rfind("if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (k === 'c'",

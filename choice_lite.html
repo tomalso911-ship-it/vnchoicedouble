@@ -19160,7 +19160,14 @@ var PROD_EQUIP_FAULT_KB = {
        可靠判据：单元格编辑覆盖层 .univer-editor-container 的尺寸 —— 空闲时约 2×2，进入编辑后变成单元格大小（如 90×26）。 */
     function finIsEditingCell(){
       try {
-        var boxes = document.querySelectorAll('.univer-editor-container');
+        /* ★★FIN-EDIT-SCOPE-20261017★★ 只扫【财务自己的容器】。
+           旧写法 document.querySelectorAll('.univer-editor-container') 是全局扫描：
+           本页同时存在财务 / 股东权益两套 Univer 实例，只要任意一套的编辑覆盖层有尺寸
+           （哪怕它是隐藏 view 里的残留），这里就会恒判"编辑中" →
+           Ctrl+C / Ctrl+X 的补写分支被整体跳过 → 剪贴板恒为空、复制"没反应"。
+           这与"只要一改快捷键就坏"的现象完全对应。 */
+        var host = document.getElementById('univer_container') || document;
+        var boxes = host.querySelectorAll('.univer-editor-container');
         for (var i = 0; i < boxes.length; i++) {
           var r = boxes[i].getBoundingClientRect();
           if (r.width > 10 && r.height > 10) return true;
@@ -27556,7 +27563,11 @@ var PROD_EQUIP_FAULT_KB = {
     /* 是否正在编辑单元格：编辑覆盖层 .univer-editor-container 空闲时约 2×2，编辑后变成单元格大小 */
     function eqIsEditingCell(){
       try {
-        var boxes = document.querySelectorAll('.univer-editor-container');
+        /* ★★EQ-EDIT-SCOPE-20261017★★ 只扫【股东权益自己的容器】：全局扫描会被财务报表
+           那边的编辑覆盖层带偏，导致权益表恒判"编辑中" → Ctrl+C/X 补写被跳过。
+           见 finIsEditingCell 里同一处说明。 */
+        var host = document.getElementById('equity_container') || document;
+        var boxes = host.querySelectorAll('.univer-editor-container');
         for (var i = 0; i < boxes.length; i++) {
           var r = boxes[i].getBoundingClientRect();
           if (r.width > 10 && r.height > 10) return true;
@@ -28101,6 +28112,20 @@ var PROD_EQUIP_FAULT_KB = {
 
           /* ① 编辑态：补 Delete = 删除光标右侧字符、→ = 光标先在文字里走（见 EQ-EDIT-ARROW-20261016）；其余交回 Univer */
           if (editing) {
+            /* ★★EQ-CLIP-EDITSAFE-20261017★★ 编辑态兜底（权益这条分支在 editing 判断【之后】，
+               一旦 isEditingCell 被另一套 Univer 实例的编辑覆盖层带偏、恒判"编辑中"，
+               下面的 C/X 补写就永远走不到 → 复制粘贴"无故消失"）。
+               规则：编辑器里【没有选中文字】时按 Ctrl+C / Ctrl+X，照样补写选区；
+                     确实选了一段文字（用户就是要复制那段）→ 放行给浏览器，不覆盖。 */
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey &&
+                (k === 'c' || k === 'C' || k === 'x' || k === 'X')) {
+              var _eqSelTxt = '';
+              try { _eqSelTxt = String(window.getSelection ? window.getSelection() : ''); } catch(errSel){}
+              if (!_eqSelTxt){
+                try { if (window.win_clipWrite) window.win_clipWrite(eq_clipMatrixText()); } catch(errClip2){}
+              }
+              return;   /* 不拦截 */
+            }
             /* ★EQ-EDIT-ARROW-20261016（v2 定稿）：Univer 的快捷键监听比我们注册得早（同在 window 捕获阶段），
                所以按 → 时它【一定】已经先把文字光标右移了一格，我们拦不住也不该拦。于是：
                  · 本次按键里编辑器发过 set-selections（= Univer 刚动过光标），且【动之前】光标不在末尾

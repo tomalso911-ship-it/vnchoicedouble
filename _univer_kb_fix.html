@@ -141,7 +141,14 @@ function finSheetObj(){
    可靠判据：单元格编辑覆盖层 .univer-editor-container 的尺寸 —— 空闲时约 2×2，进入编辑后变成单元格大小（如 90×26）。 */
 function finIsEditingCell(){
   try {
-    var boxes = document.querySelectorAll('.univer-editor-container');
+    /* ★★FIN-EDIT-SCOPE-20261017★★ 只扫【财务自己的容器】。
+       旧写法 document.querySelectorAll('.univer-editor-container') 是全局扫描：
+       本页同时存在财务 / 股东权益两套 Univer 实例，只要任意一套的编辑覆盖层有尺寸
+       （哪怕它是隐藏 view 里的残留），这里就会恒判"编辑中" →
+       Ctrl+C / Ctrl+X 的补写分支被整体跳过 → 剪贴板恒为空、复制"没反应"。
+       这与"只要一改快捷键就坏"的现象完全对应。 */
+    var host = document.getElementById('univer_container') || document;
+    var boxes = host.querySelectorAll('.univer-editor-container');
     for (var i = 0; i < boxes.length; i++) {
       var r = boxes[i].getBoundingClientRect();
       if (r.width > 10 && r.height > 10) return true;
