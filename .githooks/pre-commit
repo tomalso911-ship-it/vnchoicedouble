@@ -104,6 +104,33 @@
 #                                 ⑤ 查报表确认必须仍走 fin_reload({keepFilter:true})
 #                                 ⑥ 语言切换路径的 FIN-KEEP-SHEET-20261012 恢复不得被删
 #
+#   15) check_eq_cur_notrans_lock.py —— 股东权益报表「货币代码/货币对不翻译」锁死区
+#                                 （EQ-CURR-NOTRANS-LOCK-20261016，用户 2026-10-16 要求）：
+#                                 ① eqNoTransCur()：整格归一化后 = RMB/VND/USD，或由它们
+#                                    用 - – — / \ | 组成的货币对（RMB-VND / USD/VND …）
+#                                 ② needTrans 直接 return false（绝不发 /api/translate）
+#                                 ③ transOf 直接 return null（缓存里已存过译文也不套用）
+#                                 ④ requestTrans 直接回调 null（不发请求）
+#                                 + loadTrans 清缓存脏译文（自愈）+ applyTrans 显式跳过（双保险）
+#                                 落点：equity_report.xlsx「Đầu tư Trung Quốc」H3:L3
+#                                 （H3=RMB I3=VND J3=USD K3=RMB-VND L3=USD-VND）
+#
+#   16) check_hscroll_lock.py —— 财务/股东权益 Univer「Excel 风格水平滚动条」锁死区
+#                                 （FIN-HSCROLL-LOCK-20261017，用户 2026-10-17 要求锁死）：
+#                                 ① 节点必须 append 到 document.body + id 复用
+#                                    （挂容器里会被 Univer 重渲染清空 = "一拖就没"）
+#                                 ② 驱动必须 FWorksheet.getScrollState() + scrollToCell(curRow, target)
+#                                    ★第 1 参必须带当前 sheetViewStartRow，写 0 会把纵向重置到第 1 行
+#                                 ③ ★禁止向 canvas 派发合成 WheelEvent（Univer 0.5.5 不认，
+#                                    且与真滚动互相拉扯 = "拖了不动 / 闪烁跳动" 的历史根因）
+#                                 ④ sheet.command.scroll-to-cell 只能作兜底，必须在 if (!ok) 之后
+#                                 ⑤ visible 必须取 getVisibleRange()（固定 73px 会算出
+#                                    visible>=total → 滑块撑满 → 拖不动）
+#                                 ⑥ 拖拽状态/几何量必须外置到 bar.__hsState / __hsGeom
+#                                    （轮询 400ms 重入新建闭包，函数内 var 会让 pointermove 读旧闭包）
+#                                 ⑦ 拖动必须 requestAnimationFrame 合并 + 同列去重 + 定位防抖
+#                                 ⑧ CSS：thumb 有 left/width 过渡，.fin-hs-drag 时 transition:none
+#
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
 #   但会在提交时打印，便于及时发现并修复。CI 中建议作为独立步骤做硬阻断。
@@ -131,7 +158,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then

@@ -359,6 +359,36 @@ function finGotoCell(row, col){
   } catch(e){ return false; }
 }
 
+/* ★FIN-EXCEL-SELALL-20261016（用户 2026-10-16：「快捷键还是没有用，包括鼠标右键点击出现的
+   弹出框，选择全部功能也没作用」）：
+   现象：Ctrl+A 与右键菜单「选择全部」都像没反应。
+   根因（Univer 0.5.5 sheets-ui 产物实测）：全选命令 id = 'sheet.command.select-all'
+   （快捷键 A + CTRL_COMMAND），但它的 handler 取的是【当前活动工作簿】
+   （IUniverInstanceService.getCurrentUnitForType(UNIVER_SHEET)）。
+   本页同时存在两套 Univer 实例（财务 univer_container + 权益 equity_container），
+   财务容器没有成为"当前单元"时，这条命令就作用到了【权益】那张不可见的工作簿上
+   —— 看起来就是"点了没反应"（与「插入行插到权益表」是同一类根因）。
+   做法：不依赖"当前单元"，显式拿财务自己的 Worksheet 框选整张表（activate 是按对象作用的）。 */
+function finSelectAll(){
+  try {
+    var sh = finSheetObj(); if (!sh) return 0;
+    var sz = finSheetSize() || {};
+    var maxR = (sz.rows > 0) ? sz.rows : ((sh.getMaxRows && sh.getMaxRows()) || 0);
+    var maxC = (sz.cols > 0) ? sz.cols : ((sh.getMaxColumns && sh.getMaxColumns()) || 0);
+    if (!(maxR > 0)) maxR = 1;
+    if (!(maxC > 0)) maxC = 1;
+    var rng = sh.getRange(0, 0, maxR, maxC);
+    if (rng && rng.activate) rng.activate();
+    else if (sh.setActiveRange && rng) sh.setActiveRange(rng);
+    finRememberCur({ row: 0, col: 0 });
+    try { fin_statSchedule(); } catch(e){}     /* 统计栏跟着刷新（走既有的 debounce） */
+    return maxR * maxC;
+  } catch(e){ return 0; }
+}
+/* 「选择全部」菜单项的三语文案（Univer 菜单文案随界面语言走）：
+   zh 选择全部 / 全部选择 / 全选 · en Select all · vi Chọn tất cả */
+var FIN_SELALL_WORD = /(选择全部|全部选择|全选|select\s*all|chọn\s*tất\s*cả|chon\s*tat\s*ca)/i;
+
 /* ★Ctrl+方向键：跳到「数据边界」（Excel 语义）。
    实测 Univer 原生只做到「本块末尾」，再按一次直接跳到整表最后一行/列，跨过空档不会停在下一块数据上。
    这里按 Excel 规则自己算：邻格有内容 → 跳到本连续块的最后一个；邻格为空 → 跳到该方向上下一个非空格；
@@ -511,6 +541,16 @@ function finExcelKeysBind(){
           return;
         }
         return;   // 编辑态的其它按键一律交回 Univer
+      }
+
+      /* ①-a ★FIN-EXCEL-SELALL-20261016：Ctrl+A / ⌘A = 全选（Excel 行为）。
+         为什么自己实现、不派发 sheet.command.select-all：那条命令的 handler 内部取的是
+         "当前活动工作簿"（getCurrentUnitForType），两套 Univer 实例下会落到权益那张表上
+         —— 正是用户反馈的"右键菜单里的选择全部没作用"。见 finSelectAll() 的注释。 */
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (k === 'a' || k === 'A')) {
+        e.preventDefault(); e.stopPropagation();
+        finSelectAll();
+        return;
       }
 
       if (e.altKey || e.metaKey) return;
