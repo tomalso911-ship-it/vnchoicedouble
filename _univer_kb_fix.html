@@ -644,8 +644,13 @@ function finExcelKeysBind(){
       /* ★CLIP-RICH-20261018：镜像的 text 必须和真正写进剪贴板的文本逐字一致，
          粘贴时才敢用（不一致说明用户中途复制了别的东西 → 退回纯文本）。 */
       try {
-        if (mir) window.__finClipMirror = { text: lines.join('\n'), mat: mir, sid: sid, at: Date.now() };
-        else window.__finClipMirror = null;
+        if (mir){
+          window.__finClipMirror = { text: lines.join('\n'), mat: mir, sid: sid, at: Date.now(), src: 'fin' };
+          /* ★CLIP-RICH-XMODULE-20261018：同时写一份全局镜像，财务↔权益跨模块粘贴也能带格式 */
+          window.__clipRichGlobal = window.__finClipMirror;
+        } else {
+          window.__finClipMirror = null;
+        }
       } catch(eM){}
       return lines.join('\n');
     } catch(err){ return ''; }
@@ -704,8 +709,13 @@ function finExcelKeysBind(){
   function fin_clipPasteRich(text){
     try {
       var M = window.__finClipMirror;
+      /* ★CLIP-RICH-XMODULE-20261018：本表没有镜像时用全局镜像（另一张表刚复制的） */
+      if ((!M || !M.mat || !M.mat.length) && window.__clipRichGlobal && window.__clipRichGlobal.mat) M = window.__clipRichGlobal;
       if (!M || !M.mat || !M.mat.length) return false;
-      if (String(M.text) !== String(text)) return false;                       /* 不是本页刚复制的那段 */
+      /* ★CLIP-TEXT-NORM-20261018：必须用换行归一化比较 —— 系统剪贴板会把 \n 变 \r\n，
+         严格相等会让多行复制粘贴永远失配 → 静默退回纯文本（用户看到的就是"格式没过去") */
+      var _nt = (window.clipNormText || function(x){ return String(x == null ? '' : x).replace(/\r\n?/g, '\n'); });
+      if (_nt(M.text) !== _nt(text)) return false;                             /* 不是本页刚复制的那段 */
       if (!(Date.now() - (M.at || 0) < 30 * 60 * 1000)) return false;          /* 镜像过期 → 纯文本 */
       var api0 = finAPI(); if (!api0 || !api0.executeCommand) return false;
       var wb0 = api0.getActiveWorkbook(); if (!wb0) return false;
@@ -786,6 +796,9 @@ function finExcelKeysBind(){
   function fin_clipWrite(text){
     try { return !!(window.__clipEngine && window.__clipEngine.write(text)); } catch(err){ return false; }
   }
+  /* ★CLIP-TEXT-NORM-20261018：换行归一化器暴露到 window，财务/权益两套适配器共用，
+     防止系统剪贴板把 \n 变成 \r\n 后带格式粘贴静默失效 */
+  try { if (window.__clipEngine && window.__clipEngine.normText) window.clipNormText = window.__clipEngine.normText; } catch(eN0){}
   try {
     if (window.__clipEngine && window.__clipEngine.register){
       window.__clipEngine.register('fin', {
