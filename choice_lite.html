@@ -4200,7 +4200,7 @@ window.__finShakeReport = function (ms) {
   <div><h2 id="wonTitle">签约项目</h2></div>
   <div class="header-btns">
     <button class="btn-action" id="btnAddWon" onclick="openWonModal()">+ New Won</button>
-    <button class="btn-action" id="btnOverview" onclick="openOverviewModal()">全部项目概况</button>
+    <!-- ★WON-REMOVE-OVERVIEW-20261019（用户要求）：删除「全部项目概况」按钮 -->
     <button class="btn-action" id="btnExportWonExcel" onclick="exportWonToExcel()">📊 Export Excel</button>
     <span class="cur-toggles">
       <button type="button" class="cur-pill on" data-cur="rmb" onclick="onCurPillClick('rmb')">RMB</button>
@@ -4307,7 +4307,8 @@ window.__finShakeReport = function (ms) {
               <th id="thUsername" data-i18n="users_col_account" class="sortable" data-sort="login" style="cursor:pointer;">登录账号</th>
               <th id="thRole" data-i18n="users_col_role" class="sortable" data-sort="position" style="cursor:pointer;">职位标签</th>
               <th id="thStatus" data-i18n="users_col_status">状态</th>
-              <th id="thRange" data-i18n="users_col_range">数据范围</th>
+              <!-- ★USR-NOVIS-20261018：「数据范围」列已移除（原 id=thRange / users_col_range）。
+                   底层 vis_can_see_me / vis_he_can_see 数据仍保留在后端，只是列表不再展示。 -->
               <th id="thAction" class="action-th" data-i18n="users_col_action">操作</th>
             </tr>
           </thead>
@@ -4537,6 +4538,8 @@ window.__finShakeReport = function (ms) {
       var h2 = document.querySelector('#wl-list .page-header h2'); if(h2) h2.textContent = wl_i18n('wl_title');
     }
     function wl_open(id){
+      /* ★PERM-V2-WHOLE-20261019：整个项目=隐藏 → 禁止进入 */
+      try{ if (window._projWholeVisible && !window._projWholeVisible(id)){ alert('无权限查看该项目 / No permission'); return; } }catch(e){}
       var list = (typeof globalWonData !== 'undefined' && globalWonData) ? globalWonData : [];
       var p = list.find(function(x){ return String(x.id||'') === String(id||''); });
       if(!p) return;
@@ -4974,7 +4977,7 @@ var WL_FLOW_IMG = {
       <div id="prod-detail" style="display:none">
         <div class="prod-detail-head">
           <button class="prod-back" onclick="prod_back()" data-i18n="prod_back">← 返回列表</button>
-          <button class="prod-back" type="button" onclick="prod_protectOpen()" title="版本历史 / 备份 / 回滚">🛡 数据保护</button>
+          <!-- ★REMOVE-PROTECT-BTN-20261019（用户要求）：删除「🛡 数据保护」入口按钮 -->
           <div class="prod-detail-title" id="prod-detail-title"></div>
         </div>
         <div class="prod-tabs" id="prod-tabs"></div>
@@ -7614,6 +7617,8 @@ var WL_FLOW_IMG = {
       box.innerHTML = h;
     }
     function prod_open(id){
+      /* ★PERM-V2-WHOLE-20261019：整个项目=隐藏 → 禁止进入（含旧链接/跨模块跳转兜底） */
+      try{ if (window._projWholeVisible && !window._projWholeVisible(id)){ prod_toast(pt('toast_no_auth') || '无权限查看该项目'); return; } }catch(e){}
       /* 打开项目详情前，把「现场工厂列表」记为上一页（跨模块跳转时不记，用户并没看到列表） */
       try{ if(!window.__VIEW_JUMPING) __pushViewHistory(); }catch(e){}
       PROD_CUR = id;
@@ -7717,6 +7722,9 @@ var WL_FLOW_IMG = {
       }
       prod_renderTab(active);
       prod_fitTabs();
+      /* ★PROD-TABS-FIX-20261019：标签重建后用「当前项目」重算一次显隐
+         （否则启动阶段 pid=null 的那次判定会把标签藏掉且不再恢复） */
+      try{ setTimeout(function(){ if(typeof applyProdPerms === 'function'){ try{ applyProdPerms(); }catch(e){} } }, 0); }catch(e){}
     }
     function prod_renderTab(key){
       /* 右键删除气泡打开时，禁止切换到其它标签（直接查 DOM，避免跨作用域变量失效） */
@@ -11311,8 +11319,12 @@ var WL_FLOW_IMG = {
       var dd = prod_dmy(prod_val('pe_date')||ymdToDmy(prod_today()));
       var f = prod_get(PROD_CUR);
       var start = prod_startProdYmd(f);
-      if(prod_ymd(dd) < start){
-        dd = ymdToDmy(start);
+      // ★PROD-DATE-RANGE-20261019：填报日期只能选 [开始生产日期, 今天]，未来日期自动夹到今天
+      var todayYmd = prod_today();
+      var ymd = prod_ymd(dd);
+      if(ymd < start || ymd > todayYmd){
+        if(ymd < start) dd = ymdToDmy(start);
+        if(ymd > todayYmd) dd = ymdToDmy(todayYmd);
         var el = prod_el('pe_date'); if(el) el.value = dd;
       }
       PROD_PE_DRAFT = prod_dailyDraftFor(dd);
@@ -12410,7 +12422,8 @@ var WL_FLOW_IMG = {
       var d = prod_dmy(prod_val('pe_date')||ymdToDmy(prod_today()));
       var ymd = prod_ymd(d);
       var start = prod_startProdYmd(f);
-      if(ymd < start){ return; }
+      // ★PROD-DATE-RANGE-20261019：只能保存 [开始生产日期, 今天] 范围内的日期，未来日期拒绝保存
+      if(ymd < start || ymd > prod_today()){ return; }
       var rec = {
         date: d,
         holiday: prod_val('pe_holiday')||'no',
@@ -17507,7 +17520,7 @@ var PROD_EQUIP_FAULT_KB = {
       <div id="inst-detail" style="display:none">
         <div class="prod-detail-head">
           <button class="prod-back" type="button" onclick="inst_back()"><span id="inst-back-label">← 返回列表</span></button>
-          <button class="prod-back" type="button" onclick="prod_protectOpen()" title="版本历史 / 备份 / 回滚">🛡 数据保护</button>
+          <!-- ★REMOVE-PROTECT-BTN-20261019：安装管理同样删除「🛡 数据保护」入口按钮 -->
           <div class="prod-detail-title" id="inst-detail-title"></div>
         </div>
       <div class="prod-tabs" id="inst-tabs"></div>
@@ -28976,6 +28989,15 @@ var PROD_EQUIP_FAULT_KB = {
     setTimeout(watchToolbar, 200);
     setTimeout(watchToolbar, 600);
     setTimeout(watchToolbar, 1400);
+    /* ★EQ-PERM-TABLOCK-20261019：重建后按权限重新隐藏 股东结构/分红记录 工作簿标签
+       （render 会 dispose+create 单元，标签条是新的，旧隐藏全部丢失；applyEqPerms
+        是全局函数，定义在后面的经典 script 块里，这里经 window 调用） */
+    try {
+      if (typeof window.applyEqPerms === 'function'){
+        setTimeout(window.applyEqPerms, 350);
+        setTimeout(window.applyEqPerms, 1000);
+      }
+    } catch(eP){}
     /* ★EQ-CN-CELLCUR-20261016：状态栏按【当前表】口径显示 —— 中国投资数据表 = 无单位（按格设定、不换算） */
     st('已载入 · ' + (v.sheetOrder || []).length + ' 张表 · ' + (eqIsCnSheet(eqActiveSheetName())
         ? (eqCurNoneText() + '（单位按格设定 · 不换算）')
@@ -29567,6 +29589,58 @@ var PROD_EQUIP_FAULT_KB = {
             if (cmd2 && cmd2.params) cmd2.params.subUnitId = '';   /* 让真正执行的那条命令失败 */
           } catch(e){}
         });
+        /* ★★EQ-RO-LOCK-20261019（用户定：查看 = 整表保护，不允许任何输入）★★
+           第二道锁（命令入口）：当前活动表的级别非 edit 时，一切会改内容的命令直接拒绝执行。
+           渲染管线自己的写入不受影响：
+             · numfmt.set.numfmt（纯显示格式）放行；
+             · progUntil 窗口内（模块自己的程序化写入）放行。
+           ★Univer 0.5.5 里 beforeCommandExecuted 的返回值被忽略，必须像删表锁一样
+           从 executeCommand / syncExecuteCommand 入口 100% 拦死。 */
+        if (!cs.__eqPermRoPatched){
+          var _RO_MUT = ['set-range-values','set-cell-values','clear-selection-content','clear-content',
+                         'delete-cell-content','paste-by-short-key','insert-row','insert-col','remove-row','remove-col',
+                         'move-rows','move-cols','set-worksheet-col-width','set-worksheet-row-height',
+                         'set-row-hidden','set-col-hidden','sort',
+                         /* ★EQ-RO-LOCK-FIX-20261019：双击/Enter/F2 进编辑器的命令 —— 旧版漏了这一条，
+                            所以「双击后仍然可以编辑」。set-cell-edit-visible 是 Univer 0.5.5 打开
+                            单元格编辑器的唯一入口（eventType=3 即双击），必须一并拦死。 */
+                         'set-cell-edit-visible','set-cell-edit','set-editing','start-editing'];
+          var _eqPermRoBlocked = function(){
+            try {
+              var nm = eqActiveSheetName();
+              var lv;
+              if (nm && typeof window.__eqPermSheetLv === 'function') lv = window.__eqPermSheetLv(nm);
+              else if (typeof window.permLvCommon === 'function') lv = window.permLvCommon('eq_data');
+              else return false;
+              return lv !== 'edit';
+            } catch(e){ return false; }
+          };
+          ['executeCommand','syncExecuteCommand'].forEach(function(_en){
+            try {
+              if (typeof cs[_en] !== 'function' || cs['__eqRO_' + _en]) return;
+              var _origRo = cs[_en].bind(cs);
+              cs[_en] = function(_id, _params, _opts){
+                try {
+                  var _sid = String((_id && _id.id) || _id || '');
+                  if (_sid.indexOf('numfmt.set.numfmt') >= 0) return _origRo(_id, _params, _opts);  /* 显示格式放行 */
+                  if (Date.now() < progUntil) return _origRo(_id, _params, _opts);                   /* 程序化写入窗口放行 */
+                  if (_eqPermRoBlocked()){
+                    for (var _ri = 0; _ri < _RO_MUT.length; _ri++){
+                      if (_sid.indexOf(_RO_MUT[_ri]) >= 0){
+                        console.warn('[eq-ro-lock] 只读表禁止修改:', _sid);
+                        return (_en === 'syncExecuteCommand') ? false
+                             : Promise.resolve({ retCode: 1, retString: 'blocked-by-eq-ro-lock' });
+                      }
+                    }
+                  }
+                } catch(_e){}
+                return _origRo(_id, _params, _opts);
+              };
+              cs['__eqRO_' + _en] = true;
+            } catch(_e){}
+          });
+          cs.__eqPermRoPatched = true;
+        }
         return true;
       } catch(e){ return false; }
     }
@@ -31018,6 +31092,140 @@ var PROD_EQUIP_FAULT_KB = {
     function eqExcelKeysBind(){
       if (window.__eqExcelKeysBound) return;
       window.__eqExcelKeysBound = true;
+      /* ★EQ-RO-LOCK-20261019（查看 = 整表保护）第一道锁：交互层拦截。
+         打字 / 回车 / F2 / Delete / 退格 / 粘贴 / 剪切 / 双击进编辑器全部挡掉，
+         只保留 滚动、选区移动、Ctrl+C 复制（Excel 保护表语义）。
+         命令层还有第二道锁（cs.__eqPermRoPatched）；这层负责"连编辑器都不弹出来"。 */
+      try {
+        var eqROActive = function(){
+          try {
+            var c0 = eqContainer(); if (!c0 || (!c0.offsetHeight && !c0.getClientRects().length)) return false;
+            var nm0 = eqActiveSheetName();
+            // ★EQ-RO-LOCK-FIX-20261019：拿不到表名/映射时回退到 eq_data 总级别，绝不因判空而放行
+            if (nm0 && typeof window.__eqPermSheetLv === 'function') return window.__eqPermSheetLv(nm0) !== 'edit';
+            if (typeof window.permLvCommon === 'function') return window.permLvCommon('eq_data') !== 'edit';
+            return false;
+          } catch(e){ return false; }
+        };
+        var eqViewActive = function(){
+          try {
+            var v = document.getElementById('view-equity');
+            if (v && v.classList && v.classList.contains('hidden')) return false;
+            if (typeof window.currentView !== 'undefined' && window.currentView) return window.currentView === 'equity';
+            return !!v;
+          } catch(e){ return false; }
+        };
+        var eqROInScope = function(e){
+          try {
+            var t0 = e && e.target;
+            // 其它真实输入控件（币种下拉、公式栏输入框）不接管
+            if (t0 && t0.nodeType === 1 &&
+                (t0.tagName === 'INPUT' || t0.tagName === 'SELECT' || t0.tagName === 'TEXTAREA')){
+              var c1 = eqContainer();
+              if (!c1 || !c1.contains(t0)) return false;
+              return false;
+            }
+            var c0 = eqContainer();
+            if (c0 && t0 && (c0.contains(t0) || (t0.closest && t0.closest('#equity_container')))) return true;
+            // Univer 的键盘焦点常驻 body 上的 __editor___INTERNAL_EDITOR__ 门户（不在容器内）
+            var a0 = document.activeElement;
+            if (a0){
+              if (c0 && (c0.contains(a0) || (a0.closest && a0.closest('#equity_container')))) return true;
+              if (/^__editor___INTERNAL_EDITOR__/.test(String(a0.id || ''))) return true;
+              if (a0.closest && a0.closest('.univer-editor-container')) return true;
+            }
+            if (t0 && t0.closest && t0.closest('.univer-editor-container')) return true;
+            // 权益视图激活时，落在 body/document 上的按键也视为操作表格
+            if (eqViewActive() && (!t0 || t0 === document.body || t0 === document.documentElement)) return true;
+            return false;
+          } catch(e){ return false; }
+        };
+        /* ★EQ-RO-LOCK-FIX-20261019（最后一道兜底）：万一编辑器还是被 Univer 打开了
+           （双击/Enter 走的是它内部的 editor bridge，不一定经过命令服务），
+           这里在 1.2 秒内轮询检测 .univer-editor-container，发现可见就按 ESC 关掉并失焦。
+           只读模式下所有输入已被拦截，所以内容不会变。 */
+        var eqROKillEditor = function(){
+          try{
+            var n = 0;
+            var t = setInterval(function(){
+              n++;
+              try{
+                if (!eqROActive()){ clearInterval(t); return; }
+                var box = null;
+                var els = document.querySelectorAll('#equity_container .univer-editor-container');
+                for (var i=0;i<els.length;i++){ var r=els[i].getBoundingClientRect(); if (r.width>10 && r.height>10){ box=els[i]; break; } }
+                if (!box && eqViewActive()){
+                  var els2 = document.querySelectorAll('.univer-editor-container');
+                  for (var j=0;j<els2.length;j++){ var r2=els2[j].getBoundingClientRect(); if (r2.width>10 && r2.height>10){ box=els2[j]; break; } }
+                }
+                if (box){
+                  clearInterval(t);
+                  try{
+                    var inp = box.querySelector('textarea,input,[contenteditable="true"]') || document.activeElement;
+                    if (inp && inp.dispatchEvent){
+                      inp.dispatchEvent(new KeyboardEvent('keydown', { key:'Escape', code:'Escape', keyCode:27, which:27, bubbles:true, cancelable:true }));
+                    }
+                  }catch(_e){}
+                  try{ if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(_e){}
+                  try{ window.__eqRoKilled = (window.__eqRoKilled || 0) + 1; }catch(_e){}
+                }
+              }catch(_e){}
+              if (n > 24) clearInterval(t);
+            }, 50);
+          }catch(_e){}
+        };
+        if (!window.__eqRoKeysBound){
+          window.__eqRoKeysBound = true;
+          window.addEventListener('keydown', function(e){
+            try {
+              if (!eqROActive() || !eqROInScope(e)) return;
+              var k0 = e.key || '';
+              if (k0 === 'ArrowUp' || k0 === 'ArrowDown' || k0 === 'ArrowLeft' || k0 === 'ArrowRight' ||
+                  k0 === 'PageUp' || k0 === 'PageDown' || k0 === 'Home' || k0 === 'End' ||
+                  k0 === 'Escape' || k0 === 'Tab') return;                       /* 导航键放行 */
+              if ((e.ctrlKey || e.metaKey) && !e.altKey && (k0 === 'c' || k0 === 'C')) return;  /* 复制放行 */
+              var ch0 = (k0.length === 1);                                       /* 可见字符 = 打字 */
+              var ek0 = (k0 === 'Enter' || k0 === 'F2' || k0 === 'Delete' || k0 === 'Backspace');
+              if (ch0 || ek0 || ((e.ctrlKey || e.metaKey) && (k0 === 'v' || k0 === 'V' || k0 === 'x' || k0 === 'X'))){
+                e.preventDefault(); e.stopPropagation();
+                if (k0 === 'F2' || k0 === 'Enter'){ try{ eqROKillEditor(); }catch(_e){} }
+              }
+            } catch(_e){}
+          }, true);
+          window.addEventListener('paste', function(e){
+            try { if (eqROActive() && eqROInScope(e)){ e.preventDefault(); e.stopPropagation(); } } catch(_e){}
+          }, true);
+          window.addEventListener('dblclick', function(e){
+            try {
+              if (eqROActive() && eqROInScope(e)){
+                e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+                eqROKillEditor();
+              }
+            } catch(_e){}
+          }, true);
+          /* ★EQ-RO-LOCK-FIX-20261019：Univer 0.5.5 的「双击进编辑器」不一定走 dblclick，
+             而是自己按两次 pointerdown 的时间差判定。这里在第二次按下（同位置、450ms 内）
+             直接 stopImmediatePropagation，让它收不到第二次点击 → 双击永远凑不成。 */
+          var _roLastDown = { t: 0, x: 0, y: 0 };
+          ['pointerdown','mousedown'].forEach(function(ev0){
+            window.addEventListener(ev0, function(e){
+              try {
+                if (!eqROActive() || !eqROInScope(e)){ _roLastDown = { t:0, x:0, y:0 }; return; }
+                var now0 = Date.now();
+                var dx0 = Math.abs((e.clientX||0) - _roLastDown.x);
+                var dy0 = Math.abs((e.clientY||0) - _roLastDown.y);
+                if (now0 - _roLastDown.t < 450 && dx0 < 6 && dy0 < 6){
+                  e.preventDefault(); e.stopImmediatePropagation();
+                  _roLastDown = { t:0, x:0, y:0 };
+                  try{ eqROKillEditor(); }catch(_e){}
+                  return;
+                }
+                _roLastDown = { t:now0, x:e.clientX||0, y:e.clientY||0 };
+              } catch(_e){}
+            }, true);
+          });
+        }
+      } catch(_eRo){}
       try { eqEditCoreLoad(); } catch(e){}   /* ★EQ-EDIT-ARROW-20261016：先把 core 模块拉回来备用 */
       try { eqEditSelBind(); } catch(e){}    /* ★EQ-EDIT-ARROW-20261016：订阅光标位置命令流 */
       function eqIsUniverElem(el){
@@ -32553,8 +32761,11 @@ var PROD_EQUIP_FAULT_KB = {
     </div>
     <div class="modal-tabs">
       <div class="tab active" id="tabBtnBasic" data-tab="basic" data-i18n="user_tab_basic">基本资料</div>
-      <div class="tab" id="tabBtnVis" data-tab="vis" data-i18n="user_tab_vis">数据范围</div>
-      <div class="tab" id="tabBtnPerm" data-tab="perm" data-i18n="user_tab_perm">界面/操作权限</div>
+      <!-- ★PERM-V2-20261018（阶段 2）：模态框改为 4 页签。
+           原来的「界面/操作权限」页签改造为「公共模块」——内部 = 新版公共模块权限表 + 旧版区块权限表（保留 USR-* 沿用）。
+           注：#tab-vis 已于 USR-NOVIS 移除，saveModal 仍按「保持原值」提交数据范围。 -->
+      <div class="tab" id="tabBtnPerm" data-tab="common" data-i18n="user_tab_common">公共模块</div>
+      <div class="tab" id="tabBtnProj" data-tab="proj" data-i18n="user_tab_proj">按项目授权</div>
       <div class="tab" id="tabBtnSec" data-tab="sec" data-i18n="user_tab_sec">密码管理</div>
     </div>
 
@@ -32625,31 +32836,24 @@ var PROD_EQUIP_FAULT_KB = {
       </div>
     </div>
 
-    <!-- Tab: 数据范围（核心，双向） -->
-    <div class="modal-body" id="tab-vis" style="display:none;">
-      <div class="pos-tag" id="visUnifiedHint" data-i18n="user_vis_unified" style="margin-bottom:12px;background:#fff7e6;border-color:#ffd666;color:#ad6800;">本页设置的数据范围对 CRM / WON / LOST 三模块统一生效</div>
-      <div class="vis-grid">
-        <div class="vis-box">
-          <h4 id="visTitleCanSeeMe" data-i18n="user_vis_title_canseeme">① 他的数据可以被谁看（反向授权）</h4>
-          <button class="btn-all" id="visBtnAllCanSeeMe" onclick="checkAll('visCanSeeMe',true)" data-i18n="user_vis_all">全部</button>
-          <button class="btn-all" id="visBtnClearCanSeeMe" onclick="checkAll('visCanSeeMe',false)" style="border-color:#ddd;color:#666;" data-i18n="user_vis_clear">清空</button>
-          <div class="checklist" id="visCanSeeMe"></div>
-          <div class="pos-tag" id="visHintCanSeeMe" data-i18n="user_vis_desc_canseeme" style="margin-top:6px;">勾选的用户可以查看该用户数据范围内的数据</div>
-        </div>
-        <div class="vis-box">
-          <h4 id="visTitleHeCanSee" data-i18n="user_vis_title_hecansee">② 他可以看谁的数据（正向授权）</h4>
-          <button class="btn-all" id="visBtnAllHeCanSee" onclick="checkAll('visHeCanSee',true)" data-i18n="user_vis_all">全部</button>
-          <button class="btn-all" id="visBtnClearHeCanSee" onclick="checkAll('visHeCanSee',false)" style="border-color:#ddd;color:#666;" data-i18n="user_vis_clear">清空</button>
-          <div class="checklist" id="visHeCanSee"></div>
-          <div class="pos-tag" id="visHintHeCanSee" data-i18n="user_vis_desc_hecansee" style="margin-top:6px;">该用户可以查看被勾选用户的数据</div>
-        </div>
-      </div>
+    <!-- ★USR-NOVIS-20261018：「数据范围」页签（#tab-vis）整块已移除。
+         原先的两个 checklist（#visCanSeeMe / #visHeCanSee）不再渲染；
+         但 vis_can_see_me / vis_he_can_see 的读写逻辑必须保留：
+           · buildVisChecklists() → 容器不存在时直接 return（不再报错）
+           · switchTab()           → 跳过不存在的面板
+           · saveModal()           → 页签不存在时沿用 VIS / VIS_ME 里的现有授权，绝不清空
+         ★不要把这段说明当作"可以随便删逻辑"——后端仍按这两个字段做数据可见范围过滤。 -->
+
+    <!-- Tab: 公共模块（★PERM-V2-20261018 阶段 2） -->
+    <div class="modal-body" id="tab-perm" style="display:none;">
+      <div class="legend" id="commonLegend">按模块统一授权：隐藏 / 查看（只读，看得见但改不了）/ 编辑（可增删改）。</div>
+      <div id="commonPerm"></div>
     </div>
 
-    <!-- Tab: 界面/操作权限 -->
-    <div class="modal-body" id="tab-perm" style="display:none;">
-      <div class="legend" id="permLegend" data-i18n="user_perm_legend">逐模块勾选/下拉决定：保留默认 / 隐藏该项 / 特别授权看全公司 / 发起审批。选择"发起审批"后须在该行审批人下拉中选择 1~3 人。</div>
-      <div id="permGroups"></div>
+    <!-- Tab: 按项目授权（阶段 3 填充） -->
+    <div class="modal-body" id="tab-proj" style="display:none;">
+      <div class="legend" id="projLegend">按项目授权（阶段 3 建设中）：全局模板 + 单项目覆盖。</div>
+      <div id="projPerm"></div>
     </div>
 
     <!-- Tab: 密码管理 -->
@@ -32690,7 +32894,7 @@ var PROD_EQUIP_FAULT_KB = {
     </div>
 
     <div class="modal-footer">
-      <span class="hint" id="userFooterHint" data-i18n="user_footer_hint">保存写入 users + 数据可见性双向关系 + user_permissions（界面/操作）+ 审批人</span>
+      <span class="hint" id="userFooterHint" data-i18n="user_footer_hint">保存写入 users + user_permissions（界面/操作）+ 审批人</span>
       <div>
         <button class="btn btn-ghost" id="userBtnCancel" onclick="closeModal()" data-i18n="user_btn_cancel">取消</button>
         <button class="btn btn-primary" id="userBtnSave" onclick="saveModal()" data-i18n="user_btn_save">保存</button>
@@ -34446,7 +34650,7 @@ var I18N = {
 
              users_delete_success:"删除成功", users_delete_failed:"删除失败",
              user_modal_title_edit:"编辑用户权限", user_modal_title_add:"新增用户",
-             user_tab_basic:"基本资料", user_tab_vis:"数据范围", user_tab_perm:"界面/操作权限", user_tab_sec:"密码管理",
+             user_tab_basic:"基本资料", user_tab_common:"公共模块", user_tab_proj:"按项目授权", user_tab_vis:"数据范围", user_tab_perm:"界面/操作权限", user_tab_sec:"密码管理",
              user_lbl_name:"姓名", user_lbl_account:"账号", user_lbl_email:"邮箱", user_lbl_position:"职位标签", user_lbl_active:"状态", user_lbl_admin:"管理员", user_lbl_initpwd:"初始密码", user_lbl_forgot:"忘记密码", user_lbl_forgot_appr:"忘记密码审批人",
              user_placeholder_name:"如 Ali", user_placeholder_account:"登录名", user_placeholder_email:"user@company.com",
              user_yes:"是", user_no:"否",
@@ -34489,7 +34693,7 @@ var I18N = {
              dash_update_close:"关闭",
              btnMove:"上移或下移该行",
              perm_name_WON_P345:"签约项目总表P3-P4-P5列", user_block_WON_P345_info:"保留默认=显示P3/P4/P5列（佣金/退款/AGI付款/合同增补等） · 隐藏该项=隐藏P3-P4-P5全部列（销售/销售总监默认隐藏）", login_monthly:"月度登录统计", login_yearly:"年度登录统计", perm_name_USR_D1:"编辑用户权限（弹窗）", user_admin_tag:"可自由任命 2-4 名管理员，必须包含 tom",
-             user_footer_hint:"保存写入 users + 数据可见性双向关系 + user_permissions（界面/操作）+ 审批人",
+             user_footer_hint:"保存写入 users + user_permissions（界面/操作）+ 审批人",
              user_approve_title:"审批中心", user_approve_empty:"暂无待审批请求", user_approve_pass:"通过", user_approve_reject:"驳回",
              user_approve_requester:"申请人", user_approve_block:"区块", user_approve_time:"申请时间",
              user_approve_no_approver:"该操作未配置审批人，请联系管理员",
@@ -35267,7 +35471,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
 
              users_delete_success:"Deleted", users_delete_failed:"Delete failed",
              user_modal_title_edit:"Edit User Permission", user_modal_title_add:"Add User",
-             user_tab_basic:"Basic Info", user_tab_vis:"Data Scope", user_tab_perm:"UI / Action Permission", user_tab_sec:"Password",
+             user_tab_basic:"Basic Info", user_tab_common:"Public Modules", user_tab_proj:"Per-Project", user_tab_vis:"Data Scope", user_tab_perm:"UI / Action Permission", user_tab_sec:"Password",
              user_lbl_name:"Name", user_lbl_account:"Account", user_lbl_email:"Email", user_lbl_position:"Position Tag", user_lbl_active:"Status", user_lbl_admin:"Admin", user_lbl_initpwd:"Initial Password", user_lbl_forgot:"Forgot Password", user_lbl_forgot_appr:"Forgot-Password Approvers",
              user_placeholder_name:"e.g. Ali", user_placeholder_account:"Login name", user_placeholder_email:"user@company.com",
              user_yes:"Yes", user_no:"No",
@@ -35310,7 +35514,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
              dash_update_item_metal:"Metal Price Trends", dash_update_item_feed:"Bulk Feed Prices", dash_update_item_livestock:"Livestock Slaughter Prices", dash_update_item_farmgate:"Livestock Farm-gate Prices", dash_update_item_fx:"Historical FX Rates", dash_update_item_retail_raw:"Livestock Retail Raw Data", dash_update_item_login_stats:"Login Statistics", dash_update_item_project_stats:"Project Statistics",
              dash_update_close:"Close",
              perm_name_WON_P345:"Won Table P3-P4-P5 Columns", user_block_WON_P345_info:"Keep Default = show P3/P4/P5 columns (commission/refund/AGI payments/contracts etc.) · Hide = hide all P3-P4-P5 columns (hidden by default for Sales/Sales Director)",
-             user_footer_hint:"Save to users + bidirectional data visibility + user_permissions (UI/Action) + approvers",
+             user_footer_hint:"Save to users + user_permissions (UI/Action) + approvers",
              user_approve_title:"Approval Center", user_approve_empty:"No pending requests", user_approve_pass:"Pass", user_approve_reject:"Reject",
              user_approve_requester:"Requester", user_approve_block:"Block", user_approve_time:"Time",
              user_approve_no_approver:"No approver configured for this action. Please contact admin.",
@@ -36090,7 +36294,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
 
              users_delete_success:"Đã xóa", users_delete_failed:"Xóa thất bại",
              user_modal_title_edit:"Sửa quyền người dùng", user_modal_title_add:"Thêm người dùng",
-             user_tab_basic:"Thông tin cơ bản", user_tab_vis:"Phạm vi dữ liệu", user_tab_perm:"Quyền UI / Thao tác", user_tab_sec:"Mật khẩu",
+             user_tab_basic:"Thông tin cơ bản", user_tab_common:"Mô-đun chung", user_tab_proj:"Theo dự án", user_tab_vis:"Phạm vi dữ liệu", user_tab_perm:"Quyền UI / Thao tác", user_tab_sec:"Mật khẩu",
              user_lbl_name:"Tên", user_lbl_account:"Tài khoản", user_lbl_email:"Email", user_lbl_position:"Nhãn chức vụ", user_lbl_active:"Trạng thái", user_lbl_admin:"Quản trị viên", user_lbl_initpwd:"Mật khẩu ban đầu", user_lbl_forgot:"Quên mật khẩu", user_lbl_forgot_appr:"Người phê duyệt quên mật khẩu",
              user_placeholder_name:"vd. Ali", user_placeholder_account:"Tên đăng nhập", user_placeholder_email:"user@company.com",
              user_yes:"Có", user_no:"Không",
@@ -36133,7 +36337,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
              dash_update_item_metal:"Xu hướng giá kim loại", dash_update_item_feed:"Giá nguyên liệu thức ăn chăn nuôi", dash_update_item_livestock:"Giá xuất chuồng gia súc gia cầm", dash_update_item_farmgate:"Giá xuất chuồng (farmgate)", dash_update_item_fx:"Tỷ giá lịch sử", dash_update_item_retail_raw:"Dữ liệu bán lẻ gốc", dash_update_item_login_stats:"Thống kê đăng nhập", dash_update_item_project_stats:"Thống kê dự án",
              dash_update_close:"Đóng",
              perm_name_WON_P345:"Các cột P3-P4-P5 bảng dự án ký", user_block_WON_P345_info:"Giữ mặc định = hiển thị các cột P3/P4/P5 (hoa hồng/hoàn tiền/thanh toán AGI/hợp đồng bổ sung) · Ẩn = ẩn toàn bộ cột P3-P4-P5 (mặc định ẩn với Nhân viên bán hàng/Giám đốc kinh doanh)",
-             user_footer_hint:"Lưu vào users + phạm vi dữ liệu hai chiều + user_permissions (UI/Thao tác) + người phê duyệt",
+             user_footer_hint:"Lưu vào users + user_permissions (UI/Thao tác) + người phê duyệt",
              user_approve_title:"Trung tâm phê duyệt", user_approve_empty:"Chưa có yêu cầu chờ phê duyệt", user_approve_pass:"Duyệt", user_approve_reject:"Từ chối",
              user_approve_requester:"Người yêu cầu", user_approve_block:"Khối", user_approve_time:"Thời gian",
              user_approve_no_approver:"Hành động này chưa có người phê duyệt, vui lòng liên hệ quản trị viên.",
@@ -38226,7 +38430,90 @@ function wonDetailLinkCell(p, field, labelKey) {
     nav_finance:   { zh: '财务管理', en: 'Finance', vi: 'Quản lý tài chính' },
     nav_library:   { zh: '资料库', en: 'Library', vi: 'Thư viện' },
     nav_equity:    { zh: '股东权益', en: 'Equity', vi: 'Quyền lợi cổ đông' },
-    nav_approvals: { zh: '审批', en: 'Approvals', vi: 'Phê duyệt' }
+    nav_approvals: { zh: '审批', en: 'Approvals', vi: 'Phê duyệt' },
+
+    // ==== ★PERM-V2-20261018：新版权限（4 页签模态框）三语文案 ====
+    // 页签
+    user_tab_common: { zh: '公共模块', en: 'Public Modules', vi: 'Mô-đun chung' },
+    user_tab_proj:   { zh: '按项目授权', en: 'Per-Project',   vi: 'Theo dự án' },
+    // 级别（下拉选项）
+    perm_lv_hide:    { zh: '隐藏',           en: 'Hidden',              vi: 'Ẩn' },
+    perm_lv_view:    { zh: '查看（只读）',   en: 'View (read-only)',    vi: 'Xem (chỉ đọc)' },
+    // ★PERM-WHOLE-SHOW-20261019：整个项目下拉专用的两档（显示 = 能进项目，内部再按下方各项授权）
+    perm_lv_show:    { zh: '显示',           en: 'Show',                vi: 'Hiển thị' },
+    perm_lv_edit:    { zh: '编辑（可修改）', en: 'Edit (modify)',       vi: 'Sửa (chỉnh sửa)' },
+    perm_lv_approve: { zh: '发起审批',       en: 'Initiate Approval',   vi: 'Khởi tạo phê duyệt' },
+    perm_lv_inherit: { zh: '跟随模板',       en: 'Follow template',     vi: 'Theo mẫu' },
+    // 公共模块：组名
+    perm_g_dashboard:{ zh: '看板',     en: 'Dashboard',      vi: 'Bảng điều khiển' },
+    perm_g_won:      { zh: '签约项目', en: 'Signed Projects',vi: 'Dự án ký kết' },
+    perm_g_finance:  { zh: '财务管理', en: 'Finance',        vi: 'Quản lý tài chính' },
+    perm_g_equity:   { zh: '股东权益', en: 'Equity',         vi: 'Quyền lợi cổ đông' },
+    // 公共模块：项名（★审批已迁到按项目授权，见下方 perm_g_approval / perm_p_approval）
+    perm_c_dashboard:      { zh: '整个看板', en: 'Whole dashboard', vi: 'Toàn bộ bảng điều khiển' },
+    perm_c_won_list:       { zh: '列表整体（可见即可看全部行）', en: 'List (visible = see all rows)', vi: 'Danh sách (thấy = xem tất cả)' },
+    perm_c_won_btn_add:    { zh: '新建签约按钮', en: 'New project button', vi: 'Nút tạo dự án' },
+    perm_c_won_btn_export: { zh: '导出 Excel 按钮', en: 'Export Excel button', vi: 'Nút xuất Excel' },
+    perm_c_won_row_view:   { zh: '行内 · 查看', en: 'Row · View', vi: 'Dòng · Xem' },
+    perm_c_won_row_copy:   { zh: '行内 · 复制', en: 'Row · Copy', vi: 'Dòng · Sao chép' },
+    perm_c_won_row_edit:   { zh: '行内 · 编辑', en: 'Row · Edit', vi: 'Dòng · Sửa' },
+    perm_c_won_row_delete: { zh: '行内 · 删除', en: 'Row · Delete', vi: 'Dòng · Xóa' },
+    perm_c_fin_vn:         { zh: '越南财务报表', en: 'Vietnam report', vi: 'Báo cáo VN' },
+    perm_c_fin_cn:         { zh: '中国财务报表', en: 'China report', vi: 'Báo cáo TQ' },
+    perm_c_fin_rest:       { zh: '合并报表 / 越南看板 / 合并看板（三合一，只读）', en: 'Merge + dashboards (read-only)', vi: 'Hợp nhất + dashboard (chỉ đọc)' },
+    perm_c_eq_data:        { zh: '总投资 / 中国投资 / 越南投资（三合一，不可隐藏）', en: 'Investment sheets (cannot hide)', vi: 'Bảng đầu tư (không thể ẩn)' },
+    perm_c_eq_holders:     { zh: '股东结构', en: 'Shareholder structure', vi: 'Cơ cấu cổ đông' },
+    perm_c_eq_dividend:    { zh: '分红记录', en: 'Dividend records', vi: 'Hồ sơ cổ tức' },
+    // ★PERM-V2-APP-PROJ-20261019：审批已迁到「按项目授权」，公共模块不再有该项（键保留仅作兼容）
+    perm_c_approval:       { zh: '审批（已移至按项目授权）', en: 'Approvals (moved to per-project)', vi: 'Phê duyệt (đã chuyển sang theo dự án)' },
+    // 公共模块：其它文案
+    perm_common_legend:  { zh: '按模块统一授权：隐藏 / 查看（只读，看得见但改不了）/ 编辑（可增删改）。', en: 'Per-module: hide / view (read-only) / edit (full).', vi: 'Theo mô-đun: ẩn / xem (chỉ đọc) / sửa.' },
+    perm_legacy_summary: { zh: '旧版区块权限（过渡保留，含「用户与授权」USR-*，阶段 6 清理）', en: 'Legacy block permissions (kept temporarily, incl. USR-*)', vi: 'Quyền khối cũ (tạm giữ, gồm USR-*)' },
+    // 按项目授权：文案
+    perm_proj_legend:       { zh: '按项目授权：每个项目单独设置；未单独授权的项目模块一律隐藏。查看的人不可编辑。', en: 'Per-project: each project is set individually; anything not granted is hidden. Viewers cannot edit.', vi: 'Theo dự án: thiết lập từng dự án; mục chưa cấp quyền sẽ ẩn. Người xem không được sửa.' },
+    perm_proj_tpl_title:    { zh: '全局模板（默认，适用于所有项目）', en: 'Global template (default for all projects)', vi: 'Mẫu chung (mặc định mọi dự án)' },
+    perm_proj_list_title:   { zh: '按项目覆盖（仅保存改动过的项）', en: 'Per-project overrides (only changed items saved)', vi: 'Ghi đè theo dự án (chỉ lưu mục đổi)' },
+    perm_proj_search_ph:    { zh: '搜索项目（合同号 / 客户 / 省份）', en: 'Search (contract / customer / province)', vi: 'Tìm (hợp đồng / khách / tỉnh)' },
+    perm_proj_loading:      { zh: '项目列表加载中…', en: 'Loading projects…', vi: 'Đang tải dự án…' },
+    perm_proj_empty:        { zh: '暂无签约项目', en: 'No signed projects', vi: 'Chưa có dự án ký kết' },
+    perm_proj_col_contract: { zh: '合同编号', en: 'Contract No.', vi: 'Số hợp đồng' },
+    perm_proj_col_customer: { zh: '客户', en: 'Customer', vi: 'Khách hàng' },
+    perm_proj_col_province: { zh: '省份', en: 'Province', vi: 'Tỉnh' },
+    // 按项目：组名
+    perm_g_worklog:    { zh: '工作日志', en: 'Work Log', vi: 'Nhật ký công việc' },
+    perm_g_production: { zh: '生产管理', en: 'Production', vi: 'Sản xuất' },
+    perm_g_install:    { zh: '安装管理', en: 'Installation', vi: 'Lắp đặt' },
+    perm_g_library:    { zh: '资料库 / 合同', en: 'Library / Contract', vi: 'Thư viện / Hợp đồng' },
+    // 按项目：审批（★PERM-V2-APP-PROJ-20261019 从公共模块迁来）
+    perm_g_approval:   { zh: '审批', en: 'Approvals', vi: 'Phê duyệt' },
+    perm_p_approval:   { zh: '审批中心（编辑 = 可处理本项目相关审批）', en: 'Approval center (edit = handle this project\'s approvals)', vi: 'Trung tâm phê duyệt (sửa = xử lý phê duyệt dự án này)' },
+    // 按项目：项名
+    perm_p_wl_daily:       { zh: '每日记录报告', en: 'Daily record report', vi: 'Báo cáo ghi chép hằng ngày' },
+    perm_p_wl_mywork:      { zh: '我的工作', en: 'My work', vi: 'Công việc của tôi' },
+    perm_p_prod_A:         { zh: 'A 工厂概况', en: 'A Plant overview', vi: 'A Tổng quan nhà máy' },
+    perm_p_prod_B:         { zh: 'B 生产计划', en: 'B Production plan', vi: 'B Kế hoạch sản xuất' },
+    perm_p_prod_C:         { zh: 'C 人员(日)', en: 'C Daily labor', vi: 'C Nhân sự (ngày)' },
+    perm_p_prod_D:         { zh: 'D 原料库存', en: 'D Raw material stock', vi: 'D Tồn kho nguyên liệu' },
+    perm_p_prod_D_receipt: { zh: '└ 提交收货单按钮（隐藏 / 发起审批）', en: '└ Submit receipt (hide / approval)', vi: '└ Nút gửi phiếu nhập (ẩn / phê duyệt)' },
+    perm_p_prod_E:         { zh: 'E 每日生产', en: 'E Daily production', vi: 'E Sản xuất hằng ngày' },
+    perm_p_prod_H:         { zh: 'H 入库与出库', en: 'H Stock in / out', vi: 'H Nhập / xuất kho' },
+    perm_p_prod_F:         { zh: 'F 设备与故障', en: 'F Equipment & faults', vi: 'F Thiết bị & sự cố' },
+    perm_p_inst_A:         { zh: 'A 可视化-分区式安装总规划', en: 'A Zoning plan', vi: 'A Quy hoạch phân vùng' },
+    perm_p_inst_B:         { zh: 'B 安装计划详细安排', en: 'B Installation schedule', vi: 'B Lịch lắp đặt chi tiết' },
+    perm_p_inst_C:         { zh: 'C 人工-天气-安装量', en: 'C Labor / weather / volume', vi: 'C Nhân công / thời tiết / khối lượng' },
+    perm_p_lib:            { zh: '独立项目资料', en: 'Project documents', vi: 'Tài liệu dự án' },
+    perm_p_contract:       { zh: '合同占位文档', en: 'Contract document', vi: 'Tài liệu hợp đồng' },
+    perm_p_whole:          { zh: '整个项目', en: 'Whole project', vi: 'Toàn dự án' },
+    // 用户与授权（USR-*，沿用旧决策值 hide/company/allow）
+    perm_g_usr:            { zh: '用户与授权', en: 'Users & Authorization', vi: 'Người dùng & phân quyền' },
+    perm_c_usr_l1:         { zh: '用户列表', en: 'User list', vi: 'Danh sách người dùng' },
+    perm_c_usr_l1_company: { zh: '显示用户列表', en: 'Show user list', vi: 'Hiện danh sách' },
+    perm_c_usr_d1:         { zh: '编辑用户权限（弹窗）', en: 'Edit user permissions', vi: 'Sửa quyền người dùng' },
+    perm_c_usr_d1_allow:   { zh: '允许编辑', en: 'Allow edit', vi: 'Cho phép sửa' },
+    perm_c_usr_d2:         { zh: '新增用户', en: 'Add user', vi: 'Thêm người dùng' },
+    perm_c_usr_d2_allow:   { zh: '允许新增', en: 'Allow add', vi: 'Cho phép thêm' },
+    perm_c_usr_d3:         { zh: '删除/停用用户', en: 'Delete / disable user', vi: 'Xóa / ngừng người dùng' },
+    perm_c_usr_d3_allow:   { zh: '允许删除/停用', en: 'Allow delete/disable', vi: 'Cho phép xóa / ngừng' }
   };
 
   // ---- 注入必要 CSS（强制单行 + 不换行 + 表头不折行）----
@@ -39263,12 +39550,13 @@ function applyUsersLang() {
   setHeaderText('thUsername', u.users_col_account || '登录账号');
   setHeaderText('thRole', u.users_col_role || '职位标签');
   setHeaderText('thStatus', u.users_col_status || '状态');
-  setHeaderText('thRange', u.users_col_range || '数据范围');
+  // ★USR-NOVIS-20261018：「数据范围」列已移除，不再更新 thRange（保留词条供别处兼容）
   setHeaderText('thAction', u.users_col_action || '操作');
   // 模态框静态部分
   setText('tabBtnBasic','user_tab_basic','基本资料');
   setText('tabBtnVis','user_tab_vis','数据范围');
-  setText('tabBtnPerm','user_tab_perm','界面/操作权限');
+  setText('tabBtnPerm','user_tab_common','公共模块');
+  setText('tabBtnProj','user_tab_proj','按项目授权');
   setText('tabBtnSec','user_tab_sec','密码管理');
   setText('lblName','user_lbl_name','姓名 *');
   setText('lblLogin','user_lbl_account','登录账号 *');
@@ -39305,7 +39593,7 @@ function applyUsersLang() {
   setText('lblForgotAppr','user_lbl_forgot_appr','忘记密码审批人');
   setText('forgotApprLabel','user_approver_label','审批人');
   setText('secForgot','user_sec_forgot','用户在登录界面点击"忘记密码"时，系统会向该用户的审批人发送审批请求，任一审批人「通过」后，密码自动重置为初始密码');
-  setText('userFooterHint','user_footer_hint','保存写入 users + 数据可见性双向关系 + user_permissions（界面/操作）+ 审批人');
+  setText('userFooterHint','user_footer_hint','保存写入 users + user_permissions（界面/操作）+ 审批人');
   setText('userBtnCancel','user_btn_cancel','取消');
   setText('userBtnSave','user_btn_save','保存');
   // 模态框标题
@@ -39349,6 +39637,9 @@ function applyUsersLang() {
     var activeTabEl=document.querySelector('.modal-tabs .tab.active');
     var activeTab=activeTabEl? activeTabEl.dataset.tab : 'basic';
     if(activeTab==='vis' && typeof buildVisChecklists==='function') buildVisChecklists(curUid);
+    // ★PERM-V2-20261018（阶段 2）：页签 data-tab 已改名为 common/proj（面板容器仍为 tab-perm/tab-proj）
+    if((activeTab==='common') && typeof buildCommonPerm==='function') buildCommonPerm(curUid);
+    if(activeTab==='proj' && typeof buildProjPerm==='function') buildProjPerm(curUid);
     if(activeTab==='perm' && typeof buildPermGroups==='function') buildPermGroups(curUid);
   }
   // 若审批抽屉已打开，重渲染
@@ -39502,57 +39793,11 @@ function loadUsers(){
 }
 
 // 权限区块：每条 [id, name, cat, defaultInfo(针对性解释)]
+// ★PERM-V2-20261018（用户 2026-10-18）：旧版区块权限（看板/价格走势/CRM/WON/LOST/审批）已全部删除，
+//   仅保留「用户与权限管理」USR-* 一组 —— 且改由新版 buildCommonPerm() 以新格式渲染（见 saveModal 的 USR 映射）。
+//   其它旧区块的已存决策不再渲染编辑，但保存时会原样保留（见 saveModal 的「沿用未渲染区块」逻辑），
+//   permVisible/curRawDecision 等导航门控不受影响。
 const PERMS = [
-  {gid:"看板",rows:[
-    ["DB-S1","顶部6张统计卡(潜在/签约/丢单 总数+金额)","A", "保留默认=显示该用户自己的潜在/签约/丢单总数与金额卡片；数据范围含他人时叠加显示团队/全公司合计 · 默认显示"],
-    ["DB-P1","按省份统计双轴柱图","A", "保留默认=显示该用户自己的按省份统计双轴柱图；数据范围含他人时叠加显示团队/全公司合计 · 默认显示"],
-    ["DB-B1","按BU统计双轴柱图","A", "保留默认=显示该用户自己的按BU统计双轴柱图；数据范围含他人时叠加显示团队/全公司合计 · 默认显示"],
-    ["DB-C1","按建设情况统计双轴柱图","A", "保留默认=显示该用户自己的按建设情况统计双轴柱图；数据范围含他人时叠加显示团队/全公司合计 · 默认显示"],
-    ["DB-UP","看板当月更新情况","A", "保留默认=在看板导航图标右键可查看当月自动更新项目状态 · 默认显示"],
-    ["US-LH1","每月登录统计柱图","A", "保留默认=显示该用户自己的每月登录次数柱图；数据范围含他人时叠加 · 默认显示"],
-    ["US-LH2","每年登录统计柱图","A", "保留默认=显示该用户自己的每年登录次数柱图；数据范围含他人时叠加 · 默认显示"],
-  ]},
-  {gid:"价格走势",rows:[
-    ["DB-MT1","金属价格走势","A", "保留默认=显示该用户自己的金属价格走势图（钢铁/不锈钢/锌锭/塑料）；数据范围含他人时叠加团队/全公司合计 · 默认显示"],
-    ["DB-FD1","大宗饲料原料价格","A", "保留默认=显示该用户自己的大宗饲料原料价格走势图（玉米/大豆/豆粕/DDGS）；数据范围含他人时叠加团队/全公司合计 · 默认显示"],
-    ["DB-LS1","畜禽出栏价格","A", "保留默认=显示该用户自己的畜禽出栏价格走势图（生猪/鸡蛋/白羽肉鸡）；数据范围含他人时叠加团队/全公司合计 · 默认显示"],
-    ["DB-FX1","历史汇率走势","A", "保留默认=显示该用户自己的历史汇率走势图（USD/CNY、CNY/VND、USD/VND） · 默认显示"],
-  ]},
-  {gid:"CRM 潜在项目",rows:[
-    ["CRM-L1","CRM项目列表(行数据)","A", "保留默认=列表只显示数据范围内的CRM项目行（自己的或团队/全公司） · 默认显示"],
-    ["CRM-D1","查看CRM详情","A", "保留默认=点击列表行可打开详情模态框，查看数据范围内项目详情 · 默认显示"],
-    ["CRM-D2","编辑CRM项目","A", "保留默认=列表/详情显示「编辑」按钮，可编辑数据范围内的CRM项目 · 默认显示"],
-    ["CRM-D3","删除CRM项目","A", "保留默认=显示「删除」按钮，确认后直接删除该项目（无需审批） · 发起审批=删除需审批人通过"],
-    ["CRM-F1","转到失败项目","A", "保留默认=列表/详情显示「转到失败项目」按钮，可转移该条CRM项目至失败项目中 · 默认显示"],
-    ["CRM-N1","新增潜在项目","A", "保留默认=顶部显示「新增」按钮，可创建新CRM项目 · 默认显示"],
-    ["CRM-E1","导出Excel","A", "保留默认=列表顶部显示「导出」按钮，导出数据范围内的项目 · 默认显示"],
-  ]},
-  {gid:"Won 签约项目",rows:[
-    ["WON-L1","Won项目列表(行数据)","A", "保留默认=列表只显示数据范围内的Won项目行 · 默认显示"],
-    ["WON-D1","查看Won详情","A", "保留默认=点击列表行可打开详情模态框，查看数据范围内项目详情 · 默认显示"],
-    ["WON-D2","编辑Won项目","A", "保留默认=列表/详情显示「编辑」按钮，可编辑数据范围内的Won项目 · 默认显示"],
-    ["WON-D3","删除成功项目","A", "保留默认=显示「删除」按钮，确认后直接删除该项目（无需审批） · 发起审批=删除需审批人通过"],
-    ["WON-D4","查看CPR智能报告","A", "保留默认=详情显示「查看CPR报告」按钮，可打开数据范围内项目的智能报告 · 默认显示"],
-    ["WON-E1","导出Excel","A", "保留默认=列表顶部显示「导出」按钮，导出数据范围内的项目 · 默认显示"],
-    ["WON-N1","新增签约项目","A", "保留默认=顶部显示「新增」按钮，可创建新Won项目 · 默认显示"],
-    ["WON-C1","复制签约项目","A", "保留默认=行内显示「复制」按钮（需复制密码），可复制该签约项目生成新Won项目 · 默认显示"],
-    ["WON-P345","签约项目总表P3-P4-P5列","A", "保留默认=显示P3/P4/P5列（佣金/退款/AGI付款/合同增补等） · 隐藏该项=隐藏P3-P4-P5全部列（销售/销售总监默认隐藏）"],
-  ]},
-  {gid:"Lost 失败项目",rows:[
-    ["LOST-L1","Lost项目列表(行数据)","A", "保留默认=列表只显示数据范围内的Lost项目行 · 默认显示"],
-    ["LOST-D1","查看失败项目","A", "保留默认=点击列表行可打开详情模态框，查看数据范围内项目详情 · 默认显示"],
-    // ★ LOST-D2（编辑失败项目）已从权限界面移除：编辑功能本身已下线，
-    //   保留这一行只会让管理员误以为能控制什么（服务端 permGate 仍继续保护 API）
-    ["LOST-D3","删除失败项目","A", "保留默认=显示「删除」按钮，确认后直接删除该项目（无需审批） · 发起审批=删除需审批人通过"],
-    ["LOST-R1","转回至潜在项目","A", "保留默认=显示「转回至潜在项目」按钮，确认后直接转回（无需审批） · 发起审批=转回需审批人通过"],
-    ["LOST-E1","导出Excel","A", "保留默认=列表顶部显示「导出」按钮，导出数据范围内的项目 · 默认显示"],
-  ]},
-  {gid:"审批",rows:[
-    ["APP-L1","待我审批列表","A", "保留默认=显示当前用户作为审批人的待审项列表 · 默认显示"],
-    ["APP-L2","我发起的审批","A", "保留默认=显示当前用户发起的审批记录 · 默认显示"],
-    ["APP-L3","全部审批记录","C", "保留默认=不显示此入口（C类全公司记录，需「特别授权看全公司」才显示） · 默认不显示"],
-    ["APP-A1","同意/拒绝审批","A", "保留默认=待审列表项显示「通过/拒绝」按钮，仅对属于自己的待审项生效 · 默认显示"],
-  ]},
   {gid:"用户与权限管理",rows:[
     ["USR-L1","用户列表","C", "隐藏该项=不显示入口（C-类，仅管理员可见） · 显示用户列表=显示该入口 · 默认不显示"],
     ["USR-D1","编辑用户权限(模态框)","S", "隐藏该项=不显示「编辑用户权限」按钮（默认） · 允许编辑=可编辑，提交后生成变更报告，经 tom/cuong/james 任一人审批后生效"],
@@ -39624,6 +39869,25 @@ function _isSalesPos(u){
   return p === '销售' || p === '销售总监';
 }
 // 最终可见性（决策覆盖默认）
+// ★PERM-V2-BRIDGE-20261019：签约项目旧区块 → 新版公共模块键 的桥。
+//   行内按钮（编辑/删除/复制/报告）与新建/导出的显隐历史上挂在 WON-D2/D3/C1/D4/N1/E1，
+//   新版公共模块表（2.2~2.7）设了值就必须以新键为准，否则"设了编辑按钮也不出现"。
+//   返回 null = 新键未配置 → 完全沿用旧区块逻辑（向后兼容，不改变存量用户行为）。
+//   销售/销售总监的 5 项锁死优先级最高（即使新键给了 edit 也不放行）。
+function _wonBridgeLv(bid){
+  var map = { 'WON-D2':'won_row_edit', 'WON-D3':'won_row_delete', 'WON-C1':'won_row_copy',
+              'WON-D4':'won_row_view',  'WON-N1':'won_btn_add',   'WON-E1':'won_btn_export' };
+  var k = map[bid];
+  if (!k) return null;
+  if (typeof authUser === 'undefined' || !authUser) return null;
+  if (_isSalesPos(authUser) && typeof SALES_LOCKED_WON !== 'undefined' && SALES_LOCKED_WON.has(bid)) return 'hide';
+  if (typeof _isSuperUser === 'function' && _isSuperUser()) return 'edit';
+  var perms = authUser.perms || {};
+  if (typeof perms === 'string'){ try { perms = JSON.parse(perms || '{}'); } catch(e){ perms = {}; } }
+  var c = perms.common || {};
+  var v = c[k];
+  return (v === undefined) ? null : v;
+}
 function permVisible(bid){
   // tom/cuong/james 三人组：用户与权限管理四个区块全部直接可见（与管理员同级直通）
   if (typeof TRI_APPROVERS!=='undefined' && authUser && TRI_APPROVERS.indexOf(String(authUser.username||'').toLowerCase())>=0 && (bid==='USR-L1'||bid==='USR-D1'||bid==='USR-D2'||bid==='USR-D3')) return true;
@@ -39635,6 +39899,9 @@ function permVisible(bid){
   if(_isSalesPos(authUser) && typeof SALES_LOCKED_WON!=='undefined' && SALES_LOCKED_WON.has(bid)) dec = 'hide';
   if(!raw && bid==='WON-L1' && _isSalesPos(authUser)) dec = 'hide';  // WON-L1 职位缺省规则
   if(!raw && bid==='WON-P345' && _isSalesPos(authUser)) dec = 'hide';  // WON-P345 职位缺省规则（P3-P4-P5列）
+  // ★PERM-V2-BRIDGE-20261019：新版公共模块键已配置 → 以新键为准（hide=不显示，edit=显示）
+  var _bl = _wonBridgeLv(bid);
+  if (_bl !== null) return (_bl === 'edit');
   if (dec === 'hide') return false;
   if (dec === 'all') return true;             // 特别授权：即使默认隐藏也显示
   if (dec === 'approve') return true;         // 发起审批：入口可见，操作受拦截
@@ -39683,6 +39950,16 @@ function loadApprovedCache(){
 function permGuard(bid, actionName){
   if (typeof authUser === 'undefined' || !authUser) return true;
   var cat = (PERM_META[bid] && PERM_META[bid].cat) || 'A';
+  // ★PERM-V2-BRIDGE-20261019：新版公共模块键已配置 → 以新键为准（与 permVisible 同一座桥）。
+  //   edit=A 类放行、B 类仍走单次审批入口；非 edit=拦截并提示。
+  var _bl = _wonBridgeLv(bid);
+  if (_bl !== null){
+    if (_bl !== 'edit'){
+      showToast((_permName(bid)) + ' ' + (T().empty.user_perm_hidden||'No permission: this module is hidden'));
+      return false;
+    }
+    return cat !== 'B';
+  }
   // B 类（删除/转移）执行前一律走单次审批，不会在此被"直接放行"——调用方应改用 singleUseGuard
   if (cat === 'B') return false;
   var dec = normDecision(curRawDecision(bid));
@@ -39721,8 +39998,323 @@ var VIEW_PERM_MAP = {
   lost: 'LOST-L1',
   users: 'USR-L1'
 };
+// =====================================================================
+// ★PERM-V2-20261018 阶段 4：新版权限在界面真正落地（隐藏 / 查看=只读 / 编辑）
+//   前端镜像后端默认值（app.py 的 SYS_COMMON_DEFAULTS / SYS_PROJ_DEFAULTS）
+// =====================================================================
+var SYS_COMMON_DEF = { dashboard:'view', won_list:'view', won_btn_add:'hide', won_btn_export:'hide',
+  won_row_view:'hide', won_row_copy:'hide', won_row_edit:'hide', won_row_delete:'hide',
+  fin_vn:'view', fin_cn:'view', fin_rest:'view', eq_data:'view', eq_holders:'hide', eq_dividend:'hide' };
+  // ★PERM-V2-APP-PROJ-20261019：approval 已迁到按项目授权（默认 hide）
+var SYS_PROJ_DEF = { wl_daily:'view', wl_mywork:'view', prod_A:'view', prod_B:'view', prod_C:'view', prod_D:'view',
+  prod_D_receipt:'hide', prod_E:'view', prod_H:'view', prod_F:'view', inst_A:'view', inst_B:'view', inst_C:'view',
+  lib:'view', contract:'hide', approval:'hide' };
+function _myPermsObj(){
+  try{
+    var p = (authUser && authUser.perms) ? authUser.perms : {};
+    if (typeof p === 'string') p = JSON.parse(p || '{}');
+    return p || {};
+  }catch(e){ return {}; }
+}
+function permLvCommon(key){
+  if (_isSuperUser()) return 'edit';
+  var c = _myPermsObj().common || {};
+  var v = c[key];
+  return (v === undefined) ? (SYS_COMMON_DEF[key] || 'view') : v;
+}
+function permLvProj(pid, key){
+  if (_isSuperUser()) return 'edit';
+  var p = _myPermsObj();
+  var ov = (p.projects || {})[String(pid)];
+  if (ov && ov[key] !== undefined){
+    var v1 = ov[key];
+    if (typeof v1 === 'object') return v1.decision || 'hide';
+    return v1;
+  }
+  // ★PROJ-HIDE-DEF-20261019（用户要求）：全局模板已删除，未单独授权的项目模块一律「隐藏」
+  return 'hide';
+}
+// ★PERM-V2-WHOLE-20261019（用户要求）：「整个项目：隐藏/查看」（按项目授权第一项，默认隐藏）。
+//   隐藏 → 该用户在签约列表 / 工作日志 / 生产 / 安装 里完全看不到这个项目（卡片与行都不过滤不出来）；
+//   查看 → 能进项目，内部各模块再按各自授权（未授权=隐藏）工作。超级用户恒可见。
+function _projWholeVisible(pid){
+  try{
+    if (typeof _isSuperUser === 'function' && _isSuperUser()) return true;
+    if (typeof permLvProj !== 'function') return true;
+    return permLvProj(pid, 'whole') !== 'hide';
+  }catch(e){ return true; }
+}
+window._projWholeVisible = _projWholeVisible;
+// ★PERM-V2-APP-PROJ-20261019（用户要求）：审批从「公共模块」移到「按项目授权」，默认隐藏。
+//   导航入口可见性 = 任一项目把 approval 设成「查看 / 编辑」；全部隐藏或未配置 → 隐藏。
+function _anyProjApproval(){
+  try{
+    if (typeof _isSuperUser === 'function' && _isSuperUser()) return true;
+    var pr = (_myPermsObj().projects || {});
+    for (var pid in pr){
+      var o = pr[pid];
+      if (!o || o.approval === undefined) continue;
+      var v = o.approval;
+      if (typeof v === 'object') v = v.decision;
+      if (v && v !== 'hide') return true;
+    }
+  }catch(e){}
+  return false;
+}
+function _hideEl(el, hide){ if (el) el.style.display = hide ? 'none' : ''; }
+function _hideSel(sel, hide){ try{ _hideEl(document.querySelector(sel), hide); }catch(e){} }
+// 只读：禁用表单控件 + 屏蔽"写"类按钮（按中/英/越关键词匹配，尽力而为）
+var _RO_WORDS = /保存|新增|添加|编辑|删除|移除|提交|导入|上传|确认|应用|清空|重置|Save|Add|Edit|Delete|Remove|Submit|Import|Upload|Confirm|Apply|Reset|Lưu|Thêm|Sửa|Xóa|Gửi|Xác|Áp|Đặt/i;
+function _applyRO(container){
+  if (!container) return;
+  try{
+    var ctrls = container.querySelectorAll('input, select, textarea, [contenteditable="true"]');
+    for (var i=0;i<ctrls.length;i++){ try{ ctrls[i].disabled = true; }catch(e){} }
+    var btns = container.querySelectorAll('button, .btn');
+    for (var j=0;j<btns.length;j++){
+      var b = btns[j];
+      var txt = (b.textContent||'') + ' ' + (b.getAttribute('title')||'');
+      if (_RO_WORDS.test(txt)){
+        b.classList.add('perm-ro'); b.style.opacity = '.5'; b.style.pointerEvents = 'none';
+      }
+    }
+  }catch(e){}
+}
+function _clearRO(container){
+  if (!container) return;
+  try{
+    var ctrls = container.querySelectorAll('input, select, textarea, [contenteditable="true"]');
+    for (var i=0;i<ctrls.length;i++){ try{ ctrls[i].disabled = false; }catch(e){} }
+    var ro = container.querySelectorAll('.perm-ro');
+    for (var j=0;j<ro.length;j++){ try{ ro[j].classList.remove('perm-ro'); ro[j].style.opacity=''; ro[j].style.pointerEvents=''; }catch(e){} }
+  }catch(e){}
+}
+// ---- 签约项目：新建 / 导出按钮 + 行内 4 按钮（表格反复重渲染 → 用 CSS 类控制）----
+function _wonRowCss(){
+  if (document.getElementById('npPermStyle')) return;
+  var s = document.createElement('style');
+  s.id = 'npPermStyle';
+  s.textContent = '#wonTbody.np-rowview .icon-report{display:none!important}'
+                + '#wonTbody.np-rowcopy .icon-copy{display:none!important}'
+                + '#wonTbody.np-rowedit .icon-edit{display:none!important}'
+                + '#wonTbody.np-rowdel .icon-del{display:none!important}';
+  document.head.appendChild(s);
+}
+function applyWonPerms(){
+  // 这几项只有 hide/edit 两种态：edit = 可见即可用
+  _hideSel('#btnAddWon', permLvCommon('won_btn_add') !== 'edit');
+  _hideSel('#btnExportWonExcel', permLvCommon('won_btn_export') !== 'edit');
+  var tb = document.getElementById('wonTbody');
+  if (tb){
+    _wonRowCss();
+    tb.classList.toggle('np-rowview', permLvCommon('won_row_view') !== 'edit');
+    tb.classList.toggle('np-rowcopy', permLvCommon('won_row_copy') !== 'edit');
+    tb.classList.toggle('np-rowedit', permLvCommon('won_row_edit') !== 'edit');
+    tb.classList.toggle('np-rowdel',  permLvCommon('won_row_delete') !== 'edit');
+  }
+}
+// ---- 财务管理：5 个子标签（vn/cn 独立；merge+dash+dashm 共用 fin_rest）----
+var _FIN_TAB_KEY = { vn:'fin_vn', cn:'fin_cn', merge:'fin_rest', dash:'fin_rest', dashm:'fin_rest' };
+function applyFinPerms(){
+  var tabs = document.querySelectorAll('#fin-tabs .fin-tab');
+  var firstVis = null;
+  for (var i=0;i<tabs.length;i++){
+    var k = tabs[i].getAttribute('data-key');
+    var pk = _FIN_TAB_KEY[k];
+    if (!pk) continue;
+    var hide = (permLvCommon(pk) === 'hide');
+    _hideEl(tabs[i], hide);
+    if (!hide && !firstVis) firstVis = k;
+  }
+  // 当前激活的标签被隐藏 → 自动跳到第一个可见标签
+  try{
+    var act = document.querySelector('#fin-tabs .fin-tab.active');
+    if (act && act.style.display === 'none' && firstVis && typeof fin_switchTab === 'function') fin_switchTab(firstVis);
+  }catch(e){}
+  // vn/cn 都不是「编辑」→ 隐藏写入类按钮（保存）
+  var canEditFin = (permLvCommon('fin_vn') === 'edit' || permLvCommon('fin_cn') === 'edit');
+  _hideSel('.fin-btn[data-i18n="fin_btn_save"]', !canEditFin);
+}
+// ---- 股东权益：eq_data 控制写入；股东结构 / 分红记录 隐藏 Univer 底部工作簿标签 ----
+function applyEqPerms(){
+  _hideSel('#eq_toolbar [onclick*="save"]', permLvCommon('eq_data') !== 'edit');
+  // ★EQ-RO-LOCK-20261019：把「每张表的级别」暴露给权益模块（整表保护 / 命令锁用）。
+  //   三张投资表 = eq_data；股东结构 = eq_holders；分红记录 = eq_dividend。
+  window.__eqPermSheetLv = function(name){
+    if (!name) return 'view';
+    if (name === '股东结构' || name === 'Shareholder Structure' || name === 'Cơ cấu cổ đông') return permLvCommon('eq_holders');
+    if (name === '分红记录' || name === 'Dividend Records' || name === 'Cổ tức') return permLvCommon('eq_dividend');
+    return permLvCommon('eq_data');
+  };
+  var hideNames = [];
+  if (permLvCommon('eq_holders') === 'hide')  hideNames = hideNames.concat(['股东结构','Shareholder Structure','Cơ cấu cổ đông']);
+  if (permLvCommon('eq_dividend') === 'hide') hideNames = hideNames.concat(['分红记录','Dividend Records','Cổ tức']);
+  // ★EQ-PERM-TABLOCK-20261019：必须只取【#equity_container 内】的标签条。
+  //   旧写法 document.querySelector('.univer-sheet-bar') 全局取第一个 —— 财务、股东权益
+  //   两套 Univer 并存时经常抓到财务的标签条，股东权益的标签一个都藏不掉（用户报 BUG 根因）。
+  var bar = document.querySelector('#equity_container .univer-sheet-bar') ||
+            document.querySelector('#view-equity [class*="sheet-bar"]');
+  if (!hideNames.length || !bar) return;
+  var visNames = ['总投资数据','Total Investment','Tổng đầu tư',
+                  '中国投资数据','China Investment','Đầu tư Trung Quốc',
+                  '越南投资数据','Vietnam Investment','Đầu tư Việt Nam'];
+  var items = bar.querySelectorAll('div, span, li');
+  var activeHidden = false, firstVis = null;
+  for (var i=0;i<items.length;i++){
+    var it = items[i];
+    if (it.children.length) continue;
+    var t = (it.textContent||'').trim();
+    if (!t) continue;
+    if (hideNames.indexOf(t) >= 0){
+      it.style.display = 'none';
+      // 该隐藏表正处于激活态？（aria-selected 或 class 含 active，含父级）
+      var _mk = function(el){
+        while (el && el !== bar){
+          if (el.getAttribute && el.getAttribute('aria-selected') === 'true') return true;
+          var cn = el.className || '';
+          if (typeof cn === 'string' && /(^|\s)active(\s|$)/.test(cn)) return true;
+          el = el.parentElement;
+        }
+        return false;
+      };
+      if (_mk(it)) activeHidden = true;
+    } else if (!firstVis && it.style.display !== 'none' && visNames.indexOf(t) >= 0){
+      firstVis = it;   // 只认「三张投资表」的标签，避免误点 '+' 新建表按钮
+    }
+  }
+  // 激活表被隐藏 → 自动切到第一个可见表（点叶子节点，事件自然冒泡到 Univer 的切换处理）
+  if (activeHidden && firstVis){
+    try { firstVis.click(); } catch(e){}
+  }
+}
+// ---- 通用：按项目对某组子标签做「隐藏 + 只读」----
+function _applyTabGroupPerms(tabBoxSel, bodySel, tabSel, pid, keyFn){
+  // ★PROD-TABS-FIX-20261019（用户报 BUG：选了「编辑」却看不到 2.x/3.x 标签）：
+  //   没有当前项目（PROD_CUR/INST_CUR/WL_CUR 为空）时绝不能按 hide 去藏标签，
+  //   否则启动/切视图时以 pid=null 跑一遍就会把所有标签永久 display:none。
+  if (pid === null || pid === undefined || pid === '') return 'view';
+  var tabs = document.querySelectorAll(tabBoxSel + ' ' + tabSel);
+  var firstVis = null;
+  for (var i=0;i<tabs.length;i++){
+    var k = tabs[i].getAttribute('data-key');
+    var pk = keyFn(k);
+    if (!pk) continue;
+    var hide = (permLvProj(pid, pk) === 'hide');
+    _hideEl(tabs[i], hide);
+    if (!hide && !firstVis) firstVis = k;
+  }
+  try{
+    var act = document.querySelector(tabBoxSel + ' ' + tabSel + '.active');
+    if (act && act.style.display === 'none'){
+      // 当前标签被隐藏 → 点第一个可见标签（走各模块自己的切换函数）
+      var vis = document.querySelector(tabBoxSel + ' ' + tabSel + ':not([style*="display: none"])');
+      if (vis) vis.click();
+    }
+  }catch(e){}
+  var body = document.querySelector(bodySel);
+  if (!body) return;
+  _clearRO(body);
+  var actK = null;
+  try{ var a2 = document.querySelector(tabBoxSel + ' ' + tabSel + '.active'); actK = a2 ? a2.getAttribute('data-key') : null; }catch(e){}
+  var lv = actK ? permLvProj(pid, keyFn(actK)) : 'view';
+  if (lv !== 'edit') _applyRO(body);
+  return lv;
+}
+// ★PERM-PID-FIX-20261019：PROD_CUR / INST_CUR 存的是 **项目 id 数字**（不是对象！），
+//   旧代码写 PROD_CUR.id → undefined → 权限判定永远拿不到项目 → 隐藏不生效（用户报 H/F 隐藏了还出现）。
+function _curPid(v){
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'object') return (v.id === undefined || v.id === null || v.id === '') ? null : v.id;
+  return v;
+}
+function applyWorklogPerms(){
+  var pid = _curPid(typeof WL_CUR !== 'undefined' ? WL_CUR : null);
+  _applyTabGroupPerms('#wl-tabs', '#wl-tab-body', '.wl-tab', pid, function(k){ return k === 'daily' ? 'wl_daily' : 'wl_mywork'; });
+}
+function applyProdPerms(){
+  var pid = _curPid(typeof PROD_CUR !== 'undefined' ? PROD_CUR : null);
+  var lv = _applyTabGroupPerms('#prod-tabs', '#prod-tab-body', '.prod-tab', pid, function(k){ return 'prod_' + k; });
+  // 「提交收货单」按钮：选项 hide / approve —— 未开启即隐藏（用户给的定位路径，尽力而为）
+  try{
+    var needHide = true;
+    var dLv = permLvProj(pid, 'prod_D_receipt');
+    needHide = (dLv === 'hide');
+    var rb = document.querySelector('#prod-tab-body > div:nth-child(8) > button');
+    _hideEl(rb, needHide);
+  }catch(e){}
+  return lv;
+}
+function applyInstPerms(){
+  var pid = _curPid(typeof INST_CUR !== 'undefined' ? INST_CUR : null);
+  _applyTabGroupPerms('#inst-tabs', '#inst-tab-body', '.prod-tab', pid, function(k){ return 'inst_' + k; });
+}
+function applyNewPermUI(){
+  try{ applyWonPerms(); }catch(e){}
+  try{ applyFinPerms(); }catch(e){}
+  try{ applyEqPerms(); }catch(e){}
+  try{ applyWorklogPerms(); }catch(e){}
+  try{ applyProdPerms(); }catch(e){}
+  try{ applyInstPerms(); }catch(e){}
+}
+// 表格/子标签会反复重渲染 → 用 MutationObserver 跟随，无需逐个改渲染函数
+function installPermObservers(){
+  try{
+    if (window.__PERM_OBS_ON) return;
+    window.__PERM_OBS_ON = true;
+    var mo = new MutationObserver(function(){ try{ applyNewPermUI(); }catch(e){} });
+    ['#wonTbody','#fin-tabs','#prod-tabs','#prod-tab-body','#inst-tabs','#inst-tab-body','#wl-tabs','#wl-tab-body'].forEach(function(sel){
+      var el = document.querySelector(sel);
+      if (el) mo.observe(el, { childList: true, subtree: false });
+    });
+    // ★EQ-PERM-TABLOCK-20261019：股东权益每次 render() 都 dispose+create Univer 单元，
+    //   工作簿标签条跟着重建 → 必须监听 #equity_container 重建后重贴隐藏（节流 200ms）。
+    var eqEl = document.querySelector('#equity_container');
+    if (eqEl){
+      var eqT = null;
+      var mo2 = new MutationObserver(function(){
+        if (eqT) return;
+        eqT = setTimeout(function(){ eqT = null; try{ applyEqPerms(); }catch(e){} }, 200);
+      });
+      mo2.observe(eqEl, { childList: true, subtree: true });
+    }
+  }catch(e){}
+}
+(function(){
+  var _boot = function(){ try{ installPermObservers(); applyNewPermUI(); }catch(e){} };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _boot);
+  else setTimeout(_boot, 300);
+})();
+
+// ★PERM-V2-20261018：超级用户判定（tom/cuong/james + 管理员）→ 无视一切权限项
+function _isSuperUser(){
+  var u = ((authUser && authUser.username) || '').trim().toLowerCase();
+  if (u && typeof TRI_APPROVERS !== 'undefined'){
+    var tri = TRI_APPROVERS.map(function(s){ return String(s).toLowerCase(); });
+    if (tri.indexOf(u) >= 0) return true;
+  }
+  return !!(authUser && authUser.is_admin);
+}
+// 读取"我自己"的新版公共模块权限（未配置 → 返回默认）
+function _myCommonLevel(key, defVal){
+  try{
+    var perms = (authUser && authUser.perms) ? authUser.perms : {};
+    if (typeof perms === 'string') perms = JSON.parse(perms || '{}');
+    var c = perms ? perms.common : null;
+    if (c && c[key] !== undefined) return c[key];
+  }catch(e){}
+  return defVal;
+}
 function viewAllowed(name){
   if (typeof authUser === 'undefined' || !authUser) return false;
+  // ★PERM-V2-20261018：新版公共模块权限参与导航显隐（超级用户无视；未配置沿用旧行为）
+  if (!_isSuperUser()){
+    if (name === 'dashboard' && _myCommonLevel('dashboard', 'view') === 'hide') return false;
+    if (name === 'won'       && _myCommonLevel('won_list',  'view') === 'hide') return false;
+    if (name === 'finance'   && _myCommonLevel('fin_vn','view')   === 'hide'
+                             && _myCommonLevel('fin_cn','view')   === 'hide'
+                             && _myCommonLevel('fin_rest','view') === 'hide') return false;
+    if (name === 'approvals' && !_anyProjApproval()) return false;
+  }
   // 空领航标签：始终显示，不依赖看板区块权限
   if (name === 'dashboard') {
     return true;
@@ -39731,7 +40323,8 @@ function viewAllowed(name){
   if (name === 'approvals') {
     // 观察者角色：审批组在权限界面整组不渲染（OBSERVER_EXCLUDED_GIDS），领航标签也不显示审批按钮
     if (typeof _isObserverPos === 'function' && _isObserverPos(authUser)) return false;
-    return permVisible('APP-L1') || permVisible('APP-L2') || permVisible('APP-L3');
+    // ★PERM-V2-APP-PROJ-20261019：审批按项目授权，任一项目授权可见即显示入口（默认隐藏）
+    return _anyProjApproval();
   }
   if (name === 'commission') return false;
   var bid = VIEW_PERM_MAP[name];
@@ -42761,12 +43354,9 @@ function renderUsers(){
   const tb=document.getElementById("usersTbody");
   if(!tb) return;
   const t = (T().empty) || T();
-  const nameById = {};
-  usersData.forEach(function(u){ nameById[u.id] = u.name; });
   const canReorder = (typeof canReorderUsers==='function') && canReorderUsers();
   const selectedId = window.__selectedUserId || null;
   tb.innerHTML=usersData.map((u,idx)=>{
-    const range = (VIS[u.id]||[]).map(id=>nameById[id]||"?").join("、");
     const editLabel = t.users_edit_perm || '编辑权限';
     const deleteLabel = t.users_delete || '删除';
     const copyLabel = t.users_copy || '复制';
@@ -42787,8 +43377,7 @@ function renderUsers(){
       <td data-col="2">${u.login}</td>
       <td data-col="3">${posLabelLocalized(u.position)||"<span class='empty-cell'>—</span>"}</td>
       <td data-col="4">${u.active? "<span class='tag tag-active'>"+(t.users_status_active||'活跃')+"</span>" : "<span class='tag tag-inactive'>"+(t.users_status_inactive||'离职/停用')+"</span>"} ${u.isAdmin? "<span class='tag tag-admin'>"+(t.users_status_admin||'管理员')+"</span>":""}${u.delegateTo? " <span class='tag tag-delegate'>"+(t.usr_delegate||'离职代理')+": "+u.delegateTo+"</span>":""}</td>
-      <td data-col="5">${range}</td>
-      <td data-col="6" class="action-col">
+      <td data-col="5" class="action-col">
         <button class="btn-action-sm btn-edit" data-name="${u.name}" onclick="openModal(${u.id})" title="${u.name}" style="${permVisible('USR-D1')?'':'display:none'}">${editLabel}</button>
         <button class="btn-action-sm btn-copy" data-name="${u.name}" onclick="openModal(null,${u.id})" title="${u.name}" style="${permVisible('USR-D2')?'':'display:none'}">${copyLabel}</button>
         <button class="btn-action-sm btn-delete" data-name="${u.name}" onclick="deleteUser(${u.id})" title="${u.name}" style="${permVisible('USR-D3')?'':'display:none'}">${deleteLabel}</button>
@@ -42964,16 +43553,30 @@ function _renderUserModal(uid, copyFrom, src){
   if(curUid){ const u=usersData.find(x=>x.id===curUid); document.getElementById("f-delegate").value=u.delegateTo||""; }
   else { document.getElementById("f-delegate").value=""; }
   syncDelegateState();
+  // ★USR-NOVIS-20261018：数据范围页签已移除，但「保存时沿用谁的授权」仍要知道来源用户：
+  //   编辑=被编辑用户；复制=来源用户（以前靠预勾选的 checklist 继承，现在直接记在这里）。
+  window.__curVisUid = permUid;
   buildVisChecklists(permUid);       // 复制模式：数据范围（他可见）按来源用户预勾选
   populateForgotApprovers(permUid);  // 密码管理Tab：忘记密码审批人（复制模式沿用来源用户）
   buildPermGroups(permUid);          // 复制模式：整组区块权限按来源用户预填
+  // ★PERM-V2-20261018（阶段 2）：新版公共模块权限表（复制模式同样沿用来源用户）
+  if (typeof buildCommonPerm==='function') buildCommonPerm(permUid);
+  if (typeof buildProjPerm==='function') buildProjPerm(permUid);
   switchTab("basic");
   document.getElementById("mask").classList.add("show");
 }
 function closeModal(){ document.getElementById("mask").classList.remove("show"); }
 
+// ★PERM-V2-20261018（阶段 2）：4 页签 —— 页签名 → 面板容器 id。
+//   'common' 复用原 #tab-perm 容器（内部含新版公共模块表 + 旧版区块表）；'proj' 为新增 #tab-proj。
+//   ★若某个面板在 DOM 中不存在必须跳过，否则任一次切换都会 TypeError（整段模态框卡死）。
+var USR_TAB_PANEL = { basic:'tab-basic', common:'tab-perm', proj:'tab-proj', sec:'tab-sec' };
 function switchTab(t){
-  ["basic","vis","perm","sec"].forEach(x=>document.getElementById("tab-"+x).style.display= x===t? "block":"none");
+  Object.keys(USR_TAB_PANEL).forEach(function(x){
+    var p=document.getElementById(USR_TAB_PANEL[x]);
+    if(!p) return;
+    p.style.display = (x===t)? "block":"none";
+  });
   document.querySelectorAll(".modal-tabs .tab").forEach(el=>el.classList.toggle("active",el.dataset.tab===t));
 }
 document.querySelectorAll(".modal-tabs .tab").forEach(el=>el.addEventListener("click",()=>switchTab(el.dataset.tab)));
@@ -43034,6 +43637,9 @@ const t = (T().empty) || T();
   const inactiveSuffix = t.user_vis_inactive_suffix || '（离职）';
   const fill=(boxId,checkedIds)=>{
     const box=document.getElementById(boxId);
+    // ★USR-NOVIS-20261018：「数据范围」页签移除后这两个 checklist 不再存在 —— 直接返回，
+    //   绝不能让 null.innerHTML 抛错把 openUserModal 后面的权限表格渲染一起带崩。
+    if(!box) return;
     box.innerHTML=usersData.map(u=>`<label class="${u.active?"":"inactive"}">
       <input type="checkbox" data-uid="${u.id}" ${checkedIds.includes(u.id)?"checked":""}> ${u.name}${u.active?"":inactiveSuffix}
     </label>`).join("");
@@ -43118,6 +43724,10 @@ function authHeaders(extra){
   return h;
 }
 function buildPermGroups(uid){
+  // ★PERM-V2-20261018：旧版区块权限表已下线（看板/价格走势/CRM/WON/LOST/审批 全部删除；
+  //   仅 USR-* 迁入新版「公共模块」表，由 buildCommonPerm() 以新格式渲染并编号）。
+  //   此函数保留空转，避免历史调用点（openUserModal / 语言切换 / 职位变更）报错。
+  return;
   const t = (T().empty) || T();
   // 版本标记：附在图例末尾，用于确认浏览器加载的是最新代码
   try{
@@ -43342,6 +43952,390 @@ function usrSaveErr(d, def){
   return def || '操作失败';
 }
 
+// =====================================================================
+// ★PERM-V2-20261018（阶段 2）：新版「公共模块」权限表
+//   与后端 app.py 的 SYS_COMMON_DEFAULTS / COMMON_OPTION_SETS 严格一一对应，
+//   保存写入 users.perms.common（旧区块权限继续走原来的 flat 结构，互不干扰）。
+// =====================================================================
+var COMMON_PERM_DEFS = [
+  { mod:'看板', rows:[
+      {k:'dashboard', n:'整个看板', o:['hide','view'], d:'view'}
+  ]},
+  { mod:'签约项目', rows:[
+      {k:'won_list',       n:'列表整体（可见即可看全部行）', o:['hide','view'], d:'view'},
+      {k:'won_btn_add',    n:'新建签约按钮',   o:['hide','edit'], d:'hide'},
+      {k:'won_btn_export', n:'导出 Excel 按钮', o:['hide','edit'], d:'hide'},
+      {k:'won_row_view',   n:'行内 · 查看',    o:['hide','edit'], d:'hide'},
+      {k:'won_row_copy',   n:'行内 · 复制',    o:['hide','edit'], d:'hide'},
+      {k:'won_row_edit',   n:'行内 · 编辑',    o:['hide','edit'], d:'hide'},
+      {k:'won_row_delete', n:'行内 · 删除',    o:['hide','edit'], d:'hide'}
+  ]},
+  { mod:'财务管理', rows:[
+      {k:'fin_vn',   n:'越南财务报表',                o:['hide','view','edit'], d:'view'},
+      {k:'fin_cn',   n:'中国财务报表',                o:['hide','view','edit'], d:'view'},
+      {k:'fin_rest', n:'合并报表 / 越南看板 / 合并看板（三合一，只读）', o:['hide','view'], d:'view'}
+  ]},
+  { mod:'股东权益', rows:[
+      {k:'eq_data',     n:'总投资 / 中国投资 / 越南投资（三合一，不可隐藏）', o:['view','edit'], d:'view'},
+      {k:'eq_holders',  n:'股东结构', o:['hide','view','edit'], d:'hide'},
+      {k:'eq_dividend', n:'分红记录', o:['hide','view','edit'], d:'hide'}
+  ]},
+  { mod:'用户与授权', rows:[
+      {k:'usr_l1', block:'USR-L1', n:'用户列表',          o:['hide','company'], d:'hide', labels:{company:'显示用户列表'}},
+      {k:'usr_d1', block:'USR-D1', n:'编辑用户权限（弹窗）', o:['hide','allow'],   d:'hide', labels:{allow:'允许编辑'}},
+      {k:'usr_d2', block:'USR-D2', n:'新增用户',          o:['hide','allow'],   d:'hide', labels:{allow:'允许新增'}},
+      {k:'usr_d3', block:'USR-D3', n:'删除/停用用户',      o:['hide','allow'],   d:'hide', labels:{allow:'允许删除/停用'}}
+  ]}
+];
+var COMMON_LEVEL_LABEL = { hide:'隐藏', view:'查看（只读）', edit:'编辑（可修改）' };
+// 公共模块组名 → i18n key（中文即兜底）
+var COMMON_MOD_KEY = { '看板':'perm_g_dashboard', '签约项目':'perm_g_won', '财务管理':'perm_g_finance', '股东权益':'perm_g_equity', '用户与授权':'perm_g_usr' };
+
+// ★PERM-V2-20261018：颜色区分 —— 每组一个色系（标题色条 + 行底斑马纹），下拉按级别变色
+var PERM_GROUP_COLORS = [
+  { head:'#2b579a', bar:'#2b579a', bg:'#eef3fb' },   // 蓝
+  { head:'#b35900', bar:'#e67e22', bg:'#fdf3e7' },   // 橙
+  { head:'#1e7e34', bar:'#28a745', bg:'#eef8ee' },   // 绿
+  { head:'#6a1b9a', bar:'#8e44ad', bg:'#f6eefb' },   // 紫
+  { head:'#b71c1c', bar:'#e53935', bg:'#fdeeee' },   // 红
+  { head:'#00695c', bar:'#00897b', bg:'#e9f5f3' },   // 青
+  { head:'#37474f', bar:'#546e7a', bg:'#eef1f3' },   // 灰蓝
+  { head:'#8d6e00', bar:'#c0a020', bg:'#fbf7e7' }    // 黄褐
+];
+var PERM_LEVEL_COLORS = { hide:'#ffcdd2', view:'#fff9c4', edit:'#c8e6c9', approve:'#bbdefb', inherit:'#f5f5f5' };
+function _permSelColor(v){ return PERM_LEVEL_COLORS[v] || ''; }
+
+// ★统一取词：优先 __EXTRA_I18N（新版文案全在这里），再回退主字典，最后用中文兜底。
+//   不用普通 T() 取，是因为新增 key 没写进锁死的 I18N 字典。
+function _permTr(key, fallback){
+  try{
+    var lang = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh';
+    var E = window.__EXTRA_I18N;
+    if (E && E[key] && E[key][lang] !== undefined) return E[key][lang];
+    var t = (typeof T === 'function') ? (T().empty || T()) : null;
+    if (t && t[key] !== undefined) return t[key];
+  }catch(e){}
+  return fallback;
+}
+
+function _commonStateFor(uid){
+  const base = (uid && PERMS_STATE && PERMS_STATE[uid]) ? PERMS_STATE[uid] : {};
+  const st = (base && base.common) ? base.common : {};
+  return (st && typeof st === 'object') ? st : {};
+}
+
+function buildCommonPerm(uid){
+  const wrap = document.getElementById('commonPerm');
+  if(!wrap) return;
+  const st = _commonStateFor(uid);
+  // ★PERM-V2-20261018：USR-* 的值仍存在旧 flat 区块里（perms['USR-L1'].decision），
+  //   渲染时从区块读取；保存时再映射回去（见 saveModal 的 USR_KEY_MAP）。
+  const userBlocks = (uid && typeof PERMS_STATE !== 'undefined' && PERMS_STATE[uid]) ? PERMS_STATE[uid] : {};
+  const _posInput = document.getElementById('f-position');
+  const _editPos = uid
+    ? ((typeof usersData !== 'undefined') ? ((usersData.find(function(x){ return x.id === uid; }) || {}).position || '') : '')
+    : (_posInput ? _posInput.value : '');
+  // 观察者与「用户与授权」组无关 → 不渲染该组（与旧版权限表行为一致）
+  const _observerLock = (typeof _isObserverPos === 'function') ? _isObserverPos({ position: _editPos }) : false;
+  const levelOf = function(it){
+    let v;
+    if (it.block) {
+      v = (userBlocks[it.block] || {}).decision;
+    } else {
+      v = st[it.k];
+    }
+    // ★PERM-V2-FIX-20261019：值可能是字符串（'hide'）或对象（{decision:'hide'}），
+    //   必须统一取 decision 后再比对选项，否则存了「隐藏」却回显成系统默认「查看」。
+    let d = (v && typeof v === 'object') ? (v.decision || v.level) : v;
+    if (typeof d === 'string') d = d.trim();
+    if (d && it.o.indexOf(d) >= 0) return d;
+    return it.d;                       // 未配置 → 系统默认
+  };
+  // 三语：图例（写死中文做兜底）
+  try{
+    const lg = document.getElementById('commonLegend');
+    if (lg) lg.textContent = _permTr('perm_common_legend', '按模块统一授权：隐藏 / 查看（只读，看得见但改不了）/ 编辑（可增删改）。');
+  }catch(_e){}
+  // ★编号：主编号 = 组序号（1..n），子编号 = 组内行号（1.1 / 1.2 …）
+  // ★颜色：每组一个色系（标题色条 + 行底斑马纹），下拉按级别变色（隐藏红/查看黄/编辑绿）
+  let gi = 0;
+  wrap.innerHTML = COMMON_PERM_DEFS.map(function(g){
+    if (_observerLock && g.mod === '用户与授权') return '';
+    gi++;
+    const c = PERM_GROUP_COLORS[(gi - 1) % PERM_GROUP_COLORS.length];
+    const gLabel = gi + ' ' + _permTr(COMMON_MOD_KEY[g.mod], g.mod);
+    let ri = 0;
+    const rows = g.rows.map(function(it){
+      ri++;
+      const cur = levelOf(it);
+      const opts = it.o.map(function(o){
+        const lbl = (it.labels && it.labels[o])
+          ? _permTr('perm_c_' + it.k + '_' + o, it.labels[o])
+          : _permTr('perm_lv_' + o, COMMON_LEVEL_LABEL[o] || o);
+        return `<option value="${o}"${o===cur?' selected':''}>${lbl}</option>`;
+      }).join('');
+      const nameLbl = gi + '.' + ri + ' ' + _permTr('perm_c_' + it.k, it.n);
+      const rowBg = (ri % 2 === 1) ? c.bg : '#ffffff';
+      return `<div class="cperm-row" data-key="${it.k}" style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-bottom:1px solid ${c.bar}22;background:${rowBg};">
+        <span class="cperm-name" style="flex:1;min-width:0;font-size:13px;">${nameLbl}</span>
+        <select class="cperm-sel" style="min-width:150px;padding:3px 6px;background:${_permSelColor(cur)};">${opts}</select>
+      </div>`;
+    }).join('');
+    return `<div class="cperm-group" style="margin-bottom:10px;">
+      <div class="cperm-gh" style="font-weight:600;font-size:13px;color:${c.head};background:${c.bg};border-left:4px solid ${c.bar};padding:5px 8px;border-radius:4px 4px 0 0;">${gLabel}</div>
+      <div class="cperm-rows" style="border:1px solid ${c.bar}33;border-top:none;border-radius:0 0 4px 4px;overflow:hidden;">${rows}</div>
+    </div>`;
+  }).join('');
+  // 下拉选值变化 → 立即同步级别底色（隐藏红 / 查看黄 / 编辑绿）
+  wrap.querySelectorAll('select.cperm-sel').forEach(function(sel){
+    const sync = function(){ sel.style.background = _permSelColor(sel.value); };
+    sel.addEventListener('change', sync);
+    sync();
+  });
+}
+
+function collectCommon(){
+  const out = {};
+  document.querySelectorAll('#commonPerm .cperm-row').forEach(function(row){
+    const k = row.getAttribute('data-key');
+    const sel = row.querySelector('select.cperm-sel');
+    if (k && sel) out[k] = sel.value;
+  });
+  return out;
+}
+
+// =====================================================================
+// ★PERM-V2-20261018（阶段 3）：按项目授权 —— 全局模板 + 单项目覆盖
+//   perms.proj_default   → 全局模板（17 项，适用于所有项目）
+//   perms.projects[pid]  → 仅存被覆盖的项（下拉选「跟随模板」= 不写入）
+//   与后端 app.py 的 SYS_PROJ_DEFAULTS 严格一一对应。
+// =====================================================================
+var PROJ_PERM_DEFS = [
+  { mod:'perm_g_worklog', rows:[
+      {k:'wl_daily',       n:'每日记录报告', o:['hide','view','edit'], d:'view'},
+      {k:'wl_mywork',      n:'我的工作',     o:['hide','view','edit'], d:'view'}
+  ]},
+  { mod:'perm_g_production', rows:[
+      {k:'prod_A',         n:'A 工厂概况',   o:['hide','view','edit'], d:'view'},
+      {k:'prod_B',         n:'B 生产计划',   o:['hide','view','edit'], d:'view'},
+      {k:'prod_C',         n:'C 人员(日)',   o:['hide','view','edit'], d:'view'},
+      {k:'prod_D',         n:'D 原料库存',   o:['hide','view','edit'], d:'view'},
+      {k:'prod_D_receipt', n:'└ 提交收货单按钮（隐藏 / 发起审批）', o:['hide','approve'], d:'hide'},
+      {k:'prod_E',         n:'E 每日生产',   o:['hide','view','edit'], d:'view'},
+      {k:'prod_H',         n:'H 入库与出库', o:['hide','view','edit'], d:'view'},
+      {k:'prod_F',         n:'F 设备与故障', o:['hide','view','edit'], d:'view'}
+  ]},
+  { mod:'perm_g_install', rows:[
+      {k:'inst_A', n:'A 可视化-分区式安装总规划', o:['hide','view','edit'], d:'view'},
+      {k:'inst_B', n:'B 安装计划详细安排',       o:['hide','view','edit'], d:'view'},
+      {k:'inst_C', n:'C 人工-天气-安装量',       o:['hide','view','edit'], d:'view'}
+  ]},
+  { mod:'perm_g_library', rows:[
+      {k:'lib',      n:'独立项目资料', o:['hide','view','edit'], d:'view'},
+      {k:'contract', n:'合同占位文档', o:['hide','view','edit'], d:'hide'}
+  ]},
+  { mod:'perm_g_approval', rows:[
+      {k:'approval', n:'审批中心（编辑 = 可处理本项目相关审批）', o:['hide','view','edit'], d:'hide'}
+  ]}
+];
+
+var _LV_FALLBACK = { hide:'隐藏', view:'查看（只读）', edit:'编辑（可修改）', approve:'发起审批', inherit:'跟随模板' };
+
+function _projLevelOf(store, it){
+  let v = store[it.k];
+  if (typeof v === 'string') v = { decision: v };
+  if (v && v.decision && it.o.indexOf(v.decision) >= 0) return v;
+  // ★PROJ-HIDE-DEF-20261019（用户要求）：按项目授权未单独设置 = 默认「隐藏」；
+  //   全局模板已整体删除，不再作为回退来源。
+  return { decision: 'hide', approvers: [] };
+}
+
+function _renderProjRows(scopeId, store, mode){
+  // ★编号：主编号 = 组序号，子编号 = 组内行号（与公共模块表同一风格）
+  // ★颜色：每组一个色系 + 行底斑马纹；下拉按当前值变色（隐藏红 / 查看黄 / 编辑绿 / 发起审批蓝）
+  // ★PROJ-HIDE-DEF-20261019：已删除「跟随模板」选项 —— 每行直接选 隐藏/查看/编辑(/发起审批)
+  let gi = 0;
+  return PROJ_PERM_DEFS.map(function(g){
+    gi++;
+    const c = PERM_GROUP_COLORS[(gi - 1) % PERM_GROUP_COLORS.length];
+    let ri = 0;
+    const gLabel = gi + ' ' + _permTr(g.mod, g.mod);
+    const rows = g.rows.map(function(it){
+      ri++;
+      const cur = _projLevelOf(store, it);
+      const selVal = cur.decision;
+      const opts = it.o.slice();
+      const optHtml = opts.map(function(o){
+        const lbl = _permTr('perm_lv_' + o, _LV_FALLBACK[o] || o);
+        const selected = (cur.decision === o);
+        return `<option value="${o}"${selected?' selected':''}>${lbl}</option>`;
+      }).join('');
+      let apprHtml = '';
+      if (it.k === 'prod_D_receipt'){
+        const activeUsers = (typeof usersData !== 'undefined') ? usersData.filter(u=>u.active) : [];
+        const boxes = activeUsers.map(function(u){
+          const uname = u.login || u.username || '';
+          const checked = ((cur.approvers||[]).indexOf(uname) >= 0) ? 'checked' : '';
+          return `<label style="margin-right:8px;white-space:nowrap;"><input type="checkbox" data-username="${uname}" ${checked}> ${u.name||uname}</label>`;
+        }).join('');
+        const show = (cur.decision === 'approve') ? 'block' : 'none';
+        apprHtml = `<div class="p-appr" data-scope="${scopeId}" data-key="${it.k}" style="display:${show};margin:2px 0 6px 16px;font-size:12px;color:#555;">${boxes}</div>`;
+      }
+      const rowBg = (ri % 2 === 1) ? c.bg : '#ffffff';
+      return `<div class="pperm-row" data-scope="${scopeId}" data-key="${it.k}" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-bottom:1px solid ${c.bar}22;background:${rowBg};">
+        <span class="pperm-name" style="flex:1;min-width:0;font-size:12.5px;">${gi + '.' + ri + ' ' + _permTr('perm_p_'+it.k, it.n)}</span>
+        <select class="pperm-sel" style="min-width:150px;padding:2px 4px;background:${_permSelColor(selVal)};">${optHtml}</select>
+      </div>${apprHtml}`;
+    }).join('');
+    return `<div class="pperm-group" style="margin-bottom:8px;">
+      <div style="font-weight:600;font-size:12.5px;color:${c.head};background:${c.bg};border-left:4px solid ${c.bar};padding:4px 8px;border-radius:4px 4px 0 0;">${gLabel}</div>
+      <div style="border:1px solid ${c.bar}33;border-top:none;border-radius:0 0 4px 4px;overflow:hidden;">${rows}</div>
+    </div>`;
+  }).join('');
+}
+
+function _projStateFor(uid){
+  const base = (uid && typeof PERMS_STATE !== 'undefined' && PERMS_STATE[uid]) ? PERMS_STATE[uid] : {};
+  return {
+    tpl: (base.proj_default && typeof base.proj_default === 'object') ? base.proj_default : {},
+    prj: (base.projects && typeof base.projects === 'object') ? base.projects : {}
+  };
+}
+
+var _PROJ_CACHE = null;
+async function _ensureProjList(){
+  if (_PROJ_CACHE) return _PROJ_CACHE;
+  try{
+    const r = await fetch('/api/library/projects', { headers: (typeof authHeaders === 'function' ? authHeaders() : {}) });
+    const d = await r.json();
+    _PROJ_CACHE = Array.isArray(d) ? d : [];
+  }catch(e){ _PROJ_CACHE = []; }
+  return _PROJ_CACHE;
+}
+
+async function buildProjPerm(uid){
+  const wrap = document.getElementById('projPerm');
+  if(!wrap) return;
+  const st = _projStateFor(uid);
+  // ★PERM-KEEP-OPEN-20261019（用户要求：点保存后下拉列表不要收缩回去，保持原样）：
+  //   重建表格前先记下「已展开的项目 / 搜索词 / 滚动位置」，渲染完成后原样还原。
+  const _prevOpen = Array.prototype.map.call(wrap.querySelectorAll('.pproj[open]'), function(d){ return String(d.getAttribute('data-pid')); });
+  const _prevSearchEl = document.getElementById('projSearch');
+  const _prevSearch = _prevSearchEl ? _prevSearchEl.value : '';
+  const _prevListEl = document.getElementById('projList');
+  const _prevListScroll = _prevListEl ? _prevListEl.scrollTop : 0;
+  const _prevWrapScroll = wrap.scrollTop || 0;
+  try{
+    const lg = document.getElementById('projLegend');
+    if (lg) lg.textContent = _permTr('perm_proj_legend', '按项目授权：每个项目单独设置；未单独授权的项目模块一律隐藏。查看的人不可编辑。');
+  }catch(_e){}
+  wrap.innerHTML = `<div style="padding:6px;color:#888;font-size:12px;">${_permTr('perm_proj_loading','项目列表加载中…')}</div>`;
+  const list = await _ensureProjList();
+
+  const projHtml = list.map(function(p){
+    const store = st.prj[String(p.id)] || {};
+    const title = [p.contract_no, p.customer, p.province].filter(Boolean).join(' · ') || ('PID ' + p.id);
+    // ★PERM-V2-WHOLE-20261019：标题行「整个项目：隐藏/查看」（默认隐藏）
+    const wholeCur = _projLevelOf(store, { k:'whole', o:['hide','view'] }).decision;
+    return `<details class="pproj" data-pid="${p.id}" style="border:1px solid #eee;border-radius:4px;margin-bottom:6px;">
+      <summary style="cursor:pointer;padding:6px 8px;font-size:12.5px;display:flex;align-items:center;gap:8px;">
+        <span style="flex:1;min-width:0;">${title}</span>
+        <span class="pperm-row" data-scope="${p.id}" data-key="whole" onclick="event.stopPropagation();" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;flex:none;">
+          ${_permTr('perm_p_whole','整个项目')}
+          <select class="pperm-sel" style="min-width:100px;padding:2px 4px;background:${_permSelColor(wholeCur)};">
+            <option value="hide"${wholeCur==='hide'?' selected':''}>${_permTr('perm_lv_hide','隐藏')}</option>
+            <option value="view"${wholeCur==='view'?' selected':''}>${_permTr('perm_lv_show','显示')}</option>
+          </select>
+        </span>
+      </summary>
+      <div class="pproj-body" style="padding:4px 10px 8px;">${_renderProjRows(String(p.id), store, 'proj')}</div>
+    </details>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div style="font-weight:600;font-size:13px;margin:6px 0 6px;">${_permTr('perm_proj_list_title','按项目授权（未设置 = 隐藏）')}</div>
+    <input id="projSearch" placeholder="${_permTr('perm_proj_search_ph','搜索项目（合同号 / 客户 / 省份）')}" style="width:100%;max-width:360px;padding:5px 8px;margin-bottom:8px;" />
+    <div id="projList">${list.length ? projHtml : `<div style="color:#888;font-size:12px;padding:6px;">${_permTr('perm_proj_empty','暂无签约项目')}</div>`}</div>
+  `;
+
+  // 搜索过滤
+  const si = document.getElementById('projSearch');
+  if (si){
+    si.addEventListener('input', function(){
+      const q = (this.value || '').toLowerCase();
+      document.querySelectorAll('#projList .pproj').forEach(function(el){
+        const s = el.querySelector('summary');
+        const t = (s ? (s.textContent || '') : '').toLowerCase();
+        el.style.display = (!q || t.indexOf(q) >= 0) ? '' : 'none';
+      });
+    });
+  }
+  // 联动：只有选「发起审批」才显示审批人多选；同时同步级别底色
+  wrap.querySelectorAll('select.pperm-sel').forEach(function(sel){
+    const row = sel.closest('.pperm-row');
+    if (!row) return;
+    const k = row.getAttribute('data-key');
+    const scope = row.getAttribute('data-scope');
+    const appr = wrap.querySelector('.p-appr[data-scope="' + scope + '"][data-key="' + k + '"]');
+    const sync = function(){
+      if (appr) appr.style.display = (sel.value === 'approve') ? 'block' : 'none';
+      sel.style.background = _permSelColor(sel.value);
+    };
+    sel.addEventListener('change', sync);
+    sync();
+  });
+  // ★PERM-KEEP-OPEN-20261019：还原「已展开的项目 / 搜索词 / 滚动位置」，
+  //   保存后重建表格时保持用户原来的样子，不让下拉（折叠）收缩回去。
+  try{
+    if (si && _prevSearch){
+      si.value = _prevSearch;
+      si.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (_prevOpen.length){
+      _prevOpen.forEach(function(pid){
+        const d = wrap.querySelector('.pproj[data-pid="' + pid + '"]');
+        if (d) d.open = true;
+      });
+    }
+    wrap.scrollTop = _prevWrapScroll;
+    const _pl2 = document.getElementById('projList');
+    if (_pl2) _pl2.scrollTop = _prevListScroll;
+  }catch(_e2){}
+}
+
+function collectProjDefault(){
+  const out = {};
+  document.querySelectorAll('#projTpl .pperm-row').forEach(function(row){
+    const k = row.getAttribute('data-key');
+    const sel = row.querySelector('select.pperm-sel');
+    if (k && sel) out[k] = sel.value;
+  });
+  return out;
+}
+
+function collectProjects(){
+  const out = {};
+  document.querySelectorAll('#projList .pproj').forEach(function(pEl){
+    const pid = pEl.getAttribute('data-pid');
+    const obj = {};
+    pEl.querySelectorAll('.pperm-row').forEach(function(row){
+      const k = row.getAttribute('data-key');
+      const sel = row.querySelector('select.pperm-sel');
+      if (!k || !sel) return;
+      // ★PROJ-HIDE-DEF-20261019：「跟随模板」选项已删除，每行都显式写入（未改动的行 = 隐藏）
+      if (k === 'prod_D_receipt' && sel.value === 'approve'){
+        const ap = pEl.querySelector('.p-appr[data-scope="' + pid + '"][data-key="prod_D_receipt"]');
+        const apprs = ap ? Array.from(ap.querySelectorAll('input[type=checkbox]:checked')).map(c => String(c.dataset.username || '')).filter(Boolean) : [];
+        obj[k] = { decision: 'approve', approvers: apprs };
+      } else {
+        obj[k] = sel.value;
+      }
+    });
+    if (Object.keys(obj).length) out[pid] = obj;                  // 只存有覆盖的项目
+  });
+  return out;
+}
+
 async function saveModal(){
   if (managerLogins.length === 0) {
     try {
@@ -43361,22 +44355,57 @@ async function saveModal(){
   // 账号必须为小写字母/数字组合（与业务表 owner_user_id、销售下拉一一对应的前提）
   if(!_loginValid(login)){ showLoginFmtTip(); return; }
   // 分别读取两个方向的授权（独立、可不对称）
-  const selHe=Array.from(document.querySelectorAll("#visHeCanSee input:checked")).map(c=>+c.dataset.uid);
-  const selMe=Array.from(document.querySelectorAll("#visCanSeeMe input:checked")).map(c=>+c.dataset.uid);
-  // 组装 perms：从已渲染的 perm-row 读取每行的 decision + 审批人
-  const perms={};
-  document.querySelectorAll("#permGroups .perm-row:not(.perm-thead)").forEach(function(row){
-    const bid=row.getAttribute("data-block");
-    let decision=row.querySelector("select.decision").value;
-    // 保存兜底：无论浏览器跑的是哪个版本的代码，越界决策在提交前一律纠正
-    if(decision==='approve' && !NEED_APPROVE_DEC.has(bid)) decision='default';
-    if(decision==='company' && NO_COMPANY_DEC.has(bid))    decision='default';
-    // 销售/销售总监：5 个 WON 权限锁死（保存路径第三重保险，与渲染层/服务端一致）
-    const _posEl=document.getElementById("f-position");
-    if(_posEl && _isSalesPos({position:_posEl.value}) && SALES_LOCKED_WON.has(bid)) decision='hide';
-    const approvers=Array.from(row.querySelectorAll(".a-menu input[type=checkbox]:checked")).map(c=>String(c.dataset.username||'')).filter(Boolean);
-    perms[bid]={ decision:decision, approvers:approvers };
+  // ★USR-NOVIS-20261018：「数据范围」页签已移除，两个 checklist 不再存在。
+  //   此时【必须沿用内存里的现有授权】（编辑=VIS/VIS_ME 原值；新增=空），
+  //   否则 querySelectorAll 取到空 → 提交空数组 → 后端会把该用户已有的数据范围授权全部清空（数据事故）。
+  const visHeBox=document.getElementById("visHeCanSee");
+  const visMeBox=document.getElementById("visCanSeeMe");
+  let selHe, selMe;
+  if (visHeBox && visMeBox){
+    selHe=Array.from(visHeBox.querySelectorAll("input:checked")).map(c=>+c.dataset.uid);
+    selMe=Array.from(visMeBox.querySelectorAll("input:checked")).map(c=>+c.dataset.uid);
+  } else {
+    // 来源用户：编辑=被编辑用户；复制=来源用户（openUserModal 里记的 __curVisUid）
+    const vUid = (window.__curVisUid !== undefined && window.__curVisUid !== null) ? window.__curVisUid : curUid;
+    selHe = (vUid && typeof VIS!=="undefined" && VIS[vUid]) ? VIS[vUid].slice() : [];
+    selMe = (vUid && typeof VIS_ME!=="undefined" && VIS_ME[vUid]) ? VIS_ME[vUid].slice() : [];
+  }
+  // 组装 perms（★PERM-V2-20261018）：
+  //   1) 旧区块（WON-L1/APP-* 等）已不在 UI 渲染 —— 编辑/复制时【沿用原值】，绝不清空
+  //      （permVisible / curRawDecision 等导航门控仍读这些 flat 键）；
+  //   2) USR-L1/D1/D2/D3 由新版公共模块表渲染（usr_* 键），保存时映射回旧区块键（后端 _usr_op_gate 依赖）；
+  //   3) 新版权限挂在 common/proj_default/projects/lib_file_overrides 四个平级键，后端 _split_perms() 归一。
+  const blockPerms={};
+  const _srcUid = (window.__curVisUid !== undefined && window.__curVisUid !== null) ? window.__curVisUid : curUid;
+  const _prevBlocks = (_srcUid && typeof PERMS_STATE !== 'undefined' && PERMS_STATE[_srcUid]) ? PERMS_STATE[_srcUid] : {};
+  Object.keys(_prevBlocks).forEach(function(bid){
+    if (bid==='common' || bid==='proj_default' || bid==='projects' || bid==='lib_file_overrides') return;
+    const p=_prevBlocks[bid];
+    if (p && typeof p==='object' && p.decision!==undefined){
+      blockPerms[bid]={ decision:p.decision, approvers:(p.approvers||[]).slice() };
+    }
   });
+  const _commonCollected = (typeof collectCommon==='function') ? collectCommon() : {};
+  const USR_KEY_MAP = { usr_l1:'USR-L1', usr_d1:'USR-D1', usr_d2:'USR-D2', usr_d3:'USR-D3' };
+  Object.keys(USR_KEY_MAP).forEach(function(ck){
+    if (_commonCollected[ck] !== undefined){
+      blockPerms[USR_KEY_MAP[ck]] = { decision:_commonCollected[ck], approvers:[] };
+      delete _commonCollected[ck];
+    }
+  });
+  // ★防"变回默认"兜底：新版表是异步渲染的（项目列表要 fetch），若保存时还没渲染完，
+  //   collect* 会返回空对象 —— 直接写库就等于把已配好的权限清空、全部退回默认值。
+  //   因此：本次采集为空 且 内存里原本有值 → 沿用原值，绝不用空覆盖。
+  const _keep = function(collected, prevKey){
+    if (collected && Object.keys(collected).length) return collected;
+    return (_prevBlocks[prevKey] && typeof _prevBlocks[prevKey] === 'object') ? _prevBlocks[prevKey] : (collected || {});
+  };
+  const perms = {};
+  Object.keys(blockPerms).forEach(function(k){ perms[k]=blockPerms[k]; });
+  perms.common = _keep(_commonCollected, 'common');
+  perms.proj_default = _keep((typeof collectProjDefault==='function') ? collectProjDefault() : {}, 'proj_default');
+  perms.projects = _keep((typeof collectProjects==='function') ? collectProjects() : {}, 'projects');
+  perms.lib_file_overrides = (typeof collectFileOverrides==='function') ? collectFileOverrides() : {};
 
   const payload={
     real_name:name,
@@ -43430,6 +44459,14 @@ async function saveModal(){
         const _na = ((perms[bid]||{}).approvers||[]).join(',');
         if (_o!==_n || _oa!==_na) _changes.push({bid:bid, before:_o, after:_n});
       });
+      // ★PERM-V2-20261018（阶段 2）：新版权限区（common / proj_default / projects / 文件覆盖）
+      //   数据结构不是 {decision,approvers}，上面的比对检不出来 —— 必须单独整段比对，
+      //   否则被授权人（USR-D1）只改新版权限时会被误判成「没有权限变更」而无法提交审批。
+      ['common','proj_default','projects','lib_file_overrides'].forEach(function(sk){
+        const _o = JSON.stringify(_before[sk] || {});
+        const _n = JSON.stringify(perms[sk] || {});
+        if (_o !== _n) _changes.push({bid:sk, before:_o, after:_n});
+      });
       if (!_changes.length) { showAlert(t.usr_nochange || '没有权限变更'); return; }
       _pl = { uid:curUid, name:name, login:login, changes:_changes, perms:perms, vis_can_see_me:selMe, vis_he_can_see:selHe, delegate_to:payload.delegate_to, position:payload.position, status:payload.status, managers:selectedManagers };
     } else {
@@ -43473,6 +44510,23 @@ async function saveModal(){
                 //   避免重复创建同一用户。
                 if (!curUid && d && d.id) { curUid = d.id; }
                 loadUsers();
+                // ★PERM-V2-20261018：立即把本次保存的权限写回内存。
+                //   原因：loadUsers() 是异步的，若保存后马上重开弹窗，PERMS_STATE 还是旧值，
+                //   界面就会显示成"默认"（实际已入库） —— 这就是"保存后变回默认"的根因。
+                try{
+                  const _tUid = curUid || (d && d.id) || null;
+                  if (_tUid && typeof PERMS_STATE !== 'undefined'){
+                    const _pp = (typeof payload.perms === 'string') ? JSON.parse(payload.perms || '{}') : (payload.perms || {});
+                    PERMS_STATE[_tUid] = _pp;
+                    if (typeof buildCommonPerm === 'function') buildCommonPerm(_tUid);
+                    if (typeof buildProjPerm === 'function') buildProjPerm(_tUid);
+                    // 改的是自己 → 立刻对自己的界面生效（导航显隐等）
+                    if (authUser && String(authUser.id) === String(_tUid)){
+                      authUser.perms = _pp;
+                      if (typeof applyAllPermVisibility === 'function'){ try{ applyAllPermVisibility(); }catch(e){} }
+                    }
+                  }
+                }catch(_e){}
               } else {
                 showToast(usrSaveErr(d2, t.user_admin_save_fail || '管理员名单保存失败'));
               }
@@ -44512,7 +45566,7 @@ function applyWonLang() {
   var t = T(); 
   el('wonTitle').innerText = t.wonTitle; 
   el('btnAddWon').innerText = t.btnAddWon; 
-  el('btnOverview').innerText = t.btnOverview; 
+  /* ★WON-REMOVE-OVERVIEW-20261019：按钮已删除，不再刷文案 */
   el('btnExportWonExcel').innerText = t.btnExportExcel; 
   el('wbtnSave').innerText = t.btnSave; 
   el('wbtnCancel').innerText = t.btnCancel; 
@@ -50445,7 +51499,14 @@ async function loadWon() {
     list=await resp.json(); if(!Array.isArray(list)) list=null; } catch(e){}
   // 不再回退到 SEED_WON：API 失败或返回空时，均按"空列表"处理，
   // 确保数据库清空后界面也显示为空。
-  if(!list) list=[]; 
+  if(!list) list=[];
+  // ★PERM-V2-WHOLE-20261019：「整个项目=隐藏」的项目，对该用户彻底不可见
+  //   （签约表行 / 工作日志 / 生产 / 安装卡片 / 导出全部一起生效；超级用户不受限）。
+  try{
+    if (typeof window._projWholeVisible === 'function'){
+      list = list.filter(function(p){ return window._projWholeVisible(p.id); });
+    }
+  }catch(e){}
   globalWonData = list;
   originalWonData = list.slice();
   renderWonData(list);
@@ -51234,6 +52295,19 @@ function cpGetMonthName(m) {
 
 window.cpOpenCalendar = function(inputEl) {
   if (inputEl && inputEl.disabled) return;
+  // ★PROD-DATE-RANGE-20261019 兜底：每日生产的 #pe_date 若因旧渲染路径缺少 data-min/data-max，
+  //   在打开日历时补上（[开始生产日期, 今天]），保证无论从哪条路径打开都受限。
+  try {
+    if (inputEl && inputEl.id === 'pe_date') {
+      if (!inputEl.getAttribute('data-max') && typeof window.prod_today === 'function') {
+        inputEl.setAttribute('data-max', (typeof ymdToDmy === 'function') ? ymdToDmy(prod_today()) : prod_today());
+      }
+      if (!inputEl.getAttribute('data-min') && typeof window.prod_startProdYmd === 'function') {
+        var _st = prod_startProdYmd((typeof prod_get === 'function') ? prod_get(window.PROD_CUR) : null);
+        if (_st) inputEl.setAttribute('data-min', ymdToDmy(_st));
+      }
+    }
+  } catch(e) {}
   cpCalTarget = inputEl;
   var rect = inputEl.getBoundingClientRect();
   var popup = document.getElementById('cpCalPopup');
@@ -51284,6 +52358,25 @@ function cpCalSetYM() {
 }
 /* 选中某日（供 inline onclick 调用，避免事件委托失效/被全局监听劫持） */
 function cpCalPick(d) {
+  // ★PROD-DATE-RANGE-20261019：兜底 —— 即使 UI 没渲染出 disabled，也拒绝选中 data-min/max 外的日期
+  if (cpCalTarget){
+    var maxS = cpCalTarget.getAttribute('data-max'), minS = cpCalTarget.getAttribute('data-min');
+    // ★PROD-DATE-RANGE-20261019：#pe_date 不论有没有 data 属性，都按 [开始生产日期, 今天] 判
+    if (cpCalTarget.id === 'pe_date' && typeof prod_today === 'function'){
+      if (!maxS) maxS = ymdToDmy(prod_today());
+      if (!minS && typeof prod_startProdYmd === 'function'){
+        var _sp = prod_startProdYmd((typeof prod_get === 'function') ? prod_get(window.PROD_CUR) : null);
+        if (_sp) minS = ymdToDmy(_sp);
+      }
+    }
+    var selYmd = { y: cpCalViewYear, m: cpCalViewMonth, d: d };
+    var maxP = maxS ? cpParseDDMMYYYY(maxS) : null;
+    var minP = minS ? cpParseDDMMYYYY(minS) : null;
+    if (maxP && (selYmd.y > maxP.y || (selYmd.y === maxP.y && selYmd.m > maxP.m) ||
+        (selYmd.y === maxP.y && selYmd.m === maxP.m && d > maxP.d))){ return; }
+    if (minP && (selYmd.y < minP.y || (selYmd.y === minP.y && selYmd.m < minP.m) ||
+        (selYmd.y === minP.y && selYmd.m === minP.m && d < minP.d))){ return; }
+  }
   var val = cpFmtDDMMYYYY(cpCalViewYear, cpCalViewMonth, d);
   if (cpCalTarget) {
     cpCalTarget.value = val;
@@ -51322,6 +52415,19 @@ function cpRenderCal(selected) {
   if (cpCalTarget && cpCalTarget.getAttribute('data-min')) {
     var minP = cpParseDDMMYYYY(cpCalTarget.getAttribute('data-min'));
     if (minP) minDate = new Date(minP.y, minP.m, minP.d, 0, 0, 0, 0);
+  }
+  // ★PROD-DATE-RANGE-20261019：每日生产 #pe_date 无论有没有 data 属性，渲染时都按
+  //   [开始生产日期, 今天] 算一次；未来日期一律 disabled（这是日历层的最终保障）。
+  if (cpCalTarget && cpCalTarget.id === 'pe_date') {
+    if (!maxDate && typeof prod_today === 'function') {
+      var _tm = cpParseDDMMYYYY(ymdToDmy(prod_today()));
+      if (_tm) maxDate = new Date(_tm.y, _tm.m, _tm.d, 0, 0, 0, 0);
+    }
+    if (!minDate && typeof prod_startProdYmd === 'function') {
+      var _sm = prod_startProdYmd((typeof prod_get === 'function') ? prod_get(window.PROD_CUR) : null);
+      var _sp2 = _sm ? cpParseDDMMYYYY(ymdToDmy(_sm)) : null;
+      if (_sp2) minDate = new Date(_sp2.y, _sp2.m, _sp2.d, 0, 0, 0, 0);
+    }
   }
   var html = '';
   for (var i = 0; i < firstDow; i++) html += '<button type="button" class="empty" disabled></button>';
@@ -53338,6 +54444,8 @@ window.gotoPrevView = gotoPrevView;
 function switchView(name) {
   /* 离开当前页面前，把「当前页面」记入返回历史 */
   try { __pushViewHistory(name); } catch (e) {}
+  // ★PERM-V2-20261018（阶段 4）：进入视图后应用新版权限（延后一拍，等视图内容渲染完再落地）
+  try { setTimeout(function(){ try { applyNewPermUI(); } catch (e) {} }, 80); } catch (e) {}
   // 手动切换顶部标签时清除「返回来源」记录（跨模块跳转期间由 __VIEW_JUMPING 豁免）
   try { if (!window.__VIEW_JUMPING && window.__VIEW_BACK) window.__VIEW_BACK = null; } catch (e) {}
   // 权限拦截：目标视图无权限时回退到最近一个可见视图
@@ -57012,6 +58120,39 @@ function clearAuthKeep() {
   } catch(e){}
 }
 
+// ★PERM-V2-LIVE-20261019：刷新（F5）后必须回服务端拉一次最新 perms。
+//   原因：authUser 平时是从 sessionStorage 还原的快照，管理员在别处改了权限后，
+//   被改的人只是刷新页面 → 拿到的还是登录那一刻的旧 perms → "隐藏了却还能看"。
+//   以前只认 VAULT_TOKEN + /api/session（该接口实际不存在 → 404 → 静默走 catch），
+//   现在改为：有 token 走 /api/session，失败/无 token 一律回退 /api/me（返回最新 perms）。
+function refreshAuthFromServer(cb){
+  var _un = (authUser && authUser.username) || '';
+  if (!_un){ if (typeof cb === 'function') cb(); return; }
+  var _save = function(){
+    try { sessionStorage.setItem('won_auth_user', JSON.stringify(authUser)); } catch(e){}
+  };
+  var _viaMe = function(){
+    fetch(API_BASE + '/api/me?username=' + encodeURIComponent(_un), { credentials: 'include' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.user){ authUser = Object.assign({}, authUser, d.user); _save(); }
+      })
+      .catch(function(){})
+      .then(function(){ if (typeof cb === 'function') cb(); });
+  };
+  if (VAULT_TOKEN){
+    fetch(API_BASE + '/api/session', { method:'GET', headers:{ 'Authorization':'Bearer ' + VAULT_TOKEN } })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if (d && d.ok && d.user){ authUser = Object.assign({}, authUser, d.user); _save(); if (typeof cb === 'function') cb(); }
+        else _viaMe();
+      })
+      .catch(function(){ _viaMe(); });
+  } else {
+    _viaMe();
+  }
+}
+
 // 初始：仅从 sessionStorage（本次会话）恢复登录态，刷新页面不回登录页；
 // 但【不再】读取 localStorage 的"记住登录"——每次新开浏览器都必须重新输入密码（M10 安全加固）。
 (function(){
@@ -57046,28 +58187,10 @@ function clearAuthKeep() {
       hideMainContent();
     }
   }
-  // 用 sessionStorage 恢复后，向后端用 token 刷新最新 role/is_admin/perms
-  if (authUser && authUser.username && VAULT_TOKEN) {
-    fetch(API_BASE + '/api/session', {
-      method: 'GET',
-      headers: { 'Authorization': 'Bearer ' + VAULT_TOKEN }
-    })
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        if (d && d.ok && d.user) {
-          authUser = Object.assign({}, authUser, d.user);
-          try { sessionStorage.setItem('won_auth_user', JSON.stringify(authUser)); } catch(e){}
-          _afterAuthReady();
-        } else {
-          // 令牌无效/过期：清除会话回到登录页
-          try { sessionStorage.removeItem('won_auth_user'); sessionStorage.removeItem('won_vault_token'); } catch(e){}
-          authUser = null; VAULT_TOKEN = '';
-          hideMainContent();
-          var lp = document.getElementById('loginPage');
-          if (lp) lp.classList.remove('hidden');
-        }
-      })
-      .catch(function(){ _afterAuthReady(); });
+  // 用 sessionStorage 恢复后，回服务端刷新最新 role/is_admin/perms（★PERM-V2-LIVE-20261019：
+  // 无 token 或 /api/session 不可用时也必须回退 /api/me，否则刷新后仍是旧权限）
+  if (authUser && authUser.username) {
+    refreshAuthFromServer(_afterAuthReady);
   } else {
     _afterAuthReady();
   }
@@ -57098,6 +58221,8 @@ function reloadSession(silent){
         // 刷新权限可见性即可；看板/概况数据改由随后的 switchView(savedView) 按需加载，
         // 避免会话恢复时无条件 loadDashboard() 与 switchView 重复拉三张全表（2026-09-06）
         if(typeof applyAllPermVisibility === 'function'){ applyAllPermVisibility(); }
+        // ★PERM-V2-LIVE-20261019：新版公共模块/按项目权限也要跟着重算
+        try{ if(typeof applyNewPermUI === 'function') applyNewPermUI(); }catch(e){}
         var cur = null;
         try { cur = sessionStorage.getItem('won_current_view'); } catch(e){}
         // 关键：重绘当前视图的数据表——行内按钮（查看/编辑/删除/转移/转回）是渲染时按权限生成的，
@@ -57122,23 +58247,68 @@ function reloadSession(silent){
 }
 
 // 启动权限版本轮询：服务端版本号变化时，立即刷新本地会话（被改权限用户实时更新）
+// ★PERM-V2-LIVE-20261019（用户要求：保存后对方立刻生效，不用重新登录、也不用手动刷新）：
+//   恢复轻量轮询（默认 6s，只读内存版本号，一次极小的 GET，不吃数据库），
+//   版本号变化 → reloadSession 拉回最新 perms → 重算导航/视图/模块权限。
+//   基准版本 persist 到 localStorage，避免刷新页面后被当成"没变过"。
 function startPermWatch(intervalMs){
-  // 取消定时轮询（2026-09-06）：权限版本改为“页面加载/刷新”时一次性校验，
-  // 不再常驻轮询，避免持续消耗 D1 行读。权限变动需用户刷新或重开页面后生效。
   if(!authUser || !authUser.username) return;
   if(_permWatchTimer){ clearInterval(_permWatchTimer); _permWatchTimer = null; }
   _lastPermVersion = null;
+  var _un = authUser.username;
+  var _vkey = 'won_perm_ver_' + String(_un).toLowerCase();
   var pvOpts = VAULT_TOKEN
     ? { headers: { 'Authorization': 'Bearer ' + VAULT_TOKEN } }
     : { credentials: 'include' };
-  fetch(API_BASE + '/api/perm-version?username=' + encodeURIComponent(authUser.username), pvOpts)
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if(d && d.ok && typeof d.version === 'number'){
-        _lastPermVersion = d.version;   // 仅记录基准版本，不再触发自动 reloadSession
+  var _iv = Math.max(4000, parseInt(intervalMs, 10) || 6000);
+  var tick = function(){
+    if(!authUser || !authUser.username) return;
+    fetch(API_BASE + '/api/perm-version?username=' + encodeURIComponent(_un) + '&_t=' + Date.now(), pvOpts)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(!d || !d.ok || typeof d.version !== 'number') return;
+        var _base = _lastPermVersion;
+        if(_base === null){
+          // 首次：只登记基准（并回写 localStorage，供下次刷新比对）
+          try{
+            var _stored = parseInt(localStorage.getItem(_vkey) || '', 10);
+            if(!isNaN(_stored) && _stored !== d.version){ _base = _stored; }
+          }catch(e){}
+          _lastPermVersion = d.version;
+          try{ localStorage.setItem(_vkey, String(d.version)); }catch(e){}
+          // 本地基准落后于服务端（说明登录期间被改过权限）→ 立刻拉一次
+          if(_base !== null && d.version > _base) permChangedReload(d.version);
+          return;
+        }
+        if(d.version !== _base){ permChangedReload(d.version); }
+      })
+      .catch(function(){});
+  };
+  function permChangedReload(ver){
+    _lastPermVersion = ver;
+    try{ localStorage.setItem(_vkey, String(ver)); }catch(e){}
+    try{
+      if(typeof reloadSession === 'function') reloadSession(true);
+    }catch(e){}
+    try{ if(typeof applyNewPermUI === 'function') applyNewPermUI(); }catch(e){}
+    try{ if(typeof applyAllPermVisibility === 'function') applyAllPermVisibility(); }catch(e){}
+    // 当前视图被隐藏 → 自动跳到第一个可见视图
+    try{
+      var _cur = null;
+      try { _cur = sessionStorage.getItem('won_current_view'); } catch(e){}
+      if(_cur && typeof viewAllowed === 'function' && !viewAllowed(_cur) && typeof switchView === 'function'){
+        switchView(_cur);
       }
-    })
-    .catch(function(){});
+    }catch(e){}
+    try{
+      var _s = document.getElementById('toast');
+      if(_s && typeof showToast === 'function'){
+        showToast((T().empty && T().empty.perm_updated_toast) || '权限已更新，页面已刷新');
+      }
+    }catch(e){}
+  }
+  tick();
+  _permWatchTimer = setInterval(tick, _iv);
 }
 
 // switchView 需调用 loadCrm()/loadWon()，而它们定义在 crm_table.js / lost_table.js 中
@@ -67265,6 +68435,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   }
 
   function inst_openProject(id){
+    /* ★PERM-V2-WHOLE-20261019：整个项目=隐藏 → 禁止进入 */
+    try{ if (window._projWholeVisible && !window._projWholeVisible(id)){ prod_toast('无权限查看该项目 / No permission'); return; } }catch(e){}
     /* 打开项目详情前，把「安装项目列表」记为上一页（跨模块跳转时不记） */
     try{ if(!window.__VIEW_JUMPING) __pushViewHistory(); }catch(e){}
     INST_CUR = id;
@@ -67343,6 +68515,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     });
     box.innerHTML = h;
     inst_renderTab(active);
+    /* ★PROD-TABS-FIX-20261019：标签重建后用当前项目重算显隐（同生产模块） */
+    try{ setTimeout(function(){ if(typeof applyInstPerms === 'function'){ try{ applyInstPerms(); }catch(e){} } }, 0); }catch(e){}
   }
 
   /* ★ 监听甘特 #zoneTbl 小组数 / 逐栋计划变化：localStorage 在甘特 iframe 被修改后，

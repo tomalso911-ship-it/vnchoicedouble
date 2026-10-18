@@ -314,6 +314,36 @@ def row_to_dict(row):
                     d[k] = []
     return d
 
+# =====================================================================
+# ★PERM-V2-20261018：合同占位文档（资料库）
+# 必须定义在 init_db() 之前 —— init_db 在模块顶层被立即调用（见文件下方 init_db()），
+# 若定义在其后，启动时会抛 NameError。
+# =====================================================================
+
+# 合同占位文档名称：三语写死，不随语言切换
+CONTRACT_NAME = "合同-Contract-Hợp đồng"
+
+
+def _seed_contract_docs(c):
+    """为每个 won 项目自动生成一条「合同-Contract-Hợp đồng」占位文档（方案②：仅占位，等上传真实合同替换）。
+    已存在则不重复创建（幂等）；占位行 filename='' 表示尚无实体文件（下载/预览需做空容错）。"""
+    try:
+        pids = [r["id"] for r in c.execute("SELECT id FROM won_projects").fetchall()]
+    except Exception:
+        return
+    for pid in pids:
+        try:
+            ex = c.execute("SELECT id FROM library_files WHERE project_id=? AND is_contract=1", (pid,)).fetchone()
+            if ex:
+                continue
+            c.execute(
+                "INSERT INTO library_files (project_id, filename, original_name, uploader, size, is_contract) VALUES (?, '', ?, 'system', 0, 1)",
+                (pid, CONTRACT_NAME),
+            )
+        except Exception:
+            pass
+
+
 def init_db():
     conn = get_db()
     c = conn.cursor()
@@ -1000,6 +1030,18 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_library_project ON library_files(project_id)")
     except Exception:
         pass
+    # ★PERM-V2-20261018：资料库「合同占位」文档标记（每个项目自动生成一条，名称三语写死）
+    try:
+        c.execute("ALTER TABLE library_files ADD COLUMN is_contract INTEGER DEFAULT 0")
+    except Exception:
+        pass
+    try:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_library_contract ON library_files(is_contract)")
+    except Exception:
+        pass
+
+    # 为每个签约项目自动生成「合同-Contract-Hợp đồng」占位文档（方案②：仅占位，等上传真实合同替换）
+    _seed_contract_docs(c)
 
     conn.commit()
     conn.close()
@@ -2278,6 +2320,11 @@ def _visible_scope(username, block_id=None):
     - 其他：仅看 owner_user_id 属于“自己 + vis_he_can_see 指定人员”的记录；
       兼容旧数据（owner_user_id 为空）：退而按 salesperson 文本匹配同一组人。
     """
+    # ★PERM-V2-20261018（用户 2026-10-18 定）：数据范围彻底停用。
+    #   行可见性改由新权限决定 —— 签约项目 = 列表整体权限（可见即看全部行）；
+    #   工作日志 / 生产 / 安装 / 资料库 = 按项目权限。
+    #   vis_he_can_see / vis_can_see_me 字段与历史数据保留不删，但不再参与任何查询过滤。
+    return ("", [])
     if not username:
         return ("", [])
     conn = get_db()
@@ -2371,13 +2418,16 @@ def _visible_scope(username, block_id=None):
     return (clause, visible + visible)
 
 
-def _owns_row(table, pid, username):
+def _owns_row(table, pid, username, op=None):
     """后端写操作真实拦截：写权限仅限行归属者本人（防止通过数据范围授权越权修改他人数据）。
 
     - 数据范围授权（vis_he_can_see / vis_can_see_me）只授予“查看”权，不授予“写”权；
       被授权人只能读，不能修改/删除他人数据，他人数据也不会被其修改。
     - 管理员（总经理/副总经理/自由任命管理员）豁免，可写全部。
     - 未带 X-User-Name（如自动化/老调用）视为有权，向后兼容。
+    - ★PERM-V2-BRIDGE-20261019（签约项目）：op='edit'/'delete' 时，若该用户新版公共模块
+      won_row_edit / won_row_delete = 'edit' → 放行全部行（数据范围已停用，行内键=编辑即全部可写）；
+      ='hide' → 一律拒绝；未配置 → 沿用旧归属规则。销售/销售总监 5 项锁死优先级最高。
     返回 True 表示允许写。
     """
     if not username:
@@ -2386,6 +2436,18 @@ def _owns_row(table, pid, username):
     try:
         if _is_manager(conn, username):
             return True
+        if table == "won_projects" and op in ("edit", "delete"):
+            if _is_super(conn, username):
+                return True
+            u = conn.execute("SELECT position FROM users WHERE username=?", (username,)).fetchone()
+            pos = (u["position"] or "").strip() if u else ""
+            if pos not in ("销售", "销售总监"):
+                st = load_perms(conn, username)
+                lv = (st.get("common") or {}).get("won_row_edit" if op == "edit" else "won_row_delete")
+                if lv == "edit":
+                    return True
+                if lv == "hide":
+                    return False
         row = conn.execute(f"SELECT owner_user_id, salesperson FROM {table} WHERE id=?", (pid,)).fetchone()
         if not row:
             return False
@@ -2651,8 +2713,8 @@ def update_project(pid):
     if not row:
         conn.close()
         return jsonify({"error":"not found"}),404
-    # 后端真实拦截：仅记录所有者/被授权可见者可读写
-    if not _owns_row("won_projects", pid, request.headers.get("X-User-Name")):
+    # 后端真实拦截：仅记录所有者/被授权可见者可读写（★PERM-V2-BRIDGE：won_row_edit=edit 放行全部行）
+    if not _owns_row("won_projects", pid, request.headers.get("X-User-Name"), op="edit"):
         conn.close()
         return jsonify({"error":"forbidden"}), 403
     fields = [
@@ -2892,8 +2954,8 @@ def delete_project(pid):
     if not row:
         conn.close()
         return jsonify({"error":"not found"}),404
-    # 后端真实拦截
-    if not _owns_row("won_projects", pid, request.headers.get("X-User-Name")):
+    # 后端真实拦截（★PERM-V2-BRIDGE：won_row_delete=edit 放行全部行）
+    if not _owns_row("won_projects", pid, request.headers.get("X-User-Name"), op="delete"):
         conn.close()
         return jsonify({"error":"forbidden"}), 403
     # 彻底删除：磁盘附件 + 审批单(WON-*) + 佣金记录(按合同号) → 主记录
@@ -5920,6 +5982,46 @@ LIB_ALLOWED_EXT = {
 }
 LIB_BLOCKED_EXT = {".exe", ".bat", ".cmd", ".com", ".scr", ".msi", ".sh", ".js", ".vbs", ".ps1", ".jar", ".dll", ".app"}
 
+# 合同占位名称 CONTRACT_NAME 与 _seed_contract_docs 定义在 init_db 之前（见 PERM-V2 区块）
+
+
+def _lib_file_visible(row):
+    """当前请求用户对该文件是否可见：
+    公用资料（project_id IS NULL）恒可见；独立项目资料 / 合同占位 按新版权限判定（hide = 不可见）。"""
+    u = _lib_user()
+    try:
+        pid = row["project_id"]
+    except (IndexError, KeyError):
+        pid = None
+    if pid is None or not u:
+        return True
+    conn = get_db()
+    try:
+        lv, _a = lib_file_level(conn, u, row)
+    except Exception:
+        lv = "view"
+    finally:
+        conn.close()
+    return lv != "hide"
+
+
+def _lib_can_edit_proj(project_id, is_contract=False):
+    """项目资料写权限：三人组/管理员始终可；否则按新权限「独立项目资料 / 合同」是否 edit。"""
+    u = _lib_user()
+    if not u:
+        return False
+    if _lib_can_edit():
+        return True
+    if project_id is None:
+        return False
+    conn = get_db()
+    try:
+        return can_edit(conn, u, project_id=project_id, key=("contract" if is_contract else "lib"))
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
 def _lib_user():
     return (request.headers.get("X-User-Name") or "").strip().lower()
 
@@ -5947,20 +6049,37 @@ def library_files():
     conn = get_db()
     if project_id in (None, "", "null"):
         rows = conn.execute(
-            "SELECT id, project_id, filename, original_name, uploader, created_at, size FROM library_files WHERE project_id IS NULL ORDER BY created_at DESC"
+            "SELECT id, project_id, filename, original_name, uploader, created_at, size, is_contract FROM library_files WHERE project_id IS NULL ORDER BY created_at DESC"
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, project_id, filename, original_name, uploader, created_at, size FROM library_files WHERE project_id=? ORDER BY created_at DESC",
+            "SELECT id, project_id, filename, original_name, uploader, created_at, size, is_contract FROM library_files WHERE project_id=? ORDER BY created_at DESC",
             (int(project_id),),
         ).fetchall()
+    # ★PERM-V2-20261018 阶段 4：按授权过滤可见文件。
+    #   公用资料（project_id IS NULL）全员可看（改仍锁三人组）；
+    #   独立项目资料 / 合同占位 按「整项目 + 个别文件覆盖」判定，hide 的不返回。
+    uname = _lib_user()
+    out = []
+    for r in rows:
+        d = dict(r)
+        if d.get("project_id") is None or not uname:
+            d["can_edit"] = _lib_can_edit()
+            out.append(d)
+            continue
+        try:
+            lv, _a = lib_file_level(conn, uname, r)
+        except Exception:
+            lv = "view"
+        if lv == "hide":
+            continue
+        d["can_edit"] = (lv == "edit")
+        out.append(d)
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(out)
 
 @app.route("/api/library/upload", methods=["POST"])
 def library_upload():
-    if not _lib_can_edit():
-        return jsonify({"error": "forbidden"}), 403
     files = request.files.getlist("file")
     if not files:
         return jsonify({"error": "no file"}), 400
@@ -5969,6 +6088,17 @@ def library_upload():
         project_id = None
     else:
         project_id = int(project_id)
+    # ★PERM-V2-20261018：上传到「合同」槽位 —— 替换该项目的合同占位，名称写死三语、不随语言切换
+    is_contract = str(request.form.get("is_contract") or request.args.get("is_contract") or "").strip().lower() in ("1", "true", "yes")
+    if is_contract and project_id is None:
+        return jsonify({"error": "contract slot requires project"}), 400
+    # 门控：公用资料写仍锁三人组（硬代码）；项目资料写按新权限判定
+    if project_id is None:
+        if not _lib_can_edit():
+            return jsonify({"error": "forbidden"}), 403
+    else:
+        if not _lib_can_edit_proj(project_id, is_contract):
+            return jsonify({"error": "forbidden"}), 403
     paths = request.form.getlist("paths") or []
     uploaded = []
     for idx, f in enumerate(files):
@@ -5984,6 +6114,35 @@ def library_upload():
         ext = os.path.splitext(base)[1].lower() or ".file"
         fname = f"lib_{int(time.time()*1000)}_{hashlib.md5((base + str(idx)).encode('utf-8')).hexdigest()[:8]}{ext}"
         fpath = os.path.join(LIB_DIR, fname)
+        size = 0
+        if is_contract and project_id is not None:
+            # 合同槽位：已有占位则换新文件，否则新建（名称恒为 CONTRACT_NAME）
+            conn = get_db()
+            try:
+                ex = conn.execute("SELECT id, filename FROM library_files WHERE project_id=? AND is_contract=1", (project_id,)).fetchone()
+                if ex:
+                    if ex["filename"]:
+                        try:
+                            os.remove(os.path.join(LIB_DIR, ex["filename"]))
+                        except OSError:
+                            pass
+                    f.save(fpath)
+                    size = os.path.getsize(fpath) if os.path.isfile(fpath) else 0
+                    conn.execute("UPDATE library_files SET filename=?, original_name=?, uploader=?, size=? WHERE id=?",
+                                 (fname, CONTRACT_NAME, _lib_user(), size, ex["id"]))
+                    fid = ex["id"]
+                else:
+                    f.save(fpath)
+                    size = os.path.getsize(fpath) if os.path.isfile(fpath) else 0
+                    cur = conn.execute(
+                        "INSERT INTO library_files (project_id, filename, original_name, uploader, size, is_contract) VALUES (?, ?, ?, ?, ?, 1)",
+                        (project_id, fname, CONTRACT_NAME, _lib_user(), size))
+                    fid = cur.lastrowid
+                conn.commit()
+            finally:
+                conn.close()
+            uploaded.append({"ok": True, "id": fid, "filename": fname, "original_name": CONTRACT_NAME, "size": size, "is_contract": 1})
+            continue
         f.save(fpath)
         size = os.path.getsize(fpath) if os.path.isfile(fpath) else 0
         conn = get_db()
@@ -6000,22 +6159,40 @@ def library_upload():
 
 @app.route("/api/library/files/<int:fid>", methods=["DELETE"])
 def library_delete(fid):
-    if not _lib_can_edit():
-        return jsonify({"error": "forbidden"}), 403
     conn = get_db()
-    row = conn.execute("SELECT filename FROM library_files WHERE id=?", (fid,)).fetchone()
+    try:
+        row = conn.execute("SELECT project_id, filename, is_contract FROM library_files WHERE id=?", (fid,)).fetchone()
+    except Exception:
+        row = conn.execute("SELECT project_id, filename FROM library_files WHERE id=?", (fid,)).fetchone()
     if not row:
         conn.close()
         return jsonify({"error": "not found"}), 404
+    try:
+        is_contract = bool(row["is_contract"])
+    except (IndexError, KeyError):
+        is_contract = False
+    # ★PERM-V2-20261018：合同占位只能由 tom/cuong/james 删除；
+    #   项目资料按该项目的「独立项目资料」edit 权限；公用资料仍锁三人组。
+    if is_contract or row["project_id"] is None:
+        if not _lib_can_edit():
+            conn.close()
+            return jsonify({"error": "forbidden"}), 403
+    else:
+        if not _lib_can_edit_proj(row["project_id"], False):
+            conn.close()
+            return jsonify({"error": "forbidden"}), 403
     conn.execute("DELETE FROM library_files WHERE id=?", (fid,))
     conn.commit()
+    fn = row["filename"] or ""
     conn.close()
-    try:
-        fp = os.path.join(LIB_DIR, row["filename"])
-        if os.path.isfile(fp):
-            os.remove(fp)
-    except OSError:
-        pass
+    # 合同占位 filename='' 时没有实体文件，只删库行
+    if fn:
+        try:
+            fp = os.path.join(LIB_DIR, fn)
+            if os.path.isfile(fp):
+                os.remove(fp)
+        except OSError:
+            pass
     return jsonify({"ok": True})
 
 @app.route("/api/library/files/<int:fid>/rename", methods=["PUT"])
@@ -6043,6 +6220,12 @@ def library_download(fid):
     conn.close()
     if not row:
         return jsonify({"error": "not found"}), 404
+    # ★PERM-V2-20261018：独立项目资料 / 合同占位 按授权可见，不可见一律拒绝
+    if not _lib_file_visible(row):
+        return jsonify({"error": "forbidden"}), 403
+    # ★PERM-V2-20261018：合同占位（filename=''）尚无实体文件，下载需友好报错而不是 500
+    if not row["filename"]:
+        return jsonify({"error": "合同占位尚未上传文件"}), 409
     as_att = (request.args.get("dl") or "").strip() not in ("", "0", "false")
     dl_name = os.path.basename((row["original_name"] or row["filename"]).replace("\\", "/"))
     return send_from_directory(LIB_DIR, row["filename"], as_attachment=as_att, download_name=dl_name)
@@ -6054,6 +6237,12 @@ def library_preview(fid):
     conn.close()
     if not row:
         return jsonify({"error": "not found"}), 404
+    # ★PERM-V2-20261018：独立项目资料 / 合同占位 按授权可见，不可见一律拒绝
+    if not _lib_file_visible(row):
+        return jsonify({"error": "forbidden"}), 403
+    # ★PERM-V2-20261018：合同占位（filename=''）无实体文件，预览需友好报错
+    if not row["filename"]:
+        return jsonify({"error": "合同占位尚未上传文件"}), 409
     ext = os.path.splitext(row["filename"])[1].lower()
     ct = mimetypes.guess_type(row["original_name"])[0] or "application/octet-stream"
     if ext not in (".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp"):
@@ -6068,6 +6257,12 @@ def library_raw(fid):
     conn.close()
     if not row:
         return jsonify({"error": "not found"}), 404
+    # ★PERM-V2-20261018：独立项目资料 / 合同占位 按授权可见，不可见一律拒绝
+    if not _lib_file_visible(row):
+        return jsonify({"error": "forbidden"}), 403
+    # ★PERM-V2-20261018：合同占位（filename=''）无实体文件，在线阅览需友好报错
+    if not row["filename"]:
+        return jsonify({"error": "合同占位尚未上传文件"}), 409
     ct = mimetypes.guess_type(row["original_name"])[0] or "application/octet-stream"
     resp = send_from_directory(LIB_DIR, row["filename"], mimetype=ct, as_attachment=False,
                                download_name=row["original_name"])
@@ -6115,7 +6310,7 @@ def library_pdfview(fid):
     ?check=1 时只返回 JSON {"ok":true} 或错误，用于前端先探测是否能高保真预览。"""
     conn = get_db()
     row = conn.execute(
-        "SELECT filename, original_name FROM library_files WHERE id=?", (fid,)
+        "SELECT filename, original_name, project_id, is_contract FROM library_files WHERE id=?", (fid,)
     ).fetchone()
     conn.close()
     if not row:
@@ -7864,6 +8059,199 @@ SALES_LOCKED_WON_PERMS = ("WON-D2", "WON-D3", "WON-N1", "WON-C1", "WON-P345")
 # 用户与权限管理三人审批组（锁死）：任一人审批即结束该流程；三人自己操作免审批（与管理员同级直达）
 TRI_APPROVERS = ("tom", "cuong", "james")
 
+# =====================================================================
+# ★PERM-V2-20261018：新版细颗粒度权限（数据结构 / 解析 / 回退 / 超级用户）
+#   模态框 4 页签：基本资料 / 公共模块 / 按项目授权 / 密码管理
+#     common.*                → 公共模块（看板·签约项目·财务·股东权益·审批·用户与授权）
+#     proj_default.*          → 按项目的「全局模板」
+#     projects[pid].*         → 单项目覆盖（只存被覆盖的项）
+#     lib_file_overrides[fid] → 资料库个别文件覆盖
+#   旧 flats 结构（{block_id:{decision,...}}）自动归入 blocks，USR-* 沿用不受影响。
+#   超级用户 tom/cuong/james + managers 恒定 edit，无视以上一切设置。
+#   ★ users.perms 无需迁移：读取时统一归一。
+# =====================================================================
+
+# 公共模块：系统默认值（用户未配置时的兜底）
+SYS_COMMON_DEFAULTS = {
+    "dashboard": "view",        # 看板整体
+    "won_list": "view",         # 签约项目列表整体（可见 = 看全部行）
+    "won_btn_add": "hide",      # 新建签约按钮
+    "won_btn_export": "hide",   # 导出按钮
+    "won_row_view": "hide",     # 行内：查看
+    "won_row_copy": "hide",     # 行内：复制
+    "won_row_edit": "hide",     # 行内：编辑
+    "won_row_delete": "hide",   # 行内：删除
+    "fin_vn": "view",           # 越南财务报表
+    "fin_cn": "view",           # 中国财务报表
+    "fin_rest": "view",         # 合并 + 越南看板 + 合并看板（三合一，只读）
+    "eq_data": "view",          # 总投资/中国投资/越南投资（三合一）
+    "eq_holders": "hide",       # 股东结构
+    "eq_dividend": "hide",      # 分红记录
+    # ★PERM-V2-APP-PROJ-20261019：审批已迁到「按项目授权」（审批因项目而异），公共模块不再有该项
+}
+
+# 按项目模块：全局模板默认值
+SYS_PROJ_DEFAULTS = {
+    "wl_daily": "view", "wl_mywork": "view",
+    "prod_A": "view", "prod_B": "view", "prod_C": "view", "prod_D": "view",
+    "prod_D_receipt": "hide",   # D 原料库存「提交收货单」按钮：隐藏 / 发起审批
+    "prod_E": "view", "prod_H": "view", "prod_F": "view",
+    "inst_A": "view", "inst_B": "view", "inst_C": "view",
+    "lib": "view",              # 资料库：独立项目资料（整项目）
+    "contract": "hide",         # 资料库：合同占位文档（★用户 2026-10-18 定：默认隐藏）
+    "approval": "hide",         # 审批中心（★PERM-V2-APP-PROJ-20261019：从公共模块迁来，默认隐藏）
+}
+
+# 受限选项集（缺省 = hide/view/edit 全支持）
+COMMON_OPTION_SETS = {
+    "fin_rest": ("hide", "view"),   # 合并/两个看板：只读
+    "eq_data": ("view", "edit"),    # 三个投资表：不可隐藏
+}
+
+_PERM_ALIAS = {
+    "hide": "hide", "hidden": "hide", "隐藏": "hide",
+    "view": "view", "default": "view", "all": "view", "查看": "view",
+    "edit": "edit", "write": "edit", "allow": "edit", "编辑": "edit",
+    "approve": "approve", "发起审批": "approve",
+}
+
+
+def _is_super(conn, username):
+    """超级用户：三人组 + managers 管理员 —— 无视一切权限项，恒定可看可编辑。"""
+    u = (username or "").strip().lower()
+    if not u:
+        return False
+    if u in [str(x).lower() for x in TRI_APPROVERS]:
+        return True
+    try:
+        if _is_manager(conn, u):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _split_perms(raw):
+    """把 users.perms 归一成 {blocks, common, proj_default, projects, lib_file_overrides}。"""
+    empty = {"blocks": {}, "common": {}, "proj_default": {}, "projects": {}, "lib_file_overrides": {}}
+    if not isinstance(raw, dict):
+        return empty
+    new_keys = ("common", "proj_default", "projects", "lib_file_overrides")
+    out = {
+        "blocks": raw.get("blocks") if isinstance(raw.get("blocks"), dict) else {},
+        "common": raw.get("common") if isinstance(raw.get("common"), dict) else {},
+        "proj_default": raw.get("proj_default") if isinstance(raw.get("proj_default"), dict) else {},
+        "projects": raw.get("projects") if isinstance(raw.get("projects"), dict) else {},
+        "lib_file_overrides": raw.get("lib_file_overrides") if isinstance(raw.get("lib_file_overrides"), dict) else {},
+    }
+    if any(k in raw for k in new_keys):
+        for k, v in raw.items():
+            if k not in new_keys and k != "blocks" and isinstance(v, dict):
+                out["blocks"].setdefault(k, v)
+    else:
+        out["blocks"] = raw          # 旧扁平结构整体归 blocks
+    return out
+
+
+def load_perms(conn, username):
+    """读取某用户的权限结构（含兼容归一）。"""
+    try:
+        r = conn.execute("SELECT perms FROM users WHERE lower(username)=?", ((username or "").strip().lower(),)).fetchone()
+        raw = json.loads(r["perms"]) if (r and r["perms"]) else {}
+    except Exception:
+        raw = {}
+    return _split_perms(raw)
+
+
+def _level_of(val, default_level):
+    """归一为 (level, approvers)；level ∈ hide|view|edit|approve。
+    存储值可为字符串，或 {'decision':'approve','approvers':[...]}。"""
+    approvers = []
+    if isinstance(val, dict):
+        approvers = val.get("approvers") or []
+        raw_v = val.get("decision") or val.get("level")
+    else:
+        raw_v = val
+    lv = _PERM_ALIAS.get(str(raw_v or "").strip().lower())
+    if lv is None:
+        lv = default_level
+    if lv == "approve":
+        try:
+            return ("approve", [a for a in approvers])
+        except Exception:
+            return ("approve", [])
+    return (lv, [])
+
+
+def common_level(conn, username, key):
+    """公共模块某项对该用户的级别 → (hide|view|edit|approve, approvers)"""
+    if not username:
+        return ("hide", [])
+    default_level = SYS_COMMON_DEFAULTS.get(key, "view")
+    opts = COMMON_OPTION_SETS.get(key, ("hide", "view", "edit"))
+    if _is_super(conn, username):
+        return ("edit", []) if "edit" in opts else ("view", [])
+    st = load_perms(conn, username)
+    lv, appr = _level_of(st["common"].get(key), default_level)
+    return (lv if lv in opts else default_level, appr)
+
+
+def proj_level(conn, username, project_id, key):
+    """按项目模块级别：项目单独授权 → 未授权一律 hide。
+    ★PROJ-HIDE-DEF-20261019（用户要求）：全局模板已整体删除，不再作为回退来源，
+    未单独授权的项目模块对非超级用户一律隐藏。→ (hide|view|edit|approve, approvers)"""
+    if not username:
+        return ("hide", [])
+    if _is_super(conn, username):
+        return ("edit", [])
+    st = load_perms(conn, username)
+    val = None
+    ov = st["projects"].get(str(project_id))
+    if isinstance(ov, dict) and key in ov:
+        val = ov[key]
+    return _level_of(val, "hide")
+
+
+def lib_file_level(conn, username, file_row):
+    """资料库文件级别：先查个别文件覆盖，否则跟随项目 —— 合同占位走 contract 项，其余走 lib 项。"""
+    if not username:
+        return ("hide", [])
+    try:
+        row = dict(file_row)
+    except Exception:
+        return ("hide", [])
+    if _is_super(conn, username):
+        return ("edit", [])
+    key = "contract" if row.get("is_contract") else "lib"
+    default_level = "hide"   # ★PROJ-HIDE-DEF-20261019：与 proj_level 一致，未授权 = 隐藏
+    st = load_perms(conn, username)
+    ov = st["lib_file_overrides"].get(str(row.get("id")), None)
+    if ov is not None:
+        return _level_of(ov, default_level)
+    return proj_level(conn, username, row.get("project_id"), key)
+
+
+def can_view(conn, username, key=None, project_id=None, file_row=None):
+    """是否可见（view / edit / approve 都算可见）。"""
+    if file_row is not None:
+        lv, _a = lib_file_level(conn, username, file_row)
+    elif project_id is not None and key:
+        lv, _a = proj_level(conn, username, project_id, key)
+    else:
+        lv, _a = common_level(conn, username, key)
+    return lv in ("view", "edit", "approve")
+
+
+def can_edit(conn, username, key=None, project_id=None, file_row=None):
+    """是否可编辑（approve = 可见但需审批后生效，不算 edit）。"""
+    if file_row is not None:
+        lv, _a = lib_file_level(conn, username, file_row)
+    elif project_id is not None and key:
+        lv, _a = proj_level(conn, username, project_id, key)
+    else:
+        lv, _a = common_level(conn, username, key)
+    return lv == "edit"
+
 
 def _user_perm_dec(conn, username, bid):
     """读取用户 perms 中某区块的决策；未配置返回 ''。"""
@@ -7940,6 +8328,14 @@ def _force_sales_locked_perms(perms, position):
                 blk["approvers"] = []
             else:
                 perms[bid] = {"decision": "hide", "approvers": []}
+        # ★PERM-V2-BRIDGE-20261019：新版公共模块键同步锁死（与旧区块一一对应），
+        #   防止只改旧区块、新键仍给 edit 造成绕过（前端 permVisible/_owns_row 双桥都认新键）。
+        common = perms.get("common")
+        if not isinstance(common, dict):
+            common = {}
+            perms["common"] = common
+        for k in ("won_row_edit", "won_row_delete", "won_row_copy", "won_btn_add"):
+            common[k] = "hide"
     except Exception:
         pass
     return perms
