@@ -588,6 +588,8 @@ function finExcelKeysBind(){
       try { snap = fin_currentSnapshot(); } catch(errSnap){ snap = null; }
       try { sid = (sh && typeof sh.getSheetId === 'function') ? sh.getSheetId() : null; } catch(errSid){ sid = null; }
       var lines = [];
+      /* ★CLIP-RICH-20261018：单块选区时顺手留下「值+公式+样式」镜像，供带格式粘贴使用 */
+      var mir = null;
       for (var i = 0; i < ranges.length; i++){
         var g = ranges[i];
         var nr = g.endRow - g.startRow + 1, nc = g.endColumn - g.startColumn + 1;
@@ -595,9 +597,11 @@ function finExcelKeysBind(){
         var rng = sh.getRange(g.startRow, g.startColumn, nr, nc);
         var vals = (rng && typeof rng.getValues === 'function') ? rng.getValues() : null;
         if (!vals) continue;
+        var mirRows = (ranges.length === 1) ? [] : null;
         for (var r = 0; r < vals.length; r++){
           var row = vals[r] || [];
           var cells = [];
+          var mirRow = mirRows ? [] : null;
           for (var c2 = 0; c2 < row.length; c2++){
             /* ★FIN-CLIP-FMT-20261017（用户 2026-10-17：「复制的时候，货币符号也必须复制！」）：
                以前直接 String(getValues()) → 复制出来是裸数字 799056508；
@@ -615,10 +619,30 @@ function finExcelKeysBind(){
             } else {
               cells.push(v == null ? '' : String(v));
             }
+            if (mirRow){
+              /* 镜像存【内联样式对象】（不能存 styles 表的 id：重建/刷新会换 id） */
+              var _cdM = fin_clipCellData(snap, sid, _r0, _c0);
+              var _oM = { v: (_cdM && _cdM.v !== undefined) ? _cdM.v : null,
+                          f: (_cdM && _cdM.f !== undefined) ? _cdM.f : null,
+                          t: (_cdM && _cdM.t !== undefined) ? _cdM.t : null };
+              if (_cdM && _cdM.s !== undefined){
+                var _svM = fin_undoStyleVal(_cdM.s, snap && snap.styles);
+                if (_svM) _oM.s = _svM; else _oM.uc = 1;
+              }
+              mirRow.push(_oM);
+            }
           }
+          if (mirRows) mirRows.push(mirRow);
           lines.push(cells.join('\t'));
         }
+        if (mirRows) mir = mirRows;
       }
+      /* ★CLIP-RICH-20261018：镜像的 text 必须和真正写进剪贴板的文本逐字一致，
+         粘贴时才敢用（不一致说明用户中途复制了别的东西 → 退回纯文本）。 */
+      try {
+        if (mir) window.__finClipMirror = { text: lines.join('\n'), mat: mir, sid: sid, at: Date.now() };
+        else window.__finClipMirror = null;
+      } catch(eM){}
       return lines.join('\n');
     } catch(err){ return ''; }
   }
@@ -663,6 +687,88 @@ function finExcelKeysBind(){
       return true;
     } catch(err){ return false; }
   }
+  /* ★★CLIP-RICH-20261018（用户 2026-10-18：「复制粘贴的时候，单元格的格式、颜色、字号、
+     对齐方式，等等一切都要 100% 和被复制的内容一样！」）★★
+     本页复制过【同一段文本】时走这里：值 + 公式 + 整块样式对象一起还原。
+     样式还原用【两遍法】（沿用撤销账本 FIN-UNDO-STYLE 的实测结论）：
+       第一遍 {v,f,t,s:null} —— 覆盖值，同时把目标格原有样式整体清掉；
+       第二遍 {s: 源样式}    —— 把源格的样式整块铺回去（字体/字号/粗斜体/字色/底色/
+                                边框/水平垂直对齐/自动换行/数字格式 pattern 全在里面）。
+     为什么必须先清：这一版 Univer 的 set-range-values 对样式是 merge 语义，
+     不清的话目标格原有的底色/字色会残留在「源格没有该键」的位置 → 做不到 100% 一样。
+     ★跨应用复制（剪贴板文本与镜像不一致）仍走纯文本粘贴，不受影响。 */
+  function fin_clipPasteRich(text){
+    try {
+      var M = window.__finClipMirror;
+      if (!M || !M.mat || !M.mat.length) return false;
+      if (String(M.text) !== String(text)) return false;                       /* 不是本页刚复制的那段 */
+      if (!(Date.now() - (M.at || 0) < 30 * 60 * 1000)) return false;          /* 镜像过期 → 纯文本 */
+      var api0 = finAPI(); if (!api0 || !api0.executeCommand) return false;
+      var wb0 = api0.getActiveWorkbook(); if (!wb0) return false;
+      var sh0 = wb0.getActiveSheet(); if (!sh0) return false;
+      var r0 = -1, c0 = -1;
+      try {
+        var g0 = sh0.getSelection().getActiveRange().getRange();
+        if (g0 && typeof g0.startRow === 'number'){
+          r0 = g0.startRow; c0 = g0.startColumn;
+        }
+      } catch(eG){}
+      if (r0 < 0){
+        try {
+          var _fr = (typeof fin_getSelectionRanges === 'function') ? fin_getSelectionRanges() : null;
+          if (_fr && _fr.length && typeof _fr[0].startRow === 'number'){
+            r0 = _fr[0].startRow; c0 = _fr[0].startColumn;
+          }
+        } catch(eF){}
+      }
+      if (r0 < 0 || c0 < 0){
+        console.warn('[fin-paste] 取不到粘贴落点，已放弃（绝不写回 A1）');
+        return false;
+      }
+      var nr = M.mat.length, nc = 0, i2;
+      for (i2 = 0; i2 < nr; i2++){ if (M.mat[i2] && M.mat[i2].length > nc) nc = M.mat[i2].length; }
+      if (!(nr > 0) || !(nc > 0) || nr * nc > 20000) return false;
+      var sid = '';
+      try { sid = (sh0.getSheetId) ? sh0.getSheetId() : ''; } catch(eS){ sid = ''; }
+      var uid = (typeof fin_unitId === 'function') ? (fin_unitId() || '') : '';
+      var m1 = [], m2 = [], anyS = false, r, c;
+      for (r = 0; r < nr; r++){
+        var row1 = [], row2 = [];
+        for (c = 0; c < nc; c++){
+          var cell = (M.mat[r] && M.mat[r][c]) ? M.mat[r][c] : null;
+          var o1 = { v: (cell && cell.v !== undefined) ? cell.v : null,
+                     f: (cell && cell.f !== undefined) ? cell.f : null,
+                     t: (cell && cell.t !== undefined) ? cell.t : null };
+          if (!(cell && cell.uc)) o1.s = null;          /* 第一遍：清样式（第二遍再铺回去） */
+          row1.push(o1);
+          if (cell && cell.s){
+            var sCopy = null;
+            try { sCopy = JSON.parse(JSON.stringify(cell.s)); } catch(eC){ sCopy = cell.s; }
+            row2.push({ s: sCopy }); anyS = true;
+          } else row2.push({});                          /* 空对象 = 不动 */
+        }
+        m1.push(row1); m2.push(row2);
+      }
+      var rg = { startRow: r0, startColumn: c0, endRow: r0 + nr - 1, endColumn: c0 + nc - 1 };
+      var applyStyles = function(){
+        if (!anyS) return;
+        try {
+          var p2 = api0.executeCommand('sheet.command.set-range-values', {
+            unitId: uid, subUnitId: sid, range: rg, value: m2
+          });
+          if (p2 && typeof p2.then === 'function') p2.catch(function(){});
+        } catch(e2){}
+      };
+      var p1 = api0.executeCommand('sheet.command.set-range-values', {
+        unitId: uid, subUnitId: sid, range: rg, value: m1
+      });
+      if (p1 && typeof p1.then === 'function') p1.then(applyStyles, applyStyles);
+      else applyStyles();
+      try { if (typeof fin_markDirty === 'function') fin_markDirty(); } catch(eD){}
+      try { window.__finClipLast = { len: String(text).length, ok: true, paste: true, rich: true }; } catch(eL){}
+      return true;
+    } catch(err){ return false; }
+  }
   function fin_clipClearSel(){
     try {
       var api0 = finAPI(); if (!api0) return false;
@@ -682,6 +788,8 @@ function finExcelKeysBind(){
         el: function(){ return document.getElementById('univer_container'); },
         text: fin_clipMatrixText,
         write: fin_clipPasteText,
+        /* ★CLIP-RICH-20261018：带格式粘贴（本页复制过的内容才生效，否则引擎自动退回 write） */
+        rich: fin_clipPasteRich,
         clear: fin_clipClearSel
       });
       window.__clipEvtFin = true;          /* 接线标记（3 秒自检 + 硬锁脚本用） */
