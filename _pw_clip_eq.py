@@ -45,8 +45,9 @@ def main():
         pg.on("dialog", lambda d: d.dismiss())
         errs = []
         pg.on("pageerror", lambda e: errs.append(str(e)[:200]))
-        pg.goto(URL, wait_until="networkidle")
-        pg.wait_for_timeout(800)
+        # 权益页有长轮询，networkidle 可能永远不触发 → 用 domcontentloaded + 手动等待
+        pg.goto(URL, wait_until="domcontentloaded", timeout=45000)
+        pg.wait_for_timeout(3000)
         if pg.evaluate("() => { var e=document.getElementById('loginPage'); return e && !e.classList.contains('hidden'); }"):
             pg.fill("#loginUser", "tom")
             pg.fill("#loginPwd", "66668888")
@@ -83,6 +84,27 @@ def main():
 
         out['selectAll'] = pg.evaluate("() => { try { return eqSelectAll(); } catch(e){ return 'ERR ' + e.message; } }")
         pg.wait_for_timeout(600)
+
+        # 编辑覆盖层尺寸（全局 vs 各容器内）—— 判断 isEditingCell 是否被另一套实例带偏
+        out['editors'] = pg.evaluate("""() => {
+          function dump(root, sel){
+            var arr = [];
+            try {
+              (root || document).querySelectorAll('.univer-editor-container').forEach(function(el){
+                var r = el.getBoundingClientRect();
+                arr.push({ w: Math.round(r.width), h: Math.round(r.height) });
+              });
+            } catch(e){}
+            return arr;
+          }
+          return {
+            all: dump(document, null),
+            fin: dump(document.getElementById('univer_container'), null),
+            eq: dump(document.getElementById('equity_container'), null)
+          };
+        }""")
+        out['clipLockFailed'] = pg.evaluate("() => !!window.__CLIP_LOCK_FAILED")
+        out['hasWinClip'] = pg.evaluate("() => typeof window.win_clipWrite")
 
         out['clipBefore'] = pg.evaluate("() => { try { return navigator.clipboard.readText(); } catch(e){ return 'ERR'; } }")
 

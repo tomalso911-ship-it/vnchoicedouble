@@ -131,6 +131,18 @@
 #                                 ⑦ 拖动必须 requestAnimationFrame 合并 + 同列去重 + 定位防抖
 #                                 ⑧ CSS：thumb 有 left/width 过渡，.fin-hs-drag 时 transition:none
 #
+#   17) check_clip_robust_lock.py —— 财务/股东权益 Ctrl+C / Ctrl+X / Ctrl+V 锁死区
+#                                 （CLIP-ROBUST-LOCK-20261018，用户 2026-10-18 要求锁死）：
+#                                 ① 两张表都必须注册 copy/cut 捕获阶段补写（finClipFill / eqClipFill）
+#                                    —— 真机 http 下 execCommand 会「假成功」，setData 才是唯一稳定通道
+#                                 ② __finClipPending 通道（execCommand 触发的那次 copy 直接落盘）
+#                                 ③ 临时候选区必须在视口内且不得 ta.focus() 抢焦点
+#                                 ④ 无条件再走一次 navigator.clipboard.writeText
+#                                 ⑤ 剪切有清空兜底（fin_clipCutClearSoon / __eqClipCutClearSoon）
+#                                 ⑥ C/X/V 补丁分支内不得 preventDefault / stopPropagation
+#                                 ⑦ 复制内容必须经 win_fmtNum 还原屏幕文本（货币符号/千分位）
+#                                 ⑧ 3 秒自检必须断言两条 copy 通道（__clipEvtFin / __clipEvtEq）
+#
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
 #   但会在提交时打印，便于及时发现并修复。CI 中建议作为独立步骤做硬阻断。
@@ -158,7 +170,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py check_clip_robust_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then

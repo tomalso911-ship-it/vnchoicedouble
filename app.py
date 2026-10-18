@@ -3883,6 +3883,7 @@ def fin_init_report():
     tmp = FIN_REPORT + ".tmp"
     with open(tmp, "wb") as fh:
         fh.write(data)
+    _fin_history_backup("vn", FIN_REPORT, "before_init")   # ★FIN-KEEP-20261016：换种子前先留可回滚点
     os.replace(tmp, FIN_REPORT)
     _fin_daily_backup()
     # ★三语自动补全（FIN-TRI-AUTO-20261013）：上传的若是普通"单块"报表
@@ -4166,7 +4167,7 @@ def fin_save_snapshot():
     try:
         sys.path.insert(0, BASE_DIR)
         import univer_convert
-        tmp = FIN_REPORT + ".tmp.xlsx"
+        tmp = _fin_tmp_path(FIN_REPORT)   # ★FIN-RACE-20261016：临时文件每次唯一，防并发保存互相读坏
         univer_convert.univer_to_xlsx(data, tmp)
         # ★日期格式强制统一（FIN-DATE-FMT-20261014）：界面上以【文本】或【中文/美式格式】
         #   录入的日期，一律在落盘前刷成 dd-mm-yyyy（幂等：无异常就不重写文件）。
@@ -4177,6 +4178,18 @@ def fin_save_snapshot():
                 sys.stderr.flush()
         except Exception as _dfe:
             sys.stderr.write("[fin-datefmt] vn 保存归一化失败: %s\n" % _dfe)
+        # ★FIN-KEEP-20261016：落盘前先留历史版本 + 拦「整块数据被写没」（见 _fin_loss_guard）
+        _fin_history_backup("vn", FIN_REPORT, "presave")
+        _loss_vn, _loss_vn_detail = _fin_loss_guard("vn", FIN_REPORT, tmp)
+        if _loss_vn:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            sys.stderr.write("[fin] vn 数据量骤减，拒绝落盘（保留服务器版本）：%s\n" % _loss_vn_detail)
+            sys.stderr.flush()
+            return jsonify({"ok": False, "stale": True, "guard": "data-loss",
+                            "error": "data shrink blocked: %s" % _loss_vn_detail}), 200
         try:
             os.replace(tmp, FIN_REPORT)
         except OSError:
@@ -4296,7 +4309,9 @@ def _cn_make_seed_xlsx(path):
         ac.alignment = center          # ★勾选框水平+垂直居中（用户要求"选择框左右居中"）
     tot = last + 1                     # 205 = 底部「TỔNG CỘNG」合计行
     ws["C%d" % tot] = "TỔNG CỘNG"
-    ws["M%d" % tot] = "全部的"
+    # ★FIN-CN-LABEL-20261017（用户 2026-10-17：「全部的，改成：总计（锁定这个中文翻译）」）
+    #   旧值「全部的」是机器翻译把 TỔNG CỘNG 译歪的结果；中文块合计行一律写死「总计」。
+    ws["M%d" % tot] = "总计"
     ws["W%d" % tot] = "TOTAL"
     # ★FIN-CN-CHECK-GRAY-20261015：合计公式一律「剔除已勾选核销」，顶部第 3 行与底部合计行同口径
     for _c in ("E", "O", "Y"):
@@ -4908,7 +4923,153 @@ def _cn_cache_build(force=False):
         return True, "built"
 
 
-def _cn_daily_backup():
+# ============ ★★ FIN-KEEP-20261016：报表「录入内容永不丢」两层硬保障 ★★ ============
+# 用户要求（2026-10-16）：「我录入的内容，刷新后、或者修改代码后，不能被删除！」
+#
+# 为什么原来的备份救不了命（写代码时必须记住，别再退回旧写法）：
+#   · _vn/_cn/_eq_daily_backup() 都是在 os.replace() 【之后】才 copyfile 的 ——
+#     它复制的是「刚刚写进去的那一版」，不是「被覆盖掉的那一版」。
+#     所以它既不是回滚点，同一天还会被下一次保存覆盖 → 真出事时手上什么都没有。
+#   · 出事的三种真实路径：① 改代码引入回归，把整块数据写没；
+#     ② 另一个还开着旧数据的标签页/浏览器自动保存，整份覆盖；
+#     ③ 前端裁剪逻辑出错，只把一部分格子送上来。
+#   本组函数在【任何写盘动作之前】动手：先留历史版本，再校验「数据量有没有被写没」。
+FIN_HISTORY_KEEP = 200          # 每张报表各自保留最近多少份历史版本（22KB/份 ≈ 4.5MB）
+_FIN_HIST_LOCK = _fthreading.Lock()
+
+# ============ ★★ FIN-RACE-20261016：临时文件名必须每次唯一 ★★ ============
+# 事故现象（2026-10-16 服务器日志）：
+#   [fin-datefmt] 打不开 ...\equity_report.xlsx.tmp.xlsx: Bad CRC-32 for file 'docProps/core.xml'
+#   [fin-keep]    cell stats failed (...\equity_report.xlsx): Bad CRC-32 for file 'docProps/core.xml'
+# 原因：三处落盘都固定用 "<报表>.tmp.xlsx" 这一个文件名。两个保存撞在一起时
+#   （用户连点两下「保存」/ 自动保存正好撞上手动保存），
+#   甲线程刚写了一半，乙线程就去读同一个临时文件 —— 读出来就是「坏 zip / CRC 校验失败」，
+#   最坏的情况是把半成品 os.replace 进正式报表，用户的表就毁了。
+# 修法：临时文件名带 进程号 + 递增序号 + 线程号，谁也碰不到谁的。
+#   ★后缀必须保留 .xlsx：openpyxl 按扩展名判断格式，.bak 之类会直接拒读。
+_FIN_TMP_SEQ = __import__("itertools").count(1)
+_FIN_TMP_LOCK = _fthreading.Lock()
+
+
+def _fin_tmp_path(base):
+    """给「即将写入的临时文件」取一个本次唯一的名字（永远以 .xlsx 结尾）。"""
+    try:
+        with _FIN_TMP_LOCK:
+            n = next(_FIN_TMP_SEQ)
+        tid = _fthreading.current_thread().ident or 0
+        return "%s.tmp.%d.%d.%d.xlsx" % (base, os.getpid(), n, tid)
+    except Exception:
+        return "%s.tmp.%d.xlsx" % (base, os.getpid())
+
+
+def _fin_history_backup(kind, src, tag="presave", keep=None):
+    """★把「即将被改写的这一版」原样另存一份，作为可回滚点。
+
+    kind : 'vn' / 'cn' / 'eq'（决定落到 backups/<kind>_history/ 哪个目录）
+    src  : 源 xlsx 绝对路径（不存在则跳过，不做任何事）
+    tag  : 写入原因，只进文件名，便于人工辨认（如 presave / before_init / before_xlsx_upload）
+    文件名 = <kind>_<YYYYmmdd_HHMMSS_mmm>_<tag>.xlsx.bak，按名字排序即按时间排序。
+    滚动保留最近 keep 份（默认 FIN_HISTORY_KEEP）。
+    ★绝不抛异常：备份失败也必须让保存流程继续走（由 _fin_loss_guard 兜底）。"""
+    try:
+        if not src or not os.path.isfile(src):
+            return None
+        d = os.path.join(FIN_BACKUP_DIR, "%s_history" % kind)
+        os.makedirs(d, exist_ok=True)
+        stamp = _fdt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        dest = os.path.join(d, "%s_%s_%s.xlsx.bak" % (kind, stamp, tag))
+        shutil.copyfile(src, dest)
+        if keep is None:
+            keep = FIN_HISTORY_KEEP
+        with _FIN_HIST_LOCK:
+            files = sorted(fn for fn in os.listdir(d) if fn.endswith(".xlsx.bak"))
+            for fn in files[:max(0, len(files) - keep)]:
+                try:
+                    os.remove(os.path.join(d, fn))
+                except OSError:
+                    pass
+        return dest
+    except Exception as e:
+        sys.stderr.write("[fin-keep] %s history backup failed: %s\n" % (kind, e))
+        return None
+
+
+def _fin_cell_stats(path):
+    """报表的「数据量画像」= (非空单元格数, 有数据行数)；读不了返回 (-1, -1)。
+
+    ★只做只读统计，绝不改动文件。为了不被「格式残留导致 max_row 虚高到百万行」
+      拖死，行列都加上硬上限（行 20000 / 列 300）。"""
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(path, data_only=False, read_only=True)
+        try:
+            nz = 0
+            rows_nonempty = 0
+            for ws in wb.worksheets:
+                try:
+                    mr = min(int(ws.max_row or 0) or 0, 20000)
+                    mc = min(int(ws.max_column or 0) or 0, 300)
+                except Exception:
+                    mr, mc = 0, 0
+                if mr <= 0 or mc <= 0:
+                    continue
+                for row in ws.iter_rows(min_row=1, max_row=mr, max_col=mc, values_only=True):
+                    has = False
+                    for v in row:
+                        if v is None:
+                            continue
+                        if isinstance(v, str) and v.strip() == "":
+                            continue
+                        nz += 1
+                        has = True
+                    if has:
+                        rows_nonempty += 1
+            return nz, rows_nonempty
+        finally:
+            try:
+                wb.close()
+            except Exception:
+                pass
+    except Exception as e:
+        sys.stderr.write("[fin-keep] cell stats failed (%s): %s\n" % (path, e))
+        return -1, -1
+
+
+def _fin_loss_guard(kind, old_path, new_path):
+    """★「整块数据被写没」守卫：返回 (blocked, detail)。
+
+    判据（两者任一命中即拦）：
+      ① 非空单元格 < 旧版的一半（旧版非空须 ≥ 60 才启用，空模板不拦，避免误伤首次录入）；
+      ② 有数据行 < 旧版的六成（旧版须 ≥ 10 行）。
+    命中即【不落盘】：删掉 tmp、保留服务器现文件，返回 HTTP 200 + stale + guard='data-loss'
+    （不用 4xx：前端对 stale 的处理是「重新载入服务器版本」，控制台不会一片红）。"""
+    try:
+        if not old_path or not new_path:
+            return False, ""
+        if not (os.path.isfile(old_path) and os.path.isfile(new_path)):
+            return False, ""
+        o_nz, o_rows = _fin_cell_stats(old_path)
+        n_nz, n_rows = _fin_cell_stats(new_path)
+        # ★FIN-RACE-20261016：新文件【根本读不了】（写坏了 / 并发撞车读出半成品）⇒ 一律拒收。
+        #   哪怕算不出「少了多少格」，也绝不能拿一个打不开的文件去覆盖服务器上的好文件。
+        if n_nz < 0:
+            return True, "新快照无法被 openpyxl 解析（疑似被写坏）"
+        # 旧文件读不了（本来就损坏 / 首次生成）：不拦，让新文件去把它修好
+        if o_nz <= 0 or n_rows < 0:
+            return False, ""
+        if o_nz < 60:
+            return False, ""
+        if n_nz < o_nz * 0.5:
+            return True, "非空单元格 %d → %d（不足一半）" % (o_nz, n_nz)
+        if o_rows >= 10 and n_rows < o_rows * 0.6:
+            return True, "有数据行 %d → %d（不足六成）" % (o_rows, n_rows)
+        return False, ""
+    except Exception as e:
+        sys.stderr.write("[fin-keep] loss guard warning: %s\n" % e)
+        return False, ""
+
+
+def _fin_daily_backup():
     """每改一次中国报表就留一份当日备份（同一天只留一份，滚动 30 份）。"""
     try:
         if not os.path.isfile(CN_REPORT):
@@ -4945,6 +5106,7 @@ def fin_cn_save_report():
     tmp = CN_REPORT + ".tmp"
     with open(tmp, "wb") as fh:
         fh.write(data)
+    _fin_history_backup("cn", CN_REPORT, "before_xlsx_upload")   # ★FIN-KEEP-20261016：覆盖前先留可回滚点
     os.replace(tmp, CN_REPORT)
     _cn_daily_backup()
     _cn_cache_invalidate()   # ★源文件已改写：必须丢掉旧快照缓存
@@ -4986,6 +5148,7 @@ def fin_cn_init_report():
     tmp = CN_REPORT + ".tmp"
     with open(tmp, "wb") as fh:
         fh.write(data)
+    _fin_history_backup("cn", CN_REPORT, "before_init")   # ★FIN-KEEP-20261016：换种子前先留可回滚点
     os.replace(tmp, CN_REPORT)
     _cn_daily_backup()
     # ★新种子先做外观归一化（核销列居中 + 数据区蓝色），再重建快照
@@ -5081,7 +5244,7 @@ def fin_cn_save_snapshot():
     try:
         sys.path.insert(0, BASE_DIR)
         import univer_convert
-        tmp = CN_REPORT + ".tmp.xlsx"
+        tmp = _fin_tmp_path(CN_REPORT)   # ★FIN-RACE-20261016：临时文件每次唯一，防并发保存互相读坏
         univer_convert.univer_to_xlsx(data, tmp)
         # ★日期格式强制统一（FIN-DATE-FMT-20261014）：与越南报表同一套逻辑，
         #   落盘前把日期列刷成 dd-mm-yyyy（幂等：无异常就不重写文件）。
@@ -5126,6 +5289,23 @@ def fin_cn_save_snapshot():
                                 "rev": _cur_rev, "error": "amounts look like currency-converted values"}), 200
         except Exception as _ge:
             sys.stderr.write("[fin-cn] CN-BASIS-GUARD warning: %s\n" % _ge)
+        # ★★ FIN-KEEP-20261016（用户：录入的内容，刷新/改代码后都不能被删除）★★
+        #   ① 落盘【之前】先把「当前这一版」原样留一份历史（真正的回滚点；
+        #      注意 _cn_daily_backup 是在 replace 之后复制的，救不了命，见函数注释）；
+        #   ② 再比一比数据量：新快照的非空单元格/有数据行如果不到旧版的一半/六成，
+        #      说明这一版是「整块被写没」的残缺快照（改代码回归 / 旧标签页覆盖 /
+        #      前端裁剪出错），一律拒收，保住服务器上的完整版本。
+        _fin_history_backup("cn", CN_REPORT, "presave")
+        _loss_cn, _loss_cn_detail = _fin_loss_guard("cn", CN_REPORT, tmp)
+        if _loss_cn:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            sys.stderr.write("[fin-cn] 数据量骤减，拒绝落盘（保留服务器版本）：%s\n" % _loss_cn_detail)
+            sys.stderr.flush()
+            return jsonify({"ok": False, "stale": True, "guard": "data-loss", "rev": _cur_rev,
+                            "error": "data shrink blocked: %s" % _loss_cn_detail}), 200
         try:
             os.replace(tmp, CN_REPORT)
         except OSError:
@@ -6164,7 +6344,12 @@ def index_lite():
         #   URL 也变 → 可安全长缓存（内容不会过期）；同时对响应做 gzip 压缩（约 -75%）。
         body = html.encode("utf-8")
         headers = {
-            "Cache-Control": "public, max-age=31536000, immutable",
+            # ★FIX-2026-10-17：原来用 immutable —— 浏览器一旦缓存 /lite?v=<hash> 就再也不发请求，
+            #   导致前端每次改动（删表锁/水平滚动条等）在普通 F5 刷新下永远看不到（只有 Ctrl+F5 才生效）。
+            #   改成 no-cache：浏览器每次刷新都带 If-None-Match 问服务器；
+            #   内容没变 → 304 秒回（不重下），内容变了 → 服务器发现 hash 不一致、自动 302 重定向到新 ?v=HASH → 必拉最新。
+            #   既保留 ETag 的"内容寻址"语义，又让前端改动 100% 可见。
+            "Cache-Control": "public, no-cache",
             "ETag": '"' + hv + '"',
             # ★PERF：标记本轮响应为"内容寻址、可长缓存"，供全局 after_request 放行
             "X-Lite-Cache": "1",
@@ -10139,7 +10324,7 @@ def fin_eq_save_snapshot():
     try:
         sys.path.insert(0, BASE_DIR)
         import univer_convert
-        tmp = EQ_REPORT + ".tmp.xlsx"
+        tmp = _fin_tmp_path(EQ_REPORT)   # ★FIN-RACE-20261016：临时文件每次唯一，防并发保存互相读坏
         univer_convert.univer_to_xlsx(data, tmp)
         try:
             _n_dt = _fin_force_date_fmt(tmp)
@@ -10148,6 +10333,18 @@ def fin_eq_save_snapshot():
                 sys.stderr.flush()
         except Exception as _dfe:
             sys.stderr.write("[fin-datefmt] eq 保存归一化失败: %s\n" % _dfe)
+        # ★FIN-KEEP-20261016：落盘前先留历史版本 + 拦「整块数据被写没」（见 _fin_loss_guard）
+        _fin_history_backup("eq", EQ_REPORT, "presave")
+        _loss_eq, _loss_eq_detail = _fin_loss_guard("eq", EQ_REPORT, tmp)
+        if _loss_eq:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            sys.stderr.write("[fin-eq] 数据量骤减，拒绝落盘（保留服务器版本）：%s\n" % _loss_eq_detail)
+            sys.stderr.flush()
+            return jsonify({"ok": False, "stale": True, "guard": "data-loss",
+                            "error": "data shrink blocked: %s" % _loss_eq_detail}), 200
         try:
             os.replace(tmp, EQ_REPORT)
         except OSError:

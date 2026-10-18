@@ -313,13 +313,16 @@ def check_html(path, bed_path=None):
             errors.append("不变量⑧被破坏：找不到 fin_clipWrite（Univer 写剪贴板被拒后没人补写）")
         if "function fin_clipMatrixText" not in bind:
             errors.append("不变量⑧被破坏：找不到 fin_clipMatrixText（取不到选区数据，剪贴板会是空串）")
-        if "document.execCommand('copy')" not in bind:
-            errors.append("不变量⑧被破坏：fin_clipWrite 不再用同步 execCommand('copy')"
+        # ★CLIP-ENGINE-20261018：写入逻辑已收口到文件顶部的全局引擎，故这两项检查放到全文范围
+        if "document.execCommand('copy')" not in text:
+            errors.append("不变量⑧被破坏：全局剪贴板引擎不再用同步 execCommand('copy')"
                           "（只靠 navigator.clipboard 时，权限/安全上下文一限制复制就彻底失效）")
-        if "fin_clipWrite(fin_clipMatrixText())" not in bind:
-            errors.append("不变量⑧被破坏：Ctrl+C/X 分支没有调用 fin_clipWrite(fin_clipMatrixText())")
-        if "prev.focus({ preventScroll: true })" not in bind:
-            errors.append("不变量⑧被破坏：fin_clipWrite 不再归还焦点"
+        if ("fin_clipWrite(fin_clipMatrixText())" not in bind
+                and "window.__clipEngine.handleKey(e, 'fin')" not in bind):
+            errors.append("不变量⑧被破坏：Ctrl+C/X 分支既没调用 fin_clipWrite(fin_clipMatrixText())"
+                          "，也没交给 window.__clipEngine.handleKey(e, 'fin')")
+        if "prev.focus({ preventScroll: true })" not in text:
+            errors.append("不变量⑧被破坏：剪贴板写入后不再归还焦点"
                           "（textarea.select() 会抢焦点，之后方向键/回车全打到 body 上）")
 
     # ---- ⑧-c 股东权益那套键盘补丁【也必须接线】（EQ-CLIP-PASS-LOCK-20261017） ----
@@ -341,9 +344,10 @@ def check_html(path, bed_path=None):
     else:
         if "function eq_clipMatrixText" not in text:
             errors.append("不变量⑧被破坏：找不到 eq_clipMatrixText（权益表复制会取到空串）")
-        if "window.win_clipWrite(eq_clipMatrixText())" not in eqbind:
-            errors.append("不变量⑧被破坏：股东权益 Ctrl+C/X 没有接线 "
-                          "window.win_clipWrite(eq_clipMatrixText()) —— 权益表复制/剪切会没反应")
+        if ("window.win_clipWrite(eq_clipMatrixText())" not in eqbind
+                and "window.__clipEngine.handleKey(e, 'eq')" not in eqbind):
+            errors.append("不变量⑧被破坏：股东权益 Ctrl+C/X 既没接线 window.win_clipWrite(eq_clipMatrixText())"
+                          "，也没交给 window.__clipEngine.handleKey(e, 'eq') —— 权益表复制/剪切会没反应")
         if "EQ-CLIP-EDITSAFE-20261017" not in eqbind:
             errors.append("不变量⑧被破坏：权益「编辑态兜底」被删 —— "
                           "isEditingCell 一旦误判（两套实例的编辑层互相干扰），Ctrl+C/X 会完全跳过补写")

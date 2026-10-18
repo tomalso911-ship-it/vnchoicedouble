@@ -568,6 +568,20 @@ function finExcelKeysBind(){
           }
         }
       } catch(err){}
+      /* ★FIN-CLIP-RANGE-20261018：全选/大框选时 getRanges() 常只给"活动格" → getActiveRange().getRange() 实测能返回正确范围，用它兜底（取面积更大的那个） */
+      try {
+        var _selF = (typeof sh.getSelection === 'function') ? sh.getSelection() : null;
+        var _arF = (_selF && _selF.getActiveRange && _selF.getActiveRange()) || null;
+        var _gF = (_arF && typeof _arF.getRange === 'function') ? _arF.getRange() : null;
+        if (_gF && _gF.startRow != null && _gF.endRow != null && _gF.startColumn != null && _gF.endColumn != null){
+          var _aSz = (_gF.endRow - _gF.startRow + 1) * (_gF.endColumn - _gF.startColumn + 1);
+          var _cSz = 0;
+          for (var _z = 0; _z < ranges.length; _z++){
+            _cSz += (ranges[_z].endRow - ranges[_z].startRow + 1) * (ranges[_z].endColumn - ranges[_z].startColumn + 1);
+          }
+          if (_aSz > _cSz){ ranges = [{ startRow: _gF.startRow, startColumn: _gF.startColumn, endRow: _gF.endRow, endColumn: _gF.endColumn }]; }
+        }
+      } catch(errF){}
       if (!ranges.length) return '';
       /* 实时快照：只为读 numfmt pattern（货币符号 / 千位分隔 / 小数位） */
       var snap = null, sid = null;
@@ -608,38 +622,71 @@ function finExcelKeysBind(){
       return lines.join('\n');
     } catch(err){ return ''; }
   }
-  function fin_clipWrite(text){
-    if (text == null) return false;
-    /* 排障用：记录最近一次写入的返回值与长度（不影响功能；headless 里剪贴板读不出来时靠它定位） */
-    try { window.__finClipLast = { len: String(text).length, ok: null }; } catch(err){}
-    var prev = null;
-    try { prev = document.activeElement; } catch(err){}
+  /* ★CLIP-ENGINE-20261018：剪贴板交给全局引擎（window.__clipEngine），这里只注册适配器。
+     · text  = 当前选区 → 屏幕文本（带货币符号/千分位）
+     · write = 粘贴文本 → TSV 矩阵 → 写进表格（绕开 Univer 对 navigator.clipboard 的依赖）
+     · clear = 剪切成功后清空选区（不再等 Univer，它写剪贴板失败会整条中断）
+     为什么不再自己写 clipboard：两张表各写一套 = 改好一张、另一张又坏（历史反复出问题）。 */
+  function fin_clipPasteText(text){
     try {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly', '');
-      ta.style.cssText = 'position:fixed;left:-99999px;top:0;width:1px;height:1px;opacity:0;';
-      document.body.appendChild(ta);
-      var ok = false;
+      var api0 = finAPI(); if (!api0) return false;
+      var wb0 = api0.getActiveWorkbook(); if (!wb0) return false;
+      var sh0 = wb0.getActiveSheet(); if (!sh0) return false;
+      var m0 = (window.__clipEngine && window.__clipEngine.parse) ? window.__clipEngine.parse(text) : null;
+      if (!m0 || !m0.length) return false;
+      /* ★★FIN-PASTE-ANCHOR-20261018：与权益表同一处缺陷（EQ-PASTE-ANCHOR）。
+         旧写法拿不到选区就让 r0/c0 静默退化成 0,0 → 粘贴内容被写到 A1 并自动保存。
+         修法：落点必须是【当前活动单元格】；真拿不到就放弃这次粘贴，绝不写回 A1。
+         不用 finStatSel（统计栏记的"历史最大选区"），否则会粘到旧位置。 */
+      var r0 = -1, c0 = -1;
       try {
-        ta.select();
-        ta.setSelectionRange(0, text.length);
-        ok = document.execCommand('copy');
-      } catch(err){ ok = false; }
-      try { document.body.removeChild(ta); } catch(err){}
-      try { if (window.__finClipLast) window.__finClipLast.ok = !!ok; } catch(err){}
-      if (!ok){
-        /* 兜底：安全上下文下走异步 API（不 await；失败也只是维持原状，不弹错） */
-        try { navigator.clipboard.writeText(text).catch(function(){}); } catch(err){}
+        var g0 = sh0.getSelection().getActiveRange().getRange();
+        if (g0 && typeof g0.startRow === 'number' && typeof g0.startColumn === 'number'){
+          r0 = g0.startRow; c0 = g0.startColumn;
+        }
+      } catch(eG){}
+      if (r0 < 0){
+        try {
+          var _fr = (typeof fin_getSelectionRanges === 'function') ? fin_getSelectionRanges() : null;
+          if (_fr && _fr.length && typeof _fr[0].startRow === 'number'){
+            r0 = _fr[0].startRow; c0 = _fr[0].startColumn;
+          }
+        } catch(eF){}
       }
-      return ok;
+      if (r0 < 0 || c0 < 0){
+        console.warn('[fin-paste] 取不到粘贴落点，已放弃（绝不写回 A1）');
+        return false;
+      }
+      sh0.getRange(r0, c0, m0.length, m0[0].length).setValues(m0);
+      try { if (typeof fin_markDirty === 'function') fin_markDirty(); } catch(eD){}
+      try { window.__finClipLast = { len: String(text).length, ok: true, paste: true }; } catch(eL){}
+      return true;
     } catch(err){ return false; }
-    finally {
-      /* ★必须把焦点还给原来的元素：textarea.select() 会抢焦点，
-         不还回去的话后续方向键/回车都会打到 body 上（表格像"死"了一样）。 */
-      try { if (prev && typeof prev.focus === 'function') prev.focus({ preventScroll: true }); } catch(err){}
-    }
   }
+  function fin_clipClearSel(){
+    try {
+      var api0 = finAPI(); if (!api0) return false;
+      var pr = api0.executeCommand('sheet.command.clear-selection-content', {});
+      if (pr && typeof pr.then === 'function') pr.catch(function(){});
+      try { if (typeof fin_markDirty === 'function') fin_markDirty(); } catch(eD){}
+      return true;
+    } catch(err){ return false; }
+  }
+  /* 兼容老调用点/探针：名字保留，内部统一走引擎 */
+  function fin_clipWrite(text){
+    try { return !!(window.__clipEngine && window.__clipEngine.write(text)); } catch(err){ return false; }
+  }
+  try {
+    if (window.__clipEngine && window.__clipEngine.register){
+      window.__clipEngine.register('fin', {
+        el: function(){ return document.getElementById('univer_container'); },
+        text: fin_clipMatrixText,
+        write: fin_clipPasteText,
+        clear: fin_clipClearSel
+      });
+      window.__clipEvtFin = true;          /* 接线标记（3 秒自检 + 硬锁脚本用） */
+    }
+  } catch(errReg){}
   function finIsUniverElem(el){
     try {
       if (!el || el.nodeType !== 1) return false;
@@ -680,12 +727,11 @@ function finExcelKeysBind(){
          任何重构都不得在这三个键上加 preventDefault / stopPropagation，也不得删掉本段。 */
       var finClipKey = (k === 'c' || k === 'C' || k === 'x' || k === 'X' || k === 'v' || k === 'V');
       if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) {
-        /* C / X：Univer 自己 preventDefault 了，但它的 navigator.clipboard.write() 被拒且被静默吞掉，
-           所以这里用同步 execCommand 把内容真正写进系统剪贴板（详见 fin_clipWrite 上方注释）。
-           V 不用管：Univer 走原生 paste 事件，剪贴板有内容就能粘。 */
-        if (k === 'c' || k === 'C' || k === 'x' || k === 'X'){
-          try { fin_clipWrite(fin_clipMatrixText()); } catch(err){}
-        }
+        /* ★CLIP-ENGINE-20261018：C/X/V 统一交给全局引擎（见文件顶部 CLIP-ENGINE 说明）。
+           · C/X：引擎自己写系统剪贴板（同步 execCommand + copy/cut 事件双通道），X 还会立刻清空选区
+           · V：引擎不拦，等浏览器发 paste 事件后由引擎接管（从 clipboardData 读，绕开权限）
+           这里【绝不】preventDefault / stopPropagation。 */
+        try { if (window.__clipEngine) window.__clipEngine.handleKey(e, 'fin'); } catch(errClip){}
         return;   /* ★绝不 preventDefault / stopPropagation —— 放行给 Univer 自己的命令 */
       }
 
