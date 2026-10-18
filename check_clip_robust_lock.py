@@ -52,14 +52,22 @@ print("2) 复制：同步 execCommand + copy/cut 事件双通道")
 chk("ok = document.execCommand('copy');" in src, "execCommand('copy') 仍在（同步通道，代码不是注释）")
 chk(cnt("document.addEventListener('copy', onCopyCut, true);") == 1, "copy 事件通道已注册")
 chk(cnt("document.addEventListener('cut', onCopyCut, true);") == 1, "cut 事件通道已注册")
-chk("e.clipboardData.setData('text/plain', pending);" in src, "事件通道用 setData 落盘")
+# ★CLIP-OWN-20261018：onCopyCut 里实际写的是 `_mine`（= pending，或刚写完 800ms 内的 lastText）。
+#   两者都是「我们自己的内容」，语义等价，任一存在即通过。
+chk(("e.clipboardData.setData('text/plain', pending);" in src
+     or "e.clipboardData.setData('text/plain', _mine);" in src),
+    "事件通道用 setData 落盘")
 chk("left:-99999px" not in src, "隐藏 textarea 不得放到 -99999px（会假成功写空）")
 chk("var ok = writeClipboard(text);" in src, "复制必须真正写入剪贴板（writeClipboard 调用在）")
 chk("try { if (prev && prev.focus) prev.focus({ preventScroll: true }); } catch (e) {}" in src,
     "写剪贴板后必须把焦点还给原元素（否则后续按键全打到隐藏 textarea）")
 
 print("3) 粘贴：自己接管 paste 事件（绕开 navigator.clipboard）")
-chk(cnt("document.addEventListener('paste', function (e) {") == 1, "paste 捕获监听已注册")
+# ★CLIP-OWN-20261018：paste 改成具名函数 onPasteEvt 并同时挂在 document + window（捕获阶段，
+#   抢在 Univer 之前）。两种写法都算「已注册且只注册一套」。
+chk(cnt("document.addEventListener('paste', function (e) {") == 1
+    or cnt("document.addEventListener('paste', onPasteEvt, true);") == 1,
+    "paste 捕获监听已注册")
 chk("e.clipboardData ? e.clipboardData.getData('text/plain')" in src, "从 clipboardData 读文本")
 chk("applyPaste(o, txt);" in src, "读到内容后交给适配器写入")
 # ★CLIP-COPY-EMPTY-20261018：clipboardData 为空时，仍必须用「本页最近复制的内容」兜底，
@@ -77,7 +85,15 @@ chk("forceName && tables[forceName]" in src, "键盘补丁可指定表格（避�
 print("5) 粘贴写单元格（自己的 setValues）")
 for fn in ("fin_clipPasteText", "eq_clipPasteText"):
     chk(("function %s(text){" % fn) in src, "存在 %s" % fn)
-chk(cnt(".setValues(m0);") == 2, "两处都用 setValues 写回（实际 %d）" % cnt(".setValues(m0);"))
+# ★CLIP-TILE-20261018：粘贴矩阵现在可能先补瓦片（fin_clipTileMat / finClipTileMat）再写回，
+#   变量名不再是 m0，所以改为「两个粘贴函数体里都必须出现 setValues(」。
+_ps = {}
+for _fn in ("fin_clipPasteText", "eq_clipPasteText"):
+    _i = src.find("function %s(text){" % _fn)
+    _ps[_fn] = (src[_i:_i + 8000] if _i >= 0 else "")
+chk(all("setValues(" in _ps[_fn] for _fn in _ps),
+    "两处都用 setValues 写回（fin=%s eq=%s）"
+    % ("setValues(" in _ps["fin_clipPasteText"], "setValues(" in _ps["eq_clipPasteText"]))
 chk("window.__clipEngine.parse(text)" in src or "window.__clipEngine.parse" in src,
     "粘贴文本经引擎 parse（TSV + 数值还原）")
 
@@ -122,7 +138,13 @@ chk("window.win_fmtNum(v, _epat)" in src, "权益按 numfmt pattern 还原")
 print("7b) 复制的「空内容」语义（CLIP-COPY-EMPTY-20261018）")
 chk("if (text === null || text === undefined) return false;" in src,
     "text() 返回 null（无选区）才不接管；返回 ''（空白格）必须照常复制")
-chk("if (pending === null || pending === undefined) return;" in src,
+# ★CLIP-OWN-20261018 之后，onCopyCut 改为「pending 优先、刚写完 800ms 内用 lastText 兜底」：
+#   判定变成 `_mine = pending ?? (刚写完 ? lastText : null)` + `if (_mine === null) return;`。
+#   语义没变（空字符串 '' 依然要写进剪贴板），所以两种写法都算通过。
+_ok_empty = ("if (pending === null || pending === undefined) return;" in src
+             or ("var _mine = (pending !== null && pending !== undefined) ? pending" in src
+                 and "if (_mine === null) return;" in src))
+chk(_ok_empty,
     "copy/cut 事件允许写空内容（否则剪贴板残留旧文本 → 粘出旧数据）")
 chk("var text = null;" in src and "text = String(text);" in src,
     "复制文本先按 null 判定再转字符串（空白格也必须走复制，不得静默返回）")

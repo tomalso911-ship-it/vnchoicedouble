@@ -225,6 +225,7 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
   var tables = {};                 // name -> { el, text, write, clear }
   var pending = null;              // copy/cut 事件里要写入剪贴板的内容
   var lastText = '';               // 最近一次从本页复制的文本（paste 事件拿不到内容时的兜底）
+  var lastWriteAt = 0;             // 最近一次写剪贴板的时刻（防止浏览器默认 copy 把空选区写进去）
   var taEl = null;
   var lastPasteAt = 0;
 
@@ -272,6 +273,7 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
       ok = document.execCommand('copy');
     } catch (e) { ok = false; }
     pending = null;
+    lastWriteAt = Date.now();
     /* 焦点必须还给原来的元素，否则后续按键全打到 textarea 上（表格像"死"了一样） */
     try { if (prev && prev.focus) prev.focus({ preventScroll: true }); } catch (e) {}
     /* 异步通道兜底（安全上下文下才有效，失败静默） */
@@ -285,15 +287,30 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
     /* ★CLIP-COPY-EMPTY-20261018：pending 可能是【空字符串】（用户复制了一片空白格）。
        旧写法 `if (!pending) return;` 会把这种情况当成"没有内容"直接放行给 Univer，
        结果剪贴板留着上一次的旧文本 → 粘贴时粘出旧数据。空内容也要写进去。 */
-    if (pending === null || pending === undefined) return;
+    if (!e || e.__clipCopyDone) return;
+    if (!e.clipboardData) return;
+    /* ★CLIP-OWN-20261018：pending 只在 execCommand('copy') 期间有值。
+       紧接着浏览器为 Ctrl+C 默认动作又发一次 copy 事件，此时 pending 已清空；
+       那条路径若放行，浏览器会把"DOM 选区（空）"写进剪贴板 → 我们刚写的内容被冲掉。
+       所以刚写完的 800ms 内，遇到 copy/cut 事件一律用 lastText 再落一次并拦掉默认动作。 */
+    var _mine = (pending !== null && pending !== undefined) ? pending
+              : ((lastWriteAt && (Date.now() - lastWriteAt) < 800) ? lastText : null);
+    if (_mine === null) return;
     try {
-      if (!e.clipboardData) return;
-      e.clipboardData.setData('text/plain', pending);
+      e.__clipCopyDone = 1;
+      e.clipboardData.setData('text/plain', _mine);
       e.preventDefault();            // 用我们的内容，别让 Univer 覆盖成空的
+      /* ★CLIP-OWN-20261018：Univer 的 copy/cut 监听会另外记一份"已复制区间"，
+         随后它的粘贴（paste-by-short-key）按【剪切】语义把源格搬走（实测源格被清空）。
+         在 window 捕获里（本脚本注册得比 Univer 早）用 stopImmediatePropagation
+         把这条事件彻底截断，Univer 那条路径就不会被触发。 */
+      e.stopImmediatePropagation();
     } catch (err) {}
   }
   document.addEventListener('copy', onCopyCut, true);
   document.addEventListener('cut', onCopyCut, true);
+  window.addEventListener('copy', onCopyCut, true);
+  window.addEventListener('cut', onCopyCut, true);
 
   /* ---------- TSV 解析 + 数值还原 ---------- */
   function parseTSV(text) {
@@ -355,13 +372,49 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
      财务/权益表格（ownerOf 的"只有一张表可见就认它"兜底会命中）——
      表现就是"输入框粘不进东西，表格还莫名多了一段数据"。
      ★Univer 编辑器也在此排除：编辑态粘贴交回 Univer 处理（它自己维护单元格内的光标）。 */
+  /* ★★CLIP-SINK-20261018（探针 60 实测，复制源格被搬空的真根因）★★
+     Univer 0.5.5 的键盘焦点在【不编辑】时也常驻在它自己的内部编辑器 DOM 上：
+       id = '__editor___INTERNAL_EDITOR__DOCS_NORMAL'（公式栏是 ..._FORMULA_BAR）
+     它是常驻 contenteditable，于是旧版 isEditableEl 把它当"真实输入框"：
+       · ownerOf 返回 null → 引擎的 Ctrl+V 不接管、也不 preventDefault；
+       · 粘贴事件的目标同样是它 → onPasteEvt 直接 return（实测 prevented=false）；
+       · Univer 自己的 sheet.command.paste-by-short-key 照跑，它记着上次 Ctrl+C 的区间，
+         按【剪切】语义把源格搬空 → 「复制一格粘到别处，源格内容消失」。
+     正确判据是"是否真的在编辑单元格"，不是"焦点元素是否可编辑"：
+     真编辑态会有一个【有尺寸】的 .univer-editor-container 覆盖层
+     （与 finIsEditingCell / __eqUndo.isEditing 同一口径）。 */
+  function univerEditOverlayActive(el) {
+    try {
+      var host = null;
+      if (el && el.closest) host = el.closest('#univer_container, #equity_container');
+      if (!host) {
+        var c1 = document.getElementById('univer_container');
+        var c2 = document.getElementById('equity_container');
+        var vis = function (c) { return !!c && (c.offsetHeight > 0 || (c.getClientRects && c.getClientRects().length)); };
+        host = vis(c1) ? c1 : (vis(c2) ? c2 : null);
+      }
+      if (!host) return false;
+      var boxes = host.querySelectorAll('.univer-editor-container');
+      for (var i = 0; i < boxes.length; i++) {
+        var r = boxes[i].getBoundingClientRect();
+        if (r.width > 10 && r.height > 10) return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   function isEditableEl(el) {
     try {
       if (!el) return false;
+      /* ★先判 Univer 的常驻焦点承接层，再谈 input/contenteditable */
+      var sid = String(el.id || '');
+      var isSink = /^__editor___INTERNAL_EDITOR__/.test(sid) ||
+                   !!(el.closest && el.closest('[id^="__editor___INTERNAL_EDITOR__"]'));
+      if (isSink) return univerEditOverlayActive(el);
       var t = el.tagName ? String(el.tagName).toLowerCase() : '';
       if (t === 'input' || t === 'textarea' || t === 'select') return true;
       if (el.isContentEditable) return true;
-      if (el.closest && el.closest('.univer-editor-container')) return true;
+      if (el.closest && el.closest('.univer-editor-container')) return univerEditOverlayActive(el);
     } catch (e) {}
     return false;
   }
@@ -424,12 +477,16 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
   function handleKey(e, forceName) {
     try {
       if (!e) return false;
+      /* ★CLIP-OWN-20261018：同一个按键只由引擎处理一次（新增的 window 捕获监听 + 两张表
+         自己的键盘补丁都会调到这里，不挡住就会复制两遍、粘贴两遍） */
+      if (e.__clipHandled) return false;
       lastKeyAt = Date.now();
       var k = String(e.key || '').toLowerCase();
       if (k !== 'c' && k !== 'x' && k !== 'v') return false;
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return false;
       var o = forceName && tables[forceName] ? { name: forceName, ad: tables[forceName] } : ownerOf(e.target);
       if (!o) return false;
+      try { e.__clipHandled = 1; } catch (eM) {}
       if (k === 'v') { pasteFallback(o); return false; }   // 不放行也不拦，等 paste 事件
       /* ★★CLIP-COPY-EMPTY-20261018（用户 2026-10-18「复制剪切粘贴又没了」的排查结论）★★
          text() 的返回值有两种"空"：
@@ -462,7 +519,10 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
   }, true);
 
   /* 粘贴：捕获阶段接管，绕开 Univer 对 navigator.clipboard 的依赖 */
-  document.addEventListener('paste', function (e) {
+  function onPasteEvt(e) {
+    if (!e || e.__clipPasteDone) return;
+    /* 文件粘贴（素材库上传等）不归表格管，直接放行 */
+    try { if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length) return; } catch (eFl) {}
     var txt = '';
     try { txt = e.clipboardData ? e.clipboardData.getData('text/plain') : ''; } catch (err) { txt = ''; }
     var o = ownerOf(e.target);
@@ -477,9 +537,64 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
       else if (lastText) txt = lastText;
       else return;
     }
-    try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
+    try { e.__clipPasteDone = 1; } catch (eD) {}
+    /* ★CLIP-OWN-20261018：stopImmediatePropagation（window 捕获、本脚本最早注册）——
+       Univer 自己的粘贴监听也是走 paste 事件，不彻底截断它就会再粘一遍
+       （实测会按剪切语义把源格搬空）。 */
+    try { e.preventDefault(); e.stopImmediatePropagation(); } catch (err) {}
     lastPasteAt = Date.now();
+    /* 粘贴同样会立刻改格子 → 先抓改前值（否则撤销粘贴撤不干净） */
+    try { if (window.__finUndoCapturePre) window.__finUndoCapturePre(); } catch (eP2) {}
     applyPaste(o, txt);
+  }
+  document.addEventListener('paste', onPasteEvt, true);
+  /* ★CLIP-OWN-20261018：window 捕获（本脚本在页面最前面，注册得比 Univer 早）——
+     抢在 Univer 的 window 监听之前接住 paste，同时把事件挡在 document 之前。 */
+  window.addEventListener('paste', onPasteEvt, true);
+
+  /* ★★CLIP-OWN-20261018（探针 55/56 真机实测，勿删）★★
+     现象：财务表「复制一格 → 粘贴到别处」，**源格的内容凭空消失**（快照里直接变 null，
+     撤销账本里连一条命令都没有）；控制台能看到 Univer 自己执行了 sheet.command.paste-by-short-key。
+     根因：Univer 0.5.5 的 Ctrl+C 会把内部剪贴板置成「已复制区间」，随后的 Ctrl+V
+     （即使剪贴板事件已经被我们接管）仍按【剪切】语义把源区间搬走 → 数据丢失。
+     做法：C/X/V 的 keydown 只在 window 捕获里 stopPropagation、【绝不】preventDefault：
+       · Univer 收不到这个按键 → 不会自己复制/粘贴（源格安全、也不会重复粘贴）；
+       · 浏览器的原生 copy/cut/paste 事件照常发出 → 仍由本引擎接管（带格式、铺满选区都一样）。
+     普通输入框 / 单元格编辑器会被 ownerOf 排除，不受影响。
+     ★Ctrl+Z / Ctrl+Y 同理：先问自建账本（window.__finUndoKeyHook），它处理了就挡住 Univer，
+       否则 Univer 会再撤一步（实测一次 Ctrl+Z 撤两步、值撤不回来）。 */
+  window.addEventListener('keydown', function (e) {
+    try {
+      if (!e || e.isComposing) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      var k = String(e.key || '').toLowerCase();
+      /* 排障用（极小开销）：window.__clipKeyLog 能看到引擎到底有没有接管这个按键 */
+      try {
+        if (k === 'c' || k === 'x' || k === 'v' || k === 'z' || k === 'y'){
+          window.__clipKeyLog = window.__clipKeyLog || [];
+          window.__clipKeyLog.push(k + ':own=' + (!!ownerOf(e.target)) +
+            ':tgt=' + ((e.target && (e.target.id || e.target.tagName)) || '?') +
+            ':prev=' + e.defaultPrevented);
+          if (window.__clipKeyLog.length > 40) window.__clipKeyLog.shift();
+        }
+      } catch (eKL) {}
+      if (k === 'c' || k === 'x' || k === 'v') {
+        if (e.shiftKey) return;
+        if (!ownerOf(e.target)) return;
+        /* 剪切/粘贴会在下面这一步立刻改格子 → 先把真正的「改前值」抓下来给撤销账本 */
+        try { if (window.__finUndoCapturePre) window.__finUndoCapturePre(); } catch (eP) {}
+        handleKey(e, null);
+        /* ★必须 stopImmediatePropagation：实测（探针 59）Univer 的快捷键监听也挂在
+           window 捕获上，只 stopPropagation 挡不住同一节点上的后续监听 → 它照样执行
+           univer.command.copy / paste-by-short-key（源格被搬空）。 */
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (k === 'z' || k === 'y') {
+        var h = window.__finUndoKeyHook;
+        if (typeof h === 'function' && h(e)) e.stopImmediatePropagation();
+      }
+    } catch (err) {}
   }, true);
 
   window.__clipEngine = {
@@ -19636,7 +19751,7 @@ var PROD_EQUIP_FAULT_KB = {
     window.finUndoHist = finUndoHist;
     window.finUndoRedo = finUndoRedo;
     window.finUndoStats = { rec: 0, skipSame: 0, skipNoSnap: 0, fallback: 0 };
-    window.FIN_UNDO_BUILD = 'FIN-UNDO-EXCEL-20261018o';
+    window.FIN_UNDO_BUILD = 'FIN-UNDO-EXCEL-20261018r';
 
     /* 程序写入包一层：finExecSilent 期间不记账（翻译补写 / 币种重算 / 高亮写入…） */
     try {
@@ -19883,6 +19998,117 @@ var PROD_EQUIP_FAULT_KB = {
         return true;
       } catch(e){ return false; }
     }
+    /* ★★FIN-UNDO-CELLVALUE-RANGE-20261018（探针 48 实测，关键）★★
+       这版 Univer 的 `sheet.command.set-range-values` 在 beforeCommandExecuted 里
+       【params 根本没有 range】，只有 `cellValue: { 行: { 列: {...} } }`
+       （实测 keys = subUnitId,unitId,cellValue,trigger）。
+       旧代码拿不到 range 就退回"当前选区" —— 粘贴 1×2 时选区还是 1 格，
+       于是只记了第一格的"改前值"，撤销时第二格永远撤不干净（实测 ["",222]）。
+       这里直接从 cellValue 的行/列键推导真实矩形范围。 */
+    function fin_undoCvRanges(params){
+      var out = [];
+      try {
+        var cv = params && params.cellValue;
+        if (cv && typeof cv === 'object'){
+          var r0 = Infinity, r1 = -1, c0 = Infinity, c1 = -1, any = false, k, k2;
+          for (k in cv){
+            if (!Object.prototype.hasOwnProperty.call(cv, k)) continue;
+            var rr = parseInt(k, 10);
+            if (!isFinite(rr)) continue;
+            if (!cv[k] || typeof cv[k] !== 'object') continue;
+            for (k2 in cv[k]){
+              if (!Object.prototype.hasOwnProperty.call(cv[k], k2)) continue;
+              var cc = parseInt(k2, 10);
+              if (!isFinite(cc)) continue;
+              any = true;
+              if (rr < r0) r0 = rr;
+              if (rr > r1) r1 = rr;
+              if (cc < c0) c0 = cc;
+              if (cc > c1) c1 = cc;
+            }
+          }
+          if (any) out.push({ r0: r0, c0: c0, r1: r1, c1: c1 });
+        }
+      } catch(eC){}
+      return out;
+    }
+    /* 把多段范围并成一个外接矩形（宁可多记几格 = 写回同值，也不能漏格） */
+    function fin_undoUnionBox(a, b){
+      var r0 = Infinity, r1 = -1, c0 = Infinity, c1 = -1, i, x;
+      for (i = 0; i < (a || []).length; i++){
+        x = a[i];
+        if (x.r0 < r0) r0 = x.r0; if (x.r1 > r1) r1 = x.r1;
+        if (x.c0 < c0) c0 = x.c0; if (x.c1 > c1) c1 = x.c1;
+      }
+      for (i = 0; i < (b || []).length; i++){
+        x = b[i];
+        if (x.r0 < r0) r0 = x.r0; if (x.r1 > r1) r1 = x.r1;
+        if (x.c0 < c0) c0 = x.c0; if (x.c1 > c1) c1 = x.c1;
+      }
+      if (r0 > r1 || c0 > c1) return null;
+      return { r0: r0, c0: c0, r1: r1, c1: c1 };
+    }
+    /* ★★FIN-UNDO-WIDEST-20261018（探针 49/50 实测，方案①）★★
+       一次手势可能有多份快照（外层 paste-by-short-key 只带"当前选区"=1 格，
+       内层 set-range-values 才带真实 range=2 格）。旧代码取【队首第一份】，
+       正好取到最窄的那份 → 粘贴 1×2 只记 1 格 → 撤销后第 2 格仍留着值。
+       这里给每份快照算"覆盖格数"，记账时取覆盖最广的那份。 */
+    function fin_undoSnapCells(sn){
+      try {
+        var n = 0, i;
+        for (i = 0; i < (sn.ranges || []).length; i++){
+          var b = sn.ranges[i];
+          n += Math.max(1, b.r1 - b.r0 + 1) * Math.max(1, b.c1 - b.c0 + 1);
+        }
+        return n;
+      } catch(e){ return 0; }
+    }
+    /* a 的外接矩形是否完整包住 boxes 里的每一段 */
+    function fin_undoCovers(a, boxes){
+      try {
+        var u = fin_undoUnionBox(a, null);
+        if (!u || !boxes || !boxes.length) return false;
+        for (var i = 0; i < boxes.length; i++){
+          var b = boxes[i];
+          if (b.r0 < u.r0 || b.r1 > u.r1 || b.c0 < u.c0 || b.c1 > u.c1) return false;
+        }
+        return true;
+      } catch(e){ return false; }
+    }
+    /* ★★FIN-UNDO-PASTEDIM-20261018（探针 51 实测，方案①的补充）★★
+       实测这版 Univer 的原生粘贴【只发 mutation、不发带 range 的 command】：
+       beforeCommandExecuted 能看到的只有 paste-by-short-key，它的 params 里没有 range，
+       快照只能退回"当前选区" = 粘贴锚点的 1 格 —— 粘贴 1×2 就只记 1 格。
+       但它的 params 里有 textContent（'111\t222'），行列数就是真实粘贴区大小。
+       这里按 "\n / \t" 算出 nr×nc，从锚点左上角往外扩，补齐整块。 */
+    function fin_undoPasteDim(p){
+      try {
+        var t = (p && (p.textContent || p.text)) || '';
+        if (typeof t !== 'string' || !t) return null;
+        var lines = t.replace(/\r\n?/g, '\n').split('\n');
+        while (lines.length && lines[lines.length - 1] === '') lines.pop();
+        if (!lines.length) return null;
+        var nr = lines.length, nc = 1, i;
+        for (i = 0; i < nr; i++){
+          var cols = lines[i].split('\t').length;
+          if (cols > nc) nc = cols;
+        }
+        if (nr <= 1 && nc <= 1) return null;      /* 单格粘贴：不用扩 */
+        if (nr * nc > 2000) return null;          /* 太大不扩，保持原选区范围 */
+        return { nr: nr, nc: nc };
+      } catch(e){ return null; }
+    }
+    /* base 为底，over 覆盖 base（over 里的格子是真正的"改前值"，优先级更高） */
+    function fin_undoMergeMats(base, over){
+      var out = {}, r, c;
+      if (base) for (r in base){ if (!base[r]) continue; out[r] = {}; for (c in base[r]) out[r][c] = base[r][c]; }
+      if (over) for (r in over){
+        if (!over[r]) continue;
+        if (!out[r]) out[r] = {};
+        for (c in over[r]) out[r][c] = over[r][c];
+      }
+      return out;
+    }
     function fin_undoRangesOf(params, unitId){
       var out = [];
       try {
@@ -19893,6 +20119,7 @@ var PROD_EQUIP_FAULT_KB = {
                      c1: (rg.endColumn !== undefined ? rg.endColumn : rg.startColumn) });
         }
       } catch(e){}
+      if (!out.length) out = fin_undoCvRanges(params);
       if (!out.length){ try { var sel = fin_undoSelRanges(unitId); if (sel) out = sel; } catch(e2){} }
       return out;
     }
@@ -19943,17 +20170,45 @@ var PROD_EQUIP_FAULT_KB = {
                       c1: (_r0.endColumn !== undefined ? _r0.endColumn : _r0.startColumn) }];
         }
       } catch(_e1){}
+      if (!_cmdRg || !_cmdRg.length){ try { var _cvR = fin_undoCvRanges(p); if (_cvR.length) _cmdRg = _cvR; } catch(_e1b){} }
       try {
         var _pre = finUndoPre;
         if (_pre && (Date.now() - _pre.t) < 5000 &&
             String(_pre.unitId || '') === _pu &&
-            (!_cmdRg || fin_undoSameRanges(_cmdRg, _pre.ranges))){
+            (!_cmdRg || fin_undoSameRanges(_cmdRg, _pre.ranges) || fin_undoCovers(_cmdRg, _pre.ranges))){
           window.finUndoStats.preHit = (window.finUndoStats.preHit || 0) + 1;
           /* ★★FIN-UNDO-PRE-ONCE-20261018★：这份"改前值"只属于【按下键的那一次编辑】，
              用完必须作废。旧代码不消费 → 5 秒内后续的样式动作（点加粗/上色）会复用
              "打字之前"的旧快照，撤销加粗时把用户刚打的字一起抹掉。 */
           finUndoPre = null;
-          return { ranges: _pre.ranges, mat: _pre.mat, sid: _pre.sid, unitId: _pre.unitId };
+          /* ★★FIN-UNDO-PRE-EXPAND-20261018（探针 48 实测 ["",222] 的真根因）★★
+             粘贴 1×2 到"只选中 1 格"的位置：按键瞬间抓到的"改前值"只有 1 格，
+             而命令真正影响 2 格 → 撤销时第 2 格没有改前值可写回，值就留在格子里。
+             命令范围比按键选区大且覆盖它时，用【外接矩形】补齐：
+             缺的格子此刻（命令执行前）现场读旧值，已有的格子仍用 pre 里更早的改前值。 */
+          var _useR = _pre.ranges, _useM = _pre.mat;
+          try {
+            if (_cmdRg && _cmdRg.length && !fin_undoSameRanges(_cmdRg, _pre.ranges)){
+              var _ub = fin_undoUnionBox(_pre.ranges, _cmdRg);
+              if (_ub){
+                var _live = fin_undoRead([_ub], _pre.sid, _pre.unitId);
+                if (_live){ _useR = [_ub]; _useM = fin_undoMergeMats(_live, _pre.mat); }
+              }
+            }
+          } catch(_eX){ _useR = _pre.ranges; _useM = _pre.mat; }
+          /* ★FIN-UNDO-PASTEDIM-20261018：粘贴按 textContent 的行列数扩到整块 */
+          try {
+            var _pd = fin_undoPasteDim(p);
+            if (_pd && _useR && _useR.length){
+              var _pa = _useR[0];
+              if ((_pa.r1 - _pa.r0 + 1) * (_pa.c1 - _pa.c0 + 1) < _pd.nr * _pd.nc){
+                var _pb = { r0: _pa.r0, c0: _pa.c0, r1: _pa.r0 + _pd.nr - 1, c1: _pa.c0 + _pd.nc - 1 };
+                var _pl = fin_undoRead([_pb], _pre.sid, _pre.unitId);
+                if (_pl){ _useR = [_pb]; _useM = fin_undoMergeMats(_pl, _pre.mat); }
+              }
+            }
+          } catch(_ePD){}
+          return { ranges: _useR, mat: _useM, sid: _pre.sid, unitId: _pre.unitId };
         }
         window.finUndoStats.preMiss = (window.finUndoStats.preMiss || 0) + 1;
         window.__finUndoPreMiss = { pu: _pu, hasPre: !!_pre,
@@ -19964,6 +20219,16 @@ var PROD_EQUIP_FAULT_KB = {
       } catch(_e2){}
       var rgs = fin_undoRangesOf(p, _pu);
       if (!rgs.length) return null;
+      /* ★FIN-UNDO-PASTEDIM-20261018：粘贴按 textContent 的行列数扩到整块 */
+      try {
+        var _pd2 = fin_undoPasteDim(p);
+        if (_pd2 && rgs.length){
+          var _a2 = rgs[0];
+          if ((_a2.r1 - _a2.r0 + 1) * (_a2.c1 - _a2.c0 + 1) < _pd2.nr * _pd2.nc){
+            rgs = [{ r0: _a2.r0, c0: _a2.c0, r1: _a2.r0 + _pd2.nr - 1, c1: _a2.c0 + _pd2.nc - 1 }];
+          }
+        }
+      } catch(_ePD2){}
       var sid = '', uid = '';
       try {
       sid = forceSid || p.subUnitId || '';
@@ -20045,11 +20310,21 @@ var PROD_EQUIP_FAULT_KB = {
         var row = [];
         for (var c = box.c0; c <= box.c1; c++){
           var cell = (mat && mat[r] && mat[r][c]) ? mat[r][c] : null;
-          var oc = {
-            v: (cell && cell.v !== undefined) ? cell.v : null,
-            f: (cell && cell.f !== undefined) ? cell.f : null,
-            t: (cell && cell.t !== undefined) ? cell.t : null
-          };
+          /* ★★FIN-UNDO-NULLCLEAR-20261018（探针 50 实测，方案②）★★
+             撤销"粘贴到空格子"时要把格子恢复成【真正的空格子】。
+             实测三种写法：
+               · { v: '' } / { v: '', t: 1 } → 只留空串（快照里 v 变成 ''，和原本的 null 不等）；
+               · { v: null }              → 整格跳过，值清不掉；
+               · { v: null, t: null, f: null } → ✅ 清成 v=null,t=null（和原空格子完全一致）。
+             所以清空必须【三个键一起写成 null】，缺一个都不行。 */
+          var _hasV = !!(cell && cell.v !== undefined && cell.v !== null && cell.v !== '');
+          var oc;
+          if (_hasV){
+            oc = { v: cell.v, f: (cell.f !== undefined) ? cell.f : null };
+            if (cell.t !== undefined && cell.t !== null) oc.t = cell.t;
+          } else {
+            oc = { v: null, t: null, f: null };
+          }
           if (!(cell && cell.uc)) oc.s = null;      /* 核弹式清样式（第二遍再补回来的） */
           row.push(oc);
         }
@@ -20091,6 +20366,10 @@ var PROD_EQUIP_FAULT_KB = {
         } else {
           finUndoProg++;
           try {
+            /* ★★FIN-UNDO-CLEARFIRST-20261018（探针 48/49 真机实测）★★
+               清空必须靠 fin_undoMatOf 里的 { v: '', t: 1 }（带显式 range，见那个函数的注释）。
+               绝不能在这里用 clear-selection-content：它认"当前选区"，activate 还没生效时会
+               把【别的格子】（上一步的选区）清掉 —— 实测把源格的样式整块洗白了。 */
             /* 第一遍：值 + 清样式（s:null） */
             for (bi = 0; bi < boxes.length; bi++){
               var b = boxes[bi];
@@ -20262,26 +20541,34 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function fin_undoKeyDown(e){
       try {
-        if (!e.ctrlKey || e.altKey) return;
+        if (!e.ctrlKey || e.altKey) return false;
         var k = String(e.key || '').toLowerCase();
         var isU = (k === 'z' && !e.shiftKey);
         var isR = (k === 'y') || (k === 'z' && e.shiftKey);
-        if (!isU && !isR) return;
+        if (!isU && !isR) return false;
         var unit = fin_undoVisibleUnit();
         /* 正在单元格里打字时，Ctrl+Z 应该是"撤打字"，不能吃掉 */
         try {
           if (unit === 'equity-report'){
-            if (window.__eqUndo && window.__eqUndo.isEditing && window.__eqUndo.isEditing()) return;
+            if (window.__eqUndo && window.__eqUndo.isEditing && window.__eqUndo.isEditing()) return false;
           } else if (typeof finIsEditingCell === 'function' && finIsEditingCell()){
-            return;
+            return false;
           }
         } catch(e9){}
-        if (!fin_undoCountFor(unit, isU ? finUndoHist : finUndoRedo)) return;   // 账本空 → 交回引擎
+        if (!fin_undoCountFor(unit, isU ? finUndoHist : finUndoRedo)) return false;   // 账本空 → 交回引擎
         e.preventDefault();
         e.stopPropagation();
         fin_undoStep(isU, unit);
-      } catch(err){}
+        return true;    /* ★CLIP-OWN-20261018：告诉早注册的 window 捕获监听"已处理"，让它挡住 Univer */
+      } catch(err){ return false; }
     }
+    /* ★CLIP-OWN-20261018：引擎在页面最前面注册的 window 捕获监听会先调这里；
+       返回 true = 账本已处理 → 引擎 stopPropagation，Univer 的 undo 不会再撤一次。 */
+    window.__finUndoKeyHook = fin_undoKeyDown;
+    /* ★CLIP-OWN-20261018：引擎那条 window 捕获监听注册得比"用户输入打点"更早，
+       剪切/粘贴会在打点之前就把格子改掉 → 账本抓到的"改前值"已经是新值。
+       所以引擎在动手前先显式调一次这个，把真正的改前值抓下来。 */
+    window.__finUndoCapturePre = fin_undoCapturePre;
     /* 记账钩子：服务级监听（Univer 自己记账也走这个通道），财务 / 股东权益各装一份 */
     function fin_undoSvcHookInstall(){
       try {
@@ -20308,10 +20595,19 @@ var PROD_EQUIP_FAULT_KB = {
          然后队列整体清空 → 一次手势 = 账本一步，不会因嵌套而重复记账。 */
       var pend = [];
       var PEND_TTL = 2500, PEND_MAX = 8;
+      var pendFlushedAt = 0;      /* ★FIN-UNDO-ONEGESTURE-20261018：上一次记账时刻（同一手势合并窗口） */
       cs.beforeCommandExecuted(function(cmd){
         try {
-          if (!cmd || !cmd.params) return;
+          /* ★FIN-UNDO-NOPARAM-20261018（探针 57 实测）：Univer 自己的 Delete 快捷键执行
+             sheet.command.clear-selection-content 时【params 是 undefined】——
+             旧写法 `if (!cmd.params) return;` 直接跳过 → Delete 一步都不记账 →
+             Ctrl+Z 撤的是上一步（打字的改前值=空格子），用户看到"删掉的字回不来"。
+             现在用空对象兜底，范围由 fin_undoSelRanges（当前选区）补出来。 */
+          if (!cmd) return;
+          if (!cmd.params) cmd.params = {};
           var id = String(cmd.id || '');
+          /* ★同一手势的后续命令不再入队（带格式粘贴是两条连续命令，必须只记一步） */
+          if (pendFlushedAt && (Date.now() - pendFlushedAt) < 250) return;
           /* ★★FIN-UNDO-EVERYSTEP-20261018（用户 2026-10-18：「要求每一步动作都可以撤回，
              而不是输入数值才可以撤回」）★★
              改用【排除法】：只要不是纯界面命令，所有 sheet.command.* 一律进账本 ——
@@ -20356,13 +20652,38 @@ var PROD_EQUIP_FAULT_KB = {
           for (i = 0; i < pend.length; i++){ if (pend[i].id === id){ tracked = true; break; } }
           /* 只有被跟踪的命令才动队列：不相关命令（嵌套 mutation / 光标移动）不许冲掉现场 */
           if (!tracked) return;
-          /* 取【第一份拿得到的快照】（越早越靠前 = 越接近"改动之前"）；
-             某条命令抓不到范围（snap=null）时不要它，继续往后找。 */
-          var snap = null, si;
-          for (si = 0; si < pend.length; si++){ if (pend[si].snap){ snap = pend[si].snap; break; } }
+          /* ★★FIN-UNDO-WIDEST-20261018（方案①）★★
+             取【覆盖格数最多】的那份快照，而不是队首那一份：
+             外层命令（paste-by-short-key / set-range-bold）的 params 往往没有 range，
+             快照只能退回"当前选区"（粘贴 1×2 时选区还是 1 格）；
+             真正带 range / cellValue 的是内层 set-range-values，它的范围才等于实际改动区。
+             覆盖格数相同则仍取队首（越早 = 越接近"改动之前"，改前值最准）。 */
+          var snap = null, si, bestN = -1;
+          for (si = 0; si < pend.length; si++){
+            if (!pend[si].snap) continue;
+            var _n = fin_undoSnapCells(pend[si].snap);
+            if (_n > bestN){ bestN = _n; snap = pend[si].snap; }
+          }
           pend.length = 0;                    /* 一次手势只记一步 */
-          var B2 = window.__finUndoBridge;
-          if (snap && B2 && B2.record) B2.record(snap);
+          /* ★★FIN-UNDO-ONEGESTURE-20261018（探针 48 实测）★★
+             带格式粘贴会连着发两条 set-range-values（第一遍清样式、第二遍铺样式）。
+             旧写法在第一条命令完成时就清空队列 → 第二条命令又开一个新队列 → 一次粘贴记【两步】，
+             于是 Ctrl+Z 只撤掉"样式那一半"，值还留在格子里（用户看到的就是"撤销撤不干净"）。
+             现在记下一个合并窗口：250ms 内属于同一手势的后续命令直接不入队，一次粘贴 = 一步。 */
+          pendFlushedAt = Date.now();
+          /* ★★FIN-UNDO-AFTERDELAY-20261018★
+             同一手势的后续命令（带格式粘贴的第二遍"铺样式"）此刻还没跑完，
+             立刻读 after 只能读到"值有了、样式还没铺上"的中间态 → 恢复（Ctrl+Y）时格式丢失。
+             而 250ms 合并窗口内的后续命令本来就不该另记一步，所以把记账推迟 120ms
+             （< 250ms 窗口，绝不会和下一条手势抢顺序），让 after 抓到最终态。 */
+          if (snap){
+            setTimeout(function(){
+              try {
+                var B3 = window.__finUndoBridge;
+                if (B3 && B3.record) B3.record(snap);
+              } catch(e4){}
+            }, 120);
+          }
         } catch(e){}
       });
     }
@@ -21014,6 +21335,64 @@ var PROD_EQUIP_FAULT_KB = {
       setTimeout(run, 60);
     }
 
+    /* ★★FIN-TYPE-EDIT-20261018（用户 2026-10-18：「表格停在单元格上面的时候，直接打汉字或者输入任何
+       英文都可以直接输入；不需要双击进入单元格出现光标跳动才能输入」）★★
+       与权益表 eqTypeToEdit 完全同一套「确定性两步」（那边已实测通过，本函数只照搬，勿改那套）：
+         ① 先用 set-range-values 把字符写进当前格 —— 纯数字落成数值（t=2），其它落成字符串（t=1）；
+         ② 40ms 后再用 set-cell-edit-visible{visible:true, eventType:3, unitId} 打开编辑器
+            → 编辑器会载入刚写入的内容、光标落在末尾，之后的按键走 Univer 原生输入流
+              （编辑态本模块一律 return，不和它抢）。
+       ★eventType 必须是 3 = DeviceInputEventType.Dblclick（PointerMove=0/PointerDown=1/PointerUp=2/
+         Dblclick=3/Keyboard=4）；★绝不传 keycode（传了会被当成方向键/快捷键解释）。
+       ★汉字输入法：compositionend 拿到的 data 也从这里进（整段写入后再开编辑器）。
+       ★为什么必须"先写值再开编辑器"：只开编辑器再用 execCommand 补字符，数字列会落空
+         （权益表的历史 BUG，注释见 eqTypeToEdit 上方）。 */
+    /* ★打字补丁的排除项：真正在"某个输入宿主"里打字时不能抢（否则会把字符写进背后的单元格）。
+       · input / textarea / select（我们自己的币种、日期、搜索框…）
+       · Univer 公式栏编辑器（id 含 FORMULA_BAR）—— 它不在 .univer-editor-container 里，
+         所以 finIsEditingCell() 判不出来，必须在这里显式排掉。 */
+    function fin_typeHostBlocked(e){
+      try {
+        var t = e && e.target;
+        if (!t || t.nodeType !== 1) return false;
+        var tg = String(t.tagName || '').toLowerCase();
+        if (tg === 'input' || tg === 'textarea' || tg === 'select') return true;
+        var id = String(t.id || '');
+        if (id.indexOf('FORMULA_BAR') >= 0) return true;
+        return false;
+      } catch(err){ return false; }
+    }
+    /* 输入法刚提交时的时间戳：某些浏览器在 compositionend 之后还会补一个
+       "isComposing = false" 的 keydown（例如确认候选的那一下空格），
+       那一下若被当成普通字符，会把刚写进去的中文又覆盖掉 —— 200ms 内不接管。 */
+    var fin_typeImeAt = 0;
+    function fin_typeToEdit(text){
+      try {
+        var s = String(text == null ? '' : text);
+        if (!s) return false;
+        var api0 = finAPI(); if (!api0 || !api0.executeCommand) return false;
+        var sh = finSheetObj(); if (!sh) return false;
+        var cur = finActiveCell(); if (!cur) return false;
+        var uid = (typeof fin_unitId === 'function') ? (fin_unitId() || '') : '';
+        var sid = null;
+        try { sid = (sh.getSheetId && sh.getSheetId()) || null; } catch(eS){}
+        var isNum = /^-?\d+(\.\d+)?$/.test(s);
+        var m = {};
+        m[cur.row] = {};
+        m[cur.row][cur.col] = { v: isNum ? Number(s) : s, t: isNum ? 2 : 1, f: null };
+        var pw = api0.executeCommand('sheet.command.set-range-values', { unitId: uid, subUnitId: sid, value: m });
+        if (pw && typeof pw.then === 'function') pw.catch(function(){});
+        try { if (typeof fin_markDirty === 'function') fin_markDirty(); } catch(eD){}
+        setTimeout(function(){
+          try {
+            var pe = api0.executeCommand('sheet.operation.set-cell-edit-visible',
+              { visible: true, eventType: 3, unitId: uid });
+            if (pe && typeof pe.then === 'function') pe.catch(function(){});
+          } catch(e2){}
+        }, 40);
+        return true;
+      } catch(e){ return false; }
+    }
     /* ★主入口：绑定 Excel 键盘补丁
        · 编辑态：只补 Delete（删光标右侧字符）；Backspace 原生已正确，其余键交回 Univer；
        · 非编辑态：补 Univer 0.5.5 没实现的键（Home/End/Ctrl+Home/Ctrl+End/PageUp/PageDown、
@@ -21137,6 +21516,8 @@ var PROD_EQUIP_FAULT_KB = {
           var lines = [];
           /* ★CLIP-RICH-20261018：单块选区时顺手留下「值+公式+样式」镜像，供带格式粘贴使用 */
           var mir = null;
+          /* ★CLIP-MERGE-20261018：合并区域镜像（相对选区的行/列偏移），粘贴时还原 */
+          var mirMg = (ranges.length === 1) ? [] : null;
           for (var i = 0; i < ranges.length; i++){
             var g = ranges[i];
             var nr = g.endRow - g.startRow + 1, nc = g.endColumn - g.startColumn + 1;
@@ -21182,13 +21563,29 @@ var PROD_EQUIP_FAULT_KB = {
               if (mirRows) mirRows.push(mirRow);
               lines.push(cells.join('\t'));
             }
+            /* ★CLIP-MERGE-20261018：把【完全落在选区里】的合并区域按相对坐标记进镜像 */
+            if (mirMg){
+              try {
+                var _msh = (snap && snap.sheets && snap.sheets[sid]) || null;
+                var _ml = (_msh && _msh.mergeData) || [];
+                for (var _mi = 0; _mi < _ml.length; _mi++){
+                  var _m = _ml[_mi] || {};
+                  var _msr = _m.startRow, _msc = _m.startColumn, _mer = _m.endRow, _mec = _m.endColumn;
+                  if (typeof _msr !== 'number' || typeof _msc !== 'number' ||
+                      typeof _mer !== 'number' || typeof _mec !== 'number') continue;
+                  if (_msr < g.startRow || _msc < g.startColumn) continue;
+                  if (_mer > g.endRow || _mec > g.endColumn) continue;
+                  mirMg.push([_msr - g.startRow, _msc - g.startColumn, _mer - g.startRow, _mec - g.startColumn]);
+                }
+              } catch(eMg){}
+            }
             if (mirRows) mir = mirRows;
           }
           /* ★CLIP-RICH-20261018：镜像的 text 必须和真正写进剪贴板的文本逐字一致，
              粘贴时才敢用（不一致说明用户中途复制了别的东西 → 退回纯文本）。 */
           try {
             if (mir){
-              window.__finClipMirror = { text: lines.join('\n'), mat: mir, sid: sid, at: Date.now(), src: 'fin' };
+              window.__finClipMirror = { text: lines.join('\n'), mat: mir, mg: mirMg, sid: sid, at: Date.now(), src: 'fin' };
               /* ★CLIP-RICH-XMODULE-20261018：同时写一份全局镜像，财务↔权益跨模块粘贴也能带格式 */
               window.__clipRichGlobal = window.__finClipMirror;
             } else {
@@ -21198,6 +21595,98 @@ var PROD_EQUIP_FAULT_KB = {
           return lines.join('\n');
         } catch(err){ return ''; }
       }
+      /* ★CLIP-TILE-20261018（Excel 行为，用户 2026-10-18 实测要求）：
+         复制 1 格 → 框选 2×2 → 粘贴，Excel 会把【整个选区】铺满（4 格同值），
+         而不是只贴左上角一格。规则：选区比源块大、且行数列数都是源块的整数倍 → 平铺铺满；
+         否则仍按源块大小贴（多出来的源块照常溢出到右下）。 */
+      function fin_clipTileDims(sh, r0, c0, nr, nc){
+        var tr = nr, tc = nc;
+        try {
+          var g = sh.getSelection().getActiveRange().getRange();
+          if (g && typeof g.startRow === 'number' && g.startRow === r0 && g.startColumn === c0){
+            var sr = (g.endRow - g.startRow) + 1, sc = (g.endColumn - g.startColumn) + 1;
+            if (sr > nr && sc > nc && sr % nr === 0 && sc % nc === 0){ tr = sr; tc = sc; }
+          }
+        } catch(e){}
+        return { tr: tr, tc: tc };
+      }
+      function fin_clipTileMat(m, tr, tc){
+        var out = [], r, c;
+        for (r = 0; r < tr; r++){
+          var row = [];
+          for (c = 0; c < tc; c++){
+            var src = m[r % m.length];
+            row.push(src ? src[c % src.length] : undefined);
+          }
+          out.push(row);
+        }
+        return out;
+      }
+      /* 权益表（独立 module 作用域）也要同一套「铺满选区」语义 → 暴露到 window */
+      try { window.finClipTileDims = fin_clipTileDims; window.finClipTileMat = fin_clipTileMat; } catch(eT){}
+      /* ★CLIP-MERGE-20261018（用户 2026-10-18：「复制和粘贴的时候，合并单元格没有体现出来」）：
+         粘贴时把源选区里的合并区域按相对坐标平移到目标区并重建。
+         · 目标区已有的合并先取消（否则叠加会打架）；
+         · 平铺粘贴（选区是源块整数倍）时每块都重建一份；
+         · 全程 try/catch + Promise catch，失败绝不影响已经写好的值/样式。 */
+      function fin_clipApplyMerges(api0, uid, sid, r0, c0, mg, tr, tc, nr, nc){
+        try {
+          if (!api0 || !api0.executeCommand || !mg || !mg.length) return;
+          var rects = [], y, x, i, m;
+          var stepR = (nr > 0) ? nr : tr, stepC = (nc > 0) ? nc : tc;
+          for (y = 0; y < tr; y += stepR){
+            for (x = 0; x < tc; x += stepC){
+              for (i = 0; i < mg.length; i++){
+                m = mg[i]; if (!m || m.length < 4) continue;
+                var _r0m = r0 + y + m[0], _c0m = c0 + x + m[1];
+                var _r1m = r0 + y + m[2], _c1m = c0 + x + m[3];
+                if (_r1m > r0 + tr - 1 || _c1m > c0 + tc - 1) continue;
+                rects.push({ startRow: _r0m, startColumn: _c0m, endRow: _r1m, endColumn: _c1m });
+              }
+            }
+          }
+          if (!rects.length) return;
+          /* 1) 目标区已有的合并先取消 */
+          var kill = [];
+          try {
+            var wbM = api0.getActiveWorkbook ? api0.getActiveWorkbook() : null;
+            var snM = (wbM && wbM.getSnapshot) ? wbM.getSnapshot() : null;
+            var shM = (snM && snM.sheets && snM.sheets[sid]) || null;
+            var oldM = (shM && shM.mergeData) || [];
+            for (i = 0; i < oldM.length; i++){
+              var o = oldM[i] || {};
+              if (typeof o.startRow !== 'number' || typeof o.startColumn !== 'number') continue;
+              if (o.endRow < r0 || o.startRow > r0 + tr - 1) continue;
+              if (o.endColumn < c0 || o.startColumn > c0 + tc - 1) continue;
+              kill.push({ startRow: o.startRow, startColumn: o.startColumn, endRow: o.endRow, endColumn: o.endColumn });
+            }
+          } catch(eQ){ kill = []; }
+          var addAll = function(){
+            for (var k = 0; k < rects.length; k++){
+              try {
+                var pa = api0.executeCommand('sheet.command.add-worksheet-merge', {
+                  unitId: uid, subUnitId: sid, ranges: [rects[k]], selections: [rects[k]]
+                });
+                if (pa && typeof pa.then === 'function') pa.catch(function(){});
+              } catch(eA){}
+            }
+          };
+          if (kill.length && typeof Promise !== 'undefined'){
+            var ps = [];
+            for (i = 0; i < kill.length; i++){
+              try {
+                var pk = api0.executeCommand('sheet.command.remove-worksheet-merge', {
+                  unitId: uid, subUnitId: sid, range: kill[i]
+                });
+                if (pk && typeof pk.then === 'function') ps.push(pk.catch(function(){}));
+              } catch(eK){}
+            }
+            if (ps.length) Promise.all(ps).then(addAll, addAll);
+            else addAll();
+          } else addAll();
+        } catch(e){}
+      }
+      try { window.finClipApplyMerges = fin_clipApplyMerges; } catch(eAM){}
       /* ★CLIP-ENGINE-20261018：剪贴板交给全局引擎（window.__clipEngine），这里只注册适配器。
          · text  = 当前选区 → 屏幕文本（带货币符号/千分位）
          · write = 粘贴文本 → TSV 矩阵 → 写进表格（绕开 Univer 对 navigator.clipboard 的依赖）
@@ -21233,7 +21722,12 @@ var PROD_EQUIP_FAULT_KB = {
             console.warn('[fin-paste] 取不到粘贴落点，已放弃（绝不写回 A1）');
             return false;
           }
-          sh0.getRange(r0, c0, m0.length, m0[0].length).setValues(m0);
+          /* ★CLIP-TILE-20261018：选区是源块整数倍时铺满整个选区 */
+          var _td0 = fin_clipTileDims(sh0, r0, c0, m0.length, m0[0].length);
+          var _tn0 = _td0.tr, _tc0 = _td0.tc;
+          if (_tn0 * _tc0 > 20000){ _tn0 = m0.length; _tc0 = m0[0].length; }
+          var _mv0 = (_tn0 === m0.length && _tc0 === m0[0].length) ? m0 : fin_clipTileMat(m0, _tn0, _tc0);
+          sh0.getRange(r0, c0, _tn0, _tc0).setValues(_mv0);
           try { if (typeof fin_markDirty === 'function') fin_markDirty(); } catch(eD){}
           try { window.__finClipLast = { len: String(text).length, ok: true, paste: true }; } catch(eL){}
           return true;
@@ -21285,14 +21779,18 @@ var PROD_EQUIP_FAULT_KB = {
           var nr = M.mat.length, nc = 0, i2;
           for (i2 = 0; i2 < nr; i2++){ if (M.mat[i2] && M.mat[i2].length > nc) nc = M.mat[i2].length; }
           if (!(nr > 0) || !(nc > 0) || nr * nc > 20000) return false;
+          /* ★CLIP-TILE-20261018：选区是源块整数倍 → 铺满选区（Excel 行为） */
+          var _td1 = fin_clipTileDims(sh0, r0, c0, nr, nc);
+          var tr = _td1.tr, tc = _td1.tc;
+          if (tr * tc > 20000) return false;
           var sid = '';
           try { sid = (sh0.getSheetId) ? sh0.getSheetId() : ''; } catch(eS){ sid = ''; }
           var uid = (typeof fin_unitId === 'function') ? (fin_unitId() || '') : '';
           var m1 = [], m2 = [], anyS = false, r, c;
-          for (r = 0; r < nr; r++){
+          for (r = 0; r < tr; r++){
             var row1 = [], row2 = [];
-            for (c = 0; c < nc; c++){
-              var cell = (M.mat[r] && M.mat[r][c]) ? M.mat[r][c] : null;
+            for (c = 0; c < tc; c++){
+              var cell = (M.mat[r % nr] && M.mat[r % nr][c % nc]) ? M.mat[r % nr][c % nc] : null;
               var o1 = { v: (cell && cell.v !== undefined) ? cell.v : null,
                          f: (cell && cell.f !== undefined) ? cell.f : null,
                          t: (cell && cell.t !== undefined) ? cell.t : null };
@@ -21306,21 +21804,32 @@ var PROD_EQUIP_FAULT_KB = {
             }
             m1.push(row1); m2.push(row2);
           }
-          var rg = { startRow: r0, startColumn: c0, endRow: r0 + nr - 1, endColumn: c0 + nc - 1 };
+          var rg = { startRow: r0, startColumn: c0, endRow: r0 + tr - 1, endColumn: c0 + tc - 1 };
+          /* ★CLIP-MERGE-20261018：值 + 样式落好之后，再重建源选区的合并区域 */
+          var applyMerges = function(){
+            try { fin_clipApplyMerges(api0, uid, sid, r0, c0, M.mg, tr, tc, nr, nc); } catch(eM2){}
+          };
           var applyStyles = function(){
-            if (!anyS) return;
-            try {
-              var p2 = api0.executeCommand('sheet.command.set-range-values', {
-                unitId: uid, subUnitId: sid, range: rg, value: m2
-              });
-              if (p2 && typeof p2.then === 'function') p2.catch(function(){});
-            } catch(e2){}
+            var p2 = null;
+            if (anyS){
+              try {
+                p2 = api0.executeCommand('sheet.command.set-range-values', {
+                  unitId: uid, subUnitId: sid, range: rg, value: m2
+                });
+              } catch(e2){ p2 = null; }
+            }
+            if (p2 && typeof p2.then === 'function') p2.then(applyMerges, applyMerges);
+            else applyMerges();
           };
           var p1 = api0.executeCommand('sheet.command.set-range-values', {
             unitId: uid, subUnitId: sid, range: rg, value: m1
           });
           if (p1 && typeof p1.then === 'function') p1.then(applyStyles, applyStyles);
           else applyStyles();
+          /* ★FIN-UNDO-ONEGESTURE-20261018：粘贴后把选区留在【整个粘贴区】（Excel 手感）。
+             同时这也是记账必要的：撤销账本按"当前选区"兜底取范围，选区只有 1 格时
+             撤销只会写回第一格 → 第二格撤不干净（探针 48 实测 ["",222]）。 */
+          try { sh0.getRange(r0, c0, tr, tc).activate(); } catch(eA0){}
           try { if (typeof fin_markDirty === 'function') fin_markDirty(); } catch(eD){}
           try { window.__finClipLast = { len: String(text).length, ok: true, paste: true, rich: true }; } catch(eL){}
           return true;
@@ -21427,6 +21936,17 @@ var PROD_EQUIP_FAULT_KB = {
           }
 
           if (e.altKey || e.metaKey) return;
+          /* ★FIN-TYPE-EDIT-20261018：非编辑态敲可打印字符 → 直接进入编辑并写入该字符（Excel 行为）。
+             命中后 preventDefault + stopPropagation，避免 Univer 再按自己的语义处理一遍。
+             汉字/输入法不走这里（那些 keydown 的 isComposing = true，上面早就 return 了），
+             由下方 compositionend 分支接管。 */
+          if (!e.ctrlKey && k && k.length === 1) {
+            if (fin_typeHostBlocked(e)) return;      /* 输入框/公式栏里打字 → 交给它们自己 */
+            if (Date.now() - fin_typeImeAt < 200) return;   /* 输入法刚落字，别再补一次 */
+            e.preventDefault(); e.stopPropagation();
+            fin_typeToEdit(k);
+            return;
+          }
           var cur = finActiveCell();
           if (!cur) return;
           if (window.__finDebug) { try { window.__finDebug[window.__finDebug.length - 1] += '|cur=' + cur.row + ',' + cur.col; } catch(e4){} }
@@ -21529,6 +22049,26 @@ var PROD_EQUIP_FAULT_KB = {
 
           /* ④ 其它会动选区的键（Tab / Enter / Shift+方向键…）：不拦，只补跟随滚动 */
           if (k === 'Tab' || k === 'Enter') followSoon();
+        } catch(err){}
+      }, true);
+
+      /* ★★FIN-TYPE-EDIT-IME-20261018（用户 2026-10-18：「直接打汉字也能输入」）★★
+         汉字/日文/韩文走输入法：这些按键的 keydown 都是 isComposing = true（keyCode 229），
+         上面的键盘补丁一律 return，Univer 在非编辑态也不会把它们写进单元格。
+         做法：等输入法在 compositionend 把整段文字交出来时，用同一套「先写值再多开编辑器」
+         （fin_typeToEdit）把它写进当前格并打开编辑器，光标落在末尾。
+         · 只在【非编辑态】且事件归属财务表时接管（inScope 已含可见性判断）；
+         · 不 preventDefault / stopPropagation —— 输入法自身的收尾交给浏览器。 */
+      window.addEventListener('compositionend', function(e){
+        try {
+          if (!e || e.isComposing) return;
+          var txt = e.data;
+          if (!txt) return;
+          if (fin_typeHostBlocked(e)) return;
+          if (!inScope(e)) return;
+          if (finIsEditingCell()) return;
+          fin_typeImeAt = Date.now();
+          fin_typeToEdit(txt);
         } catch(err){}
       }, true);
 
@@ -25825,6 +26365,10 @@ var PROD_EQUIP_FAULT_KB = {
     function fin_patchFormulaService(formulaMod, rxMod){
       try {
         if (!formulaMod || !rxMod || typeof rxMod.skip !== 'function') return false;   // 拿不到 skip → 跳过
+        /* ★FIN-FORMULA-STACK-20261018：缓存本次拿到的模块引用。股东权益是【独立的第二套 Univer】
+           （它自己一个 <script type="module">），它也要在 createUniver 之前装同一份补丁，
+           通过 window.fin_ensureFormulaPatch() 复用这里缓存的同一份模块实例（同一个类/同一个 skip）。 */
+        window.__finFormulaMods = { f: formulaMod, r: rxMod };
         var cls = formulaMod.RegisterOtherFormulaService;
         var proto = cls && cls.prototype;
         if (!proto || typeof proto._initFormulaRegister !== 'function') return false;
@@ -25868,6 +26412,30 @@ var PROD_EQUIP_FAULT_KB = {
         return false;
       }
     }
+
+    /* ★FIN-FORMULA-STACK-20261018（用户 2026-10-18 再报 Uncaught RangeError: Maximum call stack size exceeded）：
+       根因不是补丁写错，而是【补丁根本没跑到】—— 股东权益 #view-equity 是独立的第二套 Univer，
+       在另一个 <script type="module"> 里自建 createUniver；用户若【先打开股东权益、后打开财务】，
+       那时 fin_initUniver 还没执行过，proto.__finFormulaSafe 仍是 false，于是
+       RegisterOtherFormulaService 构造时 calculateStarted$ 还是 BehaviorSubject，
+       bufferWhen 的关闭通知器每次订阅都同步回放 true → 同步无限重入 → 栈溢出。
+       这里通过 window 暴露幂等的「确保补丁已装」给权益那套调用
+       （★两个脚本作用域不共享，函数必须挂到 window 上才拿得到）。 */
+    try {
+      window.fin_patchFormulaService = fin_patchFormulaService;
+      window.fin_ensureFormulaPatch = function(){
+        try {
+          var c = window.__finFormulaMods;
+          if (c && c.f && c.r && fin_patchFormulaService(c.f, c.r)) return Promise.resolve(true);
+          return Promise.all([
+            import('@univerjs/sheets-formula').catch(function(){ return null; }),
+            import('rxjs').catch(function(){ return null; })
+          ]).then(function(mm){
+            return fin_patchFormulaService(mm[0], mm[1]);
+          }).catch(function(){ return false; });
+        } catch(e){ return Promise.resolve(false); }
+      };
+    } catch(e){}
 
     /* ★锁死区自检（FIN-FORMULA-STACK-20261013）：只做原型级静态确认，绝不主动触发那条递归、
        也不在这里调 injector.get —— 这个时机（createUniver 刚返回、单元还没建）去
@@ -27035,7 +27603,10 @@ var PROD_EQUIP_FAULT_KB = {
          一行都不删，仍然是原逻辑；只要这一行改成 cur = eqCurChoice 就能整体恢复。 */
     eqCurChoice = '';
     cur = 'NONE';
+    /* ★EQ-SAVE-NOLOSS-20261018：dirtyGen = 改动代数（每次真实改动 +1）；
+       saveQueued/saveQueuedManual = 保存飞行期间又有人点保存/又改了内容 → 落地后必须补存一次。 */
     var dirty = false, saving = false, saveTimer = null, progUntil = 0;
+    var dirtyGen = 0, saveQueued = false, saveQueuedManual = false, saveWaiters = [], saveLastOk = true;
     /* ★★EQ-DRAFT-20261016（用户 2026-10-16：「我录入的内容，刷新后、或者修改代码后，不能被删除！」）★★
        eqBaseId = 载入时那次 /snapshot 响应的指纹（长度+散列）；
        草稿只有在「服务器上的文件与用户当时编辑的那一版完全一致」（指纹相同 ⇒ 期间没人改过文件）
@@ -27273,11 +27844,40 @@ var PROD_EQUIP_FAULT_KB = {
     /* ★2026-10-17 用户补充：「A.C / A.J / A.L 这三组名字不要翻译！」
        —— 这三组是【人名 / 账户缩写】，不是可翻译的词；整格精确匹配（去空白 + 转大写）才豁免，
           不会误伤正文里恰好含这几个字母的其它内容。 */
-    var EQ_NO_TRANS_WORDS = ['CHOICEVN', 'T.L', 'A.C', 'A.J', 'A.L', 'DABACO'];
+    var EQ_NO_TRANS_WORDS = ['CHOICEVN', 'T.L', 'A.C', 'A.J', 'A.L', 'A.T', 'A.R', 'A.M', 'A.Z', 'DABACO'];
+    /* ============★★ 锁死区 ★★ EQ-NAME-NOTRANS-LOCK-20261018 ============
+       用户要求（2026-10-18，原话）：
+         「股东结构，里面的人名锁住，无需翻译！并且确保，语言切换时，姓名不能丢失
+           （刚才丢失过一次了已经）！」
+       落点：股东权益 ·「Cơ cấu cổ đông（股东结构）」的人名列
+             —— 截图： # 01 A.L / # 02 A.C / # 03 A.J / # 04 A.T
+                        # 05 A.R / # 06 A.M / # 07 A.Z
+       为什么必须锁（这次已经出过一次事故）：
+         · 这些是【人名缩写】，不是自然语言。翻译引擎会把 A.M 译成「上午 / am」、A.T 译成「at」；
+         · 更致命的是【译文会被写回 xlsx】：保存链 payload() 用 transOf(v,'vi') 把屏幕值还原成
+           文件原文，还原不了就把屏幕上的译文原样落盘 → 姓名被永久覆盖，下次打开就「丢了」。
+       两条判定（满足任一即豁免，整格精确匹配，不会误伤正文）：
+         ① 显式表 EQ_NO_TRANS_WORDS（含 A.L/A.C/A.J/A.T/A.R/A.M/A.Z/T.L/CHOICEVN/DABACO）；
+         ② 人名缩写模式 EQ_NO_TRANS_NAME_RE：^[A-Z]{1,3}(\.[A-Z]{1,3}){1,3}\.?$（长度 ≤ 12），
+            覆盖以后新增的 X.Y 形式（如 A.B / MRS.L），不必每次都往表里加词。
+       联动（五处，缺一条就会复发）：
+         · eqNoTransWord()  → needTrans / transOf / requestTrans / applyTrans / loadTrans 全部自动生效；
+         · loadTrans()      → 载入时把缓存里这些人名的历史脏译文删掉（自愈）；
+         · payload()        → 这些人名永远不参与译文还原，屏幕上是什么就写什么。
+       ★任何重构都不得移除本规则（check_eq_cur_notrans_lock.py 的 WORDS 表会拦）。 */
+    /* 人名缩写模式：X.Y / X.Y.Z / X.Y.（A.L、T.L、A.M …）。归一化后长度 ≤ 12 才判，
+       避免把长句里恰好带点的内容误判成人名。 */
+    var EQ_NO_TRANS_NAME_RE = /^[A-Z]{1,3}(\.[A-Z]{1,3}){1,3}\.?$/;
+    function eqNoTransName(t){
+    var s = String(t == null ? '' : t).toUpperCase().replace(/[\s\u00a0]+/g, '');
+    if (!s || s.length > 12) return false;
+    return EQ_NO_TRANS_NAME_RE.test(s);
+    }
     function eqNoTransWord(t){
     var s = String(t == null ? '' : t).toUpperCase().replace(/[\s\u00a0]+/g, '');
     if (!s) return false;
-    return EQ_NO_TRANS_WORDS.indexOf(s) >= 0;
+    if (EQ_NO_TRANS_WORDS.indexOf(s) >= 0) return true;
+    return eqNoTransName(s);   /* ★EQ-NAME-NOTRANS-LOCK-20261018：人名缩写一律不翻译 */
     }
 
     var EQ_NO_TRANS_CUR = ['RMB', 'VND', 'USD'];
@@ -27492,7 +28092,12 @@ var PROD_EQUIP_FAULT_KB = {
               if (done >= jobs){
                 /* ★EQ-TRANS-RERENDER-20261016：兜底 2.5s 已先渲染过（译文还没回来）时，
                    译文回来后必须补一次重渲染，否则表格一直停在原文（中文系统下显示越南语）。 */
-                if (fired) { try { render(); } catch(e){} } else fin();
+                /* ★EQ-RENDER-CAPTURE-20261018（用户 2026-10-18：「股东结构里面输入的数据，录入后怎么
+                   丢失了呢？」的现场根因）：译文是异步回来的，可能在用户正在录入时补一次 render()。
+                   旧写法直接 render() → 用【旧 snap】重建 → 刚录进活表的内容凭空消失
+                   （实测：写入后 1.4 秒被抹成 null，随后自动保存把"没有数据"的版本落盘）。
+                   修法：任何"非 load() 触发"的重建之前，必须先把当前屏幕并回 snap。 */
+                if (fired) { try { eqCaptureLiveToSnap(cur); render(); } catch(e){} } else fin();
               }
             });
           }
@@ -28101,6 +28706,136 @@ var PROD_EQUIP_FAULT_KB = {
       });
     } catch(e){}
     }
+    /* ★EQ-GEOM-KEEP-20261018（用户 2026-10-18：「股东结构表格，必须允许我自由调整列宽，和行距！
+       不用改变其他的！」）
+       列宽 / 行高是用户自己拖出来的版面，属于必须保住的数据。而 render() 是
+       disposeUnit + createUnit(快照)，快照来自内存里的 snap —— 只要某条重建路径
+       （切币种 / 汇率刷新 / 译文回填 / 查报表 / 切表）走的是【旧 snap】，
+       用户刚拖好的列宽行高就会被盖回原样（现象：拖了白拖、过一会儿又变回去）。
+       这里在每次重建的【第一步】把活表里的版面原样搬回 snap：
+         · columnData —— 整份搬（列宽 w / 隐藏 hd）
+         · rowData    —— 只搬行高 h，★绝不搬 hd（那是「查报表」按年月隐藏行的标记）
+         · defaultColumnWidth / defaultRowHeight / rowCount / columnCount —— 一起搬
+       ★只搬版面：cellData / styles / mergeData / 公式一概不碰（数据仍走 eqCaptureLiveToSnap）。
+       ★落盘：拖列宽/行高走 sheet.command.set-worksheet-col-width /
+         sheet.mutation.set-worksheet-row-height，bindChange 的通用分支会把它们标脏并
+         700ms 自动保存 → 版面跟着存进 xlsx，F5 / 换电脑也不会丢。
+
+       ★★EQ-GEOM-STORE-20261018（用户 2026-10-18 追加：「能拖，但过后变回去」）★★
+       光把版面并回 snap 还不够 —— 只要有一条重建路径用【服务器/内存里那份旧快照】，
+       拖好的列宽行高就还是会弹回去。所以这里再存一份【本机版面记录】：
+         · localStorage 'eq_geom_v1' = { <工作表id>: { c:{列号:宽}, r:{行号:高} } }
+         · 每次重建前 eqCaptureGeomToSnap 顺手把活表的宽/高记进这份记录；
+         · 每次 buildView 之后、createUnit 之前 eqApplyGeomStore 再把记录【盖回视图】。
+       于是不管重建由谁触发（切币种 / 汇率刷新 / 译文回填 / 切表 / F5 后重新载入），
+       用户拖出来的列宽行高都会被重新套上，绝不回弹。
+       ★只记 w / h 两个数字，不碰 cellData / styles / hd（隐藏标记）/ 公式；
+         并且【只覆盖用户真的调过的那几列/行】，没调过的列保持服务器给的值。 */
+    var EQ_GEOM_KEY = 'eq_geom_v1';
+    var eqGeomMem = null, eqGeomWroteAt = 0;
+    var eqUnitAlive = false;                 /* 当前 unit 是否为本模块建出来的（重建后置 true） */
+    function eqGeomLoad(){
+    if (eqGeomMem) return eqGeomMem;
+    try { eqGeomMem = JSON.parse(localStorage.getItem(EQ_GEOM_KEY) || '{}') || {}; }
+    catch(e){ eqGeomMem = {}; }
+    return eqGeomMem;
+    }
+    function eqGeomSaveSoon(){
+    try {
+      var now = Date.now();
+      if (now - eqGeomWroteAt < 400) return;      /* 节流：拖动过程里可能连发很多次 */
+      eqGeomWroteAt = now;
+      localStorage.setItem(EQ_GEOM_KEY, JSON.stringify(eqGeomMem || {}));
+    } catch(e){}
+    }
+    /* 把本机记录里的列宽/行高盖回【待建视图】v（在 createUnit 之前调用，不派命令、不标脏） */
+    function eqApplyGeomStore(v){
+    try {
+      var g = eqGeomLoad();
+      if (!g || !v || !v.sheets) return 0;
+      var n = 0;
+      Object.keys(v.sheets).forEach(function(sid){
+        var rec = g[sid], sh = v.sheets[sid];
+        if (!rec || !sh) return;
+        if (rec.c && typeof rec.c === 'object'){
+          var keysC = Object.keys(rec.c);
+          if (keysC.length){
+            if (!sh.columnData || typeof sh.columnData !== 'object') sh.columnData = {};
+            keysC.forEach(function(ck){
+              var w = rec.c[ck];
+              if (typeof w !== 'number' || !(w > 0)) return;
+              var t = sh.columnData[ck];
+              if (!t || typeof t !== 'object') t = sh.columnData[ck] = {};
+              t.w = w; n++;
+            });
+          }
+        }
+        if (rec.r && typeof rec.r === 'object'){
+          var keysR = Object.keys(rec.r);
+          if (keysR.length){
+            if (!sh.rowData || typeof sh.rowData !== 'object') sh.rowData = {};
+            keysR.forEach(function(rk){
+              var h = rec.r[rk];
+              if (typeof h !== 'number' || !(h > 0)) return;
+              var t = sh.rowData[rk];
+              if (!t || typeof t !== 'object') t = sh.rowData[rk] = {};
+              t.h = h; n++;                       /* ★只盖 h，不碰 hd（查报表隐藏行） */
+            });
+          }
+        }
+      });
+      return n;
+    } catch(e){ return 0; }
+    }
+    /* 抓活表的版面：既并回 snap，也记进本机记录 */
+    function eqCaptureGeomToSnap(){
+    try {
+      if (!eqUnitAlive || !snap || !snap.sheets) return 0;
+      var live = (sheet && sheet.getSnapshot) ? sheet.getSnapshot() : null;
+      if (!live || !live.sheets) return 0;
+      var g = eqGeomLoad(), touched = false, n = 0;
+      Object.keys(live.sheets).forEach(function(sid){
+        var src = live.sheets[sid], dst = snap.sheets && snap.sheets[sid];
+        if (!src) return;
+        try {
+          var rec = g[sid]; if (!rec || typeof rec !== 'object') rec = g[sid] = {};
+          if (!rec.c || typeof rec.c !== 'object') rec.c = {};
+          if (!rec.r || typeof rec.r !== 'object') rec.r = {};
+          if (src.columnData){
+            Object.keys(src.columnData).forEach(function(ck){
+              var cd = src.columnData[ck];
+              if (cd && typeof cd.w === 'number' && cd.w > 0){ rec.c[ck] = cd.w; touched = true; }
+            });
+          }
+          if (src.rowData){
+            Object.keys(src.rowData).forEach(function(rk){
+              var rd = src.rowData[rk];
+              if (rd && typeof rd.h === 'number' && rd.h > 0){ rec.r[rk] = rd.h; touched = true; }
+            });
+          }
+          if (!dst) return;
+          if (src.columnData) dst.columnData = JSON.parse(JSON.stringify(src.columnData));
+          if (typeof src.defaultColumnWidth === 'number') dst.defaultColumnWidth = src.defaultColumnWidth;
+          if (typeof src.defaultRowHeight === 'number')   dst.defaultRowHeight   = src.defaultRowHeight;
+          if (typeof src.columnCount === 'number') dst.columnCount = src.columnCount;
+          if (typeof src.rowCount === 'number')    dst.rowCount    = src.rowCount;
+          if (src.rowData){
+            if (!dst.rowData || typeof dst.rowData !== 'object') dst.rowData = {};
+            Object.keys(src.rowData).forEach(function(rk){
+              var rd = src.rowData[rk]; if (!rd || typeof rd !== 'object') return;
+              if (typeof rd.h !== 'number') return;            /* ★只搬行高，不搬 hd */
+              var t = dst.rowData[rk];
+              if (!t || typeof t !== 'object') t = dst.rowData[rk] = {};
+              t.h = rd.h;
+            });
+          }
+          n++;
+        } catch(e){}
+      });
+      if (touched) eqGeomSaveSoon();
+      return n;
+    } catch(e){ return 0; }
+    }
     /* ★EQ-FIT-20261016（用户 2026-10-16 要求「把 Excel 页面底部拉伸到最下面，看到的区域更大」）：
        不再用写死的 calc(100vh - N px) —— N 会随顶部导航换行、标题/工具栏三语高度变化而失准。
        这里按容器在视口里的【真实 top】算出到底部还剩多少高度，窗口缩放/切页/切语言后重算。 */
@@ -28188,6 +28923,9 @@ var PROD_EQUIP_FAULT_KB = {
 
     function render(){
     if (!univer) return;
+    /* ★EQ-GEOM-KEEP-20261018：重建前先把用户拖好的列宽 / 行高搬回 snap，
+       否则本次 createUnit 用的还是旧版面的快照 → 用户刚调好的列宽行高白调。 */
+    try { eqCaptureGeomToSnap(); } catch(eG){}
     /* ★EQ-KEEP-ACTIVE-SHEET-20261016：重建前记住当前活动工作表（按 id / 序位），
        否则按币种重建后新单元的活动表默认是第一张 —— 用户点「中国投资数据」会被弹回「总投资数据」。
        ★必须用 eqSheetObj()（workbook 的当前活动表）：全局 sheet 变量是上次 createUnit 的返回值，
@@ -28197,12 +28935,18 @@ var PROD_EQUIP_FAULT_KB = {
     var prevIdx = -1;
     try { prevIdx = ((view && view.sheetOrder) || []).indexOf(prevSid); } catch(e){}
     var v = buildView();
+    /* ★EQ-GEOM-STORE-20261018：把用户自己拖出来的列宽/行高盖回待建视图（只盖 w / h，
+       不碰 cellData / styles / hd / 公式）。这样即使本次快照是服务器/内存里的旧版面，
+       建出来的表也还是用户调好的样子 —— 拖完不可能再弹回去。 */
+    try { eqApplyGeomStore(v); } catch(eGA){}
     /* ★EQ-RENDER-UNIT-20261016：buildView 始终把 v.id 写死成 'equity-report'，所以单元 id 固定。
        用固定 id 销毁，比依赖 sheet.getUnitId() 更稳（一旦 sheet 被错赋成 Worksheet，
        拿到的就是工作表 id，disposeUnit 删不掉真单元 → 重建报同名单元冲突）。 */
     try { if (api && typeof api.disposeUnit === 'function') api.disposeUnit('equity-report'); } catch(e){}
+    eqUnitAlive = false;                 /* ★EQ-GEOM-KEEP-20261018：旧 unit 已销毁，别再读它的版面 */
     var TYPE = (presets && presets.UniverInstanceType && presets.UniverInstanceType.UNIVER_SHEET) || 2;
     sheet = univer.createUnit(TYPE, v);   /* ★sheet 永远是工作簿 unit（payload()/eqCaptureLiveToSnap() 靠它 getSnapshot()） */
+    eqUnitAlive = true;
     view = v;
     /* ★恢复之前活动的工作表。
        ★★关键修复：此处【绝不能用 sh2 覆盖全局 sheet】—— 否则 sheet 变成 Worksheet，
@@ -28281,6 +29025,9 @@ var PROD_EQUIP_FAULT_KB = {
             Object.keys(row).forEach(function(ck){
               var cell = row[ck]; if (!cell || cell.f !== undefined) return;
               if (typeof cell.v !== 'string') return;
+              /* ★EQ-NAME-NOTRANS-LOCK-20261018：人名/公司名（A.L、A.M、T.L…）绝不参与译文还原，
+                 屏幕上是什么就写什么 —— 这是「语言切换后姓名丢失」事故的落盘口。 */
+              if (eqNoTransWord(cell.v)) return;
               var orig = transOf(cell.v, 'vi');                    /* 翻译缓存里有越文原文就还原 */
               if (orig && orig !== cell.v) cell.v = orig;
             });
@@ -28317,9 +29064,34 @@ var PROD_EQUIP_FAULT_KB = {
     } catch(e){}
     return s;
     }
+    /* ★★EQ-SAVE-NOLOSS-20261018（用户 2026-10-18：「股东结构里面输入的数据，录入后怎么丢失了呢？
+       要求：点击保存后，必须不能丢失录入的数据！」）★★
+       三条叠加才会「静默丢数据」，缺一条都复现不了：
+         ① 旧代码 `if (saving || !sheet) return;` —— 上一笔还在飞的时候点「保存」，这次点击被直接丢掉，
+            连提示都没有；
+         ② 成功时无条件 `dirty = false` —— 「保存已发出、响应未回来」这段时间里用户新录入的内容
+            （很常见：录完一行接着录第二行）已经被标脏，却被这一行抹平 → 永远不会再存；
+         ③ `scheduleSave()` 只在 dirty 为真时才排保存 —— ②把它抹平后，连补存的机会都没有。
+       修法（与财务 FIN-CN-LOSTSAVE-FIX-20261013 同一思路，勿删）：
+         ① 飞行期间再次保存 → 记 saveQueued / saveQueuedManual，这一笔落地后【立刻补存】；
+         ② 引入改动代数 dirtyGen（scheduleSave 每次真实改动 +1）；保存回来只有 dirtyGen === genAtBuild
+            才敢清 dirty，否则自动补存；
+         ③ save() 返回 Promise<boolean>：整条补存链走完才 resolve —— 切语言/手动保存可以等它落盘再重载，
+            绝不会拿到旧数据把屏幕盖掉。 */
+    function eqFlushSaveWaiters(ok){
+      var ws = saveWaiters; saveWaiters = [];
+      for (var i = 0; i < ws.length; i++){ try { ws[i](ok); } catch(e){} }
+    }
     async function save(manual){
-    if (saving || !sheet) return;
-    var p = payload(); if (!p) { st('没有可保存的内容'); return; }
+    if (!sheet) return false;                  /* 单元正在重建：明确返回"没存成"，别让调用方误以为已落盘 */
+    if (saving){
+      /* ★① 飞行中：不丢这次点击，记下来等落地后补存 */
+      saveQueued = true;
+      if (manual) saveQueuedManual = true;
+      return new Promise(function(res){ saveWaiters.push(res); });
+    }
+    var p = payload(); if (!p) { st('没有可保存的内容'); return false; }
+    var genAtBuild = dirtyGen;                 /* ★② 本次要落盘的数据对应哪一代改动 */
     saving = true;
     if (manual) st('保存中…');
     var _body = JSON.stringify(p);
@@ -28331,22 +29103,38 @@ var PROD_EQUIP_FAULT_KB = {
       var r = await fetch(API + '/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: _body });
       var j = await r.json();
       if (j && j.ok){
-        dirty = false;
+        saveLastOk = true;
+        var _genOk = (dirtyGen === genAtBuild);
+        if (_genOk) dirty = false;                         /* 这一代确实全落盘了 */
+        else saveQueued = true;                            /* ★② 保存期间又改了 → 必须再存一次 */
         try { localStorage.removeItem(EQ_DRAFT_KEY); } catch(e){}   /* ★已确认落盘：草稿使命完成 */
-        st('已保存 ' + (j.saved_at || ''));
+        st('已保存 ' + (j.saved_at || '') + (_genOk ? '' : ' · 还有新改动待存'));
       }
       else if (j && j.stale){
         /* ★服务器没接受这份（被「数据量骤减」守卫拦下 / 已有更新版本）：草稿作废，以服务器为准 */
+        saveLastOk = false;
         try { localStorage.removeItem(EQ_DRAFT_KEY); } catch(e){}
         st('保存失败：' + ((j && j.error) || r.status));
       }
-      else { st('保存失败：' + ((j && j.error) || r.status)); }
+      else { saveLastOk = false; st('保存失败：' + ((j && j.error) || r.status)); }
     } catch(e){
+      saveLastOk = false;
       st('保存失败：' + e.message);
       /* ★网络级失败（服务器重启中/断网）→ 3 秒后自动重试：服务器回来后这一笔会自己补上 */
       if (dirty) eqScheduleRetry();
     }
-    finally { saving = false; }
+    finally {
+      saving = false;
+      if (saveQueued){
+        /* ★① 补存：把飞行期间漏掉的点击/改动再存一次（不 await，避免递归压在 finally 里） */
+        saveQueued = false;
+        var _m2 = saveQueuedManual; saveQueuedManual = false;
+        setTimeout(function(){ try { save(_m2); } catch(e){} }, 0);
+      } else {
+        eqFlushSaveWaiters(saveLastOk);                     /* ★③ 整条链走完 → 通知等待者 */
+      }
+    }
+    return saveLastOk;
     }
     /* ★EQ-DRAFT-20261016：网络级失败后的自动重试（与财务那套看门狗同思路）。
        只要还有未落盘的改动就一直重试，绝不因为一次网络抖动把录入丢掉。 */
@@ -28380,8 +29168,12 @@ var PROD_EQUIP_FAULT_KB = {
     eqDraftBusy = false;
     }
     function scheduleSave(){
+    /* ★EQ-SAVE-NOLOSS-20261018：每次真实改动把代数 +1。
+       保存回来时用「代数有没有变」判断这批改动到底落盘了没有 —— 变了就必须补存，
+       绝不能再像旧代码那样无条件 dirty=false 把飞行期间的录入吞掉。 */
+    try { dirtyGen++; } catch(e){}
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(function(){ saveTimer = null; if (dirty) save(false); }, 700);
+    saveTimer = setTimeout(function(){ saveTimer = null; if (dirty || saveQueued) save(false); }, 700);
     }
 
     /* ---------- 初始化 ---------- */
@@ -28464,6 +29256,22 @@ var PROD_EQUIP_FAULT_KB = {
       var canMenu = !!(presets.FUniver && presets.FUniver.prototype && typeof presets.FUniver.prototype.createMenu === 'function');
       var coreOpts = { container: 'equity_container' };
       if (canMenu) coreOpts.menu = eqMenuCfg;
+      /* ★FIN-FORMULA-STACK-20261018（用户 2026-10-18 报 Uncaught RangeError: Maximum call stack size exceeded）：
+         权益是【独立的第二套 Univer】，走的是本脚本自己的 createUniver —— 财务那套里的
+         bufferWhen 补丁在这里从来没被执行过。用户先打开「股东权益」时，
+         RegisterOtherFormulaService 构造里 calculateStarted$ 还是 BehaviorSubject，
+         bufferWhen 的关闭通知器每次订阅都同步回放 true → 同步无限重入 → 栈溢出。
+         ★必须在 createUniver 之前装（补丁是原型级的，装一次两套 Univer 都受益；已装则立即返回）。 */
+      try {
+        if (typeof window.fin_ensureFormulaPatch === 'function'){
+          await window.fin_ensureFormulaPatch();
+        } else if (typeof window.fin_patchFormulaService === 'function'){
+          var _fF = null, _fR = null;
+          try { _fF = await import('@univerjs/sheets-formula'); } catch(e1){}
+          try { _fR = await import('rxjs'); } catch(e2){}
+          window.fin_patchFormulaService(_fF, _fR);
+        }
+      } catch(e){ if (window.console) console.warn('[eq-formula]', e); }
       var res = presets.createUniver({
         theme: presets.defaultTheme,
         locale: initLocale,
@@ -28526,6 +29334,17 @@ var PROD_EQUIP_FAULT_KB = {
         var id = cmd && cmd.id ? String(cmd.id) : '';
         if (id.indexOf('numfmt') >= 0) return;               // 我们自己的格式化不脏
         if (id.indexOf('.operation.') >= 0) return;          // UI 状态（如进入编辑态）不是数据改动
+        /* ★EQ-GEOM-STORE-20261018（用户 2026-10-18：「能拖，但过后变回去」）：
+           用户拖列宽 / 行高走的就是这几条命令 → 立刻把版面记进本机记录，
+           不等下一次重建。这样哪怕随后立刻切表 / F5，重建时也能按记录套回去。 */
+        if (/worksheet-col-width|worksheet-row-height|col-auto-width|row-auto-height|col-is-auto-width|row-is-auto-height/.test(id)) {
+          /* 拖动过程中 Univer 可能连发多条，合并成 250ms 一次，避免频繁取整本快照 */
+          if (window.__eqGeomCapT) clearTimeout(window.__eqGeomCapT);
+          window.__eqGeomCapT = setTimeout(function(){
+            window.__eqGeomCapT = null;
+            try { eqCaptureGeomToSnap(); } catch(eGM){}
+          }, 250);
+        }
         if (Date.now() < progUntil) return;                  // 程序写入窗口
         dirty = true;
         scheduleSave();
@@ -29894,6 +30713,8 @@ var PROD_EQUIP_FAULT_KB = {
         var lines = [];
         /* ★CLIP-RICH-20261018：单块选区时顺手留下「值+公式+样式」镜像，供带格式粘贴使用 */
         var mir = null, mirRows = (ranges.length === 1) ? [] : null;
+        /* ★CLIP-MERGE-20261018：合并区域镜像（相对选区的行/列偏移），粘贴时还原 */
+        var mirMg = (ranges.length === 1) ? [] : null;
         for (var a = 0; a < ranges.length; a++){
           var g = ranges[a];
           var nR = g.endRow - g.startRow + 1, nC = g.endColumn - g.startColumn + 1;
@@ -29940,12 +30761,28 @@ var PROD_EQUIP_FAULT_KB = {
             if (mirRows) mirRows.push(mirRow);
             lines.push(cells.join('\t'));
           }
+          /* ★CLIP-MERGE-20261018：把【完全落在选区里】的合并区域按相对坐标记进镜像 */
+          if (mirMg){
+            try {
+              var _msh0 = (snap && snap.sheets && snap.sheets[sid0]) || null;
+              var _ml0 = (_msh0 && _msh0.mergeData) || [];
+              for (var _mi0 = 0; _mi0 < _ml0.length; _mi0++){
+                var _m0 = _ml0[_mi0] || {};
+                var _msr0 = _m0.startRow, _msc0 = _m0.startColumn, _mer0 = _m0.endRow, _mec0 = _m0.endColumn;
+                if (typeof _msr0 !== 'number' || typeof _msc0 !== 'number' ||
+                    typeof _mer0 !== 'number' || typeof _mec0 !== 'number') continue;
+                if (_msr0 < g.startRow || _msc0 < g.startColumn) continue;
+                if (_mer0 > g.endRow || _mec0 > g.endColumn) continue;
+                mirMg.push([_msr0 - g.startRow, _msc0 - g.startColumn, _mer0 - g.startRow, _mec0 - g.startColumn]);
+              }
+            } catch(eMg0){}
+          }
         }
         if (mirRows && mirRows.length) mir = mirRows;
         /* 镜像的 text 必须与真正写进剪贴板的文本逐字一致，粘贴时才敢用 */
         try {
           if (mir){
-            window.__eqClipMirror = { text: lines.join('\n'), mat: mir, sid: sid0, at: Date.now(), src: 'eq' };
+            window.__eqClipMirror = { text: lines.join('\n'), mat: mir, mg: mirMg, sid: sid0, at: Date.now(), src: 'eq' };
             /* ★CLIP-RICH-XMODULE-20261018：跨模块（权益↔财务）粘贴也能带格式 */
             window.__clipRichGlobal = window.__eqClipMirror;
           } else {
@@ -29993,7 +30830,15 @@ var PROD_EQUIP_FAULT_KB = {
           return false;
         }
         progUntil = 0;                                   /* ★用户操作：允许标脏并自动保存 */
-        sh0.getRange(r0, c0, m0.length, m0[0].length).setValues(m0);
+        /* ★CLIP-TILE-20261018：选区是源块整数倍时铺满整个选区（Excel 行为，与财务一致） */
+        var _tdE = (typeof window.finClipTileDims === 'function')
+          ? window.finClipTileDims(sh0, r0, c0, m0.length, m0[0].length)
+          : { tr: m0.length, tc: m0[0].length };
+        var _tnE = _tdE.tr, _tcE = _tdE.tc;
+        if (_tnE * _tcE > 20000){ _tnE = m0.length; _tcE = m0[0].length; }
+        var _mvE = (_tnE === m0.length && _tcE === m0[0].length) ? m0
+                  : (typeof window.finClipTileMat === 'function' ? window.finClipTileMat(m0, _tnE, _tcE) : m0);
+        sh0.getRange(r0, c0, _tnE, _tcE).setValues(_mvE);
         try { dirty = true; scheduleSave(); } catch(eD){}
         try { window.__finClipLast = { len: String(text).length, ok: true, paste: true }; } catch(eL){}
         return true;
@@ -30036,13 +30881,18 @@ var PROD_EQUIP_FAULT_KB = {
         var nr = M.mat.length, nc = 0, i2;
         for (i2 = 0; i2 < nr; i2++){ if (M.mat[i2] && M.mat[i2].length > nc) nc = M.mat[i2].length; }
         if (!(nr > 0) || !(nc > 0) || nr * nc > 20000) return false;
+        /* ★CLIP-TILE-20261018：选区是源块整数倍 → 铺满选区（与财务一致） */
+        var _tdE1 = (typeof window.finClipTileDims === 'function')
+          ? window.finClipTileDims(sh0, r0, c0, nr, nc) : { tr: nr, tc: nc };
+        var tr = _tdE1.tr, tc = _tdE1.tc;
+        if (tr * tc > 20000) return false;
         var sid = '';
         try { sid = (sh0.getSheetId) ? sh0.getSheetId() : ''; } catch(eS){ sid = ''; }
         var m1 = [], m2 = [], anyS = false, r, c;
-        for (r = 0; r < nr; r++){
+        for (r = 0; r < tr; r++){
           var row1 = [], row2 = [];
-          for (c = 0; c < nc; c++){
-            var cell = (M.mat[r] && M.mat[r][c]) ? M.mat[r][c] : null;
+          for (c = 0; c < tc; c++){
+            var cell = (M.mat[r % nr] && M.mat[r % nr][c % nc]) ? M.mat[r % nr][c % nc] : null;
             var o1 = { v: (cell && cell.v !== undefined) ? cell.v : null,
                        f: (cell && cell.f !== undefined) ? cell.f : null,
                        t: (cell && cell.t !== undefined) ? cell.t : null };
@@ -30056,22 +30906,35 @@ var PROD_EQUIP_FAULT_KB = {
           }
           m1.push(row1); m2.push(row2);
         }
-        var rg = { startRow: r0, startColumn: c0, endRow: r0 + nr - 1, endColumn: c0 + nc - 1 };
+        var rg = { startRow: r0, startColumn: c0, endRow: r0 + tr - 1, endColumn: c0 + tc - 1 };
         progUntil = 0;                                   /* ★用户操作：允许标脏并自动保存 */
-        var applyStyles = function(){
-          if (!anyS) return;
+        /* ★CLIP-MERGE-20261018：值 + 样式落好之后，再重建源选区的合并区域 */
+        var applyMerges = function(){
           try {
-            var p2 = api.executeCommand('sheet.command.set-range-values', {
-              unitId: 'equity-report', subUnitId: sid, range: rg, value: m2
-            });
-            if (p2 && typeof p2.then === 'function') p2.catch(function(){});
-          } catch(e2){}
+            if (typeof window.finClipApplyMerges === 'function'){
+              window.finClipApplyMerges(api, 'equity-report', sid, r0, c0, M.mg, tr, tc, nr, nc);
+            }
+          } catch(eM2){}
+        };
+        var applyStyles = function(){
+          var p2 = null;
+          if (anyS){
+            try {
+              p2 = api.executeCommand('sheet.command.set-range-values', {
+                unitId: 'equity-report', subUnitId: sid, range: rg, value: m2
+              });
+            } catch(e2){ p2 = null; }
+          }
+          if (p2 && typeof p2.then === 'function') p2.then(applyMerges, applyMerges);
+          else applyMerges();
         };
         var p1 = api.executeCommand('sheet.command.set-range-values', {
           unitId: 'equity-report', subUnitId: sid, range: rg, value: m1
         });
         if (p1 && typeof p1.then === 'function') p1.then(applyStyles, applyStyles);
         else applyStyles();
+        /* ★FIN-UNDO-ONEGESTURE-20261018：粘贴后选区留在整个粘贴区（Excel 手感 + 记账范围正确） */
+        try { sh0.getRange(r0, c0, tr, tc).activate(); } catch(eA0){}
         try { dirty = true; scheduleSave(); } catch(eD){}
         try { window.__finClipLast = { len: String(text).length, ok: true, paste: true, rich: true }; } catch(eL){}
         return true;
@@ -30427,6 +31290,30 @@ var PROD_EQUIP_FAULT_KB = {
           if (k === 'Tab' || k === 'Enter') followSoon();
         } catch(err){}
       }, true);
+
+      /* ★★EQ-TYPE-EDIT-IME-20261018（用户 2026-10-18：「直接打汉字也能输入」）★★
+         汉字/日文/韩文走输入法：这些按键的 keydown 都是 isComposing = true（keyCode 229），
+         上面第①步之前就 return 了，非编辑态下文字进不了单元格。
+         做法：等输入法在 compositionend 交出整段文字，再走 eqTypeToEdit 的同一入口
+         （先写值 → 40ms 后打开编辑器、光标落在末尾），与"敲英文字符"完全一致。
+         · 只在【非编辑态】且事件归属权益表（inScope 已含可见性判断）时接管；
+         · 不 preventDefault / stopPropagation。 */
+      window.addEventListener('compositionend', function(e){
+        try {
+          if (!e || e.isComposing) return;
+          var txt = e.data;
+          if (!txt) return;
+          var _t = e.target;
+          if (_t && _t.nodeType === 1){
+            var _tg = String(_t.tagName || '').toLowerCase();
+            if (_tg === 'input' || _tg === 'textarea' || _tg === 'select') return;
+            if (String(_t.id || '').indexOf('FORMULA_BAR') >= 0) return;   /* 公式栏里打字交回它自己 */
+          }
+          if (!inScope(e)) return;
+          if (eqIsEditingCell()) return;
+          eqTypeToEdit({ key: txt });
+        } catch(err){}
+      }, true);
     }
 
     /* ---------- 语言切换：整实例重建（用户 2026-10-16 要求）----------
@@ -30458,19 +31345,49 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function rebuildForLang(){
       /* ① 优先：只换界面语言（locale$→UI 组件自渲染）+ 数据按新语言重翻（表名/表头/单元格） */
-      if (eqSetUiLocale()) { try { load(); } catch(e){} return; }
+      if (eqSetUiLocale()) {
+        try {
+          /* ★EQ-SAVE-NOLOSS-20261018：切语言会 load() 重新从服务器取快照。
+             只要手上还有没落盘的录入（dirty / 正在保存 / 排队中）就必须【先存完再重载】，
+             否则旧快照会把屏幕上的新录入盖掉 —— 这就是「切语言后录入/姓名丢失」的根因。
+             万一存失败：不重载，改为把当前屏幕并回 snap 再原地重绘，录入一个都不丢。 */
+          if (dirty || saving || saveQueued || saveTimer){
+            save(false).then(function(ok){
+              try {
+                if (ok) load();
+                else { eqCaptureLiveToSnap(cur); render(); }
+              } catch(e){}
+            });
+          } else {
+            load();
+          }
+        } catch(e){ try { load(); } catch(e2){} }
+        return;
+      }
       /* ② 兜底：实在拿不到 LocaleService 才整实例重建。
             ★不再手动 innerHTML 硬清（那是 React removeChild 报错的根因），
               交给 Univer/React 自己卸载完再重建。 */
-      try { if (dirty) save(false); } catch(e){}                       /* 未保存的改动先顶上去 */
-      /* 币种下拉此刻挂在 Univer 工具栏里（容器内部），先接回 #eq_inline，不然会被一起卸掉 */
+      var _doRebuild = function(){
+        /* 币种下拉此刻挂在 Univer 工具栏里（容器内部），先接回 #eq_inline，不然会被一起卸掉 */
+        try {
+          var sel0 = document.getElementById('eq_cur'), bar0 = document.getElementById('eq_inline');
+          if (sel0 && bar0 && sel0.parentElement !== bar0) bar0.appendChild(sel0);
+        } catch(e){}
+        try { if (univer && typeof univer.dispose === 'function') univer.dispose(); } catch(e){}
+        univer = null; api = null; sheet = null; ready = false; inited = false; loading = false;
+        setTimeout(function(){ try { init(); } catch(e){} }, 400);
+      };
+      /* ★EQ-SAVE-NOLOSS-20261018：重建同样要等落盘完成，否则 init()→load() 会拿旧数据覆盖 */
       try {
-        var sel0 = document.getElementById('eq_cur'), bar0 = document.getElementById('eq_inline');
-        if (sel0 && bar0 && sel0.parentElement !== bar0) bar0.appendChild(sel0);
+        if (dirty || saving || saveQueued || saveTimer){
+          save(false).then(function(ok){
+            if (!ok){ try { eqCaptureLiveToSnap(cur); } catch(e){} }
+            _doRebuild();
+          });
+          return;
+        }
       } catch(e){}
-      try { if (univer && typeof univer.dispose === 'function') univer.dispose(); } catch(e){}
-      univer = null; api = null; sheet = null; ready = false; inited = false; loading = false;
-      setTimeout(function(){ try { init(); } catch(e){} }, 400);
+      _doRebuild();
     }
 
     /* ---------- 对外 API ---------- */
@@ -30634,10 +31551,13 @@ var PROD_EQUIP_FAULT_KB = {
       var m = parseInt((document.getElementById('eq_rpt_month') || {}).value || '0', 10);
       filter = (y || m) ? { year: y || 0, month: m || 0 } : null;
       pub.closeReport();
+      /* ★EQ-SAVE-NOLOSS-20261018：重建前先把屏幕（含刚录入、还没自动保存的）并回 snap，
+         否则 render() 会从旧 snap 建表 → 刚录的数据在屏幕上"凭空消失"。 */
+      try { eqCaptureLiveToSnap(cur); } catch(e){}
       render();
     },
-    restore: function(){ filter = null; sortDir = 0; render(); },
-    sort: function(dir){ sortDir = dir; render(); },
+    restore: function(){ filter = null; sortDir = 0; try { eqCaptureLiveToSnap(cur); } catch(e){} render(); },
+    sort: function(dir){ sortDir = dir; try { eqCaptureLiveToSnap(cur); } catch(e){} render(); },
     insertRow: function(){
       if (!api || !sheet) return;
       var sid = null; try { sid = sheet.getSheetId(); } catch(e){}
@@ -30784,16 +31704,23 @@ var PROD_EQUIP_FAULT_KB = {
               return true;
             }
             for (var i = 0; i < bs.length; i++){
-              var b = bs[i], m = [];
+              var b = bs[i];
+              var m = [];
               for (var r = b.r0; r <= b.r1; r++){
                 var row = [];
                 for (var c = b.c0; c <= b.c1; c++){
                   var cell = (mat && mat[r] && mat[r][c]) ? mat[r][c] : null;
-                  var oc = {
-                    v: (cell && cell.v !== undefined) ? cell.v : null,
-                    f: (cell && cell.f !== undefined) ? cell.f : null,
-                    t: (cell && cell.t !== undefined) ? cell.t : null
-                  };
+                  /* ★★FIN-UNDO-NULLCLEAR-20261018（探针 50 实测）★★
+                     空格子必须 v/t/f 三键一起写 null 才真清空：
+                       {v:''} / {v:'',t:1} → 只留空串；{v:null} → 整格跳过（不清）。 */
+                  var _hasV2 = !!(cell && cell.v !== undefined && cell.v !== null && cell.v !== '');
+                  var oc;
+                  if (_hasV2){
+                    oc = { v: cell.v, f: (cell.f !== undefined) ? cell.f : null };
+                    if (cell.t !== undefined && cell.t !== null) oc.t = cell.t;
+                  } else {
+                    oc = { v: null, t: null, f: null };
+                  }
                   /* ★FIN-UNDO-STYLE-20261018：s:null = 这版 Univer 唯一可靠的"清样式"写法；
                      样式 id 解析不出来（uc）的格子不清，免得洗掉用户原有样式。 */
                   if (!(cell && cell.uc)) oc.s = null;
@@ -30896,7 +31823,8 @@ var PROD_EQUIP_FAULT_KB = {
 
     /* 关页面前把最后一次改动顶上去 */
     window.addEventListener('beforeunload', function(){
-    try { if (dirty) { var p = payload(); if (p) navigator.sendBeacon(API + '/save', new Blob([JSON.stringify(p)], { type:'application/json' })); } } catch(e){}
+    /* ★EQ-SAVE-NOLOSS-20261018：saveQueued（排队中/保存飞行期间又改了）同样算未落盘 */
+    try { if (dirty || saveQueued) { var p = payload(); if (p) navigator.sendBeacon(API + '/save', new Blob([JSON.stringify(p)], { type:'application/json' })); } } catch(e){}
     });
     })();
     </script>

@@ -143,6 +143,20 @@
 #                                 ⑦ 复制内容必须经 win_fmtNum 还原屏幕文本（货币符号/千分位）
 #                                 ⑧ 3 秒自检必须断言两条 copy 通道（__clipEvtFin / __clipEvtEq）
 #
+#   18) check_eq_geom_lock.py —— 股东权益「列宽/行高自由调整且永不回弹」+「权益版 bufferWhen 防护」
+#                                 锁死区（EQ-GEOM-KEEP/STORE-20261018、FIN-FORMULA-STACK-20261018）：
+#                                 ① render() 第一步必须 eqCaptureGeomToSnap()，且在 disposeUnit 之前
+#                                 ② buildView() 之后、createUnit 之前必须 eqApplyGeomStore(v)
+#                                 ③ localStorage 键仍是 'eq_geom_v1'
+#                                 ④ eqApplyGeomStore 只许写 .w / .h，★绝不许碰 cellData
+#                                 ⑤ eqCaptureGeomToSnap 必须记 w / h，★不许记 hd（查报表隐藏行）
+#                                 ⑥ bindChange 必须在列宽/行高命令上记账（拖完立刻 F5 也不丢）
+#                                 ⑦ eqUnitAlive 销毁后 false、建表后 true
+#                                 ⑧ 权益那套独立 Univer 必须在自己的 createUniver 之前
+#                                    await window.fin_ensureFormulaPatch()
+#                                 ⑨ 财务侧必须暴露 __finFormulaMods + fin_ensureFormulaPatch
+#                                 ⑩ 补丁核心 skip(1) 不得删
+#
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
 #   但会在提交时打印，便于及时发现并修复。CI 中建议作为独立步骤做硬阻断。
@@ -170,7 +184,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py check_clip_robust_lock.py check_undo_everystep_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py check_clip_robust_lock.py check_undo_everystep_lock.py check_eq_geom_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then
