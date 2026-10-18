@@ -582,7 +582,11 @@ function finExcelKeysBind(){
           if (_aSz > _cSz){ ranges = [{ startRow: _gF.startRow, startColumn: _gF.startColumn, endRow: _gF.endRow, endColumn: _gF.endColumn }]; }
         }
       } catch(errF){}
-      if (!ranges.length) return '';
+      /* ★CLIP-COPY-EMPTY-20261018：null = 没有选区（不做任何事）；'' = 有选区但内容空（照常复制） */
+      if (!ranges.length){
+        try { window.__finClipMirror = null; } catch(eM0){}
+        return null;
+      }
       /* 实时快照：只为读 numfmt pattern（货币符号 / 千位分隔 / 小数位） */
       var snap = null, sid = null;
       try { snap = fin_currentSnapshot(); } catch(errSnap){ snap = null; }

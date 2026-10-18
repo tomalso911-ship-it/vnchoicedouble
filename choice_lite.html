@@ -272,7 +272,10 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
   }
 
   function onCopyCut(e) {
-    if (!pending) return;
+    /* ★CLIP-COPY-EMPTY-20261018：pending 可能是【空字符串】（用户复制了一片空白格）。
+       旧写法 `if (!pending) return;` 会把这种情况当成"没有内容"直接放行给 Univer，
+       结果剪贴板留着上一次的旧文本 → 粘贴时粘出旧数据。空内容也要写进去。 */
+    if (pending === null || pending === undefined) return;
     try {
       if (!e.clipboardData) return;
       e.clipboardData.setData('text/plain', pending);
@@ -418,9 +421,16 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
       var o = forceName && tables[forceName] ? { name: forceName, ad: tables[forceName] } : ownerOf(e.target);
       if (!o) return false;
       if (k === 'v') { pasteFallback(o); return false; }   // 不放行也不拦，等 paste 事件
-      var text = '';
-      try { text = o.ad.text ? o.ad.text() : ''; } catch (err) { text = ''; }
-      if (!text) return false;
+      /* ★★CLIP-COPY-EMPTY-20261018（用户 2026-10-18「复制剪切粘贴又没了」的排查结论）★★
+         text() 的返回值有两种"空"：
+           null      = 当前【根本没有选区】→ 不接管，连剪贴板都别动；
+           ''        = 有选区、但内容全空 → 【照常复制】。
+         旧写法 `if (!text) return false;` 把两者混为一谈：复制一片空白格时什么都不写，
+         剪贴板留着上一次的旧文本 → 用户随后粘贴，粘出来的是旧数据（看起来"乱了/坏了"）。 */
+      var text = null;
+      try { text = o.ad.text ? o.ad.text() : null; } catch (err) { text = null; }
+      if (text === null || text === undefined) return false;
+      text = String(text);
       var ok = writeClipboard(text);
       if (k === 'x') { try { o.ad.clear && o.ad.clear(); } catch (err) {} }
       try { window.__clipLast = { ver: VER, kind: k === 'x' ? 'cut' : 'copy', len: lastText.length, ok: ok, at: Date.now() }; } catch (e) {}
@@ -447,8 +457,16 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
     try { txt = e.clipboardData ? e.clipboardData.getData('text/plain') : ''; } catch (err) { txt = ''; }
     var o = ownerOf(e.target);
     if (!o) return;
-    if (!txt) txt = lastText;
-    if (!txt) return;
+    if (!txt){
+      /* ★CLIP-COPY-EMPTY-20261018：剪贴板读出来是空的 ——
+         如果本页最近一次复制/剪切确实是「空内容」，就按 Excel 语义把目标清空（继续走 rich）；
+         否则退回本页最近复制的文本；两者都没有才放弃。 */
+      var selfEmpty = !!(window.__clipLast && window.__clipLast.len === 0 &&
+                         (window.__clipLast.kind === 'copy' || window.__clipLast.kind === 'cut'));
+      if (selfEmpty) txt = '';
+      else if (lastText) txt = lastText;
+      else return;
+    }
     try { e.preventDefault(); e.stopPropagation(); } catch (err) {}
     lastPasteAt = Date.now();
     applyPaste(o, txt);
@@ -21086,7 +21104,11 @@ var PROD_EQUIP_FAULT_KB = {
               if (_aSz > _cSz){ ranges = [{ startRow: _gF.startRow, startColumn: _gF.startColumn, endRow: _gF.endRow, endColumn: _gF.endColumn }]; }
             }
           } catch(errF){}
-          if (!ranges.length) return '';
+          /* ★CLIP-COPY-EMPTY-20261018：null = 没有选区（不做任何事）；'' = 有选区但内容空（照常复制） */
+          if (!ranges.length){
+            try { window.__finClipMirror = null; } catch(eM0){}
+            return null;
+          }
           /* 实时快照：只为读 numfmt pattern（货币符号 / 千位分隔 / 小数位） */
           var snap = null, sid = null;
           try { snap = fin_currentSnapshot(); } catch(errSnap){ snap = null; }
@@ -29823,7 +29845,9 @@ var PROD_EQUIP_FAULT_KB = {
           }
         } catch(errE){}
         if (!ranges.length){
-          var cur0 = eqActiveCell(); if (!cur0) return '';
+          /* ★CLIP-COPY-EMPTY-20261018：null = 没有选区（不做任何事）；'' = 有选区但内容空（照常复制） */
+          var cur0 = eqActiveCell();
+          if (!cur0){ try { window.__eqClipMirror = null; } catch(eM0){} return null; }
           ranges.push({ startRow: cur0.row, startColumn: cur0.col, endRow: cur0.row, endColumn: cur0.col });
         }
         /* 实时快照：只为读 numfmt pattern（货币符号 / 千位分隔 / 小数位） */
@@ -30034,27 +30058,53 @@ var PROD_EQUIP_FAULT_KB = {
       }
     } catch(errRegEq){}
 
-    /* 行为级自检（3 秒后跑一次）：共用写入器 + 权益取数函数都在，才算接线成功。
-       为什么需要：用户 2026-10-17 反馈"只要一改，Ctrl+C/X/V 就立即丢失"——
-       因为财务/权益是两套独立补丁，任一侧被改坏或被异常打断时【完全没有提示】，
-       只能靠人去点一下才发现。现在刷新后 F12 里一眼能看出是 OK 还是 FAILED。 */
-    setTimeout(function(){
-      try {
-        var hasW = (typeof window.win_clipWrite === 'function');
-        var hasM = (typeof eq_clipMatrixText === 'function');
-        /* ★CLIP-ROBUST-LOCK-20261018：除了「写入器/取数器在」，还必须两条 copy/cut 补写通道都接上
-           （财务 fin_clipWrite 侧 + 权益 eq 侧）。少任何一条 = 真机上复制/剪切会静默失效。 */
-        var hasEvtF = !!window.__clipEvtFin, hasEvtE = !!window.__clipEvtEq;
-        if (!hasW || !hasM || !hasEvtF || !hasEvtE){
-          console.error('[clip-lock] 剪贴板接线缺失 → Ctrl+C/X/V 会失效',
-                        { win_clipWrite: hasW, eq_clipMatrixText: hasM,
-                          copyEvtFin: hasEvtF, copyEvtEq: hasEvtE });
-          window.__CLIP_LOCK_FAILED = true;
-        } else {
-          console.log('[clip-lock] OK · Ctrl+C/X/V 已接线（win_clipWrite + eq_clipMatrixText + copy/cut 通道）');
-        }
-      } catch(e){}
-    }, 3000);
+    /* 行为级自检：共用写入器 + 取数器 + 两条 copy/cut 补写通道。
+       ★★CLIP-SELFCHECK-VIEW-20261018（用户 2026-10-18「找回复制剪切粘贴…要锁定住」的真相之一）★★
+       旧写法在页面加载 3 秒时【无条件】要求两张表的适配器都已注册。但财务适配器要等用户
+       真正打开财务报表（fin_init）才注册 —— 停留在看板/生产/权益页时 __clipEvtFin 必然是 false，
+       于是控制台打出红字「剪贴板接线缺失 → Ctrl+C/X/V 会失效」并置 __CLIP_LOCK_FAILED：
+       功能其实是好的，但用户看到红字就以为又坏了（历史"又说没了"的误报来源之一）。
+       新判据：只要求【已经初始化过的表】必须接线；没打开的表不算缺失。
+       持续复查（5 秒一次），真缺失时照样报错，恢复后自动改回 OK。 */
+    (function(){
+      var t0 = Date.now(), bad = false;
+      function finReadyNow(){
+        try { return !!(window.finReady || document.querySelector('#univer_container canvas')); } catch(e){ return false; }
+      }
+      function eqReadyNow(){
+        try { return !!document.querySelector('#equity_container canvas'); } catch(e){ return false; }
+      }
+      function clipSelfCheck(){
+        try {
+          var hasW = (typeof window.win_clipWrite === 'function');
+          var hasM = (typeof eq_clipMatrixText === 'function');
+          var hasEvtF = !!window.__clipEvtFin, hasEvtE = !!window.__clipEvtEq;
+          var needFin = finReadyNow(), needEq = eqReadyNow();
+          var isBad = !hasW || !hasM || (needFin && !hasEvtF) || (needEq && !hasEvtE);
+          if (isBad && (Date.now() - t0) < 20000) return;      /* 表还没打开：再等等，绝不误报 */
+          if (isBad){
+            if (!bad){
+              bad = true;
+              window.__CLIP_LOCK_FAILED = true;
+              console.error('[clip-lock] 剪贴板接线缺失 → Ctrl+C/X/V 会失效',
+                            { win_clipWrite: hasW, eq_clipMatrixText: hasM,
+                              copyEvtFin: hasEvtF, copyEvtEq: hasEvtE,
+                              needFin: needFin, needEq: needEq });
+            }
+            return;
+          }
+          if (bad){ bad = false; console.log('[clip-lock] OK · 已恢复接线'); }
+          window.__CLIP_LOCK_FAILED = false;
+          if (!window.__clipLockOkLogged){
+            window.__clipLockOkLogged = true;
+            console.log('[clip-lock] OK · Ctrl+C/X/V 已接线（win_clipWrite + 矩阵取数 + copy/cut 通道；fin=' +
+                        hasEvtF + ' eq=' + hasEvtE + '）');
+          }
+        } catch(e){}
+      }
+      setTimeout(clipSelfCheck, 3000);
+      setInterval(clipSelfCheck, 5000);
+    })();
 
     function eqExcelKeysBind(){
       if (window.__eqExcelKeysBound) return;
