@@ -70257,6 +70257,11 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
                      '#ca8a04','#16a34a','#0d9488','#2563eb','#7c3aed','#db2777'];
   var BG_COLORS   = ['#ffffff','#f3f4f6','#fef3c7','#dcfce7','#dbeafe','#fae8ff',
                      '#fee2e2','#e0f2fe','#fef9c3','#e5e7eb','#fde68a','#bbf7d0'];
+  /* ★COLOR-MERGE-20261018（用户 2026-10-18：「相互增加彼此的颜色」）
+     字体颜色 = 原来的 12 个深色 + 12 个浅色；填充颜色 = 原来的 12 个浅色 + 12 个深色。
+     两个面板都是 6 列 × 4 行，先放自己的那组，再接对方的那组。 */
+  var TEXT_ALL = TEXT_COLORS.concat(BG_COLORS);
+  var BG_ALL   = BG_COLORS.concat(TEXT_COLORS);
   var POP_ID = 'stdColorPop';
 
   var CSS = ''
@@ -70284,7 +70289,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   }
 
   function buildGrid(mode){
-    var list = (mode === 'bg') ? BG_COLORS : TEXT_COLORS;
+    var list = (mode === 'bg') ? BG_ALL : TEXT_ALL;
     var h = '';
     for (var i = 0; i < list.length; i++){
       h += '<span class="scp-sw" data-hex="' + list[i] + '" title="' + list[i]
@@ -70378,10 +70383,13 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     host.insertBefore(makeBtn(target), host.firstChild);
   }
 
-  /* 原生颜色按钮：连图标带下拉箭头整块隐藏（保留命令，只是没有入口了） */
+  /* 原生颜色按钮：连图标带下拉箭头整块隐藏（保留命令，只是没有入口了）
+     ★COLOR-HIDE-BUCKET-20261018（用户 2026-10-18：「这个按钮删除」＝ 原生填充颜色/油漆桶按钮）：
+       font-color 早就隐藏了，但同排的 paint-bucket（填充颜色 + 下拉箭头）还在，现在一并整块隐藏。 */
   function hideNativeColorBtns(){
     var svgs = document.querySelectorAll(
-      '#univer_container svg.univerjs-icon-font-color, #equity_container svg.univerjs-icon-font-color');
+      '#univer_container svg.univerjs-icon-font-color, #equity_container svg.univerjs-icon-font-color,' +
+      '#univer_container svg.univerjs-icon-paint-bucket, #equity_container svg.univerjs-icon-paint-bucket');
     for (var i = 0; i < svgs.length; i++){
       var host = null;
       try { host = svgs[i].closest('.univer-toolbar-item-select-button'); } catch(e){}
