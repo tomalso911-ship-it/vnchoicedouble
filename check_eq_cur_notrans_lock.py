@@ -49,7 +49,9 @@ CODES = ("rmb", "vnd", "usd")
 # 用户截图里锁定的中文表头（顺序也要一致）
 HEAD_ZH = ['序号', '年份', '公司', '付款来自', '付款至', '金额', '汇率', '日期', '现金/转账', '备注']
 # 用户截图里要求「不翻译」的公司名 / 人名缩写（须与 EQ_NO_TRANS_WORDS 里一字不差）
-WORDS = ("CHOICEVN", "T.L", "A.C", "A.J", "A.L", "DABACO")
+# ★2026-10-18 用户补充（EQ-NAME-NOTRANS-LOCK-20261018）：股东结构里的人名全部不翻译
+#   —— 截图 A.L / A.C / A.J / A.T / A.R / A.M / A.Z
+WORDS = ("CHOICEVN", "T.L", "A.C", "A.J", "A.L", "A.T", "A.R", "A.M", "A.Z", "DABACO")
 
 
 def fn_body(text, name):

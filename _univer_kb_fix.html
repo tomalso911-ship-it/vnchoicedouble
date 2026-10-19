@@ -471,6 +471,64 @@ function finScrollToSoon(startRow, startCol){
   setTimeout(run, 60);
 }
 
+/* ★★FIN-TYPE-EDIT-20261018（用户 2026-10-18：「表格停在单元格上面的时候，直接打汉字或者输入任何
+   英文都可以直接输入；不需要双击进入单元格出现光标跳动才能输入」）★★
+   与权益表 eqTypeToEdit 完全同一套「确定性两步」（那边已实测通过，本函数只照搬，勿改那套）：
+     ① 先用 set-range-values 把字符写进当前格 —— 纯数字落成数值（t=2），其它落成字符串（t=1）；
+     ② 40ms 后再用 set-cell-edit-visible{visible:true, eventType:3, unitId} 打开编辑器
+        → 编辑器会载入刚写入的内容、光标落在末尾，之后的按键走 Univer 原生输入流
+          （编辑态本模块一律 return，不和它抢）。
+   ★eventType 必须是 3 = DeviceInputEventType.Dblclick（PointerMove=0/PointerDown=1/PointerUp=2/
+     Dblclick=3/Keyboard=4）；★绝不传 keycode（传了会被当成方向键/快捷键解释）。
+   ★汉字输入法：compositionend 拿到的 data 也从这里进（整段写入后再开编辑器）。
+   ★为什么必须"先写值再开编辑器"：只开编辑器再用 execCommand 补字符，数字列会落空
+     （权益表的历史 BUG，注释见 eqTypeToEdit 上方）。 */
+/* ★打字补丁的排除项：真正在"某个输入宿主"里打字时不能抢（否则会把字符写进背后的单元格）。
+   · input / textarea / select（我们自己的币种、日期、搜索框…）
+   · Univer 公式栏编辑器（id 含 FORMULA_BAR）—— 它不在 .univer-editor-container 里，
+     所以 finIsEditingCell() 判不出来，必须在这里显式排掉。 */
+function fin_typeHostBlocked(e){
+  try {
+    var t = e && e.target;
+    if (!t || t.nodeType !== 1) return false;
+    var tg = String(t.tagName || '').toLowerCase();
+    if (tg === 'input' || tg === 'textarea' || tg === 'select') return true;
+    var id = String(t.id || '');
+    if (id.indexOf('FORMULA_BAR') >= 0) return true;
+    return false;
+  } catch(err){ return false; }
+}
+/* 输入法刚提交时的时间戳：某些浏览器在 compositionend 之后还会补一个
+   "isComposing = false" 的 keydown（例如确认候选的那一下空格），
+   那一下若被当成普通字符，会把刚写进去的中文又覆盖掉 —— 200ms 内不接管。 */
+var fin_typeImeAt = 0;
+function fin_typeToEdit(text){
+  try {
+    var s = String(text == null ? '' : text);
+    if (!s) return false;
+    var api0 = finAPI(); if (!api0 || !api0.executeCommand) return false;
+    var sh = finSheetObj(); if (!sh) return false;
+    var cur = finActiveCell(); if (!cur) return false;
+    var uid = (typeof fin_unitId === 'function') ? (fin_unitId() || '') : '';
+    var sid = null;
+    try { sid = (sh.getSheetId && sh.getSheetId()) || null; } catch(eS){}
+    var isNum = /^-?\d+(\.\d+)?$/.test(s);
+    var m = {};
+    m[cur.row] = {};
+    m[cur.row][cur.col] = { v: isNum ? Number(s) : s, t: isNum ? 2 : 1, f: null };
+    var pw = api0.executeCommand('sheet.command.set-range-values', { unitId: uid, subUnitId: sid, value: m });
+    if (pw && typeof pw.then === 'function') pw.catch(function(){});
+    try { if (typeof fin_markDirty === 'function') fin_markDirty(); } catch(eD){}
+    setTimeout(function(){
+      try {
+        var pe = api0.executeCommand('sheet.operation.set-cell-edit-visible',
+          { visible: true, eventType: 3, unitId: uid });
+        if (pe && typeof pe.then === 'function') pe.catch(function(){});
+      } catch(e2){}
+    }, 40);
+    return true;
+  } catch(e){ return false; }
+}
 /* ★主入口：绑定 Excel 键盘补丁
    · 编辑态：只补 Delete（删光标右侧字符）；Backspace 原生已正确，其余键交回 Univer；
    · 非编辑态：补 Univer 0.5.5 没实现的键（Home/End/Ctrl+Home/Ctrl+End/PageUp/PageDown、
@@ -594,6 +652,8 @@ function finExcelKeysBind(){
       var lines = [];
       /* ★CLIP-RICH-20261018：单块选区时顺手留下「值+公式+样式」镜像，供带格式粘贴使用 */
       var mir = null;
+      /* ★CLIP-MERGE-20261018：合并区域镜像（相对选区的行/列偏移），粘贴时还原 */
+      var mirMg = (ranges.length === 1) ? [] : null;
       for (var i = 0; i < ranges.length; i++){
         var g = ranges[i];
         var nr = g.endRow - g.startRow + 1, nc = g.endColumn - g.startColumn + 1;
@@ -639,13 +699,29 @@ function finExcelKeysBind(){
           if (mirRows) mirRows.push(mirRow);
           lines.push(cells.join('\t'));
         }
+        /* ★CLIP-MERGE-20261018：把【完全落在选区里】的合并区域按相对坐标记进镜像 */
+        if (mirMg){
+          try {
+            var _msh = (snap && snap.sheets && snap.sheets[sid]) || null;
+            var _ml = (_msh && _msh.mergeData) || [];
+            for (var _mi = 0; _mi < _ml.length; _mi++){
+              var _m = _ml[_mi] || {};
+              var _msr = _m.startRow, _msc = _m.startColumn, _mer = _m.endRow, _mec = _m.endColumn;
+              if (typeof _msr !== 'number' || typeof _msc !== 'number' ||
+                  typeof _mer !== 'number' || typeof _mec !== 'number') continue;
+              if (_msr < g.startRow || _msc < g.startColumn) continue;
+              if (_mer > g.endRow || _mec > g.endColumn) continue;
+              mirMg.push([_msr - g.startRow, _msc - g.startColumn, _mer - g.startRow, _mec - g.startColumn]);
+            }
+          } catch(eMg){}
+        }
         if (mirRows) mir = mirRows;
       }
       /* ★CLIP-RICH-20261018：镜像的 text 必须和真正写进剪贴板的文本逐字一致，
          粘贴时才敢用（不一致说明用户中途复制了别的东西 → 退回纯文本）。 */
       try {
         if (mir){
-          window.__finClipMirror = { text: lines.join('\n'), mat: mir, sid: sid, at: Date.now(), src: 'fin' };
+          window.__finClipMirror = { text: lines.join('\n'), mat: mir, mg: mirMg, sid: sid, at: Date.now(), src: 'fin' };
           /* ★CLIP-RICH-XMODULE-20261018：同时写一份全局镜像，财务↔权益跨模块粘贴也能带格式 */
           window.__clipRichGlobal = window.__finClipMirror;
         } else {
@@ -655,6 +731,98 @@ function finExcelKeysBind(){
       return lines.join('\n');
     } catch(err){ return ''; }
   }
+  /* ★CLIP-TILE-20261018（Excel 行为，用户 2026-10-18 实测要求）：
+     复制 1 格 → 框选 2×2 → 粘贴，Excel 会把【整个选区】铺满（4 格同值），
+     而不是只贴左上角一格。规则：选区比源块大、且行数列数都是源块的整数倍 → 平铺铺满；
+     否则仍按源块大小贴（多出来的源块照常溢出到右下）。 */
+  function fin_clipTileDims(sh, r0, c0, nr, nc){
+    var tr = nr, tc = nc;
+    try {
+      var g = sh.getSelection().getActiveRange().getRange();
+      if (g && typeof g.startRow === 'number' && g.startRow === r0 && g.startColumn === c0){
+        var sr = (g.endRow - g.startRow) + 1, sc = (g.endColumn - g.startColumn) + 1;
+        if (sr > nr && sc > nc && sr % nr === 0 && sc % nc === 0){ tr = sr; tc = sc; }
+      }
+    } catch(e){}
+    return { tr: tr, tc: tc };
+  }
+  function fin_clipTileMat(m, tr, tc){
+    var out = [], r, c;
+    for (r = 0; r < tr; r++){
+      var row = [];
+      for (c = 0; c < tc; c++){
+        var src = m[r % m.length];
+        row.push(src ? src[c % src.length] : undefined);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  /* 权益表（独立 module 作用域）也要同一套「铺满选区」语义 → 暴露到 window */
+  try { window.finClipTileDims = fin_clipTileDims; window.finClipTileMat = fin_clipTileMat; } catch(eT){}
+  /* ★CLIP-MERGE-20261018（用户 2026-10-18：「复制和粘贴的时候，合并单元格没有体现出来」）：
+     粘贴时把源选区里的合并区域按相对坐标平移到目标区并重建。
+     · 目标区已有的合并先取消（否则叠加会打架）；
+     · 平铺粘贴（选区是源块整数倍）时每块都重建一份；
+     · 全程 try/catch + Promise catch，失败绝不影响已经写好的值/样式。 */
+  function fin_clipApplyMerges(api0, uid, sid, r0, c0, mg, tr, tc, nr, nc){
+    try {
+      if (!api0 || !api0.executeCommand || !mg || !mg.length) return;
+      var rects = [], y, x, i, m;
+      var stepR = (nr > 0) ? nr : tr, stepC = (nc > 0) ? nc : tc;
+      for (y = 0; y < tr; y += stepR){
+        for (x = 0; x < tc; x += stepC){
+          for (i = 0; i < mg.length; i++){
+            m = mg[i]; if (!m || m.length < 4) continue;
+            var _r0m = r0 + y + m[0], _c0m = c0 + x + m[1];
+            var _r1m = r0 + y + m[2], _c1m = c0 + x + m[3];
+            if (_r1m > r0 + tr - 1 || _c1m > c0 + tc - 1) continue;
+            rects.push({ startRow: _r0m, startColumn: _c0m, endRow: _r1m, endColumn: _c1m });
+          }
+        }
+      }
+      if (!rects.length) return;
+      /* 1) 目标区已有的合并先取消 */
+      var kill = [];
+      try {
+        var wbM = api0.getActiveWorkbook ? api0.getActiveWorkbook() : null;
+        var snM = (wbM && wbM.getSnapshot) ? wbM.getSnapshot() : null;
+        var shM = (snM && snM.sheets && snM.sheets[sid]) || null;
+        var oldM = (shM && shM.mergeData) || [];
+        for (i = 0; i < oldM.length; i++){
+          var o = oldM[i] || {};
+          if (typeof o.startRow !== 'number' || typeof o.startColumn !== 'number') continue;
+          if (o.endRow < r0 || o.startRow > r0 + tr - 1) continue;
+          if (o.endColumn < c0 || o.startColumn > c0 + tc - 1) continue;
+          kill.push({ startRow: o.startRow, startColumn: o.startColumn, endRow: o.endRow, endColumn: o.endColumn });
+        }
+      } catch(eQ){ kill = []; }
+      var addAll = function(){
+        for (var k = 0; k < rects.length; k++){
+          try {
+            var pa = api0.executeCommand('sheet.command.add-worksheet-merge', {
+              unitId: uid, subUnitId: sid, ranges: [rects[k]], selections: [rects[k]]
+            });
+            if (pa && typeof pa.then === 'function') pa.catch(function(){});
+          } catch(eA){}
+        }
+      };
+      if (kill.length && typeof Promise !== 'undefined'){
+        var ps = [];
+        for (i = 0; i < kill.length; i++){
+          try {
+            var pk = api0.executeCommand('sheet.command.remove-worksheet-merge', {
+              unitId: uid, subUnitId: sid, range: kill[i]
+            });
+            if (pk && typeof pk.then === 'function') ps.push(pk.catch(function(){}));
+          } catch(eK){}
+        }
+        if (ps.length) Promise.all(ps).then(addAll, addAll);
+        else addAll();
+      } else addAll();
+    } catch(e){}
+  }
+  try { window.finClipApplyMerges = fin_clipApplyMerges; } catch(eAM){}
   /* ★CLIP-ENGINE-20261018：剪贴板交给全局引擎（window.__clipEngine），这里只注册适配器。
      · text  = 当前选区 → 屏幕文本（带货币符号/千分位）
      · write = 粘贴文本 → TSV 矩阵 → 写进表格（绕开 Univer 对 navigator.clipboard 的依赖）
@@ -690,7 +858,12 @@ function finExcelKeysBind(){
         console.warn('[fin-paste] 取不到粘贴落点，已放弃（绝不写回 A1）');
         return false;
       }
-      sh0.getRange(r0, c0, m0.length, m0[0].length).setValues(m0);
+      /* ★CLIP-TILE-20261018：选区是源块整数倍时铺满整个选区 */
+      var _td0 = fin_clipTileDims(sh0, r0, c0, m0.length, m0[0].length);
+      var _tn0 = _td0.tr, _tc0 = _td0.tc;
+      if (_tn0 * _tc0 > 20000){ _tn0 = m0.length; _tc0 = m0[0].length; }
+      var _mv0 = (_tn0 === m0.length && _tc0 === m0[0].length) ? m0 : fin_clipTileMat(m0, _tn0, _tc0);
+      sh0.getRange(r0, c0, _tn0, _tc0).setValues(_mv0);
       try { if (typeof fin_markDirty === 'function') fin_markDirty(); } catch(eD){}
       try { window.__finClipLast = { len: String(text).length, ok: true, paste: true }; } catch(eL){}
       return true;
@@ -742,14 +915,18 @@ function finExcelKeysBind(){
       var nr = M.mat.length, nc = 0, i2;
       for (i2 = 0; i2 < nr; i2++){ if (M.mat[i2] && M.mat[i2].length > nc) nc = M.mat[i2].length; }
       if (!(nr > 0) || !(nc > 0) || nr * nc > 20000) return false;
+      /* ★CLIP-TILE-20261018：选区是源块整数倍 → 铺满选区（Excel 行为） */
+      var _td1 = fin_clipTileDims(sh0, r0, c0, nr, nc);
+      var tr = _td1.tr, tc = _td1.tc;
+      if (tr * tc > 20000) return false;
       var sid = '';
       try { sid = (sh0.getSheetId) ? sh0.getSheetId() : ''; } catch(eS){ sid = ''; }
       var uid = (typeof fin_unitId === 'function') ? (fin_unitId() || '') : '';
       var m1 = [], m2 = [], anyS = false, r, c;
-      for (r = 0; r < nr; r++){
+      for (r = 0; r < tr; r++){
         var row1 = [], row2 = [];
-        for (c = 0; c < nc; c++){
-          var cell = (M.mat[r] && M.mat[r][c]) ? M.mat[r][c] : null;
+        for (c = 0; c < tc; c++){
+          var cell = (M.mat[r % nr] && M.mat[r % nr][c % nc]) ? M.mat[r % nr][c % nc] : null;
           var o1 = { v: (cell && cell.v !== undefined) ? cell.v : null,
                      f: (cell && cell.f !== undefined) ? cell.f : null,
                      t: (cell && cell.t !== undefined) ? cell.t : null };
@@ -763,21 +940,32 @@ function finExcelKeysBind(){
         }
         m1.push(row1); m2.push(row2);
       }
-      var rg = { startRow: r0, startColumn: c0, endRow: r0 + nr - 1, endColumn: c0 + nc - 1 };
+      var rg = { startRow: r0, startColumn: c0, endRow: r0 + tr - 1, endColumn: c0 + tc - 1 };
+      /* ★CLIP-MERGE-20261018：值 + 样式落好之后，再重建源选区的合并区域 */
+      var applyMerges = function(){
+        try { fin_clipApplyMerges(api0, uid, sid, r0, c0, M.mg, tr, tc, nr, nc); } catch(eM2){}
+      };
       var applyStyles = function(){
-        if (!anyS) return;
-        try {
-          var p2 = api0.executeCommand('sheet.command.set-range-values', {
-            unitId: uid, subUnitId: sid, range: rg, value: m2
-          });
-          if (p2 && typeof p2.then === 'function') p2.catch(function(){});
-        } catch(e2){}
+        var p2 = null;
+        if (anyS){
+          try {
+            p2 = api0.executeCommand('sheet.command.set-range-values', {
+              unitId: uid, subUnitId: sid, range: rg, value: m2
+            });
+          } catch(e2){ p2 = null; }
+        }
+        if (p2 && typeof p2.then === 'function') p2.then(applyMerges, applyMerges);
+        else applyMerges();
       };
       var p1 = api0.executeCommand('sheet.command.set-range-values', {
         unitId: uid, subUnitId: sid, range: rg, value: m1
       });
       if (p1 && typeof p1.then === 'function') p1.then(applyStyles, applyStyles);
       else applyStyles();
+      /* ★FIN-UNDO-ONEGESTURE-20261018：粘贴后把选区留在【整个粘贴区】（Excel 手感）。
+         同时这也是记账必要的：撤销账本按"当前选区"兜底取范围，选区只有 1 格时
+         撤销只会写回第一格 → 第二格撤不干净（探针 48 实测 ["",222]）。 */
+      try { sh0.getRange(r0, c0, tr, tc).activate(); } catch(eA0){}
       try { if (typeof fin_markDirty === 'function') fin_markDirty(); } catch(eD){}
       try { window.__finClipLast = { len: String(text).length, ok: true, paste: true, rich: true }; } catch(eL){}
       return true;
@@ -884,6 +1072,17 @@ function finExcelKeysBind(){
       }
 
       if (e.altKey || e.metaKey) return;
+      /* ★FIN-TYPE-EDIT-20261018：非编辑态敲可打印字符 → 直接进入编辑并写入该字符（Excel 行为）。
+         命中后 preventDefault + stopPropagation，避免 Univer 再按自己的语义处理一遍。
+         汉字/输入法不走这里（那些 keydown 的 isComposing = true，上面早就 return 了），
+         由下方 compositionend 分支接管。 */
+      if (!e.ctrlKey && k && k.length === 1) {
+        if (fin_typeHostBlocked(e)) return;      /* 输入框/公式栏里打字 → 交给它们自己 */
+        if (Date.now() - fin_typeImeAt < 200) return;   /* 输入法刚落字，别再补一次 */
+        e.preventDefault(); e.stopPropagation();
+        fin_typeToEdit(k);
+        return;
+      }
       var cur = finActiveCell();
       if (!cur) return;
       if (window.__finDebug) { try { window.__finDebug[window.__finDebug.length - 1] += '|cur=' + cur.row + ',' + cur.col; } catch(e4){} }
@@ -986,6 +1185,26 @@ function finExcelKeysBind(){
 
       /* ④ 其它会动选区的键（Tab / Enter / Shift+方向键…）：不拦，只补跟随滚动 */
       if (k === 'Tab' || k === 'Enter') followSoon();
+    } catch(err){}
+  }, true);
+
+  /* ★★FIN-TYPE-EDIT-IME-20261018（用户 2026-10-18：「直接打汉字也能输入」）★★
+     汉字/日文/韩文走输入法：这些按键的 keydown 都是 isComposing = true（keyCode 229），
+     上面的键盘补丁一律 return，Univer 在非编辑态也不会把它们写进单元格。
+     做法：等输入法在 compositionend 把整段文字交出来时，用同一套「先写值再多开编辑器」
+     （fin_typeToEdit）把它写进当前格并打开编辑器，光标落在末尾。
+     · 只在【非编辑态】且事件归属财务表时接管（inScope 已含可见性判断）；
+     · 不 preventDefault / stopPropagation —— 输入法自身的收尾交给浏览器。 */
+  window.addEventListener('compositionend', function(e){
+    try {
+      if (!e || e.isComposing) return;
+      var txt = e.data;
+      if (!txt) return;
+      if (fin_typeHostBlocked(e)) return;
+      if (!inScope(e)) return;
+      if (finIsEditingCell()) return;
+      fin_typeImeAt = Date.now();
+      fin_typeToEdit(txt);
     } catch(err){}
   }, true);
 

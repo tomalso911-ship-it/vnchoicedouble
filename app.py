@@ -322,6 +322,8 @@ def row_to_dict(row):
 
 # 合同占位文档名称：三语写死，不随语言切换
 CONTRACT_NAME = "合同-Contract-Hợp đồng"
+# ★LIB-SALES-CONTRACT-20261019：「销售合同」自由上传文件夹（固定内部路径，界面按语言显示名称）
+SALES_CONTRACT_DIR = "销售合同"
 
 
 def _seed_contract_docs(c):
@@ -6092,14 +6094,18 @@ def library_upload():
     is_contract = str(request.form.get("is_contract") or request.args.get("is_contract") or "").strip().lower() in ("1", "true", "yes")
     if is_contract and project_id is None:
         return jsonify({"error": "contract slot requires project"}), 400
+    paths = request.form.getlist("paths") or []
+    # ★LIB-SALES-CONTRACT-20261019：上传到「销售合同」文件夹 → 按 contract 权限（view 不可上传）
+    _paths_contract = any(str(pp or "").replace("\\", "/").strip() == SALES_CONTRACT_DIR
+                          or str(pp or "").replace("\\", "/").strip().startswith(SALES_CONTRACT_DIR + "/")
+                          for pp in paths)
     # 门控：公用资料写仍锁三人组（硬代码）；项目资料写按新权限判定
     if project_id is None:
         if not _lib_can_edit():
             return jsonify({"error": "forbidden"}), 403
     else:
-        if not _lib_can_edit_proj(project_id, is_contract):
+        if not _lib_can_edit_proj(project_id, bool(is_contract or _paths_contract)):
             return jsonify({"error": "forbidden"}), 403
-    paths = request.form.getlist("paths") or []
     uploaded = []
     for idx, f in enumerate(files):
         rel = (paths[idx] if idx < len(paths) else "") or ""
@@ -6161,9 +6167,9 @@ def library_upload():
 def library_delete(fid):
     conn = get_db()
     try:
-        row = conn.execute("SELECT project_id, filename, is_contract FROM library_files WHERE id=?", (fid,)).fetchone()
+        row = conn.execute("SELECT project_id, filename, original_name, is_contract FROM library_files WHERE id=?", (fid,)).fetchone()
     except Exception:
-        row = conn.execute("SELECT project_id, filename FROM library_files WHERE id=?", (fid,)).fetchone()
+        row = conn.execute("SELECT project_id, filename, original_name FROM library_files WHERE id=?", (fid,)).fetchone()
     if not row:
         conn.close()
         return jsonify({"error": "not found"}), 404
@@ -6171,14 +6177,16 @@ def library_delete(fid):
         is_contract = bool(row["is_contract"])
     except (IndexError, KeyError):
         is_contract = False
-    # ★PERM-V2-20261018：合同占位只能由 tom/cuong/james 删除；
+    # ★PERM-V2-20261018：合同占位 / 销售合同文件夹 按「合同文档」edit 权限删除；
     #   项目资料按该项目的「独立项目资料」edit 权限；公用资料仍锁三人组。
-    if is_contract or row["project_id"] is None:
+    _nm_del = str((row["original_name"] if "original_name" in row.keys() else "") or "").replace("\\", "/")
+    _is_contract_ctx = bool(is_contract) or _nm_del == SALES_CONTRACT_DIR or _nm_del.startswith(SALES_CONTRACT_DIR + "/")
+    if row["project_id"] is None:
         if not _lib_can_edit():
             conn.close()
             return jsonify({"error": "forbidden"}), 403
     else:
-        if not _lib_can_edit_proj(row["project_id"], False):
+        if not _lib_can_edit_proj(row["project_id"], _is_contract_ctx):
             conn.close()
             return jsonify({"error": "forbidden"}), 403
     conn.execute("DELETE FROM library_files WHERE id=?", (fid,))
@@ -8222,7 +8230,10 @@ def lib_file_level(conn, username, file_row):
         return ("hide", [])
     if _is_super(conn, username):
         return ("edit", [])
-    key = "contract" if row.get("is_contract") else "lib"
+    # ★LIB-SALES-CONTRACT-20261019：合同占位（is_contract=1）以及「销售合同」文件夹下的文件都走 contract 项
+    _nm = str(row.get("original_name") or "").replace("\\", "/")
+    _is_contract_ctx = bool(row.get("is_contract")) or _nm == SALES_CONTRACT_DIR or _nm.startswith(SALES_CONTRACT_DIR + "/")
+    key = "contract" if _is_contract_ctx else "lib"
     default_level = "hide"   # ★PROJ-HIDE-DEF-20261019：与 proj_level 一致，未授权 = 隐藏
     st = load_perms(conn, username)
     ov = st["lib_file_overrides"].get(str(row.get("id")), None)

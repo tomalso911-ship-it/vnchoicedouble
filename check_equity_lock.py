@@ -135,7 +135,9 @@ chk("more-function-single" in eqblk, "★隐藏 Univer 自带「⋮」收纳按�
 chk("new MutationObserver(" in eqblk, "DOM 变动自动重挂（切表后不掉下来）")
 
 print("7) 自动保存 0.7s + 手动保存")
-chk(re.search(r"saveTimer = setTimeout\(function\(\)\{ saveTimer = null; if \(dirty\) save\(false\); \}, 700\)", html) is not None,
+# ★EQ-SAVE-NOLOSS-20261018：条件从 `if (dirty)` 扩成 `if (dirty || saveQueued)`（排队中的保存也要补存），
+#   语义只会更强，不会变弱 —— 两种写法都算合规。
+chk(re.search(r"saveTimer = setTimeout\(function\(\)\{ saveTimer = null; if \(dirty(?: \|\| saveQueued)?\) save\(false\); \}, 700\)", html) is not None,
     "录入后 0.7 秒自动落盘")
 chk("save: function(m){ save(!!m); }" in html, "手动「保存」按钮通道")
 

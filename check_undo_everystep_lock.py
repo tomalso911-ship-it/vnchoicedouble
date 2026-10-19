@@ -79,6 +79,22 @@ def main():
     chk(src.count("window.__clipRichGlobal && window.__clipRichGlobal.mat") >= 2,
         "两套 rich 都能回退到全局镜像")
 
+    print("7) 撤销写回：范围取最宽 + 空格子三键全 null")
+    chk("FIN-UNDO-WIDEST-20261018" in src, "标记 FIN-UNDO-WIDEST-20261018 在")
+    chk("function fin_undoSnapCells(sn)" in src, "快照覆盖格数计算函数在")
+    chk("if (_n > bestN){ bestN = _n; snap = pend[si].snap; }" in src,
+        "记账取【覆盖格数最多】的快照（不是队首那份 1 格的）")
+    chk("FIN-UNDO-NULLCLEAR-20261018" in src, "标记 FIN-UNDO-NULLCLEAR-20261018 在")
+    chk("oc = { v: null, t: null, f: null };" in src,
+        "空格子写回用 v/t/f 三键全 null（实测唯一能真清空的写法）")
+    chk("oc = { v: '', t: 1 };" not in src,
+        "禁止退回 {v:'',t:1}（只会留空串，快照里 v 由 null 变 ''）")
+    chk("FIN-UNDO-AFTERDELAY-20261018" in src, "标记 FIN-UNDO-AFTERDELAY-20261018 在")
+    chk("}, 120);" in src, "记账推迟 120ms（让 after 抓到铺完样式的最终态，恢复才有格式）")
+    chk("FIN-UNDO-PASTEDIM-20261018" in src, "标记 FIN-UNDO-PASTEDIM-20261018 在")
+    chk("function fin_undoPasteDim(p)" in src, "粘贴区行列数推导函数在（原生粘贴只发 mutation，params 无 range）")
+    chk(src.count("fin_undoPasteDim(p)") >= 2, "pre 快照与常规快照两条路径都做了扩展")
+
     print("")
     if fails:
         print("✗ 失败 %d 项：" % len(fails))
