@@ -6621,6 +6621,21 @@ def serve_icon_maskable():
     return send_from_directory(BASE_DIR, "icon-512-maskable.png", mimetype="image/png")
 
 
+# ★M-APP-20261019：PWA Service Worker 必须由根路径提供（scope 才能覆盖整站），
+#   且不能被缓存 —— 否则改了 sw.js 浏览器永远拿旧的。
+@app.route("/sw.js")
+def serve_service_worker():
+    resp = send_from_directory(BASE_DIR, "sw.js", mimetype="application/javascript")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
+
+
+@app.route("/apple-touch-icon.png")
+def serve_apple_touch_icon():
+    return send_from_directory(BASE_DIR, "apple-touch-icon.png", mimetype="image/png")
+
+
 # ===================== API：私密空间（Vault，tom 专属） =====================
 def _vault_now():
     return time.time()

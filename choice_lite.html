@@ -1130,6 +1130,21 @@ window.__finShakeReport = function (ms) {
   <!-- iOS 添加到主屏幕必须用 PNG（不支持 SVG），统一用 AGI 徽标 -->
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <!-- ★M-APP-20261019：注册 Service Worker（PWA 安装入口 / 弱网可打开）。
+       只在安全上下文（https / localhost / 127.0.0.1）注册，http+IP 直连时静默跳过。 -->
+  <script>
+    (function () {
+      try {
+        if (!('serviceWorker' in navigator)) return;
+        var h = location.hostname;
+        var okCtx = (location.protocol === 'https:') || h === 'localhost' || h === '127.0.0.1';
+        if (!okCtx) return;
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+        });
+      } catch (e) {}
+    })();
+  </script>
   <!-- ===== /PWA ===== -->
   <!-- 版本号：V2026.09.10.06 - 确认新代码已加载 -->
   <title>CHOICE SLATS VIET NAM v2026.09.10.06</title>
@@ -33824,6 +33839,122 @@ var PROD_EQUIP_FAULT_KB = {
       overflow-y:auto;
       -webkit-overflow-scrolling:touch;
     }
+  }
+
+  /* ============================================================
+     ★M-APP-20261019：手机原生 APP 版式（严格限定 ≤640px，桌面零影响）
+     目标：底部 Tab 栏 + 单列 + 大触摸目标 + 全屏弹窗 + 不给键盘遮住
+     注意：本项目所有断点、类名保持原样，这里只做"手机端覆盖"。
+     ============================================================ */
+  @media (max-width:640px){
+    html, body{
+      height:100%;
+      -webkit-text-size-adjust:100%;
+      overscroll-behavior-y:contain;          /* 禁下拉刷新，APP 里不会误触整页刷新 */
+      -webkit-tap-highlight-color:transparent;/* 去掉灰色点击方块 */
+    }
+    /* 1) 顶部导航 → 底部 Tab 栏（原生 APP 习惯：拇指区可达） */
+    #topbar{
+      top:auto; bottom:0; left:0; right:0;
+      height:auto; min-height:56px;
+      padding:0 max(6px, env(safe-area-inset-left)) env(safe-area-inset-bottom) max(6px, env(safe-area-inset-right));
+      box-shadow:0 -2px 10px rgba(0,0,0,.16);
+      z-index:1200;
+    }
+    #topbar.hidden{ display:none; }
+    .tb-logo{ display:none; }
+    .tb-menu{
+      flex:1 1 auto; justify-content:flex-start; gap:2px;
+      overflow-x:auto; -webkit-overflow-scrolling:touch;
+      scroll-snap-type:x proximity; padding:4px 0;
+    }
+    .tb-item{
+      flex:0 0 auto; min-width:56px; min-height:44px;
+      font-size:11.5px; line-height:1.2; padding:4px 8px; border-radius:10px;
+      scroll-snap-align:center;
+    }
+    .tb-item.active{ margin:0; padding:4px 8px; border-radius:10px; }
+    .pend-badge{ bottom:2px; right:2px; }
+    .tb-right{ gap:6px; flex:0 0 auto; }
+    .tb-user{ display:none; }                /* 底部空间紧，用户名隐藏（头像信息在「用户」页） */
+    .tb-user-role{ display:none; }
+    .tb-logout{ min-height:36px; padding:6px 10px; font-size:11px; }
+    .lang-switch{ padding:2px 4px; }
+    .lang-switch-label{ display:none; }
+    .lang-switch button{ font-size:11px; padding:3px 7px; }
+    .tb-fit{ display:none; }
+    /* 2) 内容区：顶栏挪走后不再留 42px 上边距；底部预留 Tab 栏高度（含安全区） */
+    .app-body{
+      margin-top:0 !important;
+      margin-bottom:0 !important;
+      padding-bottom:calc(64px + env(safe-area-inset-bottom));
+      min-height:100dvh;                       /* 100dvh：安卓地址栏收起/展开不跳动 */
+    }
+    /* 表格滚动区高度按「100dvh - 页面头 - 底部栏」重算，否则底部被 Tab 栏盖住 */
+    #view-won .won-scroll-wrap,
+    #view-crm .won-scroll-wrap,
+    #view-lost .won-scroll-wrap{
+      height:calc(100dvh - 150px) !important;
+    }
+    /* 表格底部那条固定横向滚动条要抬到 Tab 栏之上 */
+    .won-hscroll{ bottom:calc(56px + env(safe-area-inset-bottom)) !important; }
+    /* 3) 输入框：≥16px 防浏览器自动放大（安卓 WebView / iOS 都会跳） */
+    input, select, textarea{ font-size:16px !important; }
+    input[type="checkbox"], input[type="radio"]{ width:20px; height:20px; }
+    /* 只在表单容器里抬到 44px，表格行内的输入框保持紧凑（否则行高翻倍） */
+    .modal input, .modal select, .auth-modal input, .auth-modal select,
+    .form-row input, .form-row select,
+    .prod-field input, .prod-field select,
+    .pe-card input, .pe-card select,
+    .rc-line-card input, .rc-line-card select,
+    .inst-zone input, .inst-zone select,
+    .login-field input{
+      min-height:44px;
+    }
+    /* 4) 触摸目标：主操作 44px，表格/卡片内小按钮 36px（避免撑高行） */
+    .pe-card-actions button,
+    .form-row button,
+    .modal .btns button,
+    .auth-modal .auth-modal-btns button,
+    .lib-btn, .appr-btn, .ec-btn, .pt-btn{
+      min-height:44px;
+    }
+    .mini-btn, .icon-btn, .pe-chip, .pc-chip, .rep-zoom-btn{ min-height:36px; }
+    /* 5) 弹窗：手机上一律全屏面板，避免 92vh 被键盘顶出按钮 */
+    .modal, .auth-modal, .detail-view-box, .pt-editor-box,
+    .cust-pay-modal, .addm-modal, .gsr-modal, .cm-modal, .detail-view-modal{
+      width:100% !important;
+      max-width:100% !important;
+      min-width:0 !important;
+      height:100dvh !important;
+      max-height:100dvh !important;
+      border-radius:0 !important;
+      margin:0 !important;
+    }
+    .cust-pay-overlay, .addm-overlay, .gsr-overlay, .cm-mask,
+    .pt-editor-overlay, .detail-view-overlay{
+      padding:0 !important;
+      align-items:stretch !important;
+    }
+    .cm-body, .addm-body, .cust-pay-body{ max-height:none !important; }
+    /* 6) 表格：横向滚动 + 首列吸附（滑到右边也知道这行是哪个项目/猪舍） */
+    .cp-table-wrap, .appr-table-wrap, .cm-table-wrap, .table-wrap{
+      -webkit-overflow-scrolling:touch;
+      max-width:100%;
+    }
+    #wonTable td:first-child, #crmTable td:first-child, #lostTable td:first-child,
+    #commissionTable td:first-child, #usersTable td:first-child{
+      position:sticky; left:0; z-index:2; background:#fff;
+    }
+    /* 7) 日历浮层：小屏居中，防止飘出屏幕 */
+    #commCalPopup, .cp-cal, .cm-cal{
+      left:50% !important; right:auto !important;
+      transform:translateX(-50%);
+      width:min(94vw, 320px) !important;
+    }
+    /* 8) 登录页：小屏满宽，留白收紧 */
+    #loginPage{ padding:16px 12px; }
+    .login-card{ width:100%; max-width:100%; padding:28px 20px 22px; }
   }
 </style>
 
