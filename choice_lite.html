@@ -32588,6 +32588,13 @@ var PROD_EQUIP_FAULT_KB = {
   .perm-row.perm-thead .bdef { color:#666; font-size:13px; }
   .perm-row.perm-thead .bdec { width:130px; flex:none; }
   .perm-row.perm-thead .bappr { width:150px; flex:none; }
+  /* ★PERM-ZEBRA-20261019（用户要求：淡紫 / 淡黄 交替斑马线）：按项目授权列表的项目行隔行换底色。
+     用 .pproj-alt 类而不是 :nth-child —— 搜索会把行 display:none 掉，nth 也会把不可见的行数进去，
+     条纹会断；渲染与过滤时按【可见顺序】重新分配奇偶。 */
+  #projList .pproj > summary { background:#f6f2ff; border-radius:3px; transition:background-color .12s; }
+  #projList .pproj.pproj-alt > summary { background:#fffbe6; }
+  /* 悬停：在任意底色上叠一层淡灰，不改变"淡紫/淡黄"的条纹识别 */
+  #projList .pproj > summary:hover { background-image: linear-gradient(rgba(0,0,0,.045), rgba(0,0,0,.045)); }
   /* 审批人多选下拉 */
   .approver { position:relative; width:150px; flex:none; }
   .approver .a-btn { width:100%; padding:3px 8px; border:1px solid #ddd; border-radius:5px; font-size:13px; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:space-between; color:#555; }
@@ -44234,12 +44241,13 @@ async function buildProjPerm(uid){
   wrap.innerHTML = `<div style="padding:6px;color:#888;font-size:12px;">${_permTr('perm_proj_loading','项目列表加载中…')}</div>`;
   const list = await _ensureProjList();
 
-  const projHtml = list.map(function(p){
+  const projHtml = list.map(function(p, _pi){
     const store = st.prj[String(p.id)] || {};
     const title = [p.contract_no, p.customer, p.province].filter(Boolean).join(' · ') || ('PID ' + p.id);
     // ★PERM-V2-WHOLE-20261019：标题行「整个项目：隐藏/查看」（默认隐藏）
     const wholeCur = _projLevelOf(store, { k:'whole', o:['hide','view'] }).decision;
-    return `<details class="pproj" data-pid="${p.id}" style="border:1px solid #eee;border-radius:4px;margin-bottom:6px;">
+    // ★PERM-ZEBRA-20261019：隔行浅灰（第 2/4/6… 行）
+    return `<details class="pproj${(_pi % 2) ? ' pproj-alt' : ''}" data-pid="${p.id}" style="border:1px solid #eee;border-radius:4px;margin-bottom:6px;">
       <summary style="cursor:pointer;padding:6px 8px;font-size:12.5px;display:flex;align-items:center;gap:8px;">
         <span style="flex:1;min-width:0;">${title}</span>
         <span class="pperm-row" data-scope="${p.id}" data-key="whole" onclick="event.stopPropagation();" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;flex:none;">
@@ -44265,10 +44273,17 @@ async function buildProjPerm(uid){
   if (si){
     si.addEventListener('input', function(){
       const q = (this.value || '').toLowerCase();
+      // ★PERM-ZEBRA-20261019：过滤后按【可见顺序】重排斑马线，避免隐藏行占位导致条纹断开
+      let _vi = 0;
       document.querySelectorAll('#projList .pproj').forEach(function(el){
         const s = el.querySelector('summary');
         const t = (s ? (s.textContent || '') : '').toLowerCase();
-        el.style.display = (!q || t.indexOf(q) >= 0) ? '' : 'none';
+        const _show = (!q || t.indexOf(q) >= 0);
+        el.style.display = _show ? '' : 'none';
+        if (_show){
+          if (_vi % 2) el.classList.add('pproj-alt'); else el.classList.remove('pproj-alt');
+          _vi++;
+        }
       });
     });
   }
