@@ -33853,16 +33853,16 @@ var PROD_EQUIP_FAULT_KB = {
       overscroll-behavior-y:contain;          /* 禁下拉刷新，APP 里不会误触整页刷新 */
       -webkit-tap-highlight-color:transparent;/* 去掉灰色点击方块 */
     }
-    /* 1) 顶部导航 → 底部 Tab 栏（原生 APP 习惯：拇指区可达）
-         ★9 个标签在 390px 宽上一行只放得下 3 个，横向滑动很难用；
-           这里改成「每行 5 个、自动换行」的网格（9 个 = 2 行），全部标签一眼可见、不用滑。 */
+    /* 1) ★M-APP-TOP-20261021（用户要求：Tab 栏放【顶部】，不放最下面）
+         两行网格布局保留（10 个标签全部可见、不用滑），但整体回到页面顶部；
+         顶部让出 safe-area（刘海/状态栏）。 */
     #topbar{
-      top:auto; bottom:0; left:0; right:0;
+      top:0; bottom:auto; left:0; right:0;
       display:grid !important; grid-template-columns:1fr auto;
       align-items:center; gap:4px;
       height:auto; min-height:56px;
-      padding:2px max(6px, env(safe-area-inset-left)) env(safe-area-inset-bottom) max(6px, env(safe-area-inset-right));
-      box-shadow:0 -2px 10px rgba(0,0,0,.16);
+      padding:env(safe-area-inset-top) max(6px, env(safe-area-inset-left)) 2px max(6px, env(safe-area-inset-right));
+      box-shadow:0 2px 10px rgba(0,0,0,.16);
       z-index:1200;
     }
     #topbar.hidden{ display:none !important; }
@@ -33881,28 +33881,28 @@ var PROD_EQUIP_FAULT_KB = {
     .tb-item.active{ margin:0; padding:4px 2px; border-radius:10px; }
     .pend-badge{ bottom:2px; right:2px; }
     .tb-right{ display:flex !important; flex-direction:column; gap:4px; align-items:flex-end; flex:0 0 auto; }
-    .tb-user{ display:none; }                /* 底部空间紧，用户名隐藏（头像信息在「用户」页） */
+    .tb-user{ display:none; }                /* 空间紧，用户名隐藏（信息在「用户」页） */
     .tb-user-role{ display:none; }
     .tb-logout{ min-height:36px; padding:6px 10px; font-size:11px; }
     .lang-switch{ padding:2px 4px; }
     .lang-switch-label{ display:none; }
     .lang-switch button{ font-size:11px; padding:3px 7px; }
     .tb-fit{ display:none; }
-    /* 2) 内容区：顶栏挪走后不再留 42px 上边距；底部预留 Tab 栏高度（两行网格 + 安全区） */
+    /* 2) 内容区：顶部预留两行 Tab 栏高度（约 96px + 安全区）；底部不再额外预留 */
     .app-body{
-      margin-top:0 !important;
+      margin-top:calc(98px + env(safe-area-inset-top)) !important;
       margin-bottom:0 !important;
-      padding-bottom:calc(104px + env(safe-area-inset-bottom));
+      padding-bottom:0 !important;
       min-height:100dvh;                       /* 100dvh：安卓地址栏收起/展开不跳动 */
     }
-    /* 表格滚动区高度按「100dvh - 页面头 - 底部栏」重算，否则底部被 Tab 栏盖住 */
+    /* 表格滚动区高度按「100dvh - 顶部双行栏 - 页面头」重算 */
     #view-won .won-scroll-wrap,
     #view-crm .won-scroll-wrap,
     #view-lost .won-scroll-wrap{
-      height:calc(100dvh - 190px) !important;
+      height:calc(100dvh - 225px) !important;
     }
-    /* 表格底部那条固定横向滚动条要抬到 Tab 栏之上 */
-    .won-hscroll{ bottom:calc(96px + env(safe-area-inset-bottom)) !important; }
+    /* 横向滚动条回到底部（Tab 栏已不在下面，不再需要抬高） */
+    .won-hscroll{ bottom:0 !important; }
     /* 3) 输入框：≥16px 防浏览器自动放大（安卓 WebView / iOS 都会跳） */
     input, select, textarea{ font-size:16px !important; }
     input[type="checkbox"], input[type="radio"]{ width:20px; height:20px; }
