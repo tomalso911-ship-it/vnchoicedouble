@@ -33853,29 +33853,34 @@ var PROD_EQUIP_FAULT_KB = {
       overscroll-behavior-y:contain;          /* 禁下拉刷新，APP 里不会误触整页刷新 */
       -webkit-tap-highlight-color:transparent;/* 去掉灰色点击方块 */
     }
-    /* 1) 顶部导航 → 底部 Tab 栏（原生 APP 习惯：拇指区可达） */
+    /* 1) 顶部导航 → 底部 Tab 栏（原生 APP 习惯：拇指区可达）
+         ★9 个标签在 390px 宽上一行只放得下 3 个，横向滑动很难用；
+           这里改成「每行 5 个、自动换行」的网格（9 个 = 2 行），全部标签一眼可见、不用滑。 */
     #topbar{
       top:auto; bottom:0; left:0; right:0;
+      display:grid !important; grid-template-columns:1fr auto;
+      align-items:center; gap:4px;
       height:auto; min-height:56px;
-      padding:0 max(6px, env(safe-area-inset-left)) env(safe-area-inset-bottom) max(6px, env(safe-area-inset-right));
+      padding:2px max(6px, env(safe-area-inset-left)) env(safe-area-inset-bottom) max(6px, env(safe-area-inset-right));
       box-shadow:0 -2px 10px rgba(0,0,0,.16);
       z-index:1200;
     }
-    #topbar.hidden{ display:none; }
-    .tb-logo{ display:none; }
+    #topbar.hidden{ display:none !important; }
+    .tb-logo{ display:none !important; }
     .tb-menu{
-      flex:1 1 auto; justify-content:flex-start; gap:2px;
-      overflow-x:auto; -webkit-overflow-scrolling:touch;
-      scroll-snap-type:x proximity; padding:4px 0;
+      display:grid !important;
+      grid-template-columns:repeat(5, minmax(0, 1fr));
+      gap:3px; width:100%; min-width:0;
+      overflow:visible; padding:2px 0;
     }
     .tb-item{
-      flex:0 0 auto; min-width:56px; min-height:44px;
-      font-size:11.5px; line-height:1.2; padding:4px 8px; border-radius:10px;
-      scroll-snap-align:center;
+      width:100%; min-width:0 !important; min-height:40px;
+      font-size:10.5px; line-height:1.15; padding:4px 2px; border-radius:10px;
+      text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     }
-    .tb-item.active{ margin:0; padding:4px 8px; border-radius:10px; }
+    .tb-item.active{ margin:0; padding:4px 2px; border-radius:10px; }
     .pend-badge{ bottom:2px; right:2px; }
-    .tb-right{ gap:6px; flex:0 0 auto; }
+    .tb-right{ display:flex !important; flex-direction:column; gap:4px; align-items:flex-end; flex:0 0 auto; }
     .tb-user{ display:none; }                /* 底部空间紧，用户名隐藏（头像信息在「用户」页） */
     .tb-user-role{ display:none; }
     .tb-logout{ min-height:36px; padding:6px 10px; font-size:11px; }
@@ -33883,21 +33888,21 @@ var PROD_EQUIP_FAULT_KB = {
     .lang-switch-label{ display:none; }
     .lang-switch button{ font-size:11px; padding:3px 7px; }
     .tb-fit{ display:none; }
-    /* 2) 内容区：顶栏挪走后不再留 42px 上边距；底部预留 Tab 栏高度（含安全区） */
+    /* 2) 内容区：顶栏挪走后不再留 42px 上边距；底部预留 Tab 栏高度（两行网格 + 安全区） */
     .app-body{
       margin-top:0 !important;
       margin-bottom:0 !important;
-      padding-bottom:calc(64px + env(safe-area-inset-bottom));
+      padding-bottom:calc(104px + env(safe-area-inset-bottom));
       min-height:100dvh;                       /* 100dvh：安卓地址栏收起/展开不跳动 */
     }
     /* 表格滚动区高度按「100dvh - 页面头 - 底部栏」重算，否则底部被 Tab 栏盖住 */
     #view-won .won-scroll-wrap,
     #view-crm .won-scroll-wrap,
     #view-lost .won-scroll-wrap{
-      height:calc(100dvh - 150px) !important;
+      height:calc(100dvh - 190px) !important;
     }
     /* 表格底部那条固定横向滚动条要抬到 Tab 栏之上 */
-    .won-hscroll{ bottom:calc(56px + env(safe-area-inset-bottom)) !important; }
+    .won-hscroll{ bottom:calc(96px + env(safe-area-inset-bottom)) !important; }
     /* 3) 输入框：≥16px 防浏览器自动放大（安卓 WebView / iOS 都会跳） */
     input, select, textarea{ font-size:16px !important; }
     input[type="checkbox"], input[type="radio"]{ width:20px; height:20px; }
@@ -33955,6 +33960,21 @@ var PROD_EQUIP_FAULT_KB = {
     /* 8) 登录页：小屏满宽，留白收紧 */
     #loginPage{ padding:16px 12px; }
     .login-card{ width:100%; max-width:100%; padding:28px 20px 22px; }
+    /* 10) 手机端「财务 / 股东权益」提示条（由页面末尾 M-APP 脚本插入） */
+    .mapp-note{
+      display:block; margin:6px 8px 0; padding:8px 10px; border-radius:8px;
+      background:#fff8e1; color:#8a6d00; border:1px solid #ffe082;
+      font-size:12px; line-height:1.45;
+    }
+    /* 9) 页面标题行：副标题（如「每个签约项目 = 一个独立现场工厂…」）默认不换行，
+         实测会把安卓布局视口从 390 撑到 594px（整页被放大、右侧被裁、底部栏看不见）。 */
+    .page-header{ display:flex; flex-wrap:wrap !important; gap:6px; }
+    .page-header > h2{ flex:1 1 auto; min-width:0; }
+    .page-header .prod-sub,
+    .page-header > span{
+      display:block; width:100% !important; min-width:0 !important; margin:2px 0 0;
+      white-space:normal !important; overflow-wrap:anywhere; word-break:break-word;
+    }
   }
 </style>
 
@@ -38743,6 +38763,22 @@ function wonDetailLinkCell(p, field, labelKey) {
     }
     if (maxW <= 0) return;
     var total = Math.ceil(maxW + pl + pr + 2);
+    // ★M-APP-20261019：手机上禁止"测宽锁死不换行"把布局视口撑宽。
+    //   实测例子：生产页副标题（data-i18n=prod_sub）被这里写上 min-width:573px + nowrap，
+    //   安卓 Chrome 遂把整页布局宽度从 390 撑到 594px → 右侧被裁、底部 Tab 栏看不见。
+    //   规则：≤640px 时，① 页面标题行内的元素一律不锁宽；② 任何比视口还宽的元素一律不锁宽（交给 CSS 换行）。
+    if (window.innerWidth <= 640) {
+      var _inHeader = false, _inTopbar = false;
+      try {
+        _inHeader = !!(el.closest && el.closest('.page-header'));
+        _inTopbar = !!(el.closest && el.closest('#topbar'));
+      } catch (e0) {}
+      if (_inHeader || _inTopbar || total > (window.innerWidth - 16)) {
+        el.style.minWidth = '';
+        el.style.whiteSpace = '';
+        return;
+      }
+    }
     if (el.tagName === 'TH') {
       el.style.minWidth = total + 'px';
     } else {
@@ -39270,8 +39306,12 @@ function applyTopbarLang() {
  */
 function topbarCompact() {
   try {
-    return !!(window.matchMedia &&
-      window.matchMedia('(orientation: landscape) and (max-height: 560px)').matches);
+    if (!!(window.matchMedia &&
+      window.matchMedia('(orientation: landscape) and (max-height: 560px)').matches)) return true;
+    // ★M-APP-20261019：手机竖屏（底部 Tab 栏 = 每行 5 个的两行网格）也用短标签，
+    //   否则 "Dashboard / Potential Projects" 这类长词在 5 列网格里会被省略号截断。
+    if (window.innerWidth <= 640) return true;
+    return false;
   } catch (e) {
     return false;
   }
@@ -73086,6 +73126,59 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   if (document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', tick);
   } else { tick(); }
+})();
+
+// ==================================================================
+// ★M-APP-20261019：手机端「财务 / 股东权益」提示条
+//   Univer 表格在 390px 宽的手机上无法真正编辑（工具栏换行、单元格缩成一条），
+//   这里只在手机（≤640px）进入这两个视图时，在页面顶部插一条三语提示，
+//   提醒现场人员"手机仅查看，编辑请用横屏/电脑"。桌面端完全不插入（宽度 >640）。
+// ==================================================================
+(function () {
+  var NOTE = {
+    zh: '财务 / 股东权益报表在手机上仅供查看；录入与修改请在横屏或电脑上操作。',
+    en: 'Financial / Equity reports are view-only on phones. Edit in landscape or on a PC.',
+    vi: 'Báo cáo tài chính / vốn chủ chỉ xem trên điện thoại. Chỉnh sửa trên máy tính hoặc xoay ngang.'
+  };
+  var HOSTS = { finance: 'view-finance', equity: 'view-equity' };
+
+  function curLang() {
+    try {
+      var l = window.CUR_LANG || window.__lang || localStorage.getItem('won_lang') || 'en';
+      l = String(l).replace(/"/g, '');
+      return (l === 'zh' || l === 'vi') ? l : 'en';
+    } catch (e) { return 'en'; }
+  }
+  function ensure(v) {
+    var host = document.getElementById(HOSTS[v]);
+    if (!host) return;
+    var box = host.querySelector('.mapp-note');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'mapp-note';
+      host.insertBefore(box, host.firstChild);
+    }
+    box.textContent = NOTE[curLang()];
+  }
+  function after(v) {
+    if (window.innerWidth > 640) return;
+    if (!HOSTS[v]) return;
+    setTimeout(function () { try { ensure(v); } catch (e) {} }, 350);
+  }
+  // 主脚本里的 switchView 是函数声明，本块执行时可能尚未定义 → 轮询到有为止再包装
+  var tries = 0;
+  var timer = setInterval(function () {
+    tries++;
+    if (typeof window.switchView === 'function') {
+      var sv = window.switchView;
+      window.switchView = function (v) {
+        var r = sv.apply(this, arguments);
+        try { after(v); } catch (e) {}
+        return r;
+      };
+      clearInterval(timer);
+    } else if (tries > 60) { clearInterval(timer); }
+  }, 500);
 })();
 </script>
 </body>
