@@ -33982,12 +33982,18 @@ var PROD_EQUIP_FAULT_KB = {
             手机上一律 span 12（整行），bd-row5 / bd-row4 改单列。 */
     .bd-top10, #bdTop10,
     .bd-prodprog, #bdProdProg,
-    #bdProg, #bdWorkers, #bdProd,
-    .bd-sq, .bd-fx-tile{ grid-column:span 12 !important; }
-    .bd-row5, .bd-row4{ grid-template-columns:1fr !important; gap:12px; }
-    .bd-row5 .bd-card, .bd-row4 .bd-card{ min-height:150px; }
-    /* 曲线图（汇率/材料价）给足高度，不然 canvas 缩成一条缝 */
-    .bd-mat-chart{ min-height:130px; max-height:200px; }
+    #bdProg, #bdWorkers, #bdProd{ grid-column:span 12 !important; }
+    /* ★关键：row5/row4 是独立网格，只给子元素 span 12 会在 5 列轨道里生成 7 个 0px 隐式列，
+       实测三张汇率卡(FX)只有 150px 宽、里面的曲线 canvas 只有 120px（改看到的"没改对"）。
+       这里直接把 row5/row4 改成【单列网格】+ 子项 grid-column:1/-1，宽度真正拉满。 */
+    #view-dashboard .bd-row5,
+    #view-dashboard .bd-row4{ display:grid !important; grid-template-columns:1fr !important; gap:12px; }
+    #view-dashboard .bd-row5 > *,
+    #view-dashboard .bd-row4 > *{ grid-column:1 / -1 !important; width:auto !important; min-width:0 !important; }
+    .bd-sq, .bd-fx-tile{ aspect-ratio:auto !important; min-height:190px !important; }
+    .bd-row5 .bd-card, .bd-row4 .bd-card{ min-height:190px; }
+    /* 曲线图（汇率/材料价）给足宽高，不然 canvas 缩成一条缝 */
+    .bd-mat-chart{ width:100% !important; min-height:150px; max-height:220px; }
     .bd-fxchart .bd-fx-chart{ height:150px !important; }
     /* TOP10 进度表：行内三列（序号/项目/进度条）拉满 */
     .bd-t10-head{ grid-template-columns:36px 1fr 96px; }
