@@ -39132,6 +39132,39 @@ function setLangDebug(lang) {
       console.warn('[lang] ' + lightSteps[i] + ' failed:', e);
     }
   }
+
+  /* ★PERM-LANG-20261021（用户报：用户与授权弹窗内容不跟系统语言切换，停留越南语）：
+     公共模块/按项目授权/旧区块表三个面板是 JS 拼出来的 DOM，没有 data-i18n，
+     上面的全局 sweep 扫不到 → 打开弹窗后切语言，面板永远停在【打开那一刻】的语言。
+     修复：弹窗开着时切语言 → 先把【未保存的下拉选择】收集回 PERMS_STATE（防止重渲染
+     把用户改了一半的授权打回默认值），再按新语言重建三个面板。 */
+  try {
+    var _maskEl = document.getElementById('mask');
+    if (_maskEl && _maskEl.classList.contains('show')){
+      var _uid = (typeof curUid !== 'undefined') ? curUid : window.__curVisUid;
+      if (_uid){
+        var _base = (typeof PERMS_STATE !== 'undefined' && PERMS_STATE[_uid]) ? PERMS_STATE[_uid] : {};
+        try {
+          if (typeof collectCommon === 'function'){
+            var _c = collectCommon();
+            if (Object.keys(_c).length) _base.common = _c;
+          }
+          if (typeof collectProjDefault === 'function'){
+            var _pd = collectProjDefault();
+            if (Object.keys(_pd).length) _base.proj_default = _pd;
+          }
+          if (typeof collectProjects === 'function'){
+            var _pj = collectProjects();
+            if (Object.keys(_pj).length) _base.projects = _pj;
+          }
+          if (typeof PERMS_STATE !== 'undefined') PERMS_STATE[_uid] = _base;
+        } catch (e1) { console.warn('[lang] perm draft collect failed:', e1); }
+        if (typeof buildPermGroups === 'function') buildPermGroups(_uid);
+        if (typeof buildCommonPerm === 'function') buildCommonPerm(_uid);
+        if (typeof buildProjPerm === 'function') buildProjPerm(_uid);
+      }
+    }
+  } catch (e) { console.warn('[lang] user modal perm panels re-render failed:', e); }
   // ==================================================================
   // ⛔ V37 关键修复：heavySteps 由 requestAnimationFrame 延迟改为【同步执行】
   // ==================================================================
