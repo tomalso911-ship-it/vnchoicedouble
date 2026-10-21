@@ -2962,10 +2962,29 @@ window.__finShakeReport = function (ms) {
     /* 「适应屏幕」按钮只在窄屏出现，避免占用桌面顶栏空间 */
     .tb-fit { display: inline-block; font-size: 9px; padding: 4px 8px; }
     /* 顶栏变矮后内容区上移，避免中间出现空白 */
-    .app-body { margin-top: 42px; }
+    .app-body { margin-top:42px; min-height:calc(100dvh - 60px); }
     #view-crm .won-scroll-wrap,
     #view-won .won-scroll-wrap,
-    #view-lost .won-scroll-wrap { height: calc(100vh - 160px); }
+    #view-lost .won-scroll-wrap { height:calc(100dvh - 160px); }
+    /* ★M-APP-ROTATE-20261022（自动转屏）：横屏时高度只剩 400 上下，
+       ① 列表用 dvh 重算（安卓地址栏/viewport 变化不跳动）；
+       ② 看板卡片不要像竖屏那样占满整行（宽 840+ 却只有一行太浪费），改多列；
+       ③ 弹窗/表单必须限高并内部滚动，否则竖屏设计的高度会把按钮顶到屏幕外。 */
+    #view-dashboard .bd-row5 { grid-template-columns:repeat(3, minmax(0,1fr)) !important; }
+    #view-dashboard .bd-row4 { grid-template-columns:repeat(2, minmax(0,1fr)) !important; }
+    #view-dashboard .bd-row5 > *,
+    #view-dashboard .bd-row4 > * { grid-column:auto !important; min-height:150px; }
+    .bd-sq, .bd-fx-tile { aspect-ratio:auto !important; min-height:150px !important; }
+    .bd-mat-chart { max-height:120px; }
+    .bd-row3 { grid-template-columns:repeat(3, minmax(0,1fr)); }
+    .bd-row3 .bd-map { min-height:280px; }
+    .bd-row3 .bd-ph { min-height:280px; }
+    .modal, .auth-modal, .detail-view-box, .pt-editor-box,
+    .cust-pay-modal, .addm-modal, .gsr-modal, .cm-modal, .detail-view-modal{
+      max-height:calc(100dvh - 20px) !important; overflow-y:auto !important;
+    }
+    .login-card{ padding:22px 18px; }
+    .login-logo-box svg, .login-logo-box img{ width:60px; height:60px; }
   }
   /* ===== 主应用区 (Multi-view) ===== */
   .app-body { margin-top:42px; min-height:calc(100vh - 100px); background:#eef1f4; }
@@ -73185,6 +73204,46 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   if (document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', tick);
   } else { tick(); }
+})();
+
+// ==================================================================
+// ★M-APP-ROTATE-20261022：手机自动转屏（横屏 ↔ 竖屏）后强制重排
+//   为什么需要：① ECharts（地图/生产/安装图表）只在 window.resize 时才 resize()；
+//   ② 转屏那一刻 innerWidth/innerHeight 还是旧值，必须延后再补一次；
+//   ③ Univer（财务/权益）画布、sticky 表格列也要跟着重算。
+//   统一做法：检测到真实尺寸变化后，延迟多次派发 window resize。
+// ==================================================================
+(function () {
+  var lastW = window.innerWidth, lastH = window.innerHeight, _t2 = null;
+  function pump() {
+    var tries = 0;
+    var t = setInterval(function () {
+      tries++;
+      try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+      if (tries >= 4) clearInterval(t);
+    }, 260);
+  }
+  function onRotate() {
+    var w = window.innerWidth, h = window.innerHeight;
+    if (w === lastW && h === lastH) return;
+    lastW = w; lastH = h;
+    setTimeout(pump, 120);
+    setTimeout(pump, 480);   // 某些机型 orientationchange 触发时视口还没更新
+  }
+  window.addEventListener('orientationchange', onRotate, false);
+  if (window.screen && screen.orientation && screen.orientation.addEventListener) {
+    try { screen.orientation.addEventListener('change', onRotate); } catch (e) {}
+  }
+  try {
+    if (window.visualViewport) {
+      visualViewport.addEventListener('resize', function () {
+        clearTimeout(_t2);
+        _t2 = setTimeout(function () {
+          try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+        }, 250);
+      });
+    }
+  } catch (e) {}
 })();
 
 // ==================================================================
