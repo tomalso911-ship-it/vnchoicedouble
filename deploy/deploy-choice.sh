@@ -8,7 +8,7 @@
 set -e
 
 DEPLOY_DIR=${DEPLOY_DIR:-/opt/choice-pm}
-DOMAIN=${DOMAIN:-choice-goldsum-crm.duckdns.org}   # Choice 的 Duck DNS 子域名（同机 124.156.134.135）
+DOMAIN=${DOMAIN:-choice-vn-crm.duckdns.org}   # Choice 的 Duck DNS 子域名（同机 124.156.134.135）
 PORT=${PORT:-5060}                                     # 与 AGI 错开
 REPO=${REPO:-https://github.com/tomalso911-ship-it/vnchoicedouble}   # 你的 git 仓库
 EMAIL=${EMAIL:-admin@example.com}                      # ← 改成你自己的邮箱（证书到期提醒）
