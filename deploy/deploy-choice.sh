@@ -8,10 +8,10 @@
 set -e
 
 DEPLOY_DIR=${DEPLOY_DIR:-/opt/choice-pm}
-DOMAIN=${DOMAIN:-choice.example.com}     # ← 改你的子域名
-PORT=${PORT:-5060}
-REPO=${REPO:-""}                          # ← 你的 git 仓库地址（或留空改用 scp 上传）
-EMAIL=${EMAIL:-admin@example.com}         # ← 证书到期提醒邮箱
+DOMAIN=${DOMAIN:-choice-goldsum-crm.duckdns.org}   # Choice 的 Duck DNS 子域名（同机 124.156.134.135）
+PORT=${PORT:-5060}                                     # 与 AGI 错开
+REPO=${REPO:-https://github.com/tomalso911-ship-it/vnchoicedouble}   # 你的 git 仓库
+EMAIL=${EMAIL:-admin@example.com}                      # ← 改成你自己的邮箱（证书到期提醒）
 APP_USER=${APP_USER:-root}
 
 echo "==> 1) 安装系统依赖"
