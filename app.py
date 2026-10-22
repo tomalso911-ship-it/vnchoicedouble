@@ -10815,7 +10815,9 @@ if __name__ == "__main__":
     werkzeug_log = logging.getLogger('werkzeug')
     werkzeug_log.setLevel(logging.ERROR)
 
-    PORT = 5050
+    # 端口可通过环境变量 PORT 覆盖（默认 5050）。
+    # 部署时 CHOICE 跑在独立端口（如 5060），与同机其它站点互不冲突。
+    PORT = int(os.environ.get("PORT", 5050))
 
     # 每次启动先留一份整库快照（防数据丢失第一道保险）
     _auto_backup_db("startup")
