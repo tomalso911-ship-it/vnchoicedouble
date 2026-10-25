@@ -1,0 +1,33 @@
+feat(scroll): 财务/股东权益表 Excel 风格水平滚动条 + 硬锁 FIN-HSCROLL-LOCK-20261017
+
+滚动条本体
+- 节点挂 document.body + position:fixed 贴容器右下角（状态栏同一行右侧），
+  避开 Univer 每次重渲染清空容器导致的"看着有、一拖就没"
+- id = 'fin-hscroll-' + containerId，靠 getElementById 复用同一节点
+
+驱动方式（关键）
+- 改用 FWorksheet.getScrollState() + scrollToCell(curRow, target)：
+  合成 WheelEvent 在 Univer 0.5.5 里根本不被处理，是"拖了不动 / 页面不跟随"的根因；
+  且绝对定位命令与像素增量同时生效会互相拉扯，正是"闪烁跳动"的来源
+- scrollToCell 第 1 参带当前 sheetViewStartRow，横向滚动不再把纵向重置到第 1 行
+- sheet.command.scroll-to-cell 仅保留为拿不到 FWorksheet 时的兜底（if (!ok) 之后）
+
+平滑
+- 可见列取 getVisibleRange()（endColumn - startColumn + 1），滑块比例与真实可滚范围一致；
+  固定 73px 估算会算出 visible >= total → 滑块撑满 → 拖不动
+- 拖拽状态/几何量外置到 bar.__hsState / __hsGeom / __hsScroll / __hsSetFrac / __hsFrac，
+  规避 400ms 轮询重入新建闭包导致 pointermove 读到旧闭包
+- 拖动用 requestAnimationFrame 合并（一帧最多滚一次）；目标列未变不重复下命令；
+  layout() 比对 __hsPX/__hsPY 只在变化时写样式；resize/scroll 跟随重定位
+- thumb 有 left/width 过渡（点轨道/箭头/滚轮时"慢慢行走"），拖拽态 .fin-hs-drag 关掉过渡保证跟手
+- 非拖拽时用 sheetViewStartColumn 反推滑块位置，操作后 260ms 内不反推（防止状态未刷新把滑块拽回）
+
+锁
+- 新增 check_hscroll_lock.py（8 组静态不变量），登记进 .githooks/pre-commit 与 .git/hooks/pre-commit
+- 反向测试 _lock_reverse_test_hscroll.py：12 种篡改（挂回容器/恢复合成 wheel/纵向基准写 0/
+  不用 getVisibleRange/状态改回局部变量/去掉 rAF/去掉同列去重/去掉布局防抖/命令当主驱动/
+  去掉过渡/去掉 drag none/去掉 resize 跟随）全部拦截
+
+顺带修复既有漂移
+- _univer_kb_fix.html 补上 2026-10-16 的 FIN-EXCEL-SELALL 两段（finSelectAll / FIN_SELALL_WORD
+  与 Ctrl+A 分支），恢复与 choice_lite.html 逐行一致（check_fin_excel_keys_lock.py 不变量⑥）

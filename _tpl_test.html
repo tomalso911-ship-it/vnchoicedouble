@@ -1,0 +1,1554 @@
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>房舍水泥板安装排程甘特</title>
+<style>
+:root{
+  --row-h:40px; --head-h:66px;
+  --bd:#e3e8ee; --bd2:#eef1f4;
+  --txt:#263238; --txt2:#546e7a; --txt3:#90a4ae;
+  --bg:#f6f8fa; --card:#fff; --pri:#1e88e5;
+  --ok:#43a047; --warn:#fb8c00; --bad:#e53935;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:13px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif}
+.page{margin:0;padding:8px 0 24px}
+.hdr{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:2px}
+.hdr h1{font-size:18px;margin:0;font-weight:600}
+.hdr .sub{font-size:12px;color:var(--txt3)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;margin-top:12px}
+.card h2{font-size:13px;margin:0 0 10px;font-weight:600;color:#37474f;display:flex;align-items:center;gap:8px}
+.card h2 .tg{font-size:11px;font-weight:400;color:var(--txt3)}
+.btn{border:1px solid var(--bd);background:#fff;color:var(--txt2);border-radius:6px;
+  padding:5px 11px;font-size:12px;cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--pri);color:var(--pri)}
+.btn.primary{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.primary:hover{background:#1976d2;color:#fff}
+.btn.ghost{background:transparent}
+.btn.mini{padding:3px 8px;font-size:11px}
+.hint{font-size:11px;color:var(--txt3);line-height:1.6}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.fld{display:flex;flex-direction:column;gap:3px}
+.fld label{font-size:11px;color:var(--txt2)}
+.fld input,.fld select{border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;background:#fff;min-width:88px}
+.fld input:focus,.fld select:focus{outline:none;border-color:var(--pri)}
+textarea{width:100%;min-height:78px;border:1px solid var(--bd);border-radius:6px;padding:7px 9px;
+  font:11px/1.6 ui-monospace,Menlo,Consolas,monospace;resize:vertical;background:#fff}
+textarea:focus{outline:none;border-color:var(--pri)}
+
+/* ---------- KPI ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:4px 11px;font-size:12px;color:var(--txt2)}
+.chip b{color:var(--txt);font-weight:600}
+.chip.danger{background:#ffebee;border-color:#ffcdd2;color:#c62828}
+.chip.danger b{color:#b71c1c}
+.chip.ok{background:#e8f5e9;border-color:#c8e6c9;color:#2e7d32}
+.chip.ok b{color:#1b5e20}
+
+/* ---------- 布局 ---------- */
+.layout{display:flex;border:1px solid var(--bd);border-radius:10px;overflow:hidden;
+  background:var(--card);height:560px;position:relative;margin-top:12px}
+.tbl-wrap{width:var(--tbl-w,470px);flex:0 0 auto;overflow:auto;background:#fafbfc;
+  border-right:1px solid var(--bd);scrollbar-width:thin}
+.tbl-wrap::-webkit-scrollbar{width:0;height:9px}
+.tbl-wrap::-webkit-scrollbar-track{background:#f0f2f5}
+.tbl-wrap::-webkit-scrollbar-thumb{background:#c4cdd4;border-radius:5px}
+.tbl-wrap table{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px}
+.tbl-wrap th{position:sticky;top:0;z-index:3;background:#f4f6f8;color:#455a64;font-weight:600;
+  height:var(--head-h);padding:0 8px;text-align:left;border-bottom:1px solid var(--bd);
+  white-space:nowrap;vertical-align:middle;position:relative}
+.tbl-wrap th .rs{position:absolute;right:0;top:0;bottom:0;width:8px;cursor:col-resize;z-index:4}
+.tbl-wrap th .rs::after{content:'';position:absolute;right:3px;top:6px;bottom:6px;width:1px;background:#cfd8dc}
+.tbl-wrap th .rs:hover::after{right:2px;width:3px;background:var(--pri);top:2px;bottom:2px}
+.tbl-wrap th.rs-on{background:#e3f2fd !important}
+.tbl-wrap td{height:var(--row-h);padding:0 6px;border-bottom:1px solid var(--bd2);
+  white-space:nowrap;overflow:hidden;vertical-align:middle}
+.tbl-wrap tr:hover td{background:#f0f7ff}
+.tbl-wrap tr.sel td{background:#e3f2fd}
+.tbl-wrap tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--pri)}
+.tbl-wrap tr.zrow td{background:#f7f9fb;font-weight:600;color:#37474f}
+.tbl-wrap tr.trow td{background:#fcfdfe;color:var(--txt2);font-style:italic}
+.tbl-wrap tr.msrow td{background:#fffdf5;color:#8d6e63;font-size:11px}
+.tbl-wrap input,.tbl-wrap select{width:100%;border:1px solid transparent;background:transparent;
+  font:inherit;font-size:11px;padding:3px 4px;border-radius:4px;color:var(--txt)}
+.tbl-wrap input:hover,.tbl-wrap select:hover{border-color:#cfd8dc;background:#fff}
+.tbl-wrap input:focus,.tbl-wrap select:focus{outline:none;border-color:var(--pri);background:#fff}
+.tbl-wrap input[type=checkbox]{width:auto}
+.tbl-wrap .num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl-wrap .lk{color:var(--warn);font-size:10px;margin-left:2px}
+.empty{height:auto !important;text-align:center;color:var(--txt3);padding:22px 0 !important}
+body.col-resizing,body.col-resizing *{cursor:col-resize !important;user-select:none !important}
+
+.splitter{flex:0 0 auto;width:7px;margin:0 -1px;cursor:col-resize;position:relative;z-index:6}
+.splitter::before{content:'';position:absolute;inset:0 -4px}
+.splitter::after{content:'';position:absolute;left:3px;top:0;bottom:0;width:1px;background:var(--bd)}
+.splitter:hover::after,.splitter.on::after{left:2.5px;width:2px;background:var(--pri)}
+.splitter.on{background:#e3f2fd}
+.splitter .knob{position:absolute;left:1px;top:50%;width:5px;height:26px;margin-top:-13px;
+  border-radius:3px;background:var(--pri);opacity:0;transition:opacity .15s}
+.splitter:hover .knob,.splitter.on .knob{opacity:1}
+body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !important}
+
+/* ---------- 甘特 ---------- */
+.chart-wrap{flex:1 1 auto;overflow:auto;position:relative;background:#fff}
+.ci{position:relative}
+.thead{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--bd);height:var(--head-h)}
+.tu{display:flex;height:30px;border-bottom:1px solid var(--bd2)}
+.tu>div{font-size:11px;font-weight:600;color:#455a64;padding:0 6px;border-right:1px solid var(--bd2);
+  overflow:hidden;white-space:nowrap;display:flex;align-items:center;justify-content:center}
+.tl{display:flex;height:34px}
+.tl>div{font-size:10px;color:var(--txt2);border-right:1px solid var(--bd2);overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;white-space:nowrap}
+.tl>div .t1{line-height:13px;font-weight:600}
+.tl>div .t2{line-height:12px;font-size:9px;color:var(--txt3);margin-top:1px}
+.tl>div.we .t1{color:#e57373}
+.tl>div.we{background:#fff8f8}
+.bd{position:relative;
+  background-image:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 calc(var(--row-h) - 1px),
+    var(--bd2) calc(var(--row-h) - 1px) var(--row-h))}
+.wkend{position:absolute;top:0;bottom:0;background:#fafbfc}
+.wkend.sat{border-right:1px dashed #eceff1}
+.cl{position:absolute;top:0;bottom:0;width:1px;background:var(--bd2)}
+.today-line{position:absolute;top:0;bottom:0;width:2px;background:#e53935;z-index:3;opacity:.9}
+.today-line::after{content:'';position:absolute;top:0;left:-4px;border:5px solid transparent;border-top-color:#e53935}
+/* 今天标记：三角旗放在粘性表头内，始终钉在图表顶部，避免滚动后顶端被裁切 */
+.today-flag{position:absolute;top:0;bottom:0;width:2px;background:#e53935;z-index:7;opacity:.9;pointer-events:none}
+.today-flag::after{content:'';position:absolute;top:0;left:-4px;border:5px solid transparent;border-top-color:#e53935}
+.deps{position:absolute;left:0;top:0;overflow:visible;z-index:3;pointer-events:none}
+.deps.dragging{opacity:.35}
+.bar{position:absolute;border-radius:3px;z-index:2;cursor:grab;touch-action:none;
+  background-repeat:no-repeat;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.bar:active{cursor:grabbing}
+.bar.sel{outline:2px solid var(--pri);outline-offset:1px}
+.bar::before{content:attr(data-lbl);position:absolute;left:6px;top:0;bottom:0;display:flex;align-items:center;
+  font-size:10px;white-space:nowrap;pointer-events:none;color:var(--fg,#fff);
+  text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.bar.out::before{left:calc(100% + 6px);color:var(--txt2);text-shadow:none}
+.bar::after{content:'';position:absolute;right:0;top:0;bottom:0;width:7px;background:transparent}
+.bar:hover::after{background:rgba(255,255,255,.42)}
+.bar:hover{box-shadow:0 1px 2px rgba(0,0,0,.12),inset 0 -7px 0 -4px rgba(255,255,255,.55)}
+.bar.sum{border-radius:2px;height:9px !important;z-index:2}
+.bar.sum::before{content:none}
+.bar.sum::after{content:none}
+.bar.ms{border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);
+  box-shadow:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.28))}
+.bar.ms::before,.bar.ms::after{content:none}
+.bar.ms:hover{filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}
+.bar.fixed{cursor:default;opacity:.97}
+.bar.locked{box-shadow:0 0 0 1.5px var(--warn),0 1px 2px rgba(0,0,0,.12)}
+.base{position:absolute;height:4px;background:#cbd5e0;border-radius:2px;z-index:1;opacity:.9}
+.deps.dragging{opacity:.35}
+
+/* ---------- 资源负载 ---------- */
+.loadgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.load{background:#fff;border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+.load .lh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.load .ln{font-size:12px;font-weight:600;color:#37474f}
+.load .lv{font-size:11px;color:var(--txt2)}
+.load .lbar{height:14px;background:#eceff1;border-radius:4px;overflow:hidden;display:flex}
+.load .lbar i{display:block;height:100%}
+.load .lf{font-size:10px;color:var(--txt3);margin-top:5px;line-height:1.5}
+.load .lf b{color:var(--txt2);font-weight:600}
+.warnbox{margin-top:10px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;
+  padding:8px 11px;font-size:12px;color:#795548}
+.warnbox ul{margin:4px 0 0;padding-left:18px}
+.legend{margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--txt2)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+table.zt{width:100%;border-collapse:collapse;font-size:12px}
+table.zt th{background:#f4f6f8;color:#455a64;font-weight:600;text-align:left;padding:6px 9px;border-bottom:1px solid var(--bd)}
+table.zt td{padding:6px 9px;border-bottom:1px solid var(--bd2)}
+table.zt td.n{text-align:right;font-variant-numeric:tabular-nums}
+table.zt tr:hover td{background:#f7fbff}
+@media (max-width:1000px){
+  .layout{height:auto;flex-direction:column}
+  .tbl-wrap{width:100% !important;max-height:260px;border-right:0;border-bottom:1px solid var(--bd)}
+  .chart-wrap{min-height:360px}
+  .splitter{display:none}
+  }
+  /* ===== 日历弹出框（iframe 内自包含，与父页 cp-cal 标准设计一致） ===== */
+  .cp-date-input-wrapper { display:inline-flex; align-items:center; width:100%; gap:2px; min-width:100px; }
+  .cp-date-input-wrapper input { flex:1; min-width:60px; padding:2px 4px; cursor:pointer; background:white; }
+  .cp-date-input-wrapper input:focus { outline:none; border-color:#E53935; }
+  .cp-date-input-wrapper input:disabled { background:#f0f0f0; cursor:not-allowed; opacity:0.6; }
+  .cp-cal-popup { position:fixed;z-index:30000;width:240px;background:#fff;border:1px solid #f0c8a8;border-radius:10px;box-shadow:0 12px 30px rgba(40,30,15,.25);padding:10px 12px;font-size:12px;display:none; }
+  .cp-cal-popup.show { display:block; }
+  .cp-cal-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:6px; }
+  .cp-cal-head button { width:24px;height:24px;border:none;background:#FDECEA;color:#E53935;border-radius:5px;cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center; }
+  .cp-cal-head button:hover { background:#E53935;color:#fff; }
+  .cp-cal-title { font-weight:700;color:#E53935;font-size:12px; }
+  .cp-cal-close { width:24px;height:24px;border:none;background:none;color:#999;font-size:17px;line-height:1;cursor:pointer;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;padding:0; }
+  .cp-cal-close:hover { background:#fde8e8;color:#e74c3c; }
+  .cp-cal-week { display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px; }
+  .cp-cal-week span { text-align:center;font-size:10px;color:#999;font-weight:700;padding:2px 0; }
+  .cp-cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:2px; }
+  .cp-cal-grid button { width:100%;aspect-ratio:1/1;border:none;background:transparent;font-size:11px;color:#333;border-radius:5px;cursor:pointer;padding:0; }
+  .cp-cal-grid button:hover:not(.empty):not(.selected):not(.disabled) { background:#FDECEA;color:#E53935; }
+  .cp-cal-grid button.empty { visibility:hidden; }
+  .cp-cal-grid button.today { box-shadow:inset 0 0 0 1.5px #E53935;color:#E53935;font-weight:700; }
+  .cp-cal-grid button.selected { background:#E53935;color:#fff;font-weight:700; }
+  .cp-cal-grid button.disabled { color:#bbb;background:#f5f5f5;cursor:not-allowed; }
+  .cp-cal-foot { display:flex;justify-content:space-between;align-items:center;gap:4px;margin-top:6px;padding-top:5px;border-top:1px dashed #eee; }
+  .cp-cal-foot .cp-cal-fmt { font-size:9.5px;color:#bbb; }
+  .cp-cal-foot .cp-cal-today { border:1px solid #E53935;background:#fff;color:#E53935;font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer; }
+  .cp-cal-foot .cp-cal-today:hover { background:#E53935;color:#fff; }
+  .cp-cal-foot .cp-cal-clear { border:none;background:none;color:#999;font-size:10px;cursor:pointer;padding:2px 5px;border-radius:4px; }
+  .cp-cal-foot .cp-cal-clear:hover { background:#fde8e8;color:#e74c3c; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hdr">
+    <h1 data-i18n="g_title">房舍水泥板安装排程</h1>
+    <span class="sub" data-i18n="g_sub">分区 · 房舍 · 小组产能驱动 · 自动生成甘特</span>
+  </div>
+
+  <!-- 参数 -->
+  <div class="card">
+    <h2><span data-i18n="g_params">排程参数</span> <span class="tg" data-i18n="g_params_tip">改完点「重新排程」</span></h2>
+    <div class="row">
+      <div class="fld"><label data-i18n="g_lbl_cap">日产能（片/组/天）</label><input id="p_cap" type="number" min="1" value="200"></div>
+      <div class="fld"><label data-i18n="g_lbl_start">项目开工日</label><div class="cp-date-input-wrapper" onclick="event.stopPropagation()"><input type="text" id="p_start" placeholder="DD/MM/YYYY" readonly onfocus="cpOpenCalendar(this)" oninput="recompute()" style="width:100%;cursor:pointer;"></div></div>
+      <div class="fld"><label data-i18n="g_lbl_cal">工作日历</label><select id="p_cal">
+        <option value="natural" data-i18n="g_cal_natural">自然日（天天作业）</option>
+        <option value="week" data-i18n="g_cal_week">跳过周六日</option>
+        <option value="work" data-i18n="g_cal_work">周末+停工日</option>
+      </select></div>
+      <div class="fld"><label data-i18n="g_lbl_strat">区内房舍分配</label><select id="p_strat">
+        <option value="lpt" data-i18n="g_strat_lpt">大栋优先（LPT）</option>
+        <option value="greedy" data-i18n="g_strat_greedy">按清单顺序，谁空谁接</option>
+      </select></div>
+      <div class="fld"><label data-i18n="g_lbl_zmode">区与区之间</label><select id="p_zmode">
+        <option value="parallel" data-i18n="g_zmode_parallel">同时开工</option>
+        <option value="serial" data-i18n="g_zmode_serial">串行（前区完工才开下一区）</option>
+      </select></div>
+      <div class="fld"><label data-i18n="g_lbl_view">甘特行视图</label><select id="p_view">
+        <option value="house" data-i18n="g_view_house">按房舍（每栋一行）</option>
+        <option value="team" data-i18n="g_view_team">按小组泳道</option>
+      </select></div>
+      <div class="fld"><label data-i18n="g_lbl_color">配色依据</label><select id="p_color">
+        <option value="zone" data-i18n="g_color_zone">按分区</option>
+        <option value="team" data-i18n="g_color_team">按小组</option>
+      </select></div>
+      <button class="btn primary" onclick="recompute()" data-i18n="g_btn_recompute">重新排程</button>
+      <button class="btn" onclick="snapBaseline()" data-i18n="g_btn_baseline">设为基线</button>
+      <button class="btn" onclick="clearBaseline()" data-i18n="g_btn_clearbase">清除基线</button>
+      <button class="btn" onclick="unlockAll()" data-i18n="g_btn_unlock">解除全部锁定</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="fld" style="flex:1 1 240px"><label data-i18n="g_lbl_hol">停工日 / 节假日（每行一个，支持 2026-10-01 或 01/10/2026）</label>
+        <textarea id="p_hol" style="min-height:52px"></textarea></div>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="card"><div class="chips" id="kpi"></div></div>
+
+  <!-- 导入 -->
+  <div class="card">
+    <h2 data-i18n="g_houses">房舍清单 <span class="tg" data-i18n="g_houses_tip">来源：现有数据源 / 粘贴 / 文件</span></h2>
+    <div class="row">
+      <button class="btn mini" onclick="impOpen()" data-i18n="g_btn_imp">粘贴 / 导入数据</button>
+      <button class="btn mini" onclick="loadSample()" data-i18n="g_btn_sample">载入示例</button>
+      <button class="btn mini" onclick="addHouse()" data-i18n="g_btn_add">+ 新增房舍</button>
+      <button class="btn mini" onclick="expCsv()" data-i18n="g_btn_csv">导出 CSV</button>
+      <span class="hint" data-i18n="g_hint_edit">直接改下表里的「板数 / 已装 / 小组」即可；改完自动重排</span>
+    </div>
+    <div id="impBox" style="display:none;margin-top:10px">
+      <textarea id="impText" data-i18n-ph="g_imp_ph" placeholder="从 Excel 直接复制粘贴（自动识别制表符/逗号），或粘贴 CSV / JSON&#10;&#10;示例：&#10;区&#9;房舍&#9;水泥板数&#9;已装&#10;A区&#9;1号舍&#9;2400&#9;600&#10;A区&#9;2号舍&#9;1800&#9;0"></textarea>
+      <div class="row" style="margin-top:8px">
+        <div class="fld"><label data-i18n="g_col_zone">区列</label><select id="m_zone"></select></div>
+        <div class="fld"><label data-i18n="g_col_name">房舍列</label><select id="m_name"></select></div>
+        <div class="fld"><label data-i18n="g_col_panels">板数列</label><select id="m_pan"></select></div>
+        <div class="fld"><label data-i18n="g_col_done">已装列（可选）</label><select id="m_done"></select></div>
+        <label class="fld" style="flex-direction:row;align-items:center;gap:5px">
+          <input type="checkbox" id="m_hdr" checked style="min-width:auto"><span style="font-size:11px;color:var(--txt2)" data-i18n="g_hdr">首行为表头</span></label>
+        <button class="btn primary" onclick="impApply()" data-i18n="g_btn_parse">解析并替换</button>
+        <button class="btn" onclick="impCancel()" data-i18n="g_btn_cancel">取消</button>
+        <input type="file" id="impFile" accept=".csv,.txt,.json" style="font-size:11px">
+      </div>
+      <div id="impMsg" class="hint" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <!-- 甘特 -->
+  <div class="layout">
+    <div class="tbl-wrap" id="tblWrap"></div>
+    <div class="splitter" id="splitter" data-i18n-title="g_splitter_title" title="拖动调整宽度 · 双击适应列宽"><i class="knob"></i></div>
+    <div class="chart-wrap" id="chartWrap"><div class="ci" id="chartInner"></div></div>
+  </div>
+
+  <!-- 区汇总 -->
+  <div class="card">
+    <h2 data-i18n="g_zone_sum_h2">分区汇总</h2>
+    <table class="zt" id="zoneTbl"></table>
+  </div>
+
+  <!-- 小组负载 -->
+  <div class="card">
+    <h2><span data-i18n="g_load">小组负载</span> <span class="tg" data-i18n="g_load_tip">利用率 = 作业天数 ÷ 该组占用跨度</span></h2>
+    <div class="loadgrid" id="loadBox"></div>
+    <div id="conflict"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <!-- 日历弹出框（DD-MM-YYYY，标准设计） -->
+  <div class="cp-cal-popup" id="cpCalPopup" role="dialog" aria-label="选择日期">
+    <div class="cp-cal-head">
+      <button type="button" id="cpCalPrev" aria-label="上月" onclick="cpCalGoPrev()">‹</button>
+      <span class="cp-cal-title" id="cpCalTitle"></span>
+      <span style="display:flex;gap:6px;align-items:center;">
+        <button type="button" id="cpCalNext" aria-label="下月" onclick="cpCalGoNext()">›</button>
+        <button type="button" class="cp-cal-close" onclick="cpCloseCalendar()" aria-label="关闭">×</button>
+      </span>
+    </div>
+    <div class="cp-cal-ym">
+      <select id="cpYearSel" onchange="cpCalSetYM()" aria-label="年"></select>
+      <select id="cpMonthSel" onchange="cpCalSetYM()" aria-label="月"></select>
+    </div>
+    <div class="cp-cal-week" id="cpCalWeek"></div>
+    <div class="cp-cal-grid" id="cpCalGrid"></div>
+    <div class="cp-cal-foot">
+      <button type="button" class="cp-cal-today" onclick="cpCalPickToday()">Today</button>
+      <span class="cp-cal-fmt">DD/MM/YYYY</span>
+      <button type="button" class="cp-cal-clear" id="cpCalClear" onclick="cpCalDoClear()">清除</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============================ 国际化（i18n） ============================ */
+var GANTT_I18N = {
+  zh: {
+    g_title:'房舍水泥板安装排程', g_sub:'分区 · 房舍 · 小组产能驱动 · 自动生成甘特',
+    g_params:'排程参数', g_params_tip:'改完点「重新排程」',
+    g_lbl_cap:'日产能（片/组/天）', g_lbl_start:'项目开工日', g_lbl_cal:'工作日历',
+    g_cal_natural:'自然日（天天作业）', g_cal_week:'跳过周六日', g_cal_work:'周末+停工日',
+    g_lbl_strat:'区内房舍分配', g_strat_lpt:'大栋优先（LPT）', g_strat_greedy:'按清单顺序，谁空谁接',
+    g_lbl_zmode:'区与区之间', g_zmode_parallel:'同时开工', g_zmode_serial:'串行（前区完工才开下一区）',
+    g_lbl_view:'甘特行视图', g_view_house:'按房舍（每栋一行）', g_view_team:'按小组泳道',
+    g_lbl_color:'配色依据', g_color_zone:'按分区', g_color_team:'按小组',
+    g_btn_recompute:'重新排程', g_btn_baseline:'设为基线', g_btn_clearbase:'清除基线', g_btn_unlock:'解除全部锁定',
+    g_lbl_hol:'停工日 / 节假日（每行一个，支持 2026-10-01 或 01/10/2026）',
+    g_houses:'房舍清单', g_houses_tip:'来源：现有数据源 / 粘贴 / 文件',
+    g_btn_imp:'粘贴 / 导入数据', g_btn_sample:'载入示例', g_btn_add:'+ 新增房舍', g_btn_csv:'导出 CSV',
+    g_hint_edit:'直接改下表里的「板数 / 已装 / 小组」即可；改完自动重排',
+    g_imp_ph:'从 Excel 直接复制粘贴（自动识别制表符/逗号），或粘贴 CSV / JSON\n\n示例：\n区\t房舍\t水泥板数\t已装\nA区\t1号舍\t2400\t600\nA区\t2号舍\t1800\t0',
+    g_col_zone:'区', g_col_name:'房舍', g_col_panels:'水泥板', g_col_done:'已装', g_col_prog:'进度%', g_col_days:'天数', g_col_team:'小组', g_col_start:'开始', g_col_end:'结束',
+    g_hdr:'首行为表头', g_btn_parse:'解析并替换', g_btn_cancel:'取消',
+    g_splitter_title:'拖动调整宽度 · 双击适应列宽',
+    g_zone_sum_h2:'分区汇总', g_load:'小组负载', g_load_tip:'利用率 = 作业天数 ÷ 该组占用跨度',
+    g_zone_summary:'（区汇总）', g_finish:' 完工',
+    g_col_resize_tip:'拖右边缘调宽，双击自适应',
+    g_unit_group:'组', g_idle:'空闲', g_unit_pcs:'片', g_unit_day:'天', g_kpi_done:'已装', g_lbl_remaining:'剩', g_locked_tip:'开工日已锁定',
+    g_load_dong:'栋', g_overlap_with:' 与 ', g_time_overlap:'时间重叠', g_not_scheduled:'未排上期',
+    g_load_first:'首栋', g_load_last:'末栋', g_load_idle_warn:'空档较多，可考虑减组或调序',
+    g_load_workday:'个工作日', g_load_util:'利用率',
+    g_check_title:'排程校验',
+    g_legend_team:'按小组着色', g_legend_idle:'小组空档', g_legend_base:'基线计划', g_legend_milestone:'区完工里程碑',
+    g_legend_lock:'🔒 = 开工日已锁定（手工指定，排程不再自动挪动）',
+    g_imp_empty:'请先粘贴数据或选择文件', g_imp_json_err:'JSON 解析失败：', g_imp_nodata:'未识别到数据',
+    g_col_n:'列', g_unzoned:'未分区', g_bld_fmt:'房舍{n}',
+    g_imp_norow:'没有解析出有效行（板数列必须是数字）', g_imp_ok:'已导入 <b>{n}</b> 栋房舍', g_imp_skip:'{n} 行板数无效已跳过',
+    g_auto:'自动', g_csv_name:'房舍安装排程', g_imp_none:'— 无 —',
+    g_zt_zone:'分区', g_zt_team:'安装小组', g_zt_count:'房舍数', g_zt_panels:'总板数', g_zt_done:'已装',
+    g_zt_start:'开工日(可改)', g_zt_end:'完工', g_zt_days:'工期(天)', g_zt_ideal:'理论最少天数', g_zt_util:'利用率',
+    g_ph_follow:'跟随项目', g_zone_start_tip:'留空=跟随项目开工日',
+    g_kpi_zone:'分区', g_kpi_houses:'房舍', g_kpi_panels:'总板数', g_kpi_cap:'产能', g_kpi_teams:'安装小组',
+    g_kpi_range:'项目区间', g_kpi_days:'总工期', g_kpi_latezone:'最晚完工区', g_kpi_util:'小组平均利用率',
+    g_kpi_empty:'暂无数据', g_empty_houses:'暂无房舍，点上方「载入示例」或「粘贴/导入数据」',
+    g_team_fmt:'第{n}组', g_year:'年', g_month:'月'
+  },
+  en: {
+    g_title:'Installation Scheduling', g_sub:'Zones · Houses · Team-capacity driven · Auto Gantt',
+    g_params:'Schedule Parameters', g_params_tip:'Click "Recompute" after changes',
+    g_lbl_cap:'Daily capacity (pcs/team/day)', g_lbl_start:'Project start date', g_lbl_cal:'Work calendar',
+    g_cal_natural:'Natural days (work daily)', g_cal_week:'Skip Sat & Sun', g_cal_work:'Weekends + off-days',
+    g_lbl_strat:'House assignment in zone', g_strat_lpt:'Largest first (LPT)', g_strat_greedy:'By list order, first free',
+    g_lbl_zmode:'Between zones', g_zmode_parallel:'Parallel', g_zmode_serial:'Serial (next after prev)',
+    g_lbl_view:'Gantt row view', g_view_house:'By house (one row each)', g_view_team:'By team lane',
+    g_lbl_color:'Color by', g_color_zone:'By zone', g_color_team:'By team',
+    g_btn_recompute:'Recompute', g_btn_baseline:'Set baseline', g_btn_clearbase:'Clear baseline', g_btn_unlock:'Unlock all',
+    g_lbl_hol:'Off-days / Holidays (one per line; 2026-10-01 or 01/10/2026)',
+    g_houses:'House List', g_houses_tip:'Source: data source / paste / file',
+    g_btn_imp:'Paste / Import', g_btn_sample:'Load sample', g_btn_add:'+ Add house', g_btn_csv:'Export CSV',
+    g_hint_edit:'Edit panels / done / team below; auto-reschedule',
+    g_imp_ph:'Copy-paste from Excel (auto-detect tab/comma), or paste CSV / JSON\n\nExample:\nzone\thouse\tpanels\tdone\nA\t1\t2400\t600\nA\t2\t1800\t0',
+    g_col_zone:'Zone', g_col_name:'House', g_col_panels:'Panels', g_col_done:'Done', g_col_prog:'Progress%', g_col_days:'Days', g_col_team:'Team', g_col_start:'Start', g_col_end:'End',
+    g_hdr:'First row is header', g_btn_parse:'Parse & replace', g_btn_cancel:'Cancel',
+    g_splitter_title:'Drag to resize · double-click to fit',
+    g_zone_sum_h2:'Zone Summary', g_load:'Team Load', g_load_tip:'Utilization = workdays ÷ team span',
+    g_zone_summary:'(zone summary)', g_finish:' done',
+    g_col_resize_tip:'Drag right edge to resize, double-click to fit',
+    g_unit_group:' teams', g_idle:'idle', g_unit_pcs:'pcs', g_unit_day:'days', g_kpi_done:'Installed', g_lbl_remaining:'left', g_locked_tip:'Start date locked',
+    g_load_dong:' bldg', g_overlap_with:' and ', g_time_overlap:'time overlap', g_not_scheduled:'not scheduled',
+    g_load_first:'First', g_load_last:'Last', g_load_idle_warn:'Large idle gap; consider fewer teams or reorder',
+    g_load_workday:' workdays', g_load_util:'Utilization',
+    g_check_title:'Schedule check',
+    g_legend_team:'Colored by team', g_legend_idle:'Team idle', g_legend_base:'Baseline', g_legend_milestone:'Zone-done milestone',
+    g_legend_lock:'🔒 = Start locked (manual; schedule will not auto-move)',
+    g_imp_empty:'Paste data or pick a file', g_imp_json_err:'JSON parse failed: ', g_imp_nodata:'No data recognized',
+    g_col_n:'col', g_unzoned:'Unzoned', g_bld_fmt:'House {n}',
+    g_imp_norow:'No valid rows (panels must be numeric)', g_imp_ok:'Imported <b>{n}</b> houses', g_imp_skip:'{n} rows skipped (invalid panels)',
+    g_auto:'Auto', g_csv_name:'House install schedule', g_imp_none:'— none —',
+    g_zt_zone:'Zone', g_zt_team:'Install team', g_zt_count:'Houses', g_zt_panels:'Total panels', g_zt_done:'Done',
+    g_zt_start:'Start (editable)', g_zt_end:'Done', g_zt_days:'Duration (days)', g_zt_ideal:'Min ideal days', g_zt_util:'Utilization',
+    g_ph_follow:'Follow project', g_zone_start_tip:'Leave empty = follow project start',
+    g_kpi_zone:'Zones', g_kpi_houses:'Houses', g_kpi_panels:'Total panels', g_kpi_cap:'Capacity', g_kpi_teams:'Install teams',
+    g_kpi_range:'Project span', g_kpi_days:'Total duration', g_kpi_latezone:'Latest zone', g_kpi_util:'Avg team utilization',
+    g_kpi_empty:'No data', g_empty_houses:'No houses yet; click "Load sample" or "Paste / Import" above',
+    g_team_fmt:'Team {n}', g_year:'', g_month:''
+  },
+  vi: {
+    g_title:'Lập lịch lắp đặt tấm xi măng', g_sub:'Phân vùng · Chuồng · Theo năng suất đội · Tự động Gantt',
+    g_params:'Tham số lịch', g_params_tip:'Nhấn "Tính lại" sau khi đổi',
+    g_lbl_cap:'Năng suất ngày (viên/đội/ngày)', g_lbl_start:'Ngày khởi công', g_lbl_cal:'Lịch làm việc',
+    g_cal_natural:'Ngày tự nhiên (làm hàng ngày)', g_cal_week:'Bỏ T7 & CN', g_cal_work:'Cuối tuần + ngày nghỉ',
+    g_lbl_strat:'Phân bổ chuồng trong vùng', g_strat_lpt:'Ưu tiên lớn (LPT)', g_strat_greedy:'Theo thứ tự, đội rảnh nhận',
+    g_lbl_zmode:'Giữa các vùng', g_zmode_parallel:'Cùng lúc', g_zmode_serial:'Nối tiếp (xong vùng trước mới tới sau)',
+    g_lbl_view:'Kiểu hàng Gantt', g_view_house:'Theo chuồng (mỗi chuồng 1 hàng)', g_view_team:'Theo làn đội',
+    g_lbl_color:'Tô màu theo', g_color_zone:'Theo vùng', g_color_team:'Theo đội',
+    g_btn_recompute:'Tính lại', g_btn_baseline:'Đặt baseline', g_btn_clearbase:'Xóa baseline', g_btn_unlock:'Mở khóa tất cả',
+    g_lbl_hol:'Ngày nghỉ (mỗi dòng một; 2026-10-01 hoặc 01/10/2026)',
+    g_houses:'Danh sách chuồng', g_houses_tip:'Nguồn: dữ liệu / dán / tệp',
+    g_btn_imp:'Dán / Nhập', g_btn_sample:'Tải mẫu', g_btn_add:'+ Thêm chuồng', g_btn_csv:'Xuất CSV',
+    g_hint_edit:'Sửa số tấm / đã lắp / đội bên dưới; tự tính lại',
+    g_imp_ph:'Copy-dán từ Excel (tự nhận tab/dấu phẩy), hoặc dán CSV / JSON\n\nVí dụ:\nvùng\tchuồng\ttấm\tdã lắp\nA\t1\t2400\t600\nA\t2\t1800\t0',
+    g_col_zone:'Vùng', g_col_name:'Chuồng', g_col_panels:'Tấm', g_col_done:'Đã lắp', g_col_prog:'Tiến độ%', g_col_days:'Ngày', g_col_team:'Đội', g_col_start:'Bắt đầu', g_col_end:'Kết thúc',
+    g_hdr:'Hàng đầu là tiêu đề', g_btn_parse:'Phân tích & thay', g_btn_cancel:'Hủy',
+    g_splitter_title:'Kéo đổi rộng · nhấn đúp vừa cột',
+    g_zone_sum_h2:'Tổng hợp vùng', g_load:'Tải đội', g_load_tip:'Tỷ lệ = ngày làm ÷ trải đội',
+    g_zone_summary:'(tổng vùng)', g_finish:' hoàn thành',
+    g_col_resize_tip:'Kéo cạnh phải đổi rộng, nhấn đúp vừa',
+    g_unit_group:' đội', g_idle:'rảnh', g_unit_pcs:'viên', g_unit_day:'ngày', g_kpi_done:'Đã lắp', g_lbl_remaining:'còn', g_locked_tip:'Ngày bắt đầu đã khóa',
+    g_load_dong:' chuồng', g_overlap_with:' và ', g_time_overlap:'trùng thời gian', g_not_scheduled:'chưa lên lịch',
+    g_load_first:'Chuồng đầu', g_load_last:'Chuồng cuối', g_load_idle_warn:'Nhiều khoảng trống, giảm đội hoặc đổi thứ tự',
+    g_load_workday:' ngày làm', g_load_util:'Tỷ lệ',
+    g_check_title:'Kiểm tra lịch',
+    g_legend_team:'Tô theo đội', g_legend_idle:'Khoảng trống đội', g_legend_base:'Kế hoạch cơ sở', g_legend_milestone:'Mốc hoàn thành vùng',
+    g_legend_lock:'🔒 = Ngày bắt đầu đã khóa (chỉnh tay; lịch không tự dời)',
+    g_imp_empty:'Dán dữ liệu hoặc chọn tệp', g_imp_json_err:'Lỗi phân tích JSON: ', g_imp_nodata:'Không nhận diện được dữ liệu',
+    g_col_n:'cột', g_unzoned:'Chưa phân vùng', g_bld_fmt:'Chuồng {n}',
+    g_imp_norow:'Không có dòng hợp lệ (cột tấm phải là số)', g_imp_ok:'Đã nhập <b>{n}</b> chuồng', g_imp_skip:'{n} dòng bỏ qua (tấm không hợp lệ)',
+    g_auto:'Tự động', g_csv_name:'Lịch lắp đặt chuồng', g_imp_none:'— không —',
+    g_zt_zone:'Vùng', g_zt_team:'Đội lắp', g_zt_count:'Số chuồng', g_zt_panels:'Tổng tấm', g_zt_done:'Đã lắp',
+    g_zt_start:'Bắt đầu (sửa được)', g_zt_end:'Xong', g_zt_days:'Thời gian (ngày)', g_zt_ideal:'Số ngày lý thuyết', g_zt_util:'Tỷ lệ',
+    g_ph_follow:'Theo dự án', g_zone_start_tip:'Trống = theo ngày khởi công dự án',
+    g_kpi_zone:'Vùng', g_kpi_houses:'Chuồng', g_kpi_panels:'Tổng tấm', g_kpi_cap:'Năng suất', g_kpi_teams:'Đội lắp',
+    g_kpi_range:'Khoảng dự án', g_kpi_days:'Tổng thời gian', g_kpi_latezone:'Vùng xong muộn', g_kpi_util:'Tỷ lệ đội TB',
+    g_kpi_empty:'Chưa có dữ liệu', g_empty_houses:'Chưa có chuồng, nhấn "Tải mẫu" hoặc "Dán / Nhập" bên trên',
+    g_team_fmt:'Đội {n}', g_year:' năm', g_month:' tháng'
+  }
+};
+function curLang(){ return (window.parent&&window.parent.CUR_LANG)?window.parent.CUR_LANG:'zh'; }
+function it(k){ var l=curLang(), d=GANTT_I18N[l]; if(d&&d[k]!==undefined) return d[k]; var z=GANTT_I18N.zh[k]; return z!==undefined?z:k; }
+function localize(root){ root=root||document; var i;
+  var list=root.querySelectorAll('[data-i18n]'); for(i=0;i<list.length;i++){ list[i].textContent=it(list[i].getAttribute('data-i18n')); }
+  var al=root.querySelectorAll('[data-i18n-ph]'); for(i=0;i<al.length;i++){ al[i].setAttribute('placeholder', it(al[i].getAttribute('data-i18n-ph'))); }
+  var tl=root.querySelectorAll('[data-i18n-title]'); for(i=0;i<tl.length;i++){ tl[i].setAttribute('title', it(tl[i].getAttribute('data-i18n-title'))); }
+}
+/* =========================================================================
+ * 0. 数据源接入点  ★★★
+ *    把你的现有数据源结果赋给 HOUSE_SOURCE，再调 rebuild() 即可。
+ *    要求的字段：{ zone:区名, name:房舍名, panels:水泥板数, done:已装板数(可选) }
+ *    例：
+ *      fetch('/api/houses').then(r=>r.json()).then(d=>{ HOUSE_SOURCE=d; rebuild(); });
+ *    或在本文件末尾直接写： HOUSE_SOURCE = [...]; rebuild();
+ * ======================================================================= */
+var HOUSE_SOURCE = null;
+var SAMPLE = [
+  {zone:'A区',name:'1号舍',panels:2400,done:600},
+  {zone:'A区',name:'2号舍',panels:1800,done:1800},
+  {zone:'A区',name:'3号舍',panels:3000,done:0},
+  {zone:'A区',name:'4号舍',panels:1200,done:0},
+  {zone:'A区',name:'5号舍',panels:2000,done:0},
+  {zone:'A区',name:'6号舍',panels:1600,done:0},
+  {zone:'A区',name:'7号舍',panels:2800,done:0},
+  {zone:'B区',name:'1号舍',panels:2200,done:2200},
+  {zone:'B区',name:'2号舍',panels:1900,done:900},
+  {zone:'B区',name:'3号舍',panels:2600,done:0},
+  {zone:'B区',name:'4号舍',panels:1400,done:0},
+  {zone:'B区',name:'5号舍',panels:2100,done:0},
+  {zone:'C区',name:'1号舍',panels:3200,done:0},
+  {zone:'C区',name:'2号舍',panels:1700,done:0},
+  {zone:'C区',name:'3号舍',panels:2300,done:0},
+  {zone:'C区',name:'4号舍',panels:1500,done:0},
+  {zone:'C区',name:'5号舍',panels:2900,done:0},
+  {zone:'C区',name:'6号舍',panels:1300,done:0}
+];
+
+/* =========================================================================
+ * 1. 日期工具（UTC，避免时区；存储 YYYY-MM-DD，显示 DD/MM/YYYY）
+ * ======================================================================= */
+function pad2(n){ n=parseInt(n,10)||0; return (n<10?'0':'')+n; }
+function validYmd(y){
+  if(!y) return ''; var p=String(y).split('-'); if(p.length!==3) return '';
+  var Y=+p[0],M=+p[1],D=+p[2];
+  if(Y<1970||Y>2100||M<1||M>12||D<1||D>31) return '';
+  var d=new Date(Date.UTC(Y,M-1,D));
+  if(d.getUTCFullYear()!==Y||d.getUTCMonth()!==M-1||d.getUTCDate()!==D) return '';
+  return p[0]+'-'+pad2(M)+'-'+pad2(D);
+}
+function toYmd(v){
+  if(v===null||v===undefined||v==='') return '';
+  if(v instanceof Date) return isNaN(v.getTime())?'':toYmd(v.getUTCFullYear()+'-'+pad2(v.getUTCMonth()+1)+'-'+pad2(v.getUTCDate()));
+  var s=String(v).trim(); if(!s) return '';
+  if(/^\d{10,13}$/.test(s)){ var ts=+s; if(s.length<=10) ts*=1000; return toYmd(new Date(ts)); }
+  var m=s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/); if(m) return validYmd(m[1]+'-'+m[2]+'-'+m[3]);
+  m=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/); if(m) return validYmd(m[3]+'-'+m[2]+'-'+m[1]);
+  m=s.match(/^(\d{4})(\d{2})(\d{2})$/); if(m) return validYmd(m[1]+'-'+m[2]+'-'+m[3]);
+  m=s.match(/^(\d{1,2})[-/.](\d{1,2})$/); if(m) return validYmd(new Date().getFullYear()+'-'+m[2]+'-'+m[1]);
+  return '';
+}
+function dSep(){ return (cfg.dateSep==='-')?'-':'/'; }
+function dmy(v){ var y=toYmd(v); if(!y) return ''; var p=y.split('-'),s=dSep(); return p[2]+s+p[1]+s+p[0]; }
+function today(){ return toYmd(new Date()); }
+function addDays(y,n){ y=toYmd(y); if(!y) return ''; var p=y.split('-'),d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+  d.setUTCDate(d.getUTCDate()+(parseInt(n,10)||0)); return toYmd(d); }
+function diffDays(a,b){ a=toYmd(a);b=toYmd(b); if(!a||!b) return 0;
+  return Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000); }
+function dow(y){ y=toYmd(y); if(!y) return 1; var p=y.split('-');
+  return new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).getUTCDay(); }
+function isoWeek(d){ var p=toYmd(d).split('-'); if(p.length<3) return {w:0,y:''};
+  var t=new Date(Date.UTC(+p[0],+p[1]-1,+p[2])), dn=t.getUTCDay()||7;
+  t.setUTCDate(t.getUTCDate()+4-dn); var y=t.getUTCFullYear();
+  return {w:Math.ceil(((t.getTime()-Date.UTC(y,0,1))/86400000+1)/7),y:y}; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function hash(s){ var h=0;s=String(s||'');for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h; }
+function lum(hex){ var n=parseInt(hex.slice(1),16),c=[(n>>16)&255,(n>>8)&255,n&255].map(function(v){
+  v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); });
+  return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; }
+function fgOn(hex){ return lum(hex)>0.45?'#263238':'#fff'; }
+function shade(hex,a){ var n=parseInt(hex.slice(1),16);
+  var r=Math.max(0,Math.min(255,(n>>16)+a)),g=Math.max(0,Math.min(255,((n>>8)&255)+a)),b=Math.max(0,Math.min(255,(n&255)+a));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1); }
+
+/* =========================================================================
+ * 2. 工作日历
+ * ======================================================================= */
+var HOL={};
+function isWork(d){
+  if(cfg.cal==='natural') return true;
+  var w=dow(d); if(w===0||w===6) return false;
+  if(cfg.cal==='work'&&HOL[d]) return false;
+  return true;
+}
+function nextWork(d){ var g=0; while(!isWork(d)&&g++<400) d=addDays(d,1); return d; }
+/* 从 start 起，占用 n 个工作日，返回最后一个工作日 */
+function addWork(s,n){ var d=nextWork(s), rem=Math.max(0,(n|0)-1), g=0;
+  while(rem>0&&g++<4000){ d=addDays(d,1); if(isWork(d)) rem--; } return d; }
+function nextAfter(e){ return nextWork(addDays(e,1)); }
+/* 区间内工作日数 */
+function workDaysBetween(a,b){ var n=0,d=toYmd(a),e=toYmd(b),g=0;
+  while(d&&d<=e&&g++<4000){ if(isWork(d)) n++; d=addDays(d,1); } return n; }
+function parseHolidays(){
+  HOL={}; (cfg.holidays||'').split(/\n|,|;/).forEach(function(x){ var y=toYmd(x); if(y) HOL[y]=1; });
+}
+
+/* =========================================================================
+ * 3. 数据模型
+ * ======================================================================= */
+var ZONE_C=['#5c6bc0','#26a69a','#ffa726','#ef5350','#66bb6a','#ab47bc','#29b6f6','#8d6e63'];
+var TEAM_C=['#42a5f5','#26a69a','#ffa726','#ab47bc','#5c6bc0','#ec407a','#8d6e63','#78909c'];
+
+var houses=[];   // {id,zone,name,panels,done,days,team,start,end,lockStart,lockTeam,bs,be}
+var zones=[];    // {name,teams,start}
+var cfg={};
+var DEF={cap:200,start:'',cal:'natural',strat:'lpt',zmode:'parallel',view:'house',
+  color:'zone',holidays:'',dateSep:'/',tableWidth:470,colW:{},showWeekend:true,
+  showToday:true,showGrid:true,showDeps:true,showBase:true,viewMode:'Week',colWidth:40,barHeight:22};
+
+var COLS=[
+  {k:'zone',   w:72, n:it('g_col_zone'),     e:'text'},
+  {k:'name',   w:92, n:it('g_col_name'),   e:'text'},
+  {k:'panels', w:76, n:it('g_col_panels'), e:'num', align:'right'},
+  {k:'done',   w:72, n:it('g_col_done'),   e:'num', align:'right'},
+  {k:'prog',   w:58, n:it('g_col_prog'),  e:'ro'},
+  {k:'days',   w:52, n:it('g_col_days'),   e:'ro'},
+  {k:'team',   w:76, n:it('g_col_team'),   e:'team'},
+  {k:'start',  w:92, n:it('g_col_start'), e:'date'},
+  {k:'end',    w:92, n:it('g_col_end'),    e:'ro'}
+];
+var COL_MIN=40, COL_MAX=420;
+function findCol(k){ var r=null; COLS.forEach(function(c){ if(c.k===k) r=c; }); return r; }
+function colW(k){ var c=findCol(k); return Math.max(COL_MIN,Math.min(COL_MAX,(cfg.colW||{})[k]||(c?c.w:80))); }
+
+function zoneOf(n){ var r=null; zones.forEach(function(z){ if(z.name===n) r=z; }); return r; }
+function teamsOf(n){ var z=zoneOf(n); return z?Math.max(1,z.teams|0):1; }
+function zoneColor(n){ return ZONE_C[hash(n)%8]; }
+function teamColor(z,t){ return TEAM_C[hash(z+'#'+t)%8]; }
+
+function loadCfg(){
+  var c={}; for(var k in DEF) c[k]=DEF[k];
+  var raw=null; try{ raw=localStorage.getItem('house_sched_v1'); }catch(e){}
+  if(raw){ try{ var o=JSON.parse(raw); for(var k2 in o) if(o[k2]!==undefined&&o[k2]!==null) c[k2]=o[k2]; }catch(e){} }
+  if(!c.start) c.start=today();
+  cfg=c;
+}
+function saveCfg(){ try{ localStorage.setItem('house_sched_v1',JSON.stringify(cfg)); }catch(e){} }
+
+function loadHouses(){
+  var src=HOUSE_SOURCE||SAMPLE;
+  houses=(src||[]).map(function(h,i){
+    return {id:'H'+(i+1), zone:String(h.zone||it('g_unzoned')), name:String(h.name||(it('g_bld_fmt').replace('{n}',(i+1)))),
+      panels:Math.max(0,Math.round(+h.panels||0)), done:Math.max(0,Math.round(+h.done||0)),
+      days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bs:'',be:''};
+  });
+  // 区表：按出现顺序，默认 2 组（可在区汇总表里改）
+  var seen={}; zones=[];
+  houses.forEach(function(h){ if(!seen[h.zone]){ seen[h.zone]=1; zones.push({name:h.zone,teams:2,start:''}); } });
+  try{
+    var raw=localStorage.getItem('house_zones_v1');
+    if(raw){ var oz=JSON.parse(raw)||[];
+      zones.forEach(function(z){ oz.forEach(function(o){ if(o.name===z.name) z.teams=Math.max(1,o.teams|0); }); }); }
+  }catch(e){}
+}
+
+/* =========================================================================
+ * 4. 排程核心
+ *    规则：日产能固定 → 天数 = ceil(板数/产能)
+ *          一组独占一栋 → 组内严格串行，本栋完成「次日」才开下一栋
+ *          区内专属     → 小组只在自己区内流转
+ * ======================================================================= */
+function houseDays(h){ return Math.max(1,Math.ceil(h.panels/Math.max(1,cfg.cap))); }
+
+function schedule(){
+  parseHolidays();
+  var projStart=nextWork(toYmd(cfg.start)||today());
+  var prevEnd=null;
+  zones.forEach(function(z){
+    /* userStart = 用户显式指定的区开工日；为空则跟随项目开工日。
+       不要把排程算出的 z.start 当用户输入，否则串行切回并行会残留旧日期 */
+    var base = z.userStart ? nextWork(toYmd(z.userStart)) : projStart;
+    z.start = (cfg.zmode==='serial'&&prevEnd) ? nextWork(nextAfter(prevEnd)) : base;
+    var hs=houses.filter(function(h){ return h.zone===z.name; });
+    if(!hs.length){ z.end=''; z.days=0; return; }
+
+    /* 分配顺序 */
+    var order=hs.slice();
+    if(cfg.strat==='lpt') order.sort(function(a,b){ return b.panels-a.panels || a.name.localeCompare(b.name,'zh'); });
+
+    var n=Math.max(1,z.teams|0), free=[];
+    for(var i=0;i<n;i++) free[i]=z.start;
+
+    order.forEach(function(h){
+      h.days=houseDays(h);
+      /* 选组：锁定优先，否则选最早空闲的组（并列取组号小的）
+         注意：free 里存的是 'YYYY-MM-DD' 字符串，定宽格式下字典序 == 时间序，
+         不能用 free[j] < Infinity 这种写法（字符串转数字得 NaN，比较恒 false） */
+      var k=0;
+      if(h.lockTeam!=null&&h.lockTeam<n&&h.lockTeam>=0) k=h.lockTeam|0;
+      else{ for(var j=1;j<n;j++){ if(free[j]<free[k]) k=j; } }
+      var s=h.lockStart?nextWork(h.lockStart):nextWork(free[k]);
+      var e=addWork(s,h.days);
+      h.start=s; h.end=e; h.team=k;
+      free[k]=nextAfter(e);
+    });
+
+    var mn='',mx='';
+    hs.forEach(function(h){ if(!mn||h.start<mn) mn=h.start; if(!mx||h.end>mx) mx=h.end; });
+    z.start=mn; z.end=mx; z.days=diffDays(mn,mx)+1;
+    prevEnd=mx;
+  });
+}
+/* 锁定：手改开始日 / 手选小组 */
+function setLockStart(h,v){ h.lockStart=toYmd(v)||''; schedule(); renderAll(); saveCfg(); }
+function setLockTeam(h,v){ h.lockTeam=(v===''||v==null)?null:(+v|0); schedule(); renderAll(); saveCfg(); }
+function unlockAll(){ houses.forEach(function(h){ h.lockStart=''; h.lockTeam=null; }); schedule(); renderAll(); saveCfg(); }
+function snapBaseline(){ houses.forEach(function(h){ h.bs=h.start; h.be=h.end; }); renderAll(); saveCfg(); }
+function clearBaseline(){ houses.forEach(function(h){ h.bs=''; h.be=''; }); renderAll(); saveCfg(); }
+
+/* =========================================================================
+ * 5. 行模型（甘特行）
+ * ======================================================================= */
+var rows=[];
+function buildRows(){
+  rows=[];
+  if(cfg.view==='team'){
+    zones.forEach(function(z){
+      var hs=houses.filter(function(h){ return h.zone===z.name; });
+      if(!hs.length) return;
+      rows.push({kind:'zone',id:'Z:'+z.name,name:z.name+it('g_zone_summary'),zone:z.name,
+        start:z.start,end:z.end,days:diffDays(z.start,z.end)+1,
+        panels:sum(hs,'panels'),done:sum(hs,'done')});
+      for(var t=0;t<Math.max(1,z.teams|0);t++){
+        var ths=hs.filter(function(h){ return h.team===t; }).sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
+        rows.push({kind:'team',id:'T:'+z.name+':'+(t+1),name:z.name+' · '+teamLabel(t),zone:z.name,team:t,
+          start:ths.length?ths[0].start:'',end:ths.length?ths[ths.length-1].end:'',
+          panels:sum(ths,'panels'),done:sum(ths,'done'),houses:ths});
+        ths.forEach(function(h){ h._prev = ths[ths.indexOf(h)-1]; });
+      }
+      /* 区完工里程碑 */
+      rows.push({kind:'ms',id:'M:'+z.name,name:z.name+it('g_finish'),zone:z.name,start:z.end,end:z.end});
+    });
+  }else{
+    zones.forEach(function(z){
+      var hs=houses.filter(function(h){ return h.zone===z.name; });
+      if(!hs.length) return;
+      rows.push({kind:'zone',id:'Z:'+z.name,name:z.name+it('g_zone_summary'),zone:z.name,
+        start:z.start,end:z.end,days:diffDays(z.start,z.end)+1,
+        panels:sum(hs,'panels'),done:sum(hs,'done')});
+      /* 区内按小组聚合成道，组内按开始时间 */
+      var byTeam={};
+      hs.forEach(function(h){ (byTeam[h.team]=byTeam[h.team]||[]).push(h); });
+      Object.keys(byTeam).sort(function(a,b){ return (+a)-(+b); }).forEach(function(tk){
+        var arr=byTeam[tk].slice().sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
+        arr.forEach(function(h,i){
+          h._prev=i>0?arr[i-1]:null;
+          rows.push({kind:'house',id:h.id,name:h.name,zone:z.name,team:h.team,house:h,
+            start:h.start,end:h.end,panels:h.panels,done:h.done,days:h.days});
+        });
+      });
+      rows.push({kind:'ms',id:'M:'+z.name,name:z.name+it('g_finish'),zone:z.name,start:z.end,end:z.end});
+    });
+  }
+}
+function sum(arr,k){ var n=0; arr.forEach(function(x){ n+=(+x[k]||0); }); return n; }
+function teamLabel(t){ return it('g_team_fmt').replace('{n}',(t+1)); }
+
+/* =========================================================================
+ * 6. 时间刻度
+ * ======================================================================= */
+var S=null;
+function buildScale(){
+  var ds=[]; rows.forEach(function(r){ if(r.start) ds.push(r.start); if(r.end) ds.push(r.end); });
+  ds.push(today());
+  ds=ds.filter(Boolean).sort();
+  var min=ds[0]||today(), max=ds[ds.length-1]||min;
+  var vm=cfg.viewMode;
+  if(vm==='Day'){ min=addDays(min,-3); max=addDays(max,4); }
+  else if(vm==='Week'){ min=addDays(min,-7); max=addDays(max,10); }
+  else { min=addDays(min,-20); max=addDays(max,30); }
+  if(vm==='Week') min=addDays(min,-((dow(min)+6)%7));
+  if(vm==='Month') min=min.slice(0,8)+'01';
+
+  var cw=cfg.colWidth, cols=[], width=0, ppd;
+  if(vm==='Month'){
+    var mStartX={}, cur=min, cx=0, g=0;
+    while(cur<=max&&g++<400){
+      var y=+cur.slice(0,4), m=+cur.slice(5,7), dim=new Date(Date.UTC(y,m,0)).getUTCDate();
+      mStartX[y+'-'+pad2(m)]=cx;
+      cols.push({s:cur,e:cur.slice(0,8)+pad2(dim),l1:m+it('g_month'),ym:y+'-'+pad2(m)});
+      cx+=cw; cur=addDays(cur,dim);
+    }
+    width=cx;
+    S={min:min,max:max,cols:cols,x:function(d){ d=toYmd(d); if(!d) return 0;
+      var ym=d.slice(0,7); if(mStartX[ym]==null) return 0;
+      return mStartX[ym]+(parseInt(d.slice(8),10)-1)*cw/new Date(Date.UTC(+d.slice(0,4),+d.slice(5,7),0)).getUTCDate(); },
+       dayW:cw/30, width:Math.max(width,200)};
+  }else{
+    ppd = vm==='Day' ? cw : cw/7;
+    var d2=min,g2=0;
+    while(d2<=max&&g2++<1500){
+      var end= vm==='Day'? d2 : addDays(d2,6);
+      var l1= vm==='Day' ? String(parseInt(d2.slice(8),10)) : weekLabel(d2,end,cw);
+      S=S||null;
+      cols.push({s:d2,e:end,l1:l1,l2:'W'+isoWeek(d2).w,ym:(vm==='Day'?d2.slice(0,7):addDays(d2,3).slice(0,7))});
+      d2=addDays(end,1);
+    }
+    width=cols.length*cw;
+    S={min:min,max:max,cols:cols,x:function(d){ d=toYmd(d); if(!d) return 0; return diffDays(min,d)*ppd; },
+       dayW:ppd, width:Math.max(width,200)};
+  }
+  var up=[],last=null;
+  S.cols.forEach(function(c,i){
+    var key=(cfg.viewMode==='Month')?c.ym.slice(0,4):c.ym;
+    var lb=(cfg.viewMode==='Month')?key+it('g_year'):(c.ym.slice(0,4)+it('g_year')+parseInt(c.ym.slice(5),10)+it('g_month'));
+    if(!last||last.key!==key){ last={key:key,w:cw,label:lb}; up.push(last); } else last.w+=cw;
+  });
+  S.up=up; S.rowsH=rows.length*rowH(); S.colW=cw;
+  return S;
+}
+function weekLabel(s,e,cw){
+  var sp=dSep(), sd=pad2(s.slice(8)), sm=pad2(s.slice(5,7)), ed=pad2(e.slice(8)), em=pad2(e.slice(5,7));
+  if(cw>=62) return sd+sp+sm+' - '+ed+sp+em;
+  if(cw>=44) return sd+sp+sm+' - '+ed+(em!==sm?(sp+em):'');
+  return parseInt(sd,10)+'-'+parseInt(ed,10)+(em!==sm?(sp+parseInt(em,10)):'');
+}
+function rowH(){ return cfg.barHeight+18; }
+
+/* =========================================================================
+ * 7. 渲染甘特
+ * ======================================================================= */
+function barColorOf(r){
+  if(cfg.color==='team'&&r.team!=null) return teamColor(r.zone,r.team);
+  return zoneColor(r.zone);
+}
+function renderChart(){
+  buildScale();
+  var inner=document.getElementById('chartInner'), rh=rowH(), bh=cfg.barHeight, h='';
+  var todayX=(cfg.showToday)?(S.x(today())+S.dayW/2):-1;
+  var showToday=(cfg.showToday&&todayX>=0&&todayX<=S.width);
+  h+='<div class="thead">';
+  h+='<div class="tu">'; S.up.forEach(function(u){
+    h+='<div style="width:'+u.w+'px">'+esc(u.w>=68?u.label:u.label.replace(/^\d{4}年/,''))+'</div>'; }); h+='</div>';
+  h+='<div class="tl">'; S.cols.forEach(function(c){
+    var we=(cfg.viewMode==='Day'&&(dow(c.s)===0||dow(c.s)===6));
+    h+='<div class="'+(we?'we':'')+'" style="width:'+S.colW+'px" title="'+esc(dmy(c.s))+'">'
+      +'<span class="t1">'+esc(c.l1)+'</span><span class="t2">'+esc(c.l2||'')+'</span></div>'; }); h+='</div>'+(showToday?'<div class="today-flag" style="left:'+todayX+'px"></div>':'')+'</div>';
+  h+='<div class="bd" style="height:'+S.rowsH+'px">';
+  if(cfg.showWeekend&&cfg.viewMode!=='Month'){
+    if(cfg.viewMode==='Day'){
+      S.cols.forEach(function(c,i){ if(dow(c.s)===0||dow(c.s)===6)
+        h+='<div class="wkend'+(dow(c.s)===6?' sat':'')+'" style="left:'+(i*S.colW)+'px;width:'+S.colW+'px"></div>'; });
+    }else{
+      S.cols.forEach(function(c){
+        var sx=S.x(addDays(c.s,5)), ex=S.x(addDays(c.s,7));
+        h+='<div class="wkend" style="left:'+sx+'px;width:'+(ex-sx)+'px"></div>'; });
+    }
+  }
+  if(cfg.showGrid) S.cols.forEach(function(c,i){ h+='<div class="cl" style="left:'+(i*S.colW)+'px"></div>'; });
+  if(showToday) h+='<div class="today-line" style="left:'+todayX+'px"></div>';
+  /* ★ 这里【不能】闭合 .bd！
+     .thead 是 sticky 但仍占 66px 文档流，.bd 从 y=66 才开始；
+     条形/依赖线若放在 .bd 外面，top 会以 .ci 的 0 为基准，
+     整体上移 66px 被表头遮住，表现为「左侧表格与右侧横道图错开一个表头高度」。
+     必须让它们成为 .bd 的子元素（.bd 是 position:relative），top 才以行区域顶部为基准。 */
+
+  /* 依赖：组内上一栋 -> 本栋 */
+  if(cfg.showDeps&&cfg.view==='house'){
+    var paths='', idx={}; rows.forEach(function(r,i){ idx[r.id]=i; });
+    rows.forEach(function(r,i){
+      if(r.kind!=='house'||!r.house||!r.house._prev) return;
+      var pi=idx['H'+0]!==undefined?null:null;
+      var prevRow=null;
+      for(var k=0;k<i;k++){ if(rows[k].kind==='house'&&rows[k].house===r.house._prev){ prevRow=k; break; } }
+      if(prevRow==null) return;
+      var y1=prevRow*rh+rh/2, y2=i*rh+rh/2;
+      var x1=S.x(r.house._prev.end)+S.dayW, x2=S.x(r.start);
+      var d;
+      if(x2>x1+12) d='M'+x1+' '+y1+' H'+(x1+8)+' V'+y2+' H'+(x2-1);
+      else d='M'+x1+' '+y1+' H'+(x1+8)+' V'+(y1+rh/2-3)+' H'+(x2-11)+' V'+y2+' H'+(x2-1);
+      paths+='<path d="'+d+'" fill="none" stroke="#90a4ae" stroke-width="1.2" marker-end="url(#arw)"/>';
+    });
+    h+='<svg class="deps" id="depSvg" width="'+S.width+'" height="'+S.rowsH+'">'
+      +'<defs><marker id="arw" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">'
+      +'<path d="M0,0 L7,3.5 L0,7 Z" fill="#90a4ae"/></marker></defs>'+paths+'</svg>';
+  }
+
+  /* 条 */
+  rows.forEach(function(r,i){
+    var top=i*rh+(rh-bh)/2;
+    if(r.kind==='ms'){
+      var sz=Math.round(bh*0.8), col=zoneColor(r.zone);
+      h+='<div class="bar ms" data-id="'+esc(r.id)+'" style="left:'+Math.round(S.x(r.start)+S.dayW/2-sz/2)
+        +'px;top:'+Math.round(top+(bh-sz)/2)+'px;width:'+sz+'px;height:'+sz+'px;background-color:'+col+'"'
+        +' title="'+esc(r.name)+' · '+dmy(r.start)+'"></div>';
+      return;
+    }
+    if(r.kind==='zone'){
+      var x=S.x(r.start), w=Math.max(S.x(addDays(r.end,1))-x,3), col2=zoneColor(r.zone);
+      h+='<div class="bar sum" data-id="'+esc(r.id)+'" style="left:'+Math.round(x)+'px;top:'+Math.round(top+bh/2-4)
+        +'px;width:'+Math.round(w)+'px;background-color:'+col2+'" title="'+esc(r.name)+' | '+dmy(r.start)+' ~ '+dmy(r.end)
+        +' | '+r.panels+it('g_unit_pcs')+' | '+(r.days||0)+it('g_unit_day')+'"></div>';
+      return;
+    }
+    /* house / team */
+    var pct= r.panels? Math.round(Math.min(100,(r.done||0)/r.panels*100)) : 0;
+    var col3=barColorOf(r);
+    var x2=S.x(r.start), w2=Math.max(Math.round(S.dayW*(diffDays(r.start,r.end)+1)),4);
+    var lbl;
+    if(r.kind==='house') lbl=r.name+' '+(r.days||0)+it('g_unit_day');
+    else lbl=r.name+' · '+((r.houses&&r.houses.length)||0)+it('g_load_dong');
+    var locked=(r.kind==='house'&&r.house&&r.house.lockStart)?' locked':'';
+    if(cfg.showBase&&r.kind==='house'&&r.house&&r.house.bs){
+      var bx=S.x(r.house.bs), bw=Math.max(S.x(addDays(r.house.be,1))-bx,3);
+      h+='<div class="base" style="left:'+Math.round(bx)+'px;top:'+Math.round(top-5)+'px;width:'+Math.round(bw)+'px"></div>';
+    }
+    h+='<div class="bar'+(w2<48?' out':'')+locked+'" data-id="'+esc(r.id)+'" data-lbl="'+esc(lbl)+'"'
+      +' style="left:'+Math.round(x2)+'px;top:'+Math.round(top)+'px;width:'+w2+'px;height:'+bh+'px;'
+      +bgFor(col3,pct)+';--fg:'+fgOn(col3)+'"'
+      +' title="'+tipOf(r)+'"'
+      +(r.kind==='house'?' onmousedown="dragStart(event,this)" ontouchstart="dragStart(event,this)"':'')+'"></div>';
+  });
+  h+='</div>';   /* ← .bd 在这里才闭合：所有条形/依赖线都是它的子元素 */
+  inner.style.width=S.width+'px';
+  inner.innerHTML=h;
+}
+function bgFor(col,p){ return 'background-color:'+col+';background-image:linear-gradient(to right,'
+  +shade(col,-30)+' 0 '+p+'%,rgba(0,0,0,0) '+p+'% 100%)'; }
+function tipOf(r){
+  if(r.kind==='house'){
+    var h=r.house, rest=h.panels-h.done, wd=workDaysBetween(h.start,h.end);
+    return esc(h.zone+' '+h.name+' | '+h.panels+it('g_unit_pcs')+' → '+h.days+it('g_unit_day')+'（'+cfg.cap+it('g_unit_pcs')+'/'+it('g_unit_day')+'）'
+      +' | '+teamLabel(h.team)+' | '+dmy(h.start)+' ~ '+dmy(h.end)
+      +' | '+it('g_kpi_done')+h.done+'（'+it('g_lbl_remaining')+rest+'）'+(h.lockStart?' | '+it('g_locked_tip'):''));
+  }
+  if(r.kind==='team') return esc(r.name+' | '+((r.houses&&r.houses.length)||0)+it('g_load_dong')+' | '+r.panels+it('g_unit_pcs')+' | '+dmy(r.start)+' ~ '+dmy(r.end));
+  return esc(r.name+' | '+dmy(r.start)+' ~ '+dmy(r.end)+' | '+r.panels+'片');
+}
+
+/* =========================================================================
+ * 8. 左侧表
+ * ======================================================================= */
+function renderTable(){
+  var box=document.getElementById('tblWrap'), h='';
+  h+='<table><colgroup>';
+  COLS.forEach(function(c){ h+='<col data-k="'+c.k+'" style="width:'+colW(c.k)+'px">'; });
+  h+='</colgroup><thead><tr>';
+  COLS.forEach(function(c){
+    h+='<th data-k="'+c.k+'" title="'+it('g_col_resize_tip')+'">'+esc(c.n)
+      +'<i class="rs" onmousedown="colResizeStart(event,this)" ondblclick="colAutoFit(\''+c.k+'\')"></i></th>';
+  });
+  h+='</tr></thead><tbody>';
+  if(cfg.view==='team'){
+    zones.forEach(function(z){
+      var zs=houses.filter(function(x){return x.zone===z.name;});
+      /* 9 个单元格严格对应 COLS 的 9 列，用 colspan 会在 table-layout:fixed 下错位 */
+      h+='<tr class="zrow"><td>'+esc(z.name)+'</td><td>'+it('g_zone_summary')+'</td><td class="num">'+sum(zs,'panels')
+        +'</td><td class="num">'+sum(zs,'done')+'</td><td>'+(sum(zs,'panels')?Math.round(sum(zs,'done')/sum(zs,'panels')*100)+'%':'0%')
+        +'</td><td>'+(z.days||0)+'</td><td>'+Math.max(1,z.teams|0)+it('g_unit_group')+'</td><td>'+dmy(z.start)+'</td><td>'+dmy(z.end)+'</td></tr>';
+      for(var t=0;t<Math.max(1,z.teams|0);t++){
+        /* 必须按 start 排序再取首尾，否则 houses 原顺序会让「开始」晚于「结束」 */
+        var ths=houses.filter(function(x){ return x.zone===z.name&&x.team===t; })
+                      .sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
+        var last=ths.length?ths[ths.length-1]:null;
+        h+='<tr class="trow"><td></td><td>'+teamLabel(t)+'</td><td class="num">'+(ths.length?sum(ths,'panels'):'—')
+          +'</td><td class="num">'+(ths.length?sum(ths,'done'):'—')
+          +'</td><td></td><td>'+(ths.length?ths.length+it('g_load_dong'):it('g_idle'))+'</td><td></td><td>'
+          +(ths.length?dmy(ths[0].start):'—')+'</td><td>'+(last?dmy(last.end):'—')+'</td></tr>';
+      }
+      h+='<tr class="msrow"><td></td><td>🏁 完工</td><td></td><td></td><td></td><td></td><td></td>'
+        +'<td>'+dmy(z.end)+'</td><td>'+dmy(z.end)+'</td></tr>';
+    });
+  }else{
+    /* 房舍视图：左表必须与 buildRows() 严格同序（区汇总 → 按小组分组 → 组内按开工日 → 区完工）
+       直接按 zones/houses 重建，避免依赖可能被外部改动的 rows 数组 */
+    zones.forEach(function(z){
+      var hs=houses.filter(function(h){ return h.zone===z.name; });
+      if(!hs.length) return;
+      /* 区汇总行 */
+      h+='<tr class="zrow"><td>'+esc(z.name)+'</td><td>'+it('g_zone_summary')+'</td><td class="num">'+sum(hs,'panels')
+        +'</td><td class="num">'+sum(hs,'done')+'</td><td>'+(sum(hs,'panels')?Math.round(sum(hs,'done')/sum(hs,'panels')*100)+'%':'0%')
+        +'</td><td>'+(z.days||0)+'</td>'
+        +'<td>'+Math.max(1,z.teams|0)+it('g_unit_group')+'</td><td>'+dmy(z.start)+'</td><td>'+dmy(z.end)+'</td></tr>';
+      /* 按小组聚合成道，组内按开工日 */
+      var byTeam={};
+      hs.forEach(function(h){ (byTeam[h.team]=byTeam[h.team]||[]).push(h); });
+      Object.keys(byTeam).sort(function(a,b){ return (+a)-(+b); }).forEach(function(tk){
+        var arr=byTeam[tk].slice().sort(function(a,b){ return a.start<b.start?-1:(a.start>b.start?1:0); });
+        arr.forEach(function(hh){
+          h+='<tr data-id="'+esc(hh.id)+'" onclick="selRow(this)">';
+          h+='<td>'+esc(hh.zone)+'</td>';
+          h+='<td>'+esc(hh.name)+'</td>';
+          h+='<td class="num"><input type="number" min="0" value="'+hh.panels+'" onchange="evNum(\''+hh.id+'\',\'panels\',this.value)"></td>';
+          h+='<td class="num"><input type="number" min="0" value="'+hh.done+'" onchange="evNum(\''+hh.id+'\',\'done\',this.value)"></td>';
+          h+='<td>'+(hh.panels?Math.round((hh.done||0)/hh.panels*100)+'%':'0%')+'</td>';
+          h+='<td class="num">'+hh.days+'</td>';
+          h+='<td><select onchange="evTeam(\''+hh.id+'\',this.value)">'+teamOpts(hh)+'</select></td>';
+          h+='<td><input value="'+esc(dmy(hh.start))+'" onchange="evStart(\''+hh.id+'\',this.value)">'
+            +(hh.lockStart?'<span class="lk" title="'+it('g_locked_tip')+'">🔒</span>':'')+'</td>';
+          h+='<td>'+dmy(hh.end)+'</td>';
+          h+='</tr>';
+        });
+      });
+      /* 区完工里程碑 */
+      h+='<tr class="msrow"><td>'+esc(z.name)+'</td><td>🏁 完工</td><td></td><td></td><td></td><td></td><td></td>'
+        +'<td>'+dmy(z.end)+'</td><td>'+dmy(z.end)+'</td></tr>';
+    });
+  }
+  if(!houses.length) h+='<tr><td class="empty" colspan="'+COLS.length+'">'+it('g_empty_houses')+'</td></tr>';
+  h+='</tbody></table>';
+  box.innerHTML=h;
+  syncTableWidth();
+}
+function pctOf(r){ return r.panels?Math.round((r.done||0)/r.panels*100)+'%':'0%'; }
+function teamOpts(h){
+  var n=teamsOf(h.zone), s='<option value="">'+it('g_auto')+'</option>';
+  for(var i=0;i<n;i++) s+='<option value="'+i+'"'+(h.lockTeam===i?' selected':'')+'>'+teamLabel(i)+'</option>';
+  return s;
+}
+function evNum(id,k,v){
+  var h=byId(id); if(!h) return;
+  var n=Math.max(0,Math.round(+v||0));
+  if(k==='done') n=Math.min(n,h.panels);
+  h[k]=n; schedule(); renderAll(); saveCfg();
+}
+function evTeam(id,v){ var h=byId(id); if(!h) return; setLockTeam(h,v); }
+function evStart(id,v){ var h=byId(id); if(!h) return; setLockStart(h,v); }
+function byId(id){ var r=null; houses.forEach(function(h){ if(h.id===id) r=h; }); return r; }
+function selRow(tr){ var id=tr.getAttribute('data-id');
+  var rs=document.querySelectorAll('#tblWrap tr[data-id]');
+  for(var i=0;i<rs.length;i++) rs[i].classList.toggle('sel',rs[i].getAttribute('data-id')===id);
+  var bs=document.querySelectorAll('#chartInner .bar');
+  for(var j=0;j<bs.length;j++) bs[j].classList.toggle('sel',bs[j].getAttribute('data-id')===id); }
+function syncTableWidth(){
+  var box=document.getElementById('tblWrap'), tb=box&&box.querySelector('table'); if(!tb) return;
+  var s=0; COLS.forEach(function(c){ s+=colW(c.k); });
+  var avail=Math.max(0,(box.clientWidth||0)-2), extra=avail>s?(avail-s):0;
+  tb.style.width=(s+extra)+'px';
+  var nm=tb.querySelector('col[data-k="name"]');
+  if(nm) nm.style.width=(colW('name')+extra)+'px';
+}
+function colResizeStart(e,el){
+  if(e.button!==undefined&&e.button!==0) return;
+  var th=el.parentNode, k=th.getAttribute('data-k');
+  e.preventDefault(); e.stopPropagation();
+  var col=document.querySelector('#tblWrap col[data-k="'+k+'"]'); if(!col) return;
+  var w0=colW(k), x0=e.clientX;
+  th.classList.add('rs-on'); document.body.classList.add('col-resizing');
+  function mv(ev){ var w=Math.max(COL_MIN,Math.min(COL_MAX,Math.round(w0+ev.clientX-x0)));
+    cfg.colW=cfg.colW||{}; cfg.colW[k]=w; col.style.width=w+'px'; syncTableWidth(); }
+  function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+    th.classList.remove('rs-on'); document.body.classList.remove('col-resizing'); saveCfg(); }
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+function estText(s){ s=String(s==null?'':s); var n=0;
+  for(var i=0;i<s.length;i++) n+=(s.charCodeAt(i)>0x2e80)?12:6.6; return n; }
+function measureText(s){
+  s=String(s==null?'':s);
+  var d=document.getElementById('igMeasure');
+  if(!d){ d=document.createElement('span'); d.id='igMeasure';
+    d.style.cssText='position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;'
+      +'font:12px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Arial,sans-serif';
+    document.body.appendChild(d); }
+  d.textContent=s; var m=d.scrollWidth; return m>0?m:estText(s);
+}
+function colAutoFit(k){
+  var c=findCol(k); if(!c) return;
+  var mx=measureText(c.n)+30;
+  if(k==='name') houses.forEach(function(h){ mx=Math.max(mx,measureText(h.name)+22); });
+  if(k==='zone') houses.forEach(function(h){ mx=Math.max(mx,measureText(h.zone)+22); });
+  if(k==='team') mx=Math.max(mx,measureText(it('g_team_fmt').replace('{n}',1))+40);
+  cfg.colW=cfg.colW||{}; cfg.colW[k]=Math.max(COL_MIN,Math.min(COL_MAX,Math.ceil(mx)));
+  saveCfg(); renderTable();
+}
+
+/* =========================================================================
+ * 9. KPI / 区汇总 / 负载
+ * ======================================================================= */
+function renderKPI(){
+  var box=document.getElementById('kpi');
+  if(!houses.length){ box.innerHTML='<span class="chip">'+it('g_kpi_empty')+'</span>'; return; }
+  var tp=sum(houses,'panels'), td=sum(houses,'done');
+  var mn='',mx='',lateZone='',zt={};
+  zones.forEach(function(z){ if(!z.start) return;
+    if(!mn||z.start<mn) mn=z.start;
+    if(!mx||z.end>mx){ mx=z.end; lateZone=z.name; } });
+  var totalDays=mn?diffDays(mn,mx)+1:0;
+  /* 总作业组日 vs 总容量组日 */
+  var work=0, span=0;
+  zones.forEach(function(z){
+    var n=Math.max(1,z.teams|0);
+    houses.filter(function(h){ return h.zone===z.name; }).forEach(function(h){ work+=h.days; });
+    if(z.start&&z.end) span+= workDaysBetween(z.start,z.end)*n;
+  });
+  var util=span?Math.round(work/span*100):0;
+  var h='<span class="chip">'+it('g_kpi_zone')+' <b>'+zones.length+'</b></span>'
+   +'<span class="chip">'+it('g_kpi_houses')+' <b>'+houses.length+'</b>'+it('g_load_dong')+'</span>'
+   +'<span class="chip">'+it('g_kpi_panels')+' <b>'+tp.toLocaleString()+'</b> '+it('g_unit_pcs')+'</span>'
+   +'<span class="chip">'+it('g_kpi_done')+' <b>'+td.toLocaleString()+'</b> ('+Math.round(td/tp*100)+'%)</span>'
+   +'<span class="chip">'+it('g_kpi_cap')+' <b>'+cfg.cap+'</b> '+it('g_unit_pcs')+'/'+it('g_unit_group')+'/'+it('g_unit_day')+'</span>'
+   +'<span class="chip">'+it('g_kpi_teams')+' <b>'+zones.reduce(function(a,z){return a+Math.max(1,z.teams|0);},0)+'</b>'+it('g_unit_group')+'</span>'
+   +'<span class="chip">'+it('g_kpi_range')+' <b>'+dmy(mn)+' ~ '+dmy(mx)+'</b></span>'
+   +'<span class="chip">'+it('g_kpi_days')+' <b>'+totalDays+'</b>'+it('g_unit_day')+'</span>'
+   +'<span class="chip">'+it('g_kpi_latezone')+' <b>'+esc(lateZone)+'</b></span>'
+   +'<span class="chip '+(util>=80?'ok':'')+'">'+it('g_kpi_util')+' <b>'+util+'%</b></span>';
+  box.innerHTML=h;
+}
+function renderZoneTbl(){
+  var t=document.getElementById('zoneTbl');
+  var h='<thead><tr><th>'+it('g_zt_zone')+'</th><th>'+it('g_zt_team')+'</th><th class="n">'+it('g_zt_count')+'</th><th class="n">'+it('g_zt_panels')+'</th>'
+    +'<th class="n">'+it('g_zt_done')+'</th><th class="n">'+it('g_zt_start')+'</th><th class="n">'+it('g_zt_end')+'</th><th class="n">'+it('g_zt_days')+'</th>'
+    +'<th class="n">'+it('g_zt_ideal')+'</th><th class="n">'+it('g_zt_util')+'</th></tr></thead><tbody>';
+  zones.forEach(function(z){
+    var hs=houses.filter(function(x){ return x.zone===z.name; });
+    var n=Math.max(1,z.teams|0), tp=sum(hs,'panels'), td=sum(hs,'done');
+    var work=0; hs.forEach(function(x){ work+=x.days; });
+    var ideal=Math.ceil(tp/Math.max(1,cfg.cap)/n);
+    var real=hs.length?diffDays(z.start,z.end)+1:0;
+    var realW=hs.length?workDaysBetween(z.start,z.end):0;
+    var util=realW?Math.round(work/(realW*n)*100):0;
+    h+='<tr><td><b>'+esc(z.name)+'</b></td>'
+      +'<td><input type="number" min="1" max="12" value="'+n+'" style="width:56px;border:1px solid var(--bd);border-radius:4px;padding:2px 5px"'
+      +' onchange="setTeams(\''+esc(z.name)+'\',this.value)"></td>'
+      +'<td class="n">'+hs.length+'</td><td class="n">'+tp.toLocaleString()+'</td><td class="n">'+td.toLocaleString()+'</td>'
+      +'<td class="n"><input value="'+esc(z.userStart?dmy(z.userStart):'')+'" placeholder="'+it('g_ph_follow')+'"'
+      +' style="width:84px;border:1px solid var(--bd);border-radius:4px;padding:2px 5px"'
+      +' onchange="setZoneStart(\''+esc(z.name)+'\',this.value)" title="'+it('g_zone_start_tip')+'"></td>'
+      +'<td class="n">'+dmy(z.end)+'</td>'
+      +'<td class="n"><b>'+real+'</b></td><td class="n">'+ideal+'</td>'
+      +'<td class="n"><span style="color:'+(util>=85?'#2e7d32':(util>=65?'#f57c00':'#c62828'))+'"><b>'+util+'%</b></span></td></tr>';
+  });
+  h+='</tbody>';
+  t.innerHTML=h;
+}
+function setZoneStart(zname,v){
+  var z=zoneOf(zname); if(!z) return;
+  z.userStart=toYmd(v)||'';
+  schedule(); renderAll(); saveCfg();
+}
+function setTeams(zname,v){
+  var z=zoneOf(zname); if(!z) return;
+  z.teams=Math.max(1,Math.min(12,parseInt(v,10)||1));
+  houses.forEach(function(h){ if(h.zone===zname&&h.lockTeam!=null&&h.lockTeam>=z.teams) h.lockTeam=null; });
+  try{ localStorage.setItem('house_zones_v1',JSON.stringify(zones)); }catch(e){}
+  schedule(); renderAll(); saveCfg();
+}
+function renderLoad(){
+  var box=document.getElementById('loadBox'), h='';
+  zones.forEach(function(z){
+    for(var t=0;t<Math.max(1,z.teams|0);t++){
+      var hs=houses.filter(function(x){ return x.zone===z.name&&x.team===t; })
+                   .sort(function(a,b){ return a.start<b.start?-1:1; });
+      var work=0; hs.forEach(function(x){ work+=x.days; });
+      var span=hs.length?workDaysBetween(hs[0].start,hs[hs.length-1].end):0;
+      var util=span?Math.round(work/span*100):0;
+      var col=cfg.color==='team'?teamColor(z.name,t):zoneColor(z.name);
+      h+='<div class="load"><div class="lh"><span class="ln">'+esc(z.name)+' · '+teamLabel(t)+'</span>'
+        +'<span class="lv">'+hs.length+it('g_load_dong')+' · '+work+it('g_load_workday')+' · '+it('g_load_util')+' <b>'+util+'%</b></span></div>'
+        +'<div class="lbar">';
+      if(span){
+        var cursor=hs[0].start, idle=0;
+        hs.forEach(function(x){
+          var gap=diffDays(cursor,x.start);
+          if(gap>0){ h+='<i style="width:'+(workDaysBetween(cursor,x.start)/span*100)+'%;background:#eceff1"></i>'; }
+          h+='<i style="width:'+(workDaysBetween(x.start,x.end)/span*100)+'%;background:'+col
+            +'" title="'+esc(x.name+' '+dmy(x.start)+'~'+dmy(x.end)+' '+x.days+it('g_unit_day'))+'"></i>';
+          cursor=addDays(x.end,1);
+        });
+      }else h+='<i style="width:100%;background:#eceff1"></i>';
+      h+='</div><div class="lf">'+(hs.length?(it('g_load_first')+' <b>'+esc(hs[0].name)+'</b> '+dmy(hs[0].start)
+        +' → '+it('g_load_last')+' <b>'+esc(hs[hs.length-1].name)+'</b> '+dmy(hs[hs.length-1].end)
+        +(util<70?' · <span style="color:#c62828">'+it('g_load_idle_warn')+'</span>':'')):'<b>'+it('g_idle')+'</b>' )
+        +'</div></div>';
+    }
+  });
+  box.innerHTML=h;
+  /* 冲突检测 */
+  var cb=document.getElementById('conflict'), warn=[];
+  zones.forEach(function(z){
+    var byTeam={};
+    houses.forEach(function(h){ if(h.zone!==z.name) return;
+      (byTeam[h.team]=byTeam[h.team]||[]).push(h); });
+    Object.keys(byTeam).forEach(function(tk){
+      var arr=byTeam[tk].slice().sort(function(a,b){ return a.start<b.start?-1:1; });
+      for(var i=1;i<arr.length;i++){
+        if(arr[i].start<=arr[i-1].end)
+          warn.push(z.name+' '+teamLabel(+tk)+'：'+arr[i-1].name+it('g_overlap_with')+arr[i].name+' '+it('g_time_overlap')+'（'+dmy(arr[i-1].end)+' / '+dmy(arr[i].start)+'）');
+      }
+    });
+  });
+  zones.forEach(function(z){ if(z.teams>Math.max(1,z.teams|0)) warn.push(''); });
+  houses.forEach(function(h){ if(!h.start||!h.end) warn.push('【'+h.zone+' '+h.name+'】'+it('g_not_scheduled')); });
+  cb.innerHTML=warn.filter(Boolean).length
+    ? '<div class="warnbox"><b>'+it('g_check_title')+'（'+warn.filter(Boolean).length+'）</b><ul>'
+      +warn.filter(Boolean).slice(0,8).map(function(x){ return '<li>'+esc(x)+'</li>'; }).join('')+'</ul></div>' : '';
+  /* 图例 */
+  var lg=document.getElementById('legend');
+  lg.innerHTML=cfg.color==='zone'
+    ? zones.map(function(z){ return '<span><i style="background:'+zoneColor(z.name)+'"></i>'+esc(z.name)+'</span>'; }).join('')
+    : '<span>'+it('g_legend_team')+'</span>';
+  lg.innerHTML+='<span><i style="background:#eceff1"></i>'+it('g_legend_idle')+'</span>'
+    +'<span><i style="background:#cbd5e0"></i>'+it('g_legend_base')+'</span>'
+    +'<span><i style="background:#ffa726;transform:rotate(45deg)"></i>'+it('g_legend_milestone')+'</span>'
+    +'<span style="color:#c62828">'+it('g_legend_lock')+'</span>';
+}
+
+/* =========================================================================
+ * 10. 拖拽（房舍条 -> 锁定开工日）
+ * ======================================================================= */
+var drag=null;
+function ptX(e){ if(e.touches&&e.touches.length) return e.touches[0].clientX;
+  if(e.changedTouches&&e.changedTouches.length) return e.changedTouches[0].clientX; return e.clientX; }
+function ptY(e){ if(e.touches&&e.touches.length) return e.touches[0].clientY;
+  if(e.changedTouches&&e.changedTouches.length) return e.changedTouches[0].clientY; return e.clientY; }
+function dragStart(e,el){
+  var id=el.getAttribute('data-id'), h=byId(id); if(!h) return;
+  if(e.type==='touchstart'&&e.touches.length>1) return;
+  drag={h:h,x0:ptX(e)+(document.getElementById('chartWrap').scrollLeft||0),moved:false,
+        touch:e.type.indexOf('touch')===0};
+  e.preventDefault();
+  var mv=drag.touch?'touchmove':'mousemove', up=drag.touch?'touchend':'mouseup';
+  document.addEventListener(mv,dragMove,{passive:false});
+  document.addEventListener(up,dragEnd);
+  document.addEventListener('touchcancel',dragEnd);
+}
+function applyDrag(x){
+  if(!drag) return;
+  var cw=document.getElementById('chartWrap');
+  var dx=(x+(cw?cw.scrollLeft:0))-drag.x0;
+  if(Math.abs(dx)>2) drag.moved=true;
+  var target=addDays(drag.h.lockStart||drag.h.start, Math.round(dx/S.dayW));
+  drag.h.start=nextWork(target);
+  drag.h.end=addWork(drag.h.start,drag.h.days);
+  updateRowsAfterDrag();
+}
+function updateRowsAfterDrag(){
+  var r=null; rows.forEach(function(x){ if(x.kind==='house'&&x.house===drag.h) r=x; });
+  if(r){ r.start=drag.h.start; r.end=drag.h.end; }
+  var i=rows.indexOf(r); if(i>=0) updateBar(i);
+  var svg=document.getElementById('depSvg'); if(svg) svg.classList.add('dragging');
+}
+function dragMove(e){
+  if(!drag) return;
+  if(e.cancelable) e.preventDefault();
+  var x=ptX(e), y=ptY(e); drag.lastX=x; drag.lastY=y;
+  applyDrag(x); edgeScroll(x,y);
+}
+var edgeRAF=null;
+function edgeScroll(x,y){
+  var cw=document.getElementById('chartWrap'); if(!cw||!drag) return;
+  var r=cw.getBoundingClientRect(), E=48, hx=0, vy=0;
+  if(x>r.right-E) hx=1; else if(x<r.left+E) hx=-1;
+  if(y>r.bottom-E) vy=1; else if(y<r.top+E) vy=-1;
+  drag.edge=hx; drag.edgeV=vy;
+  if((hx||vy)&&!edgeRAF) edgeRAF=requestAnimationFrame(edgeTick);
+}
+function edgeTick(){
+  edgeRAF=null; if(!drag||(!drag.edge&&!drag.edgeV)) return;
+  var cw=document.getElementById('chartWrap'), tw=document.getElementById('tblWrap');
+  if(drag.edge) cw.scrollLeft+=drag.edge*16;
+  if(drag.edgeV){ var mx=Math.max(0,cw.scrollHeight-cw.clientHeight);
+    var tp=Math.max(0,Math.min(cw.scrollTop+drag.edgeV*10,mx)); cw.scrollTop=tp; if(tw) tw.scrollTop=tp; }
+  if(drag.edge) applyDrag(drag.lastX);
+  edgeRAF=requestAnimationFrame(edgeTick);
+}
+function dragEnd(){
+  if(edgeRAF){ cancelAnimationFrame(edgeRAF); edgeRAF=null; }
+  var svg=document.getElementById('depSvg'); if(svg) svg.classList.remove('dragging');
+  if(drag){
+    if(drag.moved){ drag.h.lockStart=drag.h.start; }   /* 拖过 = 锁定开工日 */
+    schedule(); renderAll(); saveCfg();
+  }
+  drag=null;
+  document.removeEventListener('mousemove',dragMove);
+  document.removeEventListener('mouseup',dragEnd);
+  document.removeEventListener('touchmove',dragMove);
+  document.removeEventListener('touchend',dragEnd);
+  document.removeEventListener('touchcancel',dragEnd);
+}
+function updateBar(i){
+  var r=rows[i]; if(!r) return;
+  var el=document.querySelector('#chartInner .bar[data-id="'+cssEsc(r.id)+'"]'); if(!el) return;
+  var rh=rowH(), bh=cfg.barHeight, top=i*rh+(rh-bh)/2;
+  var pct=r.panels?Math.round(Math.min(100,(r.done||0)/r.panels*100)):0;
+  var col=barColorOf(r);
+  var x=S.x(r.start), w=Math.max(Math.round(S.dayW*(diffDays(r.start,r.end)+1)),4);
+  el.className='bar'+(w<48?' out':'')+(r.house&&r.house.lockStart?' locked':'');
+  el.style.cssText='left:'+Math.round(x)+'px;top:'+Math.round(top)+'px;width:'+w+'px;height:'+bh+'px;'
+    +bgFor(col,pct)+';--fg:'+fgOn(col);
+  if(r.kind==='house') el.setAttribute('data-lbl',r.name+' '+(r.days||0)+it('g_unit_day'));
+}
+function cssEsc(s){ return String(s).replace(/([ #.;?%&,@+*~':"!\^$[\]()=>|/])/g,'\\$1'); }
+
+/* =========================================================================
+ * 11. 分隔线
+ * ======================================================================= */
+function applyTblW(){ document.documentElement.style.setProperty('--tbl-w',Math.round(cfg.tableWidth||470)+'px'); }
+function fitTblW(){ var s=0; COLS.forEach(function(c){ s+=colW(c.k); });
+  cfg.tableWidth=Math.max(220,Math.min(s+2,Math.max(window.innerWidth-360,280)));
+  applyTblW(); saveCfg(); }
+function initSplitter(){
+  var sp=document.getElementById('splitter'); if(!sp||sp.__init) return; sp.__init=1;
+  function clamp(w){ return Math.max(220,Math.min(w,Math.max(window.innerWidth-360,300))); }
+  sp.addEventListener('mousedown',function(e){
+    if(e.button!==0) return; e.preventDefault();
+    var w0=cfg.tableWidth||470, x0=e.clientX;
+    sp.classList.add('on'); document.body.classList.add('resizing');
+    function mv(ev){ cfg.tableWidth=Math.round(clamp(w0+ev.clientX-x0)); applyTblW(); }
+    function up(){ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+      sp.classList.remove('on'); document.body.classList.remove('resizing'); saveCfg(); }
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); });
+  sp.addEventListener('dblclick',fitTblW);
+}
+function syncScroll(){
+  var a=document.getElementById('tblWrap'), b=document.getElementById('chartWrap');
+  if(!a||!b||a.__sync) return; a.__sync=1; var lock=false;
+  function link(p,q){ p.addEventListener('scroll',function(){
+    if(lock) return; lock=true; q.scrollTop=p.scrollTop;
+    requestAnimationFrame(function(){ lock=false; }); }); }
+  link(a,b); link(b,a);
+}
+
+/* =========================================================================
+ * 12. 导入
+ * ======================================================================= */
+function impOpen(){ document.getElementById('impBox').style.display='block'; }
+function impCancel(){ document.getElementById('impBox').style.display='none'; }
+/* 引号感知切分：支持 CSV 里 "1,800"、"上海,徐汇" 这类带分隔符的字段 */
+function splitLine(line,d){
+  line=String(line==null?'':line);
+  if(d!==',') return line.split(d).map(function(x){ return String(x).replace(/^"|"$/g,'').trim(); });
+  var out=[], cur='', q=false;
+  for(var i=0;i<line.length;i++){
+    var c=line[i];
+    if(c==='"'){ if(q&&line[i+1]==='"'){ cur+='"'; i++; } else q=!q; }
+    else if(c===','&&!q){ out.push(cur); cur=''; }
+    else cur+=c;
+  }
+  out.push(cur);
+  return out.map(function(x){ return x.trim(); });
+}
+function parseTable(text){
+  text=String(text||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  var lines=text.split('\n').filter(function(l){ return l.trim()!==''; });
+  if(!lines.length) return [];
+  var cand=['\t',',',';','|'], best=',', bestN=1;
+  cand.forEach(function(d){ var n=splitLine(lines[0],d).length; if(n>bestN){ bestN=n; best=d; } });
+  return lines.map(function(l){ return splitLine(l,best); });
+}
+/* 数字：去千分位逗号、"1,800片" -> 1800 */
+function toNum(v){
+  var s=String(v==null?'':v).replace(/,/g,'');
+  var n=parseFloat(s.replace(/[^0-9.\-]/g,''));
+  return isNaN(n)?0:n;
+}
+function impApply(){
+  var txt=document.getElementById('impText').value;
+  var msg=document.getElementById('impMsg');
+  var grid;
+  if(!txt.trim()){ msg.textContent=it('g_imp_empty'); return; }
+  if(txt.trim()[0]==='['||txt.trim()[0]==='{'){
+    try{
+      var o=JSON.parse(txt); var arr=Array.isArray(o)?o:(o.data||o.houses||o.list||[o]);
+      grid=[Object.keys(arr[0]||{})].concat(arr.map(function(x){ return Object.keys(x).map(function(k){ return x[k]; }); }));
+    }catch(e){ msg.textContent=it('g_imp_json_err')+e.message; return; }
+  }else grid=parseTable(txt);
+  if(grid.length<1){ msg.textContent=it('g_imp_nodata'); return; }
+  var hdr=document.getElementById('m_hdr').checked;
+  var heads=hdr?grid[0]:grid[0].map(function(_,i){ return it('g_col_n')+(i+1); });
+  var body=hdr?grid.slice(1):grid;
+  var zi=+document.getElementById('m_zone').value,
+      ni=+document.getElementById('m_name').value,
+      pi=+document.getElementById('m_pan').value,
+      di=document.getElementById('m_done').value;
+  di=(di===''||di==null)?-1:+di;
+  var out=[], bad=0;
+  body.forEach(function(r){
+    var z=r[zi], n=r[ni], p=toNum(r[pi]);
+    if(!z&&!n) return;
+    if(!p){ bad++; return; }
+    out.push({zone:z||it('g_unzoned'),name:n||(it('g_bld_fmt').replace('{n}',(out.length+1))),panels:Math.round(p),
+      done:di>=0?Math.max(0,Math.round(toNum(r[di]))):0});
+  });
+  if(!out.length){ msg.textContent=it('g_imp_norow'); return; }
+  HOUSE_SOURCE=out; loadHouses(); schedule(); renderAll(); saveCfg();
+  msg.innerHTML='<span style="color:#2e7d32">'+it('g_imp_ok').replace('{n}',out.length)
+    +(bad?('（'+it('g_imp_skip').replace('{n}',bad)+'）'):'')+'</span>';
+  impCancel();
+}
+function impFillMapping(){
+  var txt=document.getElementById('impText').value;
+  if(!txt.trim()) return;
+  var grid;
+  try{
+    if(txt.trim()[0]==='['||txt.trim()[0]==='{'){ var o=JSON.parse(txt);
+      var arr=Array.isArray(o)?o:(o.data||o.houses||[o]); grid=[Object.keys(arr[0]||{})]; }
+    else grid=[parseTable(txt)[0]||[]];
+  }catch(e){ return; }
+  var heads=grid[0]||[];
+  ['m_zone','m_name','m_pan','m_done'].forEach(function(id){
+    var sel=document.getElementById(id); sel.innerHTML='';
+    heads.forEach(function(hd,i){ sel.innerHTML+='<option value="'+i+'">'+esc(hd||(it('g_col_n')+(i+1)))+'</option>'; });
+    sel.innerHTML+='<option value="-1" data-none="1">'+it('g_imp_none')+'</option>';
+  });
+  /* 顺序：区 -> 房舍 -> 已装 -> 板数（已装先占位，避免被 /数/ 抢走）
+     正则没命中时按位置兜底，且已被占用的列不再重复分配 */
+  var used={};
+  function assign(id,re,fb){
+    var sel=document.getElementById(id), idx=-1;
+    heads.forEach(function(hd,i){ if(idx<0&&!used[i]&&re.test(String(hd||''))) idx=i; });
+    if(idx<0&&fb!=null&&fb<heads.length&&!used[fb]) idx=fb;
+    if(idx>=0){ used[idx]=1; sel.value=String(idx); }
+    return idx;
+  }
+  assign('m_zone',/区|zone|分区|area|block|地块/i,0);
+  assign('m_name',/舍|房|栋|名|name|building|house|楼/i,1);
+  var di=assign('m_done',/已|完成|done|installed|finished|已装/i,null);
+  assign('m_pan', /板|片|数|panel|qty|count|数量|pieces/i,2);
+  /* 未匹配时必须显式置「无」，否则会残留上一次的选择而误读别的列 */
+  if(di<0) document.getElementById('m_done').value='-1';
+}
+function expCsv(){
+  var head=[it('g_col_zone'),it('g_col_name'),it('g_col_panels'),it('g_col_done'),it('g_col_prog'),it('g_col_days'),it('g_col_team'),it('g_col_start'),it('g_col_end')];
+  var rows=[head.join(',')];
+  houses.forEach(function(h){
+    var p=h.panels?Math.round(h.done/h.panels*100):0;
+    rows.push([h.zone,h.name,h.panels,h.done,p,h.days,teamLabel(h.team),h.start,h.end]
+      .map(function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }).join(','));
+  });
+  var blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=it('g_csv_name')+'_'+today()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+}
+function loadSample(){ HOUSE_SOURCE=null; loadHouses(); schedule(); renderAll(); saveCfg(); }
+function addHouse(){
+  var z=zones.length?zones[0].name:'A区';
+  var hs=houses.filter(function(h){ return h.zone===z; });
+  houses.push({id:'H'+(houses.length+1),zone:z,name:it('g_bld_fmt').replace('{n}',(hs.length+1)),panels:1800,done:0,
+    days:0,team:0,start:'',end:'',lockStart:'',lockTeam:null,bs:'',be:''});
+  if(!zoneOf(z)) zones.push({name:z,teams:2,start:''});
+  schedule(); renderAll(); saveCfg();
+}
+
+/* =========================================================================
+ * 13. 参数绑定 / 主入口
+ * ======================================================================= */
+function readParams(){
+  cfg.cap=Math.max(1,parseInt(document.getElementById('p_cap').value,10)||200);
+  cfg.start=toYmd(document.getElementById('p_start').value)||cfg.start||today();
+  cfg.cal=document.getElementById('p_cal').value;
+  cfg.strat=document.getElementById('p_strat').value;
+  cfg.zmode=document.getElementById('p_zmode').value;
+  cfg.view=document.getElementById('p_view').value;
+  cfg.color=document.getElementById('p_color').value;
+  cfg.holidays=document.getElementById('p_hol').value;
+}
+function syncParamUI(){
+  document.getElementById('p_cap').value=cfg.cap;
+  document.getElementById('p_start').value=cfg.start?cpFmtDDMMYYYY(+cfg.start.slice(0,4),+cfg.start.slice(5,7)-1,+cfg.start.slice(8,10)):'';
+  document.getElementById('p_cal').value=cfg.cal;
+  document.getElementById('p_strat').value=cfg.strat;
+  document.getElementById('p_zmode').value=cfg.zmode;
+  document.getElementById('p_view').value=cfg.view;
+  document.getElementById('p_color').value=cfg.color;
+  document.getElementById('p_hol').value=cfg.holidays||'';
+  document.getElementById('p_hol').parentNode.parentNode.style.display=(cfg.cal==='work')?'':'none';
+}
+function recompute(){ readParams(); schedule(); renderAll(); saveCfg(); }
+function renderAll(){
+  document.documentElement.style.setProperty('--row-h',rowH()+'px');
+  document.documentElement.style.setProperty('--head-h','66px');
+  applyTblW();
+  buildRows(); renderChart(); renderTable();
+  renderKPI(); renderZoneTbl(); renderLoad(); syncScroll();
+}
+function rebuild(){ loadHouses(); schedule(); renderAll(); }
+
+document.getElementById('p_cal').addEventListener('change',function(){ readParams(); syncParamUI(); schedule(); renderAll(); saveCfg(); });
+['p_strat','p_zmode','p_view','p_color'].forEach(function(id){
+  document.getElementById(id).addEventListener('change',recompute); });
+['p_cap','p_start','p_hol'].forEach(function(id){
+  document.getElementById(id).addEventListener('change',recompute); });
+document.getElementById('impText').addEventListener('input',impFillMapping);
+document.getElementById('impFile').addEventListener('change',function(e){
+  var f=e.target.files&&e.target.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){ document.getElementById('impText').value=r.result; impFillMapping(); };
+  r.readAsText(f,'utf-8');
+});
+window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
+
+/* ============================ 日历弹出框（DD-MM-YYYY，标准设计，iframe 内自包含） ============================ */
+var cpCalTarget=null, cpCalOpenedAt=0, cpCalViewYear, cpCalViewMonth;
+function cpPad(n){ return n<10?'0'+n:''+n; }
+function cpFmtDDMMYYYY(y,m,d){ return cpPad(d)+'/'+cpPad(m+1)+'/'+y; }
+function cpParseDDMMYYYY(s){ if(!s) return null; var m=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/); return m?{y:+m[3],m:+m[2]-1,d:+m[1]}:null; }
+function cpGetWeekDays(){ var lang=curLang(); if(lang==='en') return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; if(lang==='vi') return ['CN','T2','T3','T4','T5','T6','T7']; return ['日','一','二','三','四','五','六']; }
+function cpGetMonthName(m){ var lang=curLang(); var months = lang==='en' ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] : lang==='vi' ? ['Th.1','Th.2','Th.3','Th.4','Th.5','Th.6','Th.7','Th.8','Th.9','Th.10','Th.11','Th.12'] : ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']; return months[m]||''; }
+function cpOpenCalendar(inputEl){
+  if(inputEl && inputEl.disabled) return;
+  cpCalTarget=inputEl;
+  var rect=inputEl.getBoundingClientRect();
+  var popup=document.getElementById('cpCalPopup');
+  var top=rect.bottom+4, left=rect.left;
+  if(left+248>window.innerWidth) left=Math.max(8,window.innerWidth-260);
+  if(top+330>window.innerHeight) top=Math.max(8,rect.top-334);
+  popup.style.top=top+'px'; popup.style.left=left+'px';
+  popup.classList.add('show');
+  cpCalOpenedAt=Date.now();
+  var L=curLang(); var lbl=L==='en'?{today:'Today',clear:'Clear'}:L==='vi'?{today:'Hôm nay',clear:'Xóa'}:{today:'今天',clear:'清除'};
+  var tb=document.querySelector('.cp-cal-today'); if(tb) tb.textContent=lbl.today;
+  var cb=document.getElementById('cpCalClear'); if(cb) cb.textContent=lbl.clear;
+  var cur=cpParseDDMMYYYY(inputEl.value);
+  var now=new Date();
+  cpCalViewYear=cur?cur.y:now.getFullYear();
+  cpCalViewMonth=cur?cur.m:now.getMonth();
+  cpRenderCal(cur);
+}
+function cpCloseCalendar(){ var popup=document.getElementById('cpCalPopup'); if(popup) popup.classList.remove('show'); cpCalTarget=null; }
+function cpCalBuildYM(){
+  var ys=document.getElementById('cpYearSel'), ms=document.getElementById('cpMonthSel'); if(!ys||!ms) return;
+  var yNow=new Date().getFullYear(), o='';
+  for(var yy=2000; yy<=yNow+50; yy++) o+='<option value="'+yy+'"'+(yy===cpCalViewYear?' selected':'')+'>'+yy+'</option>';
+  ys.innerHTML=o;
+  var mm=''; for(var i=0;i<12;i++) mm+='<option value="'+i+'"'+(i===cpCalViewMonth?' selected':'')+'>'+cpGetMonthName(i)+'</option>';
+  ms.innerHTML=mm;
+}
+function cpCalSetYM(){ var ys=document.getElementById('cpYearSel'), ms=document.getElementById('cpMonthSel'); if(!ys||!ms) return; cpCalViewYear=parseInt(ys.value,10)||cpCalViewYear; cpCalViewMonth=parseInt(ms.value,10)||cpCalViewMonth; cpRenderCal(cpParseDDMMYYYY(cpCalTarget?cpCalTarget.value:'')); }
+function cpCalPick(d){
+  var val=cpFmtDDMMYYYY(cpCalViewYear,cpCalViewMonth,d);
+  if(cpCalTarget){ cpCalTarget.value=val; cpCalTarget.dispatchEvent(new Event('input',{bubbles:true})); }
+  cpCloseCalendar();
+}
+function cpCalPickToday(){ var n=new Date(); cpCalViewYear=n.getFullYear(); cpCalViewMonth=n.getMonth(); cpCalPick(n.getDate()); }
+function cpRenderCal(selected){
+  var weekContainer=document.getElementById('cpCalWeek'); if(weekContainer) weekContainer.innerHTML=cpGetWeekDays().map(function(w){return '<span>'+w+'</span>';}).join('');
+  var titleEl=document.getElementById('cpCalTitle'); if(titleEl) titleEl.textContent=cpCalViewYear+'-'+cpPad(cpCalViewMonth+1);
+  cpCalBuildYM();
+  var firstDow=new Date(cpCalViewYear,cpCalViewMonth,1).getDay();
+  var daysInMonth=new Date(cpCalViewYear,cpCalViewMonth+1,0).getDate();
+  var today=new Date();
+  var maxDate=null; if(cpCalTarget&&cpCalTarget.getAttribute('data-max')){ var mp=cpParseDDMMYYYY(cpCalTarget.getAttribute('data-max')); if(mp) maxDate=new Date(mp.y,mp.m,mp.d,0,0,0,0); }
+  var minDate=null; if(cpCalTarget&&cpCalTarget.getAttribute('data-min')){ var np=cpParseDDMMYYYY(cpCalTarget.getAttribute('data-min')); if(np) minDate=new Date(np.y,np.m,np.d,0,0,0,0); }
+  var html='';
+  for(var i=0;i<firstDow;i++) html+='<button type="button" class="empty" disabled></button>';
+  for(var d=1; d<=daysInMonth; d++){
+    var cls=[], thisDate=new Date(cpCalViewYear,cpCalViewMonth,d);
+    var isDisabled=(maxDate&&thisDate.getTime()>maxDate.getTime())||(minDate&&thisDate.getTime()<minDate.getTime());
+    if(selected&&selected.y===cpCalViewYear&&selected.m===cpCalViewMonth&&selected.d===d) cls.push('selected');
+    if(today.getFullYear()===cpCalViewYear&&today.getMonth()===cpCalViewMonth&&today.getDate()===d) cls.push('today');
+    if(isDisabled) cls.push('disabled');
+    if(isDisabled) html+='<button type="button" class="'+cls.join(' ')+'" disabled>'+d+'</button>';
+    else html+='<button type="button" class="'+cls.join(' ')+'" onclick="cpCalPick('+d+')">'+d+'</button>';
+  }
+  var grid=document.getElementById('cpCalGrid'); if(grid) grid.innerHTML=html;
+}
+function cpCalGoPrev(){ cpCalViewMonth--; if(cpCalViewMonth<0){ cpCalViewMonth=11; cpCalViewYear--; } cpRenderCal(cpParseDDMMYYYY(cpCalTarget?cpCalTarget.value:'')); }
+function cpCalGoNext(){ cpCalViewMonth++; if(cpCalViewMonth>11){ cpCalViewMonth=0; cpCalViewYear++; } cpRenderCal(cpParseDDMMYYYY(cpCalTarget?cpCalTarget.value:'')); }
+function cpCalDoClear(){ if(cpCalTarget){ cpCalTarget.value=''; cpCalTarget.dispatchEvent(new Event('input',{bubbles:true})); } cpCloseCalendar(); }
+document.addEventListener('click', function(e){
+  var popup=document.getElementById('cpCalPopup');
+  if(!popup||!popup.classList.contains('show')) return;
+  if(popup.contains(e.target)) return;
+  if(Date.now()-cpCalOpenedAt<120) return;
+  if(cpCalTarget){
+    if(cpCalTarget===e.target) return;
+    var wrap=cpCalTarget.parentNode;
+    if(wrap&&wrap.classList&&wrap.classList.contains('cp-date-input-wrapper')&&wrap.contains(e.target)) return;
+  }
+  cpCloseCalendar();
+<script>
+(function(){
+  window.__errs=window.__errs||[];
+  window.onerror=function(m,s,l,c){ window.__errs.push(String(m)+' @'+l+':'+c); return false; };
+  function report(){
+    var out={errs:window.__errs};
+    var tbl=document.querySelector('#tblWrap table tbody');
+    var chart=document.getElementById('chartInner');
+    if(!tbl||!chart){ out.fatal='no table/chart'; return out; }
+    var trs=tbl.querySelectorAll('tr');
+    var bars=Array.prototype.slice.call(chart.querySelectorAll('.bar,.base'));
+    out.tbl=[]; out.chart=[]; out.tblTop=[]; out.barTop=[];
+    var tRect=document.getElementById('tblWrap').getBoundingClientRect();
+    for(var i=0;i<trs.length;i++){
+      var c=trs[i].cells[1]?trs[i].cells[1].textContent:'-';
+      out.tbl.push(c.replace(/^\s+|\s+$/g,''));
+      out.tblTop.push(Math.round(trs[i].getBoundingClientRect().top-tRect.top));
+    }
+    for(var j=0;j<bars.length;j++){
+      var b=bars[j];
+      out.chart.push((b.getAttribute('data-lbl')||b.getAttribute('title')||'').slice(0,12));
+      out.barTop.push(Math.round(parseFloat(b.style.top)||0));
+    }
+    var th=document.querySelector('.thead');
+    var bdEl=document.querySelector('.bd');
+    out.theadH=th?Math.round(th.getBoundingClientRect().height):-1;
+    out.bdChildBars=bdEl?bdEl.querySelectorAll('.bar,.base').length:-1;
+    out.barsTotal=chart.querySelectorAll('.bar,.base').length;
+    out.trCount=trs.length; out.barCount=bars.length;
+    return out;
+  }
+  window.__dump=function(){
+    var p=document.createElement('pre'); p.id='__report';
+    p.textContent='MYREPORT'+JSON.stringify(report());
+    document.body.appendChild(p);
+  };
+  window.addEventListener('load',function(){ setTimeout(window.__dump,1200); });
+})();
+</script>

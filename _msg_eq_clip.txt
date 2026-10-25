@@ -1,0 +1,24 @@
+fix(clip): 股东权益表接线剪贴板补写 + 启动自检（EQ-CLIP-PASS-LOCK-20261017）
+
+根因（用户 2026-10-17：「只要你修改，Ctrl+C/X/V 就立即丢失！根因？」）
+- 财务（finExcelKeysBind）与股东权益（eqExcelKeysBind）是【两套独立】的键盘补丁；
+- 之前只给财务那套加了「放行 + execCommand 补写」，权益这套从来没有接线；
+- Univer 自己的复制走 navigator.clipboard.write()，被 NotAllowedError 拒绝后
+  又被页面顶部「忽略噪声」分支吞掉 → 剪贴板恒为空 → 权益表复制/剪切完全没反应；
+- 所以每次"修一处"，用户正在用的另一张表依旧是坏的，观感就是"一改就丢"。
+
+修复
+- 新增全局 window.win_clipWrite(text)：两套补丁共用的唯一写剪贴板入口
+  （临时 textarea + 同步 execCommand('copy') + 失败降级 clipboard.writeText + 必须归还焦点）；
+- 新增 eq_clipMatrixText()：权益选区 → TSV（多区域优先，兜底活动单元格）；
+- eqExcelKeysBind 的 keydown 里接线：Ctrl+C/X 放行 Univer 后用 win_clipWrite 补写，
+  不 preventDefault、不 stopPropagation（V 不处理，Univer 走原生 paste 事件）；
+- 启动 3 秒后自检：接线缺失直接 console.error + window.__CLIP_LOCK_FAILED，
+  刷新后 F12 一眼能看出是 OK 还是 FAILED（原本完全静默，坏了也没人知道）。
+
+锁
+- check_fin_excel_keys_lock.py 新增 ⑧-c：window.win_clipWrite 必须存在、
+  eq_clipMatrixText 必须存在、eqExcelKeysBind 内必须调用
+  window.win_clipWrite(eq_clipMatrixText())、该分支不得有 preventDefault/stopPropagation；
+  与 ⑧-b（财务那套）并列 —— 以后【任何一侧】被删都会被 pre-commit 拦下。
+- 新增 _pw_clip_eq.py：股东权益表的真实浏览器回归探针。

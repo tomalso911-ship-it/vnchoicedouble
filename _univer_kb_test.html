@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Univer 0.5.5 键盘/滚动 行为测试床</title>
+<script type="importmap">
+{
+  "imports": {
+    "@univerjs/presets": "https://esm.sh/@univerjs/presets@0.5.5",
+    "@univerjs/presets/": "https://esm.sh/@univerjs/presets@0.5.5/"
+  }
+}
+</script>
+<link rel="stylesheet" href="https://esm.sh/@univerjs/presets@0.5.5/lib/styles/preset-sheets-core.css">
+<link rel="stylesheet" href="https://esm.sh/@univerjs/design@0.5.5/lib/index.css">
+<link rel="stylesheet" href="https://esm.sh/@univerjs/ui@0.5.5/lib/index.css">
+<style>
+  body{margin:0;background:#fff;font-family:system-ui,Arial}
+  #c{height:420px;border:1px solid #ddd}
+</style>
+</head>
+<body>
+<div id="c"></div>
+<script>
+window.__ready = false; window.__err = null;
+(async function(){
+  try {
+    const presets  = await import('@univerjs/presets');
+    const corePreset = await import('@univerjs/presets/preset-sheets-core');
+    const localeMod = await import('@univerjs/presets/preset-sheets-core/locales/en-US');
+    const en = (localeMod && (localeMod.default || localeMod)) || {};
+    const snapshot = {
+      id: 't', name: 't', sheetOrder: ['s1'],
+      sheets: { s1: { id: 's1', name: 'S1', rowCount: 200, columnCount: 20,
+        cellData: { '0': { '0': { v: 'A1' }, '1': { v: 'B1' } },
+                    '1': { '0': { v: 11 } },
+                    '2': { '0': { v: 22 } },
+                    '3': { '0': { v: 'ABCDE' } } } } },
+      styles: {}
+    };
+    const r = presets.createUniver({
+      theme: presets.defaultTheme,
+      locale: presets.LocaleType.EN_US,
+      locales: { [presets.LocaleType.EN_US]: en },
+      presets: [ corePreset.UniverSheetsCorePreset({ container: 'c' }) ]
+    });
+    window.presets = presets;
+    window.corePreset = corePreset;
+    window.u = r.univer;
+    window.api = r.univerAPI;
+    const UNIT = (presets.UniverInstanceType && presets.UniverInstanceType.UNIVER_SHEET) || 2;
+    window.sheet = window.u.createUnit(UNIT, snapshot);
+    window.__ready = true;
+  } catch (e) { window.__err = String((e && e.message) || e); }
+})();
+</script>
+</body>
+</html>

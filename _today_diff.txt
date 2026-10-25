@@ -1,0 +1,1642 @@
+﻿diff --git a/choice_lite.html b/choice_lite.html
+index 3dacd20..5970e46 100644
+--- a/choice_lite.html
++++ b/choice_lite.html
+@@ -153,4 +153,12 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
+ // 全局错误浮层：任何 JS 报错都显示在页面顶部红线，方便定位"进不去"问题
+ (function () {
++  /* ★RO-NOISE-20261018：ResizeObserver 的这两条是浏览器的「回调通知延迟」警告，
++     不是异常（没有调用栈、页面照常工作）。Univer 的布局每帧都会触发几十条，
++     把真正的报错完全淹掉（用户看到满屏红条）。默认吞掉；
++     需要专门排查时在控制台执行 window.__showROWarning = true 再刷新即可恢复显示。 */
++  function isResizeObserverNoise(m) {
++    return /ResizeObserver loop (completed with undelivered notifications|limit exceeded)/i.test(String(m || ''));
++  }
++  var __errLastMsg = '', __errLastCnt = 0, __errLastEl = null;
+   function showErr(msg) {
+     var box = document.getElementById('__global_err_box__');
+@@ -161,8 +169,25 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
+       document.body.appendChild(box);
+     }
+-    box.textContent += '[ERR] ' + msg + '\n';
++    /* 连续重复的同一错误折叠成 (×N)：否则每秒几十条会把整页撑爆、也看不到别的错 */
++    if (msg === __errLastMsg && __errLastEl) {
++      __errLastCnt++;
++      __errLastEl.textContent = '[ERR] ' + msg + '  (×' + __errLastCnt + ')';
++      return;
++    }
++    __errLastMsg = msg; __errLastCnt = 1;
++    var line = document.createElement('div');
++    line.textContent = '[ERR] ' + msg;
++    box.appendChild(line);
++    __errLastEl = line;
++    while (box.childNodes.length > 60) box.removeChild(box.firstChild);   /* 只留最近 60 条 */
+   }
+   window.addEventListener('error', function (e) {
+-    showErr((e.message || 'error') + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
++    var m = e.message || 'error';
++    if (isResizeObserverNoise(m)) {
++      /* 噪声不上浮层，但要计数：抖动取证（__finShakeReport）靠它判断有没有布局死循环 */
++      try { window.__roErrCount = (window.__roErrCount || 0) + 1; } catch (e1) {}
++      if (!window.__showROWarning) return;
++    }
++    showErr(m + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : ''));
+   });
+   window.addEventListener('unhandledrejection', function (e) {
+@@ -177,4 +202,405 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
+   });
+ })();
++// ============================================================================
++// ★UNIVER-POPUP-PIN-20261018（用户 2026-10-18：「字体颜色面板这个总是在晃动」）
++//
++// 实测根因（不是猜的，探针 _pw_shake_zoom.py / _pw_shake_fix3.py 量出来的）：
++//   Univer 0.5.5 的浮层（取色器、下拉面板）用 ResizeObserver 做「measure → set 位置/尺寸」。
++//   当锚点下方放不下这个面板时（窗口矮、或浏览器缩放 125%+ 让可视高度变小的机器上），
++//   它会夹到 top:0 并反复重新测量：高度在 360↔441 之间跳、宽度在 326↔341 之间跳
++//   （差 15px 就是内部滚动条出现/消失），每秒触发 ~60 条
++//   "ResizeObserver loop completed with undelivered notifications"，
++//   肉眼看到的就是「面板一直在抖」。这是 Univer 内部的反馈死循环，改不了它的代码。
++//
++// 方案：浮层出现后，把它的【宽 + 高】用 CSS !important 钉死（覆盖 Univer 每帧写入的内联样式）。
++//   尺寸不再变化 → 循环失去反馈 → 面板定住。只在「大面板」（≥200×200）上生效，
++//   普通下拉菜单不受影响。
++//   ★2026-10-18 加固二（用户：「刷新后不晃，第二次再点开改变颜色又开始晃」）：
++//     旧版每轮只挑【一个】浮层（面积最小的那个）来钉，并用「当前节点 === 上次节点」提前 return。
++//     但 Univer 关掉浮层时节点常常留在 DOM 里（只是隐藏），第二次打开是【新节点】，
++//     旧逻辑一直命中那个隐藏的旧节点 → 直接 return → 新面板永远钉不上 → 又开始抖。
++//     现在改成：每一轮遍历【所有】可见的大浮层，逐个钉；新节点延迟 150ms 等它稳定再钉
++//     （避免把入场动画中间尺寸钉死）。规则按「宽x高」分桶写进一张样式表，互不干扰。
++//   需要排查原始行为时：控制台执行 window.__finPopupPinOff = true 再刷新即可。
++// ============================================================================
++(function () {
++  window.__FIN_POPUP_PIN = '20261018l';   /* 版本标记：控制台可查，确认页面是不是最新 */
++  var CSS_ID = '__fin_popup_pin_css';
++  var rules = {};          /* key(宽x高) -> css 规则文本 */
++  var lastGood = {};      /* 浮层种类(z-index) -> 首次量出的自然尺寸 {w,h}，第二次打开直接复用 */
++  function ensureStyle() {
++    var s = document.getElementById(CSS_ID);
++    if (!s || !s.isConnected) {
++      s = document.createElement('style');
++      s.id = CSS_ID;
++      (document.head || document.documentElement).appendChild(s);
++    }
++    return s;
++  }
++  function flush() {
++    try { ensureStyle().textContent = Object.keys(rules).map(function (k) { return rules[k]; }).join('\n'); } catch (e) {}
++  }
++  /* ★PIN-BADGE-20261018：右下角小徽标，把"到底有没有钉上"直接显示在屏幕上。
++     用户反馈第二次打开仍晃，但本地四种视口都正常 —— 需要确认真机上
++     第二次的浮层是不是根本不在我们选择器里。看完可以 window.__finPinBadgeOff = true 关掉。 */
++  var badge = null;
++  function showBadge(txt) {
++    try {
++      if (window.__finPinBadgeOff) { if (badge) { badge.style.display = 'none'; } return; }
++      if (!badge || !badge.isConnected) {
++        badge = document.createElement('div');
++        badge.id = '__fin_pin_badge';
++        badge.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:2147483647;pointer-events:none;' +
++          'background:rgba(0,0,0,.78);color:#7CFC98;font:11px/1.45 Consolas,monospace;padding:4px 7px;' +
++          'border-radius:4px;max-width:420px;white-space:pre-wrap;';
++        (document.body || document.documentElement).appendChild(badge);
++      }
++      badge.style.display = 'block';
++      if (badge.textContent !== txt) badge.textContent = txt;
++    } catch (e) {}
++  }
++  function visibleBox(el) {
++    var cs = null;
++    try { cs = getComputedStyle(el); } catch (e) { return null; }
++    if (!cs || cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0) return null;
++    var r = el.getBoundingClientRect();
++    if (r.width < 200 || r.height < 200) return null;           /* 只处理大面板（取色器等） */
++    if (r.bottom <= 0 || r.right <= 0) return null;
++    if (r.top > (window.innerHeight || 800) || r.left > (window.innerWidth || 1200)) return null;
++    return r;
++  }
++  /* ★PIN-RAFTRACK-20261018：浮层出现后逐帧（rAF）采样 900ms，挑出【内容不被裁】的那一帧尺寸。
++     实测（_pw_pin_color5.py，1100×620 视口）取色器在两种状态间每帧对跳：
++       · 326 × 441.5  ← 内容完整、没有滚动条（真正的自然尺寸）
++       · 341 × 360    ← 宽度多了 15px（= 出现竖向滚动条），高度被砍，内容被裁
++     所以「取最大宽度」是错的：会挑中被裁的 341×360，于是色块被压扁 → 点绿色落到了深色块上。
++     正确规则：**取最高**的那一帧（高度决定内容有没有被裁），并配用同一帧的宽度；
++     高度相同再比宽度。结果写进 el.__finObs = { t0, w, h, run }，由 tick() 在 900ms 后取用。 */
++  function startTrack(el) {
++    try {
++      if (el.__finObs && el.__finObs.run) return;          /* 已经在跟踪，不重复开 */
++      var rec = { t0: Date.now(), w: 0, h: 0, run: true };
++      el.__finObs = rec;
++      function step() {
++        try {
++          if (!rec.run || !el.isConnected) { rec.run = false; return; }
++          var r = el.getBoundingClientRect();
++          if (r.height > rec.h + 0.5 || (Math.abs(r.height - rec.h) <= 0.5 && r.width > rec.w)) {
++            rec.h = r.height; rec.w = r.width;               /* 高的一帧优先，同高取宽 */
++          }
++          if (Date.now() - rec.t0 >= 900) { rec.run = false; return; }
++          requestAnimationFrame(step);
++        } catch (e) { rec.run = false; }
++      }
++      try { requestAnimationFrame(step); } catch (e) { rec.run = false; }
++    } catch (e) {}
++  }
++  function tick() {
++    try {
++      if (window.__finPopupPinOff) { showBadge('popup-pin: OFF'); return; }
++      /* ★PIN-SCAN-20261018：不再依赖 .univer-fixed 类名 —— 用户反馈「永远第二次就晃」，
++         说明第二次挂载的浮层很可能换了父容器/类名，按类名找永远找不到它。
++         现在改成按【位置 + 尺寸】扫候选：
++           body 直接子节点 + 它们的直接子节点（portal 挂载点常见形态）+ 所有 .univer-fixed。 */
++      var vw = window.innerWidth || 1200, vh = window.innerHeight || 800;
++      var list = [], picked = [];
++      function addCand(el) {
++        if (!el || el.nodeType !== 1 || picked.indexOf(el) >= 0) return;
++        picked.push(el);
++        if (el.id === '__fin_pin_badge' || el.id === '__fin_popup_pin_css') return;
++        if (/^(inst_|fin_|prod_|eq_|auth_|bd_|bd[A-Z])/.test(el.id || '')) return;   /* 自家浮层不碰 */
++        if (el.id === 'univer_container' || el.id === 'equity_container') return;
++        var cs; try { cs = getComputedStyle(el); } catch (e) { return; }
++        if (!cs || cs.display === 'none' || cs.visibility === 'hidden' || (+cs.opacity) === 0) return;
++        if (cs.position !== 'fixed' && cs.position !== 'absolute') return;
++        var rr = el.getBoundingClientRect();
++        if (rr.width < 200 || rr.height < 200) return;
++        if (rr.width > vw + 4 || rr.height > vh + 4) return;
++        if (rr.width > vw * 0.95 && rr.height > vh * 0.95) return;    /* 整页遮罩不算浮层 */
++        if (rr.bottom <= 0 || rr.right <= 0 || rr.top > vh || rr.left > vw) return;
++        list.push(el);
++      }
++      try {
++        var kids = document.body ? document.body.children : [];
++        for (var k1 = 0; k1 < kids.length; k1++) {
++          addCand(kids[k1]);
++          var gk = kids[k1].children;
++          for (var k2 = 0; k2 < gk.length && k2 < 40; k2++) addCand(gk[k2]);
++        }
++        var uf = document.querySelectorAll('.univer-fixed');
++        for (var k3 = 0; k3 < uf.length; k3++) addCand(uf[k3]);
++      } catch (e1) {}
++      var total = list.length, vis = 0, pinnedTxt = [];
++      var now = Date.now();
++      for (var i = 0; i < list.length; i++) {
++        var el = list[i];
++        var r = visibleBox(el);
++        if (!r) {
++          /* ★PIN-REM-20261018：浮层隐藏时清掉"已测/已钉"标记。
++             如果 Univer 第二次打开复用同一个 DOM 节点，旧的 data-fin-seen / __finMaxW
++             会让它直接按"上一次的尺寸"钉住；内容变了就对不上，反而每帧重排 → 还是抖。
++             清掉标记后，重新打开会重新观察 500ms 再钉。 */
++          try {
++            if (el.getAttribute('data-fin-seen')) el.removeAttribute('data-fin-seen');
++            if (el.getAttribute('data-fin-pin')) el.removeAttribute('data-fin-pin');
++            el.__finMaxW = 0; el.__finMaxH = 0;
++            el.__finObs = null;      /* 隐藏时作废逐帧采样的旧结果，重新打开要重新量 */
++          } catch (e0) {}
++          continue;
++        }
++        vis++;
++        /* ★PIN-NOWAIT-20261018（用户：「永远都是第二次就晃」）：
++           只等 500ms 再钉的问题：如果 Univer 第二次打开是【每帧重挂浮层】的死循环，
++           每个新节点都活不到 500ms，永远没人钉 → 第二次必晃。
++           立刻钉的问题（实测过）：会钉到入场动画中途的尺寸（h=424 而不是 442），
++           内容被压扁 → 点绿色落到了深色色块上 → 就是用户说的"选绿色却变黑"。
++           最终方案：第一次打开量准（500ms 内最大尺寸）并按种类记住，
++           之后同种类浮层一出现就用记住的自然尺寸钉，既不等也不会压扁。 */
++        var seen = +(el.getAttribute('data-fin-seen') || 0);
++        /* 浮层种类：Univer 用 z-index 区分（取色器是 univer-z-[1071]）。
++           第一次打开量出的"自然尺寸"按种类记下来，第二次打开直接用它钉，
++           既不会等 500ms（重挂循环里等不到），也不会钉到动画中途的小尺寸（会把色块压扁）。 */
++        var kind = 'k';
++        try {
++          var mzc = /univer-z-\[(\d+)\]/.exec(String(el.getAttribute('class') || ''));
++          if (mzc) kind = 'z' + mzc[1];
++        } catch (eK) {}
++        var good = lastGood[kind] || null;
++        if (!seen) {
++          el.setAttribute('data-fin-seen', String(now));
++          if (good) {
++            try { el.__finMaxW = good.w; el.__finMaxH = good.h; } catch (e) {}
++          } else {
++            startTrack(el);         /* 第一次遇到这种浮层：逐帧记录最大尺寸（700ms） */
++            continue;
++          }
++        }
++        /* 入场若是"缩放"动画（matrix 的 scale ≠ 1），此刻量到的尺寸偏小，
++           钉住会永久变小 → 跳过这一帧，等动画结束再钉。 */
++        try {
++          var tr = getComputedStyle(el).transform || 'none';
++          if (tr && tr.indexOf('matrix') === 0) {
++            var mm = tr.replace(/^matrix\(|\)$/g, '').split(',');
++            var sc = parseFloat(mm[0]) || 1;
++            if (Math.abs(sc - 1) > 0.02) continue;
++          }
++        } catch (e2) {}
++        /* 这个种类还没量过 → 等逐帧跟踪跑完 900ms，用【最高那一帧】的宽高（内容完整的自然尺寸）再钉。 */
++        if (!good) {
++          var rec0 = el.__finObs;
++          if (!rec0) continue;
++          if (now - rec0.t0 < 900) continue;
++          try { el.__finMaxW = rec0.w; el.__finMaxH = rec0.h; } catch (e) {}
++        }
++        /* ★PIN-FRACTION-20261018：保留 2 位小数，不用整数。
++           浏览器缩放 110% / 125% / 150% 时尺寸是小数（如 326.4），
++           钉成整数 326 会与 Univer 的内部计算每帧打架 → 反而一直抖。 */
++        var w = Math.round((el.__finMaxW || r.width) * 100) / 100;
++        var natH = el.__finMaxH || r.height;
++        var capH = (window.innerHeight || 800) - 16;
++        var h = Math.round(Math.min(natH, capH) * 100) / 100;
++        var clipped = h < Math.round(natH * 100) / 100 - 0.5;   /* 面板比视口还高 → 允许内部滚动，别把色块裁掉 */
++        if (!good && w > 120 && h > 120) lastGood[kind] = { w: w, h: h };   /* 记住自然尺寸，下次直接复用 */
++        if (!(w > 120) || !(h > 120)) continue;
++        var key = 'w' + w + 'h' + h;
++        if (!rules[key]) {
++          rules[key] = '[data-fin-pin="' + key + '"]{' +
++            'width:' + w + 'px !important;max-width:' + w + 'px !important;' +
++            'height:' + h + 'px !important;min-height:' + h + 'px !important;max-height:' + h + 'px !important;' +
++            (clipped ? 'overflow-y:auto !important;' : '') +
++            /* 入场动画/透明度：Univer 频繁重挂浮层时 animate-in 会反复重播，看起来是半透明一闪一闪 + 抖 */
++            'animation:none !important;transition:none !important;opacity:1 !important;}';
++          flush();
++        }
++        if (el.getAttribute('data-fin-pin') !== key) {
++          el.setAttribute('data-fin-pin', key);
++          try { console.log('[popup-pin] pinned ' + w + 'x' + h); } catch (e) {}
++        }
++        pinnedTxt.push('✓' + w + 'x' + h);
++      }
++      /* 徽标：Univer 浮层总数 / 大面板数 / 已钉住的尺寸 —— 第二次打开时看一眼就知道有没有钉上 */
++      if (total) {
++        showBadge('popup-pin ' + (pinnedTxt.length ? pinnedTxt.join(' ') : '(未钉)') +
++          '\n候选浮层 ' + total + ' 个（可见 ' + vis + '）');
++      } else {
++        try { if (badge) badge.style.display = 'none'; } catch (e) {}   /* 没浮层就不显示 */
++      }
++    } catch (e) {}
++  }
++  /* 一出现就钉：监听整个 body 子树（浮层可能挂在任意 portal 容器里） */
++  try {
++    new MutationObserver(function () { tick(); }).observe(document.body, { childList: true, subtree: true });
++  } catch (e) {}
++  setInterval(tick, 120);
++})();
++// ============================================================================
++// ★SHAKE-REPORT-20261018：晃动现场取证（用户 2026-10-18「股东权益里面的表格全部在晃」）
++//   控制台执行：  await window.__finShakeReport()
++//   会采样 2 秒的「容器/画布几何 + 页面尺寸 + DPR」，并统计这段时间内
++//   两个 Univer 实例各自执行了哪些命令、执行了多少次。
++//   · 几何在"在抖"→ 是容器/页面尺寸在变（CSS/布局问题，我们能修）；
++//   · 几何"稳定"但命令次数很高 → 有代码在每帧派发命令（我们的定时器，能修）；
++//   · 两者都正常 → 是 Univer 画布自身重绘（第三方渲染，另想办法）。
++// ============================================================================
++window.__finShakeReport = function (ms) {
++  ms = ms || 2000;
++  var t0 = Date.now();
++  var samples = [], cmds = {}, patched = [];
++  function patch(api, tag) {
++    try {
++      if (!api || typeof api.executeCommand !== 'function' || api.__shakePatched) return;
++      var orig = api.executeCommand;
++      api.__shakePatched = true;
++      api.executeCommand = function (id) {
++        try { var k = tag + String(id); cmds[k] = (cmds[k] || 0) + 1; } catch (e) {}
++        return orig.apply(api, arguments);
++      };
++      patched.push(function () { try { api.executeCommand = orig; api.__shakePatched = false; } catch (e) {} });
++    } catch (e) {}
++  }
++  try { patch(window.finUniverAPI, 'fin:'); } catch (e) {}
++  try { if (window.__eqAPI) patch(window.__eqAPI(), 'eq:'); } catch (e) {}
++  function box(el) {
++    if (!el) return null;
++    var r = el.getBoundingClientRect();
++    return [Math.round(r.width * 10) / 10, Math.round(r.height * 10) / 10,
++            Math.round(r.top * 10) / 10, Math.round(r.left * 10) / 10];
++  }
++  function grab() {
++    var ec = document.getElementById('equity_container');
++    var fc = document.getElementById('univer_container');
++    var cv = ec && ec.querySelector('canvas');
++    samples.push({
++      eq: box(ec), eqc: box(cv), fin: box(fc),
++      ewbw: cv ? cv.width : 0, ewbh: cv ? cv.height : 0,   /* 画布后备缓冲尺寸（DPR 取整抖动的证据） */
++      sh: document.documentElement.scrollHeight,
++      cw: document.documentElement.clientWidth,
++      dpr: window.devicePixelRatio || 1
++    });
++  }
++  grab();
++  var iv = setInterval(grab, 100);
++  return new Promise(function (resolve) {
++    setTimeout(function () {
++      try { clearInterval(iv); } catch (e) {}
++      patched.forEach(function (f) { f(); });
++      var names = ['eq.w', 'eq.h', 'eq.top', 'eq.left', 'eqc.w', 'eqc.h',
++                   'fin.w', 'fin.h', 'fin.top', 'fin.left', 'ewbw', 'ewbh'];
++      function get(s, path) {
++        if (path.indexOf('.') < 0) return s[path];
++        var parts = path.split('.'), v = s[parts[0]];
++        if (!v) return null;
++        return v[['w', 'h', 'top', 'left'].indexOf(parts[1])];
++      }
++      var lines = ['采样 ' + samples.length + ' 次 / ' + ms + 'ms'];
++      names.forEach(function (n) {
++        var vals = samples.map(function (s) { return get(s, n); }).filter(function (v) { return v != null; });
++        if (!vals.length) { lines.push('  ' + n + ': -'); return; }
++        var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
++        lines.push('  ' + n + ': ' + mn + (mn === mx ? '  (稳定)' : ' ~ ' + mx + '  ★在抖'));
++      });
++      var shs = samples.map(function (s) { return s.sh; });
++      lines.push('  页面高: ' + Math.min.apply(null, shs) + (Math.min.apply(null, shs) === Math.max.apply(null, shs) ? '  (稳定)' : ' ~ ' + Math.max.apply(null, shs) + '  ★在抖'));
++      lines.push('  DPR: ' + samples[samples.length - 1].dpr);
++      var cmdKeys = Object.keys(cmds);
++      lines.push('命令调用: ' + (cmdKeys.length ? cmdKeys.map(function (k) { return k + '×' + cmds[k]; }).join('  ') : '（期间没有任何命令）'));
++      var out = lines.join('\n');
++      console.log('[shake-report]\n' + out);
++      resolve(out);
++    }, ms);
++  });
++};
++// ============================================================================
++// ★SHAKE-AUTOREPORT-20261018：进入「财务 / 股东权益」后自动采样 2 秒，
++//   一旦发现容器/画布尺寸或位置在抖，就自己往控制台打一份 [shake-report]。
++//   （用户 2026-10-18 反馈「还是晃」「股东权益里面的表格全部在晃」，本地四种视口都复现不出来，
++//     需要真机上晃动发生那一刻的数据；这样不用让用户手敲命令。）
++//   采样项：容器/画布 CSS 尺寸与位置、画布后备缓冲尺寸、工具栏宽高、页面尺寸、RO 警告数。
++// ============================================================================
++(function () {
++  var wrapped = false;
++  function armAfterSwitch() {
++    try {
++      if (wrapped || typeof window.switchView !== 'function') return;
++      var orig = window.switchView;
++      window.switchView = function () {
++        var r = orig.apply(this, arguments);
++        setTimeout(function () { autoSample(); }, 1200);
++        return r;
++      };
++      wrapped = true;
++    } catch (e) {}
++  }
++  function rect(el) {
++    if (!el) return null;
++    var r = el.getBoundingClientRect();
++    return { w: +r.width.toFixed(1), h: +r.height.toFixed(1), t: +r.top.toFixed(1), l: +r.left.toFixed(1) };
++  }
++  function autoSample() {
++    try {
++      var n = 20, iv = 80, rows = [];
++      var ro0 = window.__roErrCount || 0;
++      var t = setInterval(function () {
++        var fin = document.getElementById('view-finance');
++        var eqv = document.getElementById('view-equity');
++        var activeFin = fin && fin.classList.contains('active');
++        var c = document.getElementById(activeFin ? 'univer_container' : 'equity_container');
++        var tb = c ? c.querySelector('.univer-toolbar-container') : null;
++        var cv = c ? c.querySelector('canvas') : null;
++        rows.push({
++          box: rect(c), cv: rect(cv), tb: rect(tb),
++          bw: cv ? cv.width : 0, bh: cv ? cv.height : 0,
++          sh: document.documentElement.scrollHeight,
++          cw: document.documentElement.clientWidth
++        });
++        if (rows.length >= n) {
++          clearInterval(t);
++          report(rows, (window.__roErrCount || 0) - ro0);
++        }
++      }, iv);
++    } catch (e) {}
++  }
++  function report(rows, roDelta) {
++    try {
++      function span(get) {
++        var v = rows.map(get).filter(function (x) { return x != null && !isNaN(x); });
++        if (!v.length) return null;
++        var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v);
++        return { mn: mn, mx: mx, shake: Math.abs(mx - mn) > 0.4 };
++      }
++      var checks = [
++        ['容器宽', function (s) { return s.box && s.box.w; }],
++        ['容器高', function (s) { return s.box && s.box.h; }],
++        ['容器top', function (s) { return s.box && s.box.t; }],
++        ['容器left', function (s) { return s.box && s.box.l; }],
++        ['画布CSS宽', function (s) { return s.cv && s.cv.w; }],
++        ['画布CSS高', function (s) { return s.cv && s.cv.h; }],
++        ['画布缓冲宽', function (s) { return s.bw; }],
++        ['画布缓冲高', function (s) { return s.bh; }],
++        ['工具栏宽', function (s) { return s.tb && s.tb.w; }],
++        ['页面高', function (s) { return s.sh; }],
++        ['页面宽', function (s) { return s.cw; }]
++      ];
++      var lines = [], anyShake = false;
++      checks.forEach(function (c) {
++        var r = span(c[1]);
++        if (!r) return;
++        if (r.shake) anyShake = true;
++        lines.push('  ' + c[0] + ': ' + r.mn + (r.shake ? ' ~ ' + r.mx + '  ★在抖' : '  (稳定)'));
++      });
++      lines.push('  ResizeObserver 警告: ' + roDelta + ' 条 / 1.6s');
++      if (anyShake || roDelta > 20) {
++        console.warn('[shake-report] 检测到晃动\n' + lines.join('\n'));
++      } else {
++        console.log('[shake-report] 几何稳定（没有检测到晃动）\n' + lines.join('\n'));
++      }
++    } catch (e) {}
++  }
++  var t0 = setInterval(function () {
++    armAfterSwitch();
++    if (wrapped) { clearInterval(t0); }
++  }, 400);
++  setTimeout(function () { autoSample(); }, 3000);
++})();
+ </script>
+ <!-- ==================== 手机横屏支持 ====================
+@@ -19004,4 +19430,640 @@ var PROD_EQUIP_FAULT_KB = {
+     }
+ 
++    /* ================= ★★ FIN-UNDO-LEDGER-20261018 ★★ =================
++       用户要求：撤销/恢复要和 Excel 完全一样 —— 能连续撤 10 次、恢复按撤销的相反顺序、
++       一旦做了新编辑恢复队列清空。
++       ★为什么不用 Univer 自带的撤销服务：实测它各种重载（切报表 / 保存重载 / 切语言 /
++         disposeUnit+createUnit）之后整栈清空，pushUndoRedo 在某些门面上不可赋值，
++        用户那边表现就是"按钮是灰的 / 点了没反应"。所以这套语义自己保证：
++         ① 账本记【原始 cellData 的 {v,f,t}】，一格一份，上限 10 步（先进先出）；
++         ② 记账挂【命令服务级】beforeCommandExecuted / onCommandExecuted（用户打字、粘贴、
++            Delete 清空都会经过这里）；程序自己的写入（finExecSilent）一律不记账；
++         ③ 写回必须带【显式 range】（不带时 Univer 会写到"当前选区左上角"→ 撤销写错格子）；
++         ④ 键按下/粘贴的同一瞬间先抓一份"改前值"（权益表的自建键盘写入会抢在命令之前写格子）。
++       ==================================================================== */
++    var FIN_UNDO_MAX = 10;
++    var finUndoHist = [], finUndoRedo = [];
++    var finUndoProg = 0;               // >0 = 程序写入（不记账）
++    var finUndoApplyUntil = 0;         // >now = 正在撤销/恢复写回（不记账）
++    var finLastUserInputAt = 0;        // 最后一次真实用户输入
++    var finUndoPre = null, finUndoPreAt = 0;
++    window.finUndoHist = finUndoHist;
++    window.finUndoRedo = finUndoRedo;
++    window.finUndoStats = { rec: 0, skipSame: 0, skipNoSnap: 0, fallback: 0 };
++    window.FIN_UNDO_BUILD = 'FIN-UNDO-EXCEL-20261018k';
++
++    /* 程序写入包一层：finExecSilent 期间不记账（翻译补写 / 币种重算 / 高亮写入…） */
++    try {
++      if (typeof finExecSilent === 'function' && !finExecSilent.__finUndoWrapped){
++        var _finExecOrig_ = finExecSilent;
++        finExecSilent = function(cmdId, params){
++          finUndoProg++;
++          try { return _finExecOrig_(cmdId, params); }
++          finally { finUndoProg--; }
++        };
++        finExecSilent.__finUndoWrapped = true;
++      }
++    } catch(e){}
++
++    function fin_undoVisibleUnit(){
++      try {
++        var eq = document.getElementById('equity_container');
++        if (eq && eq.offsetParent) return 'equity-report';
++      } catch(e){}
++      return '';
++    }
++    function fin_undoSelRanges(unitId){
++      try {
++        if (unitId === 'equity-report'){
++          var b0 = window.__eqUndo;
++          var r0 = (b0 && b0.ranges) ? b0.ranges() : null;
++          return (r0 && r0.length) ? r0 : null;
++        }
++        var sh = null;
++        try { if (finSheet && finSheet.getSelection) sh = finSheet; } catch(e){}
++        if (!sh && finUniverAPI && finUniverAPI.getActiveWorkbook){
++          var wb = finUniverAPI.getActiveWorkbook();
++          sh = (wb && wb.getActiveSheet) ? wb.getActiveSheet() : null;
++        }
++        if (!sh || !sh.getSelection) return null;
++        var sel = sh.getSelection();
++        var out = [], i;
++        var arr = (sel && sel.getRanges) ? sel.getRanges() : null;
++        if (arr && arr.length){
++          for (i = 0; i < arr.length; i++){
++            var rg = arr[i];
++            if (!rg || rg.startRow === undefined) continue;
++            out.push({ r0: rg.startRow, c0: rg.startColumn,
++                       r1: (rg.endRow !== undefined ? rg.endRow : rg.startRow),
++                       c1: (rg.endColumn !== undefined ? rg.endColumn : rg.startColumn) });
++          }
++        }
++        if (!out.length){
++          var ar = (sel && sel.getActiveRange) ? sel.getActiveRange() : null;
++          if (!ar && sh.getActiveRange) ar = sh.getActiveRange();
++          if (ar && ar.startRow !== undefined){
++            out.push({ r0: ar.startRow, c0: ar.startColumn,
++                       r1: (ar.endRow !== undefined ? ar.endRow : ar.startRow),
++                       c1: (ar.endColumn !== undefined ? ar.endColumn : ar.startColumn) });
++          }
++        }
++        return out.length ? out : null;
++      } catch(e){ return null; }
++    }
++    function fin_undoSheetOf(unitId, sid){
++      try {
++        if (unitId === 'equity-report'){
++          var b = window.__eqUndo;
++          var sn = (b && b.snapshot) ? b.snapshot(sid) : null;
++          if (sn && sn.sheets){
++            if (sid && sn.sheets[sid]) return sn.sheets[sid];
++            for (var k in sn.sheets) return sn.sheets[k];
++          }
++          return (sn && sn.cellData) ? sn : null;
++        }
++        var sn2 = (typeof fin_currentSnapshot === 'function') ? fin_currentSnapshot() : null;
++        if (!sn2) return null;
++        if (sn2.sheets){
++          if (sid && sn2.sheets[sid]) return sn2.sheets[sid];
++          for (var k2 in sn2.sheets) return sn2.sheets[k2];
++          return null;
++        }
++        return null;
++      } catch(e){ return null; }
++    }
++    function fin_undoRead(ranges, sid, unitId){
++      var mat = {};
++      try {
++        if (!ranges || !ranges.length) return null;
++        var sh = fin_undoSheetOf(unitId || '', sid);
++        var cd = (sh && sh.cellData) || null;
++        var cnt = 0, i, r, c;
++        for (i = 0; i < ranges.length; i++){
++          for (r = ranges[i].r0; r <= ranges[i].r1; r++){
++            for (c = ranges[i].c0; c <= ranges[i].c1; c++){
++              var cell = (cd && cd[r] && cd[r][c]) || null;
++              if (!mat[r]) mat[r] = {};
++              /* ★空格子必须写显式 null：JSON 会丢掉 undefined，写回一个 {} 等于没撤 */
++              mat[r][c] = {
++                v: (cell && cell.v !== undefined) ? cell.v : null,
++                f: (cell && cell.f !== undefined) ? cell.f : null,
++                t: (cell && cell.t !== undefined) ? cell.t : null
++              };
++              if (++cnt > 4000) return null;
++            }
++          }
++        }
++      } catch(e){ return null; }
++      return mat;
++    }
++    function fin_undoDiffers(a, b){
++      if (!a || !b) return false;
++      for (var r in a){
++        var ra = a[r], rb = b[r] || {};
++        for (var c in ra){
++          var x = ra[c], y = rb[c];
++          if (!x || !y) return true;
++          if (String(x.v) !== String(y.v) || String(x.f) !== String(y.f)) return true;
++        }
++      }
++      return false;
++    }
++    function fin_undoSameRanges(a, b){
++      try {
++        if (!a || !b || a.length !== b.length) return false;
++        for (var i = 0; i < a.length; i++){
++          if (a[i].r0 !== b[i].r0 || a[i].c0 !== b[i].c0 ||
++              a[i].r1 !== b[i].r1 || a[i].c1 !== b[i].c1) return false;
++        }
++        return true;
++      } catch(e){ return false; }
++    }
++    function fin_undoRangesOf(params, unitId){
++      var out = [];
++      try {
++        var rg = params && params.range;
++        if (rg && rg.startRow !== undefined){
++          out.push({ r0: rg.startRow, c0: rg.startColumn,
++                     r1: (rg.endRow !== undefined ? rg.endRow : rg.startRow),
++                     c1: (rg.endColumn !== undefined ? rg.endColumn : rg.startColumn) });
++        }
++      } catch(e){}
++      if (!out.length){ try { var sel = fin_undoSelRanges(unitId); if (sel) out = sel; } catch(e2){} }
++      return out;
++    }
++    /* 键按下/粘贴的同一瞬间抓"改前值"：权益表的自建键盘写入会在发命令之前就把字写进格子，
++       等命令到达再去读，读到的已经是新值 → 前后相等 → 一步都不记。 */
++    function fin_undoCapturePre(){
++      try {
++        var uid = '';
++        try { if (fin_undoVisibleUnit() === 'equity-report') uid = 'equity-report'; } catch(e0){}
++        if (uid !== 'equity-report'){
++          if (!finReady) return;
++          try { uid = (typeof fin_unitId === 'function') ? (fin_unitId() || '') : ''; } catch(e3){ uid = ''; }
++        }
++        var sid = '';
++        if (uid === 'equity-report'){
++          try { sid = (window.__eqUndo && window.__eqUndo.sheetId) ? window.__eqUndo.sheetId() : ''; } catch(e1){}
++        } else {
++          /* ★当前活动工作表 id（fin_curSheetId 给的是第一张标签，多标签报表会取错表） */
++          try {
++            var _shB = (typeof finSheetObj === 'function') ? finSheetObj() : null;
++            sid = (_shB && _shB.getSheetId) ? _shB.getSheetId() : '';
++            if (!sid && typeof fin_curSheetId === 'function') sid = fin_curSheetId() || '';
++          } catch(e2){ sid = ''; }
++        }
++        var rgs = fin_undoSelRanges(uid);
++        if (!rgs || !rgs.length){ finUndoPre = null; return; }
++        var cells = 0;
++        for (var i = 0; i < rgs.length; i++){
++          cells += (rgs[i].r1 - rgs[i].r0 + 1) * (rgs[i].c1 - rgs[i].c0 + 1);
++          if (cells > 600){ finUndoPre = null; return; }
++        }
++        var mat = fin_undoRead(rgs, sid, uid);
++        if (!mat){ finUndoPre = null; window.__finUndoPreDbg = { fail: 'no-mat', uid: uid, sid: sid }; return; }
++        finUndoPre = { t: Date.now(), unitId: uid, sid: sid, ranges: rgs, mat: mat };
++        window.__finUndoPreDbg = { t: Date.now(), uid: uid, sid: sid, n: rgs.length,
++                                   v: JSON.stringify(mat).slice(0, 90) };
++      } catch(e){ finUndoPre = null; }
++    }
++    function fin_undoSnapshot(params, forceUnitId, forceSid){
++      var p = params || {};
++      var _pu = String(forceUnitId || p.unitId || '');
++      var _cmdRg = null;
++      try {
++        var _r0 = p.range;
++        if (_r0 && _r0.startRow !== undefined){
++          _cmdRg = [{ r0: _r0.startRow, c0: _r0.startColumn,
++                      r1: (_r0.endRow !== undefined ? _r0.endRow : _r0.startRow),
++                      c1: (_r0.endColumn !== undefined ? _r0.endColumn : _r0.startColumn) }];
++        }
++      } catch(_e1){}
++      try {
++        var _pre = finUndoPre;
++        if (_pre && (Date.now() - _pre.t) < 5000 &&
++            String(_pre.unitId || '') === _pu &&
++            (!_cmdRg || fin_undoSameRanges(_cmdRg, _pre.ranges))){
++          window.finUndoStats.preHit = (window.finUndoStats.preHit || 0) + 1;
++          return { ranges: _pre.ranges, mat: _pre.mat, sid: _pre.sid, unitId: _pre.unitId };
++        }
++        window.finUndoStats.preMiss = (window.finUndoStats.preMiss || 0) + 1;
++        window.__finUndoPreMiss = { pu: _pu, hasPre: !!_pre,
++                                    preUid: _pre ? String(_pre.unitId || '') : null,
++                                    age: _pre ? (Date.now() - _pre.t) : null,
++                                    hasCmdRg: !!_cmdRg,
++                                    same: (_pre && _cmdRg) ? fin_undoSameRanges(_cmdRg, _pre.ranges) : null };
++      } catch(_e2){}
++      var rgs = fin_undoRangesOf(p, _pu);
++      if (!rgs.length) return null;
++      var sid = '', uid = '';
++      try {
++      sid = forceSid || p.subUnitId || '';
++      uid = forceUnitId || p.unitId || '';
++      if (!sid && uid === 'equity-report'){
++        sid = (window.__eqUndo && window.__eqUndo.sheetId) ? window.__eqUndo.sheetId() : '';
++      }
++      if (!sid && uid !== 'equity-report'){
++        /* ★必须取【当前活动工作表】的 id：fin_curSheetId() 返回的是 sheetOrder[0]（第一张标签），
++           在多标签报表里会读写错工作表。 */
++        try { var _shA = (typeof finSheetObj === 'function') ? finSheetObj() : null;
++              sid = (_shA && _shA.getSheetId) ? _shA.getSheetId() : ''; } catch(e4){ sid = ''; }
++      }
++      if (!sid && uid !== 'equity-report' && typeof fin_curSheetId === 'function') sid = fin_curSheetId();
++      if (!uid && typeof fin_unitId === 'function') uid = fin_unitId();
++      } catch(e){}
++      return { ranges: rgs, mat: fin_undoRead(rgs, sid, uid), sid: sid, unitId: uid };
++    }
++    function fin_undoRecord(before){
++      try {
++        var S = window.finUndoStats;
++        if (!before || !before.mat){
++          S.skipNoSnap++;
++          window.__finUndoLastRec = { why: 'no-snap' };
++          return;
++        }
++        var after = fin_undoRead(before.ranges, before.sid, before.unitId);
++        if (!after || !fin_undoDiffers(before.mat, after)){
++          S[after ? 'skipSame' : 'skipNoSnap']++;
++          window.__finUndoLastRec = { why: after ? 'same' : 'no-after', unitId: before.unitId,
++                                      sid: before.sid, n: before.ranges.length,
++                                      before: JSON.stringify(before.mat).slice(0, 100),
++                                      after: after ? JSON.stringify(after).slice(0, 100) : null };
++          return;
++        }
++        finUndoHist.push({ unitId: before.unitId, sid: before.sid,
++                           before: before.mat, after: after, ranges: before.ranges });
++        while (finUndoHist.length > FIN_UNDO_MAX) finUndoHist.shift();
++        finUndoRedo.length = 0;              // 新编辑 → 恢复队列清空（Excel 语义）
++        S.rec++;
++        window.__finUndoLastRec = { why: 'ok', unitId: before.unitId, sid: before.sid, n: before.ranges.length };
++        fin_undoPaint(true);
++      } catch(e){}
++    }
++    function fin_undoBoxesOf(entry){
++      try {
++        if (entry && entry.ranges && entry.ranges.length) return entry.ranges.slice();
++      } catch(e){}
++      var out = [];
++      try {
++        var mat = (entry && entry.before) || null;
++        if (!mat) return out;
++        var r0 = Infinity, r1 = -1, c0 = Infinity, c1 = -1;
++        for (var r in mat){
++          var rr = parseInt(r, 10);
++          if (!isFinite(rr)) continue;
++          if (rr < r0) r0 = rr;
++          if (rr > r1) r1 = rr;
++          for (var c in mat[r]){
++            var cc = parseInt(c, 10);
++            if (!isFinite(cc)) continue;
++            if (cc < c0) c0 = cc;
++            if (cc > c1) c1 = cc;
++          }
++        }
++        if (r0 <= r1 && c0 <= c1) out.push({ r0: r0, c0: c0, r1: r1, c1: c1 });
++      } catch(e){}
++      return out;
++    }
++    function fin_undoMatOf(mat, box){
++      var m = [];
++      for (var r = box.r0; r <= box.r1; r++){
++        var row = [];
++        for (var c = box.c0; c <= box.c1; c++){
++          var cell = (mat && mat[r] && mat[r][c]) ? mat[r][c] : null;
++          row.push({
++            v: (cell && cell.v !== undefined) ? cell.v : null,
++            f: (cell && cell.f !== undefined) ? cell.f : null,
++            t: (cell && cell.t !== undefined) ? cell.t : null
++          });
++        }
++        m.push(row);
++      }
++      return m;
++    }
++    /* ★写回必须带显式 range（不带 = 写到当前选区左上角，会写错格子） */
++    function fin_undoApply(entry, useAfter){
++      if (!entry) return false;
++      try {
++        var mat = useAfter ? entry.after : entry.before;
++        if (!mat) return false;
++        var boxes = fin_undoBoxesOf(entry);
++        if (!boxes.length) return false;
++        var _prevUntil = finUndoApplyUntil;
++        finUndoApplyUntil = Date.now() + 1500;
++        try { window.__finUndoApplyUntil = finUndoApplyUntil; } catch(e0){}
++        try { finEditQuietUntil = Date.now() + 1200; } catch(e1){}
++        var bi;
++        if (entry.unitId === 'equity-report'){
++          var b3 = window.__eqUndo;
++          if (!(b3 && b3.write)) return false;
++          b3.write(entry.unitId, entry.sid, mat, boxes);
++        } else {
++          finUndoProg++;
++          try {
++            for (bi = 0; bi < boxes.length; bi++){
++              var b = boxes[bi];
++              finExecSilent('sheet.command.set-range-values', {
++                unitId: entry.unitId, subUnitId: entry.sid,
++                range: { startRow: b.r0, startColumn: b.c0, endRow: b.r1, endColumn: b.c1 },
++                value: fin_undoMatOf(mat, b)
++              });
++            }
++          } finally { finUndoProg--; }
++        }
++        var _stamp = finUndoApplyUntil;
++        setTimeout(function(){
++          try {
++            if (finUndoApplyUntil === _stamp){
++              finUndoApplyUntil = 0;
++              try { window.__finUndoApplyUntil = 0; } catch(e5){}
++            }
++          } catch(e6){}
++        }, 1600);
++        return true;
++      } catch(e){ return false; }
++    }
++    /* ★FIN-UNDO-FOCUS-20261018★（用户：撤销的时候单元格也要跟着动，完全模拟 Excel）
++       撤销/恢复一步之后，把光标和选区落到"刚被改的那一块"上（并自动滚进视野）。 */
++    function fin_undoFocus(entry, box){
++      if (!entry || !box) return;
++      try {
++        if (entry.unitId === 'equity-report'){
++          if (window.__eqUndo && window.__eqUndo.focus) window.__eqUndo.focus(entry.sid, box);
++          return;
++        }
++        var sh = (typeof finSheetObj === 'function') ? finSheetObj() : null;
++        if (!sh || !sh.getRange) return;
++        try {
++          var sid = sh.getSheetId ? sh.getSheetId() : '';
++          if (sid && entry.sid && sid !== entry.sid) return;   /* 不在同一张表上：不硬跳 */
++        } catch(e0){}
++        var rg = sh.getRange(box.r0, box.c0, Math.max(1, box.r1 - box.r0 + 1), Math.max(1, box.c1 - box.c0 + 1));
++        if (rg && rg.activate) rg.activate();
++      } catch(e){}
++    }
++    function fin_undoPop(arr, unitId){
++      for (var i = arr.length - 1; i >= 0; i--){
++        var isEq = String(arr[i].unitId) === 'equity-report';
++        if (unitId === 'equity-report' ? isEq : !isEq) return arr.splice(i, 1)[0];
++      }
++      return null;
++    }
++    function fin_undoStep(isUndo, unitId){
++      try {
++        var e = null;
++        if (isUndo){
++          e = fin_undoPop(finUndoHist, unitId || '');
++          if (!e) return false;
++          if (!fin_undoApply(e, false)){ finUndoHist.push(e); return false; }
++          finUndoRedo.push(e);
++          while (finUndoRedo.length > FIN_UNDO_MAX) finUndoRedo.shift();
++        } else {
++          e = fin_undoPop(finUndoRedo, unitId || '');
++          if (!e) return false;
++          if (!fin_undoApply(e, true)){ finUndoRedo.push(e); return false; }
++          finUndoHist.push(e);
++          while (finUndoHist.length > FIN_UNDO_MAX) finUndoHist.shift();
++        }
++        /* ★撤销/恢复后光标跟到被改的那一块（Excel 手感）；写回是异步的，稍等一下再落选区 */
++        try {
++          var _box = fin_undoBoxesOf(e)[0] || null;
++          if (_box){
++            fin_undoFocus(e, _box);
++            setTimeout(function(){ fin_undoFocus(e, _box); }, 180);
++          }
++        } catch(eF){}
++        fin_undoPaint(true);
++        return true;
++      } catch(err){ return false; }
++    }
++    /* ★按钮只做"看起来灰"，绝不加 disabled —— disabled 的按钮连 click 都不派发，
++       账本空的时候用户就彻底点不动（用户原话："按钮好像被锁死了"） */
++    function fin_undoPaintBtn(btn, n, undo){
++      if (!btn) return;
++      var on = n > 0;
++      try {
++        if (btn.hasAttribute('disabled')) btn.removeAttribute('disabled');
++        try { btn.setAttribute('aria-disabled', on ? 'false' : 'true'); } catch(e0){}
++        btn.style.opacity = on ? '' : '.55';
++        btn.style.cursor = 'pointer';
++        btn.title = (undo ? '撤销' : '恢复') + '（' + n + '/' + FIN_UNDO_MAX + '）';
++        var badge = btn.__finUndoBadge;
++        if (!badge){
++          badge = document.createElement('span');
++          badge.style.cssText = 'position:absolute;top:-3px;right:-3px;min-width:14px;height:14px;' +
++            'line-height:14px;border-radius:7px;font-size:9px;font-weight:700;color:#fff;' +
++            'text-align:center;padding:0 3px;pointer-events:none;z-index:20;box-shadow:0 0 0 1px #fff';
++          btn.style.position = 'relative';
++          btn.appendChild(badge);
++          btn.__finUndoBadge = badge;
++        }
++        badge.style.background = undo ? '#2f6fed' : '#0a8a3a';
++        badge.textContent = String(n);
++        badge.style.display = on ? 'block' : 'none';
++      } catch(e){}
++    }
++    var fin_undoBtnSyncAt = 0;
++    function fin_undoCountFor(unitId, arr){
++      var n = 0;
++      for (var i = 0; i < arr.length; i++){
++        var isEq = String(arr[i].unitId) === 'equity-report';
++        if (unitId === 'equity-report' ? isEq : !isEq) n++;
++      }
++      return n;
++    }
++    function fin_undoPaint(force){
++      try {
++        var now = Date.now();
++        if (!force && now - fin_undoBtnSyncAt < 100) return;
++        fin_undoBtnSyncAt = now;
++        var hosts = [['univer_container', ''], ['equity_container', 'equity-report']];
++        for (var hi = 0; hi < hosts.length; hi++){
++          var host = document.getElementById(hosts[hi][0]);
++          if (!host) continue;
++          var nU = fin_undoCountFor(hosts[hi][1], finUndoHist);
++          var nR = fin_undoCountFor(hosts[hi][1], finUndoRedo);
++          var uIco = host.querySelector('button.univer-toolbar-btn .univerjs-icon-undo-single');
++          var rIco = host.querySelector('button.univer-toolbar-btn .univerjs-icon-redo-single');
++          fin_undoPaintBtn(uIco && uIco.closest ? uIco.closest('button') : null, nU, true);
++          fin_undoPaintBtn(rIco && rIco.closest ? rIco.closest('button') : null, nR, false);
++        }
++        /* （自检状态条已按用户要求删除；需要时看 window.finUndoHist.length / __finUndoLastRec） */
++      } catch(e){}
++    }
++    window.finUndoPaint = fin_undoPaint;
++    function fin_undoButtonClick(e){
++      try {
++        var t = e.target;
++        if (!t || !t.closest) return;
++        var btn = t.closest('button.univer-toolbar-btn');
++        if (!btn) return;
++        var inEq = !!btn.closest('#equity_container');
++        if (!inEq && !btn.closest('#univer_container')) return;
++        var isU = !!btn.querySelector('.univerjs-icon-undo-single');
++        var isR = !!btn.querySelector('.univerjs-icon-redo-single');
++        if (!isU && !isR) return;
++        e.preventDefault();
++        e.stopPropagation();
++        var unit = inEq ? 'equity-report' : '';
++        var n = fin_undoCountFor(unit, isU ? finUndoHist : finUndoRedo);
++        if (n){ fin_undoStep(isU, unit); setTimeout(function(){ fin_undoPaint(true); }, 300); return; }
++        /* 账本里没有（删行/插入这类非改值操作）→ 退回引擎原生 undo/redo，不丢功能。
++           ★必须按容器选对命令服务（权益是另一个 Univer 实例）。 */
++        var cs = inEq ? (window.__eqCmdSvc || window.__finCmdSvc) : window.__finCmdSvc;
++        window.finUndoStats.fallback++;
++        if (cs && typeof cs.executeCommand === 'function'){
++          try { cs.executeCommand(isU ? 'univer.command.undo' : 'univer.command.redo'); } catch(e3){}
++        }
++        fin_undoPaint(true);
++      } catch(err){}
++    }
++    function fin_undoKeyDown(e){
++      try {
++        if (!e.ctrlKey || e.altKey) return;
++        var k = String(e.key || '').toLowerCase();
++        var isU = (k === 'z' && !e.shiftKey);
++        var isR = (k === 'y') || (k === 'z' && e.shiftKey);
++        if (!isU && !isR) return;
++        var unit = fin_undoVisibleUnit();
++        /* 正在单元格里打字时，Ctrl+Z 应该是"撤打字"，不能吃掉 */
++        try {
++          if (unit === 'equity-report'){
++            if (window.__eqUndo && window.__eqUndo.isEditing && window.__eqUndo.isEditing()) return;
++          } else if (typeof finIsEditingCell === 'function' && finIsEditingCell()){
++            return;
++          }
++        } catch(e9){}
++        if (!fin_undoCountFor(unit, isU ? finUndoHist : finUndoRedo)) return;   // 账本空 → 交回引擎
++        e.preventDefault();
++        e.stopPropagation();
++        fin_undoStep(isU, unit);
++      } catch(err){}
++    }
++    /* 记账钩子：服务级监听（Univer 自己记账也走这个通道），财务 / 股东权益各装一份 */
++    function fin_undoSvcHookInstall(){
++      try {
++        var cs = window.__finCmdSvc;
++        if (!cs || cs.__finUndoHooked) return false;
++        if (typeof cs.beforeCommandExecuted !== 'function' || typeof cs.onCommandExecuted !== 'function') return false;
++        cs.__finUndoHooked = true;
++        _fin_undoBindHooks(cs, '');
++        return true;
++      } catch(e){ return false; }
++    }
++    function _fin_undoBindHooks(cs, forceUnit){
++      var pending = null;
++      cs.beforeCommandExecuted(function(cmd){
++        try {
++          if (!cmd || !cmd.params) return;
++          var id = String(cmd.id || '');
++          if (!/^sheet\.command\.(set-range-values|clear-selection-content|delete-cell-content|clear-content)/.test(id)) return;
++          if (finUndoProg > 0) return;
++          if (finUndoApplyUntil && Date.now() < finUndoApplyUntil) return;
++          if ((Date.now() - (finLastUserInputAt || 0)) > 2500) return;
++          var B = window.__finUndoBridge;
++          pending = { id: id, snap: (B && B.snap) ? B.snap(cmd.params, forceUnit || null) : null };
++        } catch(e){ pending = null; }
++      });
++      cs.onCommandExecuted(function(cmd){
++        try {
++          if (!pending || !cmd || String(cmd.id || '') !== pending.id) return;
++          var B2 = window.__finUndoBridge;
++          if (B2 && B2.record) B2.record(pending.snap);
++        } catch(e){}
++        /* ★只有配对上才清 pending：任何不相关命令（嵌套 mutation / 光标移动）都不许冲掉现场 */
++        if (cmd && pending && String(cmd.id || '') === pending.id) pending = null;
++      });
++    }
++    window.__finUndoBridge = {
++      snap: function(params, forceUnitId, forceSid){ return fin_undoSnapshot(params, forceUnitId, forceSid); },
++      record: function(before){ return fin_undoRecord(before); },
++      ranges: function(unitId){ return fin_undoSelRanges(unitId || ''); },
++      bind: function(cs, forceUnit){ try { _fin_undoBindHooks(cs, forceUnit || ''); return true; } catch(e){ return false; } }
++    };
++    (function fin_undoLedgerBoot(){
++      try {
++        var mark = function(){
++          finLastUserInputAt = Date.now();
++          try { window.__finUndoLastInputAt = finLastUserInputAt; } catch(e){}
++        };
++        var markEdit = function(){
++          mark();
++          try {
++            var now = Date.now();
++            if (now - finUndoPreAt < 60) return;
++            finUndoPreAt = now;
++            fin_undoCapturePre();
++          } catch(e){}
++        };
++        ['mousedown', 'pointerdown'].forEach(function(ev){
++          try { window.addEventListener(ev, mark, true); } catch(e){}
++        });
++        ['keydown', 'paste', 'cut'].forEach(function(ev){
++          try { window.addEventListener(ev, markEdit, true); } catch(e){}
++        });
++        document.addEventListener('click', fin_undoButtonClick, true);
++        document.addEventListener('keydown', fin_undoKeyDown, true);
++        setInterval(function(){
++          try { fin_undoPaint(); } catch(e){}
++          try {
++            if (!window.__finUndoSvcHookOk && fin_undoSvcHookInstall()) window.__finUndoSvcHookOk = true;
++          } catch(e){}
++        }, 300);
++        console.log('%c[undo] ' + window.FIN_UNDO_BUILD + ' 已装载：自建 10 步撤销/恢复（按钮 + Ctrl+Z/Y 都走它）',
++                    'color:#0a0;font-weight:bold');
++      } catch(e){}
++    })();
++
++    /* ★FIN-CELL-KEEP-20261018（用户：为什么刷新后单元格会自动跳到 A1？）
++       原因：刷新 = 整张表重新 createUnit(快照)，Univer 新建单元时选区固定是 A1，
++       我们从来没有记住光标。这里按"工作簿 + 工作表"记住上次的单元格，
++       载入/重建后自动落回去（滚动位置跟着 activate 一起回到该格）。 */
++    var FIN_CELL_KEY = 'fin_last_cell_v1';
++    function fin_cellStore(){
++      try { return JSON.parse(localStorage.getItem(FIN_CELL_KEY) || '{}') || {}; } catch(e){ return {}; }
++    }
++    function fin_cellRemember(){
++      try {
++        if (!finReady || !finSheet) return;
++        var sh = finSheetObj(); if (!sh) return;
++        /* ★用 finActiveCell()（内部走 ar.getRow()/getColumn()）——这一版门面上
++           getActiveRange() 返回的对象没有 startRow 字段，直接读会永远是 undefined。 */
++        var ac = (typeof finActiveCell === 'function') ? finActiveCell() : null;
++        if (!ac || typeof ac.row !== 'number' || typeof ac.col !== 'number') return;
++        var uid = (typeof fin_unitId === 'function') ? fin_unitId() : '';
++        var sid = sh.getSheetId ? sh.getSheetId() : '';
++        if (!uid || !sid) return;
++        var m = fin_cellStore();
++        if (!m[uid]) m[uid] = {};
++        var prev = m[uid][sid];
++        if (prev && prev[0] === ac.row && prev[1] === ac.col) return;
++        m[uid][sid] = [ac.row, ac.col];
++        localStorage.setItem(FIN_CELL_KEY, JSON.stringify(m));
++      } catch(e){}
++    }
++    function fin_cellRestoreSoon(){
++      try {
++        setTimeout(function(){
++          try {
++            if (!finReady) return;
++            var sh = finSheetObj(); if (!sh) return;
++            var uid = (typeof fin_unitId === 'function') ? fin_unitId() : '';
++            var sid = sh.getSheetId ? sh.getSheetId() : '';
++            if (!uid || !sid) return;
++            var m = fin_cellStore();
++            var c = (m[uid] && m[uid][sid]) ? m[uid][sid] : null;
++            if (!c) return;
++            var rg = sh.getRange(c[0], c[1]);
++            if (rg && rg.activate) rg.activate();
++          } catch(e){}
++        }, 80);
++      } catch(e){}
++    }
++    try {
++      if (!window.__finCellKeepPoll){
++        window.__finCellKeepPoll = setInterval(function(){ try { fin_cellRemember(); } catch(e){} }, 1200);
++      }
++    } catch(e){}
++
+     var finEditsBound = false;
+     function fin_bindEdits(){
+@@ -19030,4 +20092,5 @@ var PROD_EQUIP_FAULT_KB = {
+         }
+         finEditsBound = true;
++        try { fin_cellRestoreSoon(); } catch(eR){}   /* ★刷新/重建后回到上次的光标，不再跳 A1 */
+       } catch(e){ console.warn('[fin] bindEdits', e); }
+     }
+@@ -19588,4 +20651,18 @@ var PROD_EQUIP_FAULT_KB = {
+             }
+           } catch(err){}
++          /* ★FIN-CLIP-RANGE-20261018：全选/大框选时 getRanges() 常只给"活动格" → getActiveRange().getRange() 实测能返回正确范围，用它兜底（取面积更大的那个） */
++          try {
++            var _selF = (typeof sh.getSelection === 'function') ? sh.getSelection() : null;
++            var _arF = (_selF && _selF.getActiveRange && _selF.getActiveRange()) || null;
++            var _gF = (_arF && typeof _arF.getRange === 'function') ? _arF.getRange() : null;
++            if (_gF && _gF.startRow != null && _gF.endRow != null && _gF.startColumn != null && _gF.endColumn != null){
++              var _aSz = (_gF.endRow - _gF.startRow + 1) * (_gF.endColumn - _gF.startColumn + 1);
++              var _cSz = 0;
++              for (var _z = 0; _z < ranges.length; _z++){
++                _cSz += (ranges[_z].endRow - ranges[_z].startRow + 1) * (ranges[_z].endColumn - ranges[_z].startColumn + 1);
++              }
++              if (_aSz > _cSz){ ranges = [{ startRow: _gF.startRow, startColumn: _gF.startColumn, endRow: _gF.endRow, endColumn: _gF.endColumn }]; }
++            }
++          } catch(errF){}
+           if (!ranges.length) return '';
+           /* 实时快照：只为读 numfmt pattern（货币符号 / 千位分隔 / 小数位） */
+@@ -19628,4 +20705,29 @@ var PROD_EQUIP_FAULT_KB = {
+         } catch(err){ return ''; }
+       }
++      /* ★CLIP-EVENTSET-20261018：在 copy/cut 事件里直接用 clipboardData.setData 写剪贴板。
++         为什么：真实 Chrome 里 document.execCommand('copy') 可能"假成功"（返回 true 但剪贴板为空）；
++         clipboardData.setData 是浏览器原生复制通道，不依赖 execCommand、不依赖剪贴板权限，最可靠。 */
++      (function(){
++        function finClipFill(e){
++          try {
++            if (!e.clipboardData) return;
++            /* ★CLIP-PENDING-20261018：fin_clipWrite 自己触发的那次 copy/cut 事件，
++               优先把 pending 文本直接 setData 落盘 —— 这条通道【不需要焦点、不需要
++               navigator.clipboard、不需要剪贴板权限】，http / 局域网 IP 下同样有效。 */
++            var pend = window.__finClipPending;
++            if (pend){
++              e.clipboardData.setData('text/plain', pend);
++              e.preventDefault();
++              return;
++            }
++            var a = document.activeElement;
++            if (!a || !a.closest || !a.closest('#univer_container')) return;
++            var txt = (typeof fin_clipMatrixText === 'function') ? fin_clipMatrixText() : '';
++            if (txt){ e.clipboardData.setData('text/plain', txt); e.preventDefault(); }
++          } catch(err){}
++        }
++        document.addEventListener('copy', finClipFill, true);
++        document.addEventListener('cut', finClipFill, true);
++      })();
+       function fin_clipWrite(text){
+         if (text == null) return false;
+@@ -19638,20 +20740,35 @@ var PROD_EQUIP_FAULT_KB = {
+           ta.value = text;
+           ta.setAttribute('readonly', '');
+-          ta.style.cssText = 'position:fixed;left:-99999px;top:0;width:1px;height:1px;opacity:0;';
++          /* ★CLIP-EXECFIX-20261018：临时候选区必须留在【视口内】并显式 focus，否则真实 Chrome 的 execCommand('copy') 会"假成功"（返回 true 但剪贴板为空）。 */
++          ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:0;padding:0;margin:0;z-index:2147483647;';
+           document.body.appendChild(ta);
+           var ok = false;
+           try {
++            /* ★CLIP-NOFOCUS-20261018：不再 ta.focus() 抢焦点 —— 抢了之后 Univer 拿不回焦点，
++               第二次 Ctrl+C 会 inScope 失败、撤销/重做按钮也失效。
++               真正的写入交给 copy/cut 事件的 clipboardData.setData（见上方 IIFE）。 */
+             ta.select();
+             ta.setSelectionRange(0, text.length);
++            /* ★CLIP-PENDING-20261018：execCommand 会派发一次 copy 事件，
++               finClipFill 看到 pending 就用 clipboardData.setData 直接落盘。
++               这条通道在 http（非安全上下文）下同样有效 —— 用户那边 navigator.clipboard
++               很可能根本不存在，这是唯一稳定的一条。 */
++            window.__finClipPending = text;
+             ok = document.execCommand('copy');
+           } catch(err){ ok = false; }
++          window.__finClipPending = null;
+           try { document.body.removeChild(ta); } catch(err){}
++          try { if (prev && typeof prev.focus === 'function') prev.focus({ preventScroll: true }); } catch(err){}
+           try { if (window.__finClipLast) window.__finClipLast.ok = !!ok; } catch(err){}
+-          if (!ok){
+-            /* 兜底：安全上下文下走异步 API（不 await；失败也只是维持原状，不弹错） */
+-            try { navigator.clipboard.writeText(text).catch(function(){}); } catch(err){}
+-          }
++          /* ★CLIP-ALWAYSASYNC-20261018：不再用 `if (!ok)` 判断 —— 真实 Chrome 里
++             execCommand('copy') 会「假成功」（返回 true 但剪贴板为空），旧写法正好把
++             唯一能救场的异步通道跳过。这里【无条件】再写一次（有 API 才写，失败静默）。 */
++          try {
++            if (navigator.clipboard && navigator.clipboard.writeText){
++              navigator.clipboard.writeText(text).catch(function(){});
++            }
++          } catch(err){}
+           return ok;
+-        } catch(err){ return false; }
++        } catch(err){ window.__finClipPending = null; return false; }
+         finally {
+           /* ★必须把焦点还给原来的元素：textarea.select() 会抢焦点，
+@@ -19660,4 +20777,24 @@ var PROD_EQUIP_FAULT_KB = {
+         }
+       }
++      /* ★CLIP-CUTCLEAR-20261018：剪切（Ctrl+X）的兜底。
++         Univer 0.5.5 的 cut = 异步写剪贴板 + 清空单元格；非安全上下文 / 剪贴板权限受限时
++         写剪贴板被拒 → 整个命令中断 → 用户看到「剪切没反应」（单元格没被清掉）。
++         这里只做兜底：把剪切前的选区内容当指纹，420ms 后如果【一点没变】才自己清空；
++         用户已经移动/改过选区就绝不动手。 */
++      function fin_clipCutClearSoon(){
++        var sig = '';
++        try { sig = fin_clipMatrixText(); } catch(err){ return; }
++        if (!sig || !sig.replace(/[\t\r\n]/g, '')) return;      /* 空选区不用兜底 */
++        setTimeout(function(){
++          try {
++            var now = '';
++            try { now = fin_clipMatrixText(); } catch(errN){ return; }
++            if (now !== sig) return;                            /* Univer 已经清空 / 内容变了 */
++            var api0 = finAPI(); if (!api0) return;
++            var pr = api0.executeCommand('sheet.command.clear-selection-content', {});
++            if (pr && typeof pr.then === 'function') pr.catch(function(){});   /* ★绝不冒未处理拒绝 */
++          } catch(err2){}
++        }, 420);
++      }
+       function finIsUniverElem(el){
+         try {
+@@ -19705,4 +20842,6 @@ var PROD_EQUIP_FAULT_KB = {
+             if (k === 'c' || k === 'C' || k === 'x' || k === 'X'){
+               try { fin_clipWrite(fin_clipMatrixText()); } catch(err){}
++              /* ★CLIP-CUTCLEAR-20261018：X 的「清空单元格」兜底（Univer 的 cut 写剪贴板失败会中断） */
++              if (k === 'x' || k === 'X'){ try { fin_clipCutClearSoon(); } catch(err2){} }
+             }
+             return;   /* ★绝不 preventDefault / stopPropagation —— 放行给 Univer 自己的命令 */
+@@ -20349,10 +21488,26 @@ var PROD_EQUIP_FAULT_KB = {
+       var m = {};
+       var minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
++      var snapCur = null;
++      try { snapCur = fin_currentSnapshot(); } catch(e){ snapCur = null; }
+       cells.forEach(function(hc){
+         var orig = finHiOriginal(sid, hc.r, hc.c);
+         var p = {};
++        /* ★HI-KEEP-USERCOLOR-20261018（用户 2026-10-18：「我选的是绿色，系统自动给我黑色」）：
++           旧逻辑无条件把颜色写回"加高亮之前"的值（多半是黑色），等于把用户自己选的颜色洗掉。
++           现在先看这格【当前】的颜色：如果已经不是我们打的红色（#ff0000）而是用户自选色，
++           就只还原本我们的加粗，颜色一个字节都不动。 */
++        var curSt = null;
++        try {
++          var cdRow = snapCur && snapCur.sheets && snapCur.sheets[sid] && snapCur.sheets[sid].cellData && snapCur.sheets[sid].cellData[String(hc.r)];
++          curSt = fin_cellStyle(snapCur, cdRow && cdRow[String(hc.c)]);
++        } catch(e){ curSt = null; }
++        var curIsOurRed = !!(curSt && curSt.cl && curSt.cl.rgb && String(curSt.cl.rgb).toUpperCase().indexOf('FF0000') >= 0);
++        if (curSt && curSt.cl && !curIsOurRed){
++          if (orig.bl !== null) p.bl = orig.bl; else p.bl = 0;
++        } else {
+         // 必须用显式黑/不加粗覆盖，不能用 null；Univer 把 null 当成“不修改”，红色会残留。
+         if (orig.cl !== null) p.cl = orig.cl; else p.cl = { rgb: '#000000' };
+         if (orig.bl !== null) p.bl = orig.bl; else p.bl = 0;
++        }
+         m[hc.r] = m[hc.r] || {};
+         m[hc.r][hc.c] = { s: p };
+@@ -23990,4 +25145,5 @@ var PROD_EQUIP_FAULT_KB = {
+        用户只看到浏览器那条滚动条（就是截图里的现象）。
+        这里照搬 eqFitHeight：高度 = innerHeight - 容器真实 top - 30，窗口缩放/切页/换语言后重算。 */
++    var __finFitSig = '';
+     function finFitHeight(){
+     try {
+@@ -23997,6 +25153,18 @@ var PROD_EQUIP_FAULT_KB = {
+       var top = c.getBoundingClientRect().top;
+       if (!(top > 0)) return;
++      /* ★FIT-STABLE-20261018（用户 2026-10-18：「又在晃」）：
++         本函数被 400ms 轮询。原来每次都无条件重算并写高度，在「刚好卡在竖向滚动条
++         出现阈值」的窗口上会让页面反复多/少一条滚动条 → 整页左右抖、Univer 浮层
++         （取色器）跟着跳。现在：尺寸/位置没变 → 什么都不做。 */
++      var sig = (window.innerWidth || 0) + 'x' + (window.innerHeight || 0) + '@' + Math.round(top);
++      if (sig === __finFitSig && c.style.height) return;
+       var h = Math.max(360, Math.round((window.innerHeight || 800) - top - 30));
+-      if (Math.abs((parseFloat(c.style.height) || 0) - h) > 2) c.style.height = h + 'px';
++      /* 若因此整页溢出（会多出竖向滚动条）→ 一次性把溢出量减掉；只减不增，避免来回切 */
++      try {
++        var over = (document.documentElement.scrollHeight || 0) - (window.innerHeight || 0);
++        if (over > 0 && over < 80) h = Math.max(360, h - over - 2);
++      } catch(e0){}
++      __finFitSig = sig;
++      if (Math.abs((parseFloat(c.style.height) || 0) - h) > 1) c.style.height = h + 'px';
+     } catch(e){}
+     }
+@@ -25137,4 +26305,5 @@ var PROD_EQUIP_FAULT_KB = {
+       } catch(e){}
+     }
++    var finToolbarTimer = null;
+     function fin_watchToolbar2(){
+       try { fin_mountToolbar2(); } catch(e){}
+@@ -25143,5 +26312,15 @@ var PROD_EQUIP_FAULT_KB = {
+       try {
+         if (finToolbarObserver) finToolbarObserver.disconnect();
+-        finToolbarObserver = new MutationObserver(function(){ fin_mountToolbar2(); });
++        /* ★TOOLBAR-DEBOUNCE-20261018：原来「每一次容器内 DOM 变动都立刻重挂工具栏」。
++           我们把按钮插进 Univer 的 React 容器 → 工具栏宽度变化 → Univer 自己的
++           ResizeObserver 重排 → 又一轮 DOM 变动 …… 在窄窗口上会退化成每帧一次的
++           互相拉扯（整张表看起来一直晃）。这里合并成 180ms 一次，最坏 ~5 次/秒。 */
++        finToolbarObserver = new MutationObserver(function(){
++          if (finToolbarTimer) return;
++          finToolbarTimer = setTimeout(function(){
++            finToolbarTimer = null;
++            try { fin_mountToolbar2(); } catch(e){}
++          }, 180);
++        });
+         finToolbarObserver.observe(host, { childList: true, subtree: true });
+       } catch(e){}
+@@ -26335,4 +27514,5 @@ var PROD_EQUIP_FAULT_KB = {
+       } finally { window.__eqMounting = false; }
+     }
++    var eqToolbarTimer = null;
+     function watchToolbar(){
+       try { mountToolbar(); } catch(e){}
+@@ -26340,5 +27520,13 @@ var PROD_EQUIP_FAULT_KB = {
+         if (window.__eqToolbarObs) return;
+         var box = document.getElementById('equity_container'); if (!box) return;
+-        window.__eqToolbarObs = new MutationObserver(function(){ try { mountToolbar(); } catch(e){} });
++        /* ★TOOLBAR-DEBOUNCE-20261018：同财务 —— 每次 DOM 变动立刻重挂会被 Univer 的
++           ResizeObserver 反向拉扯成高频循环（整张表持续晃动）。合并成 180ms 一次。 */
++        window.__eqToolbarObs = new MutationObserver(function(){
++          if (eqToolbarTimer) return;
++          eqToolbarTimer = setTimeout(function(){
++            eqToolbarTimer = null;
++            try { mountToolbar(); } catch(e){}
++          }, 180);
++        });
+         window.__eqToolbarObs.observe(box, { childList: true, subtree: true });
+       } catch(e){}
+@@ -26361,4 +27549,5 @@ var PROD_EQUIP_FAULT_KB = {
+        不再用写死的 calc(100vh - N px) —— N 会随顶部导航换行、标题/工具栏三语高度变化而失准。
+        这里按容器在视口里的【真实 top】算出到底部还剩多少高度，窗口缩放/切页/切语言后重算。 */
++    var __eqFitSig = '';
+     function eqFitHeight(){
+     try {
+@@ -26368,7 +27557,15 @@ var PROD_EQUIP_FAULT_KB = {
+       var top = c.getBoundingClientRect().top;
+       if (!(top > 0)) return;
++      /* ★FIT-STABLE-20261018：同 finFitHeight —— 尺寸没变就不动，杜绝 400ms 轮询引发的抖动 */
++      var sig = (window.innerWidth || 0) + 'x' + (window.innerHeight || 0) + '@' + Math.round(top);
++      if (sig === __eqFitSig && c.style.height) return;
+       var pad = 30;                                        /* 容器下方还有 .approvals-page 10px + body 20px padding */
+       var h = Math.max(420, Math.round((window.innerHeight || 800) - top - pad));
+-      if (Math.abs((parseFloat(c.style.height) || 0) - h) > 2) c.style.height = h + 'px';
++      try {
++        var over = (document.documentElement.scrollHeight || 0) - (window.innerHeight || 0);
++        if (over > 0 && over < 80) h = Math.max(420, h - over - 2);
++      } catch(e0){}
++      __eqFitSig = sig;
++      if (Math.abs((parseFloat(c.style.height) || 0) - h) > 1) c.style.height = h + 'px';
+     } catch(e){}
+     }
+@@ -26389,4 +27586,49 @@ var PROD_EQUIP_FAULT_KB = {
+     return v;
+     }
++    /* ★EQ-CELL-KEEP-20261018（用户：刷新后单元格老是跳到 A1）
++       原因：刷新/重建 = 重新 createUnit，Univer 新建单元的选区固定是 A1，我们从没记住光标。
++       这里按工作表记住上次的单元格，重建后自动落回去（activate 顺带把滚动位置带回该格）。 */
++    var EQ_CELL_KEY = 'eq_last_cell_v1';
++    function eqCellStore(){
++      try { return JSON.parse(localStorage.getItem(EQ_CELL_KEY) || '{}') || {}; } catch(e){ return {}; }
++    }
++    function eqCellRemember(){
++      try {
++        var v = document.getElementById('view-equity');
++        if (!v || !v.classList.contains('active')) return;
++        var sh = eqSheetObj(); if (!sh) return;
++        var sid = sh.getSheetId ? sh.getSheetId() : '';
++        if (!sid) return;
++        var rg = (typeof eqCurrentSelRange === 'function') ? eqCurrentSelRange() : null;
++        if (!rg || rg.startRow === undefined) return;
++        var m = eqCellStore();
++        var prev = m[sid];
++        if (prev && prev[0] === rg.startRow && prev[1] === rg.startColumn) return;
++        m[sid] = [rg.startRow, rg.startColumn];
++        localStorage.setItem(EQ_CELL_KEY, JSON.stringify(m));
++      } catch(e){}
++    }
++    function eqRestoreCellSoon(){
++      try {
++        setTimeout(function(){
++          try {
++            var sh = eqSheetObj(); if (!sh) return;
++            var sid = sh.getSheetId ? sh.getSheetId() : '';
++            if (!sid) return;
++            var m = eqCellStore();
++            var c = m[sid];
++            if (!c) return;
++            var rg = sh.getRange(c[0], c[1]);
++            if (rg && rg.activate) rg.activate();
++          } catch(e){}
++        }, 80);
++      } catch(e){}
++    }
++    try {
++      if (!window.__eqCellKeepPoll){
++        window.__eqCellKeepPoll = setInterval(function(){ try { eqCellRemember(); } catch(e){} }, 1200);
++      }
++    } catch(e){}
++
+     function render(){
+     if (!univer) return;
+@@ -26424,4 +27666,6 @@ var PROD_EQUIP_FAULT_KB = {
+       }
+     } catch(e){}
++    /* ★EQ-CELL-KEEP-20261018（用户：刷新后光标老是跳回 A1）：重建后回到上次的单元格 */
++    try { eqRestoreCellSoon(); } catch(eR){}
+     setTimeout(fmtCurrency, 300);
+     setTimeout(fmtCurrency, 900);
+@@ -28049,17 +29293,25 @@ var PROD_EQUIP_FAULT_KB = {
+         ta.value = text;
+         ta.setAttribute('readonly', '');
+-        ta.style.cssText = 'position:fixed;left:-99999px;top:0;width:1px;height:1px;opacity:0;';
++        /* ★CLIP-EXECFIX-20261018：临时候选区留在【视口内】并显式 focus，避免真实 Chrome 的 execCommand('copy') 假成功写空。 */
++        ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:0;padding:0;margin:0;z-index:2147483647;';
+         document.body.appendChild(ta);
+         try {
++          /* ★CLIP-NOFOCUS-20261018：不抢焦点（理由同财务）；真正写入走 copy/cut 事件 setData。 */
+           ta.select();
+           ta.setSelectionRange(0, text.length);
++          /* ★CLIP-PENDING-20261018：让 copy 事件的 setData 通道真正落盘（不依赖权限/安全上下文） */
++          window.__finClipPending = text;
+           ok = document.execCommand('copy');
+         } catch(err){ ok = false; }
++        window.__finClipPending = null;
+         try { document.body.removeChild(ta); } catch(err){}
+         try { if (window.__finClipLast) window.__finClipLast.ok = !!ok; } catch(err){}
+-        if (!ok){
+-          try { navigator.clipboard.writeText(text).catch(function(){}); } catch(err){}
+-        }
+-      } catch(err){ ok = false; }
++        /* ★CLIP-ALWAYSASYNC-20261018：无条件再走一次异步 API（execCommand 可能假成功） */
++        try {
++          if (navigator.clipboard && navigator.clipboard.writeText){
++            navigator.clipboard.writeText(text).catch(function(){});
++          }
++        } catch(err){}
++      } catch(err){ window.__finClipPending = null; ok = false; }
+       finally {
+         try { if (prev && typeof prev.focus === 'function') prev.focus({ preventScroll: true }); } catch(err){}
+@@ -28089,4 +29341,18 @@ var PROD_EQUIP_FAULT_KB = {
+           }
+         } catch(err){}
++        /* ★EQ-CLIP-RANGE-20261018：全选/大框选时 getRanges() 常只给"活动格" → getActiveRange().getRange() 实测能返回正确范围，用它兜底（取面积更大的那个） */
++        try {
++          var _selE = (sh.getSelection && sh.getSelection()) || null;
++          var _arE = (_selE && _selE.getActiveRange && _selE.getActiveRange()) || null;
++          var _gE = (_arE && typeof _arE.getRange === 'function') ? _arE.getRange() : null;
++          if (_gE && _gE.startRow != null && _gE.endRow != null && _gE.startColumn != null && _gE.endColumn != null){
++            var _aSzE = (_gE.endRow - _gE.startRow + 1) * (_gE.endColumn - _gE.startColumn + 1);
++            var _cSzE = 0;
++            for (var _zE = 0; _zE < ranges.length; _zE++){
++              _cSzE += (ranges[_zE].endRow - ranges[_zE].startRow + 1) * (ranges[_zE].endColumn - ranges[_zE].startColumn + 1);
++            }
++            if (_aSzE > _cSzE){ ranges = [{ startRow: _gE.startRow, startColumn: _gE.startColumn, endRow: _gE.endRow, endColumn: _gE.endColumn }]; }
++          }
++        } catch(errE){}
+         if (!ranges.length){
+           var cur0 = eqActiveCell(); if (!cur0) return '';
+@@ -28134,4 +29400,43 @@ var PROD_EQUIP_FAULT_KB = {
+     }
+ 
++    /* ★CLIP-CUTCLEAR-20261018：权益表剪切（Ctrl+X）的清空兜底（理由与财务 fin_clipCutClearSoon 相同）。 */
++    window.__eqClipCutClearSoon = function(){
++      var sig = '';
++      try { sig = eq_clipMatrixText(); } catch(err){ return; }
++      if (!sig || !sig.replace(/[\t\r\n]/g, '')) return;
++      setTimeout(function(){
++        try {
++          var now = '';
++          try { now = eq_clipMatrixText(); } catch(errN){ return; }
++          if (now !== sig) return;                      /* Univer 已清空 / 内容已变 → 不动手 */
++          progUntil = 0;                                /* ★用户操作：允许标脏并自动保存 */
++          var pr = api.executeCommand('sheet.command.clear-selection-content', {});
++          if (pr && typeof pr.then === 'function') pr.catch(function(){});
++        } catch(err2){}
++      }, 420);
++    };
++
++    /* ★CLIP-EVENTSET-20261018：copy/cut 事件里用 clipboardData.setData 直接写剪贴板（绕过 execCommand 假成功）。 */
++    (function(){
++      function eqClipFill(e){
++        try {
++          if (!e.clipboardData) return;
++          /* ★CLIP-PENDING-20261018：与财务同一条通道（不依赖焦点/权限/安全上下文） */
++          var pend = window.__finClipPending;
++          if (pend){
++            e.clipboardData.setData('text/plain', pend);
++            e.preventDefault();
++            return;
++          }
++          var a = document.activeElement;
++          if (!a || !a.closest || !a.closest('#equity_container')) return;
++          var txt = (typeof eq_clipMatrixText === 'function') ? eq_clipMatrixText() : '';
++          if (txt){ e.clipboardData.setData('text/plain', txt); e.preventDefault(); }
++        } catch(err){}
++      }
++      document.addEventListener('copy', eqClipFill, true);
++      document.addEventListener('cut', eqClipFill, true);
++    })();
++
+     /* 行为级自检（3 秒后跑一次）：共用写入器 + 权益取数函数都在，才算接线成功。
+        为什么需要：用户 2026-10-17 反馈"只要一改，Ctrl+C/X/V 就立即丢失"——
+@@ -28290,4 +29595,6 @@ var PROD_EQUIP_FAULT_KB = {
+           if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (k === 'c' || k === 'C' || k === 'x' || k === 'X')) {
+             try { if (window.win_clipWrite) window.win_clipWrite(eq_clipMatrixText()); } catch(errClip){}
++            /* ★CLIP-CUTCLEAR-20261018：X 的「清空单元格」兜底（Univer 的 cut 写剪贴板失败会中断） */
++            if (k === 'x' || k === 'X'){ try { if (window.__eqClipCutClearSoon) window.__eqClipCutClearSoon(); } catch(errCut){} }
+             return;   /* ★绝不 preventDefault / stopPropagation */
+           }
+@@ -28658,4 +29965,142 @@ var PROD_EQUIP_FAULT_KB = {
+     }
+     };
++    /* ============ ★EQ-UNDO-BRIDGE-20261018★ 股东权益 ↔ 财务那本统一账本 ============
++       权益表在独立的 <script type="module"> 作用域里，财务那边拿不到这里的 api，
++       所以这里只暴露 4 个桥接函数（读当前表 id / 读快照 / 读选区 / 发写回），
++       记账与撤销动作全部复用财务那套（window.__finUndoBridge / finUndoHist）。
++       ★实测这一版 Univer 的 FWorksheet 上没有 getSnapshot（只有 Workbook 有），
++         所以快照一律走 getActiveWorkbook().getSnapshot()（{sheets:{...}}）。 */
++    var eqUndoProgFlag = 0;                          // >0 = 我们自己的写回，不记账
++    try { window.__eqAPI = function(){ return api; }; } catch(e){}
++    window.__eqUndo = {
++      sheetId: function(){
++        try { var s = eqSheetObj(); return (s && s.getSheetId) ? s.getSheetId() : ''; } catch(e){ return ''; }
++      },
++      isEditing: function(){
++        try { return (typeof eqIsEditingCell === 'function') ? !!eqIsEditingCell() : false; } catch(e){ return false; }
++      },
++      /* 撤销/恢复后把选区落到被改的那一块（Excel 手感） */
++      focus: function(sid, box){
++        try {
++          if (!api || !api.getActiveWorkbook || !box) return false;
++          var wb = api.getActiveWorkbook();
++          if (!wb) return false;
++          var cur = null;
++          try { var s0 = wb.getActiveSheet(); cur = (s0 && s0.getSheetId) ? s0.getSheetId() : null; } catch(e1){}
++          if (sid && cur && cur !== sid && wb.setActiveSheet){
++            try { wb.setActiveSheet(sid); } catch(e2){}
++          }
++          var sh = wb.getActiveSheet();
++          if (!sh || !sh.getRange) return false;
++          var rg = sh.getRange(box.r0, box.c0, Math.max(1, box.r1 - box.r0 + 1), Math.max(1, box.c1 - box.c0 + 1));
++          if (rg && rg.activate) rg.activate();
++          return true;
++        } catch(e){ return false; }
++      },
++      selDebug: function(){
++        var o = {};
++        try { o.facade = eq_getSelectionRanges(); } catch(e){ o.facade = 'err:' + e; }
++        try { o.cur = eqCurrentSelRange(); } catch(e2){ o.cur = 'err:' + e2; }
++        try { o.cmd = (typeof eqStatSel !== 'undefined') ? eqStatSel : 'na'; } catch(e3){ o.cmd = 'na'; }
++        try { var s = eqSheetObj(); o.sid = s && s.getSheetId ? s.getSheetId() : ''; } catch(e4){}
++        return o;
++      },
++      snapshot: function(sid){
++        try {
++          if (!api || !api.getActiveWorkbook) return null;
++          var wb = api.getActiveWorkbook();
++          var sn = (wb && wb.getSnapshot) ? wb.getSnapshot() : null;
++          if (!sn){
++            var s = (wb && wb.getActiveSheet) ? wb.getActiveSheet() : null;
++            sn = (s && s.getSnapshot) ? s.getSnapshot() : null;
++          }
++          return sn || null;
++        } catch(e){ return null; }
++      },
++      ranges: function(){
++        try {
++          var cr = (typeof eqCurrentSelRange === 'function') ? eqCurrentSelRange() : null;
++          if (cr && cr.startRow !== undefined){
++            return [{ r0: cr.startRow, c0: cr.startColumn,
++                      r1: (cr.endRow !== undefined ? cr.endRow : cr.startRow),
++                      c1: (cr.endColumn !== undefined ? cr.endColumn : cr.startColumn) }];
++          }
++        } catch(e0){}
++        try {
++          var rs = (typeof eq_getSelectionRanges === 'function') ? (eq_getSelectionRanges() || []) : [];
++          var out = [];
++          for (var i = 0; i < rs.length; i++){
++            var o = rs[i];
++            if (!o || o.startRow === undefined) continue;
++            out.push({ r0: o.startRow, c0: o.startColumn,
++                       r1: (o.endRow !== undefined ? o.endRow : o.startRow),
++                       c1: (o.endColumn !== undefined ? o.endColumn : o.startColumn) });
++          }
++          return out.length ? out : null;
++        } catch(e){ return null; }
++      },
++      /* 写回必须带显式 range（不带时 Univer 会写到当前选区左上角 → 撤销写错格子） */
++      write: function(unitId, sid, mat, boxes){
++        try {
++          if (!api || !api.executeCommand) return false;
++          eqUndoProgFlag++;
++          try {
++            var bs = (boxes && boxes.length) ? boxes : null;
++            if (!bs){
++              api.executeCommand('sheet.command.set-range-values',
++                { unitId: unitId || 'equity-report', subUnitId: sid, value: mat });
++              return true;
++            }
++            for (var i = 0; i < bs.length; i++){
++              var b = bs[i], m = [];
++              for (var r = b.r0; r <= b.r1; r++){
++                var row = [];
++                for (var c = b.c0; c <= b.c1; c++){
++                  var cell = (mat && mat[r] && mat[r][c]) ? mat[r][c] : null;
++                  row.push({
++                    v: (cell && cell.v !== undefined) ? cell.v : null,
++                    f: (cell && cell.f !== undefined) ? cell.f : null,
++                    t: (cell && cell.t !== undefined) ? cell.t : null
++                  });
++                }
++                m.push(row);
++              }
++              api.executeCommand('sheet.command.set-range-values', {
++                unitId: unitId || 'equity-report', subUnitId: sid,
++                range: { startRow: b.r0, startColumn: b.c0, endRow: b.r1, endColumn: b.c1 },
++                value: m
++              });
++            }
++          } finally { eqUndoProgFlag--; }
++          return true;
++        } catch(e){ return false; }
++      }
++    };
++    /* 权益的命令服务也挂同一套记账钩子（单位 id 强制成 equity-report） */
++    function eqUndoHookInstall(){
++      try {
++        if (!coreMod || !univer || typeof univer.__getInjector !== 'function') return false;
++        var tok = coreMod.ICommandService;
++        if (!tok) return false;
++        var cs = univer.__getInjector().get(tok);
++        if (!cs || cs.__eqUndoHooked) return false;
++        if (typeof cs.beforeCommandExecuted !== 'function') return false;
++        cs.__eqUndoHooked = true;
++        try { window.__eqCmdSvc = window.__eqCmdSvc || cs; } catch(e){}
++        if (window.__finUndoBridge && window.__finUndoBridge.bind){
++          window.__finUndoBridge.bind(cs, 'equity-report');
++        }
++        return true;
++      } catch(e){ return false; }
++    }
++    var _eqUndoBooter = setInterval(function(){
++      try {
++        if (eqUndoHookInstall()){
++          clearInterval(_eqUndoBooter);
++          window.__eqUndoHookOk = true;
++        }
++      } catch(e){}
++    }, 400);
++
+     window.__eq = pub;
+ 

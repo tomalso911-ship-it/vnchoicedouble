@@ -1,0 +1,15 @@
+fix(equity): A.J / A.L 加入「人名缩写不翻译」保护表（A.C 原本已在）
+
+用户 2026-10-17：「A.C / A.J / A.L 这三组名字不要翻译！」
+
+- EQ_NO_TRANS_WORDS 由 ['CHOICEVN','T.L','A.C','DABACO']
+  扩为 ['CHOICEVN','T.L','A.C','A.J','A.L','DABACO']；
+- 判定仍是 eqNoTransWord()：整格去空白 + 转大写后精确匹配，
+  不放宽成子串匹配，避免误伤正文里恰好含这几个字母的其它内容；
+- needTrans / transOf / requestTrans / applyTrans 四处联动本来就走 eqNoTransWord，
+  所以历史缓存里若已存过 A.J / A.L 的译文也不会被套用。
+
+锁
+- check_eq_cur_notrans_lock.py 的 WORDS 同步为
+  (CHOICEVN, T.L, A.C, A.J, A.L, DABACO)，A.J / A.L 成为必须项：
+  以后任何人把这两个词从保护表里删掉，提交会被拦下。

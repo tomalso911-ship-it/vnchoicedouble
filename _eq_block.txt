@@ -1,0 +1,4146 @@
+    <script type="module">
+    (function(){
+    var API = '/api/finance/equity-report';
+    /* ★EQ-STRUCT-20261016（用户 2026-10-16 要求）：去掉固定表头 / 固定金额列，字段由用户自己在表格里定义。
+       这里只保留 5 张表的【表名】（用于标签三语切换 + 文件里的真实表名）；不再写死金额列/日期列。
+       越文表名 = 文件里的真实工作表名（改动会导致跨表公式断链，勿动）。 */
+    var SHEETS = [
+    { vi:'Tổng đầu tư',       zh:'总投资数据',    en:'Total Investment' },
+    { vi:'Đầu tư Trung Quốc', zh:'中国投资数据',  en:'China Investment' },
+    { vi:'Đầu tư Việt Nam',   zh:'越南投资数据',  en:'Vietnam Investment' },
+    { vi:'Cơ cấu cổ đông',    zh:'股东结构',      en:'Shareholder Structure' },
+    { vi:'Cổ tức',            zh:'分红记录',      en:'Dividend Records' }
+    ];
+    /* ★EQ-MONEY-COLS-20261016 / ★EQ-ALLMONEY-20261016：哪些列是「钱」（带货币符号 + 参与汇率换算）。
+       ★用户 2026-10-16 明确要求：「整表数值都要带货币符号」——所以默认
+         【整张表的所有数字列都算钱列】（带符号 + 参与汇率换算 + 保存乘回 VND），
+         不需要再逐表逐列登记（用户自定义的列随时会加，登记法跟不上）。
+       · 若要收窄成白名单：把该表写进 EQ_MONEY_COLS（键可用 中/越/英 任一表名，
+         值 = 列号数组，0 基，A=0），写明后只认这个数组；
+       · 若只想排除个别列（比例%/编号等）：写进下面的 EQ_PLAIN_COLS。 */
+    var EQ_MONEY_COLS = {};
+    /* ★EQ-ALLMONEY-20261016：例外列 —— 不算钱（只加千位符，不带符号、不换算）。 */
+    var EQ_PLAIN_COLS = {};
+    /* ★日期列（仅用于「查报表筛选 / 排序」；用户新结构确定后更新）。缺省 = 该表无日期列。 */
+    var EQ_DATE_COLS = {
+    '中国投资数据': 0, '越南投资数据': 0, '股东结构': 4, '分红记录': 0
+    };
+    var R_HEAD = 4, R_DATA0 = 5, R_DATA1 = 1004, R_TOTAL = 1005;   // 0 基（Excel 第 5 / 6..1005 / 1006 行）
+
+    var univer = null, api = null, sheet = null, presets = null;
+    var coreMod = null;
+    var inited = false, loading = false, ready = false;
+    var snap = null, view = null;
+    var cur = 'VND', rate = 1, filter = null, sortDir = 0;
+    /* ★EQ-SELCUR-20261016：用户「框选单元格 → 选币种」时的显式覆盖（优先于列配置）：
+       · eqSelMoney = 强制算「钱格」（带货币符号 + 参与换算）；
+       · eqSelPlain = 强制「不算钱」（选「无」时把符号去掉，只留千位符）。
+       结构 { sid: { "行,列": 1 } }（行/列 0 基，sid = 越文表名）。 */
+    var eqSelMoney = {};
+    var eqSelPlain = {};
+    try { eqSelMoney = JSON.parse(localStorage.getItem('eq_sel_money_v1') || '{}') || {}; } catch(e){ eqSelMoney = {}; }
+    try { eqSelPlain = JSON.parse(localStorage.getItem('eq_sel_plain_v1') || '{}') || {}; } catch(e){ eqSelPlain = {}; }
+    function eqSaveSelMoney(){
+      try { localStorage.setItem('eq_sel_money_v1', JSON.stringify(eqSelMoney)); } catch(e){}
+      try { localStorage.setItem('eq_sel_plain_v1', JSON.stringify(eqSelPlain)); } catch(e){}
+    }
+    /* ★EQ-CN-CELLCUR-20261016（用户 2026-10-16：「中国投资数据」表默认无单位，单位按格自由设定，
+       而且不参与货币换算，这样容易很多）：
+       · 这张表【整表不换算】—— 屏幕不除汇率、保存不乘回，文件里的数字就是用户录入的数字；
+       · 默认【无单位】（只带千位符）；
+       · 用户在表里框选（含只选一格）后从币种下拉选一种货币 = 只给这些格子挂上货币符号（纯显示），
+         数值一个都不动；选「无」= 把单位去掉。
+       所以它的单位是【按格】记的，与全局 cur 无关：
+         eqCellCur = { <越文表名>: { "行,列": 'RMB'|'USD'|'VND' } }（没有条目 = 无单位 '#,##0'）。
+       ★其它表格的逻辑完全不变（仍走全局 cur + eqSelMoney/eqSelPlain + 汇率换算）。 */
+    var eqCellCur = {};
+    try { eqCellCur = JSON.parse(localStorage.getItem('eq_cell_cur_v1') || '{}') || {}; } catch(e){ eqCellCur = {}; }
+    function eqSaveCellCur(){ try { localStorage.setItem('eq_cell_cur_v1', JSON.stringify(eqCellCur)); } catch(e){} }
+    var eqLastActiveSheetName = '';   /* ★EQ-SHEET-CUR-20261016：用于切工作簿时按默认币种切换 */
+    /* ★EQ-CURSTICK-20261016：用户手动选过的币种（'' = 从未手动选过）。
+       选了就一直生效（切表/轮询/重建都不许改回默认），并记住到下次打开页面。 */
+    var eqCurChoice = '';
+    try { eqCurChoice = String(localStorage.getItem('eq_cur_choice_v1') || ''); } catch(e){ eqCurChoice = ''; }
+    if (eqCurChoice !== 'VND' && eqCurChoice !== 'RMB' && eqCurChoice !== 'USD' && eqCurChoice !== 'NONE') eqCurChoice = '';
+    /* ★★EQ-CELLCUR-ALL5-20261017：5 张表全部「整表不换算」（见 eqIsCnSheet 的注释）后，
+       全局币种/汇率在股东权益里已经【没有任何作用对象】→ 载入即「无」，不再沿用 eqCurChoice 记忆的
+       RMB/USD（否则统计栏会挂着 ¥/$、下拉也会显示错）。
+       ★下面三条换算路径（applyCurrency ÷汇率 / eqCaptureLiveToSnap ×汇率 / payload ×汇率）
+         一行都不删，仍然是原逻辑；只要这一行改成 cur = eqCurChoice 就能整体恢复。 */
+    eqCurChoice = '';
+    cur = 'NONE';
+    /* ★EQ-SAVE-NOLOSS-20261018：dirtyGen = 改动代数（每次真实改动 +1）；
+       saveQueued/saveQueuedManual = 保存飞行期间又有人点保存/又改了内容 → 落地后必须补存一次。 */
+    var dirty = false, saving = false, saveTimer = null, progUntil = 0;
+    var dirtyGen = 0, saveQueued = false, saveQueuedManual = false, saveWaiters = [], saveLastOk = true;
+    /* ★★EQ-DRAFT-20261016（用户 2026-10-16：「我录入的内容，刷新后、或者修改代码后，不能被删除！」）★★
+       eqBaseId = 载入时那次 /snapshot 响应的指纹（长度+散列）；
+       草稿只有在「服务器上的文件与用户当时编辑的那一版完全一致」（指纹相同 ⇒ 期间没人改过文件）
+       时才允许自动补交 —— 否则留草稿、不提交（硬提交会覆盖别人的新数据）。 */
+    var EQ_DRAFT_KEY = 'eq_draft_v1';
+    var eqBaseId = '', eqDraftBusy = false;
+    function eqFp(t){
+    var s = String(t || ''), h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+    return s.length + '-' + h;
+    }
+    var trans = {}, pending = {};
+
+    function lang(){
+    /* ★EQ-LANG-20261016：主程序用 window.CUR_LANG + localStorage['won_lang']（存的是 JSON 字符串，
+       如 "zh"）；旧写法只读 localStorage['lang']（主程序从不用这个键）→ 取不到就回退 'vi'，
+       导致中文系统下表格被翻成越南语。这里把 won_lang / __lang 都纳入，并做 JSON 解析与白名单。 */
+    try {
+      var l = window.CUR_LANG || window.__lang || localStorage.getItem('won_lang') || localStorage.getItem('lang') || 'vi';
+      try { var p = JSON.parse(l); if (typeof p === 'string') l = p; } catch(e){}
+      l = String(l || 'vi').toLowerCase();
+      return (l === 'zh' || l === 'en' || l === 'vi') ? l : 'vi';
+    } catch(e){ return 'vi'; }
+    }
+    function st(msg){ var el = document.getElementById('eq_status'); if (el) el.textContent = msg || ''; }
+    function isNum(v){ return typeof v === 'number' && isFinite(v); }
+    /* ★三语表名都能认：界面把表名翻成中文/英文后，仍要能找到列定义（金额列/日期列），
+       否则查报表、排序、币种换算会全部失效。 */
+    function sheetDef(name){
+      if (!name) return null;
+      for (var i=0;i<SHEETS.length;i++){
+        var d = SHEETS[i];
+        if (d.vi === name || d.zh === name || d.en === name) return d;
+      }
+      return null;
+    }
+    /* ★EQ-STRUCT-20261016：配置对象按表名（中/越/英任一）取值；找不到返回 null。 */
+    function eqCfgBySheet(cfg, name){
+      try {
+        var d = sheetDef(name); if (!d || !cfg) return null;
+        for (var k in cfg){ if (!cfg.hasOwnProperty(k)) continue;
+          var dk = sheetDef(k);
+          if (dk && dk.vi === d.vi) return cfg[k];
+        }
+      } catch(e){}
+      return null;
+    }
+    /* 钱列（0 基列号数组）。★EQ-ALLMONEY-20261016：返回 null = 该表未指定白名单
+       → 整表数字都算钱（默认）。 */
+    function eqMoneyCols(name){
+      var a = eqCfgBySheet(EQ_MONEY_COLS, name);
+      return (a && a.length) ? a : null;
+    }
+    function eqPlainCols(name){ var a = eqCfgBySheet(EQ_PLAIN_COLS, name); return a || []; }
+    /* ★EQ-ALLMONEY-20261016：默认整表数字都算钱；日期列与 EQ_PLAIN_COLS 例外。 */
+    function eqIsMoneyCol(name, c){
+      if (c === eqDateCol(name)) return false;                 /* 日期列永远不是钱 */
+      if (eqPlainCols(name).indexOf(c) >= 0) return false;      /* 显式排除的普通数字列 */
+      var m = eqMoneyCols(name);
+      return m ? m.indexOf(c) >= 0 : true;                      /* 未指定 → 整表都算钱 */
+    }
+    /* ★EQ-SELCUR-20261016：把任意语言表名归一成稳定的键（越文表名），
+       这样 eqSelMoney / eqSelPlain 不随界面语言/快照 key 变化而丢。 */
+    function eqSheetKey(name){ var d = sheetDef(name); return d ? d.vi : (name || ''); }
+    /* ★EQ-SELCUR-20261016：某表某格是否算「钱格」。
+       优先级：框选强制算钱 → 框选强制不算钱 → 列配置（默认整表算钱）。 */
+    function eqIsMoneyCell(name, r, c){
+      var key = eqSheetKey(name), k = r + ',' + c;
+      var mm = eqSelMoney[key]; if (mm && mm[k]) return true;
+      var pp = eqSelPlain[key]; if (pp && pp[k]) return false;
+      return eqIsMoneyCol(name, c);
+    }
+    /* 日期列（0 基列号；无则 null）。 */
+    function eqDateCol(name){ var c = eqCfgBySheet(EQ_DATE_COLS, name); return (c === undefined || c === null) ? null : c; }
+    /* ★★EQ-CELLCUR-ALL5-20261017（用户 2026-10-17 拍板：
+       「总投资数据 / 越南投资数据 / 股东结构 / 分红记录 里面的录入逻辑完全按照中国投资数据表格做，1:1 复刻」；
+       并逐条确认：① 4 张表也一律默认「无单位」（只千位符）；② 仍按 VND 原值存储；
+       ③ 单位「保持纯数字」（只活在屏幕上，不写进 xlsx）；④ 不留「整表换算」入口。）★★
+       这 5 张表全部适用：整表不换算 + 默认无单位 + 单位按格设定（纯显示）。
+       函数名沿用 eqIsCnSheet（11 处调用点 + 硬锁脚本都认这个名字），只把判定扩成下面这张白名单。
+       ★只改判定、不动任何调用点 —— 于是 applyCurrency / eqCaptureLiveToSnap / payload /
+         applyNumFmt / setCurrency / eqSyncCurToActiveSheet / eqDefaultCurFor 会一起翻过去。 */
+    var EQ_CELLCUR_ZH = ['总投资数据', '中国投资数据', '越南投资数据', '股东结构', '分红记录'];
+    function eqIsCnSheet(name){
+      try {
+        var d = sheetDef(name); if (!d) return false;
+        for (var i = 0; i < SHEETS.length; i++){
+          if (SHEETS[i].vi !== d.vi) continue;
+          if (EQ_CELLCUR_ZH.indexOf(SHEETS[i].zh) >= 0) return true;
+        }
+      } catch(e){}
+      return false;
+    }
+    /* 中国投资数据：某格挂的单位（'NONE' = 没挂 → 只带千位符） */
+    function eqCellCurOf(name, r, c){
+      try {
+        var m = eqCellCur[eqSheetKey(name)];
+        if (!m) return 'NONE';
+        var v = m[r + ',' + c];
+        return (v === 'RMB' || v === 'USD' || v === 'VND') ? v : 'NONE';
+      } catch(e){ return 'NONE'; }
+    }
+    function eqCellCurSet(name, r, c, code){
+      try {
+        var k = eqSheetKey(name);
+        var m = eqCellCur[k] || (eqCellCur[k] = {});
+        if (code === 'NONE') delete m[r + ',' + c];
+        else m[r + ',' + c] = code;
+        if (!Object.keys(m).length) delete eqCellCur[k];
+      } catch(e){}
+    }
+    /* 中国投资数据：把 code 刷到当前选区的格子上。
+       小选区（≤400 格）连空格一起标 —— 方便用户先定单位再往里录数字；
+       大选区只标真实存在的数字格（不按矩形逐格循环，整列/整表也不会卡）。 */
+    function eqCnApplyUnit(code){
+      var n = 0, sid = '', cells = [];
+      /* 排障用（用户描述问题时可直接看 window.__eqCnDebug：stage 停在哪一步） */
+      var dbg = { code: code, stage: 'init', sheet: '', isCn: false, hasCd: false, sel: null, n: 0 };
+      try { window.__eqCnDebug = dbg; } catch(e){}
+      try {
+        var sh = eqSheetObj();
+        dbg.stage = 'sh';
+        if (!sh) return { n: 0, sid: '', cells: [] };
+        /* ★必须走 eqActiveSheetName()：实测 Worksheet 门面的 getName() 在编辑后可能返回空串，
+           而它内部还有 sh.name、以及按 subUnitId 回查 view 的兜底。 */
+        var name = eqActiveSheetName();
+        dbg.sheet = name;
+        dbg.isCn = eqIsCnSheet(name);
+        dbg.stage = 'name';
+        if (!name || !dbg.isCn) return { n: 0, sid: '', cells: [] };
+        sid = eqSubUnitId(sh) || '';
+        var src = null;
+        try { src = (sheet && sheet.getSnapshot) ? sheet.getSnapshot() : null; } catch(e){}
+        if (!src) src = snap;
+        var cd = null;
+        Object.keys((src && src.sheets) || {}).forEach(function(s2sid){
+          if (cd) return;
+          var s2 = src.sheets[s2sid]; if (!s2) return;
+          if (eqSheetKey(s2.name) === eqSheetKey(name)){ cd = s2.cellData || {}; if (!sid) sid = s2sid; }
+        });
+        dbg.hasCd = !!cd;
+        dbg.stage = 'cd';
+        if (!cd) return { n: 0, sid: sid, cells: [] };
+        var sel = eqCurrentSelRange();
+        dbg.sel = sel ? [sel.startRow, sel.endRow, sel.startColumn, sel.endColumn] : null;
+        dbg.stage = 'sel';
+        if (!sel) return { n: 0, sid: sid, cells: [] };
+        var r0 = Math.min(sel.startRow, sel.endRow), r1 = Math.max(sel.startRow, sel.endRow);
+        var c0 = Math.min(sel.startColumn, sel.endColumn), c1 = Math.max(sel.startColumn, sel.endColumn);
+        if (r1 - r0 + 1 <= 0 || c1 - c0 + 1 <= 0) return { n: 0, sid: sid, cells: [] };
+        if ((r1 - r0 + 1) * (c1 - c0 + 1) <= 400){
+          /* 小选区：连空格一起标（先定单位、再往里录数字也行） */
+          for (var r = r0; r <= r1; r++){
+            for (var c = c0; c <= c1; c++){ eqCellCurSet(name, r, c, code); n++; }
+          }
+        } else {
+          /* 大选区：只标真实存在的数字格（不按矩形逐格循环，整列/整表也不会卡） */
+          Object.keys(cd).forEach(function(rk){
+            var rr = parseInt(rk, 10);
+            if (rr < r0 || rr > r1) return;
+            var row = cd[rk] || {};
+            Object.keys(row).forEach(function(ck){
+              var cc = parseInt(ck, 10);
+              if (cc < c0 || cc > c1) return;
+              var cell = row[ck];
+              if (!cell || !isNum(cell.v)) return;
+              eqCellCurSet(name, rr, cc, code); n++;
+            });
+          });
+        }
+        /* 已经是数字的格子：立刻用 numfmt 命令重刷格式（避免整表重建 → 用户框选会被重置到 A1） */
+        Object.keys(cd).forEach(function(rk){
+          var rr = parseInt(rk, 10);
+          if (rr < r0 || rr > r1) return;
+          var row = cd[rk] || {};
+          Object.keys(row).forEach(function(ck){
+            var cc = parseInt(ck, 10);
+            if (cc < c0 || cc > c1) return;
+            var cell = row[ck];
+            if (!cell || !isNum(cell.v)) return;
+            cells.push({ row: rr, col: cc });
+          });
+        });
+        dbg.stage = 'done';
+      } catch(e){ dbg.stage = 'err:' + e; }
+      try { dbg.n = n; } catch(e){}
+      if (n) eqSaveCellCur();
+      return { n: n, sid: sid, cells: cells };
+    }
+    /* ★EQ-CN-CELLCUR-20261016：下拉/状态栏该显示的币种 —— 中国投资数据表永远显示「无」
+       （整表不换算，单位是【按格】设的）。 */
+    function eqActiveSheetName(){
+      try {
+        var sh = eqSheetObj(); if (!sh) return '';
+        var n = (sh.getName && sh.getName()) || sh.name || '';
+        if (n) return n;
+        var _sid = eqSubUnitId(sh);
+        if (_sid && view && view.sheets && view.sheets[_sid]) return view.sheets[_sid].name || '';
+      } catch(e){}
+      return '';
+    }
+    function eqCurLabelNow(){ return eqIsCnSheet(eqActiveSheetName()) ? 'NONE' : cur; }
+
+    /* ============★★ 锁死区 ★★ EQ-CURR-NOTRANS-LOCK-20261016 ============
+       用户要求（2026-10-16，原话）：
+         「表格里面的 RMB, VND, USD. RMB-VND, USD-VND，这几个单元格里面的内容
+           禁止被翻译，锁死！」
+       落点（已核对文件）：股东权益报表 · 工作表 Đầu tư Trung Quốc（中国投资数据）第 3 行
+         H3=RMB  I3=VND  J3=USD  K3=RMB-VND  L3=USD-VND
+       为什么必须锁：这几个是【货币代码 / 货币对】，不是自然语言。
+         · 「RMB」被译成「人民币」「Nhân dân tệ」后，表头与公式/对账口径就对不上了；
+         · 更糟的是译文会被写回 xlsx（保存链把屏幕值落盘），下次打开文件里就是译文。
+       四条不变量（任何重构都不得移除，见 check_eq_cur_notrans_lock.py）：
+         ① 判定函数 eqNoTransCur()：整格归一化（去空白、转大写）后等于货币代码，
+            或由货币代码用 - – — / \ | 组成的货币对（RMB-VND / USD/VND …）；
+         ② needTrans()      —— 直接判「不需要翻译」→ 绝不发 /api/translate；
+         ③ transOf()        —— 直接返回 null → 即使缓存里【已经】存过译文（历史脏数据）
+                               也绝不套用；
+         ④ requestTrans()   —— 直接回调 null 返回，不发请求。
+       另：loadTrans() 载入时会把缓存里货币代码的历史脏译文清掉（自愈），
+           applyTrans() 里再显式跳过一次，双保险。 */
+    /* ============★★ 锁死区 ★★ EQ-WORD-NOTRANS-LOCK-20261016 ============
+       用户要求（2026-10-16，原话）：「这个内容也不需要翻译！」
+       截图内容 = Choice VN / T.L / A.C
+       落点（已核对文件）：股东权益 · Đầu tư Trung Quốc（中国投资数据）
+         E4:G6 —— 公司=Choice VN、付款来自=T.L、付款至=A.C
+       为什么必须锁：这些是【公司名 + 人名缩写】，不是可翻译的词。
+         「Choice VN」被译成「Lựa chọn VN」（= 越南选项）之类就不再是公司名了；
+         「T.L」「A.C」被翻译引擎改写更是灾难。
+       判定：整格文字【去掉所有空白 + 转大写】后等于下表任一项 ⇒ 永不翻译；
+             即使缓存里已经存过译文，也一律不套用（历史脏数据防线）。
+         · DABACO 一并纳入：财务报表早有「品牌名不翻译」契约（FIN-NO-TRANS-20261013），
+           同一个品牌不该在两处规则不一致。
+       要加词/改词只改这一张表（属用户明确要求的锁死）。 */
+    /* ★2026-10-17 用户补充：「A.C / A.J / A.L 这三组名字不要翻译！」
+       —— 这三组是【人名 / 账户缩写】，不是可翻译的词；整格精确匹配（去空白 + 转大写）才豁免，
+          不会误伤正文里恰好含这几个字母的其它内容。 */
+    var EQ_NO_TRANS_WORDS = ['CHOICEVN', 'T.L', 'A.C', 'A.J', 'A.L', 'A.T', 'A.R', 'A.M', 'A.Z', 'DABACO'];
+    /* ============★★ 锁死区 ★★ EQ-NAME-NOTRANS-LOCK-20261018 ============
+       用户要求（2026-10-18，原话）：
+         「股东结构，里面的人名锁住，无需翻译！并且确保，语言切换时，姓名不能丢失
+           （刚才丢失过一次了已经）！」
+       落点：股东权益 ·「Cơ cấu cổ đông（股东结构）」的人名列
+             —— 截图： # 01 A.L / # 02 A.C / # 03 A.J / # 04 A.T
+                        # 05 A.R / # 06 A.M / # 07 A.Z
+       为什么必须锁（这次已经出过一次事故）：
+         · 这些是【人名缩写】，不是自然语言。翻译引擎会把 A.M 译成「上午 / am」、A.T 译成「at」；
+         · 更致命的是【译文会被写回 xlsx】：保存链 payload() 用 transOf(v,'vi') 把屏幕值还原成
+           文件原文，还原不了就把屏幕上的译文原样落盘 → 姓名被永久覆盖，下次打开就「丢了」。
+       两条判定（满足任一即豁免，整格精确匹配，不会误伤正文）：
+         ① 显式表 EQ_NO_TRANS_WORDS（含 A.L/A.C/A.J/A.T/A.R/A.M/A.Z/T.L/CHOICEVN/DABACO）；
+         ② 人名缩写模式 EQ_NO_TRANS_NAME_RE：^[A-Z]{1,3}(\.[A-Z]{1,3}){1,3}\.?$（长度 ≤ 12），
+            覆盖以后新增的 X.Y 形式（如 A.B / MRS.L），不必每次都往表里加词。
+       联动（五处，缺一条就会复发）：
+         · eqNoTransWord()  → needTrans / transOf / requestTrans / applyTrans / loadTrans 全部自动生效；
+         · loadTrans()      → 载入时把缓存里这些人名的历史脏译文删掉（自愈）；
+         · payload()        → 这些人名永远不参与译文还原，屏幕上是什么就写什么。
+       ★任何重构都不得移除本规则（check_eq_cur_notrans_lock.py 的 WORDS 表会拦）。 */
+    /* 人名缩写模式：X.Y / X.Y.Z / X.Y.（A.L、T.L、A.M …）。归一化后长度 ≤ 12 才判，
+       避免把长句里恰好带点的内容误判成人名。 */
+    var EQ_NO_TRANS_NAME_RE = /^[A-Z]{1,3}(\.[A-Z]{1,3}){1,3}\.?$/;
+    function eqNoTransName(t){
+    var s = String(t == null ? '' : t).toUpperCase().replace(/[\s\u00a0]+/g, '');
+    if (!s || s.length > 12) return false;
+    return EQ_NO_TRANS_NAME_RE.test(s);
+    }
+    function eqNoTransWord(t){
+    var s = String(t == null ? '' : t).toUpperCase().replace(/[\s\u00a0]+/g, '');
+    if (!s) return false;
+    if (EQ_NO_TRANS_WORDS.indexOf(s) >= 0) return true;
+    return eqNoTransName(s);   /* ★EQ-NAME-NOTRANS-LOCK-20261018：人名缩写一律不翻译 */
+    }
+
+    var EQ_NO_TRANS_CUR = ['RMB', 'VND', 'USD'];
+    function eqNoTransCur(t){
+    var s = String(t == null ? '' : t).trim().toUpperCase().replace(/[\s\u00a0]+/g, '');
+    if (!s) return false;
+    if (EQ_NO_TRANS_CUR.indexOf(s) >= 0) return true;            /* RMB / VND / USD */
+    /* 货币对：RMB-VND、USD/VND、VND–RMB…（2~3 个代码，连接符 - – — / \ |） */
+    var parts = s.split(/[-–—/\\|]+/);
+    if (parts.length >= 2 && parts.length <= 3){
+      for (var i = 0; i < parts.length; i++){
+        if (EQ_NO_TRANS_CUR.indexOf(parts[i]) < 0) return false;
+      }
+      return true;
+    }
+    return false;
+    }
+
+    /* ============★★ 锁死区 ★★ EQ-HEAD-LOCK-20261016 ============
+       用户要求（2026-10-16，原话）：
+         「这个中文就不用改动了，请锁住；英文和越南文，也按照现在的意思锁住！」
+       落点：股东权益 ·「中国投资数据」表头行（第2行 C~O）+ 货币行（第3行 H~L）。
+       做法：这一行三语【全部写死成常量】，永不联网翻译、也永不被缓存里别的说法覆盖。
+         · zh 列 = 用户截图里现在的写法（序号/年份/公司/付款来自/付款至/金额/汇率/日期/现金转账/备注，一字不改）
+         · en / vi 列 = 按中文现在的意思给出的标准说法
+         · alias 列 = 文件里历史上漂移出来的其它写法（旧引擎的译法，如 'sự liên tiếp' / 'Số lượng'），
+           一并归到同一条 —— 这样无论文件当前存的是哪一版，切任何语言都显示上面这套固定说法。
+       预期效果：中文界面永远是你截图里的写法；英文界面 No./Year/Company/…；
+                 越南文界面 STT/Năm/Công ty/…；三者永不随翻译引擎漂移。
+       ★这一行显示什么，只由 EQ_HEAD_LOCK 说了算。要改词只能改本表
+         （属用户明确要求的锁死，禁止擅自改；check_eq_cur_notrans_lock.py 会检查本表是否被掏空）。 */
+    var EQ_HEAD_LOCK = [
+    { zh: '序号', en: 'No.', vi: 'STT', alias: ['sự liên tiếp', 'số seri'] },
+    { zh: '年份', en: 'Year', vi: 'Năm', alias: [] },
+    { zh: '公司', en: 'Company', vi: 'Công ty', alias: [] },
+    { zh: '付款来自', en: 'Paid from', vi: 'Thanh toán từ', alias: ['Thanh toán đến từ', '款项来自'] },
+    { zh: '付款至', en: 'Paid to', vi: 'Thanh toán đến', alias: ['Trả tiền cho', '款项去处'] },
+    { zh: '金额', en: 'Amount', vi: 'Số tiền', alias: ['Số lượng'] },
+    { zh: '汇率', en: 'Exchange rate', vi: 'Tỷ giá', alias: ['tỷ giá hối đoái'] },
+    { zh: '日期', en: 'Date', vi: 'Ngày', alias: [] },
+    { zh: '现金/转账', en: 'Cash/Transfer', vi: 'Tiền mặt/Chuyển khoản', alias: ['现金', '转账'] },
+    { zh: '备注', en: 'Remark', vi: 'Ghi chú', alias: ['Nhận xét'] }
+    ];
+    var EQ_HEAD_IDX = null;
+    function eqHeadRec(t){
+    /* 按【整格文字】认表头：中/英/越三语 + 历史别名，统一归到同一条记录。
+       比较时去首尾空白 + 忽略大小写（文件里是 'năm' 还是 'Năm' 都认）。 */
+    var s = String(t == null ? '' : t).trim().toLowerCase();
+    if (!s) return null;
+    if (!EQ_HEAD_IDX){
+      EQ_HEAD_IDX = {};
+      for (var i = 0; i < EQ_HEAD_LOCK.length; i++){
+        var r = EQ_HEAD_LOCK[i];
+        var keys = [r.zh, r.en, r.vi].concat(r.alias || []);
+        for (var j = 0; j < keys.length; j++){
+          var k = String(keys[j] == null ? '' : keys[j]).trim().toLowerCase();
+          if (k && !EQ_HEAD_IDX[k]) EQ_HEAD_IDX[k] = r;
+        }
+      }
+    }
+    return EQ_HEAD_IDX[s] || null;
+    }
+
+    /* ★★EQ-TOTAL-LABEL-LOCK-20261017（用户 2026-10-17：「怎么还是全部的？改成：总计」）★★
+       根因：股东权益模块有【自己独立的一套翻译缓存】localStorage['eq_trans_cache_v1']，
+       与财务模块的 finTransCache 不是同一个。越南文 "TỔNG CỘNG" 被谷歌词典译成「全部的」，
+       结果就存进了 equity 这份缓存里 → 永不重翻 → 界面一直是「全部的」。
+       这里与财务模块 FIN-TOTAL-LABEL-LOCK-20261017 用【同一张写死表】，优先于一切缓存/联网翻译。
+       ★任何重构都不得移除；要改合计行文案只能改这里 + FIN_TOTAL_LOCK + fin_trilingual 三处。 */
+    var EQ_TOTAL_LOCK = { zh: '总计', en: 'TOTAL', vi: 'TỔNG CỘNG' };
+    var EQ_TOTAL_SRC = { 'TỔNG CỘNG':1, 'TỔNG':1, 'TOTAL':1, 'TOTAL CỘNG':1,
+                         '全部的':1, '全部':1, '合计':1, '总计':1, '共計':1, '合計':1 };
+    function eqTotalLock(t, target){
+      var s = String(t == null ? '' : t).trim();
+      if (!s) return '';
+      var suf = '';
+      var last = s.charAt(s.length - 1);
+      if (last === ':' || last === '：'){ suf = last; s = s.slice(0, -1).trim(); }   /* 保留结尾冒号 */
+      if (!EQ_TOTAL_SRC[s.toUpperCase()]) return '';
+      var base = EQ_TOTAL_LOCK[target];
+      return base ? (base + suf) : '';
+    }
+
+    /* ============★★ EQ-VI-TRANS-20261016（用户 2026-10-16：切越文界面「缺少了越南语的翻译」）★★
+       现象：界面切到越南语后，表头还是中文（序号 / 年份 / 公司 / 款项来自 / 金额 / 汇率 …）。
+       根因：旧实现把「文件里的文字」默认当成【越文原文】—— lang()==='vi' 时
+             seedAndApply 不请求译文、applyTrans 直接 return，一个都不翻。
+             可用户是在【中文界面】下录的这些表头 → 文件里存的是中文
+             （实测 equity_report.xlsx「Đầu tư Trung Quốc」C2='序号' D2='年份' …）→
+             越文界面就原样显示中文。
+       修法：把越南语当成与中文/英文【平等的目标语言】：
+         · 这一格含汉字 ⇒ 明显不是越文 ⇒ 也去请求 vi 译文（服务端中译越正常：
+           序号→số seri、年份→năm、公司→công ty、现金/转账→Tiền mặt/Chuyển khoản）；
+         · 显示时套用缓存里的 vi 译文；
+         · 真正的越文（不含汉字）一律不碰 ⇒ 零回归风险（越文原文永不被改写）。
+       注：货币代码/货币对仍走上一条 EQ-CURR-NOTRANS-LOCK-20261016 的硬锁，不被翻译。 */
+    function eqHasCJK(s){
+    return /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(String(s == null ? '' : s));
+    }
+    function eqNeedTransLang(t, L){
+    /* 这一格要不要为 L 语言翻译：中/英沿用原逻辑；越文只翻「明显是汉字」的格子 */
+    if (L !== 'vi') return true;
+    return eqHasCJK(t);
+    }
+
+    /* ---------- 三语：翻译缓存 + 请求 ---------- */
+    function loadTrans(){
+    try { trans = JSON.parse(localStorage.getItem('eq_trans_cache_v1') || '{}') || {}; } catch(e){ trans = {}; }
+    /* ★EQ-CURR-NOTRANS-LOCK-20261016：把缓存里「货币代码」的历史脏译文清掉（自愈）。
+       不清的话，某些只读缓存、不看 transOf 的路径还可能把「人民币」套上去。 */
+    try {
+      var _purged = false;
+      Object.keys(trans).forEach(function(k){
+        if (eqNoTransCur(k) || eqNoTransWord(k)) { delete trans[k]; _purged = true; }
+      });
+      if (_purged) saveTrans();
+    } catch(e){}
+    /* ★EQ-TOTAL-LABEL-LOCK-20261017：把缓存里旧的「全部的」就地改写成锁定值（自愈，不重翻）。
+       不做「删除」—— 删掉会触发一次联网翻译，谷歌词典又会还回「全部的」。 */
+    try {
+      var _tlFixed = false;
+      Object.keys(trans).forEach(function(k){
+        ['zh', 'en', 'vi'].forEach(function(lg){
+          var want = eqTotalLock(k, lg);
+          if (!want) return;
+          var rec = trans[k] || {};
+          if (rec[lg] !== want){ rec[lg] = want; trans[k] = rec; _tlFixed = true; }
+        });
+      });
+      if (_tlFixed) saveTrans();
+    } catch(e){}
+    }
+    function saveTrans(){
+    try { localStorage.setItem('eq_trans_cache_v1', JSON.stringify(trans)); } catch(e){}
+    }
+    function needTrans(t){
+    if (!t || typeof t !== 'string') return false;
+    if (eqNoTransCur(t)) return false;      /* ★② 货币代码/货币对：永不翻译 */
+    if (eqNoTransWord(t)) return false;     /* ★EQ-WORD-NOTRANS-LOCK-20261016：公司名/人名缩写永不翻译 */
+    if (eqHeadRec(t)) return false;         /* ★EQ-HEAD-LOCK-20261016：表头三语已写死，不联网翻译 */
+    if (eqTotalLock(t, 'zh')) return false; /* ★EQ-TOTAL-LABEL-LOCK-20261017：合计行三语写死，不联网翻译 */
+    if (/^[\d\s.,:;+\-/%()₫¥$]+$/.test(t)) return false;
+    if (t.length > 160) return false;
+    if (/^[\u4e00-\u9fa5\s]+$/.test(t) && lang() === 'zh') return false;
+    return true;
+    }
+    function transOf(text, target){
+    if (eqNoTransCur(text)) return null;    /* ★③ 货币代码/货币对：就算缓存里有译文也不用 */
+    if (eqNoTransWord(text)) return null;   /* ★EQ-WORD-NOTRANS-LOCK-20261016：公司名/人名缩写，缓存有译文也不用 */
+    var _hr = eqHeadRec(text);
+    if (_hr) return _hr[target] || null;    /* ★EQ-HEAD-LOCK-20261016：表头三语写死，缓存说什么都不改 */
+    var _tlk = eqTotalLock(text, target);   /* ★EQ-TOTAL-LABEL-LOCK-20261017：合计行三语写死 */
+    if (_tlk) return _tlk;
+    var rec = trans[text];
+    if (!rec) return null;
+    var v = rec[target];
+    if (!v) return null;
+    /* ★EQ-VI-TRANS-20261016：旧实现 requestTrans 里有一行 `rec.vi = rec.vi || text` ——
+       给「非越文原文」的格子（比如中文'序号'）补了个 rec.vi = '序号' 的【假越文译文】。
+       后果：越文界面取到 rec.vi 有值 ⇒ 既不去请求、也套不上真译文 ⇒ 永远显示中文。
+       这里判：target='vi' 且译文与原文一字不差 ⇒ 视为【没有译文】（让它去请求真的 vi 译文）。 */
+    if (target === 'vi' && String(v) === String(text)) return null;
+    return v;
+    }
+    function requestTrans(text, target, cb){
+    if (!text || !target) return;
+    if (eqNoTransCur(text)) { cb && cb(null); return; }   /* ★④ 货币代码/货币对：不发翻译请求 */
+    if (eqNoTransWord(text)) { cb && cb(null); return; }  /* ★EQ-WORD-NOTRANS-LOCK-20261016：公司名/人名缩写不发请求 */
+    if (eqHeadRec(text)) { cb && cb(null); return; }      /* ★EQ-HEAD-LOCK-20261016：表头三语已写死，不发请求 */
+    /* ★EQ-VI-TRANS-20261016：缓存里那条「假越文译文」（rec.vi === 原文）不算数 ——
+       否则这里会拿它立刻回调、根本不发请求，越文界面就永远停在中文。 */
+    var _have = trans[text] && trans[text][target];
+    if (_have && !(target === 'vi' && String(_have) === String(text))) { cb && cb(_have); return; }
+    var key = text + '|' + target;
+    if (pending[key]) { cb && cb(null); return; }
+    pending[key] = true;
+    fetch('/api/translate?q=' + encodeURIComponent(text) + '&target=' + target)
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        delete pending[key];
+        if (!j || !j.ok || !j.text) { cb && cb(null); return; }
+        var rec = trans[text] || {};
+        rec[target] = j.text; rec.vi = rec.vi || text;
+        /* ★EQ-TOTAL-LABEL-LOCK-20261017：合计行标签的译文一律用锁定值，不让「全部的」再进缓存 */
+        var _tlk2 = eqTotalLock(text, target); if (_tlk2) rec[target] = _tlk2;
+        trans[text] = rec; if (!trans[j.text]) trans[j.text] = rec;
+        saveTrans();
+        cb && cb(j.text);
+      })
+      .catch(function(){ delete pending[key]; cb && cb(null); });
+    }
+    /* 把整份快照里的文字翻成当前语言（含表头、表名在别处处理） */
+    function seedAndApply(v, cb){
+    var jobs = 0, done = 0, fired = false;
+    function fin(){ if (fired) return; fired = true; cb && cb(); }
+    var L = lang();
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var cd = (v.sheets[sid] || {}).cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {};
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck]; if (!cell || cell.f !== undefined) return;
+          var t = cell.v;
+          if (!needTrans(t)) return;
+          /* ★EQ-VI-TRANS-20261016：不再把 vi 当成「源语言」。越文界面下，
+             含汉字的格子（用户是在中文界面录的）同样要去取 vi 译文。 */
+          var known = transOf(t, L);
+          if (!known && eqNeedTransLang(t, L)){
+            jobs++;
+            requestTrans(t, L, function(){
+              done++;
+              if (done >= jobs){
+                /* ★EQ-TRANS-RERENDER-20261016：兜底 2.5s 已先渲染过（译文还没回来）时，
+                   译文回来后必须补一次重渲染，否则表格一直停在原文（中文系统下显示越南语）。 */
+                /* ★EQ-RENDER-CAPTURE-20261018（用户 2026-10-18：「股东结构里面输入的数据，录入后怎么
+                   丢失了呢？」的现场根因）：译文是异步回来的，可能在用户正在录入时补一次 render()。
+                   旧写法直接 render() → 用【旧 snap】重建 → 刚录进活表的内容凭空消失
+                   （实测：写入后 1.4 秒被抹成 null，随后自动保存把"没有数据"的版本落盘）。
+                   修法：任何"非 load() 触发"的重建之前，必须先把当前屏幕并回 snap。 */
+                if (fired) { try { eqCaptureLiveToSnap(cur); render(); } catch(e){} } else fin();
+              }
+            });
+          }
+          });
+          });
+          });
+          if (!jobs) { fin(); return; }
+          /* 兜底：网络慢也不能卡住渲染 */
+          setTimeout(fin, 2500);
+    }
+    function applyTrans(v){
+    /* ★EQ-VI-TRANS-20261016：删掉旧的 `if (L === 'vi') return;` ——
+       越文界面也要把「文件里是汉字的格子」翻成越文（真正的越文由 eqNeedTransLang 拦下）。 */
+    var L = lang();
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var cd = (v.sheets[sid] || {}).cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {};
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck]; if (!cell || cell.f !== undefined) return;
+          if (eqNoTransCur(cell.v)) return;   /* ★EQ-CURR-NOTRANS-LOCK-20261016：货币代码/货币对原样保留 */
+          if (eqNoTransWord(cell.v)) return;  /* ★EQ-WORD-NOTRANS-LOCK-20261016：公司名/人名缩写原样保留 */
+          /* ★EQ-HEAD-LOCK-20261016：表头格无视「越文只翻汉字格」的闸门，一律按写死的三语显示 */
+          if (!eqHeadRec(cell.v) && !eqNeedTransLang(cell.v, L)) return;
+          var t = transOf(cell.v, L);
+          if (t && t !== cell.v) cell.v = t;
+        });
+      });
+    });
+    }
+    /* ★表名三语（双向）：不管快照里的表名是越/中/英哪种（用户曾在别的语言下保存过，
+       文件里就可能存着中文表名），都能映射到当前语言的目标名；
+       并把【所有表】公式里的跨表引用一起改掉（总投资表的公式引用的是其它表的名字，
+       只改本表公式会漏掉跨表引用 → #REF!）。显示（applyTitles）与存盘还原越文（payload）共用。 */
+    function eqRenameSheets(s, tgt){
+    var sids = s.sheetOrder || Object.keys(s.sheets || {});
+    var renames = [];
+    sids.forEach(function(sid){
+      var sh = s.sheets[sid]; if (!sh) return;
+      var d = sheetDef(sh.name); if (!d) return;
+      var neu = tgt(d);
+      if (!neu || neu === sh.name) return;
+      renames.push({ old: sh.name, neu: neu });
+      sh.name = neu;
+    });
+    if (!renames.length) return;
+    sids.forEach(function(sid){
+      var sh = s.sheets[sid]; if (!sh) return;
+      var cd = sh.cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {};
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck];
+          if (!cell || typeof cell.f !== 'string') return;
+          renames.forEach(function(r){
+            if (cell.f.indexOf("'" + r.old + "'") >= 0){
+              cell.f = cell.f.split("'" + r.old + "'").join("'" + r.neu + "'");
+            }
+          });
+        });
+      });
+    });
+    }
+    function applyTitles(v){
+    var L = lang();
+    eqRenameSheets(v, function(d){ return (L === 'zh') ? d.zh : (L === 'en') ? d.en : d.vi; });
+    }
+
+    /* ---------- 日期：识别 Excel 序列号 / 文本 ---------- */
+    function dateOf(v){
+    if (isNum(v)) {
+      var d = new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 86400000);
+      return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 };
+    }
+    if (typeof v === 'string'){
+      var s = v.trim();
+      var m1 = s.match(/^(\d{4})[-/](\d{1,2})/);
+      if (m1) return { y: parseInt(m1[1],10), m: parseInt(m1[2],10) };
+      var m2 = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+      if (m2) return { y: parseInt(m2[3],10), m: parseInt(m2[2],10) };
+    }
+    return null;
+    }
+    function applyFilter(v){
+    if (!filter) return;
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var sh = v.sheets[sid]; if (!sh) return;
+      var dcol = eqDateCol(nameOfSid(v, sid)); if (dcol === null) return;   /* ★EQ-STRUCT：日期列按配置 */
+      var cd = sh.cellData || {};
+      sh.rowData = sh.rowData || {};
+      Object.keys(cd).forEach(function(rk){
+        var r = parseInt(rk, 10);
+        if (r < R_DATA0 || r > R_DATA1) return;
+        var cell = (cd[rk] || {})[dcol];
+        var dt = cell ? dateOf(cell.v) : null;
+        var keep = dt && ((!filter.year || dt.y === filter.year) && (!filter.month || dt.m === filter.month));
+        if (!keep){
+          sh.rowData[rk] = sh.rowData[rk] || {};
+          sh.rowData[rk].hd = 1;
+        }
+      });
+    });
+    }
+    function nameOfSid(v, sid){ var sh = v.sheets[sid]; return sh ? sh.name : ''; }
+    function applySort(v){
+    if (!sortDir) return;
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var sh = v.sheets[sid]; if (!sh) return;
+      var dcol = eqDateCol(nameOfSid(v, sid)); if (dcol === null) return;   /* ★EQ-STRUCT：日期列按配置 */
+      var cd = sh.cellData || {};
+      var rows = [];
+      for (var r = R_DATA0; r <= R_DATA1; r++) if (cd[r]) rows.push(r);
+      rows.sort(function(a, b){
+        var da = dateOf((cd[a] || {})[dcol] ? cd[a][dcol].v : null);
+        var db = dateOf((cd[b] || {})[dcol] ? cd[b][dcol].v : null);
+        var ka = da ? da.y * 100 + da.m : 0, kb = db ? db.y * 100 + db.m : 0;
+        return (ka - kb) * sortDir;
+      });
+      var src = rows.map(function(r){ return cd[r]; });
+      for (var i = 0; i < rows.length; i++) cd[rows[i]] = src[i];
+    });
+    }
+
+    /* ---------- 币种：只改显示，保存时乘回 ---------- */
+    /* ★EQ-RATE-20261016（用户 2026-10-16：「汇率换算的逻辑错了」+「不需要汇率框，逻辑和财务报表里的一样」）：
+       ① ★根因一：原来用 parseFloat 解析带千位分隔符的汇率框（"3,850" → 3）→ 整表按 ÷3 换算。
+          现在统一按全 app 的口径解析（eqParseNum：先去掉千位分隔符再 parseFloat）。
+       ② ★根因二：汇率来源原来是 CRM 弹窗里的输入框 + 硬编码 3500/25000。
+          按用户要求改成【和财务报表同一套汇率】：财务报表走 /api/finance/convert-currency，
+          它的汇率来自库里的 fx_cache（USD→VND、USD→CNY，CNY→VND = USDVND/USDCNY），
+          月度曲线接口就是 /api/fx-rates —— 权益页取它最新的一期，与报表口径完全一致。
+       ③ 汇率来源优先级：/api/fx-rates（与财务报表同源）
+          → CRM 项目表单 #w_rate_*_vnd（同一 app 口径）
+          → 签约项目数据 globalWonData 的 rate_rmb_vnd/rate_usd_vnd
+          → 兜底默认 3500 / 25000。
+       ④ ★换算方向：汇率 = 1 外币 = ? 越南盾（报表同口径）：
+          屏幕值 = VND ÷ 汇率；保存/并回快照时 ×汇率（用 eqRateApplied，即"屏幕上真正用的那个汇率"）。 */
+    var EQ_DEF_RATE = { RMB: 3500, USD: 25000 };
+    /* ★EQ-RATE：与财务报表同源的汇率（/api/fx-rates → fx_cache），并本地记住一份以便秒开 */
+    var eqFxServer = { RMB: 0, USD: 0 };
+    try { var _eqFx = JSON.parse(localStorage.getItem('eq_fx_server_v1') || ''); if (_eqFx && typeof _eqFx === 'object') eqFxServer = _eqFx; } catch(e){}
+    /* 全 app 的汇率解析口径（认英美 25,500 与越南 25.500 两种千位写法） */
+    function eqParseNum(v){
+      if (v === null || v === undefined) return 0;
+      if (typeof v === 'number') return isFinite(v) ? v : 0;
+      var s = String(v).replace(/[^\d.,\-]/g, '').trim();
+      if (!s) return 0;
+      if (/^\d{1,3}(?:\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');   /* 越南式千位点 */
+      s = s.replace(/,/g, '');                                        /* 英美式千位逗号 */
+      var n = parseFloat(s);
+      return isFinite(n) ? n : 0;
+    }
+    function eqRateInputVal(id){
+      try { var el = document.getElementById(id); return el ? eqParseNum(el.value) : 0; } catch(e){ return 0; }
+    }
+    /* 从签约项目数据里取汇率（取出现次数最多的那个，避免个别项目填错就跟着错） */
+    function eqRateFromData(code){
+      try {
+        var list = (typeof globalWonData !== 'undefined' && globalWonData) ? globalWonData : null;
+        if (!list || !list.length) return 0;
+        var key = (code === 'RMB') ? 'rate_rmb_vnd' : 'rate_usd_vnd';
+        var cnt = {}, best = 0, bestN = 0;
+        for (var i = 0; i < list.length; i++){
+          var v = eqParseNum(list[i] && list[i][key]);
+          if (!(v > 0)) continue;
+          cnt[v] = (cnt[v] || 0) + 1;
+          if (cnt[v] > bestN){ bestN = cnt[v]; best = v; }
+        }
+        return best;
+      } catch(e){ return 0; }
+    }
+    /* ★EQ-RATE：取 /api/fx-rates 的最新一期 → 与财务报表同一套汇率（USD→VND、CNY→VND）。
+       拿到后若汇率与刚才不同 → 按真实汇率重建一次（避免页面先按兜底值换算过）。 */
+    function eqFxFetch(){
+      try {
+        fetch('/api/fx-rates').then(function(r){ return r.json(); }).then(function(j){
+          try {
+            if (!j || !j.ok || !j.series) return;
+            var last = function(arr){
+              if (!arr || !arr.length) return 0;
+              for (var i = arr.length - 1; i >= 0; i--){ var v = eqParseNum(arr[i]); if (v > 0) return v; }
+              return 0;
+            };
+            var before = readRate('RMB') + '|' + readRate('USD');
+            var u = last(j.series.usd_vnd), c = last(j.series.cny_vnd);
+            if (u > 0) eqFxServer.USD = u;      /* 1 USD = ? VND */
+            if (c > 0) eqFxServer.RMB = c;      /* 1 CNY = ? VND */
+            try { localStorage.setItem('eq_fx_server_v1', JSON.stringify(eqFxServer)); } catch(e){}
+            if (readRate('RMB') + '|' + readRate('USD') !== before && univer){
+              eqCaptureLiveToSnap(cur);
+              rate = readRate(cur); eqRateApplied = rate;
+              render();
+            }
+          } catch(e){}
+        }).catch(function(){});
+      } catch(e){}
+    }
+    /* 汇率：① 与财务报表同源 → ② CRM 表单口径 → ③ 签约项目数据 → ④ 兜底默认 */
+    function readRate(code){
+      if (code !== 'RMB' && code !== 'USD') return 1;
+      var v = eqParseNum(eqFxServer[code]);
+      if (v > 0) return v;
+      v = eqRateInputVal(code === 'RMB' ? 'w_rate_rmb_vnd' : 'w_rate_usd_vnd');
+      if (v > 0) return v;
+      v = eqRateFromData(code);
+      return v > 0 ? v : EQ_DEF_RATE[code];
+    }
+    /* ★这次屏幕上真正用过的汇率（乘回 VND / 保存还原都用它，绝不用"输入框此刻的新值"） */
+    var eqRateApplied = 1;
+    /* 状态栏里显示的汇率说明（让用户一眼看到用的是多少） */
+    function eqRateNote(){
+      try {
+        return '1¥=' + Math.round(readRate('RMB')).toLocaleString('en-US') + '₫ · 1$=' + Math.round(readRate('USD')).toLocaleString('en-US') + '₫';
+      } catch(e){ return ''; }
+    }
+    /* ★EQ-RATE：服务器的 /api/fx-rates 没数据时，退而等签约项目数据到位 → 用真实汇率重建一次。 */
+    function eqLoadRatesFromData(tries){
+      tries = tries || 0;
+      var has = (typeof globalWonData !== 'undefined' && globalWonData && globalWonData.length);
+      if (!has && tries < 25){ setTimeout(function(){ eqLoadRatesFromData(tries + 1); }, 300); return; }
+      if (!has) return;
+      var sig = readRate('RMB') + '|' + readRate('USD');
+      if (window.__eqRateSig === sig) return;
+      window.__eqRateSig = sig;
+      try { eqCaptureLiveToSnap(cur); } catch(e){}   /* 先按旧汇率把屏幕值乘回 VND 基 */
+      try { rate = readRate(cur); eqRateApplied = rate; render(); } catch(e){}
+    }
+    /* ★EQ-SELCUR-20261016：'NONE'（无）= 不带任何货币符号，仅千位符。
+       ★EQ-SYMLEFT-20261016（用户 2026-10-16 要求）：货币符号放【数值左侧】，
+       与财务页 / app.py 的 CN_MONEY_FMT '"¥"#,##0' 写法一致。 */
+    function moneyPattern(code){
+      if (code === 'NONE') return '#,##0';
+      return code === 'RMB' ? '"¥"#,##0' : code === 'USD' ? '"$"#,##0' : '"₫"#,##0';
+    }
+    /* ★★EQ-CELLCUR-ALL5-20261017（用户 2026-10-17 第③条：单位「保持纯数字」）★★
+       "₫"#,##0 / "¥"#,##0 / "$"#,##0 这三种是【屏幕专用】格式 —— 落盘前必须剥掉，
+       文件里永远只剩纯数字（千位符 '#,##0' 保留）。
+       cell.s 有两种形态：内联样式对象，或 styles 表的字符串 id —— 本函数只管"把一个样式对象上的
+       货币符号剥掉"，两种形态的定位在 payload() 里各自处理。 */
+    var EQ_MONEY_PAT_RE = /["\u20ab\u00a5$]/;
+    function eqStripMoneyPat(st){
+      try {
+        if (!st || typeof st !== 'object' || !st.n || !st.n.pattern) return;
+        if (!EQ_MONEY_PAT_RE.test(String(st.n.pattern))) return;
+        delete st.n.pattern;                             /* 只删格式本身，数值一个都不碰 */
+        if (!Object.keys(st.n).length) delete st.n;
+      } catch(e){}
+    }
+    /* ★★EQ-KEEP-FMT-20261017（用户 2026-10-17：「单元格里用 ' 当文本前缀，刷新后日期变一串数值」）★★
+       取「这个格现有的数字格式」。cell.s 有两种形态：内联样式对象 / styles 表的字符串 id ——
+       两种都要认，否则判断不出"用户自己设过的格式"，就会被我们无条件覆盖掉。 */
+    function eqCellStyleObj(cell, styles){
+      try {
+        if (!cell) return null;
+        var s = cell.s;
+        if (s && typeof s === 'object') return s;
+        if (typeof s === 'string' && styles && styles[s] && typeof styles[s] === 'object') return styles[s];
+      } catch(e){}
+      return null;
+    }
+    function eqExistingPat(cell, styles){
+      try {
+        var st = eqCellStyleObj(cell, styles);
+        return (st && st.n && st.n.pattern) ? String(st.n.pattern) : '';
+      } catch(e){ return ''; }
+    }
+    /* 「我们自己写的」格式 = 空 / '#,##0' / 带货币符号的三件套。只有这三类允许被覆盖；
+       其余（yyyy-mm-dd 日期、0.00%、#,##0.00 自定义…）一律原样保留。 */
+    function eqPatIsOurs(pat){
+      if (!pat) return true;
+      if (pat === '#,##0') return true;
+      return EQ_MONEY_PAT_RE.test(pat);
+    }
+    /* ★EQ-SHEET-CUR-20261016：根据工作表名返回默认币种（其余表默认 VND）。
+       ★EQ-CN-CELLCUR-20261016（用户 2026-10-16 改口径）：中国投资数据【不再】默认 RMB ——
+         这张表整表不换算、默认无单位、单位按格设定，所以这里返回【当前币种】（= 不切换），
+         任何调用路径都不会因为切到这张表而改掉全局 cur / 影响其它表格。 */
+    function eqDefaultCurFor(sheetName){
+      if (!sheetName) return 'VND';
+      if (eqIsCnSheet(sheetName)) return cur;    /* 不参与默认币种切换 */
+      return 'VND';
+    }
+    /* ★把屏幕上（含刚输入）的改动同步回 snap；切换币种前调用，避免重建丢掉未保存录入。
+       oldCur 是当前显示币种，若它非 VND，需把格值乘回 VND 基，保证 snap 永远是 VND 基。 */
+    function eqCaptureLiveToSnap(oldCur){
+      oldCur = oldCur || cur;
+      try {
+        var live = (sheet && sheet.getSnapshot) ? sheet.getSnapshot() : null;
+        if (!live) return;
+        /* ★★EQ-LIVE-SNAP-FIX-20261016（用户 2026-10-16 报「货币切换后无限计算循环」的真正根因）：
+           Univer 0.5.5 的 getSnapshot() 返回的快照【与实时模型共享对象】（cellData 里的单元格对象、
+           styles 都是同一引用 —— 财务那边 FIN-HI-LOCK 也踩过 styles 这条）。
+           旧代码直接在它上面乘汇率 → 等于把"屏幕上的数据"乘了一遍 → 屏幕值变化 → 下一次保存再乘…
+           数值被反复乘爆（实测 E4 变成 7.4e18），屏幕不停重算＝用户看到的「无限计算循环」。
+           ★修法：先深拷贝再动；拷贝失败就干脆不捕获（宁可漏一次并回，也绝不污染实时数据）。 */
+        var ls = null;
+        try { ls = JSON.parse(JSON.stringify(live)); } catch(e2){ return; }
+        if (!ls) return;
+        if (oldCur !== 'VND' && oldCur !== 'NONE'){
+          /* ★EQ-RATE：必须用 eqRateApplied（屏幕上真正用过的那个汇率），不能用 readRate(oldCur)：
+             用户可能刚在汇率框里改了数字，此刻读会拿到【新值】→ 乘回去就错了。 */
+          var _f = (eqRateApplied > 0) ? eqRateApplied : readRate(oldCur);
+          Object.keys(ls.sheets || {}).forEach(function(sid){
+            var sh = ls.sheets[sid]; if (!sh) return;
+            var nm = nameOfSid(ls, sid);
+            if (eqIsCnSheet(nm)) return;   /* ★EQ-CN-CELLCUR-20261016：中国投资数据整表不换算 */
+            var cd = sh.cellData || {};
+            Object.keys(cd).forEach(function(rk){
+              var row = cd[rk] || {}; var r = parseInt(rk, 10);
+              Object.keys(row).forEach(function(ck){
+                var cell = row[ck];
+                if (!cell || cell.f !== undefined || !isNum(cell.v)) return;
+                if (!eqIsMoneyCell(nm, r, parseInt(ck, 10))) return;   /* ★EQ-SELCUR：钱格（列 ∪ 框选） */
+                cell.v = Math.round(cell.v * _f);
+              });
+            });
+          });
+        }
+        snap = ls;
+      } catch(e){}
+    }
+    /* ★切工作簿标签时，按该表的默认币种切换（并先 capture 当前屏幕改动）。
+       ★EQ-CURSTICK-20261016（用户 2026-10-16：「选择了其他货币，然后单位还是越南盾，这是错误」）：
+         用户一旦手动选过币种，这个选择必须【一直有效】—— 切工作簿、轮询、工具栏重挂、重建
+         都不许把它改回该表默认（中国投资数据=RMB / 其余=VND）。只有用户再次选别的币种才变。
+         eqCurChoice === '' 表示用户从未手动选过 → 仍按每张表的默认币种自动切。 */
+    function eqSyncCurToActiveSheet(){
+      try {
+        var sh = eqSheetObj(); if (!sh) return;
+        var name = '';
+        try { name = (sh.getName && sh.getName()) || sh.name || ''; } catch(e){ name = ''; }
+        if (!name){
+          try {
+            var _sid = eqSubUnitId(sh);
+            if (_sid && view && view.sheets && view.sheets[_sid]) name = view.sheets[_sid].name || '';
+          } catch(e){}
+        }
+        if (!name) return;
+        if (name === eqLastActiveSheetName){
+          eqSetCurDisplay(eqCurLabelNow());
+          return;
+        }
+        eqLastActiveSheetName = name;
+        /* ★EQ-CN-CELLCUR-20261016（用户 2026-10-16）：中国投资数据 = 整表不换算、默认无单位、
+           单位按格设定 → 既不切全局 cur、也不动 eqCurChoice（切走时其它表格的币种逻辑丝毫不受影响），
+           只把下拉显示成「无」。 */
+        if (eqIsCnSheet(name)){
+          eqSetCurDisplay('NONE');
+          return;
+        }
+        if (eqCurChoice){                 /* ★用户手动定过 → 绝不按表默认切回去 */
+          eqSetCurDisplay(cur);
+          return;
+        }
+        var want = eqDefaultCurFor(name);
+        if (want !== cur){
+          eqCaptureLiveToSnap(cur);
+          cur = want;
+          rate = readRate(cur);
+          eqRateApplied = rate;
+          render();
+        }
+        eqSetCurDisplay(cur);
+      } catch(e){}
+    }
+    function applyCurrency(v){
+    if (cur === 'VND' || cur === 'NONE') return;   /* ★EQ-SELCUR：VND=基准、NONE=不换算 */
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var sh = v.sheets[sid]; if (!sh) return;
+      var nm = nameOfSid(v, sid);
+      if (eqIsCnSheet(nm)) return;   /* ★EQ-CN-CELLCUR-20261016：中国投资数据整表不换算 */
+      var cd = sh.cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {}; var r = parseInt(rk, 10);
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck];
+          if (!cell || cell.f !== undefined || !isNum(cell.v)) return;
+          if (!eqIsMoneyCell(nm, r, parseInt(ck, 10))) return;   /* ★EQ-SELCUR：只换算钱格 */
+          cell.v = Math.round(cell.v / rate * 100) / 100;
+        });
+      });
+    });
+    }
+    /* ★EQ-NUM-FMT-20261016：在【构建视图】阶段就把数字格式写进单元格，保证所有已存在的数据
+       一建表就带格式（金额列=币种符号+千位符；其余数字格=千位符；日期列跳过），不依赖
+       后续 set.numfmt 命令的时机。 */
+    function applyNumFmt(v){
+    Object.keys(v.sheets || {}).forEach(function(sid){
+      var sh = v.sheets[sid]; if (!sh) return;
+      var name = nameOfSid(v, sid);
+      var cd = sh.cellData || {};
+      Object.keys(cd).forEach(function(rk){
+        var row = cd[rk] || {}; var r = parseInt(rk, 10);
+        Object.keys(row).forEach(function(ck){
+          var cell = row[ck]; if (!cell || cell.v === undefined || cell.v === null || cell.v === '') return;
+          var c = parseInt(ck, 10);
+          if (!isNum(cell.v)) return;                  // 只处理数字格
+          /* ★EQ-CN-CELLCUR-20261016：中国投资数据 → 单位按格（没挂 = 无单位，只带千位符），
+             ★只有显示格式变，数值不动（它的换算在 applyCurrency 里已被整表跳过）。 */
+          if (eqIsCnSheet(name)){
+            if (c === eqDateCol(name)) return;                     // 日期列保留原格式
+            var cu = eqCellCurOf(name, r, c);
+            if (cu === 'NONE' && cell.f !== undefined) return;     // 公式格且没指定单位 → 不动
+            /* ★★EQ-KEEP-FMT-20261017（用户 2026-10-17：「输入日期，刷新后日期变成一串数值」）★★
+               用户自己设过的格式（yyyy-mm-dd 日期、百分比、#,##0.00 自定义…）一律不覆盖。
+               旧写法无条件写 '#,##0' → 日期格被压成「整数」显示 → 屏幕上就只剩序列号 46123。
+               只接管三类：没格式 / 我们写的 '#,##0' / 我们写的货币格式。 */
+            if (!eqPatIsOurs(eqExistingPat(cell, v.styles))) return;
+            var patCn = moneyPattern(cu);
+            var stCn = eqCellStyleObj(cell, v.styles);
+            if (stCn){ stCn.n = stCn.n || {}; stCn.n.pattern = patCn; }
+            else { cell.s = { n: { pattern: patCn } }; }
+            return;
+          }
+          var isMoney = eqIsMoneyCell(name, r, c);  /* ★EQ-SELCUR：钱格（钱列 ∪ 框选） */
+          if (!isMoney){
+            if (c === eqDateCol(name)) return;         // 日期列保留原格式
+            if (cell.f !== undefined) return;          // 普通数字列的公式格不动
+          }
+          var pat = isMoney ? moneyPattern(cur) : '#,##0';
+          if (cell.s && typeof cell.s === 'object'){ cell.s.n = cell.s.n || {}; cell.s.n.pattern = pat; }
+          else { cell.s = { n: { pattern: pat } }; }
+        });
+      });
+    });
+    }
+    function fmtCurrency(){
+    if (!api || !sheet) return;
+    var v = snap; if (!v) return;
+    /* ★EQ-CUR-FMT-20261016：用 workbook.getSheets() 取真实工作表 id，不再依赖 snapshot 的 key
+       与 getSheetId 是否一致；金额格套货币符号。
+       ★EQ-NUM-FMT-20261016：用户要求「所有数值默认带千位分隔符」。做法：
+         金额列用 moneyPattern（币种符号 + 千位符）；其他数字格用 '#,##0'（仅千位符，不含货币符号）。
+         日期列（SHEETS[].date）保留原样，不被数字格式覆盖。 */
+    try {
+      var wb = api.getActiveWorkbook && api.getActiveWorkbook();
+      var sheets = (wb && wb.getSheets && wb.getSheets()) || [];
+      sheets.forEach(function(sh){
+        var sid = eqSubUnitId(sh); if (!sid) return;
+        var snapSheet = v.sheets[sid];
+        var name = '';
+        if (!snapSheet){
+          try { name = (sh.getName && sh.getName()) || sh.name || ''; } catch(e){ name = ''; }
+          Object.keys(v.sheets || {}).forEach(function(s){ if (v.sheets[s] && v.sheets[s].name === name) snapSheet = v.sheets[s]; });
+        }
+        if (!snapSheet) return;
+        var sname = snapSheet.name;
+        var cd = snapSheet.cellData || {};
+        var moneyVals = [], numVals = [];
+        /* ★只对【真实存在】的格套格式：空表也一次性灌 1000 行会把命令撑爆 */
+        Object.keys(cd).forEach(function(rk){
+          var row = cd[rk] || {};
+          var r = parseInt(rk, 10);
+          Object.keys(row).forEach(function(ck){
+            var cell = row[ck]; if (!cell || cell.v === undefined || cell.v === null || cell.v === '') return;
+            var c = parseInt(ck, 10);
+            var isNum = (typeof cell.v === 'number' && isFinite(cell.v));
+            if (!isNum) return;
+            /* ★EQ-CN-CELLCUR-20261016：中国投资数据 → 单位按格、只改显示格式、不换算。 */
+            if (eqIsCnSheet(sname)){
+              if (c === eqDateCol(sname)) return;
+              var cuCn = eqCellCurOf(sname, r, c);
+              /* ★EQ-KEEP-FMT-20261017：用户自己设过的格式（日期/百分比/自定义）不动 ——
+                 否则「输入日期 → 刷新 → 变成一串数值」。只接管空/千位符/我们写的货币格式。 */
+              if (!eqPatIsOurs(eqExistingPat(cell, v.styles))) return;
+              /* ★单位是这张表的权威格式：没挂单位就刷回 '#,##0'（否则之前挂过的 ¥/$ 符号会留着） */
+              if (cuCn !== 'NONE') moneyVals.push({ row: r, col: c, pattern: moneyPattern(cuCn) });
+              else numVals.push({ row: r, col: c, pattern: '#,##0' });
+              return;
+            }
+            if (eqIsMoneyCell(sname, r, c)){              /* ★EQ-SELCUR：钱格（钱列 ∪ 框选） */
+              moneyVals.push({ row: r, col: c, pattern: moneyPattern(cur) });
+            } else if (c !== eqDateCol(sname) && !cell.s){
+              /* 非钱列、非日期列、且还没有格式的数字格 → 默认千位分隔符 */
+              numVals.push({ row: r, col: c, pattern: '#,##0' });
+            }
+          });
+        });
+        if (numVals.length) eqExecNumFmt(sid, numVals);
+        if (moneyVals.length) eqExecNumFmt(sid, moneyVals);
+      });
+    } catch(e){}
+    }
+    /* ★EQ-NUMFMT-RACE-20261016（用户 2026-10-16 报 "sheet.command.numfmt.set.numfmt is not registered"）：
+       根因：Univer 0.5.5 的 numfmt 命令不是插件 onStarting 时注册的，而是在【首帧渲染完成】
+       （@univerjs/sheets-numfmt 的插件 onRendered）里 registerCommand —— 我们在 render() 后 300ms
+       就调用，此时若首次渲染还没跑完（译文拉取/重建会把它推后），executeCommand 会抛出
+       "[CommandService]: command ... is not registered"，而它是【异步拒绝】，
+       外面那层 try/catch 抓不到 → 变成 Uncaught (in promise)，格式也没套上。
+       这里统一走一个入口：① 一定 .catch() 掉，绝不让它冒成未处理拒绝；
+       ② 命令还没注册就定时重试（250/500/750…ms，最多 6 次），首帧渲染后一定能补上格式。 */
+    function eqExecNumFmt(sid, values, n){
+    if (!api || !api.executeCommand || !values || !values.length) return;
+    n = n || 0;
+    var p = null;
+    try {
+      progUntil = Date.now() + 800;
+      p = api.executeCommand('sheet.command.numfmt.set.numfmt',
+            { unitId:'equity-report', subUnitId:sid, values:values });
+    } catch(e){ p = null; }
+    if (p && typeof p.then === 'function'){
+      p.then(null, function(err){
+        if (n < 6) setTimeout(function(){ eqExecNumFmt(sid, values, n + 1); }, 200 + 150 * n);
+        else console.warn('[equity] numfmt', err);
+      });
+    }
+    }
+
+    /* ---------- 工具栏归位（用户 2026-10-15 第五次调整：照「越南财务报表」的做法）----------
+       ① 【币种下拉】(#eq_inline) 挂到 Excel 自带工具栏最左侧（与财务 fin_mountToolbar2 同机制）；
+       ② 字体 / 字号 / 数字格式那些「展开」下拉跟着 Univer 工具栏【留在 Excel 里面的表头位置】，
+          不再搬到表格外面；保存 / 导出 xlsx 留在表格上方的按钮行里。 */
+    /* 隐藏 Univer 自带的「⋮」溢出收纳按钮：它一出现就会把那几个「展开」下拉收进去藏起来 */
+    function eqHideMore(){
+      try {
+        var svgs = document.querySelectorAll('#eq_inline svg[class*="more-function-single"], #equity_container svg[class*="more-function-single"]');
+        for (var i = 0; i < svgs.length; i++){
+          var b = svgs[i].closest ? svgs[i].closest('button') : svgs[i].parentElement;
+          if (b && b.classList){
+            b.classList.add('fin-hide-more-btn');
+            b.style.setProperty('display', 'none', 'important');
+          }
+        }
+      } catch(e){}
+    }
+    /* ★EQ-SELCUR-20261016：币种下拉。
+       为了让「再选同一个币种」也能触发（原生 select 选同值不发 change），
+       第 0 个 option 是【哨兵】：它显示当前币种、值恒为 ""，选完任何一项后把 select 复位到它。
+       于是每次选择（哪怕又是 VND）都会发 change。 */
+    function eqCurNoneText(){ var L = lang(); return (L === 'zh') ? '无' : (L === 'en') ? 'None' : 'Không'; }
+    function eqCurLabel(code){
+      if (code === 'RMB') return 'RMB ¥';
+      if (code === 'USD') return 'USD $';
+      if (code === 'NONE') return eqCurNoneText();
+      return 'VND ₫';
+    }
+    function eqSetCurDisplay(code){
+      try {
+        var sel = document.getElementById('eq_cur');
+        var c0 = document.getElementById('eq_cur_cur');
+        var txt = eqCurLabel(code);
+        /* ★EQ-NOLOOP-20261016：必须先比较再赋值！textContent 即使赋同值也会替换文本节点
+           → 触发观察 #equity_container 的 MutationObserver → 再调 mountToolbar → 死循环卡死页面。 */
+        if (c0 && c0.textContent !== txt) c0.textContent = txt;
+        if (sel && sel.value !== '') sel.value = '';
+      } catch(e){}
+    }
+    function eqUpdateCurLabels(){
+      try {
+        var o = document.getElementById('eq_cur_none');
+        var t = eqCurNoneText();
+        if (o && o.textContent !== t) o.textContent = t;   /* ★EQ-NOLOOP：同上，先比较 */
+        /* ★EQ-CN-CELLCUR-20261016：中国投资数据表永远显示「无」（单位按格设定，整表不换算） */
+        eqSetCurDisplay(eqCurLabelNow());
+
+      } catch(e){}
+    }
+    function mountToolbar(){
+      /* ★EQ-NOLOOP-20261016：防重入。mountToolbar 里的 DOM 写入会触发 MutationObserver
+         （观察 #equity_container）→ 又调 mountToolbar。除下面的「先比较再赋值」外，
+         再加一道同步防重入，双保险。 */
+      if (window.__eqMounting) return;
+      window.__eqMounting = true;
+      try {
+        var sel = document.getElementById('eq_cur');
+        var host = document.querySelector('#equity_container .univer-toolbar-container');
+        if (!sel || !host) return;
+        if (sel.parentElement !== host || host.firstChild !== sel){
+          try { host.insertBefore(sel, host.firstChild); } catch(e){}
+        }
+        eqHideMore();
+        eqUpdateCurLabels();
+        /* ★EQ-SHEET-CUR-20261016：工具栏归位时同步一次默认币种（切工作簿标签时触发） */
+        try { eqSyncCurToActiveSheet(); } catch(e){}
+      } finally { window.__eqMounting = false; }
+    }
+    var eqToolbarTimer = null;
+    function watchToolbar(){
+      try { mountToolbar(); } catch(e){}
+      try {
+        if (window.__eqToolbarObs) return;
+        var box = document.getElementById('equity_container'); if (!box) return;
+        /* ★TOOLBAR-DEBOUNCE-20261018：同财务 —— 每次 DOM 变动立刻重挂会被 Univer 的
+           ResizeObserver 反向拉扯成高频循环（整张表持续晃动）。合并成 180ms 一次。 */
+        window.__eqToolbarObs = new MutationObserver(function(){
+          if (eqToolbarTimer) return;
+          eqToolbarTimer = setTimeout(function(){
+            eqToolbarTimer = null;
+            try { mountToolbar(); } catch(e){}
+          }, 180);
+        });
+        window.__eqToolbarObs.observe(box, { childList: true, subtree: true });
+      } catch(e){}
+    }
+
+    /* ---------- 渲染 ---------- */
+    /* ★EQ-GRID-20261016（用户要求）：每张表默认至少 Z 列(26) × 50 行，方便从空白开始录入。
+       只放大不缩小：已有更多行/列数据的工作表不受影响。 */
+    function eqEnsureGrid(v){
+    try {
+      var MINC = 26, MINR = 50;
+      Object.keys((v && v.sheets) || {}).forEach(function(sid){
+        var sh = v.sheets[sid]; if (!sh) return;
+        var rc = parseInt(sh.rowCount, 10);    if (!isFinite(rc) || rc < MINR) sh.rowCount = MINR;
+        var cc = parseInt(sh.columnCount, 10); if (!isFinite(cc) || cc < MINC) sh.columnCount = MINC;
+      });
+    } catch(e){}
+    }
+    /* ★EQ-FIT-20261016（用户 2026-10-16 要求「把 Excel 页面底部拉伸到最下面，看到的区域更大」）：
+       不再用写死的 calc(100vh - N px) —— N 会随顶部导航换行、标题/工具栏三语高度变化而失准。
+       这里按容器在视口里的【真实 top】算出到底部还剩多少高度，窗口缩放/切页/切语言后重算。 */
+    var __eqFitSig = '';
+    function eqFitHeight(){
+    try {
+      var c = document.getElementById('equity_container'); if (!c) return;
+      var v = document.getElementById('view-equity');
+      if (!v || !v.classList.contains('active')) return;   /* 视图隐藏时 rect 全是 0，别乱算 */
+      var top = c.getBoundingClientRect().top;
+      if (!(top > 0)) return;
+      /* ★FIT-STABLE-20261018：同 finFitHeight —— 尺寸没变就不动，杜绝 400ms 轮询引发的抖动 */
+      var sig = (window.innerWidth || 0) + 'x' + (window.innerHeight || 0) + '@' + Math.round(top);
+      if (sig === __eqFitSig && c.style.height) return;
+      var pad = 30;                                        /* 容器下方还有 .approvals-page 10px + body 20px padding */
+      var h = Math.max(420, Math.round((window.innerHeight || 800) - top - pad));
+      try {
+        var over = (document.documentElement.scrollHeight || 0) - (window.innerHeight || 0);
+        if (over > 0 && over < 80) h = Math.max(420, h - over - 2);
+      } catch(e0){}
+      __eqFitSig = sig;
+      if (Math.abs((parseFloat(c.style.height) || 0) - h) > 1) c.style.height = h + 'px';
+    } catch(e){}
+    }
+    function buildView(){
+    var v = JSON.parse(JSON.stringify(snap || {}));
+    v.id = 'equity-report';
+    /* ★EQ-RATE-20261016：每次建表前按【当前币种】重算一次汇率，并记下"这次用的是哪个汇率"。
+       applyCurrency 会用它换算，payload()/eqCaptureLiveToSnap() 用它乘回 VND 原值。 */
+    rate = readRate(cur);
+    eqRateApplied = rate;
+    eqEnsureGrid(v);      /* ★EQ-GRID：每张表默认 Z 列 × 50 行 */
+    applyTrans(v);
+    applyTitles(v);       /* ★必须在 applyFilter/applySort 之前：它们靠表名找列定义 */
+    applySort(v);
+    applyFilter(v);
+    applyCurrency(v);
+    applyNumFmt(v);   /* ★EQ-NUM-FMT-20261016：所有数字格默认带千位符/货币符号（作用于全部数据） */
+    return v;
+    }
+    /* ★EQ-CELL-KEEP-20261018（用户：刷新后单元格老是跳到 A1）
+       原因：刷新/重建 = 重新 createUnit，Univer 新建单元的选区固定是 A1，我们从没记住光标。
+       这里按工作表记住上次的单元格，重建后自动落回去（activate 顺带把滚动位置带回该格）。 */
+    var EQ_CELL_KEY = 'eq_last_cell_v1';
+    function eqCellStore(){
+      try { return JSON.parse(localStorage.getItem(EQ_CELL_KEY) || '{}') || {}; } catch(e){ return {}; }
+    }
+    function eqCellRemember(){
+      try {
+        var v = document.getElementById('view-equity');
+        if (!v || !v.classList.contains('active')) return;
+        var sh = eqSheetObj(); if (!sh) return;
+        var sid = sh.getSheetId ? sh.getSheetId() : '';
+        if (!sid) return;
+        var rg = (typeof eqCurrentSelRange === 'function') ? eqCurrentSelRange() : null;
+        if (!rg || rg.startRow === undefined) return;
+        var m = eqCellStore();
+        var prev = m[sid];
+        if (prev && prev[0] === rg.startRow && prev[1] === rg.startColumn) return;
+        m[sid] = [rg.startRow, rg.startColumn];
+        localStorage.setItem(EQ_CELL_KEY, JSON.stringify(m));
+      } catch(e){}
+    }
+    function eqRestoreCellSoon(){
+      try {
+        setTimeout(function(){
+          try {
+            var sh = eqSheetObj(); if (!sh) return;
+            var sid = sh.getSheetId ? sh.getSheetId() : '';
+            if (!sid) return;
+            var m = eqCellStore();
+            var c = m[sid];
+            if (!c) return;
+            var rg = sh.getRange(c[0], c[1]);
+            if (rg && rg.activate) rg.activate();
+          } catch(e){}
+        }, 80);
+      } catch(e){}
+    }
+    try {
+      if (!window.__eqCellKeepPoll){
+        window.__eqCellKeepPoll = setInterval(function(){ try { eqCellRemember(); } catch(e){} }, 1200);
+      }
+    } catch(e){}
+
+    function render(){
+    if (!univer) return;
+    /* ★EQ-KEEP-ACTIVE-SHEET-20261016：重建前记住当前活动工作表（按 id / 序位），
+       否则按币种重建后新单元的活动表默认是第一张 —— 用户点「中国投资数据」会被弹回「总投资数据」。
+       ★必须用 eqSheetObj()（workbook 的当前活动表）：全局 sheet 变量是上次 createUnit 的返回值，
+         用户点了标签页后它是【旧的】，拿它当 prev 就还是第一张。 */
+    var prevSid = '';
+    try { prevSid = eqSubUnitId(eqSheetObj() || sheet) || ''; } catch(e){}
+    var prevIdx = -1;
+    try { prevIdx = ((view && view.sheetOrder) || []).indexOf(prevSid); } catch(e){}
+    var v = buildView();
+    /* ★EQ-RENDER-UNIT-20261016：buildView 始终把 v.id 写死成 'equity-report'，所以单元 id 固定。
+       用固定 id 销毁，比依赖 sheet.getUnitId() 更稳（一旦 sheet 被错赋成 Worksheet，
+       拿到的就是工作表 id，disposeUnit 删不掉真单元 → 重建报同名单元冲突）。 */
+    try { if (api && typeof api.disposeUnit === 'function') api.disposeUnit('equity-report'); } catch(e){}
+    var TYPE = (presets && presets.UniverInstanceType && presets.UniverInstanceType.UNIVER_SHEET) || 2;
+    sheet = univer.createUnit(TYPE, v);   /* ★sheet 永远是工作簿 unit（payload()/eqCaptureLiveToSnap() 靠它 getSnapshot()） */
+    view = v;
+    /* ★恢复之前活动的工作表。
+       ★★关键修复：此处【绝不能用 sh2 覆盖全局 sheet】—— 否则 sheet 变成 Worksheet，
+         下一次 render() 的 dispose 拿不到单元 id，重建必然报
+         "cannot create a unit with the same unit id: equity-report"。 */
+    try {
+      var wb = api && api.getActiveWorkbook && api.getActiveWorkbook();
+      if (wb){
+        var target = null;
+        if (prevSid && (v.sheets || {})[prevSid]) target = prevSid;
+        else if (prevIdx >= 0 && v.sheetOrder && v.sheetOrder[prevIdx]) target = v.sheetOrder[prevIdx];
+        if (target && typeof wb.setActiveSheet === 'function'){
+          var curId = null;
+          try { var _as = wb.getActiveSheet && wb.getActiveSheet(); curId = _as && _as.getSheetId ? _as.getSheetId() : null; } catch(e){}
+          if (curId !== target) wb.setActiveSheet(target);
+        }
+      }
+    } catch(e){}
+    /* ★EQ-CELL-KEEP-20261018（用户：刷新后光标老是跳回 A1）：重建后回到上次的单元格 */
+    try { eqRestoreCellSoon(); } catch(eR){}
+    setTimeout(fmtCurrency, 300);
+    setTimeout(fmtCurrency, 900);
+    /* ★币种下拉挂到 Univer 工具栏最左侧：渲染后多试几次（Univer 工具栏是异步挂出来的） */
+    setTimeout(watchToolbar, 200);
+    setTimeout(watchToolbar, 600);
+    setTimeout(watchToolbar, 1400);
+    /* ★EQ-CN-CELLCUR-20261016：状态栏按【当前表】口径显示 —— 中国投资数据表 = 无单位（按格设定、不换算） */
+    st('已载入 · ' + (v.sheetOrder || []).length + ' 张表 · ' + (eqIsCnSheet(eqActiveSheetName())
+        ? (eqCurNoneText() + '（单位按格设定 · 不换算）')
+        : (cur + '（' + eqRateNote() + '）')));
+    }
+
+    /* ---------- 保存 ---------- */
+    function payload(){
+    var live = null;
+    try { live = sheet && sheet.getSnapshot ? sheet.getSnapshot() : null; } catch(e){}
+    if (!live) return null;
+    /* ★★EQ-PAYLOAD-FIX-20261016（与 eqCaptureLiveToSnap 同一类根因，用户报「无限计算循环」的第二处）：
+       getSnapshot() 返回的快照【与实时模型共享对象】（cell.s / cell.v 都是同一引用）。
+       旧代码直接在它上面乘汇率 + 还原译文 → 等于把"屏幕上的数据"改了 → 屏幕值变化 →
+       下一次自动保存再乘…数值被反复乘爆（E4=7.4e18），页面不停重算＝「无限计算循环」。
+       ★修法：先深拷贝再动；拷贝失败就返回 null（宁可不保存，也绝不污染实时数据）。 */
+    var s = null;
+    try { s = JSON.parse(JSON.stringify(live)); } catch(e){ return null; }
+    if (!s) return null;
+    /* ★币种还原：屏幕上除以过汇率，这里乘回去，文件里永远只剩 VND 原值 */
+    if (cur !== 'VND' && cur !== 'NONE'){
+      Object.keys(s.sheets || {}).forEach(function(sid){
+        var sh = s.sheets[sid]; if (!sh) return;
+        var nm = sh.name;
+        if (eqIsCnSheet(nm)) return;   /* ★EQ-CN-CELLCUR-20261016：中国投资数据整表不换算 */
+        var cd = sh.cellData || {};
+        Object.keys(cd).forEach(function(rk){
+          var row = cd[rk] || {}; var r = parseInt(rk, 10);
+          Object.keys(row).forEach(function(ck){
+            var cell = row[ck];
+            if (!cell || cell.f !== undefined || !isNum(cell.v)) return;
+            if (!eqIsMoneyCell(nm, r, parseInt(ck, 10))) return;   /* ★EQ-SELCUR：钱格 */
+            cell.v = Math.round(cell.v * rate);
+          });
+        });
+      });
+    }
+    /* ★三语还原（2026-10-16）：文件是唯一事实源，里面永远存【越文表名 + 越文原文】，
+       界面翻译只活在屏幕上。否则在中文界面下自动保存会把中文表名/表头写进文件，
+       下次切语言 applyTitles 就认不出来了（表名卡在中文的 BUG 根因）。 */
+    try {
+      var L = lang();
+      if (L !== 'vi'){
+        eqRenameSheets(s, function(d){ return d.vi; });           /* 表名还原越文（含跨表公式修正） */
+        Object.keys(s.sheets || {}).forEach(function(sid){
+          var sh = s.sheets[sid]; if (!sh) return;
+          var cd = sh.cellData || {};
+          Object.keys(cd).forEach(function(rk){
+            var row = cd[rk] || {};
+            Object.keys(row).forEach(function(ck){
+              var cell = row[ck]; if (!cell || cell.f !== undefined) return;
+              if (typeof cell.v !== 'string') return;
+              /* ★EQ-NAME-NOTRANS-LOCK-20261018：人名/公司名（A.L、A.M、T.L…）绝不参与译文还原，
+                 屏幕上是什么就写什么 —— 这是「语言切换后姓名丢失」事故的落盘口。 */
+              if (eqNoTransWord(cell.v)) return;
+              var orig = transOf(cell.v, 'vi');                    /* 翻译缓存里有越文原文就还原 */
+              if (orig && orig !== cell.v) cell.v = orig;
+            });
+          });
+        });
+      }
+    } catch(e){}
+    /* ★★EQ-CELLCUR-ALL5-20261017（用户 2026-10-17 第③条：单位「保持纯数字」）★★
+       这 5 张表的货币符号【只在屏幕上】，绝不写进 xlsx：
+       落盘前把 "₫"#,##0 / "¥"#,##0 / "$"#,##0 从 cell.s 里剥掉（值一个都不碰），
+       千位符 '#,##0' 保留 → 文件里永远是纯数字。
+       屏幕上的单位由 localStorage 的 eqCellCur 按格记住，下次打开时 buildView 会重新套上。 */
+    try {
+      Object.keys(s.sheets || {}).forEach(function(csid){
+        var csh = s.sheets[csid]; if (!csh) return;
+        if (!eqIsCnSheet(csh.name)) return;
+        var ccd = csh.cellData || {};
+        Object.keys(ccd).forEach(function(crk){
+          var crow = ccd[crk] || {};
+          Object.keys(crow).forEach(function(cck){
+            var ccell = crow[cck]; if (!ccell) return;
+            var cs = ccell.s;
+            if (!cs) return;
+            if (typeof cs === 'string'){                       /* 形态一：styles 表的字符串 id */
+              try { if (s.styles && s.styles[cs]) eqStripMoneyPat(s.styles[cs]); } catch(e){}
+              return;
+            }
+            if (typeof cs !== 'object') return;
+            eqStripMoneyPat(cs);                               /* 形态二：内联样式对象 */
+            if (!Object.keys(cs).length) delete ccell.s;       /* 空对象一并清掉 */
+          });
+        });
+      });
+    } catch(e){}
+    return s;
+    }
+    /* ★★EQ-SAVE-NOLOSS-20261018（用户 2026-10-18：「股东结构里面输入的数据，录入后怎么丢失了呢？
+       要求：点击保存后，必须不能丢失录入的数据！」）★★
+       三条叠加才会「静默丢数据」，缺一条都复现不了：
+         ① 旧代码 `if (saving || !sheet) return;` —— 上一笔还在飞的时候点「保存」，这次点击被直接丢掉，
+            连提示都没有；
+         ② 成功时无条件 `dirty = false` —— 「保存已发出、响应未回来」这段时间里用户新录入的内容
+            （很常见：录完一行接着录第二行）已经被标脏，却被这一行抹平 → 永远不会再存；
+         ③ `scheduleSave()` 只在 dirty 为真时才排保存 —— ②把它抹平后，连补存的机会都没有。
+       修法（与财务 FIN-CN-LOSTSAVE-FIX-20261013 同一思路，勿删）：
+         ① 飞行期间再次保存 → 记 saveQueued / saveQueuedManual，这一笔落地后【立刻补存】；
+         ② 引入改动代数 dirtyGen（scheduleSave 每次真实改动 +1）；保存回来只有 dirtyGen === genAtBuild
+            才敢清 dirty，否则自动补存；
+         ③ save() 返回 Promise<boolean>：整条补存链走完才 resolve —— 切语言/手动保存可以等它落盘再重载，
+            绝不会拿到旧数据把屏幕盖掉。 */
+    function eqFlushSaveWaiters(ok){
+      var ws = saveWaiters; saveWaiters = [];
+      for (var i = 0; i < ws.length; i++){ try { ws[i](ok); } catch(e){} }
+    }
+    async function save(manual){
+    if (!sheet) return false;                  /* 单元正在重建：明确返回"没存成"，别让调用方误以为已落盘 */
+    if (saving){
+      /* ★① 飞行中：不丢这次点击，记下来等落地后补存 */
+      saveQueued = true;
+      if (manual) saveQueuedManual = true;
+      return new Promise(function(res){ saveWaiters.push(res); });
+    }
+    var p = payload(); if (!p) { st('没有可保存的内容'); return false; }
+    var genAtBuild = dirtyGen;                 /* ★② 本次要落盘的数据对应哪一代改动 */
+    saving = true;
+    if (manual) st('保存中…');
+    var _body = JSON.stringify(p);
+    /* ★EQ-DRAFT-20261016：请求【发出之前】先把这份待落盘内容存成本地草稿。
+       服务器正在重启（改代码）/ 网络断掉时下面的 fetch 会直接抛错，
+       没有草稿的话这一笔录入就只剩内存里那一份，用户一按 F5 就没了。 */
+    try { localStorage.setItem(EQ_DRAFT_KEY, JSON.stringify({ base: eqBaseId, ts: Date.now(), body: _body })); } catch(e){}
+    try {
+      var r = await fetch(API + '/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: _body });
+      var j = await r.json();
+      if (j && j.ok){
+        saveLastOk = true;
+        var _genOk = (dirtyGen === genAtBuild);
+        if (_genOk) dirty = false;                         /* 这一代确实全落盘了 */
+        else saveQueued = true;                            /* ★② 保存期间又改了 → 必须再存一次 */
+        try { localStorage.removeItem(EQ_DRAFT_KEY); } catch(e){}   /* ★已确认落盘：草稿使命完成 */
+        st('已保存 ' + (j.saved_at || '') + (_genOk ? '' : ' · 还有新改动待存'));
+      }
+      else if (j && j.stale){
+        /* ★服务器没接受这份（被「数据量骤减」守卫拦下 / 已有更新版本）：草稿作废，以服务器为准 */
+        saveLastOk = false;
+        try { localStorage.removeItem(EQ_DRAFT_KEY); } catch(e){}
+        st('保存失败：' + ((j && j.error) || r.status));
+      }
+      else { saveLastOk = false; st('保存失败：' + ((j && j.error) || r.status)); }
+    } catch(e){
+      saveLastOk = false;
+      st('保存失败：' + e.message);
+      /* ★网络级失败（服务器重启中/断网）→ 3 秒后自动重试：服务器回来后这一笔会自己补上 */
+      if (dirty) eqScheduleRetry();
+    }
+    finally {
+      saving = false;
+      if (saveQueued){
+        /* ★① 补存：把飞行期间漏掉的点击/改动再存一次（不 await，避免递归压在 finally 里） */
+        saveQueued = false;
+        var _m2 = saveQueuedManual; saveQueuedManual = false;
+        setTimeout(function(){ try { save(_m2); } catch(e){} }, 0);
+      } else {
+        eqFlushSaveWaiters(saveLastOk);                     /* ★③ 整条链走完 → 通知等待者 */
+      }
+    }
+    return saveLastOk;
+    }
+    /* ★EQ-DRAFT-20261016：网络级失败后的自动重试（与财务那套看门狗同思路）。
+       只要还有未落盘的改动就一直重试，绝不因为一次网络抖动把录入丢掉。 */
+    function eqScheduleRetry(){
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){ saveTimer = null; if (dirty) save(false); }, 3000);
+    }
+    /* ★EQ-DRAFT-20261016：下次打开页面时自动补交「上次没存上」的草稿。
+       只认基线指纹没变（服务器文件与用户当时编辑的那版完全一致）才提交。 */
+    async function eqReplayDraft(){
+    if (eqDraftBusy || !univer || !api) return;
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(EQ_DRAFT_KEY) || 'null'); } catch(e){ d = null; }
+    if (!d || !d.body || !d.base || !eqBaseId) return;
+    if (d.base !== eqBaseId){
+      console.warn('[equity] 草稿基线已变（草稿 ' + d.base + ' / 当前 ' + eqBaseId + '），保留草稿但不自动提交');
+      return;
+    }
+    eqDraftBusy = true;
+    try {
+      var r = await fetch(API + '/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: d.body });
+      var j = await r.json();
+      if (j && j.ok){
+        try { localStorage.removeItem(EQ_DRAFT_KEY); } catch(e){}
+        st('已恢复上次未保存的内容');
+        load();
+      } else if (j && j.stale){
+        try { localStorage.removeItem(EQ_DRAFT_KEY); } catch(e){}
+      }
+    } catch(e){ /* 服务器还没回来：草稿留着，下次打开再试 */ }
+    eqDraftBusy = false;
+    }
+    function scheduleSave(){
+    /* ★EQ-SAVE-NOLOSS-20261018：每次真实改动把代数 +1。
+       保存回来时用「代数有没有变」判断这批改动到底落盘了没有 —— 变了就必须补存，
+       绝不能再像旧代码那样无条件 dirty=false 把飞行期间的录入吞掉。 */
+    try { dirtyGen++; } catch(e){}
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){ saveTimer = null; if (dirty || saveQueued) save(false); }, 700);
+    }
+
+    /* ---------- 初始化 ---------- */
+    async function init(){
+    if (inited) return;
+    inited = true;
+    st('正在加载表格引擎…');
+    try {
+      /* ★locale 必须自己带上：Univer 0.5.5 的 LocaleService 在没拿到 locales 时会直接抛
+         "[LocaleService]: Locale not initialized"（2026-10-15 实测）。这里与财务那套
+         fin_initUniver 用【完全相同】的模块清单与合并方式（三语 + filter/sort 的 locale）。 */
+      var _impOpt = function(s){ return import(s).catch(function(){ return null; }); };
+      var m = await Promise.all([
+        import('@univerjs/presets'),                                          // 0
+        import('@univerjs/presets/preset-sheets-core'),                       // 1
+        _impOpt('@univerjs/presets/preset-sheets-core/locales/en-US'),        // 2
+        _impOpt('@univerjs/presets/preset-sheets-core/locales/zh-CN'),        // 3
+        _impOpt('@univerjs/presets/preset-sheets-core/locales/vi-VN'),        // 4
+        import('@univerjs/sheets-filter'),                                    // 5
+        import('@univerjs/sheets-filter-ui'),                                 // 6
+        import('@univerjs/sheets-sort'),                                      // 7
+        import('@univerjs/sheets-sort-ui'),                                   // 8
+        _impOpt('@univerjs/sheets-filter-ui/locale/en-US'),                   // 9
+        _impOpt('@univerjs/sheets-sort/locale/en-US'),                        // 10
+        _impOpt('@univerjs/sheets-sort-ui/locale/en-US'),                     // 11
+        _impOpt('@univerjs/sheets-filter-ui/locale/zh-CN'),                   // 12
+        _impOpt('@univerjs/sheets-sort/locale/zh-CN'),                        // 13
+        _impOpt('@univerjs/sheets-sort-ui/locale/zh-CN'),                     // 14
+        _impOpt('@univerjs/sheets-filter-ui/locale/vi-VN'),                   // 15
+        _impOpt('@univerjs/sheets-sort/locale/vi-VN'),                        // 16
+        _impOpt('@univerjs/sheets-sort-ui/locale/vi-VN'),                     // 17
+        // ★只为拿 LocaleService 这个 DI token（切系统语言时运行时换界面语言用）
+        _impOpt('@univerjs/core')                                             // 18
+      ]);
+      presets = m[0];
+      coreMod = m[18] || null;
+      var _merge = presets.merge || function(a, b){ return Object.assign({}, a, b); };
+      function mergeL(base, mods){
+        var r = _merge({}, base || {});
+        mods.forEach(function(x){ var d = (x && (x.default || x)) || {}; if (d) r = _merge(r, d); });
+        return r;
+      }
+      var enL = (m[2] && (m[2].default || m[2])) || {};
+      var zhL = (m[3] && (m[3].default || m[3])) || {};
+      var viL = (m[4] && (m[4].default || m[4])) || {};
+      var loc = mergeL(enL, [m[9], m[10], m[11]]);
+      var zhLoc = mergeL(zhL, [m[12], m[13], m[14]]);
+      var viLoc = mergeL(viL, [m[15], m[16], m[17]]);
+      var lt = presets.LocaleType || {};
+      var L = lang();
+      var initLocale = (L === 'zh') ? lt.ZH_CN : (L === 'vi') ? lt.VI_VN : lt.EN_US;
+      /* ★用户 2026-10-15 要求：删掉 Univer 自带的「$」货币按钮、内置筛选（漏斗）、
+         以及右端那两个「保护/权限」图标按钮 —— 币种换算由我们自己的 VND₫/RMB¥/USD$ 下拉负责。
+         机制与财务 fin_initUniver 完全相同：通过 menu 配置把命令的菜单项隐藏。 */
+      var eqMenuCfg = {
+        'sheet.command.numfmt.set.currency': { hidden: true },        // 内置货币 $（已改用左侧币种下拉）
+        'sheet.command.smart-toggle-filter': { hidden: true },        // 内置筛选（漏斗）
+        'sheet.command.add-range-protection-from-toolbar': { hidden: true },         // 工具栏：保护范围
+        'sheet.command.add-range-protection-from-context-menu': { hidden: true },    // 右键：开启保护范围
+        'sheet.command.set-range-protection-from-context-menu': { hidden: true },    // 右键：编辑保护范围
+        'sheet.command.delete-range-protection-from-context-menu': { hidden: true }, // 右键：删除保护范围
+        'sheet.command.view-sheet-permission-from-context-menu': { hidden: true },   // 右键：查看全部保护区域
+        'sheet.command.add-range-protection-from-sheet-bar': { hidden: true },       // 标签右键：保护工作表
+        'sheet.command.delete-worksheet-protection-from-sheet-bar': { hidden: true },// 标签右键：取消保护
+        'sheet.command.change-sheet-protection-from-sheet-bar': { hidden: true },    // 标签右键：更改权限
+        'sheet.command.view-sheet-permission-from-sheet-bar': { hidden: true },      // 标签右键：查看权限
+        'base-ui.operation.toggle-shortcut-panel': { hidden: true }                  // 快捷键面板开关
+      };
+      /* ★★删表锁（配置级）：非 tom/cuong/james 时在菜单配置里隐藏"删除工作表"（与财务同一机制）。 */
+      try {
+        var _u1 = (typeof authUser !== 'undefined' && authUser && authUser.username) ? String(authUser.username).trim().toLowerCase() : '';
+        if (_u1 !== 'tom' && _u1 !== 'cuong' && _u1 !== 'james' && _u1 !== 'tomcuong'){
+          eqMenuCfg['sheet.command.remove-sheet-confirm'] = { hidden: true };
+          eqMenuCfg['sheet.command.remove-sheet'] = { hidden: true };
+          eqMenuCfg['sheet.menu.delete-sheet'] = { hidden: true };
+          eqMenuCfg['sheet.menu.sheet-bar.delete-sheet'] = { hidden: true };
+          eqMenuCfg['sheet.menu.sheet-bar.delete'] = { hidden: true };
+        }
+      } catch(e){}
+      var canMenu = !!(presets.FUniver && presets.FUniver.prototype && typeof presets.FUniver.prototype.createMenu === 'function');
+      var coreOpts = { container: 'equity_container' };
+      if (canMenu) coreOpts.menu = eqMenuCfg;
+      /* ★FIN-FORMULA-STACK-20261018（用户 2026-10-18 报 Uncaught RangeError: Maximum call stack size exceeded）：
+         权益是【独立的第二套 Univer】，走的是本脚本自己的 createUniver —— 财务那套里的
+         bufferWhen 补丁在这里从来没被执行过。用户先打开「股东权益」时，
+         RegisterOtherFormulaService 构造里 calculateStarted$ 还是 BehaviorSubject，
+         bufferWhen 的关闭通知器每次订阅都同步回放 true → 同步无限重入 → 栈溢出。
+         ★必须在 createUniver 之前装（补丁是原型级的，装一次两套 Univer 都受益；已装则立即返回）。 */
+      try {
+        if (typeof window.fin_ensureFormulaPatch === 'function'){
+          await window.fin_ensureFormulaPatch();
+        } else if (typeof window.fin_patchFormulaService === 'function'){
+          var _fF = null, _fR = null;
+          try { _fF = await import('@univerjs/sheets-formula'); } catch(e1){}
+          try { _fR = await import('rxjs'); } catch(e2){}
+          window.fin_patchFormulaService(_fF, _fR);
+        }
+      } catch(e){ if (window.console) console.warn('[eq-formula]', e); }
+      var res = presets.createUniver({
+        theme: presets.defaultTheme,
+        locale: initLocale,
+        locales: (lt.EN_US ? { [lt.EN_US]: loc, [lt.ZH_CN]: zhLoc, [lt.VI_VN]: viLoc } : undefined),
+        presets: [ m[1].UniverSheetsCorePreset(coreOpts) ],
+        plugins: [ m[5].UniverSheetsFilterPlugin, m[6].UniverSheetsFilterUIPlugin,
+                   m[7].UniverSheetsSortPlugin, m[8].UniverSheetsSortUIPlugin ]
+      });
+      univer = res.univer;
+      api = res.univerAPI || null;
+      ready = true;
+      try { eqExcelKeysBind(); } catch(e){}   /* ★Excel 键盘行为补丁（EQ-EXCEL-KEYS） */
+      try { eqPatchPermissionService(); } catch(e){}   /* ★权限点放行：右键「插入行」等编辑命令不再被静默拦下 */
+      try { eqPatchCommandService(); } catch(e){}      /* ★EQ-TEXT-PREFIX-20261017：' 前缀 = 强制文本（写值命令前置钩子） */
+      try { eq_statBind(); } catch(e){}                /* ★底部统计栏（计数/总计/平均/最大/最小）*/
+      try { eq_bindContextMenuOnce(); } catch(e){}    /* ★右键「插入行」菜单补丁：限定在权益容器内，插入作用于当前表格 */
+      /* ★EQ-SHEET-CUR-20261016：轮询同步工作簿默认币种（中国投资数据→RMB，其余→VND） */
+      if (!window.__eqCurPoll){ window.__eqCurPoll = setInterval(function(){ try { eqSyncCurToActiveSheet(); } catch(e){} }, 600); }
+      /* ★EQ-FIT-20261017：轮询保底——只要权益视图可见就每 400ms 校正一次高度，
+         保证 Univer 自带的横/纵滚动条（Excel 观感）始终落在表格下沿/右沿、页面不跟着滚。 */
+      if (!window.__eqFitTimer){ window.__eqFitTimer = setInterval(function(){ try { eqFitHeight(); } catch(e){} try { if (window.makeHScroll) window.makeHScroll('equity_container', function(){ return api; }, function(){ return window.__eqCmdSvc; }); } catch(e){} }, 400); }
+    } catch(e){
+      inited = false;
+      st('引擎加载失败：' + e.message);
+      console.error('[equity] init', e);
+      return;
+    }
+    await load();
+    bindChange();
+    }
+    async function load(){
+    if (loading) return;
+    if (!univer) { await init(); return; }
+    loading = true;
+    st('正在载入报表…');
+    try {
+      var r = await fetch(API + '/snapshot', { cache:'no-store' });
+      if (!r.ok) { st('报表未初始化（HTTP ' + r.status + '）'); loading = false; return; }
+      var _eqRaw = await r.text();
+      try { eqBaseId = eqFp(_eqRaw); } catch(e){ eqBaseId = ''; }   /* ★EQ-DRAFT：记下这次载入的基线指纹 */
+      snap = JSON.parse(_eqRaw);
+      eqEnsureGrid(snap);          /* ★EQ-GRID：每张表默认 Z 列 × 50 行（写入 snap，保存也带上） */
+      loadTrans();
+      seedAndApply(snap, function(){
+        render(); loading = false;
+        /* ★EQ-DRAFT-20261016：载入完成后，若存在「基线未变」的未落盘草稿 → 自动补交 */
+        setTimeout(function(){ try { eqReplayDraft(); } catch(e){} }, 1200);
+      });
+    } catch(e){
+      st('载入失败：' + e.message);
+      loading = false;
+    }
+    }
+    function bindChange(){
+    if (!api || typeof api.onCommandExecuted !== 'function') return;
+    if (window.__eqBound) return;
+    window.__eqBound = true;
+    api.onCommandExecuted(function(cmd){
+      try {
+        var id = cmd && cmd.id ? String(cmd.id) : '';
+        if (id.indexOf('numfmt') >= 0) return;               // 我们自己的格式化不脏
+        if (id.indexOf('.operation.') >= 0) return;          // UI 状态（如进入编辑态）不是数据改动
+        if (Date.now() < progUntil) return;                  // 程序写入窗口
+        dirty = true;
+        scheduleSave();
+        /* ★EQ-CUR-FMT-20261016：新录入/修改的数字立刻套上当前币种符号（与财务一致）。
+           先把屏幕改动并回 snap（非 VND 时乘回 VND 基），再重放金额格式，避免「输入数字后
+           一直不显示 ₫/¥/$，只有切币种才出现」的问题。 */
+        if (window.__eqFmtTimer) clearTimeout(window.__eqFmtTimer);
+        window.__eqFmtTimer = setTimeout(function(){
+          window.__eqFmtTimer = null;
+          try { eqCaptureLiveToSnap(cur); fmtCurrency(); } catch(e){}
+        }, 260);
+      } catch(e){}
+    });
+    }
+
+    /* =========================================================================
+       ★ EQ-EXCEL-KEYS：Excel 键盘行为补丁（股东权益版，与财务 FIN-EXCEL-KEYS 同一套思路）
+       为什么需要（用户 2026-10-15 要求）：
+       ① 单击单元格后必须能像 Excel 一样【直接打字输入】——Univer 0.5.5 没有这个行为
+         （源码里只有 F2/Enter/Backspace/双击才能进入编辑），必须自己补；
+       ② 方向键到边界不回卷、Ctrl+方向键=数据边界、Home/End/PageUp/PageDown、
+         编辑态 Delete、选区跟随滚动 —— 全部照财务 finExcelKeysBind 移植；
+       ③ Enter 的 Excel 语义：非编辑态=选区向下移（Shift+Enter 向上），而不是进入编辑。
+       ★监听挂 window 捕获阶段；只在 #equity_container 可见且事件落在表格里时接管，
+         绝不影响页面其它输入框/下拉（SELECT/INPUT/TEXTAREA 一律放行）。
+       ========================================================================= */
+    var EQ_EDGE_SCAN = 4000;
+    var eqPrevCur = null, eqLastKeyAt = 0;
+
+    /* ★Univer 0.5.5 权限点补丁（照财务 fin_patchPermissionService 移植，2026-10-16）。
+       现象：右键行号 →「在上方/下方插入行」点了完全没反应。
+       根因：这类编辑命令受 IPermissionService 的权限点守卫，而纯净 workbook 里
+       这些权限点【根本没注册】→ composePermission$ 收到缺失的 id → 命令被静默拦下。
+       做法：缺失的权限点用「兜底点」占位（value=true = 放行）；同步版缺失直接放行。 */
+    function eqPatchPermissionService(){
+      try {
+        if (!coreMod || !univer || typeof univer.__getInjector !== 'function') return false;
+        var token = coreMod.IPermissionService;
+        if (!token) return false;                       /* @univerjs/core 没导入成功 */
+        var inj = univer.__getInjector();
+        var perm = (inj && typeof inj.get === 'function') ? inj.get(token) : null;
+        if (!perm) return false;
+        if (perm.__eqPermSafe) return true;             /* 幂等：只装一次 */
+        var origAsync = perm.composePermission$;
+        var origSync = perm.composePermission;
+        if (typeof origAsync !== 'function' || typeof origSync !== 'function') return false;
+        var FALLBACK_ID = '__eq_perm_fallback__';
+        function fallbackId(self){
+          try {
+            if (!self.getPermissionPoint$(FALLBACK_ID)) {
+              self.addPermissionPoint({ id: FALLBACK_ID, value: true });
+            }
+          } catch(e){}
+          return self.getPermissionPoint$(FALLBACK_ID) ? FALLBACK_ID : null;
+        }
+        /* 异步版：缺失的 id 用兜底 id 占位后再交给原实现（入参个数=输出数组长度，语义不变） */
+        perm.composePermission$ = function(ids){
+          var self = this;
+          var list = ids || [];
+          var safe = null;
+          for (var i = 0; i < list.length; i++){
+            if (self.getPermissionPoint$(list[i])) {
+              if (safe) safe.push(list[i]);
+            } else {
+              if (!safe) safe = list.slice(0, i);
+              var fb = fallbackId(self);
+              if (!fb) return origAsync.call(self, list);
+              safe.push(fb);
+            }
+          }
+          if (!safe) return origAsync.call(self, list);   /* 全都在 → 完全走原实现 */
+          return origAsync.call(self, safe);
+        };
+        /* 同步版：取不到就直接给「放行」对象，绝不 throw */
+        perm.composePermission = function(ids){
+          var self = this;
+          return (ids || []).map(function(id){
+            var p = self.getPermissionPoint(id);
+            return p || { id: id, value: true };
+          });
+        };
+        perm.__eqPermSafe = true;
+        return true;
+      } catch(e){ return false; }
+    }
+
+    /* ============ ★★ EQ-TEXT-PREFIX-20261017 ★★ ============
+       用户要求（2026-10-17 原话）：「日期格式，我已经在单元格里面加入了 ' ，因为 EXCEL 里面的 '
+         可以让日期格式变成文本，但是这个功能目前没有实现 —— 我尽管可以使用 ' 然后继续输入日期，
+         但是刷新后日期变成了一串数值；请修改」
+       期望（Excel 语义）：单元格内容以 ' 开头 = 【强制文本】。撇号本身不算内容，
+         后面的字符原样当字符串存（永不解析成日期序列号 / 数字）。
+       根因（Univer 0.5.5 sheets-ui 实测）：
+         编辑器提交走 _submitCellData(editorSnapshot) → 解析 → executeCommand(set-range-values)，
+         ' 只是普通字符，日期照样被解析成 number（日期 = 序列号，如 46123）；
+         落盘后就是 46123，刷新回来自然"变成一串数值"。
+       做法：装一个【命令前置钩子】ICommandService.beforeCommandExecuted（core 里确认存在）：
+         在写值命令执行【之前】，如果编辑器里的原始文本以 ' 开头，就把要写入的值改成
+         { v: 去掉撇号后的原文, t: 1 }（t=1 = 字符串），并删掉 f（公式）与样式覆盖。
+       不碰 Univer 源码、不改编辑器；只改这一次命令的参数，幂等只装一次。 */
+    var EQ_TEXT_PREFIX_RE = /^\s*['\u2018\u2019\u201a\u2032\uff07]/;
+    /* ★兜底：提交那一刻编辑器可能已经被销毁（读不到原文）。
+       所以编辑过程中每次按键都把编辑器原文记一份，钩子里读不到再用它（5 秒内有效）。 */
+    var EQ_EDIT_RAW = '', EQ_EDIT_RAW_AT = 0;
+    /* 读【单元格编辑器】里的原始文本（提交前的那串字符）。两个编辑器 id 都试；
+       dataStream 末尾带段落符，去掉。取不到就返回 ''（= 不干预，绝不猜）。 */
+    function eqEditorRawText(){
+      try {
+        var mod = coreMod || eqEditCore;
+        if (!univer || typeof univer.__getInjector !== 'function' || !mod) return '';
+        var IS = mod.IUniverInstanceService;
+        if (!IS) return '';
+        var svc = null;
+        try { svc = univer.__getInjector().get(IS); } catch(e){ svc = null; }
+        if (!svc || typeof svc.getUnit !== 'function') return '';
+        var ids = ['__INTERNAL_EDITOR__DOCS_NORMAL', '__INTERNAL_EDITOR__DOCS_FORMULA_BAR'];
+        for (var i = 0; i < ids.length; i++){
+          var u = null;
+          try { u = svc.getUnit(ids[i]); } catch(e){ u = null; }
+          if (!u) continue;
+          var sn = null;
+          try { sn = u.getSnapshot(); } catch(e){ sn = null; }
+          var s = (sn && sn.body && sn.body.dataStream) ? String(sn.body.dataStream) : '';
+          if (s) return s.replace(/[\r\n]+$/, '');
+        }
+      } catch(e){}
+      return '';
+    }
+    /* ★★EQ-SHEET-LOCK-20261017（用户 2026-10-17：所有工作薄都必须锁死、不允许被删除，
+       只有 tom / cuong / james 才可以删除，其他人一律不允许）★★
+       与全站既有的三人组判定保持同一口径（authUser.username，小写比对）。 */
+    function eqIsTriAdmin(){
+      try {
+        var u = (typeof authUser !== 'undefined' && authUser && authUser.username) ? String(authUser.username).trim().toLowerCase() : '';
+        return (u === 'tom' || u === 'cuong' || u === 'james' || u === 'tomcuong');
+      } catch(e){ return false; }
+    }
+    function eqPatchCommandService(){
+      try {
+        if (!coreMod || !univer || typeof univer.__getInjector !== 'function') return false;
+        var token = coreMod.ICommandService;
+        if (!token) return false;
+        var cs = univer.__getInjector().get(token);
+        try { console.log('[eq-sheetlock] token=' + !!token + ' cs=' + !!cs + ' patched=' + !!(cs && cs.__eqTextPrefixPatched)); } catch(_){}
+        if (!cs || typeof cs.beforeCommandExecuted !== 'function'){ console.warn('[eq-sheetlock] 取不到命令服务，删表锁未安装'); return false; }
+        if (cs.__eqTextPrefixPatched) return true;              /* 幂等：只装一次 */
+        cs.beforeCommandExecuted(function(cmd){
+          try {
+            /* ★不按命令 id 过滤：Univer 各版本里"提交单元格"的命令 id 可能是
+               set-range-values / set-cell-values 等几种。真正的守门条件是
+               「编辑器此刻开着，而且里面的原文以撇号开头」—— 编辑器只在编辑时存在，
+               所以绝对不会误伤粘贴/格式化等其它命令。 */
+            var p = cmd && cmd.params; if (!p || !p.range || !p.value) return;
+            var rg = p.range;
+            /* 只处理单格提交（编辑器提交必然是 1×1） */
+            if (rg.startRow !== rg.endRow || rg.startColumn !== rg.endColumn) return;
+            var raw = eqEditorRawText();
+            /* ★提交瞬间编辑器可能已销毁 → 用编辑过程中记下的原文兜底（5 秒内） */
+            if (!raw && EQ_EDIT_RAW && (Date.now() - EQ_EDIT_RAW_AT < 5000)) raw = EQ_EDIT_RAW;
+            if (!raw || !EQ_TEXT_PREFIX_RE.test(raw)) return;
+            var txt = raw.replace(EQ_TEXT_PREFIX_RE, '');        /* 只去掉开头那一个撇号 */
+            /* 参数里 cell 的形态有两种：单个 ICellData，或 { 行: { 列: ICellData } } 的映射 */
+            var cell = null, val = p.value;
+            if (val && typeof val === 'object'){
+              if (typeof val.v !== 'undefined' || typeof val.t !== 'undefined' || typeof val.f !== 'undefined') cell = val;
+              else if (val[rg.startRow] && val[rg.startRow][rg.startColumn]) cell = val[rg.startRow][rg.startColumn];
+            }
+            if (!cell) return;
+            /* ★只改「值 + 类型」：i.params 与 handler 拿到的 params 是同一个对象引用
+               （core 里 syncExecuteCommand/executeCommand 都是 `{params:t}` 后再 `_exec(o,t)`），
+               所以这里原地改就能生效，不需要重新派发命令。 */
+            cell.v = txt;
+            cell.t = 1;                                          /* 1 = 字符串（文本） */
+            delete cell.f;                                       /* 绝不留公式 */
+            delete cell.p;
+            /* ★不删 cell.s：保留粗体/底色等外观；字符串不受数字格式影响，不会又变回日期 */
+            try { window.__eqTextPrefixHits = (window.__eqTextPrefixHits || 0) + 1; } catch(e){}
+          } catch(e){}
+        });
+        cs.__eqTextPrefixPatched = true;
+        window.__eqCmdSvc = cs;   /* 供自建水平滚动条直接派发 scroll-to-cell */
+        /* ★★EQ-SHEET-LOCK-20261017（主锁）：包裹 executeCommand / syncExecuteCommand，
+           非 tom/cuong/james 时，任何 remove-sheet* 命令直接拒绝执行（返回失败）。
+           原因：Univer 0.5.5 里 beforeCommandExecuted 的返回值被【忽略】，根本无法取消命令，
+           所以之前"毒化参数"只是软拦。这一层从命令入口 100% 拦死——
+           标签右键、键盘、程序化调用全都走 executeCommand，无处可逃。 */
+        ['executeCommand', 'syncExecuteCommand'].forEach(function(_en){
+          try {
+            if (typeof cs[_en] !== 'function' || cs['__eqBL_' + _en]) return;
+            var _orig = cs[_en].bind(cs);
+            cs[_en] = function(_id, _params, _opts){
+              try {
+                if (/remove-sheet/.test(String(_id)) && !eqIsTriAdmin()){
+                  console.warn('[eq-sheetlock] 非管理员禁止删除工作表:', _id);
+                  return (_en === 'syncExecuteCommand') ? false
+                       : Promise.resolve({ retCode: 1, retString: 'blocked-by-sheet-lock' });
+                }
+              } catch(_e){}
+              return _orig(_id, _params, _opts);
+            };
+            cs['__eqBL_' + _en] = true;
+          } catch(_e){}
+        });
+        /* ★★EQ-SHEET-LOCK-20261017：删表命令的前置拦截（第二道软锁，保留作冗余兜底）★★
+           Univer 0.5.5 删表链路（已从源码核实）：
+             工作表标签右键「删除工作表」→ sheet.command.remove-sheet-confirm（弹确认框）
+               → sheet.command.remove-sheet（真正执行删除）
+           非 tom/cuong/james 时把 subUnitId 打成空 → remove-sheet 的
+           `getWorkbookAndWorksheet()` 取不到工作表 → 直接 return false，表删不掉。
+           ★两道锁配合：这里兜底（任何入口都拦），eq_bindContextMenuOnce 里那条
+             按文案拦「删除工作表」点击的负责【连确认框都不弹】。 */
+        cs.beforeCommandExecuted(function(cmd2){
+          try {
+            var id2 = String((cmd2 && cmd2.id) || '');
+            if (id2.indexOf('remove-sheet') < 0) return;
+            if (eqIsTriAdmin()) return;                        /* 三人组放行 */
+            if (cmd2 && cmd2.params) cmd2.params.subUnitId = '';   /* 让真正执行的那条命令失败 */
+          } catch(e){}
+        });
+        return true;
+      } catch(e){ return false; }
+    }
+
+    /* ============ ★股东权益底部统计栏（EQ-STATBAR-20261016，照搬财务 FIN-STATBAR）★============
+       用户要求：Excel 底部要有 计数/总计/平均/最大值/最小值，三语、字号小、位置同财务。
+       · 自建 bar #eq_statbar，贴在 #equity_container 下沿（Univer 自带底条上方）；
+       · 计数=选区内非空格数；总计/平均/最大/最小只统计数字格；日期序列号不计入数字统计；
+       · 选区优先从命令流 sheet.operation.set-selections 取（门面 getSelection 常只给一格）；
+       · 标签随 lang() 实时三语切换。 */
+    var eqStatTimer = null, eqStatDomBound = false, eqStatLastHtml = null;
+    var eqStatSel = null, eqStatSelSid = '';
+    function eq_statLabels(){
+      var L = lang();
+      if (L === 'zh') return { cnt:'计数', sum:'总计', avg:'平均', max:'最大值', min:'最小值', none:'未选择单元格' };
+      if (L === 'en') return { cnt:'Count', sum:'Sum', avg:'Average', max:'Max', min:'Min', none:'No selection' };
+      return { cnt:'Đếm', sum:'Tổng', avg:'Trung bình', max:'Lớn nhất', min:'Nhỏ nhất', none:'Chưa chọn ô' };
+    }
+    function eq_statSym(){
+      if (cur === 'NONE') return '';   /* ★EQ-SELCUR：「无」不带符号 */
+      if (cur === 'USD') return '$';
+      if (cur === 'RMB') return '\u00a5';
+      return '\u20ab';
+    }
+    function eq_statFmt(n){
+      try {
+        if (n === null || n === undefined || !isFinite(n)) return '-';
+        var s = (Math.abs(n) >= 1000) ? String(Math.round(n)) : String(Math.round(n * 100) / 100);
+        s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return eq_statSym() + s;
+      } catch(e){ return String(n); }
+    }
+    function eq_statPattern(snap, cell){
+      try {
+        var s = cell && cell.s;
+        var st = (typeof s === 'string') ? ((snap && snap.styles && snap.styles[s]) || null) : s;
+        return (st && st.n && st.n.pattern) || '';
+      } catch(e){ return ''; }
+    }
+    function eq_statIsDate(pat){ return !!(pat && /yyyy|yy|mm|dd|m|d/i.test(pat)); }
+    var eqStatBuiltinTries = 0;
+    function eq_statHideBuiltinBar(){
+      try {
+        if (window.__eqStatBuiltinHidden || eqStatBuiltinTries >= 30) return;
+        eqStatBuiltinTries++;
+        var mine = document.getElementById('eq_statbar');
+        var roots = [document.getElementById('equity_container'), document.body];
+        for (var ri = 0; ri < roots.length; ri++){
+          var root = roots[ri];
+          if (!root || !root.querySelectorAll) continue;
+          var all = root.querySelectorAll('[class*="status"]');
+          for (var i = 0; i < all.length; i++){
+            var el = all[i];
+            if (mine && (el === mine || el.contains(mine) || mine.contains(el))) continue;
+            if (!/status-?bar|statusbar/i.test(String(el.className || ''))) continue;
+            if (/计数|Count|Đếm/.test(el.textContent || '')){
+              el.style.display = 'none';
+              el.setAttribute('data-eq-statbar-hidden', '1');
+              window.__eqStatBuiltinHidden = true;
+            }
+          }
+        }
+      } catch(e){}
+    }
+    function eq_statEnsureBar(){
+      var b = document.getElementById('eq_statbar');
+      if (b) return b;
+      try {
+        var cont = document.getElementById('equity_container');
+        if (!cont) return null;
+        b = document.createElement('div');
+        b.id = 'eq_statbar'; b.className = 'eq-statbar';
+        cont.appendChild(b);
+        eqStatLastHtml = null;
+      } catch(e){ return null; }
+      return b;
+    }
+    function eq_statRangeOf(rng){
+      try {
+        if (!rng) return null;
+        if (typeof rng.getRow === 'function'){
+          var sr = rng.getRow(), sc = rng.getColumn();
+          if (isNaN(sr) || isNaN(sc)) return null;
+          return { startRow: sr, startColumn: sc,
+                   endRow: (typeof rng.getLastRow === 'function') ? rng.getLastRow() : sr,
+                   endColumn: (typeof rng.getLastColumn === 'function') ? rng.getLastColumn() : sc };
+        }
+        var rr = rng.range ? rng.range : rng;
+        if (rr && rr.startRow != null && rr.startColumn != null){
+          return { startRow: rr.startRow, startColumn: rr.startColumn,
+                   endRow: (rr.endRow != null ? rr.endRow : rr.startRow),
+                   endColumn: (rr.endColumn != null ? rr.endColumn : rr.startColumn) };
+        }
+      } catch(e){}
+      return null;
+    }
+    function eq_getSelectionRanges(){
+      var out = [];
+      try {
+        var sh = eqSheetObj();
+        if (!sh) return out;
+        var sel = (typeof sh.getSelection === 'function') ? sh.getSelection() : null;
+        if (sel && typeof sel.getRanges === 'function'){
+          var rs = sel.getRanges() || [];
+          for (var i = 0; i < rs.length; i++){ var o = eq_statRangeOf(rs[i]); if (o) out.push(o); }
+        }
+        if (!out.length){
+          var rng = (sel && typeof sel.getActiveRange === 'function') ? sel.getActiveRange() : null;
+          if (!rng && typeof sh.getActiveRange === 'function') rng = sh.getActiveRange();
+          var o2 = eq_statRangeOf(rng);
+          if (o2) out.push(o2);
+        }
+      } catch(e){}
+      return out;
+    }
+    /* ★EQ-SELCUR-20261016：取当前选区（单个 range）。与统计栏同一套来源优先级：
+       命令流 set-selections > 门面 getSelection。取不到返回 null。 */
+    function eqCurrentSelRange(){
+      try {
+        var sid = eqSubUnitId(eqSheetObj()) || '';
+        var ranges = eq_getSelectionRanges();
+        var cmdSel = (eqStatSel && eqStatSel.length && (!eqStatSelSid || !sid || eqStatSelSid === sid)) ? eqStatSel : null;
+        if (cmdSel && (typeof eq_statSize === 'function') && eq_statSize(cmdSel) > eq_statSize(ranges)) ranges = cmdSel;
+        return ranges.length ? ranges[0] : null;
+      } catch(e){ return null; }
+    }
+    function eq_statWholeRange(cells){
+      try {
+        if (!cells) return null;
+        var r0 = Infinity, r1 = -Infinity, c0 = Infinity, c1 = -Infinity, n = 0;
+        for (var rk in cells){
+          var row = cells[rk];
+          if (!row) continue;
+          for (var ck in row){
+            var cell = row[ck];
+            if (cell && cell.v !== undefined && cell.v !== null && String(cell.v).trim() !== ''){
+              var rr = parseInt(rk, 10), cc = parseInt(ck, 10);
+              if (rr < r0) r0 = rr; if (rr > r1) r1 = rr;
+              if (cc < c0) c0 = cc; if (cc > c1) c1 = cc;
+              if (++n > 200000) break;
+            }
+          }
+        }
+        return n ? { startRow: r0, startColumn: c0, endRow: r1, endColumn: c1 } : null;
+      } catch(e){ return null; }
+    }
+    function eq_statScanRanges(o, depth, out){
+      if (!o || typeof o !== 'object' || depth > 6) return;
+      if (typeof o.startRow === 'number' && typeof o.startColumn === 'number'){
+        var _sr = o.startRow, _sc = o.startColumn;
+        var _er = (typeof o.endRow === 'number') ? o.endRow : _sr;
+        var _ec = (typeof o.endColumn === 'number') ? o.endColumn : _sc;
+        if (_sr >= 0 && _sc >= 0 && _er < 100000 && _ec < 1000){
+          out.push({ startRow: Math.min(_sr,_er), startColumn: Math.min(_sc,_ec),
+                     endRow: Math.max(_sr,_er), endColumn: Math.max(_sc,_ec) });
+        }
+        return;
+      }
+      if (Object.prototype.toString.call(o) === '[object Array]' && o.length === 4 &&
+          typeof o[0] === 'number' && typeof o[1] === 'number' &&
+          typeof o[2] === 'number' && typeof o[3] === 'number' &&
+          o[0] >= 0 && o[1] >= 0 && o[2] < 100000 && o[3] < 1000){
+        out.push({ startRow: Math.min(o[0],o[2]), startColumn: Math.min(o[1],o[3]),
+                   endRow: Math.max(o[0],o[2]), endColumn: Math.max(o[1],o[3]) });
+        return;
+      }
+      for (var k in o){
+        if (k === 's' || k === 'styles') continue;
+        var v = o[k];
+        if (v && typeof v === 'object') eq_statScanRanges(v, depth + 1, out);
+      }
+    }
+    function eq_statSize(ranges){
+      var n = 0;
+      for (var i = 0; i < (ranges || []).length; i++){
+        var r = ranges[i]; if (!r) continue;
+        n += (Math.max(0, r.endRow - r.startRow) + 1) * (Math.max(0, r.endColumn - r.startColumn) + 1);
+      }
+      return n;
+    }
+    function eq_statCompute(){
+      try { eq_statHideBuiltinBar(); } catch(e){}
+      try {
+        var bar = eq_statEnsureBar();
+        if (!bar) return;
+        if (!ready || !sheet){ eqStatLastHtml = null; bar.innerHTML = '<span class="eq-stat-item">…表格初始化中</span>'; return; }
+        var cont = document.getElementById('equity_container');
+        if (cont && bar.parentNode !== cont){ try { cont.appendChild(bar); } catch(e){} }
+        var rc = bar.getBoundingClientRect();
+        if (!rc.width) return;
+        var sh = eqSheetObj(); if (!sh) return;
+        /* ★★EQ-STATBAR-VALUES2-20261017（用户 2026-10-17：「所有表格里只有计数在工作，
+           总计/平均/最大值/最小值都失去了计算能力」——根因在这里）★★
+           旧写法 `snap = sh.getSnapshot()`：FWorksheet.getSnapshot() 返回的是【单张工作表】的
+             IWorksheetData（只有 id/name/rowCount/cellData …），**根本没有 .sheets**。
+           于是 `snap.sheets[sid]` 恒为 undefined ⇒ cells 恒为 null ⇒ 数字只能靠
+             `sh.getRange(...).getValues()` 这一条路，而它这版给的是「显示值」而不是裸数值，
+             下面 `typeof v === 'number'` 判不上 ⇒ nums 恒 0 ⇒ 只剩「计数」
+             （计数只累加格子数，不依赖格值，所以看起来"只有计数在工作"）。
+           修法（与财务报表统计栏同一套）：改从【工作簿快照】取 cellData；
+           sid 对不上时再按表名归一匹配（越/中/英表名都认）；getValues() 降为补充来源。 */
+        var sid = eqSubUnitId(sh) || '';
+        var snap = null, cells = null;
+        try {
+          var wb0 = api && api.getActiveWorkbook && api.getActiveWorkbook();
+          snap = (wb0 && wb0.getSnapshot) ? wb0.getSnapshot() : null;
+        } catch(e){}
+        if (!snap){ try { snap = (sheet && sheet.getSnapshot) ? sheet.getSnapshot() : null; } catch(e){} }
+        if (snap && snap.sheets){
+          if (sid && snap.sheets[sid]) cells = snap.sheets[sid].cellData || null;
+          if (!cells){
+            var _statK = eqSheetKey(eqActiveSheetName());
+            Object.keys(snap.sheets).forEach(function(s2){
+              if (cells) return;
+              var o2 = snap.sheets[s2]; if (!o2) return;
+              if (eqSheetKey(o2.name) === _statK) cells = o2.cellData || null;
+            });
+          }
+        }
+        var ranges = eq_getSelectionRanges();
+        var cmdSel = (eqStatSel && eqStatSel.length && (!eqStatSelSid || !sid || eqStatSelSid === sid)) ? eqStatSel : null;
+        if (cmdSel && eq_statSize(cmdSel) > eq_statSize(ranges)) ranges = cmdSel;
+        var usedWhole = false;
+        if (!ranges.length){
+          var wr = eq_statWholeRange(cells);
+          if (wr){ ranges = [wr]; usedWhole = true; }
+        }
+        var cnt = 0, nums = 0, sum = 0, mn = null, mx = null, scanned = 0;
+        /* ★COUNT-CELLS-ALL-20261016：用户要求「计数 = 选中了多少个单元格」，与 Excel 一致 ——
+           包括空格；求和/平均/最大/最小仍只统计数字格。 */
+        var seen = {};
+        for (var qi = 0; qi < ranges.length && scanned < 20000; qi++){
+          var rq = ranges[qi];
+          var hgt = rq.endRow - rq.startRow + 1;
+          var wid = rq.endColumn - rq.startColumn + 1;
+          var vals = null;
+          try { if (sh && sh.getRange) vals = sh.getRange(rq.startRow, rq.startColumn, hgt, wid).getValues(); } catch(e){ vals = null; }
+          for (var rr = rq.startRow; rr <= rq.endRow; rr++){
+            var rIdx = rr - rq.startRow;
+            for (var cc = rq.startColumn; cc <= rq.endColumn; cc++){
+              if (++scanned > 20000) break;
+              var key = rr + ',' + cc;
+              if (seen[key]) continue;
+              seen[key] = 1;
+              /* COUNT-CELLS-ALL-20261016：计数 = 选中的单元格总数（含空格），与 Excel 一致 */
+              cnt++;
+              var v = null;
+              if (vals && vals[rIdx]){
+                var raw = vals[rIdx][cc - rq.startColumn];
+                v = (raw && typeof raw === 'object' && 'v' in raw) ? raw.v : raw;
+              }
+              /* ★EQ-STATBAR-VALUES2-20261017：cells = 工作簿快照的 cellData —— 这才是"真值"来源。
+                 getValues() 拿不到（或给的是显示值）时，一律回落到这里。 */
+              if ((v === undefined || v === null || v === '') && cells && cells[String(rr)] && cells[String(rr)][String(cc)]){
+                v = cells[String(rr)][String(cc)].v;
+              }
+              if (v === undefined || v === null) continue;
+              if (typeof v === 'string' && v.trim() === '') continue;
+              var num = null;
+              if (typeof v === 'number') num = v;
+              else if (typeof v === 'string'){
+                /* ★EQ-STATBAR-VALUES2-20261017：屏幕值可能带货币符号/千位分隔（"₫1,350,060"、"¥ 15"），
+                   ★不能再用老正则直接判（那样带符号的一律判成非数字 → 总计/平均/最大/最小全空）。
+                   先剥掉符号/千位符/空白，再认数字。 */
+                var vs = v.replace(/[\s\u00a0\u20ab\u00a5$,]/g, '');
+                if (/^-?\d+(\.\d+)?$/.test(vs)) num = Number(vs);
+              }
+              if (num !== null && isFinite(num)){
+                var cellForPat = (cells && cells[String(rr)] && cells[String(rr)][String(cc)]) || null;
+                if (cellForPat && eq_statIsDate(eq_statPattern(snap, cellForPat))) continue;
+                nums++; sum += num;
+                if (mn === null || num < mn) mn = num;
+                if (mx === null || num > mx) mx = num;
+              }
+            }
+          }
+        }
+        var lab = eq_statLabels();
+        var h;
+        if (!ranges.length){
+          h = '<span class="eq-stat-item">' + lab.none + '</span>';
+        } else {
+          h = '<span class="eq-stat-item"><b>' + lab.cnt + ':</b> ' + cnt + '</span>'
+            + '<span class="eq-stat-item"><b>' + lab.sum + ':</b> ' + (nums ? eq_statFmt(sum) : '-') + '</span>'
+            + '<span class="eq-stat-item"><b>' + lab.avg + ':</b> ' + (nums ? eq_statFmt(sum / nums) : '-') + '</span>'
+            + '<span class="eq-stat-item"><b>' + lab.max + ':</b> ' + (nums ? eq_statFmt(mx) : '-') + '</span>'
+            + '<span class="eq-stat-item"><b>' + lab.min + ':</b> ' + (nums ? eq_statFmt(mn) : '-') + '</span>';
+        }
+        if (h !== eqStatLastHtml){ eqStatLastHtml = h; bar.innerHTML = h; }
+        try { window.__eqStatInfo = { ready: !!ready, sid: sid, hasCells: !!cells, ranges: ranges, usedWhole: usedWhole, cnt: cnt, nums: nums, sum: sum, min: mn, max: mx }; } catch(e){}
+      } catch(e){}
+    }
+    function eqStatNow(){ try { eq_statCompute(); } catch(e){} }
+    function eq_statSchedule(){
+      if (eqStatTimer) clearTimeout(eqStatTimer);
+      eqStatTimer = setTimeout(function(){ try { eq_statCompute(); } catch(e){} }, 90);
+    }
+    function eq_statOnCommand(evt){
+      try {
+        var id = String((evt && evt.id) || '');
+        var isSel = (id.indexOf('selection') >= 0 || id.indexOf('range') >= 0);
+        if (!isSel) return;
+        if (id.indexOf('set-selections') >= 0){
+          var found = [];
+          eq_statScanRanges(evt && evt.params, 0, found);
+          if (found.length){
+            eqStatSel = found;
+            try { eqStatSelSid = String(((evt.params || {}).subUnitId) || ''); } catch(e){ eqStatSelSid = ''; }
+          }
+        }
+        eq_statSchedule();
+      } catch(e){}
+    }
+    function eq_statTryApi(){
+      try {
+        if (window.__eqStatApiBound) return;
+        if (api && typeof api.onCommandExecuted === 'function'){
+          api.onCommandExecuted(eq_statOnCommand);
+          window.__eqStatApiBound = true;
+        } else if (univer && typeof univer.onCommandExecuted === 'function'){
+          univer.onCommandExecuted(eq_statOnCommand);
+          window.__eqStatApiBound = true;
+        }
+      } catch(e){}
+    }
+    function eq_statBind(){
+      if (eqStatDomBound) return;
+      eqStatDomBound = true;
+      try {
+        document.addEventListener('mouseup', function(){ eq_statSchedule(); }, true);
+        document.addEventListener('keyup', function(){ eq_statSchedule(); }, true);
+        setInterval(function(){ try { eq_statCompute(); } catch(e){} }, 1500);
+      } catch(e){}
+      eq_statTryApi();
+    }
+    try {
+      eq_statBind();
+      var _eqStatBooter = setInterval(function(){
+        try { eq_statTryApi(); } catch(e){}
+        try { eq_statCompute(); } catch(e){}
+        if (window.__eqStatApiBound) clearInterval(_eqStatBooter);
+      }, 800);
+      setTimeout(function(){ try { clearInterval(_eqStatBooter); } catch(e){} }, 90000);
+    } catch(e){}
+
+    /* ============ ★股东权益右键「插入行」菜单补丁（EQ-INS-ROWS-MENU-20261016）============
+       ★多实例隔离（用户反馈：在权益表插入行，却作用到了财务报表）：
+         财务页挂了 document 级 contextmenu 监听，会接管「插入行」菜单并调用财务的插入
+         （带财务 unitId）→ 在权益页右键时，原本应插在权益表，却插到了财务报表。
+         ① 财务侧已加容器作用域（只接管 univer_container 内的右键）；
+         ② 这里权益侧自己接管 equity_container 内的右键，调 eq_insertRows（显式带 equity-report unitId），
+            保证插在当前（权益）表格。菜单项文案三语，随 Univer 菜单语言。 */
+    var eqMenuObs = null, eqMenuObsTimer = null, eqMenuObsStopTimer = null;
+    var eqMenuInsRounds = 0, eqMenuInsPatched = 0, eqActive = false;
+    function eq_containerOf(e){
+      try {
+        var t = (e && e.target) || null;
+        while (t && t !== document.body){
+          if (t.id === 'equity_container' || (t.classList && t.classList.contains('univer-container'))) return t;
+          t = t.parentNode;
+        }
+      } catch(_){}
+      return null;
+    }
+    var EQ_ROW_WORD = /(行|row|dòng)/i;
+    var EQ_COL_WORD = /(列|col|cột)/i;
+    var EQ_BEFORE_WORD = /(上方|above|before|trên|phía\s*trên|bên\s*trên)/i;
+    function eq_menuRowInsPair(){
+      try {
+        var cands = document.querySelectorAll('li, [role="menuitem"]');
+        var groups = [];
+        for (var i = 0; i < cands.length; i++){
+          var el = cands[i];
+          if (el.classList && el.classList.contains('eq-menu-ins-item')) continue;   /* 我们自己注入的 */
+          var p = el.parentNode;
+          if (!p) continue;
+          var g = null;
+          for (var k = 0; k < groups.length; k++){ if (groups[k].p === p){ g = groups[k]; break; } }
+          if (!g){ g = { p: p, els: [] }; groups.push(g); }
+          g.els.push(el);
+        }
+        for (var m = 0; m < groups.length; m++){
+          var els = groups[m].els;
+          if (els.length !== 2) continue;
+          var a = els[0], b = els[1];
+          var ta = (a.textContent || '').replace(/\s+/g, '');
+          var tb = (b.textContent || '').replace(/\s+/g, '');
+          if (!ta || !tb) continue;
+          if (!EQ_ROW_WORD.test(ta) || !EQ_ROW_WORD.test(tb)) continue;
+          if (EQ_COL_WORD.test(ta) || EQ_COL_WORD.test(tb)) continue;
+          if (EQ_BEFORE_WORD.test(tb) && !EQ_BEFORE_WORD.test(ta)) return [b, a];
+          return [a, b];
+        }
+      } catch(e){}
+      return null;
+    }
+    function eq_menuIconOf(li){
+      try {
+        var ic = li.querySelector('svg') || li.querySelector('i');
+        if (ic) return ic.cloneNode(true);
+        for (var i = 0; i < li.children.length; i++){
+          var c = li.children[i];
+          if (!(c.textContent || '').trim()) return c.cloneNode(true);
+        }
+      } catch(e){}
+      return null;
+    }
+    function eq_univerLangKey(){
+      try {
+        if (univer && univer.__getInjector && presets && presets.LocaleService){
+          var ls = univer.__getInjector().get(presets.LocaleService);
+          var cur = (ls && ls.getLocale) ? String(ls.getLocale() || '').toLowerCase() : '';
+          if (cur.indexOf('zh') === 0) return 'zh';
+          if (cur.indexOf('vi') === 0) return 'vi';
+          if (cur.indexOf('en') === 0) return 'en';
+        }
+      } catch(e){}
+      return null;
+    }
+    function eq_insRowsText(key, dflt){
+      var L = eq_univerLangKey() || (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'zh');
+      try { var d = window.I18N && window.I18N[L]; if (d && d[key]) return d[key]; } catch(e){}
+      return dflt;
+    }
+    function eq_menuInsRefresh(){
+      try {
+        var nodes = document.querySelectorAll('.eq-menu-ins-lbl');
+        for (var i = 0; i < nodes.length; i++){
+          var kind = (nodes[i].getAttribute('data-kind') === 'above') ? 'above' : 'below';
+          nodes[i].textContent = (kind === 'above')
+            ? eq_insRowsText('fin_btn_ins_rows_above', '在上方插入行')
+            : eq_insRowsText('fin_btn_ins_rows', '在下方插入行');
+        }
+        var inps = document.querySelectorAll('.eq-menu-ins-input');
+        for (var j = 0; j < inps.length; j++) inps[j].setAttribute('title', eq_insRowsText('fin_title_ins_rows', ''));
+      } catch(e){}
+    }
+    function eqPatchInsertRowItem(li, kind){
+      if (!li) return;
+      kind = (kind === 'above') ? 'above' : 'below';
+      if (li.__eqMenuPatched){ eq_menuInsRefresh(); return; }
+      var host = li.parentNode;
+      if (!host) return;
+      li.__eqMenuPatched = true;
+      eqMenuInsPatched++;
+      var labelKey = (kind === 'above') ? 'fin_btn_ins_rows_above' : 'fin_btn_ins_rows';
+      var labelDflt = (kind === 'above') ? '在上方插入行' : '在下方插入行';
+      var mine = document.createElement('li');
+      mine.className = (li.className || '') + ' eq-menu-ins-item';
+      mine.setAttribute('role', 'menuitem');
+      mine.setAttribute('data-kind', kind);
+      var icon = eq_menuIconOf(li);
+      if (icon){
+        var iw = document.createElement('span');
+        iw.className = 'eq-menu-ins-icon';
+        iw.setAttribute('aria-hidden', 'true');
+        iw.appendChild(icon);
+        mine.appendChild(iw);
+      }
+      var lbl = document.createElement('span');
+      lbl.className = 'eq-menu-ins-lbl';
+      lbl.setAttribute('data-kind', kind);
+      lbl.textContent = eq_insRowsText(labelKey, labelDflt);
+      var inp = document.createElement('input');
+      inp.className = 'eq-menu-ins-input';
+      inp.type = 'text';
+      inp.inputMode = 'numeric';
+      inp.value = '1';
+      inp.maxLength = 3;
+      inp.setAttribute('title', eq_insRowsText('fin_title_ins_rows', ''));
+      mine.appendChild(lbl);
+      mine.appendChild(inp);
+      li.style.display = 'none';
+      host.insertBefore(mine, li.nextSibling);
+      ['pointerdown','mousedown','mouseup','click','dblclick','keydown','keyup','keypress'].forEach(function(ev){
+        inp.addEventListener(ev, function(e){
+          e.stopPropagation();
+          if (ev === 'keydown' && (e.key === 'Enter' || e.keyCode === 13)){
+            e.preventDefault();
+            eq_menuInsertRows(inp, kind);
+          }
+        }, true);
+      });
+      mine.addEventListener('click', function(e){
+        if (e.target === inp) return;
+        e.preventDefault();
+        e.stopPropagation();
+        eq_menuInsertRows(inp, kind);
+      }, true);
+    }
+    function eqPatchInsertRowMenu(){
+      try {
+        if (!eqActive) return;            /* ★多实例隔离：只在权益容器内右键才接管 */
+        if (!api) return;
+        var before = null, after = null;
+        var pair = eq_menuRowInsPair();
+        if (pair){ before = pair[0]; after = pair[1]; }
+        if (before) eqPatchInsertRowItem(before, 'above');
+        if (after) eqPatchInsertRowItem(after, 'below');
+      } catch(e){}
+    }
+    /* ★插入 N 行：显式带 unitId:'equity-report'（这是修复「插到财务报表」的关键），
+       below=true → 选区最后一行下方；false → 第一行上方。走 Univer 门面 API，可撤销/重做。 */
+    function eq_insertRows(nOpt, below){
+      if (!api || !sheet) return;
+      try {
+        var n = parseInt(nOpt, 10);
+        if (!(n >= 1)) n = 1;
+        if (n > 200) n = 200;
+        var sid = eqSubUnitId(sheet) || eqSubUnitId(eqSheetObj());
+        if (!sid) return;
+        var at = 0;
+        try {
+          var wb = api.getActiveWorkbook && api.getActiveWorkbook();
+          var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+          var rng = sh && sh.getActiveRange && sh.getActiveRange();
+          if (rng && typeof rng.getRow === 'function') at = rng.getRow();
+        } catch(e){}
+        var D = presets && presets.Direction;
+        var dir = below ? ((D && D.DOWN != null) ? D.DOWN : 1) : ((D && D.UP != null) ? D.UP : 0);
+        api.executeCommand('sheet.command.insert-row', {
+          unitId: 'equity-report', subUnitId: sid,
+          range: { startRow: at, endRow: at + n - 1, startColumn: 0, endColumn: 9 },
+          direction: dir
+        });
+        dirty = true; scheduleSave();     /* 插入算数据改动，走自动保存 */
+      } catch(e){ console.warn('[equity] insert-row', e); }
+    }
+    function eq_menuInsertRows(inp, kind){
+      var n = parseInt(String((inp && inp.value) || '1').replace(/[^0-9]/g, ''), 10);
+      if (!(n >= 1)) n = 1;
+      eq_closeUniverMenu();
+      var below = (kind !== 'above');
+      eq_insertRows(n, below);
+      try { if (inp && inp.blur) inp.blur(); } catch(e){}
+      eq_focusSheet();
+    }
+    function eq_closeUniverMenu(){
+      try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true })); } catch(e){}
+      try { document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); } catch(e){}
+    }
+    function eq_focusSheet(){
+      try { var c = document.getElementById('equity_container'); if (c && c.focus) c.focus(); } catch(e){}
+    }
+    function eq_onContextMenu(e){
+      eqActive = !!(eq_containerOf(e) || (e && e.target && (e.target.id === 'equity_container' || (e.target.classList && e.target.classList.contains('univer-container')))));
+      if (!eqActive) return;
+      [0, 40, 120, 260].forEach(function(d){ setTimeout(function(){ eqPatchInsertRowMenu(); }, d); });
+      eqMenuInsRounds++;
+      eq_menuWatchStart();
+      if (eqMenuObsStopTimer) clearTimeout(eqMenuObsStopTimer);
+      eqMenuObsStopTimer = setTimeout(eq_menuWatchStop, 15000);
+      eq_menuInsRefresh();
+    }
+    function eq_menuWatchStart(){
+      try {
+        if (eqMenuObs) return;
+        if (!window.MutationObserver) return;
+        eqMenuObs = new MutationObserver(function(muts){
+          var hit = false;
+          for (var i = 0; i < muts.length && !hit; i++){
+            var added = muts[i].addedNodes;
+            for (var j = 0; j < added.length; j++){
+              var n = added[j];
+              if (!n || n.nodeType !== 1) continue;
+              var cn = String(n.className || '');
+              if (/menu/i.test(cn) || n.tagName === 'LI' || n.tagName === 'UL'){ hit = true; break; }
+            }
+          }
+          if (!hit || eqMenuObsTimer) return;
+          eqMenuObsTimer = setTimeout(function(){ eqMenuObsTimer = null; eqPatchInsertRowMenu(); }, 30);
+        });
+        eqMenuObs.observe(document.body, { childList: true, subtree: true });
+      } catch(e){ eqMenuObs = null; }
+    }
+    function eq_menuWatchStop(){
+      try { if (eqMenuObs) eqMenuObs.disconnect(); } catch(e){}
+      eqMenuObs = null;
+      if (eqMenuObsTimer){ clearTimeout(eqMenuObsTimer); eqMenuObsTimer = null; }
+      if (eqMenuObsStopTimer){ clearTimeout(eqMenuObsStopTimer); eqMenuObsStopTimer = null; }
+    }
+    function eq_bindContextMenuOnce(){
+      if (window.__eqCtxMenuBound) return;
+      window.__eqCtxMenuBound = true;
+      document.addEventListener('contextmenu', eq_onContextMenu, true);
+      document.addEventListener('mousedown', function(e){
+        if (e && e.button === 2){ eq_onContextMenu(e); return; }
+        try {
+          var a = document.activeElement;
+          if (a && a.classList && a.classList.contains('eq-menu-ins-input')){
+            var box = a.closest ? a.closest('.eq-menu-ins-item') : null;
+            if (!box || !box.contains(e.target)){
+              a.blur();
+              setTimeout(function(){ eq_focusSheet(); }, 0);
+            }
+          }
+        } catch(_e){}
+      }, true);
+      /* ★EQ-EXCEL-SELALL-20261016：右键菜单里那条「选择全部」点了没反应
+         （Univer 的 sheet.command.select-all 跑到了财务报表那张不可见的工作簿上）。
+         这里在【捕获阶段】拦下这次点击，改跑我们自己的 eqSelectAll()（显式作用在权益自己的
+         工作表上），然后关掉菜单；stopPropagation 同时阻止 Univer 再执行那条跑错地方的命令。
+         只认权益容器里触发的这一次右键（eqActive 由 eq_onContextMenu 设置），财务页不受影响。 */
+      document.addEventListener('click', function(e){
+        try {
+          if (!eqActive) return;
+          var t = e && e.target; if (!t) return;
+          var li = (t.closest && (t.closest('li') || t.closest('[role="menuitem"]') || t.closest('button'))) || t;
+          if (li && li.classList && li.classList.contains('eq-menu-ins-item')) return;   /* 我们自己注入的行插入项 */
+          /* 保险：只认「确实挂在某个菜单容器里」的那一项。
+             否则页面其它地方叫「全选」的控件（比如面板上的全选复选框）会被误伤。 */
+          var inMenu = false;
+          for (var p = li; p && p !== document.body; p = p.parentNode){
+            var cn = String((p.getAttribute && p.getAttribute('class')) || '');
+            if (/menu|dropdown|popup/i.test(cn)) { inMenu = true; break; }
+          }
+          if (!inMenu) return;
+          var label = String((li && li.textContent) || '').replace(/\s+/g, ' ').trim();
+          var w = EQ_SELALL_WORD || /(选择全部|全部选择|全选|select\s*all|chọn\s*tất\s*cả)/i;
+          if (!label || !w.test(label)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          eqSelectAll();
+          eqActive = false;            /* 一次右键只接管一次点击 */
+          try { eq_closeUniverMenu(); } catch(_1){}
+          try { eq_focusSheet(); } catch(_2){}
+        } catch(_3){}
+      }, true);
+      /* ★★EQ-SHEET-LOCK-20261017（用户 2026-10-17：工作薄锁死，只有 tom/cuong/james 可删）★★
+         工作表标签（sheet-bar）右键菜单里的「删除工作表」——非三人组一律在捕获阶段拦掉，
+         连 Univer 的确认框都不弹（比命令级拦截更早，用户完全看不到入口）。
+         标签栏菜单的容器 class 是 .univer-sheet-bar-menu（已从 Univer 源码核实），
+         所以这个监听只认挂在标签菜单里的项，不会误伤单元格右键的「删除行/列」。 */
+      document.addEventListener('click', function(e){
+        try {
+          if (eqIsTriAdmin()) return;
+          var t = e && e.target; if (!t || !t.closest) return;
+          var host = t.closest('.univer-sheet-bar-menu, [class*="sheet-bar-menu"]');
+          if (!host) return;                                  /* 不是工作表标签菜单 → 不干预 */
+          var li = t.closest('li') || t.closest('[role="menuitem"]') || t.closest('button') || t;
+          var label = String((li && li.textContent) || '').replace(/\s+/g, ' ').trim();
+          if (!/(删除工作表|删除工作簿|删除表格|delete\s*sheet|x\u00f3a)/i.test(label)) return;
+          e.preventDefault();
+          e.stopPropagation();                               /* 拦住，Univer 的菜单项不执行 */
+          try { eq_closeUniverMenu(); } catch(_4){}
+        } catch(_5){}
+      }, true);
+    }
+
+    function eqSheetObj(){
+      try { var wb = api && api.getActiveWorkbook && api.getActiveWorkbook();
+            return (wb && wb.getActiveSheet) ? wb.getActiveSheet() : null; } catch(e){ return null; }
+    }
+    /* 是否正在编辑单元格：编辑覆盖层 .univer-editor-container 空闲时约 2×2，编辑后变成单元格大小 */
+    function eqIsEditingCell(){
+      try {
+        /* ★★EQ-EDIT-SCOPE-20261017★★ 只扫【股东权益自己的容器】：全局扫描会被财务报表
+           那边的编辑覆盖层带偏，导致权益表恒判"编辑中" → Ctrl+C/X 补写被跳过。
+           见 finIsEditingCell 里同一处说明。 */
+        var host = document.getElementById('equity_container') || document;
+        var boxes = host.querySelectorAll('.univer-editor-container');
+        for (var i = 0; i < boxes.length; i++) {
+          var r = boxes[i].getBoundingClientRect();
+          if (r.width > 10 && r.height > 10) return true;
+        }
+      } catch(e){}
+      return false;
+    }
+    function eqActiveCell(){
+      try {
+        var sh = eqSheetObj(); if (!sh) return null;
+        var sel = sh.getSelection && sh.getSelection();
+        var ar = sel && sel.getActiveRange && sel.getActiveRange();
+        if (!ar) return null;
+        return { row: ar.getRow(), col: ar.getColumn() };
+      } catch(e){ return null; }
+    }
+    function eqVisibleRange(){
+      try {
+        var sh = eqSheetObj(); if (!sh) return null;
+        var vr = sh.getVisibleRange && sh.getVisibleRange();
+        if (!vr) return null;
+        if (typeof vr.startRow === 'number' && typeof vr.endRow === 'number') {
+          return { startRow: vr.startRow, endRow: vr.endRow, startColumn: vr.startColumn, endColumn: vr.endColumn };
+        }
+        if (vr.getRow && vr.getNumRows) {
+          var r0 = vr.getRow(), c0 = vr.getColumn();
+          return { startRow: r0, endRow: r0 + vr.getNumRows() - 1,
+                   startColumn: c0, endColumn: c0 + vr.getNumColumns() - 1 };
+        }
+      } catch(e){}
+      return null;
+    }
+    function eqScrollState(){
+      try {
+        var sh = eqSheetObj(); if (!sh || !sh.getScrollState) return null;
+        var s = sh.getScrollState();
+        if (!s) return null;
+        return { row: s.sheetViewStartRow || 0, col: s.sheetViewStartColumn || 0 };
+      } catch(e){ return null; }
+    }
+    function eqScrollTo(startRow, startCol){
+      try {
+        var sh = eqSheetObj(); if (!sh || !sh.scrollToCell) return false;
+        if (startRow < 0) startRow = 0;
+        if (startCol < 0) startCol = 0;
+        sh.scrollToCell(startRow, startCol);
+        return true;
+      } catch(e){ return false; }
+    }
+    function eqScrollToSoon(startRow, startCol){
+      var run = function(){ try { eqScrollTo(startRow, startCol); } catch(e){} };
+      try { requestAnimationFrame(run); } catch(e){}
+      setTimeout(run, 60);
+    }
+    function eqEnsureVisible(){
+      try {
+        var cur2 = eqActiveCell(); if (!cur2) return;
+        var vr = eqVisibleRange(); if (!vr) return;
+        var ss = eqScrollState(); if (!ss) return;
+        var nsr = ss.row, nsc = ss.col;
+        if (cur2.row > vr.endRow) nsr = ss.row + (cur2.row - vr.endRow);
+        else if (cur2.row < vr.startRow) nsr = ss.row - (vr.startRow - cur2.row);
+        if (typeof vr.endColumn === 'number') {
+          if (cur2.col > vr.endColumn) nsc = ss.col + (cur2.col - vr.endColumn);
+          else if (cur2.col < vr.startColumn) nsc = ss.col - (vr.startColumn - cur2.col);
+        }
+        if (nsr < 0) nsr = 0;
+        if (nsc < 0) nsc = 0;
+        if (nsr !== ss.row || nsc !== ss.col) eqScrollTo(nsr, nsc);
+      } catch(e){}
+    }
+    function eqLastUsedCell(){
+      try {
+        var sh = eqSheetObj(); if (!sh) return null;
+        var lr = (typeof sh.getLastRow === 'function') ? sh.getLastRow() : null;
+        var lc = (typeof sh.getLastColumn === 'function') ? sh.getLastColumn() : null;
+        if (typeof lr === 'number' && typeof lc === 'number' && lr >= 0 && lc >= 0) return { row: lr, col: lc };
+        var rng = sh.getDataRange && sh.getDataRange();
+        if (!rng || !rng.getValues) return null;
+        var v = rng.getValues(); if (!v || !v.length) return null;
+        var r0 = rng.getRow ? rng.getRow() : 0, c0 = rng.getColumn ? rng.getColumn() : 0;
+        for (var i = v.length - 1; i >= 0; i--) {
+          var row = v[i] || [];
+          for (var j = row.length - 1; j >= 0; j--) {
+            var val = row[j];
+            if (val !== null && val !== undefined && val !== '') return { row: r0 + i, col: c0 + j };
+          }
+        }
+      } catch(e){}
+      return null;
+    }
+    function eqRowLastCol(row){
+      try {
+        var sh = eqSheetObj(); if (!sh) return 0;
+        var maxC = (typeof sh.getMaxColumns === 'function') ? sh.getMaxColumns() : 0;
+        var lastC = (typeof sh.getLastColumn === 'function') ? sh.getLastColumn() : 0;
+        if (maxC > 0 && lastC > maxC - 1) lastC = maxC - 1;
+        if (lastC <= 0) return 0;
+        var vals = sh.getRange(row, 0, 1, lastC + 1).getValues();
+        var r = vals && vals[0]; if (!r) return 0;
+        for (var c = r.length - 1; c >= 0; c--) {
+          var v = r[c];
+          if (v !== null && v !== undefined && v !== '') return c;
+        }
+      } catch(e){}
+      return 0;
+    }
+    /* 边界判定唯一来源：声明行列数 与 最后有数据行列+1 取大者 */
+    function eqSheetSize(){
+      try {
+        var sh = eqSheetObj(); if (!sh) return null;
+        var r = (sh.getMaxRows ? sh.getMaxRows() : 0) || 0;
+        var c = (sh.getMaxColumns ? sh.getMaxColumns() : 0) || 0;
+        try {
+          var lr = (typeof sh.getLastRow === 'function') ? sh.getLastRow() : -1;
+          var lc = (typeof sh.getLastColumn === 'function') ? sh.getLastColumn() : -1;
+          if (typeof lr === 'number' && lr >= 0) r = Math.max(r, lr + 1);
+          if (typeof lc === 'number' && lc >= 0) c = Math.max(c, lc + 1);
+        } catch(e2){}
+        return { rows: r, cols: c };
+      } catch(e){ return null; }
+    }
+    function eqPageRows(){
+      try {
+        var vr = eqVisibleRange();
+        if (vr && typeof vr.endRow === 'number') {
+          var n = vr.endRow - vr.startRow;
+          if (n >= 1) return n;
+        }
+        return 0;   /* 股东权益表不需要兜底算法，量不到就不接管 PageUp/PageDown */
+      } catch(e){ return 0; }
+    }
+    function eqGotoCell(row, col){
+      try {
+        var sh = eqSheetObj(); if (!sh) return false;
+        var sz = eqSheetSize() || {};
+        var maxR = sz.rows || 100000;
+        var maxC = sz.cols || 200;
+        if (row < 0) row = 0;
+        if (col < 0) col = 0;
+        if (row > maxR - 1) row = maxR - 1;
+        if (col > maxC - 1) col = maxC - 1;
+        var rng = sh.getRange(row, col);
+        if (rng && rng.activate) rng.activate();
+        else if (sh.setActiveRange) sh.setActiveRange(rng);
+        eqRememberCur({ row: row, col: col });
+        return true;
+      } catch(e){ return false; }
+    }
+    /* ★EQ-EXCEL-SELALL-20261016（用户 2026-10-16：「快捷键还是没有用，包括鼠标右键点击出现的
+       弹出框，选择全部功能也没作用」）：
+       现象：Ctrl+A 与右键菜单「选择全部」都像没反应。
+       根因（Univer 0.5.5 sheets-ui 产物实测，非猜测）：
+         · 全选的命令 id = 'sheet.command.select-all'，快捷键 = A + CTRL_COMMAND
+           （shortcut.sheet.select-all，group 3_sheet-view）；
+         · 但它的 handler 内部取的是【当前活动工作簿】：
+             `je(e.get(W))` = IUniverInstanceService.getCurrentUnitForType(UNIVER_SHEET)，
+             再用 kr(e).getCurrentLastSelection() 取选区。
+           本页同时存在两套 Univer 实例（财务 univer_container + 权益 equity_container），
+           权益容器里的右键/点击并没有让权益单元成为"当前单元"，于是这条命令作用到了
+           【财务报表】那张不可见的工作簿上 —— 看起来就是"点了没反应"。
+           （与之前"在权益表插入行却插到财务报表"是同一类根因。）
+       做法：不再依赖"当前单元"，而是【显式拿权益自己的 Worksheet】框选整张表 ——
+         sh.getRange(0,0,maxRows,maxCols).activate() 是按对象作用的，天然只影响权益。
+       绑定两处：① 非编辑态 Ctrl+A / ⌘A；② 右键菜单里那条「选择全部」的点击（按三语文案识别）。 */
+    function eqSelectAll(){
+      try {
+        var sh = eqSheetObj(); if (!sh) return 0;
+        var sz = eqSheetSize() || {};
+        var maxR = (sz.rows > 0) ? sz.rows : ((sh.getMaxRows && sh.getMaxRows()) || 0);
+        var maxC = (sz.cols > 0) ? sz.cols : ((sh.getMaxColumns && sh.getMaxColumns()) || 0);
+        if (!(maxR > 0)) maxR = 1;
+        if (!(maxC > 0)) maxC = 1;
+        var rng = sh.getRange(0, 0, maxR, maxC);
+        if (rng && rng.activate) rng.activate();
+        else if (sh.setActiveRange && rng) sh.setActiveRange(rng);
+        eqRememberCur({ row: 0, col: 0 });
+        try { eq_statSchedule(); } catch(e){}     /* 统计栏跟着刷新（走既有的 debounce） */
+        return maxR * maxC;
+      } catch(e){ return 0; }
+    }
+    /* 「选择全部」菜单项的三语文案（Univer 菜单文案随界面语言走）：
+       zh 选择全部 / 全部选择 / 全选 · en Select all · vi Chọn tất cả */
+    var EQ_SELALL_WORD = /(选择全部|全部选择|全选|select\s*all|chọn\s*tất\s*cả|chon\s*tat\s*ca)/i;
+    /* Ctrl+方向键 = Excel 的数据边界语义 */
+    function eqDataEdge(dr, dc, base){
+      try {
+        var sh = eqSheetObj(); if (!sh) return null;
+        var cur2 = base || eqActiveCell(); if (!cur2) return null;
+        var maxR = (sh.getMaxRows ? sh.getMaxRows() : 1) - 1;
+        var maxC = (sh.getMaxColumns ? sh.getMaxColumns() : 1) - 1;
+        var isV = (dr !== 0);
+        var limit = isV ? maxR : maxC;
+        var from = isV ? cur2.row : cur2.col;
+        var fixed = isV ? cur2.col : cur2.row;
+        var dir = isV ? dr : dc;
+        var step = dir > 0 ? 1 : -1;
+        function hasAt(i){
+          try {
+            var rng = isV ? sh.getRange(i, fixed) : sh.getRange(fixed, i);
+            var v = rng && rng.getValue ? rng.getValue() : null;
+            return !(v === null || v === undefined || v === '');
+          } catch(e){ return false; }
+        }
+        var scanned = 0;
+        var i = from + step;
+        if (i < 0 || i > limit) return null;
+        var neighborHas = hasAt(i);
+        var last = null;
+        while (i >= 0 && i <= limit && scanned < EQ_EDGE_SCAN) {
+          scanned++;
+          var has = hasAt(i);
+          if (neighborHas) { if (!has) break; last = i; }
+          else { if (has) { last = i; break; } }
+          i += step;
+        }
+        if (scanned >= EQ_EDGE_SCAN) return null;
+        var target = (last === null) ? limit : last;
+        return isV ? { row: target, col: cur2.col } : { row: cur2.row, col: target };
+      } catch(e){ return null; }
+    }
+    function eqRememberCur(c){ if (c && typeof c.row === 'number') eqPrevCur = { row: c.row, col: c.col }; }
+    function eqRememberSoon(){ setTimeout(function(){ try { eqRememberCur(eqActiveCell()); } catch(e){} }, 0); }
+    function eqContainer(){
+      try { return document.getElementById('equity_container'); } catch(e){ return null; }
+    }
+
+    /* ★单击打字直接进入编辑（Excel 行为：直接覆盖原内容，光标落在字符后面）。
+       为什么不能像之前那样「打开编辑器再塞字符」—— 源码实测（sheets-ui 0.5.5）：
+         _handleEditorVisible 里：eventType=Keyboard 且 keycode≠F2 → 【清空】编辑器内容并把光标放到 0，
+         之后再靠 execCommand('selectAll'+'insertText') 补字符，对数字总是落空（正是「数字打不进去」的 BUG）；
+         eventType=Dblclick → 载入当前格内容 + 光标落到末尾。
+       所以改成确定性两步：
+         ① 先用 set-range-values 把字符写进当前格（数字列自然落成数值，文本落成字符串）；
+         ② 再用 eventType=Dblclick(3)【不带 keycode】打开编辑器 → 载入刚写入的内容 + 光标在末尾，
+            之后的按键走 Univer 原生输入流（编辑态我们一律交回）。 */
+    function eqSubUnitId(sh){
+      try { var s = sh && sh.getSheetId && sh.getSheetId(); if (s) return s; } catch(e){}
+      try { var ws = sh && sh.getSheet && sh.getSheet(); var s2 = ws && ws.getSheetId && ws.getSheetId(); if (s2) return s2; } catch(e){}
+      return null;
+    }
+    function eqTypeToEdit(e){
+      var ch = e.key;
+      var sh = eqSheetObj(); if (!sh) return;
+      var cur = eqActiveCell(); if (!cur) return;
+      var isNum = (typeof ch === 'string' && ch.length === 1 && ch >= '0' && ch <= '9');
+      try {
+        var wb = api && api.getActiveWorkbook && api.getActiveWorkbook();
+        var uid = (wb && wb.getId && wb.getId()) || 'equity-report';
+        var m = {}; m[cur.row] = {}; m[cur.row][cur.col] = { v: isNum ? Number(ch) : ch, t: isNum ? 2 : 1, f: null };
+        api.executeCommand('sheet.command.set-range-values',
+          { unitId: uid, subUnitId: eqSubUnitId(sh), value: m });
+        if (window.__eqKeyDebug) console.log('[eq-key] write', JSON.stringify({ ch: ch, row: cur.row, col: cur.col }));
+      } catch(err){}
+      /* ★eventType:3 = DeviceInputEventType.Dblclick；★不传 keycode（传了会被当方向键/快捷键解释） */
+      setTimeout(function(){
+        try {
+          var wb2 = api && api.getActiveWorkbook && api.getActiveWorkbook();
+          var uid2 = (wb2 && wb2.getId && wb2.getId()) || 'equity-report';
+          api.executeCommand('sheet.operation.set-cell-edit-visible', { visible: true, eventType: 3, unitId: uid2 });
+        } catch(err){}
+        setTimeout(function(){
+          if (window.__eqKeyDebug) console.log('[eq-key] editing=' + eqIsEditingCell());
+        }, 150);
+      }, 40);
+    }
+
+    /* ★EQ-EDIT-ARROW-20261016（用户 2026-10-16：输入模式下光标在最右侧时按 → 直接换单元格了）：
+       期望行为（用户拍板 B）= 「光标先照常在文字里往右走，走到文本末尾之后再按一次 → 才跳右格」。
+       根因（Univer 0.5.5 sheets-ui 源码 + 探针 v13/v18 实测，非猜测）：
+         ① 编辑态方向键走 sheet.operation.set-cell-edit-visible-arrow 这条快捷键；sheets-ui 的
+            _commandExecutedListener 判定 `keycode != null && (_cursorChange === 2 || FOCUSING_FX_BAR_EDITOR)`
+            → 才执行 _moveInEditor（把文字光标右移一格）；否则执行 changeVisible（收起编辑框 +
+            选区按方向移一格 = 换格）。_cursorChange === 2 只在 PointerDown / Dblclick 进入编辑时才置位
+            （DeviceInputEventType 实测：PointerMove=0 PointerDown=1 PointerUp=2 Dblclick=3 Keyboard=4），
+            所以键盘打字/F2 进来后按 → 的原生行为是「换格」。
+         ② ★我们这套 keydown 监听虽然在【捕获阶段】，但它注册得比 Univer 的监听晚 —— Univer 的监听
+            同样在 window 上、更早注册（探针 v18 铁证：一次按 →，日志里先出现 Univer 移动后的光标 3，
+            再出现我们自己派发的结果 4，即光标一次跳两格）。也就是说：**Univer 永远先动光标**，
+            我们 preventDefault / stopPropagation 拦不住它。
+       做法（只动 →，不影响 ← / ↑↓ / 其它锁定逻辑）：配合 Univer，而不是跟它抢：
+         · 本次按键里编辑器发过 doc.operation.set-selections（= Univer 刚动过光标），
+           且【动之前】光标不在末尾 → 什么都不做（它已经把光标右移了一格，正是要的效果）；
+         · 动之前光标就已经在末尾（或本次它根本没发事件）→ 我们自己关编辑器：
+           set-cell-edit-visible{visible:false, eventType:4=Keyboard, keycode:39=→, unitId}
+           —— 这条就是 ENTER/TAB/ESC 的原生绑定，会走 _handleEditorInvisible：
+              提交值(_submitCellData) + 按 keycode 移动选区(_moveCursor) = 「退出编辑 + 右移一格」。
+         · 拿不到光标/文本末尾 → 原样交回 Univer（绝不吞键），异常一律 fail-open。
+       ★绝不自己再派发一次 move-cursor（旧写法就是这么跳两格的）。
+       ★已知残留：若用户是用【Backspace】进入编辑（Univer 自带的"清空并开始编辑"快捷链传的是
+         eventType=Keyboard=4 → _cursorChange=1），Univer 在文字中间按 → 也会走 changeVisible 直接换格，
+         我们排在上游拦不住（不改它，是因为把 _cursorChange 硬掰成 2 需要重新 changeVisible(visible:true)，
+         而那条路径会把 editorDirty 复位 → 退出时被判成 ESC → 用户刚打的字会丢，风险远大于收益）。 */
+    var eqEditSel = null;            /* 最近一次 doc.operation.set-selections 的光标偏移 */
+    var eqEditSelPrev = null;        /* 再上一次的光标偏移（本次按键前那个值） */
+    var eqEditSelAt = 0;             /* 最近一次光标事件的时间戳 */
+    var EQ_EDIT_EDGE_MS = 12;        /* 「本次按键里编辑器动过光标」的判定窗口（实测 1~2ms） */
+    var eqEditCore = null;           /* @univerjs/core（importmap 单一模块实例，与引擎同一份） */
+    var eqEditCoreLoading = false;
+    try { window.__eqArrowCopy = (window.__eqArrowCopy || 0) + 1; } catch(e){}
+    function eqArrowNow(){ try { return (window.performance && performance.now) ? performance.now() : Date.now(); } catch(e){ return 0; } }
+    /* 排障用（用户截图/描述时可直接看 window.__eqArrowDebug）：moved=自己移动光标次数，
+       exitEnd=光标已在末尾时自己关编辑器次数，handedBack=交回 Univer 的次数，core=core 模块是否拿到，
+       sel/end=光标/文本末尾偏移，selAtKey=按键那一刻的光标，err=异常信息 */
+    function eqArrowLog(k, v){ try { window.__eqArrowDebug = window.__eqArrowDebug || { moved:0, exitEnd:0, handedBack:0, core:0, sel:-1, end:-1, err:null }; if (k) window.__eqArrowDebug[k] = v; } catch(e){} }
+    function eqEditCoreLoad(){
+      if (eqEditCore || eqEditCoreLoading) return;
+      eqEditCoreLoading = true;
+      try {
+        eqArrowLog('core', 0);
+        Promise.resolve().then(function(){ return import('@univerjs/core'); }).then(function(m){
+          eqEditCore = m || null;
+          eqArrowLog('core', eqEditCore ? 1 : 0);
+        }, function(err){ eqEditCoreLoading = false; eqArrowLog('err', 'core-load:' + err); });
+      } catch(e){ eqEditCoreLoading = false; eqArrowLog('err', 'core-load:' + e); }
+    }
+    /* 订阅命令流拿"光标在哪"：编辑器的每次光标移动/输入都会发 doc.operation.set-selections，
+       参数里带 ranges[0].startOffset/endOffset（实测：F2 后 = 文本末尾；按 ← 两次 = 末尾-2）。 */
+    function eqEditSelBind(){
+      try {
+        if (window.__eqEditSelBound) return;
+        if (!api || typeof api.onCommandExecuted !== 'function') { eqArrowLog('err', 'sel-bind:no-api'); return; }
+        api.onCommandExecuted(function(evt){
+          try {
+            var id = String((evt && evt.id) || '');
+            if (id !== 'doc.operation.set-selections') return;
+            /* 只认【单元格编辑器】那个文档单元（公式栏是另一个单元，别把它当成本格光标） */
+            var u = evt.params || {};
+            var want = (eqEditCore && eqEditCore.DOCS_NORMAL_EDITOR_UNIT_ID_KEY) || '__INTERNAL_EDITOR__DOCS_NORMAL';
+            if (u.unitId && String(u.unitId) !== String(want)) return;
+            var rg = (u.ranges || [])[0];
+            if (!rg) return;
+            var s = rg.startOffset, e2 = rg.endOffset;
+            if (typeof s === 'number' && typeof e2 === 'number') {
+              eqEditSelPrev = eqEditSel;                       /* ★EQ-EDIT-ARROW：留住"本次事件之前"的光标 */
+              eqEditSel = { s: s, e: Math.max(s, e2) };
+              eqEditSelAt = eqArrowNow();
+              eqArrowLog('sel', eqEditSel.e);
+              try { (window.__eqArrowLog = window.__eqArrowLog || []).push(Math.round(performance.now()) + ':' + eqEditSel.e + ':' + (u.isEditing ? 1 : 0)); if (window.__eqArrowLog.length > 80) window.__eqArrowLog.shift(); } catch(e){}
+            }
+          } catch(e){}
+        });
+        window.__eqEditSelBound = true;
+      } catch(e){ eqArrowLog('err', 'sel-bind:' + e); }
+    }
+    /* 编辑器文档的"文本末尾"偏移：dataStream 形如 "VND\r\n"（末尾两个字符是段落符，不是内容） */
+    function eqEditTextEnd(){
+      try {
+        if (!eqEditCore || !eqEditCore.IUniverInstanceService) { eqArrowLog('err', 'textEnd:no-core'); return -1; }
+        if (!univer || typeof univer.__getInjector !== 'function') { eqArrowLog('err', 'textEnd:no-univer'); return -1; }
+        var us = univer.__getInjector().get(eqEditCore.IUniverInstanceService);
+        var doc = us && us.getUnit(eqEditCore.DOCS_NORMAL_EDITOR_UNIT_ID_KEY);
+        var snap = doc && doc.getSnapshot && doc.getSnapshot();
+        var ds = snap && snap.body && snap.body.dataStream;
+        if (typeof ds !== 'string') { eqArrowLog('err', 'textEnd:no-datastream'); return -1; }
+        var end = Math.max(0, ds.length - 2);
+        eqArrowLog('end', end);
+        return end;
+      } catch(e){ eqArrowLog('err', 'textEnd:' + e); return -1; }
+    }
+    /* ★EQ-EDIT-ARROW-20261016：光标已在文本末尾时，「再按一次 →」的原生语义 =
+       退出编辑（提交值）+ 单元格选区右移一格。
+       实现 = 执行 Univer 自己的命令 sheet.operation.set-cell-edit-visible（就是 ENTER/TAB/ESC 的原生绑定），
+       只是把 keycode 换成 39（ARROW_RIGHT）：
+         { visible:false, eventType:4（=Xe.Keyboard）, keycode:39（=z.ARROW_RIGHT）, unitId }
+       链路（sheets-ui 源码）：命令 handler → editorBridgeService.changeVisible(params) →
+         visible$ 订阅 → 核心类 _handleEditorInvisible(params)：
+           getEditorDirty() !== false（我们打过字 → 是 true）
+             → _submitCellData(snapshot)：提交编辑器内容到单元格
+             → _moveCursor(39)：ARROW_RIGHT → 原生把选区右移一格
+       ★eventType 必须是 4：engine-render 的 DeviceInputEventType = {PointerMove:0, PointerDown:1,
+         PointerUp:2, Dblclick:3, Keyboard:4}；传错不会崩，但语义就不对了。 */
+    function eqEndEditMoveRight(){
+      try {
+        var wb = api && api.getActiveWorkbook && api.getActiveWorkbook();
+        var uid = (wb && wb.getId && wb.getId()) || 'equity-report';
+        var pr = api.executeCommand('sheet.operation.set-cell-edit-visible',
+                    { visible: false, eventType: 4, keycode: 39, unitId: uid });
+        if (pr && typeof pr.then === 'function') pr.catch(function(){});   /* ★绝不冒未处理拒绝 */
+        return true;
+      } catch(e){ eqArrowLog('err', 'endEdit:' + e); return false; }
+    }
+
+    /* ============★★ 锁死区 ★★ WIN-CLIP-WRITE-LOCK-20261017 ============
+       用户 2026-10-17（原话）：「只要你修改，Ctrl+C, Ctrl+X, Ctrl+V 这个功能就立即丢失！根因？
+       保证锁死，一定要锁死这个逻辑，不能再丢了！」
+       根因：财务（finExcelKeysBind）与股东权益（eqExcelKeysBind）是【两套独立】的键盘补丁。
+             之前只在财务那套里加了「放行 + execCommand 补写」，权益这套从来没有 →
+             用户在股东权益表里每改一次都发现复制粘贴没了。
+       本函数是【两套共用】的唯一写剪贴板入口，任何一侧都不得再各自实现一份：
+         · 同步 document.execCommand('copy')：在 keydown 的 user gesture 同步栈里必然允许，
+           不依赖 https/localhost 安全上下文，也不依赖 clipboard 权限
+           （Univer 自己走 navigator.clipboard.write()，会被 NotAllowedError 拒绝且被静默吞掉）；
+         · 结束必须把焦点还原给原 activeElement（textarea.select() 会抢焦点，
+           否则之后方向键/回车全打到 body 上，表格像"死了"一样）。
+       检查：check_fin_excel_keys_lock.py 不变量⑧ 会同时校验财务与权益两处接线。 */
+    /* ============★★ 锁死区 ★★ CLIP-FMT-LOCK-20261017 ============
+       用户 2026-10-17（原话）：「复制的时候，货币符号也必须复制！」
+       作用：把数值按单元格的 numfmt pattern 还原成【屏幕上看到的文本】，
+             复制出去才有 ₫799,056,508 / ¥1,234.00，而不是裸数字 799056508。
+       规则：
+         · 只处理 number；字符串/布尔/空值原样返回；
+         · 货币符号取 pattern 开头的 "..."（本项目货币格式一律【符号在左】）；
+         · 小数位 = pattern 里 .0 / .00 的个数；
+         · 千位分隔始终加（屏幕上就是带千位符的）；
+         · ★负数按 Excel 语义：负号在最前，再跟货币符号 → -₫1,000（不是 ₫-1,000）；
+         · 日期/时间格式（pattern 含 y/m/d）与百分比（含 %）单独处理：
+           日期原样返回（值是序列号，加了千位符就变成错的），百分比按 ×100 后加 %。
+       ★任何重构都不得退化成"直接返回原始值"，否则又会退回裸数字。 */
+    window.win_fmtNum = function(v, pat){
+      if (v == null || v === '') return '';
+      if (typeof v !== 'number' || !isFinite(v)) return String(v);
+      if (!pat) return String(v);
+      var bare = String(pat).replace(/"[^"]*"/g, '');      /* 去掉引号里的字面量再判断类型 */
+      if (/^general$/i.test(String(pat).trim())) return String(v);   /* General：屏幕上就是原样数字 */
+      if (/[ymd]/i.test(bare)) return String(v);           /* 日期/时间：值是序列号，不能套数字格式 */
+      var sym = '';
+      var m = /^\s*"([^"]*)"/.exec(pat);
+      if (m) sym = m[1] || '';
+      var d = /\.(0+)/.exec(pat);
+      var digits = d ? d[1].length : 0;
+      if (/%/.test(bare)) return (v * 100).toFixed(digits) + '%';
+      var neg = v < 0;
+      var abs = Math.abs(v);
+      var body = digits > 0 ? abs.toFixed(digits) : String(Math.round(abs));
+      var parts = body.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      body = parts.join('.');
+      if (!sym) return (neg ? '-' : '') + body;
+      return (neg ? '-' : '') + sym + body;
+    };
+
+    /* ★CLIP-ENGINE-20261018：全局 win_clipWrite 统一交给引擎（两张表同一套写入逻辑）。 */
+    window.win_clipWrite = function(text){
+      try { return !!(window.__clipEngine && window.__clipEngine.write(text)); } catch(err){ return false; }
+    };
+
+    /* 股东权益：把当前选区序列化成 TSV（与财务同口径：优先多区域，兜底活动单元格） */
+    function eq_clipMatrixText(){
+      try {
+        var sh = eqSheetObj(); if (!sh) return '';
+        var ranges = [];
+        try {
+          var sel = (sh.getSelection && sh.getSelection()) || null;
+          var rs = (sel && sel.getRanges && sel.getRanges()) || null;
+          if (rs && rs.length){
+            for (var i = 0; i < rs.length; i++){
+              var r0 = rs[i]; if (!r0) continue;
+              var rr0 = (typeof r0.getRow === 'function') ? r0.getRow() : r0.startRow;
+              var cc0 = (typeof r0.getColumn === 'function') ? r0.getColumn() : r0.startColumn;
+              var nr0 = (typeof r0.getNumRows === 'function') ? r0.getNumRows() : (r0.endRow - r0.startRow + 1);
+              var nc0 = (typeof r0.getNumColumns === 'function') ? r0.getNumColumns() : (r0.endColumn - r0.startColumn + 1);
+              if (nr0 > 0 && nc0 > 0) {
+                ranges.push({ startRow: rr0, startColumn: cc0, endRow: rr0 + nr0 - 1, endColumn: cc0 + nc0 - 1 });
+              }
+            }
+          }
+        } catch(err){}
+        /* ★EQ-CLIP-RANGE-20261018：全选/大框选时 getRanges() 常只给"活动格" → getActiveRange().getRange() 实测能返回正确范围，用它兜底（取面积更大的那个） */
+        try {
+          var _selE = (sh.getSelection && sh.getSelection()) || null;
+          var _arE = (_selE && _selE.getActiveRange && _selE.getActiveRange()) || null;
+          var _gE = (_arE && typeof _arE.getRange === 'function') ? _arE.getRange() : null;
+          if (_gE && _gE.startRow != null && _gE.endRow != null && _gE.startColumn != null && _gE.endColumn != null){
+            var _aSzE = (_gE.endRow - _gE.startRow + 1) * (_gE.endColumn - _gE.startColumn + 1);
+            var _cSzE = 0;
+            for (var _zE = 0; _zE < ranges.length; _zE++){
+              _cSzE += (ranges[_zE].endRow - ranges[_zE].startRow + 1) * (ranges[_zE].endColumn - ranges[_zE].startColumn + 1);
+            }
+            if (_aSzE > _cSzE){ ranges = [{ startRow: _gE.startRow, startColumn: _gE.startColumn, endRow: _gE.endRow, endColumn: _gE.endColumn }]; }
+          }
+        } catch(errE){}
+        if (!ranges.length){
+          /* ★CLIP-COPY-EMPTY-20261018：null = 没有选区（不做任何事）；'' = 有选区但内容空（照常复制） */
+          var cur0 = eqActiveCell();
+          if (!cur0){ try { window.__eqClipMirror = null; } catch(eM0){} return null; }
+          ranges.push({ startRow: cur0.row, startColumn: cur0.col, endRow: cur0.row, endColumn: cur0.col });
+        }
+        /* 实时快照：只为读 numfmt pattern（货币符号 / 千位分隔 / 小数位） */
+        var snap = null, sid0 = null;
+        try {
+          var wb0 = (api && api.getActiveWorkbook) ? api.getActiveWorkbook() : null;
+          snap = (wb0 && typeof wb0.getSnapshot === 'function') ? wb0.getSnapshot() : null;
+          sid0 = (sh && typeof sh.getSheetId === 'function') ? sh.getSheetId() : null;
+        } catch(errSnap0){ snap = null; sid0 = null; }
+        var lines = [];
+        /* ★CLIP-RICH-20261018：单块选区时顺手留下「值+公式+样式」镜像，供带格式粘贴使用 */
+        var mir = null, mirRows = (ranges.length === 1) ? [] : null;
+        /* ★CLIP-MERGE-20261018：合并区域镜像（相对选区的行/列偏移），粘贴时还原 */
+        var mirMg = (ranges.length === 1) ? [] : null;
+        for (var a = 0; a < ranges.length; a++){
+          var g = ranges[a];
+          var nR = g.endRow - g.startRow + 1, nC = g.endColumn - g.startColumn + 1;
+          if (!(nR > 0) || !(nC > 0) || nR * nC > 200000) continue;
+          var rng = sh.getRange(g.startRow, g.startColumn, nR, nC);
+          var vals = (rng && typeof rng.getValues === 'function') ? rng.getValues() : null;
+          if (!vals) continue;
+          for (var r = 0; r < vals.length; r++){
+            var row = vals[r] || [], cells = [];
+            var mirRow = mirRows ? [] : null;
+            for (var c = 0; c < row.length; c++){
+              /* ★EQ-CLIP-FMT-20261017：复制要带货币符号（用户 2026-10-17：
+                 「复制的时候，货币符号也必须复制！」），按该格 numfmt pattern 还原屏幕文本。 */
+              var v = row[c];
+              var _er = g.startRow + r, _ec = g.startColumn + c;
+              var _epat = '', _ecell = null, _est = null;
+              try {
+                var _esheet = snap && snap.sheets && snap.sheets[sid0];
+                var _erow = _esheet && _esheet.cellData && _esheet.cellData[_er];
+                _ecell = _erow && _erow[_ec];
+                _est = _ecell && _ecell.s;
+                if (typeof _est === 'string') _est = (snap.styles && snap.styles[_est]) || null;
+                if (_est && _est.n && _est.n.pattern) _epat = String(_est.n.pattern);
+                if (_ecell && _ecell.v != null) v = _ecell.v;
+              } catch(errP){}
+              cells.push((_epat && window.win_fmtNum) ? window.win_fmtNum(v, _epat) : (v == null ? '' : String(v)));
+              if (mirRow){
+                /* 镜像存内联样式对象（不能存 styles 表 id：重建/刷新会换 id） */
+                var _mo = { v: (_ecell && _ecell.v !== undefined) ? _ecell.v : null,
+                            f: (_ecell && _ecell.f !== undefined) ? _ecell.f : null,
+                            t: (_ecell && _ecell.t !== undefined) ? _ecell.t : null };
+                if (_ecell && _ecell.s !== undefined){
+                  var _mc = null;
+                  try { _mc = _est ? JSON.parse(JSON.stringify(_est)) : null; } catch(eMc){ _mc = null; }
+                  if (_mc){
+                    var _mk;
+                    for (_mk in _mc){ if (_mc[_mk] === null || _mc[_mk] === undefined) delete _mc[_mk]; }
+                    _mo.s = _mc;
+                  } else _mo.uc = 1;
+                }
+                mirRow.push(_mo);
+              }
+            }
+            if (mirRows) mirRows.push(mirRow);
+            lines.push(cells.join('\t'));
+          }
+          /* ★CLIP-MERGE-20261018：把【完全落在选区里】的合并区域按相对坐标记进镜像 */
+          if (mirMg){
+            try {
+              var _msh0 = (snap && snap.sheets && snap.sheets[sid0]) || null;
+              var _ml0 = (_msh0 && _msh0.mergeData) || [];
+              for (var _mi0 = 0; _mi0 < _ml0.length; _mi0++){
+                var _m0 = _ml0[_mi0] || {};
+                var _msr0 = _m0.startRow, _msc0 = _m0.startColumn, _mer0 = _m0.endRow, _mec0 = _m0.endColumn;
+                if (typeof _msr0 !== 'number' || typeof _msc0 !== 'number' ||
+                    typeof _mer0 !== 'number' || typeof _mec0 !== 'number') continue;
+                if (_msr0 < g.startRow || _msc0 < g.startColumn) continue;
+                if (_mer0 > g.endRow || _mec0 > g.endColumn) continue;
+                mirMg.push([_msr0 - g.startRow, _msc0 - g.startColumn, _mer0 - g.startRow, _mec0 - g.startColumn]);
+              }
+            } catch(eMg0){}
+          }
+        }
+        if (mirRows && mirRows.length) mir = mirRows;
+        /* 镜像的 text 必须与真正写进剪贴板的文本逐字一致，粘贴时才敢用 */
+        try {
+          if (mir){
+            window.__eqClipMirror = { text: lines.join('\n'), mat: mir, mg: mirMg, sid: sid0, at: Date.now(), src: 'eq' };
+            /* ★CLIP-RICH-XMODULE-20261018：跨模块（权益↔财务）粘贴也能带格式 */
+            window.__clipRichGlobal = window.__eqClipMirror;
+          } else {
+            window.__eqClipMirror = null;
+          }
+        } catch(eM){}
+        return lines.join('\n');
+      } catch(err){ return ''; }
+    }
+
+    /* ★CLIP-ENGINE-20261018：粘贴写入 + 剪切清空（权益侧适配器）。
+       为什么自己写：Univer 的粘贴走 navigator.clipboard.read()，局域网 http 下必然被拒
+       → 用户看到「Ctrl+V 毫无反应」。这里从 paste 事件自带的 clipboardData 取内容，再自己 setValues。 */
+    function eq_clipPasteText(text){
+      try {
+        if (!api) return false;
+        var sh0 = eqSheetObj(); if (!sh0) return false;
+        var m0 = (window.__clipEngine && window.__clipEngine.parse) ? window.__clipEngine.parse(text) : null;
+        if (!m0 || !m0.length) return false;
+        /* ★★EQ-PASTE-ANCHOR-20261018（事故：2026-10-18 12:58 权益表表头行 A1/B1/C1 被写成
+           「# 01 / 2026 / Choice VN」——复制的是 A3:C4，粘到了 A1:C2，随后自动保存落盘）。
+           排查结论：落点就是「当前活动单元格」，当时它确实是 A1（自动化探针用 API 移了选区，
+           但产品内部读到的一直是 A1），所以内容被写进表头行。
+           ★修法只做一件事：落点必须是【当前活动单元格】；真拿不到就【放弃这次粘贴】，
+             绝不静默退化成 (0,0) 写回 A1。优先级保持原样（活动单元格最准），
+             不用 eqStatSel 那类"历史最大选区"，否则会粘到旧位置。 */
+        var r0 = -1, c0 = -1;
+        try {
+          var g0 = sh0.getSelection().getActiveRange().getRange();
+          if (g0 && typeof g0.startRow === 'number' && typeof g0.startColumn === 'number'){
+            r0 = g0.startRow; c0 = g0.startColumn;
+          }
+        } catch(eG){}
+        if (r0 < 0){
+          try {
+            var _rs = (typeof eq_getSelectionRanges === 'function') ? eq_getSelectionRanges() : null;
+            if (_rs && _rs.length && typeof _rs[0].startRow === 'number'){
+              r0 = _rs[0].startRow; c0 = _rs[0].startColumn;
+            }
+          } catch(eR){}
+        }
+        if (r0 < 0 || c0 < 0){
+          console.warn('[eq-paste] 取不到粘贴落点，已放弃（绝不写回 A1）');
+          try { st('粘贴失败：取不到当前单元格'); } catch(eN){}
+          return false;
+        }
+        progUntil = 0;                                   /* ★用户操作：允许标脏并自动保存 */
+        /* ★CLIP-TILE-20261018：选区是源块整数倍时铺满整个选区（Excel 行为，与财务一致） */
+        var _tdE = (typeof window.finClipTileDims === 'function')
+          ? window.finClipTileDims(sh0, r0, c0, m0.length, m0[0].length)
+          : { tr: m0.length, tc: m0[0].length };
+        var _tnE = _tdE.tr, _tcE = _tdE.tc;
+        if (_tnE * _tcE > 20000){ _tnE = m0.length; _tcE = m0[0].length; }
+        var _mvE = (_tnE === m0.length && _tcE === m0[0].length) ? m0
+                  : (typeof window.finClipTileMat === 'function' ? window.finClipTileMat(m0, _tnE, _tcE) : m0);
+        sh0.getRange(r0, c0, _tnE, _tcE).setValues(_mvE);
+        try { dirty = true; scheduleSave(); } catch(eD){}
+        try { window.__finClipLast = { len: String(text).length, ok: true, paste: true }; } catch(eL){}
+        return true;
+      } catch(err){ return false; }
+    }
+    /* ★★CLIP-RICH-20261018（与财务同一套口径）：本页复制过同一段文本时，
+       值 + 公式 + 整块样式（字体/字号/粗斜体/字色/底色/边框/对齐/换行/数字格式）
+       一起还原。两遍写：第一遍清样式，第二遍铺源样式（set-range-values 是 merge 语义）。 */
+    function eq_clipPasteRich(text){
+      try {
+        if (!api || !api.executeCommand) return false;
+        var M = window.__eqClipMirror;
+        /* ★CLIP-RICH-XMODULE-20261018：本表没有镜像时用全局镜像（另一张表刚复制的） */
+        if ((!M || !M.mat || !M.mat.length) && window.__clipRichGlobal && window.__clipRichGlobal.mat) M = window.__clipRichGlobal;
+        if (!M || !M.mat || !M.mat.length) return false;
+        /* ★CLIP-TEXT-NORM-20261018：换行归一化后再比较（\r\n），否则多行复制一律退化纯文本 */
+        var _nt2 = (window.clipNormText || function(x){ return String(x == null ? '' : x).replace(/\r\n?/g, '\n'); });
+        if (_nt2(M.text) !== _nt2(text)) return false;
+        if (!(Date.now() - (M.at || 0) < 30 * 60 * 1000)) return false;
+        var sh0 = eqSheetObj(); if (!sh0) return false;
+        var r0 = -1, c0 = -1;
+        try {
+          var g0 = sh0.getSelection().getActiveRange().getRange();
+          if (g0 && typeof g0.startRow === 'number' && typeof g0.startColumn === 'number'){
+            r0 = g0.startRow; c0 = g0.startColumn;
+          }
+        } catch(eG){}
+        if (r0 < 0){
+          try {
+            var _rs = (typeof eq_getSelectionRanges === 'function') ? eq_getSelectionRanges() : null;
+            if (_rs && _rs.length && typeof _rs[0].startRow === 'number'){
+              r0 = _rs[0].startRow; c0 = _rs[0].startColumn;
+            }
+          } catch(eR){}
+        }
+        if (r0 < 0 || c0 < 0){
+          console.warn('[eq-paste] 取不到粘贴落点，已放弃（绝不写回 A1）');
+          return false;
+        }
+        var nr = M.mat.length, nc = 0, i2;
+        for (i2 = 0; i2 < nr; i2++){ if (M.mat[i2] && M.mat[i2].length > nc) nc = M.mat[i2].length; }
+        if (!(nr > 0) || !(nc > 0) || nr * nc > 20000) return false;
+        /* ★CLIP-TILE-20261018：选区是源块整数倍 → 铺满选区（与财务一致） */
+        var _tdE1 = (typeof window.finClipTileDims === 'function')
+          ? window.finClipTileDims(sh0, r0, c0, nr, nc) : { tr: nr, tc: nc };
+        var tr = _tdE1.tr, tc = _tdE1.tc;
+        if (tr * tc > 20000) return false;
+        var sid = '';
+        try { sid = (sh0.getSheetId) ? sh0.getSheetId() : ''; } catch(eS){ sid = ''; }
+        var m1 = [], m2 = [], anyS = false, r, c;
+        for (r = 0; r < tr; r++){
+          var row1 = [], row2 = [];
+          for (c = 0; c < tc; c++){
+            var cell = (M.mat[r % nr] && M.mat[r % nr][c % nc]) ? M.mat[r % nr][c % nc] : null;
+            var o1 = { v: (cell && cell.v !== undefined) ? cell.v : null,
+                       f: (cell && cell.f !== undefined) ? cell.f : null,
+                       t: (cell && cell.t !== undefined) ? cell.t : null };
+            if (!(cell && cell.uc)) o1.s = null;
+            row1.push(o1);
+            if (cell && cell.s){
+              var sCopy = null;
+              try { sCopy = JSON.parse(JSON.stringify(cell.s)); } catch(eC){ sCopy = cell.s; }
+              row2.push({ s: sCopy }); anyS = true;
+            } else row2.push({});
+          }
+          m1.push(row1); m2.push(row2);
+        }
+        var rg = { startRow: r0, startColumn: c0, endRow: r0 + tr - 1, endColumn: c0 + tc - 1 };
+        progUntil = 0;                                   /* ★用户操作：允许标脏并自动保存 */
+        /* ★CLIP-MERGE-20261018：值 + 样式落好之后，再重建源选区的合并区域 */
+        var applyMerges = function(){
+          try {
+            if (typeof window.finClipApplyMerges === 'function'){
+              window.finClipApplyMerges(api, 'equity-report', sid, r0, c0, M.mg, tr, tc, nr, nc);
+            }
+          } catch(eM2){}
+        };
+        var applyStyles = function(){
+          var p2 = null;
+          if (anyS){
+            try {
+              p2 = api.executeCommand('sheet.command.set-range-values', {
+                unitId: 'equity-report', subUnitId: sid, range: rg, value: m2
+              });
+            } catch(e2){ p2 = null; }
+          }
+          if (p2 && typeof p2.then === 'function') p2.then(applyMerges, applyMerges);
+          else applyMerges();
+        };
+        var p1 = api.executeCommand('sheet.command.set-range-values', {
+          unitId: 'equity-report', subUnitId: sid, range: rg, value: m1
+        });
+        if (p1 && typeof p1.then === 'function') p1.then(applyStyles, applyStyles);
+        else applyStyles();
+        /* ★FIN-UNDO-ONEGESTURE-20261018：粘贴后选区留在整个粘贴区（Excel 手感 + 记账范围正确） */
+        try { sh0.getRange(r0, c0, tr, tc).activate(); } catch(eA0){}
+        try { dirty = true; scheduleSave(); } catch(eD){}
+        try { window.__finClipLast = { len: String(text).length, ok: true, paste: true, rich: true }; } catch(eL){}
+        return true;
+      } catch(err){ return false; }
+    }
+    function eq_clipClearSel(){
+      try {
+        if (!api) return false;
+        progUntil = 0;
+        var pr = api.executeCommand('sheet.command.clear-selection-content', {});
+        if (pr && typeof pr.then === 'function') pr.catch(function(){});
+        try { dirty = true; scheduleSave(); } catch(eD){}
+        return true;
+      } catch(err){ return false; }
+    }
+    try {
+      if (window.__clipEngine && window.__clipEngine.register){
+        window.__clipEngine.register('eq', {
+          el: function(){ return document.getElementById('equity_container'); },
+          text: eq_clipMatrixText,
+          write: eq_clipPasteText,
+          /* ★CLIP-RICH-20261018：带格式粘贴（本页复制过的内容才生效） */
+          rich: eq_clipPasteRich,
+          clear: eq_clipClearSel
+        });
+        window.__clipEvtEq = true;                       /* 接线标记（3 秒自检 + 硬锁脚本用） */
+      }
+    } catch(errRegEq){}
+
+    /* 行为级自检：共用写入器 + 取数器 + 两条 copy/cut 补写通道。
+       ★★CLIP-SELFCHECK-VIEW-20261018（用户 2026-10-18「找回复制剪切粘贴…要锁定住」的真相之一）★★
+       旧写法在页面加载 3 秒时【无条件】要求两张表的适配器都已注册。但财务适配器要等用户
+       真正打开财务报表（fin_init）才注册 —— 停留在看板/生产/权益页时 __clipEvtFin 必然是 false，
+       于是控制台打出红字「剪贴板接线缺失 → Ctrl+C/X/V 会失效」并置 __CLIP_LOCK_FAILED：
+       功能其实是好的，但用户看到红字就以为又坏了（历史"又说没了"的误报来源之一）。
+       新判据：只要求【已经初始化过的表】必须接线；没打开的表不算缺失。
+       持续复查（5 秒一次），真缺失时照样报错，恢复后自动改回 OK。 */
+    (function(){
+      var t0 = Date.now(), bad = false;
+      function finReadyNow(){
+        try { return !!(window.finReady || document.querySelector('#univer_container canvas')); } catch(e){ return false; }
+      }
+      function eqReadyNow(){
+        try { return !!document.querySelector('#equity_container canvas'); } catch(e){ return false; }
+      }
+      function clipSelfCheck(){
+        try {
+          var hasW = (typeof window.win_clipWrite === 'function');
+          var hasM = (typeof eq_clipMatrixText === 'function');
+          var hasEvtF = !!window.__clipEvtFin, hasEvtE = !!window.__clipEvtEq;
+          var needFin = finReadyNow(), needEq = eqReadyNow();
+          var isBad = !hasW || !hasM || (needFin && !hasEvtF) || (needEq && !hasEvtE);
+          if (isBad && (Date.now() - t0) < 20000) return;      /* 表还没打开：再等等，绝不误报 */
+          if (isBad){
+            if (!bad){
+              bad = true;
+              window.__CLIP_LOCK_FAILED = true;
+              console.error('[clip-lock] 剪贴板接线缺失 → Ctrl+C/X/V 会失效',
+                            { win_clipWrite: hasW, eq_clipMatrixText: hasM,
+                              copyEvtFin: hasEvtF, copyEvtEq: hasEvtE,
+                              needFin: needFin, needEq: needEq });
+            }
+            return;
+          }
+          if (bad){ bad = false; console.log('[clip-lock] OK · 已恢复接线'); }
+          window.__CLIP_LOCK_FAILED = false;
+          if (!window.__clipLockOkLogged){
+            window.__clipLockOkLogged = true;
+            console.log('[clip-lock] OK · Ctrl+C/X/V 已接线（win_clipWrite + 矩阵取数 + copy/cut 通道；fin=' +
+                        hasEvtF + ' eq=' + hasEvtE + '）');
+          }
+        } catch(e){}
+      }
+      setTimeout(clipSelfCheck, 3000);
+      setInterval(clipSelfCheck, 5000);
+    })();
+
+    function eqExcelKeysBind(){
+      if (window.__eqExcelKeysBound) return;
+      window.__eqExcelKeysBound = true;
+      try { eqEditCoreLoad(); } catch(e){}   /* ★EQ-EDIT-ARROW-20261016：先把 core 模块拉回来备用 */
+      try { eqEditSelBind(); } catch(e){}    /* ★EQ-EDIT-ARROW-20261016：订阅光标位置命令流 */
+      function eqIsUniverElem(el){
+        try {
+          if (!el || el.nodeType !== 1) return false;
+          if (el.classList && el.classList.contains('univer-editor')) return true;
+          if (el.closest && el.closest('.univer-editor-container')) return true;
+          if (el.closest && el.closest('.univer-workbench-layout')) return true;
+          if (el.closest && el.closest('#equity_container')) return true;
+        } catch(err){}
+        return false;
+      }
+      function inScope(e){
+        try {
+          var c = eqContainer(); if (!c) return false;
+          if (!c.offsetHeight && !c.getClientRects().length) return false;   /* 页面不可见 → 不接管 */
+          var t = e && e.target, a = document.activeElement;
+          /* 我们自己的控件（币种下拉等）和公式栏输入框：在这些元素上按键不接管 */
+          if (t && (t.tagName === 'SELECT' || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') && c.contains(t)) return false;
+          if (t && c.contains(t)) return true;
+          if (a && c.contains(a)) return true;
+          if (eqIsUniverElem(t) || eqIsUniverElem(a)) return true;
+          return false;
+        } catch(err){ return false; }
+      }
+      function followSoon(){
+        try { requestAnimationFrame(function(){ eqEnsureVisible(); setTimeout(eqEnsureVisible, 60); }); }
+        catch(e){ setTimeout(eqEnsureVisible, 0); }
+      }
+      try { eqRememberCur(eqActiveCell()); } catch(e){}
+      try {
+        setInterval(function(){
+          if (document.hidden) return;
+          if (Date.now() - eqLastKeyAt < 400) return;
+          eqRememberCur(eqActiveCell());
+        }, 250);
+        window.addEventListener('mousedown', function(){ setTimeout(function(){ eqRememberCur(eqActiveCell()); }, 0); }, true);
+      } catch(e){}
+
+      window.addEventListener('keydown', function(e){
+        try {
+          if (!e || e.isComposing) return;
+          eqLastKeyAt = Date.now();
+          if (!inScope(e)) return;
+          var k = e.key;
+          var editing = eqIsEditingCell();
+
+          /* ★EQ-TEXT-PREFIX-20261017：编辑过程中留一份「编辑器原文」快照。
+             提交那一刻编辑器可能已经销毁、读不到原文，钩子会回落到这里（5 秒内有效）。 */
+          if (editing){
+            try { var _eqRaw0 = eqEditorRawText(); if (_eqRaw0) { EQ_EDIT_RAW = _eqRaw0; EQ_EDIT_RAW_AT = Date.now(); } } catch(errRaw){}
+          }
+
+          /* ① 编辑态：补 Delete = 删除光标右侧字符、→ = 光标先在文字里走（见 EQ-EDIT-ARROW-20261016）；其余交回 Univer */
+          if (editing) {
+            /* ★★EQ-CLIP-EDITSAFE-20261017★★ 编辑态兜底（权益这条分支在 editing 判断【之后】，
+               一旦 isEditingCell 被另一套 Univer 实例的编辑覆盖层带偏、恒判"编辑中"，
+               下面的 C/X 补写就永远走不到 → 复制粘贴"无故消失"）。
+               规则：编辑器里【没有选中文字】时按 Ctrl+C / Ctrl+X，照样补写选区；
+                     确实选了一段文字（用户就是要复制那段）→ 放行给浏览器，不覆盖。 */
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey &&
+                (k === 'c' || k === 'C' || k === 'x' || k === 'X')) {
+              var _eqSelTxt = '';
+              try { _eqSelTxt = String(window.getSelection ? window.getSelection() : ''); } catch(errSel){}
+              if (!_eqSelTxt){
+                try { if (window.win_clipWrite) window.win_clipWrite(eq_clipMatrixText()); } catch(errClip2){}
+              }
+              return;   /* 不拦截 */
+            }
+            /* ★EQ-EDIT-ARROW-20261016（v2 定稿）：Univer 的快捷键监听比我们注册得早（同在 window 捕获阶段），
+               所以按 → 时它【一定】已经先把文字光标右移了一格，我们拦不住也不该拦。于是：
+                 · 本次按键里编辑器发过 set-selections（= Univer 刚动过光标），且【动之前】光标不在末尾
+                   → 直接 return：光标已经右移一格，正是用户要的（旧写法在这里又派发一次 move-cursor，
+                     结果是"按一次 → 光标跳两格"，已被探针 v18 抓到）；
+                 · 动之前光标就已经在末尾（或本次它压根没发事件）→ 我们自己关编辑器（提交值 + 右移一格）；
+                 · 量不到光标/文本末尾 → return 交回 Univer（绝不吞键），异常一律 fail-open。 */
+            if (k === 'ArrowRight' && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+              try { eqEditSelBind(); } catch(err){}
+              var endR = -1;
+              try { endR = eqEditTextEnd(); } catch(err){}
+              var emittedR = (eqEditSelAt > 0) && (eqArrowNow() - eqEditSelAt <= EQ_EDIT_EDGE_MS);
+              var beforeR = null;
+              if (emittedR && eqEditSelPrev && typeof eqEditSelPrev.e === 'number') beforeR = eqEditSelPrev.e;
+              else if (eqEditSel && typeof eqEditSel.e === 'number') beforeR = eqEditSel.e;
+              eqArrowLog('selAtKey', (eqEditSel && typeof eqEditSel.e === 'number') ? eqEditSel.e : -99);
+              eqArrowLog('arrowMovedBy', emittedR ? 1 : 0);
+              if (beforeR === null || endR < 0) {
+                try { window.__eqArrowDebug.handedBack++; } catch(err){}   /* 量不到 → 交回 Univer */
+                return;
+              }
+              if (beforeR < endR) {
+                if (emittedR) return;                       /* Univer 已经把光标右移一格 ✓ 什么都不做 */
+                e.preventDefault(); e.stopPropagation();    /* 兜底：它没动 → 我们自己动一格 */
+                try { window.__eqArrowDebug.moved++; } catch(err){}
+                try {
+                  var eqMv = api.executeCommand('doc.operation.move-cursor', { direction: 1 });   /* 1 = RIGHT（实测） */
+                  if (eqMv && typeof eqMv.then === 'function') eqMv.catch(function(){});
+                } catch(err){}
+                return;
+              }
+              /* 光标本来就在末尾 → 退出编辑 + 提交值 + 选区右移一格（原生路径） */
+              e.preventDefault(); e.stopPropagation();
+              try { window.__eqArrowDebug.exitEnd++; } catch(err){}
+              eqEndEditMoveRight();
+              try { eqRememberSoon(); } catch(err){}
+              followSoon();
+              return;
+            }
+            if (k === 'Delete' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+              e.preventDefault(); e.stopPropagation();
+              try { api.executeCommand('doc.command.delete-right', {}); } catch(err){}
+              return;
+            }
+            return;
+          }
+
+          /* ①-a ★EQ-EXCEL-SELALL-20261016：Ctrl+A / ⌘A = 全选（Excel 行为）。
+             为什么自己实现、不派发 sheet.command.select-all：那条命令的 handler 内部取的是
+             "当前活动工作簿"（getCurrentUnitForType），本页两套 Univer 实例下它会落到财务报表上
+             —— 正是用户反馈的"右键菜单里的选择全部没作用"。见 eqSelectAll() 的注释。 */
+          if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (k === 'a' || k === 'A')) {
+            e.preventDefault(); e.stopPropagation();
+            eqSelectAll();
+            return;
+          }
+
+          if (e.altKey || e.metaKey) return;
+
+          /* ★★EQ-CLIP-PASS-LOCK-20261017（用户 2026-10-17：「Ctrl+C / Ctrl+X / Ctrl+V 又不能用」）★★
+             与财务报表同因：Univer 对 Ctrl+C/X 调 preventDefault，却改走 navigator.clipboard.write()，
+             该 Promise 被 NotAllowedError 拒绝后又被本页「忽略噪声」分支吞掉 → 剪贴板恒为空。
+             做法：不拦事件（放行给 Univer），但自己用同步 execCommand 再写一次剪贴板。
+             ★V 不处理：Univer 走原生 paste 事件，剪贴板有内容就能粘。 */
+          if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (k === 'c' || k === 'C' || k === 'x' || k === 'X' || k === 'v' || k === 'V')) {
+            /* ★CLIP-ENGINE-20261018：C/X/V 统一交给全局引擎（与财务同一套）。
+               C/X 由引擎写剪贴板（X 还会立刻清空选区）；V 不拦，等 paste 事件由引擎接管。 */
+            try { if (window.__clipEngine) window.__clipEngine.handleKey(e, 'eq'); } catch(errClip){}
+            return;   /* ★绝不 preventDefault / stopPropagation */
+          }
+
+          /* ①-b ★EQ-DEL-20261016（用户 2026-10-16：请允许我框选后按 DELETE 删除，和 Excel 一样）：
+             非编辑态按 Delete / Backspace = 清空【框选区域】的内容（Excel 行为）。
+             · Univer 自带的快捷键在本页不生效（焦点/disableAutoFocus 的关系），所以自己补；
+             · 不传 ranges → 让命令自己读内部选区（就是屏幕上画出来的那个框，含 Ctrl 多区域选择），
+               比我们自己估算的准（facade 的 getSelection 只给活动单元格）；
+             · progUntil 清零 → 保证这次【用户操作】会标脏并自动落盘。 */
+          if ((k === 'Delete' || k === 'Backspace') && !e.ctrlKey) {
+            e.preventDefault(); e.stopPropagation();
+            try {
+              progUntil = 0;   /* ★这是用户操作、不是程序写入 → 必须让它标脏并自动保存 */
+              var prd = api.executeCommand('sheet.command.clear-selection-content', {});
+              if (prd && typeof prd.then === 'function') prd.catch(function(){});   /* ★绝不冒未处理拒绝 */
+            } catch(err){}
+            try { eqRememberSoon(); } catch(err){}
+            return;
+          }
+
+          /* ② ★Excel 行为：非编辑态敲可打印字符 → 直接进入编辑并替换内容 */
+          if (!e.ctrlKey && k && k.length === 1) {
+            e.preventDefault(); e.stopPropagation();
+            eqTypeToEdit(e);
+            return;
+          }
+
+          /* ③ ★Excel 行为：Enter = 选区向下移（Shift+Enter 向上），而不是进入编辑 */
+          if (!e.ctrlKey && k === 'Enter') {
+            var base3 = eqPrevCur || eqActiveCell();
+            if (base3) {
+              e.preventDefault(); e.stopPropagation();
+              eqGotoCell(base3.row + (e.shiftKey ? -1 : 1), base3.col);
+              followSoon();
+            }
+            return;
+          }
+
+          var cur = eqActiveCell();
+          if (!cur) return;
+          var sz = eqSheetSize() || {};
+          var maxR = sz.rows || 0;
+          var maxC = sz.cols || 0;
+
+          /* ④ 普通方向键：到边界停住，不回卷 */
+          if (!e.ctrlKey && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) {
+            var prev = eqPrevCur || cur;
+            var wrapped = (k === 'ArrowDown' && cur.row < prev.row)
+                       || (k === 'ArrowUp' && cur.row > prev.row)
+                       || (k === 'ArrowRight' && cur.col < prev.col)
+                       || (k === 'ArrowLeft' && cur.col > prev.col);
+            var atEdge = (k === 'ArrowDown' && maxR > 0 && prev.row >= maxR - 1)
+                      || (k === 'ArrowUp' && prev.row <= 0)
+                      || (k === 'ArrowRight' && maxC > 0 && prev.col >= maxC - 1)
+                      || (k === 'ArrowLeft' && prev.col <= 0);
+            if (atEdge || wrapped) {
+              e.preventDefault(); e.stopPropagation();
+              if (cur.row !== prev.row || cur.col !== prev.col) eqGotoCell(prev.row, prev.col);
+              eqRememberCur(prev);
+              followSoon();
+              return;
+            }
+            followSoon();
+            eqRememberSoon();
+            return;
+          }
+
+          /* ⑤ Ctrl+方向键：数据边界语义 */
+          if (e.ctrlKey && !e.shiftKey && (k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight')) {
+            var base2 = eqPrevCur || cur;
+            var dr = (k === 'ArrowDown') ? 1 : (k === 'ArrowUp' ? -1 : 0);
+            var dc = (k === 'ArrowRight') ? 1 : (k === 'ArrowLeft' ? -1 : 0);
+            var t = eqDataEdge(dr, dc, base2);
+            if (t) {
+              e.preventDefault(); e.stopPropagation();
+              eqGotoCell(t.row, t.col);
+              eqRememberCur(t);
+              followSoon();
+              return;
+            }
+            followSoon();
+            eqRememberSoon();
+            return;
+          }
+
+          if (!e.ctrlKey && !e.shiftKey && k === 'Home') {
+            e.preventDefault(); e.stopPropagation();
+            var ssH = eqScrollState();
+            eqGotoCell(cur.row, 0);
+            eqScrollToSoon(ssH ? ssH.row : 0, 0);
+            return;
+          }
+          if (!e.ctrlKey && !e.shiftKey && k === 'End') {
+            e.preventDefault(); e.stopPropagation();
+            var ssE = eqScrollState(), vrE = eqVisibleRange();
+            var tc = eqRowLastCol(cur.row);
+            var nsc = ssE ? ssE.col : 0;
+            var vcols = (vrE && typeof vrE.endColumn === 'number') ? Math.max(1, vrE.endColumn - vrE.startColumn + 1) : 1;
+            if (tc < nsc) nsc = tc;
+            else if (tc > nsc + vcols - 1) nsc = tc - vcols + 1;
+            eqGotoCell(cur.row, tc);
+            eqScrollToSoon(ssE ? ssE.row : 0, Math.max(0, nsc));
+            return;
+          }
+          if (e.ctrlKey && !e.shiftKey && k === 'Home') {
+            e.preventDefault(); e.stopPropagation();
+            eqGotoCell(0, 0);
+            eqScrollToSoon(0, 0);
+            return;
+          }
+          if (e.ctrlKey && !e.shiftKey && k === 'End') {
+            e.preventDefault(); e.stopPropagation();
+            var last = eqLastUsedCell();
+            if (last) {
+              var vr = eqVisibleRange();
+              var rows = vr ? Math.max(1, vr.endRow - vr.startRow + 1) : 1;
+              var cols = (vr && typeof vr.endColumn === 'number') ? Math.max(1, vr.endColumn - vr.startColumn + 1) : 1;
+              eqGotoCell(last.row, last.col);
+              eqScrollToSoon(Math.max(0, last.row - rows + 1), Math.max(0, last.col - cols + 1));
+            }
+            return;
+          }
+          if (!e.ctrlKey && !e.shiftKey && (k === 'PageDown' || k === 'PageUp')) {
+            var page = eqPageRows();
+            if (page <= 0) return;
+            e.preventDefault(); e.stopPropagation();
+            var ss = eqScrollState();
+            var target = (k === 'PageDown') ? cur.row + page : cur.row - page;
+            eqGotoCell(target, cur.col);
+            if (ss) eqScrollToSoon((k === 'PageDown') ? ss.row + page : Math.max(0, ss.row - page), ss.col);
+            else followSoon();
+            return;
+          }
+
+          /* ⑥ 其它键（Tab / Shift+方向键…）：不拦，只补跟随滚动 */
+          if (k === 'Tab' || k === 'Enter') followSoon();
+        } catch(err){}
+      }, true);
+
+      /* ★★EQ-TYPE-EDIT-IME-20261018（用户 2026-10-18：「直接打汉字也能输入」）★★
+         汉字/日文/韩文走输入法：这些按键的 keydown 都是 isComposing = true（keyCode 229），
+         上面第①步之前就 return 了，非编辑态下文字进不了单元格。
+         做法：等输入法在 compositionend 交出整段文字，再走 eqTypeToEdit 的同一入口
+         （先写值 → 40ms 后打开编辑器、光标落在末尾），与"敲英文字符"完全一致。
+         · 只在【非编辑态】且事件归属权益表（inScope 已含可见性判断）时接管；
+         · 不 preventDefault / stopPropagation。 */
+      window.addEventListener('compositionend', function(e){
+        try {
+          if (!e || e.isComposing) return;
+          var txt = e.data;
+          if (!txt) return;
+          var _t = e.target;
+          if (_t && _t.nodeType === 1){
+            var _tg = String(_t.tagName || '').toLowerCase();
+            if (_tg === 'input' || _tg === 'textarea' || _tg === 'select') return;
+            if (String(_t.id || '').indexOf('FORMULA_BAR') >= 0) return;   /* 公式栏里打字交回它自己 */
+          }
+          if (!inScope(e)) return;
+          if (eqIsEditingCell()) return;
+          eqTypeToEdit({ key: txt });
+        } catch(err){}
+      }, true);
+    }
+
+    /* ---------- 语言切换：整实例重建（用户 2026-10-16 要求）----------
+       ① 工具栏按钮的悬停提示（删除线/加粗/Arial…）用的是 Univer 的 locale，
+          它在 createUniver 时就定死了——只有【整个实例重建】才会跟随系统语言切换；
+       ② 工作簿内容（表名/表头/单元格文字）由 load()→seedAndApply→applyTrans 按新语言
+          重新走 /api/translate 翻译（带 localStorage 缓存，切回旧语言秒显示）。 */
+    /* ★运行时切换 Univer 界面语言（工具栏悬停提示等 UI 文案）。
+       为什么优先用它、而不是销毁实例重建：销毁+硬清容器会让 React 在自己还在调度时
+       发现「要删的节点已经不是容器的孩子」→ NotFoundError: Failed to execute 'removeChild'
+       （用户 2026-10-16 实测报错来源）。locale$ 变化后 UI 组件自己重渲染，零 DOM 冲突。 */
+    function eqSetUiLocale(){
+      try {
+        if (!coreMod || !univer || !presets) return false;
+        var inj = null;
+        if (typeof univer.__getInjector === 'function') inj = univer.__getInjector();
+        else if (typeof univer.getInjector === 'function') inj = univer.getInjector();
+        if (!inj || typeof inj.get !== 'function') return false;
+        var LS = coreMod.LocaleService;
+        var ls = LS ? inj.get(LS) : null;
+        if (!ls || typeof ls.setLocale !== 'function') return false;
+        var lt = presets.LocaleType || {};
+        var L2 = lang();
+        var target = (L2 === 'zh') ? lt.ZH_CN : (L2 === 'vi') ? lt.VI_VN : lt.EN_US;
+        if (!target) return false;
+        ls.setLocale(target);
+        return true;
+      } catch(e){ return false; }
+    }
+    function rebuildForLang(){
+      /* ① 优先：只换界面语言（locale$→UI 组件自渲染）+ 数据按新语言重翻（表名/表头/单元格） */
+      if (eqSetUiLocale()) {
+        try {
+          /* ★EQ-SAVE-NOLOSS-20261018：切语言会 load() 重新从服务器取快照。
+             只要手上还有没落盘的录入（dirty / 正在保存 / 排队中）就必须【先存完再重载】，
+             否则旧快照会把屏幕上的新录入盖掉 —— 这就是「切语言后录入/姓名丢失」的根因。
+             万一存失败：不重载，改为把当前屏幕并回 snap 再原地重绘，录入一个都不丢。 */
+          if (dirty || saving || saveQueued || saveTimer){
+            save(false).then(function(ok){
+              try {
+                if (ok) load();
+                else { eqCaptureLiveToSnap(cur); render(); }
+              } catch(e){}
+            });
+          } else {
+            load();
+          }
+        } catch(e){ try { load(); } catch(e2){} }
+        return;
+      }
+      /* ② 兜底：实在拿不到 LocaleService 才整实例重建。
+            ★不再手动 innerHTML 硬清（那是 React removeChild 报错的根因），
+              交给 Univer/React 自己卸载完再重建。 */
+      var _doRebuild = function(){
+        /* 币种下拉此刻挂在 Univer 工具栏里（容器内部），先接回 #eq_inline，不然会被一起卸掉 */
+        try {
+          var sel0 = document.getElementById('eq_cur'), bar0 = document.getElementById('eq_inline');
+          if (sel0 && bar0 && sel0.parentElement !== bar0) bar0.appendChild(sel0);
+        } catch(e){}
+        try { if (univer && typeof univer.dispose === 'function') univer.dispose(); } catch(e){}
+        univer = null; api = null; sheet = null; ready = false; inited = false; loading = false;
+        setTimeout(function(){ try { init(); } catch(e){} }, 400);
+      };
+      /* ★EQ-SAVE-NOLOSS-20261018：重建同样要等落盘完成，否则 init()→load() 会拿旧数据覆盖 */
+      try {
+        if (dirty || saving || saveQueued || saveTimer){
+          save(false).then(function(ok){
+            if (!ok){ try { eqCaptureLiveToSnap(cur); } catch(e){} }
+            _doRebuild();
+          });
+          return;
+        }
+      } catch(e){}
+      _doRebuild();
+    }
+
+    /* ---------- 对外 API ---------- */
+    var pub = {
+    ensure: function(){
+      eqFitHeight();                                          /* ★EQ-FIT：视图刚显示 → 立刻按真实位置撑满到底部 */
+      setTimeout(eqFitHeight, 60);
+      /* ★EQ-RATE-20261016：汇率口径 = 和财务报表同一套（/api/fx-rates → fx_cache）。
+         拉到后若与当前不同 → 按真实汇率重建一次。服务器没有汇率数据时才退而用签约项目数据。 */
+      if (!window.__eqRateWired){
+        window.__eqRateWired = true;
+        try {
+          window.__eqRateSig = readRate('RMB') + '|' + readRate('USD');
+          eqFxFetch();
+          if (!(eqParseNum(eqFxServer.RMB) > 0 && eqParseNum(eqFxServer.USD) > 0)
+              && (typeof globalWonData === 'undefined' || !globalWonData || !globalWonData.length)
+              && typeof loadWon === 'function'){
+            loadWon();
+            eqLoadRatesFromData(0);
+          }
+        } catch(e){}
+      }
+      if (window.__eqStaleLocale && univer){                 /* 在别的页面切了语言 → 回来时先重建 */
+        try { window.__eqStaleLocale = false; rebuildForLang(); } catch(e){}
+        return;
+      }
+      if (!inited) init();
+    },
+    load: function(){ load(); },
+    save: function(m){ save(!!m); },
+    exportXlsx: function(){ window.location.href = API; },
+    /* ★EQ-SELCUR-20261016（用户 2026-10-16 要求）：
+       有框选（多格）→ 只作用于框选；没框选 → 作用于整表钱列。
+       · 框选的数字格会被登记成「钱格」（eqSelMoney），从此带货币符号 + 参与换算 + 保存乘回 VND；
+       · 选 'NONE'（无）→ 去掉符号、不换算，只保留千位符（回到 VND 原值显示）；
+       · 切换前先把屏幕（含刚录入）的改动乘回 VND 基，保证 snap 永远是 VND 基、不丢未保存录入。
+       ★EQ-CN-CELLCUR-20261016（用户 2026-10-16）：上面这套是【其它表格】的逻辑，原样保留。
+         若当前在「中国投资数据」表 → 走下面的独立分支：只给选中的格子挂单位（纯显示），
+         不改全局 cur / 不改 eqCurChoice / 不换算，所以其它表格完全不受影响。 */
+    setCurrency: function(code){
+      code = code || 'VND';
+      var oldCur = cur;
+      /* ① 先按【旧币种】把屏幕改动并回 VND 基快照（不丢录入、不重复换算）
+            ★eqCaptureLiveToSnap 内部已跳过中国投资数据表（整表不换算） */
+      eqCaptureLiveToSnap(oldCur);
+      /* ①-b ★中国投资数据：只挂单位、不换算，直接返回（不碰 cur / eqCurChoice） */
+      try {
+        var _cnName = eqActiveSheetName();
+        if (_cnName && eqIsCnSheet(_cnName)){
+          var _res = eqCnApplyUnit(code);
+          /* ★不整表重建：render() 会把用户的框选重置到 A1（下一次选币种就会标错格子）。
+             直接对受影响的数字格发 numfmt 命令即可 —— 值一个都不动，只是显示格式变。 */
+          try {
+            if (_res && _res.sid && _res.cells && _res.cells.length){
+              var _vals = [];
+              for (var _i = 0; _i < _res.cells.length; _i++){
+                _vals.push({ row: _res.cells[_i].row, col: _res.cells[_i].col, pattern: moneyPattern(code) });
+              }
+              eqExecNumFmt(_res.sid, _vals);
+            }
+          } catch(e){}
+          eqSetCurDisplay(eqCurLabelNow());
+          st(eqCurLabel(code) + ' · ' + ((_res && _res.n)
+              ? ((code === 'NONE' ? '已清除 ' : '已标注 ') + _res.n + ' 格单位（仅显示 · 不换算）')
+              : '没有数字格'));
+          return;
+        }
+      } catch(e){}
+      /* ② 判定框选（必须是多格）→ 登记/取消登记为钱格 */
+      var marked = false;
+      try {
+        var sel = eqCurrentSelRange();
+        var sh = eqSheetObj();
+        var shn = '';
+        try { shn = (sh && sh.getName && sh.getName()) || (sh && sh.name) || ''; } catch(e){ shn = ''; }
+        if (sel && shn && snap && snap.sheets){
+          var r0 = Math.min(sel.startRow, sel.endRow), r1 = Math.max(sel.startRow, sel.endRow);
+          var c0 = Math.min(sel.startColumn, sel.endColumn), c1 = Math.max(sel.startColumn, sel.endColumn);
+          if (r0 !== r1 || c0 !== c1){                       /* 多格才算「框选」 */
+            var skey = eqSheetKey(shn);
+            /* 找到该表在 snap 里的 cellData（按越文名归一匹配） */
+            var scd = null;
+            Object.keys(snap.sheets).forEach(function(s){ if (scd) return;
+              var s2 = snap.sheets[s]; if (!s2) return;
+              if (eqSheetKey(s2.name) === skey) scd = s2.cellData || {};
+            });
+            eqSelMoney[skey] = eqSelMoney[skey] || {};
+            var m = eqSelMoney[skey];
+            /* ★EQ-ALLMONEY-20261016：默认整表都算钱，所以框选选「无」时必须显式登记
+               「强制不算钱」（eqSelPlain）才能真正去掉符号；选具体币种则清掉该标记。 */
+            eqSelPlain[skey] = eqSelPlain[skey] || {};
+            var p = eqSelPlain[skey];
+            /* ★EQ-SELCUR：只遍历【真实存在的单元格】（不按矩形逐格循环）——整列/整表框选也不会卡死。 */
+            if (scd){
+              Object.keys(scd).forEach(function(rk){
+                var rr = parseInt(rk, 10);
+                if (rr < r0 || rr > r1) return;
+                var row = scd[rk] || {};
+                Object.keys(row).forEach(function(ck){
+                  var cc = parseInt(ck, 10);
+                  if (cc < c0 || cc > c1) return;
+                  var cell = row[ck];
+                  if (!cell || !isNum(cell.v)) return;        /* 只登记数字格 */
+                  var k = rr + ',' + cc;
+                  if (code === 'NONE'){
+                    if (m[k]){ delete m[k]; marked = true; }
+                    if (!p[k]){ p[k] = 1; marked = true; }
+                  } else {
+                    if (p[k]){ delete p[k]; marked = true; }
+                    if (!m[k]){ m[k] = 1; marked = true; }
+                  }
+                });
+              });
+            }
+          }
+        }
+      } catch(e){}
+      if (marked) eqSaveSelMoney();
+      /* ③ 无变化（同币种且没登记任何格）→ 不重建 */
+      if (code === oldCur && !marked) return;
+      cur = code;
+      rate = readRate(cur);
+      eqRateApplied = rate;
+      /* ★EQ-CURSTICK-20261016：把用户的选择记成【长期有效】，之后切表/轮询/重建都不会改回默认 */
+      eqCurChoice = code;
+      try { localStorage.setItem('eq_cur_choice_v1', code); } catch(e){}
+      render();
+    },
+    /* ★EQ-SELCUR-20261016：下拉 change 入口。选完把 select 复位到哨兵（值 ""），
+       这样下次【再选同一个币种】也会触发 change（否则点 VND 永远没反应）。 */
+    onCurChange: function(sel){
+      try {
+        var code = (sel && sel.value) ? String(sel.value) : '';
+        if (code) pub.setCurrency(code);
+      } catch(e){}
+      /* ★EQ-CN-CELLCUR-20261016：复位哨兵时显示的是【当前表视角】的币种 —— 中国投资数据表 = 「无」 */
+      finally { try { eqSetCurDisplay(eqCurLabelNow()); } catch(e){} }
+    },
+    /* ★EQ-FXRATE-20261016：汇率与财务报表同源（/api/fx-rates），页面上不再有汇率框。
+       需要重新拉一次汇率时（例如报表那边更新了汇率）调用它。 */
+    refetchFx: function(){ try { eqFxFetch(); } catch(e){} },
+    openReport: function(){
+      var pop = document.getElementById('eq_rpt_pop'); if (!pop) return;
+      var ys = document.getElementById('eq_rpt_year'), ms = document.getElementById('eq_rpt_month');
+      if (ys && !ys.options.length){
+        var y0 = 2020, y1 = new Date().getFullYear() + 1;
+        ys.innerHTML = '<option value="0">—</option>';
+        for (var y = y1; y >= y0; y--) ys.innerHTML += '<option value="' + y + '">' + y + '</option>';
+        ms.innerHTML = '<option value="0">0</option>';
+        for (var m = 1; m <= 12; m++) ms.innerHTML += '<option value="' + m + '">' + m + '</option>';
+      }
+      var btn = document.getElementById('eq_btn_report');
+      var rect = btn ? btn.getBoundingClientRect() : { left: 20, bottom: 120 };
+      pop.style.left = Math.max(8, Math.min(rect.left, (window.innerWidth || 1200) - 280)) + 'px';
+      pop.style.top = (rect.bottom + 6) + 'px';
+      pop.style.display = 'block';
+    },
+    closeReport: function(){ var p = document.getElementById('eq_rpt_pop'); if (p) p.style.display = 'none'; },
+    applyReport: function(){
+      var y = parseInt((document.getElementById('eq_rpt_year') || {}).value || '0', 10);
+      var m = parseInt((document.getElementById('eq_rpt_month') || {}).value || '0', 10);
+      filter = (y || m) ? { year: y || 0, month: m || 0 } : null;
+      pub.closeReport();
+      /* ★EQ-SAVE-NOLOSS-20261018：重建前先把屏幕（含刚录入、还没自动保存的）并回 snap，
+         否则 render() 会从旧 snap 建表 → 刚录的数据在屏幕上"凭空消失"。 */
+      try { eqCaptureLiveToSnap(cur); } catch(e){}
+      render();
+    },
+    restore: function(){ filter = null; sortDir = 0; try { eqCaptureLiveToSnap(cur); } catch(e){} render(); },
+    sort: function(dir){ sortDir = dir; try { eqCaptureLiveToSnap(cur); } catch(e){} render(); },
+    insertRow: function(){
+      if (!api || !sheet) return;
+      var sid = null; try { sid = sheet.getSheetId(); } catch(e){}
+      if (!sid) return;
+      var row = 0;
+      try {
+        var wb = api.getActiveWorkbook && api.getActiveWorkbook();
+        var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+        var rng = sh && sh.getActiveRange && sh.getActiveRange();
+        if (rng && typeof rng.getRow === 'function') row = rng.getRow();
+      } catch(e){}
+      try {
+        api.executeCommand('sheet.command.insert-row', {
+          unitId: 'equity-report', subUnitId: sid,
+          range: { startRow: row + 1, endRow: row + 1, startColumn: 0, endColumn: 9 }
+        });
+      } catch(e){ console.warn('[equity] insert-row', e); }
+    }
+    };
+    /* ============ ★EQ-UNDO-BRIDGE-20261018★ 股东权益 ↔ 财务那本统一账本 ============
+       权益表在独立的 <script type="module"> 作用域里，财务那边拿不到这里的 api，
+       所以这里只暴露 4 个桥接函数（读当前表 id / 读快照 / 读选区 / 发写回），
+       记账与撤销动作全部复用财务那套（window.__finUndoBridge / finUndoHist）。
+       ★实测这一版 Univer 的 FWorksheet 上没有 getSnapshot（只有 Workbook 有），
+         所以快照一律走 getActiveWorkbook().getSnapshot()（{sheets:{...}}）。 */
+    var eqUndoProgFlag = 0;                          // >0 = 我们自己的写回，不记账
+    try { window.__eqAPI = function(){ return api; }; } catch(e){}
+    /* ★★COLOR-STD-20261018：标准色块面板 → 股东权益落色入口★
+       mode: 'text'（字体色，写 s.cl）/ 'bg'（填充色，写 s.bg）
+       ★走 api.executeCommand（不是程序静默写），这样会进财务那本统一撤销账本。 */
+    window.__eqApplyCellStyle = function(mode, hex){
+      try {
+        if (!api || !api.executeCommand) return false;
+        if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return false;
+        /* ★点色块 = 明确的用户动作：打时间戳，确保这次改动一定进撤销账本 */
+        try { if (window.__finMarkUserInput) window.__finMarkUserInput(); } catch(eM){}
+        var wb = api.getActiveWorkbook();
+        var sh = (wb && wb.getActiveSheet) ? wb.getActiveSheet() : null;
+        if (!sh) return false;
+        var sid = sh.getSheetId ? sh.getSheetId() : '';
+        if (!sid) return false;
+        var g = null;
+        try { g = sh.getSelection().getActiveRange().getRange(); } catch(e1){}
+        if (!g || g.startRow === undefined) return false;
+        var r1 = (g.endRow !== undefined) ? g.endRow : g.startRow;
+        var c1 = (g.endColumn !== undefined) ? g.endColumn : g.startColumn;
+        var nr = r1 - g.startRow + 1, nc = c1 - g.startColumn + 1;
+        if (nr <= 0 || nc <= 0 || nr * nc > 20000) return false;
+        var mat = [], r, c;
+        for (r = 0; r < nr; r++){
+          var row = [];
+          for (c = 0; c < nc; c++){
+            var st = {};
+            if (mode === 'bg') st.bg = { rgb: hex }; else st.cl = { rgb: hex };
+            row.push({ s: st });
+          }
+          mat.push(row);
+        }
+        api.executeCommand('sheet.command.set-range-values', {
+          unitId: 'equity-report', subUnitId: sid,
+          range: { startRow: g.startRow, startColumn: g.startColumn, endRow: r1, endColumn: c1 },
+          value: mat
+        });
+        return true;
+      } catch(e){ return false; }
+    };
+    window.__eqUndo = {
+      sheetId: function(){
+        try { var s = eqSheetObj(); return (s && s.getSheetId) ? s.getSheetId() : ''; } catch(e){ return ''; }
+      },
+      isEditing: function(){
+        try { return (typeof eqIsEditingCell === 'function') ? !!eqIsEditingCell() : false; } catch(e){ return false; }
+      },
+      /* 撤销/恢复后把选区落到被改的那一块（Excel 手感） */
+      focus: function(sid, box){
+        try {
+          if (!api || !api.getActiveWorkbook || !box) return false;
+          var wb = api.getActiveWorkbook();
+          if (!wb) return false;
+          var cur = null;
+          try { var s0 = wb.getActiveSheet(); cur = (s0 && s0.getSheetId) ? s0.getSheetId() : null; } catch(e1){}
+          if (sid && cur && cur !== sid && wb.setActiveSheet){
+            try { wb.setActiveSheet(sid); } catch(e2){}
+          }
+          var sh = wb.getActiveSheet();
+          if (!sh || !sh.getRange) return false;
+          var rg = sh.getRange(box.r0, box.c0, Math.max(1, box.r1 - box.r0 + 1), Math.max(1, box.c1 - box.c0 + 1));
+          if (rg && rg.activate) rg.activate();
+          return true;
+        } catch(e){ return false; }
+      },
+      selDebug: function(){
+        var o = {};
+        try { o.facade = eq_getSelectionRanges(); } catch(e){ o.facade = 'err:' + e; }
+        try { o.cur = eqCurrentSelRange(); } catch(e2){ o.cur = 'err:' + e2; }
+        try { o.cmd = (typeof eqStatSel !== 'undefined') ? eqStatSel : 'na'; } catch(e3){ o.cmd = 'na'; }
+        try { var s = eqSheetObj(); o.sid = s && s.getSheetId ? s.getSheetId() : ''; } catch(e4){}
+        return o;
+      },
+      snapshot: function(sid){
+        try {
+          if (!api || !api.getActiveWorkbook) return null;
+          var wb = api.getActiveWorkbook();
+          var sn = (wb && wb.getSnapshot) ? wb.getSnapshot() : null;
+          if (!sn){
+            var s = (wb && wb.getActiveSheet) ? wb.getActiveSheet() : null;
+            sn = (s && s.getSnapshot) ? s.getSnapshot() : null;
+          }
+          return sn || null;
+        } catch(e){ return null; }
+      },
+      ranges: function(){
+        try {
+          var cr = (typeof eqCurrentSelRange === 'function') ? eqCurrentSelRange() : null;
+          if (cr && cr.startRow !== undefined){
+            return [{ r0: cr.startRow, c0: cr.startColumn,
+                      r1: (cr.endRow !== undefined ? cr.endRow : cr.startRow),
+                      c1: (cr.endColumn !== undefined ? cr.endColumn : cr.startColumn) }];
+          }
+        } catch(e0){}
+        try {
+          var rs = (typeof eq_getSelectionRanges === 'function') ? (eq_getSelectionRanges() || []) : [];
+          var out = [];
+          for (var i = 0; i < rs.length; i++){
+            var o = rs[i];
+            if (!o || o.startRow === undefined) continue;
+            out.push({ r0: o.startRow, c0: o.startColumn,
+                       r1: (o.endRow !== undefined ? o.endRow : o.startRow),
+                       c1: (o.endColumn !== undefined ? o.endColumn : o.startColumn) });
+          }
+          return out.length ? out : null;
+        } catch(e){ return null; }
+      },
+      /* 写回必须带显式 range（不带时 Univer 会写到当前选区左上角 → 撤销写错格子） */
+      write: function(unitId, sid, mat, boxes){
+        try {
+          if (!api || !api.executeCommand) return false;
+          eqUndoProgFlag++;
+          try {
+            var bs = (boxes && boxes.length) ? boxes : null;
+            if (!bs){
+              api.executeCommand('sheet.command.set-range-values',
+                { unitId: unitId || 'equity-report', subUnitId: sid, value: mat });
+              return true;
+            }
+            for (var i = 0; i < bs.length; i++){
+              var b = bs[i];
+              var m = [];
+              for (var r = b.r0; r <= b.r1; r++){
+                var row = [];
+                for (var c = b.c0; c <= b.c1; c++){
+                  var cell = (mat && mat[r] && mat[r][c]) ? mat[r][c] : null;
+                  /* ★★FIN-UNDO-NULLCLEAR-20261018（探针 50 实测）★★
+                     空格子必须 v/t/f 三键一起写 null 才真清空：
+                       {v:''} / {v:'',t:1} → 只留空串；{v:null} → 整格跳过（不清）。 */
+                  var _hasV2 = !!(cell && cell.v !== undefined && cell.v !== null && cell.v !== '');
+                  var oc;
+                  if (_hasV2){
+                    oc = { v: cell.v, f: (cell.f !== undefined) ? cell.f : null };
+                    if (cell.t !== undefined && cell.t !== null) oc.t = cell.t;
+                  } else {
+                    oc = { v: null, t: null, f: null };
+                  }
+                  /* ★FIN-UNDO-STYLE-20261018：s:null = 这版 Univer 唯一可靠的"清样式"写法；
+                     样式 id 解析不出来（uc）的格子不清，免得洗掉用户原有样式。 */
+                  if (!(cell && cell.uc)) oc.s = null;
+                  row.push(oc);
+                }
+                m.push(row);
+              }
+              api.executeCommand('sheet.command.set-range-values', {
+                unitId: unitId || 'equity-report', subUnitId: sid,
+                range: { startRow: b.r0, startColumn: b.c0, endRow: b.r1, endColumn: b.c1 },
+                value: m
+              });
+              /* 第二遍：把原样式铺回去（空样式格子写 {} = 不动） */
+              var sm = [], anyS = false;
+              for (var r2 = b.r0; r2 <= b.r1; r2++){
+                var row2 = [];
+                for (var c2 = b.c0; c2 <= b.c1; c2++){
+                  var cell2 = (mat && mat[r2] && mat[r2][c2]) ? mat[r2][c2] : null;
+                  if (cell2 && cell2.s){ row2.push({ s: cell2.s }); anyS = true; }
+                  else row2.push({});
+                }
+                sm.push(row2);
+              }
+              if (anyS){
+                api.executeCommand('sheet.command.set-range-values', {
+                  unitId: unitId || 'equity-report', subUnitId: sid,
+                  range: { startRow: b.r0, startColumn: b.c0, endRow: b.r1, endColumn: b.c1 },
+                  value: sm
+                });
+              }
+            }
+          } finally { eqUndoProgFlag--; }
+          return true;
+        } catch(e){ return false; }
+      }
+    };
+    /* 权益的命令服务也挂同一套记账钩子（单位 id 强制成 equity-report） */
+    function eqUndoHookInstall(){
+      try {
+        if (!coreMod || !univer || typeof univer.__getInjector !== 'function') return false;
+        var tok = coreMod.ICommandService;
+        if (!tok) return false;
+        var cs = univer.__getInjector().get(tok);
+        if (!cs || cs.__eqUndoHooked) return false;
+        if (typeof cs.beforeCommandExecuted !== 'function') return false;
+        cs.__eqUndoHooked = true;
+        try { window.__eqCmdSvc = window.__eqCmdSvc || cs; } catch(e){}
+        if (window.__finUndoBridge && window.__finUndoBridge.bind){
+          window.__finUndoBridge.bind(cs, 'equity-report');
+        }
+        return true;
+      } catch(e){ return false; }
+    }
+    var _eqUndoBooter = setInterval(function(){
+      try {
+        if (eqUndoHookInstall()){
+          clearInterval(_eqUndoBooter);
+          window.__eqUndoHookOk = true;
+        }
+      } catch(e){}
+    }, 400);
+
+    window.__eq = pub;
+
+    /* ★EQ-FIT-20261016：窗口缩放 / 导航换行导致容器上沿位移时，重算到底部的高度 */
+    window.addEventListener('resize', function(){ try { eqFitHeight(); } catch(e){} });
+
+    /* ★ 顶部「股东权益」标签 → 懒加载本引擎（不改 switchView 内部实现） */
+    try {
+    var _sv = window.switchView;
+    if (typeof _sv === 'function' && !window.__eqSwitchWrapped){
+      window.__eqSwitchWrapped = true;
+      window.switchView = function(name){
+        var out = _sv.apply(this, arguments);
+        try { if (name === 'equity') setTimeout(function(){ pub.ensure(); }, 50); } catch(e){}
+        return out;
+      };
+    }
+    } catch(e){}
+    /* ★EQ-FIT：刷新后直接停在「股东权益」页（switchView 早于本脚本执行）→ 补一次 ensure，
+       否则表格不会初始化、高度也不会按真实位置撑满。 */
+    try {
+    var _ve0 = document.getElementById('view-equity');
+    if (_ve0 && _ve0.classList.contains('active')) setTimeout(function(){ try { pub.ensure(); } catch(e){} }, 120);
+    } catch(e){}
+
+    /* ★语言切换（用户 2026-10-16 要求：悬停提示 + 工作簿内容都随系统三语）：
+       在股东权益页 → 整实例重建（locale 换成新语言）+ 数据按新语言重新翻译；
+       在其它页面 → 只打 __eqStaleLocale 标记，等切回股东权益时（pub.ensure）再重建。 */
+    window.addEventListener('app:langchange', function(){
+    try {
+      var v = document.getElementById('view-equity');
+      if (typeof sweepI18n === 'function' && v) sweepI18n(v);
+      try { eqFitHeight(); } catch(e){}          /* ★EQ-FIT：换语言后标题/工具栏高度会变，重算一次 */
+      if (!univer) return;
+      if (!v || v.classList.contains('active') === false){ window.__eqStaleLocale = true; return; }
+      rebuildForLang();
+    } catch(e){}
+    });
+
+    /* 关页面前把最后一次改动顶上去 */
+    window.addEventListener('beforeunload', function(){
+    /* ★EQ-SAVE-NOLOSS-20261018：saveQueued（排队中/保存飞行期间又改了）同样算未落盘 */
+    try { if (dirty || saveQueued) { var p = payload(); if (p) navigator.sendBeacon(API + '/save', new Blob([JSON.stringify(p)], { type:'application/json' })); } } catch(e){}
+    });
+    })();
+    

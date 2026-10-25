@@ -1,0 +1,32 @@
+fix(keys): 锁死 Ctrl+C/X/V —— 拖拽自愈 + 剪贴板三键显式放行 (FIN-CLIP-PASS-LOCK-20261017)
+
+故障与根因
+- 用户反馈 Ctrl+C / Ctrl+X / Ctrl+V 又失效。排查发现两处会把它们彻底搞死：
+  ① 水平滚动条拖拽的 pointerup 收不到（Univer 常在 canvas 上 stopPropagation，
+     且监听在冒泡阶段）→ bar.__hsState.dragging 永久为 true；
+     此后【每一次】鼠标移动都 preventDefault + 滚动表格，选区与焦点被搅乱，
+     复制/剪切/粘贴自然全部失效。
+  ② 键盘补丁挂在 window 捕获阶段、抢在 Univer 之前，历史上曾因"顺手"对这三个键
+     preventDefault/stopPropagation 而让它们彻底没反应；本次起显式放行并上锁。
+
+修复
+- pointermove 增加自愈：e.buttons === 0（鼠标已松开）时立即 bar.__hsEndDrag() 收尾；
+- pointerup / pointercancel 改【捕获阶段】监听，另挂 blur、visibilitychange
+  兜住"拖到一半切窗 / 标签页隐藏"；
+- endDrag 结束时把键盘焦点还给 Univer 的 canvas（Univer 的快捷键监听绑在它上面）；
+- finExcelKeysBind 里新增显式放行：
+    var finClipKey = (k === 'c' || ... 'V');
+    if (e.ctrlKey && !e.shiftKey && !e.altKey && finClipKey) return;
+
+锁
+- check_fin_excel_keys_lock.py 新增【不变量⑧】：finClipKey 放行段必须存在，
+  且该分支内不得出现 preventDefault / stopPropagation（删掉/改坏即拦截提交）；
+- check_hscroll_lock.py 新增第 7 组「拖拽自愈」：buttons===0 自愈、__hsEndDrag 外置、
+  pointerup 捕获阶段、blur/visibilitychange、焦点归还；
+- 新增反向测试 _lock_reverse_test_clip.py：删放行段 / 改成 preventDefault /
+  删自愈 / pointerup 改回冒泡 / 去掉焦点归还 —— 5/5 全部拦截；
+- 验证床 _univer_kb_fix.html 同步（保持不变量⑥ 逐行一致）。
+
+另：工作区 choice_lite.html 在本次提交前曾被替换成 10-13 的老版本（少 6396 行，
+makeHScroll / FIN-EXCEL-SELALL / FIN-SHEET-LOCK / FIN-CN-HIDE-CHECKED / FIN-DASH2 全都不在）。
+已从 213a1cf 恢复，旧内容备份为 choice_lite.html.bak_reverted_20261017_2051。

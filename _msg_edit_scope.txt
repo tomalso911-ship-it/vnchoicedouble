@@ -1,0 +1,22 @@
+fix(clip): 编辑态判定按容器隔离（真根因：两套 Univer 实例互相带偏）+ 权益编辑态兜底
+
+根因（用户 2026-10-17：「只要一改，Ctrl+C/X/V 就立即丢失」）
+- finIsEditingCell / eqIsEditingCell 都用 document.querySelectorAll('.univer-editor-container')
+  【全局扫描】；
+- 本页同时存在财务 #univer_container 与股东权益 #equity_container 两套 Univer 实例，
+  只要任意一套的编辑覆盖层有尺寸（编辑过之后的残留），两边就都恒判「编辑中」；
+- 财务的 C/X 补写分支位于 editing 判断【之前】，侥幸还能跑；
+  权益的分支位于 editing 判断【之后】→ 直接 return，补写永远不执行 → 剪贴板恒为空。
+  于是表现为「只要改动过就坏、而且改哪都坏、没有任何报错」。
+
+修复
+- finIsEditingCell 改为只扫 #univer_container，eqIsEditingCell 改为只扫 #equity_container；
+- 权益 editing 分支增加兜底（EQ-CLIP-EDITSAFE-20261017）：
+  编辑器里【没有选中文字】时按 Ctrl+C/X，仍然补写选区；确实选中了文字才放行给浏览器。
+  这样即使判定再出错，也不会静默失效。
+
+锁
+- check_fin_excel_keys_lock.py 不变量⑧ 增加三条：
+  · FIN-EDIT-SCOPE-20261017（财务编辑态判定不得改回全局扫描）
+  · EQ-EDIT-SCOPE-20261017（权益同上）
+  · EQ-CLIP-EDITSAFE-20261017（权益编辑态兜底不得被删）

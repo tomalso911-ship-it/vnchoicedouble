@@ -1,0 +1,112 @@
+# -*- coding: utf-8 -*-
+"""股东权益表剪贴板验收（非安全上下文）：Ctrl+C 复制一片 → 移到别处 → Ctrl+V → 读回。
+输出 _clip_accept_eq_out2.txt
+"""
+import json
+import os
+import sys
+
+from playwright.sync_api import sync_playwright
+
+BASE = os.environ.get("PW_BASE", "http://127.0.0.1:5050")
+OUT = os.environ.get("PW_OUT", "_clip_accept_eq_out2.txt")
+URL = BASE + "/lite?v=clipAcceptEq"
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
+CANVAS = """
+() => {
+  var c = document.querySelector('#equity_container canvas');
+  if (!c) return null;
+  var r = c.getBoundingClientRect();
+  return { x: Math.round(r.x + 120), y: Math.round(r.y + 120) };
+}
+"""
+
+EQ_SELECT = """
+() => {
+  var api = window.__eqAPI ? window.__eqAPI() : null;
+  if (!api) return 'no-api';
+  var wb = api.getActiveWorkbook(), sh = wb.getActiveSheet();
+  sh.getRange(2, 0, 2, 3).activate();
+  return 1;
+}
+"""
+
+EQ_SRC = """
+() => {
+  var api = window.__eqAPI ? window.__eqAPI() : null;
+  var wb = api.getActiveWorkbook(), sh = wb.getActiveSheet();
+  return sh.getRange(2, 0, 2, 3).getValues();
+}
+"""
+
+EQ_MOVE = """
+(rc) => {
+  var api = window.__eqAPI ? window.__eqAPI() : null;
+  var wb = api.getActiveWorkbook(), sh = wb.getActiveSheet();
+  sh.getRange(rc[0], rc[1], 1, 1).activate();
+  return 1;
+}
+"""
+
+EQ_READ = """
+(rc) => {
+  var api = window.__eqAPI ? window.__eqAPI() : null;
+  var wb = api.getActiveWorkbook(), sh = wb.getActiveSheet();
+  return sh.getRange(rc[0], rc[1], 2, 3).getValues();
+}
+"""
+
+
+def main():
+    res = {}
+    with sync_playwright() as p:
+        b = p.chromium.launch(channel="chrome", headless=False, args=["--no-sandbox"])
+        pg = b.new_context(viewport={"width": 1400, "height": 900}).new_page()
+        pg.on("dialog", lambda d: d.dismiss())
+        errs = []
+        pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+        pg.add_init_script("try{localStorage.setItem('won_lang','\"zh\"');}catch(e){}")
+        pg.goto(URL, wait_until="domcontentloaded", timeout=60000)
+        pg.wait_for_timeout(2500)
+        if pg.evaluate("()=>{var e=document.getElementById('loginPage');return e&&!e.classList.contains('hidden');}"):
+            pg.fill("#loginUser", "tom")
+            pg.fill("#loginPwd", "66668888")
+            pg.click("#loginBtn")
+        pg.wait_for_selector("#topbar:not(.hidden)", timeout=30000)
+        pg.wait_for_timeout(800)
+        pg.evaluate("()=>{try{switchView('equity');}catch(e){}}")
+        for _ in range(160):
+            pg.wait_for_timeout(300)
+            if pg.evaluate("()=>!!document.querySelector('#equity_container canvas')"):
+                break
+        pg.wait_for_timeout(3000)
+
+        res['secCtx'] = pg.evaluate("()=>window.isSecureContext")
+        res['engine'] = pg.evaluate("()=>window.__clipEngine ? window.__clipEngine.ver : null")
+        hit = pg.evaluate(CANVAS)
+        if hit:
+            pg.mouse.click(hit['x'], hit['y'])
+            pg.wait_for_timeout(400)
+        res['select'] = pg.evaluate(EQ_SELECT)
+        pg.wait_for_timeout(300)
+        res['src'] = pg.evaluate(EQ_SRC)
+
+        pg.keyboard.press("Control+c")
+        pg.wait_for_timeout(600)
+        res['afterCopy'] = pg.evaluate("()=>window.__clipLast || null")
+
+        pg.evaluate(EQ_MOVE, [20, 12])       # AE81 空白区
+        pg.wait_for_timeout(300)
+        pg.keyboard.press("Control+v")
+        pg.wait_for_timeout(1200)
+        res['afterPaste'] = pg.evaluate("()=>window.__clipLast || null")
+        res['pasted'] = pg.evaluate(EQ_READ, [20, 12])
+        res['errs'] = errs[:5]
+        b.close()
+    txt = json.dumps(res, ensure_ascii=False, indent=1)
+    open(OUT, 'w', encoding='utf-8').write(txt)
+    print(txt[:2500])
+
+
+main()

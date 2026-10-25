@@ -1,0 +1,30 @@
+feat(clip): 复制时还原屏幕显示文本（货币符号 + 千位分隔）CLIP-FMT-LOCK-20261017
+
+用户 2026-10-17：「复制的时候，货币符号也必须复制！」
+
+问题
+- fin_clipMatrixText / eq_clipMatrixText 原来直接 String(getValues())，复制出去是裸数字
+  799056508，粘到 Excel / 微信里既没有 ₫ / ¥ / $ 也没有千位分隔。
+
+修复
+- 新增全局 window.win_fmtNum(v, pat)：按单元格的 numfmt pattern 还原屏幕文本
+  · 货币符号取 pattern 开头的 "..."（本项目货币格式一律符号在左）；
+  · 小数位 = pattern 里 .0 / .00 的个数；
+  · 千位分隔始终加；
+  · ★负数按 Excel 语义：负号在最前再跟货币符号 → -₫1,000（不是 ₫-1,000）；
+  · 日期/时间 pattern（含 y/m/d）原样返回（值是序列号，套数字格式会变成错的）；
+  · General 原样返回；百分比按 ×100 后加 %。
+- 财务：新增 fin_clipCellData / fin_clipCellPattern，从 fin_currentSnapshot() 实时快照读
+  cell.s → styles[id].n.pattern，再套 win_fmtNum。
+- 权益：eq_clipMatrixText 里用 api.getActiveWorkbook().getSnapshot() 读同样的 pattern。
+
+实测（playwright + 真实 Chrome，财务报表全选 440 格后 Ctrl+C）
+  剪贴板内容：I	现金和银行余额/TM + 银行余额	₫799,056,508	截至2026年10月9日
+              VPbank 银行	₫303,401	…
+  → 货币符号与千位分隔都在。
+
+锁
+- check_fin_excel_keys_lock.py 新增 ⑧-d：window.win_fmtNum 必须存在、
+  财务复制必须调用 window.win_fmtNum(_raw, _pat)、权益必须调用 window.win_fmtNum(v, _epat)、
+  fin_clipCellPattern 必须存在。
+- _lock_reverse_test_clip.py 扩到 10 个用例（新增「复制退回裸数字」「删掉 win_fmtNum」）。

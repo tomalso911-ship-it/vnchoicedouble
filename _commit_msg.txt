@@ -1,0 +1,43 @@
+锁定+修复：中国报表统计栏多选统计 与 保存不丢（FIN-CN-STAT-LOCK-20261013）
+
+【统计栏：拉选多个数据 → 正确计数 / 总计 / 平均 / 最大 / 最小】
+① 选区改从命令流 sheet.operation.set-selections 取全部 range
+   （门面 getSelection().getRanges() 这版只给“活动单元格”一格 → 拉选一整段仍显示 计数:1）；
+   以 fin_statSize 更大者优先，换工作表自动作废
+② 逐格去重 seen[r,c]：Univer 的 selections 同时带“整块选区 + 锚点单元格”，
+   不去重会把锚点格算两次（实测 E5:E15 → 计数 12、总计多出 10,664）
+   实测：单格 → 1 / ¥10,664；E5:E15 → 11 / ¥63,116 / 平均 ¥5,738 / 最大 ¥18,291 / 最小 ¥221.06；
+   D5:E15 → 22 / ¥63,116 —— 全部与快照逐格求和一致
+
+【保存不丢：勾核销 / 录入被静默吞掉的三条根因】
+③ finCnMarkDirty 在挂起窗口内由 drop 改 defer：旧实现 `if (Date.now() < finCnHoldUntil) return;`
+   直接丢弃改动、窗口结束也不补排 → 勾选核销只把 finDirty 置真，永远没有定时器落盘；
+   另加 2 秒看门狗（有 dirty + 无待发定时器 + 窗口已过 → 补排一次）
+④ 改动代数 finDirtyGen：保存异步 2~4 秒，旧代码保存成功就无条件 finDirty=false，
+   “保存已发出、响应未回来”期间的新勾选被静默抹掉（打桩实测 dirty 1 秒内被清、文件没变）；
+   现在只有代数未变才清 dirty，否则 resaveNeeded 并在 finally 再排一次；
+   finCnFlushBeacon 不再清 dirty（sendBeacon 拿不到响应，服务器拒收就丢数据）
+⑤ 服务端恢复 CN-BASIS-GUARD 金额守卫：落盘前用 _cn_block_total 比对
+   （新基准块 / 旧基准块 < 0.02 = ÷3882 换算污染；新基准块 / 新中文块 < 0.5 = 三块必须同值）；
+   命中就删 tmp、保留服务器文件、返回 HTTP 200 + stale（前端收到即重载干净数据）
+   —— 这层守卫一度从代码里消失，被污染的保存直接落盘，把 41,400,000 写成 10,664.14 又写成 2.75
+⑦ 前端三块对账 FIN-CN-TRI-CONSIST：落盘 payload 上，数值格若基准块 ≠ 中文块则以中文块为准，
+   已污染的文件在下一次保存时自动修回；新录入行（另两块为空）保留，公式格 / 文字格 / 核销列不碰
+
+【数据修复与落盘安全】
+- _cn_repair_triconsist.py：11 个被人民币换算值污染的基准块金额格按中文块回填
+  （41,400,000 / 33,068,000 / 28,305,200 / 7,560,000 / …），三块恢复为 245,025,360
+- ⑥ _cn_ws_save_atomic：外观归一化 4 处改原子落盘（先写 .norm.tmp 再 os.replace），
+  不再就地截断重写（实测那一瞬间能读到坏 zip：BadZipFile: File is not a zip file）
+
+【锁死】
+- 新增硬锁脚本 check_fin_cn_lock.py，静态守卫 ①②③④⑤⑥⑦ 七条不变量（失败即 exit 1）
+- 已登记进 .githooks/pre-commit 与 .git/hooks/pre-commit（core.hooksPath=.githooks）
+- 前端新增 finCnLockCheck() 启动行为级自检，破坏即 console.error + window.__FIN_CN_LOCK_FAILED
+- 反向测试 _lock_reverse_test.py：10 种篡改（改回门面选区、去掉去重、挂起窗口又丢改动、
+  删看门狗、保存无条件清 dirty、beacon 又清 dirty、删三块对账、删服务端守卫、放宽阈值、
+  又用非原子写盘）全部被拦截
+
+验证产物：_verify_final_out.txt（统计栏 + 核销往返 + 金额完好，全部通过）、
+_verify_cn_guard_out.txt（污染快照被守卫拒收、文件哈希不变）、
+_verify_lock_boot_out.txt（启动自检通过、0 页面报错）

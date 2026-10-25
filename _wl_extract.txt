@@ -1,0 +1,211 @@
+4800:             });
+4801:           });
+4802:         } };
+4803:         WL_CHARTS.push(new Chart(cv.getContext('2d'), { type:'line', plugins:[stepLabels], data:{ labels:labels, datasets:[{ label:'', data:data, borderColor:color, backgroundColor:color+'33', fill:true, tension:0.3, pointRadius:3, pointBackgroundColor:'#fff', pointBorderWidth:2 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, ovDataLabels:{display:fals ...[truncated len=545]
+4804:       }
+4805:       mk('wlChartProd', prodS, '#E53935');
+4806:       mk('wlChartLabor', laborS, '#1E88E5');
+4807:       mk('wlChartInst', instS, '#43A047');
+4808:     }
+4809:     function wl_renderDaily(){
+4810:       var body = document.getElementById('wl-tab-body'); if(!body) return;
+4811:       var f = wl_factory();
+4812:       if(!f){ body.innerHTML='<div class="wl-empty">'+wl_i18n('wl_rep_no_data')+'</div>'; return; }
+4813:       var dates = wl_reportDates(f);
+4814:       if(!WL_CUR_DATE){ WL_CUR_DATE = dates.length ? dates[0] : ymdToDmy(prod_today()); }
+4815:       if(!WL_CAL_MONTH){ var p=WL_CUR_DATE.split('/'); WL_CAL_MONTH={ y:+p[2], m:+p[1]-1 }; }
+4816:       WL_CHARTS = [];
+4817:       body.innerHTML = '<div id="wl-report"></div>';
+4818:       wl_renderReport(f, dates);
+4819:     }
+4820:     function wl_renderReport(f, dates){
+4821:       var box = document.getElementById('wl-report'); if(!box) return;
+4822:       var date = WL_CUR_DATE;
+4823:       var dt = new Date(dmyToYmd(date));
+4824:       var w = f.workers && f.workers[date];
+4825:       var rec = f.production && f.production[date];
+4826:       var produced={}, lines=0;
+4827:       if(rec && rec.lines){
+4828:         Object.keys(rec.lines).forEach(function(n){
+4829:           lines++;
+4830:           var L=rec.lines[n]; if(!L) return;
+4831:           if(L.qty){ Object.keys(L.qty).forEach(function(s){ produced[s]=(+produced[s]||0)+(+L.qty[s]||0); }); }
+4832:           else if(L.matrix){ Object.keys(L.matrix).forEach(function(hh){ Object.keys(L.matrix[hh]).forEach(function(s){ produced[s]=(+produced[s]||0)+(+L.matrix[hh][s]||0); }); }); }
+4833:           else if(L.qtyDetail){ Object.keys(L.qtyDetail).forEach(function(s){ var d=L.qtyDetail[s]; if(d&&typeof d==='object'){ Object.keys(d).forEach(function(h){ produced[s]=(+produced[s]||0)+(+d[h]||0); }); } }); }
+4834:         });
+4835:       }
+4836:       var prodTotal=0; Object.keys(produced).forEach(function(s){ prodTotal+=produced[s]; });
+4837:       var workersTotal=0; if(w){ PROD_WORKERS.forEach(function(k){ workersTotal+=(+w[k[0]]||0); }); }
+4838:       var wxAm = w && w.weatherAm;
+4839:       var wxPm = w && w.weatherPm;
+4840:       var faults=(f.equipment&&f.equipment.faults||[]).filter(function(x){ return wl_normDate(x.date)===date; });
+4841:       var rcpts=(f.materials&&f.materials.receipts||[]).filter(function(r){ return wl_normDate(r.date)===date; });
+4842:       var ip=(typeof inst_projectProgress==='function')?inst_projectProgress(f):{demand:0,produced:0,installed:0,prodRate:0,instRate:0};
+4843: 
+4844:       var h='';
+4845:       h += '<div class="wl-report-card">';
+4846:       // 表头：标题
+4847:       h += '<div class="wl-report-header">'
+4848:         + '<div class="wl-report-title">'+wl_i18n('wl_tab_daily_report')+'</div>'
+4849:         + '</div>';
+4850:       // 第二行：合并天气卡（左右分栏，下方日期导航，两者等宽对齐）+ 加宽日历
+4851:       var weekday = String(wl_i18n('wl_weekdays','周日,周一,周二,周三,周四,周五,周六').split(',')[dt.getDay()]||'');
+4852:       h += '<div class="wl-report-top-row">'
+4853:         + '<div class="wl-report-left-col">'
+4854:         + wl_wxCardMerged(wxAm, wxPm)
+4855:         + '<div class="wl-rep-nav-group">'
+4856:         + '<button type="button" class="wl-rep-nav" onclick="wl_repStep(-1)" title="'+wl_i18n('wl_prev')+'">‹</button>'
+4857:         + '<div class="wl-rep-date">'+dmyToYmd(date)+' · '+weekday+'</div>'
+4858:         + '<button type="button" class="wl-rep-nav" onclick="wl_repStep(1)" title="'+wl_i18n('wl_next')+'">›</button>'
+4859:         + '</div></div>'
+4860:         + '<div class="wl-cal-compact">'+wl_calHtml(f, dates)+'</div>'
+4861:         + '</div>';
+4862: 
+4863:       // 采购
+4864:       h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_procurement')+'</div><div class="wl-sec-body">';
+4865:       if(!rcpts.length){ h += '<div class="wl-muted">—</div>'; }
+4866:       else {
+4867:         rcpts.forEach(function(r){
+4868:           var mats=[]; var total=0;
+4869:           if(r.rows&&r.rows.length){ r.rows.forEach(function(rr){
+4870:             var q=(rr.qty!=null?rr.qty:(rr.qty_whole!=null?rr.qty_whole:rr.qty_unit));
+4871:             var u=rr.unit?(' '+rr.unit):'';
+4872:             var sp=rr.spec?(' ('+rr.spec+')'):'';
+4873:             mats.push((rr.material||wl_i18n('wl_material'))+sp+(q!==''&&q!=null?' ×'+wl_fmt(q)+u:''));
+4874:             total += (+rr.subVnd||0);
+4875:           }); }
+4876:           var amt = total>0 ? wl_fmt(total)+' VND' : (r.amount||r.money||r.total||'');
+4877:           h += '<div class="wl-row2">'+ (mats.length?mats.join('；'):wl_i18n('wl_material')) + (amt!==''?' ｜ '+wl_i18n('wl_amount')+': '+amt:'') +'</div>';
+4878:         });
+4879:       }
+4880:       h += '</div></div>';
+4881: 
+4882:       // 生产
+4883:       h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_production')+'</div><div class="wl-sec-body">';
+4884:       h += '<div class="wl-kpis"><div class="wl-kpi"><b>'+wl_fmt(lines)+'</b>'+wl_i18n('wl_lines')+'</div>'
+4885:         + '<div class="wl-kpi"><b>'+wl_fmt(workersTotal)+'</b>'+wl_i18n('wl_workers')+'</div>'
+4886:         + '<div class="wl-kpi"><b>'+wl_fmt(prodTotal)+'</b>'+wl_i18n('wl_total')+'</div></div>';
+4887:       if(prodTotal>0){
+4888:         h += '<table class="wl-tbl"><thead><tr><th>'+wl_i18n('wl_spec')+'</th><th>'+wl_i18n('wl_qty')+'</th><th>'+wl_i18n('wl_share')+'</th></tr></thead><tbody>';
+4889:         Object.keys(produced).forEach(function(s){
+4890:           var q=produced[s]; var pct = prodTotal? (q/prodTotal*100).toFixed(1)+'%':'0%';
+4891:           h += '<tr><td>'+wl_esc(s)+'</td><td>'+wl_fmt(q)+'</td><td>'+pct+'</td></tr>';
+4892:         });
+4893:         h += '</tbody></table>';
+4894:       } else { h += '<div class="wl-muted">—</div>'; }
+4895:       h += '</div></div>';
+4896: 
+4897:       // 故障
+4898:       h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_fault')+'</div><div class="wl-sec-body">';
+4899:       if(!faults.length){ h += '<div class="wl-muted">'+wl_i18n('wl_fault_none')+'</div>'; }
+4900:       else {
+4901:         h += '<div class="wl-kpis"><div class="wl-kpi"><b>'+wl_fmt(faults.length)+'</b>'+wl_i18n('wl_fault_count')+'</div></div>';
+4902:         faults.forEach(function(x){ h += '<div class="wl-row2">'+wl_i18n('wl_reason')+': '+(x.reason||'—')+' ｜ '+wl_i18n('wl_down')+': '+(x.down||'—')+' ｜ '+wl_i18n('wl_repair')+': '+(x.repair||'—')+'</div>'; });
+4903:       }
+4904:       h += '</div></div>';
+4905: 
+4906:       // 安装
+4907:       var todayInstallQty = wl_dayInstallQty(f.installation && f.installation.workers && f.installation.workers[date]);
+4908:       h += '<div class="wl-sec"><div class="wl-sec-title">'+wl_i18n('wl_install')+'</div><div class="wl-sec-body">';
+4909:       h += '<div class="wl-kpis">'
+4910:         + '<div class="wl-kpi"><b>'+wl_fmt(todayInstallQty)+'</b>'+wl_i18n('wl_today_install')+'</div>'
+4911:         + '<div class="wl-kpi"><b>'+wl_fmt((+ip.installed)||0)+'</b>'+wl_i18n('wl_installed')+'</div>'
+4912:         + '<div class="wl-kpi"><b>'+wl_fmt((+ip.demand)||0)+'</b>'+wl_i18n('wl_demand')+'</div>'
+4913:         + '<div class="wl-kpi"><b>'+((+ip.instRate)||0).toFixed(1)+'%</b>'+wl_i18n('wl_inst_rate')+'</div></div>';
+4914:       h += '</div></div>';
+4915: 
+4916:       // 趋势（含汇总与三行曲线）
+4917:       h += wl_trendsHtml(f, dates);
+4918: 
+4919:       h += '</div>'; // end report-card
+4920:       box.innerHTML = h;
+4921:       wl_renderCharts(f, dates);
+4922:     }
+4923:     function wl_renderTab(key){
+4924:       WL_ACTIVE_TAB = key;
+4925:       var box = document.getElementById('wl-tabs'); if(box){
+4926:         Array.prototype.forEach.call(box.querySelectorAll('.wl-tab'), function(t){ t.classList.toggle('active', t.getAttribute('data-key') === key); });
+4927:       }
+4928:       var body = document.getElementById('wl-tab-body'); if(!body) return;
+4929:       if(key==='daily') wl_renderDaily();
+4930:       else wl_renderMywork();
+4931:     }
+4932: var WL_FLOW_IMG = {
+4933:   '01_purchase.webp':'data:image/webp;base64,UklGRvJDAABXRUJQVlA4IOZDAADwFwGdASqkAZ8BPqFInUqmJCMkqfh6IMAUCU3b2eHBMTfDPUr8z/jfUItL+B/JvtN8seyfN78x/ovNr6Nv0H7BX6Yf9L+i/5js4eZv94/WK9Sv/K9OPqo/RV6X/92vR41Rj0551bJXUb9L/ffRRyt9sepT4d5zf8Tvh+ZuoR+Yf2H/hf3D1rIGfUP830Dvcj7754H2nm9/Df672AuCnoDfq/1b/9LyVfYnsHbuUYc/6SIk2yJ6PmbXRgJdGAl0pDQ3OxHUkx6PfrXz7kjDM75ZOyu/KOu8uIW2tAl0YE6Qk3dfo70lNuqU2bZE1A6tRzfeqZSF/uD ...[truncated len=23251]
+4934:   '02_production.webp':'data:image/webp;base64,UklGRq6JAABXRUJQVlA4IKKJAABQpgGdASqkAZYBPpk+l0ilo6KiMdvriLATCWRudcFN8Y8cl/YT0aOQe0v4Z91/y3rR7duyPLR6t833+6/a/3Ufpj/5+4Z/Uf8X+x3uc/9frL/eH1G/2D/k/vJ7t//d9c/989SL++/9z1zPVh/z3qbecB/9vZ7/rP/j9ND//9n/0d/ZPzIeYn8Dwb/JfrH9n/g/yP92zH32o6lPzz8w+mPaJ/W/tH42/IX6l9gv80/pP+3/wHrWfb/tb3y2u/7T0CPZj7T/5v87/nPY5+2/93+p9Uv4T/UewD/evSn/f+F57R7BP9I/1/q1/53/88yv17+3nwGfz ...[truncated len=47057]
+4935:   '03_finished.webp':'data:image/webp;base64,UklGRg5PAABXRUJQVlA4IAJPAAAQUwGdASqkAZ4BPqFGnEmmJCKkK9grKMAUCWdudF0okWiAOxDOfq72AP1E9KHpj80nnO+cLvt3Qp+sDaPfmPYr2VPdb40MFfw3gx93c5/Zv9ANQj8a/of+U9DSHF0qoD/Rv7x6XU3H9C1Af8D6dd+j/L9QLxe/uL0K/sP/P9gb+inBE49zZS2oLwW7ce5S9g3SrTpqLkt3m3ZWNaMatDIP7Iq7FmAbTZKX97Yxm0Ifn36Laycevw8TPvi8FWIO7f4+kSZtPlxDXjgiSfbRgkUVxT1/CTF2Op+E+uzcYw40eDoJ+wn3Whi4heKetTdAVyK/Z9Z8q6/ ...[truncated len=27043]
+4936:   '04_warehouse.webp':'data:image/webp;base64,UklGRip+AABXRUJQVlA4IB5+AABwnQGdASqdAaQBPp1AmUilo6IkMVirwLATiU05uxdn9uDy7jsLsAcqiwwQOwYE5evK58fz4ON+9f3j5G9qXj/2v5vfUHm2/6/q5/TXsEfrN+xfX38yv7teqz/4v3A9/v9/9S3/B/7LrkPQl8vP2gv3g9Jv/////VyJavO79/4V+cL5t/De1H+95c/gv9LzL/on5//u/5P2f/3n7VeM/57/IegR+T/0T/df3n1NPwe7K17/eft17CPtV97/Y31rPyvOP+O9QL+5elf/l8NGgH/Wf3n9mz/Q/cX0Z/X/7b/AP/PP8ciVv56iU4ae5+KKwIiVXzg9eZ ...[truncated len=43124]
+4937:   '05_installation.webp':'data:image/webp;base64,UklGRlRcAABXRUJQVlA4IEhcAABQbwGdASqkAaEBPqFGm0omI6YmqzdcGNAUCUUO/BV9OFBTXwjjfmKj6QX/K9D+3/6D+9/rv+9e87zF7c87fpLzW/971k/rP2CP1X6hXmg/dD1W/+56+/7h6kn9g/5nppe0N6D/m4f/D2ev67/2vSTwfjTnw//J/tv9x5veau1f+d/mH+h6Hd+fzo1CPzL+f/7n01IkPT6gX82/t/7M+qR9//6v8n6x/yP++9gLzo7/ugP/SP9L+zHu4f6/k2+x//r/s/gL/nn+RNb/qwRG86xerMjIAbNcYDQEFEGHlj8P9tS33CjDMmmEC3XC65Zylk/7q0g ...[truncated len=31579]
+4938:   '06_maintenance.webp':'data:image/webp;base64,UklGRviaAABXRUJQVlA4IOyaAAAw7AGdASqeAaQBPp08lkiloyIkM1gc+LATiWRrSdYtLofvjDDkC1GM9ph+XV++w38/+++ldxz3W/A/wXnk8Ee1fMc9k/qvNZ/wf2s92P6R/Y/4Df6X/iPVH/0/2g993+F/8Hqa/pn+1/dz3bv+77BP8P6kH+S/6PXA/5X1PfLz9oP97vUv/03///7nb/84/CR4//uvCP8p+s/3P+C9FTJn296kf0L8+Y93/N/qPHP88/hP/H/nvYL/M/6F/sf7p6zv2v5a+NTsP+u/+X+r9gv2V+yf9n/Jf5j2ifu/Nz+V/33sA/4H0r/8vh6UC/6V/uvVu/z/ ...[truncated len=52958]
+4939: };
+4940: 
+4941:     function wl_renderMywork(){
+4942:       var body = document.getElementById('wl-tab-body'); if(!body) return;
+4943:       if(!WL_CUR){ body.innerHTML = '<div class="wl-empty">'+wl_i18n('wl_empty_list')+'</div>'; return; }
+4944:       var steps = [
+4945:         {key:'procurement', svg:'01_purchase.webp',    color:'#2196F3', goto:'wl_gotoProcurement()'},
+4946:         {key:'production',  svg:'02_production.webp',  color:'#FF9800', goto:'wl_gotoProduction()'},
+4947:         {key:'finished',    svg:'03_finished.webp',    color:'#4CAF50', goto:'wl_gotoFinished()'},
+4948:         {key:'warehouse',   svg:'04_warehouse.webp',   color:'#9C27B0', goto:'wl_gotoWarehouse()'},
+4949:         {key:'install',     svg:'05_installation.webp',color:'#009688', goto:'wl_gotoInstall()'},
+4950:         {key:'maintenance', svg:'06_maintenance.webp', color:'#795548', goto:'wl_gotoMaintenance()'}
+4951:       ];
+4952:       var h = '<div class="wl-flow-grid">';
+4953:       steps.forEach(function(s, i){
+4954:         h += '<div class="wl-flow-card" style="border-top-color:'+s.color+'" onclick="'+s.goto+'">'
+4955:           + '<div class="wl-flow-num" style="background:'+s.color+'">0'+(i+1)+'</div>'
+4956:           + '<img class="wl-flow-svg" src="'+WL_FLOW_IMG[s.svg]+'" alt="'+wl_i18n('flow_'+s.key)+'">'
+4957:           + '<div class="wl-flow-title">'+wl_i18n('flow_'+s.key)+'</div>'
+4958:           + '<div class="wl-flow-sub">'+wl_i18n('flow_sub_'+s.key)+'</div>'
+4959:           + '</div>';
+4960:       });
+4961:       h += '</div>';
+4962:       body.innerHTML = h;
+4963:     }
+4964:     function wl_gotoProdTab(tab){
+4965:       var id = WL_CUR && WL_CUR.id; if(!id) return;
+4966:       try{
+4967:         window.__VIEW_JUMPING = 1;
+4968:         window.__PROD_OPEN_TAB = tab;
+4969:         if(typeof switchView==='function') switchView('production');
+4970:         setTimeout(function(){ window.__VIEW_JUMPING = 0; }, 0);
+4971:         if(typeof prod_open==='function') prod_open(id);
+4972:       }catch(e){}
+4973:     }
+4974:     function wl_gotoProcurement(){ wl_gotoProdTab('D'); }
+4975:     function wl_gotoProduction(){ wl_gotoProdTab('E'); }
+4976:     function wl_gotoFinished(){ wl_gotoProdTab('H'); }
+4977:     function wl_gotoWarehouse(){ wl_gotoProdTab('H'); }
+4978:     function wl_gotoMaintenance(){ wl_gotoProdTab('F'); }
+4979:     function wl_gotoInstall(){
+4980:       var id = WL_CUR && WL_CUR.id; if(!id) return;
+4981:       try{
+4982:         window.__VIEW_JUMPING = 1;
+4983:         if(typeof switchView==='function') switchView('install');
+4984:         setTimeout(function(){ window.__VIEW_JUMPING = 0; }, 0);
+4985:         window.__INST_OPEN_TAB = 'C';
+4986:         if(typeof inst_openProject==='function') inst_openProject(id);
+4987:       }catch(e){}
+4988:     }
+4989:     // 语言切换后，强制刷新工作日志全部文案（不依赖 currentView 守卫，避免跳转路径导致漏刷）
+4990:     try {
+4991:       window.addEventListener('app:langchange', function(){
+4992:         var h2 = document.querySelector('#view-worklog h2'); if(h2) h2.textContent = wl_i18n('wl_title');
+4993:         var backBtn = document.querySelector('#wl-detail .wl-back'); if(backBtn) backBtn.textContent = wl_i18n('wl_back');
+4994:         wl_renderList();
+4995:         if(WL_CUR) wl_renderTabs(WL_ACTIVE_TAB);
+4996:       });
+4997:     } catch(e){ console.warn('[wl] langchange refresh failed', e); }
+4998:     </script>
+4999:   </section>
+5000: 
+5001:   <!-- 生产管理（现场工厂子系统） -->
+5002:   <section class="view" id="view-production">
+5003:     <div class="prod-wrap">
+5004:       <div id="prod-list">
+5005:         <div class="page-header">
+5006:           <h2 data-i18n="prod_title">生产管理 · 现场工厂</h2>
+5007:           <span class="prod-sub" data-i18n="prod_sub">每个签约项目 = 一个独立现场工厂（人员/产能/设备/库存互不串）</span>
+5008:         </div>
+5009:         <div id="prod-cards" class="prod-cards"></div>
+5010:       </div>

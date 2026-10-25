@@ -1,0 +1,1470 @@
+﻿diff --git a/choice_lite.html b/choice_lite.html
+index 867d9e4..a839416 100644
+--- a/choice_lite.html
++++ b/choice_lite.html
+@@ -3009,12 +3009,13 @@ function _ovLoadChartLib(cb){
+ <!-- ============ Univer 0.5.5（开源 + 专业版 exchange 导入导出） ============
+      通过 esm.sh 提供 ESM；财务电脑首次加载需联网一次，之后浏览器缓存即离线可用。
+      如需彻底断网，把相同 URL 镜像到 /vendor 并改写下方 import map 即可。 -->
+ <script type="importmap">
+ {
+   "imports": {
++    "@univerjs/core": "https://esm.sh/@univerjs/core@0.5.5",
+     "@univerjs/presets": "https://esm.sh/@univerjs/presets@0.5.5",
+     "@univerjs/presets/": "https://esm.sh/@univerjs/presets@0.5.5/",
+     "@univerjs/sheets-filter": "https://esm.sh/@univerjs/sheets-filter@0.5.5",
+     "@univerjs/sheets-filter/": "https://esm.sh/@univerjs/sheets-filter@0.5.5/",
+     "@univerjs/sheets-filter-ui": "https://esm.sh/@univerjs/sheets-filter-ui@0.5.5",
+     "@univerjs/sheets-filter-ui/": "https://esm.sh/@univerjs/sheets-filter-ui@0.5.5/",
+@@ -4320,12 +4321,16 @@ var WL_FLOW_IMG = {
+       .univer-container [class*="popup"],
+       .univer-container [class*="filter-panel"]{z-index:1200;}
+       .fin-note{font-size:12px;color:#999;margin-top:8px;line-height:1.6;}
+       .fin-note code{background:#f2f2f2;padding:1px 5px;border-radius:4px;}
+       .fin-panel{display:none;background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;}
+       .fin-panel.active{display:block;}
++      /* ★共用工作区（FIN-CN-REPORT-20261013）：越南/中国两张报表共用这一块；
++         merge（合并总报表）还没做 → fin_renderTabs 会把它隐藏。 */
++      .fin-workspace{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;margin-top:12px;}
++      .fin-cn-hint{font-size:12px;color:#777;margin:4px 0 0;line-height:1.6;}
+       /* 设备故障图标报告：图表盒（锁高度防 Chart.js resize 死循环） */
+       .prod-eq-charts{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0 14px;}
+       .prod-eq-chart-box{flex:1 1 360px;min-width:280px;max-width:560px;height:320px;background:#fff;border:1px solid #eef1f4;border-radius:10px;padding:10px 12px;position:relative;overflow:hidden;box-sizing:border-box;display:flex;flex-direction:column;}
+       .prod-eq-chart-box canvas{flex:1 1 auto;min-height:0;width:100%;}
+       .prod-eq-chart-box-wide{flex:1 1 100%;max-width:none;}
+       .prod-eq-chart-title{text-align:center;font-size:13px;font-weight:700;color:#263238;margin-bottom:8px;flex:0 0 auto;}
+@@ -16609,19 +16614,27 @@ var PROD_EQUIP_FAULT_KB = {
+         <div class="fin-tab active" data-key="vn" data-i18n="fin_tab_vn_report" onclick="fin_switchTab('vn')">越南财务报表</div>
+         <div class="fin-tab" data-key="cn" data-i18n="fin_tab_cn_report" onclick="fin_switchTab('cn')">中国财务报表</div>
+         <div class="fin-tab" data-key="merge" data-i18n="fin_tab_merge_report" onclick="fin_switchTab('merge')">合并财务总报表</div>
+       </div>
+       <div class="fin-panel active" id="fin_panel_vn">
+         <h3 data-i18n="fin_tab_vn_report">越南财务报表</h3>
++      </div>
++      <div class="fin-panel" id="fin_panel_cn">
++        <h3 data-i18n="fin_tab_cn_report">中国财务报表</h3>
++        <p class="fin-cn-hint" data-i18n="fin_cn_hint">与越南报表同一套表格逻辑；Excel 里只有「实际支出」一张表。改动后请点「保存」。</p>
++      </div>
++      <!-- ★共用工作区（FIN-CN-REPORT-20261013）：越南/中国两张报表复用同一套工具栏 + Univer 容器，
++           切标签只换【数据源】（vn_report.xlsx / cn_report.xlsx），表格逻辑完全一套。 -->
++      <div class="fin-workspace" id="fin_workspace">
+         <div class="fin-toolbar">
+           <button class="fin-btn fin-btn-green" onclick="fin_sortDatesByBlock()"><span data-i18n="fin_btn_date_fmt">按日-月-年排序</span><span id="fin_date_sort_arrow" class="fin-sort-arrow">↑</span></button>
+           <button class="fin-btn" data-i18n="fin_btn_load" onclick="fin_loadOrReload()">载入/刷新报表</button>
+           <button class="fin-btn" data-i18n="fin_btn_save" onclick="fin_autoSave()">保存</button>
+           <button class="fin-btn" data-i18n="fin_btn_report" onclick="fin_rptQueryPop(this)">查报表</button>
+           <button class="fin-btn" data-i18n="fin_btn_export" onclick="fin_exportLocal()">导出 xlsx</button>
+-          <button class="fin-btn" data-i18n="fin_btn_reimport" onclick="document.getElementById('fin_reimport_file').click()">重导</button>
++          <button class="fin-btn" id="fin_reimport_btn" data-i18n="fin_btn_reimport" onclick="document.getElementById('fin_reimport_file').click()">重导</button>
+           <input type="file" id="fin_reimport_file" accept=".xlsx" style="display:none" onchange="fin_reimport(this)">
+           <span class="fin-spacer"></span>
+           <span id="fin_status" class="fin-status" data-i18n="fin_status_not_loaded">未载入</span>
+           <span id="fin_build_tag" title="FIN-HI-LOCK-20261011" style="font-size:11px;opacity:.5;margin-left:8px;white-space:nowrap">HL6-LOCK</span>
+         </div>
+         <div class="fin-toolbar2">
+@@ -16645,16 +16658,12 @@ var PROD_EQUIP_FAULT_KB = {
+               <circle cx="16.5" cy="16.5" r="2.5"/>
+             </svg>
+           </button>
+         </div>
+         <div id="univer_container" class="univer-container"></div>
+       </div>
+-      <div class="fin-panel" id="fin_panel_cn">
+-        <h3 data-i18n="fin_tab_cn_report">中国财务报表</h3>
+-        <p data-i18n="fin_panel_placeholder">该报表内容建设中，敬请期待。</p>
+-      </div>
+       <div class="fin-panel" id="fin_panel_merge">
+         <h3 data-i18n="fin_tab_merge_report">合并财务总报表</h3>
+         <p data-i18n="fin_panel_placeholder">该报表内容建设中，敬请期待。</p>
+       </div>
+     </div>
+   </section>
+@@ -16682,28 +16691,109 @@ var PROD_EQUIP_FAULT_KB = {
+        用户要求「就是这一份，不要每日保存」。打开后：
+        ① 任何单元格改动不再触发 fin_markDirty / fin_autoSave；
+        ② 日期规范化、排序等视图操作不再回写 xlsx；
+        ③ 保存按钮禁用；更新报表请走「重导」上传新的 xlsx。
+        关闭：改成 false 即可恢复自动保存。 */
+     var FIN_READONLY = true;
++
++    /* ============ 报表种类：越南 / 中国（FIN-CN-REPORT-20261013）============
++       用户要求：把越南财务报表的【整套表格逻辑】原样复制到中国财务报表，唯一差别是
++       中国报表的 Excel 里【只有一张「实际支出」表】。
++       实现：不复制一份代码，而是给同一套逻辑加一个「报表种类」维度 ——
++         · 数据源 / unitId / 接口前缀 / 显示窗口宽度 / 表名映射 由 FIN_KIND 决定；
++         · 工具栏与 Univer 容器两张报表【共用同一块】(#fin_workspace)，切标签只换数据源；
++         · 自动翻译链路（finTransCache / fin_requestTrans / fin_transChecked …）一个字不改。
++       ★保存差异：越南保持只读（保存按钮禁用，更新走「重导」）；
++         中国报表【录入后 0.7s 自动写回 cn_report.xlsx】+ 手点「保存」双通道 ——
++         用户要求「录入后立即保存，刷新页面数据仍在」（CN-AUTOSAVE-20261013）。 */
++    var FIN_KIND = 'vn';
++    var FIN_CHECK_COL = 28;              // AC 列（0 基）：中国报表的「核销」勾选框列
++    var FIN_CHECK_ON = '\u2611';         // ☑
++    var FIN_CHECK_OFF = '\u2610';        // ☐
++    var FIN_KINDS = {
++      vn: { slug: 'vn-report', unitId: 'vn-report', dl: 'vn_report.xlsx',
++            viewMaxCol: 9,  explicitSave: false, checkCol: false },
++      cn: { slug: 'cn-report', unitId: 'cn-report', dl: 'cn_report.xlsx',
++            viewMaxCol: 28, explicitSave: true,  checkCol: true }
++    };
++    function fin_cfg(){ return FIN_KINDS[FIN_KIND] || FIN_KINDS.vn; }
++    function fin_isCn(){ return FIN_KIND === 'cn'; }
++    function fin_api(p){ return '/api/finance/' + fin_cfg().slug + (p || ''); }
++    /* 中国报表的表名三语（服务端 finance_data/fin_sheet_titles_cn.json 的兜底） */
++    function fin_titlesFallbackCn(){
++      var o = {};
++      o['\u5b9e\u9645\u652f\u51fa'] = { vi: 'Chi th\u1ef1c t\u1ebf', zh: '\u5b9e\u9645\u652f\u51fa', en: 'Actual Payments' };
++      return o;
++    }
++    var finTitlesKind = null;            // 当前表名映射属于哪张报表
++    /* 只装「当前报表种类」的本地表名兜底表（服务端表名到达前的临时值） */
++    function fin_applyTitlesFallback(){
++      if (FIN_KIND === 'cn'){
++        finSheetTitles = fin_titlesFallbackCn();
++      } else if (typeof FIN_SHEET_TITLES_FALLBACK !== 'undefined' && FIN_SHEET_TITLES_FALLBACK){
++        finSheetTitles = FIN_SHEET_TITLES_FALLBACK;
++      }
++    }
++    /* 切报表种类：换数据源相关的全局（表名映射 / 显示窗口宽度 / 标题兜底），并重拉表名 */
++    function fin_setKind(k){
++      if (k !== 'vn' && k !== 'cn') k = 'vn';
++      var first = (finTitlesKind === null);
++      var changed = (finTitlesKind !== null && finTitlesKind !== k);
++      FIN_KIND = k;
++      FIN_KINDS[k] && (FIN_VIEW_MAXCOL = FIN_KINDS[k].viewMaxCol);
++      if (finTitlesKind === k) return;
++      finTitlesKind = k;
++      fin_applyTitlesFallback();
++      finTitlesLoaded = false;
++      finTitlesTried = 0;
++      if (changed && !first) { try { fin_loadSheetTitles(true); } catch(e){} }   // 首次由 fin_initUniver 统一拉
++    }
+     function fin_renderTabs(active){
+       FIN_ACTIVE_TAB = active || 'vn';
+       try { sessionStorage.setItem('won_fin_tab', FIN_ACTIVE_TAB); } catch(e){}
+       var tabs = document.querySelectorAll('#fin-tabs .fin-tab');
+       for (var i = 0; i < tabs.length; i++) {
+         tabs[i].classList.toggle('active', tabs[i].getAttribute('data-key') === FIN_ACTIVE_TAB);
+       }
+       var panels = document.querySelectorAll('#view-finance .fin-panel');
+       for (var j = 0; j < panels.length; j++) {
+         panels[j].classList.toggle('active', panels[j].id === ('fin_panel_' + FIN_ACTIVE_TAB));
+       }
++      // ★报表种类：vn / cn 共用同一块工作区；merge（合并总报表）还没做 → 隐藏工作区
++      fin_setKind(FIN_ACTIVE_TAB === 'cn' ? 'cn' : 'vn');
++      var ws = document.getElementById('fin_workspace');
++      if (ws) ws.style.display = (FIN_ACTIVE_TAB === 'merge') ? 'none' : '';
++      try { fin_applyReadonlyUI(); } catch(e){}
++    }
++    /* 换报表：丢掉当前单元与按报表缓存的状态，重新拉目标报表的快照 */
++    /* ★切报表种类（越南 ⇄ 中国）：换数据源重新载入。
++       ★★这里【绝不能】先 fin_disposeUnit() 再去取数据：中间会出现"一个工作单元都没有"的空窗，
++         Univer 的界面/渲染层这时去取当前单元，就会撞上 null ——
++         实测控制台报 `Uncaught TypeError: Cannot read properties of null (reading 'getUnitId')`。
++       正确的时序跟 fin_reload 一致：先 fetch 快照，快照到手后再在 createUnit 前一刻销毁旧单元
++         （fin_loadReport 内部就是这么做的）→ 空窗为 0。 */
++    function fin_switchKindReload(){
++      try {
++        finLastSnapshot = null; finLastView = null; finRowOrder = [];
++        finRptFilter = null; finCurCache = {}; finHiState = {}; finHiHealAt = 0;
++        // 旧单元还活着时先撤掉筛选插件的状态（跟 fin_reload 同因同果：
++        // 否则销毁瞬间插件仍可能再发一条带旧 unitId 的校验命令）
++        if (finSheet) { try { fin_removeFilter(); } catch(e){} }
++      } catch(e){}
++      try { fin_loadReport(); } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); }
+     }
+     function fin_switchTab(key){
+       if (!key || !document.getElementById('fin_panel_' + key)) return;
++      var prevKind = FIN_KIND;
+       fin_renderTabs(key);
+-      if (key === 'vn') fin_initUniver();   // 切到越南报表时懒加载 Univer
++      if (key !== 'vn' && key !== 'cn') return;          // merge 还没做
++      if (finInited && finUniver) {
++        if (FIN_KIND !== prevKind) fin_switchKindReload();  // 换报表 → 换数据源重载
++        return;
++      }
++      fin_initUniver();                                   // 首次：懒加载 Univer 引擎
+     }
+     fin_renderTabs(FIN_ACTIVE_TAB);
+ 
+     /* ============ 越南财务报表：Univer 嵌入（OSS，免授权） ============ */
+     // 路线 A：Univer OSS 核心(@univerjs/presets + preset-sheets-core) 负责界面/编辑；
+     // xlsx 导入导出由后端 Python(openpyxl) 完成，前端只 load/save 快照。无需 Pro 授权、无水印。
+@@ -16724,13 +16814,15 @@ var PROD_EQUIP_FAULT_KB = {
+       var s = document.getElementById('fin_status');
+       if (s) s.textContent = fin_L(k) + (finStatusSuffix ? finStatusSuffix : '');
+     }
+     // 语言切换时原地刷新状态文字与按钮（三语联动）
+     window.addEventListener('app:langchange', function(){
+       try { fin_setStatusKey(finStatusKey, finStatusSuffix); } catch(e){}
+-      try { if (typeof sweepI18n === 'function') sweepI18n(document.getElementById('fin_panel_vn')); } catch(e){}
++      // ★越南/中国两张报表共用工作区：语言切换时整块财务视图都要重刷文字（含中国面板说明）
++      try { if (typeof sweepI18n === 'function') sweepI18n(document.getElementById('view-finance')); } catch(e){}
++      try { if (typeof fin_applyReadonlyUI === 'function') fin_applyReadonlyUI(); } catch(e){}
+       try { if (typeof fin_menuInsRefresh === 'function') fin_menuInsRefresh(); } catch(e){}
+       // ★查报表浮层：只原地刷新文字（不重建、不重算位置）
+       try { if (typeof fin_rptPopLocalize === 'function') fin_rptPopLocalize(); } catch(e){}
+     });
+ 
+     function fin_currentSnapshot(){
+@@ -16779,13 +16871,16 @@ var PROD_EQUIP_FAULT_KB = {
+       return 0;
+     }
+     function fin_loadSheetTitles(force){
+       if (finTitlesLoaded && !force) return Promise.resolve();
+       if (!force && finTitlesTried >= 3) return Promise.resolve();   // 接口不可用就别一直重试
+       finTitlesTried++;
+-      return fetch('/api/finance/sheet-titles').then(function(r){ return r.json(); }).then(function(j){
++      var want = FIN_KIND;                        // ★认住这次请求属于哪张报表（中国报表另一份映射）
++      var url = '/api/finance/sheet-titles' + (want === 'cn' ? '?kind=cn' : '');
++      return fetch(url).then(function(r){ return r.json(); }).then(function(j){
++        if (FIN_KIND !== want) return;            // 期间又切了报表：丢弃这次结果，避免串台
+         if (j && j.ok && j.titles && Object.keys(j.titles).length){
+           finSheetTitles = j.titles; finTitlesLoaded = true;         // 服务端为准
+         }
+       }).catch(function(){ /* 接口不可用：继续用兜底表，标签仍随语言切换 */ });
+     }
+     /* ★改工作表标签名时必须同步改写公式里的跨表引用（'旧名'! → '新名'!）。
+@@ -16943,14 +17038,31 @@ var PROD_EQUIP_FAULT_KB = {
+               if (tt && tt !== cell.v){
+                 var cp = {};
+                 for (var kk in cell) cp[kk] = cell[kk];
+                 cp.v = tt;
+                 nrow[ck] = cp; has = true; continue;
+               }
+-              // 缓存里没有 → 立即调 API，到了再补写；★含保护词的文字不去翻译（免得译出「达巴科」）
+-              if (!rec && !fin_hasNoTrans(cell.v)) fin_requestTrans(cell.v, lang);
++              /* ★FIN-TRANS-MISS-20261013（用户 2026-10-13 报的 BUG）★
++                 判定"要不要去翻译"【绝不能只看 finTransCache 里有没有这条记录】：
++                 fin_seedLang 会给基准块（A–H）里每一个文字都建记录，而当文件里对应的
++                 中/英块为空时，记录就是 { vi: 原文, zh: null, en: null } —— rec 是"有"的。
++                 老代码写成 `if (!rec ...)`，于是「只有越南文那一列、中英块为空」的行
++                 【永远不会被送去翻译】：屏幕一直显示越南文（用户截图里的第 14 行），
++                 保存也只会把原文写回中英块 → 切语言/刷新永远是原文。
++                 正确判定：这条记录【缺当前语言的译文】就该去请求。
++                 ★含保护词的文字仍然不翻（免得把 DABACO 译成「达巴科」）。 */
++              if ((!rec || !rec[lang]) && !fin_hasNoTrans(cell.v)){
++                fin_requestTrans(cell.v, lang);
++                /* ★中国报表：只翻「当前语言」不够。落盘时 finCnBuildSavePayload 是拿
++                   finTransCache 生成三语块的，另两块取不到译文就会把「当前语言原文」当兜底
++                   写进去 —— 于是英文列显示中文。这里把另外两种语言一并取回来，
++                   保存时的三块才是各自语言（越南报表不动：它仍是只读 + 重导）。 */
++                if (fin_isCn()){
++                  ['vi', 'zh', 'en'].forEach(function(l){ if (l !== lang) fin_requestTrans(cell.v, l); });
++                }
++              }
+             }
+             nrow[ck] = cell; has = true;
+           }
+           if (has) ncd[rk] = nrow;
+         }
+         // 公式跨表引用：把任意语言变体统一成当前语言的目标表名
+@@ -16982,12 +17094,70 @@ var PROD_EQUIP_FAULT_KB = {
+         outs[sid] = ns;
+       }
+       out.sheets = outs;
+       return out;
+     }
+ 
++    /* ★中国报表：显示视图适配（FIN-CN-REPORT-20261013）
++       中国报表只有一张工作表，列布局与越南那张「实际支出」完全一致：
++         A–E（越南文基准块）| K–O（中文块）| U–Y（英文块）| AC（核销勾选框列）
++       跟翻视图仍只显示「当前语言那一块」（A–J）；为了让 AC 核销列也能一屏看到，
++       这里把中间三语块（K–AB = 第 10–27 列）的内容清空并隐藏，屏上只留 A–J + AC。
++       ★只动"显示快照"，绝不写回文件 —— 真正落盘由 finCnBuildSavePayload 从
++         【原始完整快照 + 视图里的改动】重建三语块（不破坏 K–O / U–Y）。 */
++    function finCnAdaptView(view){
++      if (!fin_isCn() || !view || !view.sheets) return view;
++      var sid = (view.sheetOrder || [])[0];
++      var sh = sid ? view.sheets[sid] : null;
++      if (!sh) return view;
++      var hid0 = 10, hid1 = FIN_CHECK_COL - 1;          // K..AB
++      var cd = sh.cellData || {};
++      for (var rk in cd){
++        var row = cd[rk] || {};
++        for (var ck in row){
++          var c = parseInt(ck, 10);
++          if (c >= hid0 && c <= hid1) delete row[ck];
++        }
++      }
++      var colD = sh.columnData || (sh.columnData = {});
++      for (var i = hid0; i <= hid1; i++){
++        var k = String(i);
++        if (!colD[k]) colD[k] = {};
++        colD[k].hd = 1;                                 // 隐藏：宽度塌成 0 → AC 紧跟在 J 后面
++      }
++      if (sh.mergeData){
++        sh.mergeData = sh.mergeData.filter(function(m){
++          var a = m.startColumn || 0, b = m.endColumn || 0;
++          return b < hid0 || a >= FIN_CHECK_COL;
++        });
++      }
++      sh.columnCount = FIN_CHECK_COL + 1;
++      return view;
++    }
++    /* 中国报表必须走这一层：先按当前语言生成视图，再做中国报表专属适配 */
++    function fin_buildViewFor(snap, lang){
++      var view = fin_buildLangView(snap, lang);
++      try { finCnAdaptView(view); } catch(e){ console.warn('[fin-cn] adapt view', e); }
++      return view;
++    }
++    /* ★核销列的表头「核销」与勾选符号「☐/☑」也要跟语言走，但它们是【标签/符号】，
++       不该送去机器翻译：这里先把它们种进译文缓存（三语同一条记录），
++       于是跟翻时原样显示、且不会发任何翻译请求。★不涉及翻译逻辑本身。 */
++    function finCnSeedCheckGlossary(){
++      if (!fin_isCn()) return;
++      try {
++        [FIN_CHECK_ON, FIN_CHECK_OFF].forEach(function(g){
++          if (!finTransCache[g]) finTransCache[g] = { vi: g, zh: g, en: g };
++        });
++        var rec = { vi: 'Xác nhận', zh: '\u6838\u9500', en: 'Write-off' };
++        finTransCache['\u6838\u9500'] = rec;
++        finTransCache[rec.vi] = rec;
++        finTransCache[rec.en] = rec;
++      } catch(e){}
++    }
++
+     /* ============ 内容键翻译缓存 + 编辑监控（FIN-LIVE-TRANS-20261012） ============
+        用户在任何工作表、任何语言下改动/新增内容时：
+          · 记下这份文字属于哪个语言；
+          · 【立即】调 /api/translate 把另外两种语言的译文取回来（"专业翻译同步到其他语言"）；
+          · 切语言时用缓存里的译文重建显示，译文还没回来的先原样显示，回来后再补写。 */
+     var finTransCache = {};      // 文字 -> {vi,zh,en}（vi/zh/en 三个键都指向同一条记录）
+@@ -17031,12 +17201,17 @@ var PROD_EQUIP_FAULT_KB = {
+       finPatchTimer = setTimeout(function(){ finPatchTimer = null; try { fin_patchTransView(); } catch(e){} }, 150);
+     }
+     // 译文回来后，把当前视图里"还显示着别的语言"的文字补成当前语言
+     function fin_patchTransView(){
+       if (!finReady || !finUniverAPI || !finSheet) return;
+       if (finEditSuppress > 0) return;
++      /* ★CN-AUTOSAVE-20261013：补译文是【程序改视图】，不是用户录入。
++         它的格子改动会被"改动扫描"在 180ms 后看见 → 挂起自动保存，
++         否则每补一个译文都会触发一次整份 xlsx 重写。译文本身会进下一次保存的 payload
++         （payload 是从 finTransCache 生成三语块的，不靠这次屏幕补写）。 */
++      try { finCnHoldAutoSave(2000); } catch(e){}
+       var lang = CUR_LANG || 'vi';
+       var snap; try { snap = fin_currentSnapshot(); } catch(e){ return; }
+       if (!snap || !snap.sheetOrder) return;
+       var unitId = fin_unitId();
+       var n = 0;
+       finEditSuppress++;
+@@ -17060,13 +17235,20 @@ var PROD_EQUIP_FAULT_KB = {
+                 try { finExecSilent('sheet.command.set-range-values', { unitId: unitId, subUnitId: sid, value: m }); n++; } catch(e){}
+               }
+             }
+           } catch(e){}
+         });
+       } finally { finEditSuppress--; finEditQuietUntil = Date.now() + 400; }
+-      if (n){ console.log('[fin] patch trans cells', n); fin_captureEditBase(); }
++      if (n){
++        console.log('[fin] patch trans cells', n);
++        fin_captureEditBase();
++        /* ★中国报表：屏幕上刚补上的是"译文到位"的内容 —— 只有落盘，文件里缺的那两块
++           （K/M 中文块、U/W 英文块）才会被补上，而不是每次打开都要重新翻一遍。
++           只对中国报表排自动保存；越南报表只读，绝不写盘。 */
++        try { if (fin_isCn()) finCnScheduleSave(); } catch(e){}
++      }
+     }
+ 
+     /* ---- 编辑监控：与上次基线逐格对比，发现"用户改了/加了什么" ---- */
+     var finEditBase = {};          // sid -> { "r,c": 值字符串 }
+     var finEditSuppress = 0;       // 我们自己写盘时抑制误判
+     var finEditQuietUntil = 0;     // 异步回调的静默窗口
+@@ -17133,12 +17315,21 @@ var PROD_EQUIP_FAULT_KB = {
+       console.log('[fin] 检测到用户改动', changed.length, '格');
+       finEditSuppress++;
+       try { changed.forEach(function(ch){ try { fin_handleUserEdit(ch.sid, ch.r, ch.c, ch.v); } catch(e){} }); }
+       finally { finEditSuppress--; finEditQuietUntil = Date.now() + 250; }
+       fin_captureEditBase();        // 内部写入（日期规范化）之后再打基线
+       try { finHiRecompute(); } catch(e){}      // ★立即重算"离今天最近"的高亮行
++      /* ★中国报表：新录入/粘贴进来的字【立即】补成蓝色（CN-BLUE-LIVE-20261013）。
++         必须排在高亮之后：这样才拿得到本轮的高亮行号，从而跳过它。
++         只在中国报表生效，且只写样式、静默写入，不会标脏/触发保存。 */
++      try { finCnBlueEnsureTimer(); } catch(e){}
++      try { finCnBluePass(); } catch(e){}
++      /* ★中国报表：检测到真实改动 → 立刻排一次自动保存（CN-AUTOSAVE-20261013）。
++         用户要求：「录入后立即保存，确保刷新页面数据仍在」。
++         ★只对中国报表生效（finCnMarkDirty 第一行就 return），越南报表一个字不动。 */
++      try { finCnMarkDirty(); } catch(e){}
+       fin_captureEditBase();
+       return changed.length;
+     }
+     // 一次用户编辑：① 日期强制成 DD-MM-YYYY ② 文字立即调 API 翻译并同步到其它语言
+     function fin_handleUserEdit(sid, r, c, v){
+       var lang = CUR_LANG || 'vi';
+@@ -17321,13 +17512,23 @@ var PROD_EQUIP_FAULT_KB = {
+         clearInterval(fin_undoLoadPurgeTimer);
+         fin_undoLoadPurgeTimer = null;
+       }, 300);
+     }
+     /* 内部维护写入的统一入口（替代 finUniverAPI.executeCommand），返回值语义不变（Promise）。
+        ★这一段写入不进撤销栈、也不清 redo 栈；用户自己点的排序/筛选/百分比仍走原生 executeCommand，照旧可撤销。 */
++    /* ★CN-AUTOSAVE-20261013：程序自己写视图时开一个静默窗口（不是用户录入）。
++       finExecSilent 是"内部写入"的统一入口（翻译补写 / 币种重算 / 日期规范化 / 高亮写入…）。
++       命令流的回调是异步的，所以窗口必须【执行前】就打开，并且窗口期间不许把改动算成用户录入 ——
++       否则中国报表会因为「补了个译文」「换了个币种」就自动重写整份 xlsx。
++       ★真正的用户录入（打字/粘贴/删除）不走 finExecSilent，不受影响。 */
++    var finProgWriteUntil = 0;
+     function finExecSilent(cmdId, params){
++      try { finProgWriteUntil = Date.now() + 800; } catch(e){}
++      return finExecSilentInner(cmdId, params);
++    }
++    function finExecSilentInner(cmdId, params){
+       if (!finUniverAPI || !finUniverAPI.executeCommand) return null;
+       var ur = fin_undoRedoService();
+       if (!ur || typeof ur.pushUndoRedo !== 'function'){
+         try { return finUniverAPI.executeCommand(cmdId, params); } catch(e){ return null; }
+       }
+       if (fin_undoMute > 0){          // 已在静默窗口内：直接执行，由最外层统一恢复
+@@ -17611,13 +17812,13 @@ var PROD_EQUIP_FAULT_KB = {
+       try {
+         var UNIT_SHEET = (finPresets && finPresets.UniverInstanceType && finPresets.UniverInstanceType.UNIVER_SHEET) || 2;
+         var base = null;
+         try { base = fin_currentSnapshot(); } catch(e){}
+         if (!base) base = finLastView || finLastSnapshot;
+         var keep = fin_captureSheetState();        // ★先记下"用户正在看的表 + 滚动位置"
+-        var snapshot = fin_buildLangView(base, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
++        var snapshot = fin_buildViewFor(base, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
+         // ★查报表筛选：语言切换后保持「隐藏其它日期行 + 汇总表本期数值/本期文字」
+         try { fin_rptHideInView(snapshot, base); } catch(e){}
+         try { fin_rptApplySummary(snapshot, base); } catch(e){}
+         finLastView = snapshot;
+         finLoading = true;
+         try {
+@@ -17642,16 +17843,145 @@ var PROD_EQUIP_FAULT_KB = {
+         setTimeout(function(){ try { finHiRecompute(); } catch(e){} }, 1000);
+         // ★重建后重放当前选中的币种（含默认 VND）：保证所有工作表都带正确的货币符号
+         setTimeout(function(){ try { fin_reapplyCurrency(true); } catch(e){} }, 1200);
+       } catch(e){ console.warn('[fin] applyLangView failed', e); }
+     }
+     /* 每次新建显示单元后都要重新绑定"单元格改数据"监听（sheet 对象是新的） */
++    /* ★中国报表「核销」列（FIN-CN-REPORT-20261013）：AC 列的勾选框
++       · 格里存的就是 ☐ / ☑ 两个字符（随文件保存，刷新 / 换语言都还在）；
++       · 单击一格 = 切换 ☐ ↔ ☑；
++       · 在 AC 列上按住鼠标下滑（拖选）= 把扫过的格子【统一】设成同一状态
++         （起点是 ☐ → 全部 ☑；起点是 ☑ → 全部 ☐）→ 就是用户要的"鼠标快速下滑批量勾选"。
++       ★选区从哪来：不依赖门面的 getActiveRange()（实测它在本环境返回的包装对象没有
++         getRow 方法，取不到；而且拖动过程中它是异步滞后的），改为【听 Univer 的命令流】：
++         鼠标按下/拖动时引擎会发 `sheet.operation.set-selections`，参数里就带着
++         [[startRow,startColumn,endRow,endColumn], ...]。只挑「列 = AC」的那些，
++         取本次手势里最大的范围，松手时统一处理。→ 单击/拖动都稳。
++       ★只认 AC 列：其它列的选区拖动完全不受影响。 */
++    var finCnSel = null;      // 本次手势里落在 AC 列上的最大选区 { r0, r1 }
++    var finCnDown = false;
++
++    /* 递归扫出命令参数里所有「单元格范围」，只留 AC 列上的那些 */
++    function finCnScanRanges(o, depth){
++      if (!o || typeof o !== 'object' || depth > 6) return;
++      if (typeof o.startRow === 'number' && typeof o.endRow === 'number' &&
++          typeof o.startColumn === 'number' && typeof o.endColumn === 'number'){
++        if (o.startColumn === FIN_CHECK_COL && o.endColumn === FIN_CHECK_COL){
++          var a = Math.min(o.startRow, o.endRow), b = Math.max(o.startRow, o.endRow);
++          if (!finCnSel || (b - a) > (finCnSel.r1 - finCnSel.r0)) finCnSel = { r0: a, r1: b };
++        }
++      }
++      for (var k in o){
++        if (k === 's' || k === 'styles') continue;
++        var v = o[k];
++        if (v && typeof v === 'object') finCnScanRanges(v, depth + 1);
++      }
++    }
++    function finCnOnCommand(evt){
++      if (!fin_isCn()) return;
++      try {
++        var id = String((evt && evt.id) || '');
++        if (id.indexOf('selection') < 0) return;                 // 只关心选区类命令
++        finCnScanRanges(evt && evt.params, 0);
++      } catch(e){}
++    }
++    /* 「核销」表头所在行（0 基）：AC 列里第一个不是勾选框的文字格 */
++    function finCnCheckHeaderRow(snap, sid){
++      var cd = (snap && snap.sheets && snap.sheets[sid] && snap.sheets[sid].cellData) || {};
++      for (var rk in cd){
++        var c0 = (cd[rk] || {})[String(FIN_CHECK_COL)];
++        var v = c0 && c0.v;
++        if (typeof v === 'string' && v.trim() &&
++            v.indexOf(FIN_CHECK_ON) < 0 && v.indexOf(FIN_CHECK_OFF) < 0){
++          return parseInt(rk, 10);
++        }
++      }
++      return 3;   // 兜底：表头在第 4 行（0 基 3）
++    }
++    /* 勾选/取消：rangeIn 可显式传入（测试用），否则用命令流里记下的选区
++       ★注意两种形状：命令流里记下的是 {r0,r1}（只可能是 AC 列），
++         门面/显式传入的是 {startRow,endRow,startColumn,endColumn}。两种都要认。 */
++    function finCnCheckApply(rangeIn){
++      if (!fin_isCn() || !finReady) return 0;
++      var r = rangeIn || finCnSel || fin_getSelectionRange();
++      if (!r) return 0;
++      var sR = (r.startRow != null) ? r.startRow : r.r0;
++      var eR = (r.endRow != null) ? r.endRow : r.r1;
++      var sC = (r.startColumn != null) ? r.startColumn : FIN_CHECK_COL;
++      var eC = (r.endColumn != null) ? r.endColumn : FIN_CHECK_COL;
++      if (sR == null || eR == null) return 0;
++      var r0 = Math.min(sR, eR), r1 = Math.max(sR, eR);
++      var c0 = Math.min(sC, eC), c1 = Math.max(sC, eC);
++      if (c0 !== FIN_CHECK_COL || c1 !== FIN_CHECK_COL) return 0;   // 不是核销列 → 不插手
++      var snap; try { snap = fin_currentSnapshot(); } catch(e){ return 0; }
++      if (!snap || !snap.sheetOrder) return 0;
++      var sid = snap.sheetOrder[0];
++      var head = finCnCheckHeaderRow(snap, sid);
++      if (r1 <= head) return 0;                                     // 表头那格不勾
++      if (r0 <= head) r0 = head + 1;
++      var cd = (snap.sheets[sid] || {}).cellData || {};
++      var anchor = ((cd[String(r0)] || {})[String(FIN_CHECK_COL)] || {}).v;
++      var target = (String(anchor || '').indexOf(FIN_CHECK_ON) >= 0) ? FIN_CHECK_OFF : FIN_CHECK_ON;
++      var val = {}, n = 0;
++      for (var rr = r0; rr <= r1; rr++){
++        var curV = ((cd[String(rr)] || {})[String(FIN_CHECK_COL)] || {}).v;
++        var on = (String(curV || '').indexOf(FIN_CHECK_ON) >= 0);
++        if ((target === FIN_CHECK_ON) === on) continue;             // 已是目标状态
++        val[rr] = {};
++        val[rr][FIN_CHECK_COL] = { v: target };
++        n++;
++      }
++      if (!n) return 0;
++      finEditSuppress++;      // 程序写视图，别让"改动扫描"当成用户录入文字去翻译
++      try {
++        finExecSilent('sheet.command.set-range-values',
++                      { unitId: fin_unitId(), subUnitId: sid, value: val });
++      } catch(e){ console.warn('[fin-cn] check write', e); }
++      finally { finEditSuppress--; finEditQuietUntil = Date.now() + 400; }
++      setTimeout(function(){
++        try { fin_captureEditBase(); } catch(e){}
++        finDirty = true;                       // 有改动待保存
++        try { finCnMarkDirty(); } catch(e){}   // ★中国报表：勾选核销也立刻自动保存
++        fin_setStatusKey('fin_status_dirty');
++      }, 80);
++      return n;
++    }
++    function finCnCheckBind(){
++      if (window.__finCnCheckBound) return;
++      window.__finCnCheckBound = true;
++      // ① 听命令流：拖动过程中累计 AC 列选区（FIN-CN-CHECK 的核心，见上）
++      try {
++        if (finUniverAPI && typeof finUniverAPI.onCommandExecuted === 'function') finUniverAPI.onCommandExecuted(finCnOnCommand);
++        else if (finUniver && typeof finUniver.onCommandExecuted === 'function') finUniver.onCommandExecuted(finCnOnCommand);
++      } catch(e){ console.warn('[fin-cn] bind cmd', e); }
++      // ② 鼠标手势：按下清空，松开按记下的选区统一勾
++      document.addEventListener('mousedown', function(e){
++        if (!fin_isCn() || !finReady) return;
++        if (typeof finIsUniverElem === 'function' && !finIsUniverElem(e.target)) return;
++        finCnDown = true;
++        finCnSel = null;
++      }, true);
++      document.addEventListener('mouseup', function(e){
++        if (!finCnDown) return;
++        finCnDown = false;
++        if (!fin_isCn() || !finReady) return;
++        if (typeof finIsUniverElem === 'function' && !finIsUniverElem(e.target)) return;
++        setTimeout(function(){
++          try { finCnCheckApply(); } catch(err){ console.warn('[fin-cn] check', err); }
++          finCnSel = null;
++        }, 0);
++      }, true);
++    }
++
+     var finEditsBound = false;
+     function fin_bindEdits(){
+       if (!finUniverAPI || !finUniverAPI.getActiveWorkbook) return;
+       try { fin_bindTypedDateCapture(); } catch(e){}
++      try { finCnCheckBind(); } catch(e){}     // ★中国报表：核销列的勾选/拖选（只绑一次）
++      try { finCnBlueEnsureTimer(); } catch(e){}   // ★中国报表：数据区蓝字兜底轮询（只在中国报表生效）
++      try { finCnBindFlush(); } catch(e){}     // ★中国报表：隐藏/卸载前把最后那次改动顶上（只在中国报表生效）
+       try {
+         var wb = finUniverAPI.getActiveWorkbook();
+         var sheets = (wb && wb.getSheets && wb.getSheets()) || [];
+         for (var i = 0; i < sheets.length; i++){
+           (function(sh){
+             try {
+@@ -18315,21 +18645,26 @@ var PROD_EQUIP_FAULT_KB = {
+           _impOpt('@univerjs/sheets-sort-ui/locale/zh-CN'),                     // 14
+           _impOpt('@univerjs/sheets-filter-ui/locale/vi-VN'),                   // 15
+           _impOpt('@univerjs/sheets-sort/locale/vi-VN'),                        // 16
+           _impOpt('@univerjs/sheets-sort-ui/locale/vi-VN'),                     // 17
+           // facade 导入（注册 FUniver API，缺了可能影响内置交互）
+           _impOpt('@univerjs/sheets-filter/facade'),                            // 18
+-          _impOpt('@univerjs/sheets-sort/facade')                               // 19
++          _impOpt('@univerjs/sheets-sort/facade'),                              // 19
++          // ★PermissionService 修复用（FIN-PERM-FIX）：只为拿 IPermissionService 这个 DI token。
++          //   importmap 里 @univerjs/core 指向的正是各包内部引用的同一个
++          //   /@univerjs/core@0.5.5/es2022/core.mjs → 同一个模块实例 → token 才是同一个对象。
++          _impOpt('@univerjs/core')                                             // 20
+         ]);
+         var presets = _mods[0], corePreset = _mods[1];
+         var localeMod = _mods[2], zhLocaleMod = _mods[3], viLocaleMod = _mods[4];
+         var filterMod = _mods[5], filterUiMod = _mods[6];
+         var sortMod = _mods[7], sortUiMod = _mods[8];
+         var filterLocaleMod = _mods[9], sortLocaleMod = _mods[10], sortUiLocaleMod = _mods[11];
+         var filterLocaleModZh = _mods[12], sortLocaleModZh = _mods[13], sortUiLocaleModZh = _mods[14];
+         var filterLocaleModVi = _mods[15], sortLocaleModVi = _mods[16], sortUiLocaleModVi = _mods[17];
++        var coreMod = _mods[20];   // ★@univerjs/core（只为 IPermissionService token，见 fin_patchPermissionService）
+         var mergeFn = presets.merge || function(a, b){ return Object.assign({}, a, b); };
+         function mergeLocales(base, mods){
+           var r = mergeFn({}, base || {});
+           mods.forEach(function(m){
+             var d = (m && (m.default || m)) || {};
+             if (d) r = mergeFn(r, d);
+@@ -18418,12 +18753,15 @@ var PROD_EQUIP_FAULT_KB = {
+             sortMod.UniverSheetsSortPlugin,
+             sortUiMod.UniverSheetsSortUIPlugin
+           ]
+         });
+         finUniver = createResult.univer;
+         finUniverAPI = createResult.univerAPI || null;
++        /* ★PermissionService 补丁（FIN-PERM-FIX）：必须早于第一次 createUnit 装上。
++           详见 fin_patchPermissionService 的注释（切越南/中国标签时的控制台红色报错）。 */
++        try { fin_patchPermissionService(coreMod); } catch(e){ console.warn('[fin-perm]', e); }
+         fin_debug('api=' + (finUniverAPI ? 'ok' : 'null') + ' createMenu=' + (typeof (finUniverAPI && finUniverAPI.createMenu)) + ' exec=' + (typeof (finUniverAPI && finUniverAPI.executeCommand)));
+ 
+         // 让 Univer 内部 locale 与页面当前语言保持一致
+         try { fin_setUniverLocale(CUR_LANG); } catch(e){}
+ 
+         /* Excel 键盘补丁（FIN-EXCEL-KEYS）：api 就绪后绑定，capture 阶段抢在 Univer 之前 */
+@@ -18899,13 +19237,13 @@ var PROD_EQUIP_FAULT_KB = {
+       // ★夹到显示块内（FIN-LANG-VIEW-20261012）：视图只到 J 列，超出的列不该被写样式/数字格式
+       if (maxC > FIN_VIEW_MAXCOL) maxC = FIN_VIEW_MAXCOL;
+       return { startRow: 0, startColumn: 0, endRow: maxR, endColumn: maxC };
+     }
+ 
+     function fin_unitId(){
+-      return (finSheet && typeof finSheet.getUnitId === 'function' && finSheet.getUnitId()) || (finLastSnapshot && finLastSnapshot.id) || 'vn-report';
++      return (finSheet && typeof finSheet.getUnitId === 'function' && finSheet.getUnitId()) || (finLastSnapshot && finLastSnapshot.id) || fin_cfg().unitId;
+     }
+ 
+     // 取当前选区（返回 {startRow,startColumn,endRow,endColumn}）
+     function fin_getSelectionRange(){
+       try {
+         var wb = finUniverAPI && finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+@@ -19348,12 +19686,17 @@ var PROD_EQUIP_FAULT_KB = {
+     // 把日期单元格的数字格式统一为 DD-MM-YYYY
+     //   ① 已经是日期格式的格 → 统一成小写 dd-mm-yyyy（大写 token numfmt 不认，会退化成序列号）
+     //   ② 表头写着 Ngày/Date 的列里、值是合理日期序列号的纯数字 → 也补上日期格式
+     // onlyCol == null：处理【全部工作表】（加载 / 一键按钮）；给了 onlyCol：只处理当前表的该列（排序菜单）。
+     function fin_normalizeDates(snap, onlyCol){
+       if (!finUniverAPI || !finUniverAPI.executeCommand) return 0;
++      /* ★CN-AUTOSAVE-20261013：日期规范化是【程序改视图】（加载后 / 一键整理按钮 / 排序菜单），
++         它自己会调 fin_autoSave 的旧路径已被 FIN_READONLY 挡住；但它的格子改动会被
++         "改动扫描"看见 → 若不禁用，中国报表会在每次【刷新页面】后自动重写一遍 xlsx。
++         所以这里挂起自动保存，保证「刷新页面 ≠ 改文件」。 */
++      try { finCnHoldAutoSave(5000); } catch(e){}
+       var unitId = fin_unitId();
+       var sids = (onlyCol == null)
+         ? (((snap && snap.sheetOrder) || []).slice())
+         : [fin_curSheetId()];
+       var total = 0;
+       for (var si = 0; si < sids.length; si++) {
+@@ -19580,13 +19923,14 @@ var PROD_EQUIP_FAULT_KB = {
+       if (!fmtTotal && !blockTotal && !styleTotal) { fin_setStatusKey('fin_status_dates_none'); return; }
+       fin_setStatusKey('fin_status_dates_sorted', ' ' + (asc ? '↑' : '↓') + ' (' + fmtTotal + (convTotal ? ' +' + convTotal : '') + ')');
+     }
+ 
+     async function fin_loadReport(){
+       fin_setStatusKey('fin_status_importing');
+-      var resp = await fetch('/api/finance/vn-report/snapshot');
++      var wantKind = FIN_KIND;   // ★认住这次加载属于哪张报表：加载途中用户可能又切了标签
++      var resp = await fetch(fin_api('/snapshot'));
+       if (!resp.ok) { fin_setStatusKey('fin_status_not_init'); return; }
+       var snapshot = await resp.json();
+       finLastSnapshot = snapshot;
+       var _sid0 = snapshot && snapshot.sheetOrder && snapshot.sheetOrder[0];
+       var _maxR0 = fin_maxDataRow(snapshot, _sid0);
+       finRowOrder = [];
+@@ -19596,14 +19940,21 @@ var PROD_EQUIP_FAULT_KB = {
+       fin_updateDateSortBtn();
+       finLoading = true;
+       try {
+         fin_disposeUnit();   // 防止重复创建单元导致重影
+         var UNIT_SHEET = (finPresets && finPresets.UniverInstanceType && finPresets.UniverInstanceType.UNIVER_SHEET) || 2;
+         // ★先用【原始完整快照】播三语种（表名/三语块/翻译缓存），再生成"当前语言"的显示快照
++        /* ★每次加载前把「当前报表种类」的显示窗口/表名兜底装上：
++           vn → 9 列（A–J）；cn → 29 列（A–J + AC 核销列）。
++           这样即使脚本初始化顺序把 FIN_VIEW_MAXCOL/finSheetTitles 重置了，加载时也一定正确。 */
++        FIN_VIEW_MAXCOL = fin_cfg().viewMaxCol;
++        fin_applyTitlesFallback();
+         fin_seedLang(snapshot);
+-        finLastView = fin_buildLangView(snapshot, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
++        finCnSeedCheckGlossary();   // ★中国报表：核销列的表头/勾选符号先入缓存（不翻译、随语言原样）
++        finLastView = fin_buildViewFor(snapshot, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
++        finLastView.id = fin_cfg().unitId;   // ★按报表种类认领单元 id（切标签时互不串台）
+         try { fin_rptHideInView(finLastView, snapshot); } catch(e){}   // ★查报表筛选：首屏/重载同一口径
+         try { fin_rptApplySummary(finLastView, snapshot); } catch(e){} // ★查报表：汇总表按期间重算（甲方案）
+         finSheet = finUniver.createUnit(UNIT_SHEET, finLastView);
+       } finally { finLoading = false; }
+       // ★绑定"单元格改数据"监控（新增/修改记录 → 立即翻译同步 + 立即重算高亮）
+       try { fin_bindEdits(); } catch(e){}
+@@ -19622,22 +19973,29 @@ var PROD_EQUIP_FAULT_KB = {
+         try {
+           var _cleaned = finHiCleanup();
+           finHiRecompute();
+           if (_cleaned > 0) fin_markDirty();
+         } catch(e){ console.warn('[hi] init', e); }
+       }, 700);
++      // ★加载途中用户切了报表（例如首屏越南还没load完就点了「中国财务报表」）：
++      //   这次的结果已经过时 → 立刻丢单元、按目标报表重载一次，避免"标签是中国、内容却是越南"。
++      if (FIN_KIND !== wantKind) { try { fin_switchKindReload(); } catch(e){} }
+     }
+ 
+     function fin_bindChange(){
+       try {
+         var listener = function(evt){
+           var id = (evt && evt.id) || '';
+           // 我们自己打/撤高亮的命令一律跳过，避免循环执行、误标脏、误把“视图排序”落盘。
+           // ★必须同时看静默窗口：这个回调是异步的，进来时 finHiApplying 已复位成 false（实测会漏判），
+           //   漏判会让高亮写入把表格标脏 → 1.5s 后自动保存 → 保存路径要剥离高亮样式。
+           if (finHiApplying || Date.now() < finHiQuietUntil) return;
++          // ★CN-AUTOSAVE-20261013：再看"程序写视图"静默窗口（finExecSilent 开的）。
++          //   没有它，翻译补写 / 币种重算 / 日期规范化这些【内部写入】会被当成用户录入 →
++          //   中国报表每次刷新或每补一个译文都自动重写整份 xlsx。
++          if (Date.now() < finProgWriteUntil) return;
+           console.log('[hi] cmd', id);
+           var isViewOnly = (typeof id === 'string' && (id.indexOf('sort') >= 0 || id.indexOf('filter') >= 0 || id.indexOf('numfmt') >= 0));
+           // 排序/筛选只是视图操作，不写盘，保证「复位」能回到上次保存的顺序；
+           // 数字格式（numfmt）由「加载/一键按钮」自动重刷，也不单独触发写盘，避免每次刷新页面就重写整份 xlsx。
+           // 但高亮要跟着数据位置重算，所以即便是视图操作也安排一次 finHiRecompute。
+           if (!isViewOnly) fin_markDirty();
+@@ -19673,12 +20031,17 @@ var PROD_EQUIP_FAULT_KB = {
+         try { finHiLockVerify(); } catch(e){ console.warn('[hi] lock verify', e); }
+       } catch(e){ console.warn('bindChange', e); }
+     }
+ 
+     function fin_markDirty(){
+       if (finLoading || !finReady) return;
++      /* ★中国报表：录入后【立即】保存（CN-AUTOSAVE-20261013）。
++         命令流已经把「排序 / 筛选 / numfmt」这些纯视图操作排除掉了（见 fin_bindChange），
++         所以走到这里的都是真正要落盘的改动 → 排一次 700ms 防抖的自动保存。
++         ★越南报表仍然只读：不改脏、不设保存定时器（下面这行一个字符都不动）。 */
++      if (fin_isCn()) return finCnScheduleSave();
+       if (FIN_READONLY) return;   /* ★只读模式：不改脏、不设保存定时器 */
+       finDirty = true;
+       fin_setStatusKey('fin_status_dirty');
+       if (finSaveTimer) clearTimeout(finSaveTimer);
+       finSaveTimer = setTimeout(fin_autoSave, 1500);
+     }
+@@ -19810,31 +20173,385 @@ var PROD_EQUIP_FAULT_KB = {
+       }
+       return errs;
+     }
+ 
+     async function fin_autoSave(){
+       if (finSaving || !finReady) return;
++      if (fin_cfg().explicitSave) return finCnSave({ manual: true });   /* ★中国报表：手点「保存」（会顺带刷屏） */
+       if (FIN_READONLY) { fin_setStatusKey('fin_status_ready', '（只读，不保存）'); return; }  /* ★ */
+       finSaving = true;
+       fin_setStatusKey('fin_status_saving');
+       try {
+         var snapshot = fin_currentSnapshot();
+         if (!snapshot) { fin_setStatusKey('fin_status_no_wb'); finSaving = false; return; }
+-        var resp = await fetch('/api/finance/vn-report/save', {
++        var resp = await fetch(fin_api('/save'), {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify(fin_inlineStyles(snapshot))
+         });
+         var j = await resp.json();
+         if (j && j.ok) { finDirty = false; fin_setStatusKey('fin_status_saved', (j.saved_at || '')); }
+         else { fin_setStatusKey('fin_status_save_failed', ((j && j.error) || 'unknown')); }
+       } catch (e) {
+         fin_setStatusKey('fin_status_save_failed', (e && e.message ? e.message : e));
+       } finally { finSaving = false; }
+     }
+ 
++    /* ===================== 中国报表：保存（FIN-CN-REPORT-20261013 / CN-AUTOSAVE-20261013）=====
++       用户要求：「录入后立即保存，确保输入后刷新页面，数据仍然在那里！」
++       所以中国报表有两条通道写回 cn_report.xlsx：
++         ① 【自动】改动被检测到 → 0.7s 后 finCnSave({auto:true})；页面隐藏/卸载前再补一次
++            （见 CN-AUTOSAVE-20261013 区块，只对中国报表生效，绝不重载屏幕）；
++         ② 【手动】点「保存」按钮 → finCnSave({manual:true})，保存后若屏幕还有黑字则刷屏一次。
++       ★自动保存不改变 FIN_READONLY 的语义：越南报表仍然完全不自动保存。
++
++       ★为什么不能把"显示快照"直接存下去：显示视图是【裁剪 + 只留当前语言】的
++         （K–AB 已被清空隐藏、A–E 里放的是当前语言的文字），直接存会毁掉三语结构。
++       做法（幂等，每次保存都从原始完整快照重建）：
++         · 以 finLastSnapshot（服务端原始完整快照）为底；
++         · 数字 / 日期 / 公式 / 布尔（与语言无关）→ 三块（c / c+10 / c+20）同步写；
++         · 文字 → 写进【当前语言】那一块，另外两块用译文缓存里的译文
++           （取不到就保留文件原值，绝不写空）；译文链路与越南完全同一套，不改一字；
++         · AC 核销列 → 原样写回（勾选状态随文件一起保存）。
++       ★只改各格的"值"，保留文件原有的样式（s/t）→ 屏幕高亮永远不会被写进文件。 */
++    function finCnBuildSavePayload(){
++      var full = finLastSnapshot;
++      var view = fin_currentSnapshot();
++      if (!full || !view || !full.sheets) return null;
++      var cp = null;
++      try { cp = JSON.parse(JSON.stringify(full)); } catch(e){ return null; }
++      var sid = (cp.sheetOrder || [])[0];
++      var vsid = (view.sheetOrder || [])[0];
++      if (!sid || !vsid || !cp.sheets[sid]) return null;
++      var lang = (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi');
++      var srcOff = (lang === 'zh') ? 10 : (lang === 'en' ? 20 : 0);
++      var dst = cp.sheets[sid].cellData || (cp.sheets[sid].cellData = {});
++      var src = (view.sheets[vsid] || {}).cellData || {};
++      function put(r, c, val){
++        var row = dst[r] || (dst[r] = {});
++        var cur = row[c] || {};
++        var nc = {};
++        for (var k in cur){ if (k !== 'v') nc[k] = cur[k]; }   // 保留文件原样式/类型
++        if (val && typeof val === 'object'){
++          for (var kk in val){ if (kk !== 's') nc[kk] = val[kk]; }
++        } else {
++          nc.v = val;
++        }
++        row[c] = nc;
++      }
++      for (var rk in src){
++        var r = parseInt(rk, 10);
++        if (isNaN(r)) continue;
++        var row = src[rk] || {};
++        for (var ck in row){
++          var c = parseInt(ck, 10);
++          if (isNaN(c)) continue;
++          var cell = row[ck];
++          if (c === FIN_CHECK_COL){
++            // ★核销列：只把「勾选框」写回；表头那种文字（当前语言的"核销"标签）
++            //   不写回，保持文件里的原值，由译文缓存负责三语跟翻。
++            var av = (cell && cell.v !== undefined && cell.v !== null) ? String(cell.v) : '';
++            if (av !== '' && av !== FIN_CHECK_ON && av !== FIN_CHECK_OFF) continue;
++            put(r, c, av);
++            continue;
++          }
++          if (c > FIN_VIEW_MAXCOL) continue;
++          var isText = !!(cell && !cell.f && typeof cell.v === 'string' && cell.v !== '');
++          if (!isText){
++            if (!cell){ var dr = dst[r]; if (dr) delete dr[c]; continue; }
++            put(r, c, cell); put(r, c + 10, cell); put(r, c + 20, cell);
++            continue;
++          }
++          // ★文字：写进【当前语言】那一块；另外两块用译文缓存里的译文，
++          //   ★译文还没到（或只有原文）时退回原文 —— 与界面上"缺译文就显示原文"的口径一致，
++          //   绝不能留空（留空会导致切到那种语言时这一格看着"数据丢了"）。
++          var txt = cell.v;
++          put(r, c + srcOff, txt);
++          var rec = finTransCache[txt];
++          var tSrc = (srcOff === 0)  ? txt : ((rec && rec.vi) || txt);
++          var tZh  = (srcOff === 10) ? txt : ((rec && rec.zh) || txt);
++          var tEn  = (srcOff === 20) ? txt : ((rec && rec.en) || txt);
++          put(r, c, tSrc);
++          put(r, c + 10, tZh);
++          put(r, c + 20, tEn);
++        }
++      }
++      return cp;
++    }
++    /* ============★ 中国报表：数据区「立即变蓝」（CN-BLUE-LIVE-20261013）★============
++       用户要求：「新录入的记录必须【立即】服从数据区蓝字逻辑」，不能等保存/刷新。
++       蓝色本来是 xlsx 里的基样式（直接打字会继承），但【粘贴】会把来源的黑色样式一起
++       带进来，那种格子自己不会变蓝 —— 所以这里在用户改动之后立刻把数据区的字色补成蓝色。
++       ★边界（与 FIN-HI-LOCK 高亮机制互不干扰，任何一条都不得移除）：
++         · 只在中国报表（fin_isCn）生效 —— 越南报表绝不触发；
++         · 跳过「屏幕高亮行」（红+粗）：高亮只显示在屏幕上，绝不能被蓝色覆盖；
++         · 跳过标题行/表头行（0 基 0..3）、合计行（按合计标签识别）、AC 核销列（☐ 无字色）；
++         · 只写【样式】不写值（与高亮同款写法），并复用高亮的静默窗口机制
++           （finHiApplying + finHiQuietUntil）→ 绝不标脏、绝不触发自动保存。 */
++    var FIN_CN_BLUE = '#0000FF';
++    var FIN_CN_TOTAL_LABELS = { 'TỔNG CỘNG': 1, '全部的': 1, 'TOTAL': 1, '合计': 1, '总计': 1 };
++    var finCnBlueTimer = null, finCnBlueAt = 0;
++
++    function finCnBluePass(){
++      try {
++        if (!fin_isCn()) return 0;                       // ★只在中国报表生效
++        if (!finReady || !finUniverAPI || !finSheet) return 0;
++        if (finHiApplying) return 0;                     // 高亮正在写样式，不插队
++        if (Date.now() < finCnBlueAt) return 0;           // 节流 200ms
++        var snap = fin_currentSnapshot();
++        if (!snap || !snap.sheetOrder || !snap.sheetOrder.length) return 0;
++        var sid = snap.sheetOrder[0];
++        var cd = (snap.sheets[sid] || {}).cellData || {};
++        var hiRows = [];
++        ((finHiState && finHiState[sid]) || []).forEach(function(h){
++          if (h && typeof h.row === 'number') hiRows.push(h.row);
++        });
++        var map = {}, n = 0;
++        for (var rk in cd){
++          var r = parseInt(rk, 10);
++          if (isNaN(r) || r < 4) continue;               // 0 基第 4 行 = Excel 第 5 行 = 第一条数据行
++          if (hiRows.indexOf(r) >= 0) continue;          // ★屏幕高亮行（红+粗）不动
++          var row = cd[rk] || {};
++          var isTotal = false;
++          for (var tk in row){                           // 合计行识别（三语标签任一个）
++            var tv = row[tk] && row[tk].v;
++            if (typeof tv === 'string' && FIN_CN_TOTAL_LABELS[tv.trim().toUpperCase()]){ isTotal = true; break; }
++          }
++          if (isTotal) continue;
++          for (var ck in row){
++            var c = parseInt(ck, 10);
++            if (isNaN(c) || c > FIN_VIEW_MAXCOL) continue;
++            if (c === FIN_CHECK_COL) continue;           // 核销列（☐）没有字色，不动
++            var cell = row[ck];
++            if (!cell) continue;
++            var v = cell.v;
++            if (v === undefined || v === null || v === '') continue;   // 空格子没有可见字色
++            var st = fin_cellStyle(snap, cell) || {};
++            var cl = st.cl, rgb = (cl && typeof cl === 'object') ? cl.rgb : cl;
++            rgb = String(rgb || '').toUpperCase();
++            if (rgb.indexOf('0000FF') >= 0) continue;     // 已经是蓝字
++            if (rgb.indexOf('FF0000') >= 0) continue;     // 红（高亮残留）交给高亮逻辑处理
++            var ns = {};
++            for (var k in st){ if (Object.prototype.hasOwnProperty.call(st, k)) ns[k] = st[k]; }
++            ns.cl = { rgb: FIN_CN_BLUE };
++            map[r] = map[r] || {};
++            map[r][c] = { s: ns };                        // ★只写样式，绝不写值
++            n++;
++          }
++        }
++        finCnBlueAt = Date.now() + 200;
++        if (!n) return 0;
++        finHiApplying = true;                             // ★静默：与高亮写样式同一套机制
++        try {
++          /* ★执行【前】就把静默窗口打开：onCommandExecuted 的回调是异步的，只在执行后设窗口
++             有被"回调先到"漏判的风险 —— 一旦漏判，这次纯样式写入会被当成用户录入 →
++             触发一次多余的自动保存（CN-AUTOSAVE-20261013）。执行后再补一次窗口。 */
++          finHiQuietUntil = Date.now() + ((typeof FIN_HI_LOCK !== 'undefined' && FIN_HI_LOCK.quietMs) ? FIN_HI_LOCK.quietMs : 600);
++          finExecSilent('sheet.command.set-range-values', { unitId: fin_unitId(), subUnitId: sid, value: map });
++        } catch(e){ console.warn('[cn-blue] exec', e); }
++        finHiApplying = false;
++        finHiQuietUntil = Date.now() + ((typeof FIN_HI_LOCK !== 'undefined' && FIN_HI_LOCK.quietMs) ? FIN_HI_LOCK.quietMs : 600);
++        return n;
++      } catch(e){ if (window.console) console.warn('[cn-blue] pass', e); return 0; }
++    }
++
++    /* 兜底轮询：万一某条编辑路径没触发 onCellDataChange，也能在 2s 内补上蓝字。
++       ★只有在中国报表才真正干活，其它情况第一行就 return 0。 */
++    function finCnBlueEnsureTimer(){
++      if (finCnBlueTimer) return;
++      finCnBlueTimer = setInterval(function(){ try { finCnBluePass(); } catch(e){} }, 2000);
++    }
++
++    /* ============★ 中国报表：录入后「立即保存」（CN-AUTOSAVE-20261013）★============
++       用户要求：「我录入的数据后立即保存，确保我输入后刷新页面，数据仍然在那里！」
++       以前中国报表是「只认手点保存」（FIN-CN-REPORT-20261013），手点之前刷新就会丢录入。
++       现在：只要检测到真实改动 → 0.7s 内自动落盘；另外在页面被隐藏 / 即将卸载前
++       再补一次「最后那次改动」，把「输完就按 F5」这条路径也兜住。
++
++       ★边界（任何一条都不得移除）：
++         · 只对中国报表生效 —— finCnMarkDirty / finCnFlushNow / finCnFlushBeacon
++           第一行都是 if (!fin_isCn()) return; 越南报表绝不自动保存（仍是「只读 + 重导」）；
++         · 自动保存【不】刷新屏幕（只有手点「保存」才刷），否则保存完把光标顶掉、没法连续录入；
++         · 保存用的仍是 finCnBuildSavePayload + fin_inlineStyles 那一套（三语结构 / 样式安全），
++           高亮红字绝不进文件（FIN-HI-LOCK 四条不变量不动）；
++         · 保存失败【不】自动重试，避免服务器出错时每 0.7s 打一次；等下一次录入或手点保存。 */
++    var FIN_CN_AUTOSAVE_MS = 700;              // 录入 → 落盘的防抖（用户要「立即」）
++    var finCnFlushBound = false;
++    var finCnHoldUntil = 0;                    // 视图操作（重载/日期整理/排序）期间的自动保存挂起截止时刻
++
++    /* 视图操作开始/结束时打一个「挂起窗口」：
++       重载、日期整理、排序都会【程序性地】改动视图里的格子，改动扫描会把它们
++       误判成"用户录入"，从而把重排后的行序 / 屏幕专用的日期格式写回文件。
++       这个窗口只挡「扫描路径」（finCnMarkDirty），
++       命令流路径（fin_markDirty）已经排除 sort/filter/numfmt，不受影响。 */
++    function finCnHoldAutoSave(ms){
++      try { finCnHoldUntil = Math.max(finCnHoldUntil, Date.now() + (ms || 3000)); } catch(e){}
++    }
++
++    /* 命令流判定为「真实改动」时走这里：直接排自动保存（不受挂起窗口影响） */
++    function finCnScheduleSave(){
++      if (!fin_isCn()) return;                 // ★越南报表绝不自动保存
++      if (finLoading || !finReady) return;
++      finDirty = true;
++      fin_setStatusKey('fin_status_dirty');
++      if (finSaveTimer) clearTimeout(finSaveTimer);
++      finSaveTimer = setTimeout(fin_autoSaveTick, FIN_CN_AUTOSAVE_MS);
++    }
++
++    /* 改动扫描路径：可能是真录入，也可能是视图操作留下的假改动 → 过挂起窗口 */
++    function finCnMarkDirty(){
++      if (!fin_isCn()) return;                 // ★越南报表绝不自动保存
++      if (Date.now() < finCnHoldUntil) return; // ★视图操作刚做完：这不是用户录入，别排自动保存
++      finCnScheduleSave();
++    }
++
++    /* 自动保存定时器到点：中国报表走「不刷屏」的自动保存，越南走原逻辑 */
++    function fin_autoSaveTick(){
++      finSaveTimer = null;
++      if (fin_cfg().explicitSave) return finCnSave({ auto: true });
++      return fin_autoSave();
++    }
++
++    /* 页面还在（切标签 / 最小化）→ 用普通请求立刻保存，不再等那 0.7s 防抖 */
++    function finCnFlushNow(reason){
++      if (!fin_isCn() || !finReady || !finDirty || finSaving) return;
++      if (finSaveTimer){ clearTimeout(finSaveTimer); finSaveTimer = null; }
++      finCnSave({ auto: true, reason: reason });
++    }
++
++    /* 页面即将卸载（刷新 / 关闭）→ 尽力把最后那次改动顶上。
++       优先 fetch keepalive（上限 64KB，超了直接不试），失败再退 navigator.sendBeacon。 */
++    function finCnFlushBeacon(){
++      try {
++        if (!fin_isCn() || !finReady || !finDirty || finSaving) return;
++        var payload = null;
++        try { payload = finCnBuildSavePayload(); } catch(e){ payload = null; }
++        if (!payload) return;
++        try { payload = fin_inlineStyles(payload); } catch(e){}
++        var body = JSON.stringify(payload);
++        var url = fin_api('/save');
++        var sent = false;
++        if (body.length < 60000){
++          try {
++            fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
++                         body: body, keepalive: true });
++            sent = true;
++          } catch(e){ sent = false; }
++        }
++        if (!sent){
++          try { sent = navigator.sendBeacon(url, new Blob([body], { type: 'application/json' })); }
++          catch(e){ sent = false; }
++        }
++        if (sent) finDirty = false;
++      } catch(e){}
++    }
++
++    function finCnBindFlush(){
++      if (finCnFlushBound) return;             // 只绑一次
++      finCnFlushBound = true;
++      try {
++        document.addEventListener('visibilitychange', function(){
++          if (document.hidden) finCnFlushNow('hidden');
++        });
++      } catch(e){}
++      try { window.addEventListener('pagehide', function(){ finCnFlushBeacon(); }); } catch(e){}
++      try { window.addEventListener('beforeunload', function(){ finCnFlushBeacon(); }); } catch(e){}
++    }
++
++    /* ★中国报表：数据区蓝字校正（CN-BLUE-20261013）
++       用户要求：「越/中/英三种语言块的数据区都必须是蓝字」。
++       蓝色是【文件里的基样式】给的（app.py _cn_normalize_text_color），所以：
++         · 直接打字录入 → 单元格本来就有蓝样式 → 打出来就是蓝的（无需任何处理）；
++         · 从别处【粘贴】进来 → 粘贴会把来源的黑色样式一起带进来 → 屏幕上变黑。
++       保存时后端会把文件里的字色再刷回蓝色，但【屏幕上那份】还是黑的，
++       所以要判断一下：数据区里只要出现"既不是蓝、也不是屏幕高亮红"的有值单元格，
++       保存成功后就从服务端重载一次，让屏幕与文件一致。
++       ★只在真的不一致时才重载：正常打字录入不会触发，不打断录入节奏。 */
++    function finCnNeedsBlueReload(){
++      if (!fin_isCn()) return false;
++      try {
++        var view = fin_currentSnapshot();
++        if (!view || !view.sheets) return false;
++        var styles = view.styles || {};
++        var sid = (view.sheetOrder || [])[0];
++        var cd = (view.sheets[sid] || {}).cellData || {};
++        var first = 4;                 // 0 基第 4 行 = Excel 第 5 行 = 第一条数据行（上面是标题/表头）
++        var last = first + 199;        // 与后端种子的 200 行数据区对齐（合计行不在检查范围内）
++        for (var rk in cd){
++          var r = parseInt(rk, 10);
++          if (isNaN(r) || r < first || r > last) continue;
++          var row = cd[rk] || {};
++          for (var ck in row){
++            var c = parseInt(ck, 10);
++            if (isNaN(c) || c > FIN_VIEW_MAXCOL) continue;
++            if (c === FIN_CHECK_COL) continue;              // 核销列（☐）本来就没有字色
++            var cell = row[ck];
++            if (!cell) continue;
++            var v = cell.v;
++            if (v === undefined || v === null || v === '') continue;   // 空格子没有可见字色
++            var s = cell.s;
++            if (typeof s === 'string') s = styles[s] || null;
++            if (!s || typeof s !== 'object') return true;   // 有值却没有样式 = 默认黑字
++            var cl = s.cl, rgb = (cl && typeof cl === 'object') ? cl.rgb : cl;
++            rgb = String(rgb || '').toUpperCase();
++            if (rgb.indexOf('0000FF') >= 0) continue;       // 已经是蓝字
++            if (rgb.indexOf('FF0000') >= 0) continue;       // 屏幕高亮的红字（只显示在屏幕，不进文件）
++            return true;
++          }
++        }
++      } catch(e){}
++      return false;
++    }
++
++    /* opts.manual=true 只由「保存」按钮传（会顺带把屏幕刷成蓝）；
++       自动保存（finCnMarkDirty / finCnFlushNow）传 {auto:true}，绝不重载屏幕，
++       否则保存完光标被顶掉、没法连续录入。 */
++    async function finCnSave(opts){
++      if (finSaving || !finReady) return;
++      var manual = !!(opts && opts.manual);
++      var ok = false;
++      var payload = null;
++      try { payload = finCnBuildSavePayload(); } catch(e){ console.warn('[fin-cn] build payload', e); }
++      if (!payload) { fin_setStatusKey('fin_status_save_failed', 'no snapshot'); return; }
++      finSaving = true;
++      fin_setStatusKey('fin_status_saving');
++      try {
++        var out = payload;
++        try { out = fin_inlineStyles(payload); } catch(e){ out = payload; }
++        var resp = await fetch(fin_api('/save'), {
++          method: 'POST',
++          headers: { 'Content-Type': 'application/json' },
++          body: JSON.stringify(out)
++        });
++        var j = await resp.json();
++        if (j && j.ok){
++          ok = true;
++          finLastSnapshot = payload;      // 已落盘：后续保存继续以它为底合并
++          finDirty = false;
++          fin_setStatusKey('fin_status_saved', (j.saved_at || ''));
++          /* ★粘贴进来的数据在屏幕上是黑字 → 重载一次让屏幕也变蓝（保留滚动位置）。
++             ★只手动保存才重载：自动保存重载会把光标顶掉、打断录入。
++             ★正常打字录入本来就是蓝字（有 CN-BLUE-LIVE 兜底），这里不会触发。 */
++          if (manual && finCnNeedsBlueReload()){
++            var _ss = finScrollState();
++            try { fin_reload(); } catch(e){}
++            if (_ss) setTimeout(function(){ try { finScrollTo(_ss.row, _ss.col); } catch(e){} }, 900);
++          }
++        } else {
++          fin_setStatusKey('fin_status_save_failed', ((j && j.error) || 'unknown'));
++        }
++      } catch (e) {
++        fin_setStatusKey('fin_status_save_failed', (e && e.message ? e.message : e));
++      } finally {
++        finSaving = false;
++        /* ★保存期间用户又改了 → 再排一次，保证最后那次改动也落盘。
++           ★只在成功后排（失败不重试，免得服务器出错时死循环打请求）。 */
++        if (ok && finDirty && fin_isCn()) { try { finCnMarkDirty(); } catch(e){} }
++      }
++    }
++
+     /* 旧「快照」入口：已按用户要求从工具栏撤下（按钮改为「查报表」）。
+        函数与后端 /api/finance/vn-report/snapshot 保留，将来要挂回随时可用。 */
+     function fin_snapshotPrompt(){
+       var p = prompt(fin_L('fin_prompt_snapshot'), '');
+       if (p) fin_snapshot(p.trim());
+     }
+@@ -20543,45 +21260,45 @@ var PROD_EQUIP_FAULT_KB = {
+       }
+     }
+ 
+     async function fin_snapshot(period){
+       if (finDirty && !FIN_READONLY) await fin_autoSave();   /* ★只读模式不自动保存 */
+       try {
+-        var resp = await fetch('/api/finance/vn-report/snapshot?period=' + encodeURIComponent(period), { method:'POST' });
++        var resp = await fetch(fin_api('/snapshot?period=') + encodeURIComponent(period), { method:'POST' });
+         var j = await resp.json();
+         if (j && j.ok) { fin_setStatusKey('fin_status_snapshot_ok', (j.file || '')); }
+         else { fin_setStatusKey('fin_status_snapshot_fail', ((j && j.error) || '')); }
+       } catch(e){ fin_setStatusKey('fin_status_snapshot_fail', (e && e.message ? e.message : e)); }
+     }
+ 
+     function fin_exportLocal(){
+       // 下载【服务器上】的 xlsx。★注意：只读模式（FIN_READONLY=true）下浏览器里的改动不会保存，
+       // 所以导出的永远是服务器那一份；不校验 r.ok 的话，接口 404 时会把 {"error":...} 当 xlsx 下下来。
+       fin_setStatusKey('fin_status_exporting');
+-      fetch('/api/finance/vn-report')
++      fetch(fin_api(''))
+         .then(function(r){
+           if (!r.ok) throw new Error(r.status === 404 ? fin_L('fin_status_not_init') : ('HTTP ' + r.status));
+           return r.blob();
+         })
+         .then(function(blob){
+           if (!blob || !blob.size) throw new Error('empty');
+           var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+-          a.download = 'vn_report.xlsx'; a.click(); URL.revokeObjectURL(a.href);
++          a.download = fin_cfg().dl; a.click(); URL.revokeObjectURL(a.href);
+           fin_setStatusKey('fin_status_exported');
+         })
+         .catch(function(e){ fin_setStatusKey('fin_status_export_fail', (e && e.message ? e.message : e)); });
+     }
+ 
+     async function fin_reimport(input){
+       var file = input.files && input.files[0];
+       if (!file) return;
+       fin_setStatusKey('fin_status_reimporting');
+       var fd = new FormData();
+       fd.append('file', file);
+       try {
+-        var resp = await fetch('/api/finance/vn-report/init', { method: 'POST', body: fd });
++        var resp = await fetch(fin_api('/init'), { method: 'POST', body: fd });
+         var j = await resp.json();
+         if (j && j.ok) {
+           fin_setStatusKey('fin_status_reimported', String(j.bytes || ''));
+           // 重新导入后整页刷新，避免 Univer 插件/组件重复注册
+           setTimeout(function(){ window.location.reload(); }, 400);
+         } else {
+@@ -20619,12 +21336,105 @@ var PROD_EQUIP_FAULT_KB = {
+     // 必须且只能调用 finUniverAPI.disposeUnit(unitId)。它会：
+     //   1) 把单元从 UniverInstanceService 移除；2) 触发 unitDisposed$，渲染层据此删除旧 canvas
+     //      （少了这一步，旧单元会残留并继续渲染，新建单元叠加其上 → 出现「重影」）。
+     // 【不要】再额外调用 finSheet.dispose()：disposeUnit 已经连带清理了该单元的权限点，
+     // 再调模型 dispose 会去删已不存在的 permissionPoint，抛出
+     // "[PermissionService]: ... permissionPoint does not exist!"。
++    /* =================★ PermissionService 报错修复（FIN-PERM-FIX）★=================
++       现象：在「越南财务报表 ⇄ 中国财务报表」之间切标签时，控制台抛
++         Uncaught Error: [PermissionService]: 1.1_cn-report permissionPoint does not exist!
++         （切到哪边就报刚被销毁的那一边：切 vn 时报 1.1_cn-report，切 cn 时报 1.1_vn-report）
++
++       根因（读 esm.sh 上 @univerjs/core@0.5.5 与 @univerjs/sheets-ui@0.5.5 的源码确认）：
++         ① 权限点 id 模板是 `${type}.${subType}_${unitId}` → 形如 "1.1_cn-report"；
++         ② WorksheetPermissionService 在 unitAdded$ 时 addPermissionPoint、在 unitDisposed$
++            时 deletePermissionPoint；
++         ③ sheets-ui 的权限拦截器订阅了 selectionMoveEnd$，**在发射的那一刻**才同步调用
++            composePermission$([...ids])；而 composePermission$ 里对取不到的 id 是【直接 throw】；
++         ④ disposeUnit(旧id) 会同时做两件事：(a) 删掉该 unit 的全部权限点；
++            (b) 触发射选区复位 → selectionMoveEnd$ 发射。
++            这时外层订阅还挂在【旧单元】上（新单元要等后面的 createUnit 才存在），
++            于是旧订阅拿【已删除】的 id 去 composePermission$ → 取不到 → throw，
++            被 core 的 ReportUnhandledError 报成「未捕获错误」。
++
++       修复：把 IPermissionService 的两个 compose 方法包一层 ——
++         · 权限点都在时【完全走原实现】，行为一字不变（零风险）；
++         · 有缺失时用「一个恒为放行(value:true)的兜底权限点」占位，绝不 throw。
++       本应用不使用任何「保护范围 / 保护工作表」（相关菜单已全部隐藏，见 sortMenuCfg），
++       所以「权限点不存在 ⇒ 默认放行」在语义上也是正确的。
++
++       ★边界：只改这一个由 Univer 内部拆卸竞态产生的报错；不碰渲染、不碰数据、不碰快照、
++         不碰任何锁死区。若 patch 装不上（CDN 抖动导致 @univerjs/core 导入失败等）只是
++         退回原来的控制台报错，功能不受影响。
++       ★打补丁时机：fin_initUniver 里 createUniver 之后、【任何 createUnit 之前】。 */
++    function fin_patchPermissionService(coreMod){
++      try {
++        if (!finUniver || typeof finUniver.__getInjector !== 'function') return false;
++        var token = coreMod && coreMod.IPermissionService;
++        if (!token) return false;                       // @univerjs/core 没导入成功
++        var inj = finUniver.__getInjector();
++        var perm = (inj && typeof inj.get === 'function') ? inj.get(token) : null;
++        if (!perm) return false;
++        if (perm.__finPermSafe) return true;            // 幂等：只装一次
++        var origAsync = perm.composePermission$;
++        var origSync = perm.composePermission;
++        if (typeof origAsync !== 'function' || typeof origSync !== 'function') return false;
++
++        // 兜底权限点：惰性创建一次，之后所有「缺失」都拿它占位。
++        //   必须是【真实注册进 PermissionService 的权限点】，这样它的 asObservable()
++        //   就是服务内部原生的 rxjs Observable，无需再引入 rxjs 依赖。
++        var FALLBACK_ID = '__fin_perm_fallback__';
++        function fallbackId(self){
++          try {
++            if (!self.getPermissionPoint$(FALLBACK_ID)) {
++              self.addPermissionPoint({ id: FALLBACK_ID, value: true });
++            }
++          } catch(e){}
++          return self.getPermissionPoint$(FALLBACK_ID) ? FALLBACK_ID : null;
++        }
++        function missingPoint(id){ return { id: id, value: true }; }
++
++        // 异步版：缺失的 id 用兜底 id 占位后再交给原实现。
++        //   原实现是 combineLatest(observables)，**入参个数决定输出数组长度**，
++        //   所以占位后输出仍是等长的数组，调用方（.some(k => k.value === false)）语义不变。
++        perm.composePermission$ = function(ids){
++          var self = this;
++          var list = ids || [];
++          var safe = null;
++          for (var i = 0; i < list.length; i++){
++            if (self.getPermissionPoint$(list[i])) {
++              if (safe) safe.push(list[i]);
++            } else {
++              if (!safe) safe = list.slice(0, i);       // 首个缺失之前的都还在
++              var fb = fallbackId(self);
++              if (!fb) return origAsync.call(self, list); // 兜底点都建不出来 → 交回原逻辑
++              safe.push(fb);
++            }
++          }
++          if (!safe) return origAsync.call(self, list);   // ★全都在 → 完全走原实现
++          return origAsync.call(self, safe);
++        };
++
++        // 同步版：取不到就直接给「放行」对象，绝不 throw。
++        perm.composePermission = function(ids){
++          var self = this;
++          return (ids || []).map(function(id){
++            var p = self.getPermissionPoint(id);
++            return p || missingPoint(id);
++          });
++        };
++
++        perm.__finPermSafe = true;
++        fin_debug('permSafe=on');                        // 自检标记
++        return true;
++      } catch(e){
++        if (window.console) console.warn('[fin-perm] patch skipped', e);
++        return false;
++      }
++    }
++
+     function fin_disposeUnit(){
+       var oldId = null;
+       try { if (finSheet && typeof finSheet.getUnitId === 'function') oldId = finSheet.getUnitId(); } catch(e){}
+       if (oldId && finUniverAPI && typeof finUniverAPI.disposeUnit === 'function') {
+         try { finUniverAPI.disposeUnit(oldId); } catch(e){ if (window.console) console.warn('disposeUnit', e); }
+       }
+@@ -20636,26 +21446,28 @@ var PROD_EQUIP_FAULT_KB = {
+       fin_disposeUnit();
+       // 【必须复用同一个 unitId】（服务端快照自带 'vn-report'）。
+       // Univer 的权限点是按 unitId 注册的；若每次换成 'vn-report-<时间戳>'，
+       // 旧单元被真正移除后，仍残留的权限校验（形如 1.1_vn-report）会查不到权限点，
+       // 抛出 "[PermissionService]: 1.1_vn-report permissionPoint does not exist!"。
+       // 复用同一 id 后，新单元会把同一批权限点按原 id 重新注册，残留校验就能命中。
+-      if (!snap.id) snap.id = 'vn-report';
++      snap.id = fin_cfg().unitId;   // ★按报表种类强制（xlsx→快照转换里默认写的是 'vn-report'）
+       var UNIT_SHEET = (finPresets && finPresets.UniverInstanceType && finPresets.UniverInstanceType.UNIVER_SHEET) || 2;
+       // 复位：重新从服务端快照种三语信息（用户本次会话的改动按语义就该丢弃）
++      FIN_VIEW_MAXCOL = fin_cfg().viewMaxCol;   // ★按报表种类装显示窗口（vn 9 / cn 29）
+       try { fin_seedLang(snap); } catch(e){}
++      try { finCnSeedCheckGlossary(); } catch(e){}   // ★中国报表：核销列表头/勾选符号入缓存
+       // ★只显示当前语言那一块（FIN-LANG-VIEW-20261012）：finLastSnapshot 仍存完整快照。
+-      var view = fin_buildLangView(snap, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
++      var view = fin_buildViewFor(snap, (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'vi'));
+       try { fin_rptHideInView(view, snap); } catch(e){}   // ★查报表筛选：按年/月隐藏其它日期行（不删数据）
+       try { fin_rptApplySummary(view, snap); } catch(e){} // ★查报表：汇总表按期间重算（甲方案）
+       finLastView = view;
+       try {
+         finSheet = finUniver.createUnit(UNIT_SHEET, view);
+       } catch (e) {
+         // 万一同名单元没清干净（__addUnit 会因重复 id 抛错），退化为唯一 id 兜底
+-        view.id = 'vn-report-' + Date.now();
++        view.id = fin_cfg().unitId + '-' + Date.now();
+         finSheet = finUniver.createUnit(UNIT_SHEET, view);
+       }
+       finLastSnapshot = snap;
+       try { fin_bindEdits(); } catch(e){}
+       try { fin_captureEditBase(finLastView); } catch(e){}
+       try { fin_rptScheduleReapply(); } catch(e){}   // ★视图建好后把本期值写回（压住公式引擎的异步覆盖）
+@@ -20664,25 +21476,45 @@ var PROD_EQUIP_FAULT_KB = {
+     function fin_afterDataChange(){
+       if (FIN_READONLY) return;   /* ★只读模式：数据变化不触发保存 */
+       try { fin_markDirty(); } catch(e){}
+       try { if (typeof fin_autoSave === 'function') fin_autoSave(); } catch(e){}
+     }
+ 
+-    /* ★只读模式 UI 反馈：禁用「保存」按钮，提示用户用「重导」更新报表 */
++    /* ★「保存 / 重导」按钮的可用性（按报表种类）：
++       · 越南：只读 → 「保存」禁用，更新走「重导」上传新 xlsx（行为与以前完全一致）；
++       · 中国：「保存」可用（录入本来就会自动落盘 CN-AUTOSAVE-20261013，这个按钮是
++         「手动保存 + 顺带把屏幕刷成蓝字」的加保险）；「重导」按钮【隐藏】——
++         中国报表的模板 / 三语表头 / 列格式 / 核销列全部内嵌在服务端
++         （app.py::_cn_make_seed_xlsx，缺文件还会自动补），不需要人工上传更新
++         （用户 2026-10-13 要求「格式是固定的，就不用再上传更新了」）。
++       ★★注意：工具栏是 vn / cn 共用的同一块，这里【只对 cn 隐藏】；
++         越南报表是只读的，它唯一的更新通道就是「重导」，绝不能被一起藏掉。
++       ★要临时恢复中国报表的重导入口：把下面 isCn 那行改成 `re.style.display = '';`
++         （或直接用接口 POST /api/finance/cn-report/init 上传 xlsx，后端一条都没动）。 */
+     function fin_applyReadonlyUI(){
+-      if (!FIN_READONLY) return;
+       try {
+-        var btn = document.querySelector('#fin_panel_vn button[onclick="fin_autoSave()"]');
+-        if (btn) { btn.disabled = true; btn.title = "只读模式：请使用「重导」上传新的 xlsx 更新报表"; }
++        var isCn = !!fin_cfg().explicitSave;
++        var save = document.querySelector('#fin_workspace button[onclick="fin_autoSave()"]');
++        if (save){
++          if (isCn){ save.disabled = false; save.title = fin_L('fin_title_save_cn'); }
++          else if (FIN_READONLY) { save.disabled = true; save.title = fin_L('fin_title_save_ro'); }
++        }
++        var re = document.getElementById('fin_reimport_btn');
++        if (re) re.style.display = isCn ? 'none' : '';
+       } catch(e){}
+     }
+ 
+     function fin_sortByColumn(dir){
+       if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
+       try {
+         var col = fin_getActiveColumn();
++        /* ★CN-AUTOSAVE-20261013：排序是【视图重排】，绝不能因为自动保存把重排后的行序写进文件。
++           ① 先把「排序前」还没落盘的改动立刻存掉（payload 在这一行同步取好 = 排序前的行序）；
++           ② 再挂起自动保存，盖住「日期规范化 → 排序 → 改动扫描」整个过程。 */
++        try { finCnFlushNow('before-sort'); } catch(e){}
++        try { finCnHoldAutoSave(6000); } catch(e){}
+         // 排序前先把该列日期格统一成 DD-MM-YYYY（非日期格跳过）
+         var snap = fin_currentSnapshot();
+         if (snap) fin_normalizeDates(snap, col);
+         // 用 Univer 内置排序（正确维护行高/合并/公式）；日期为数值序列号，会按真实日期排序
+         setTimeout(function(){
+           try {
+@@ -20693,21 +21525,24 @@ var PROD_EQUIP_FAULT_KB = {
+       } catch(e){ fin_setStatusKey('fin_status_load_failed', (e && e.message ? e.message : e)); }
+     }
+ 
+     // 复位 = 从服务器重新加载（自动保存保证录入内容已落盘），恢复干净视图与原始顺序
+     async function fin_reload(opts){
+       if (!finUniver || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
++      /* ★CN-AUTOSAVE-20261013：重载 = 从服务器重新拉快照并重建视图（含筛选期重算、日期规范化），
++         这些【程序改动】会被"改动扫描"看见。挂起自动保存，否则中国报表会「一刷新就回写整份 xlsx」。 */
++      try { finCnHoldAutoSave(8000); } catch(e){}
+       // ★「查报表」筛选：只有应用筛选时带 {keepFilter:true}；
+       //   「复位」/「载入/刷新报表」都不带参数 → 清掉筛选、恢复显示全部。
+       if (!(opts && opts.keepFilter)) finRptFilter = null;
+       fin_setStatusKey('fin_status_importing');
+       try {
+         // 先撤掉筛选：否则旧单元被销毁时，筛选插件仍持有状态并可能再发一次
+         // 带旧 unitId 的权限校验命令，从而在控制台抛 PermissionService 报错。
+         try { fin_removeFilter(); } catch(e){}
+-        var resp = await fetch('/api/finance/vn-report/snapshot');
++        var resp = await fetch(fin_api('/snapshot'));
+         if (!resp.ok) { fin_setStatusKey('fin_status_not_init'); return; }
+         var snap = await resp.json();
+         finLastSnapshot = snap;
+         var sid0 = snap && snap.sheetOrder && snap.sheetOrder[0];
+         var maxR0 = fin_maxDataRow(snap, sid0);
+         finRowOrder = [];
+@@ -20774,13 +21609,13 @@ var PROD_EQUIP_FAULT_KB = {
+       if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) { fin_setStatusKey('fin_status_not_init'); return; }
+       // 旧逻辑：百分比/自定义数字格式只套用 numfmt，不改值（fin_applyPercent 仍走这里）
+       if (/[%#]/.test(pattern) || pattern.indexOf('0.00') > -1) {
+         try {
+           var sid = fin_curSheetId();
+           var snap = finLastSnapshot;
+-          var unitId = (typeof finSheet.getUnitId === 'function' && finSheet.getUnitId()) || (snap && snap.id) || 'vn-report';
++          var unitId = (typeof finSheet.getUnitId === 'function' && finSheet.getUnitId()) || (snap && snap.id) || fin_cfg().unitId;
+           var cells = [];
+           try {
+             var wb = finUniverAPI.getActiveWorkbook && finUniverAPI.getActiveWorkbook();
+             var sh = wb && wb.getActiveSheet && wb.getActiveSheet();
+             var rng = sh && sh.getActiveRange && sh.getActiveRange();
+             if (rng && typeof rng.getRow === 'function') {
+@@ -20830,12 +21665,18 @@ var PROD_EQUIP_FAULT_KB = {
+        ① 静态数字格写换算值；② 所有金额格（含公式格、汇总表）套该币种符号。
+        服务端返回的 fmt 列表是"哪些格是金额"，与币种无关；values 是逐格换算值。
+        这两块必须在【每一次视图重建后】重放，否则切语言/复位后金额会退回无符号裸数字。 */
+     function fin_applyCurrencyData(cur, j, silent){
+       try {
+         if (!finUniverAPI || !finUniverAPI.executeCommand || !finSheet) return;
++        /* ★CN-AUTOSAVE-20261013：币种换算是【显示层】的重算（文件是只读源），
++           它写进来的换算值不该被自动保存当成"用户录入"。
++           ★注意（既有隐患，未在本轮改动）：该换算值留在视图里，之后任何一次保存
++             （手动或自动）都可能把换算后的金额写回文件。若你在中国报表里会用
++             右上角币种下拉（USD/RMB），告诉我，我再单独处理。 */
++        try { finCnHoldAutoSave(3000); } catch(e){}
+         var fmtMap = finCurFmtMap;   // ★单一事实源（FIN-CURR-MONEY-20261012）
+         var snap = finLastSnapshot;
+         var unitId = fin_unitId();
+         var sheets = (snap && snap.sheets) || {};
+         var order = (snap && snap.sheetOrder) || [];
+         var nameToSid = {};
+@@ -23955,12 +24796,13 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
+     comm_amt_empty:"暂无佣金金额修改审批", comm_amt_by:"申请人",
+     bp_opt_yes:"有", bp_opt_no:"无", bp_finished_yes:"结束", bp_finished_no:"尚未", bp_nature_advance:"提前预支佣金", bp_nature_normal:"正常支付佣金",
+     comm_opt_agi:"AGI-客户", comm_opt_gs:"GS-客户",
+     comm_col_currency:"签约货币", comm_f_currency:"签约货币", comm_cur_rmb:"人民币 RMB", comm_cur_usd:"美元 USD", comm_cur_vnd:"越南盾 VND",
+     comm_f_equip_rmb:"设备金额 RMB", comm_f_equip_usd:"设备金额 USD", comm_f_equip_vnd:"设备金额 VND", comm_f_deposit:"定金给付时间",
+     fin_tab_vn_report:"越南财务报表", fin_tab_cn_report:"中国财务报表", fin_tab_merge_report:"合并财务总报表", fin_panel_placeholder:"该报表内容建设中，敬请期待。",
++    fin_cn_hint:"与越南报表同一套表格逻辑；Excel 里只有「实际支出」一张表。改动后请点「保存」。", fin_title_save_cn:"手动保存到服务器（中国报表：不会自动保存）", fin_title_save_ro:"只读模式：请使用「重导」上传新的 xlsx 更新报表",
+     fin_btn_load:"载入/刷新报表", fin_btn_save:"保存", fin_btn_snapshot:"快照", fin_btn_export:"导出 xlsx", fin_btn_reimport:"重导", fin_btn_filter:"筛选", fin_btn_sort_asc:"升序", fin_btn_sort_desc:"降序",     fin_btn_restore:"复原", fin_btn_date_fmt:"按日-月-年排序", fin_btn_ins_rows:"在下方插入行", fin_btn_ins_rows_above:"在上方插入行",
+     fin_btn_report:"查报表", fin_rpt_title:"查报表", fin_rpt_year:"年份", fin_rpt_month:"月份", fin_rpt_note0:"选择0表示只看年度报告！", fin_rpt_ok:"确认", fin_rpt_cancel:"取消", fin_rpt_restore:"恢复",
+     fin_status_rpt_filtered:"已筛选：", fin_status_rpt_empty:"该年份/月份没有记录：",
+     fin_rpt_period_line:"{p} 发生额 · 余额截至 {e}", fin_rpt_period_remark:"截至 {e}",
+     fin_menu_sort_asc:"升序", fin_menu_sort_desc:"降序", fin_menu_sort_reset:"复位", fin_cur_none:"货币",
+     fin_status_not_loaded:"未载入", fin_status_engine:"正在加载表格引擎…", fin_status_importing:"正在导入报表…", fin_status_loaded:"报表已载入", fin_status_ready:"已就绪",
+@@ -24755,12 +25597,13 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
+     comm_amt_empty:"No commission amount change requests", comm_amt_by:"Requester",
+     bp_opt_yes:"Yes", bp_opt_no:"No", bp_finished_yes:"Finished", bp_finished_no:"Pending", bp_nature_advance:"Advance Commission", bp_nature_normal:"Regular Commission",
+     comm_opt_agi:"AGI-Customer", comm_opt_gs:"GS-Customer",
+     comm_col_currency:"Contract Currency", comm_f_currency:"Contract Currency", comm_cur_rmb:"CNY (RMB)", comm_cur_usd:"USD", comm_cur_vnd:"VND",
+     comm_f_equip_rmb:"Equip Amount RMB", comm_f_equip_usd:"Equip Amount USD", comm_f_equip_vnd:"Equip Amount VND", comm_f_deposit:"Deposit Payment Date",
+     fin_tab_vn_report:"Vietnam Financial Report", fin_tab_cn_report:"China Financial Report", fin_tab_merge_report:"Consolidated Financial Statement", fin_panel_placeholder:"Content under construction, please stay tuned.",
++    fin_cn_hint:"Same table logic as the Vietnam report; the Excel contains only the \u201cActual Payments\u201d sheet. Click Save after editing.", fin_title_save_cn:"Save to the server manually (China report: no auto-save)", fin_title_save_ro:"Read-only: use Re-import to upload a new xlsx",
+     fin_btn_load:"Load / Refresh", fin_btn_save:"Save", fin_btn_snapshot:"Snapshot", fin_btn_export:"Export xlsx", fin_btn_reimport:"Re-import", fin_btn_filter:"Filter", fin_btn_sort_asc:"Asc", fin_btn_sort_desc:"Desc", fin_btn_restore:"Restore", fin_btn_date_fmt:"Sort by day-month-year", fin_btn_ins_rows:"Insert rows below", fin_btn_ins_rows_above:"Insert rows above",
+     fin_btn_report:"Query Report", fin_rpt_title:"Query Report", fin_rpt_year:"Year", fin_rpt_month:"Month", fin_rpt_note0:"Choose 0 to view the annual report only!", fin_rpt_ok:"Confirm", fin_rpt_cancel:"Cancel", fin_rpt_restore:"Restore",
+     fin_status_rpt_filtered:"Filtered: ", fin_status_rpt_empty:"No records for ",
+     fin_rpt_period_line:"{p} movements · balances as of {e}", fin_rpt_period_remark:"As of {e}",
+     fin_menu_sort_asc:"Sort A → Z", fin_menu_sort_desc:"Sort Z → A", fin_menu_sort_reset:"Reset sort", fin_cur_none:"Currency",
+     fin_status_not_loaded:"Not loaded", fin_status_engine:"Loading engine…", fin_status_importing:"Importing report…", fin_status_loaded:"Report loaded", fin_status_ready:"Ready",
+@@ -25553,12 +26396,13 @@ crm_yes:"Có", crm_no_yes:"Không", lostRestore:"Chuyển về Dự án Tiềm n
+     comm_amt_empty:"Chưa có yêu cầu sửa số tiền hoa hồng", comm_amt_by:"Người gửi",
+     bp_opt_yes:"Có", bp_opt_no:"Không", bp_finished_yes:"Kết thúc", bp_finished_no:"Chưa", bp_nature_advance:"Ứng trước hoa hồng", bp_nature_normal:"TT hoa hồng bình thường",
+     comm_opt_agi:"AGI-Khách hàng", comm_opt_gs:"GS-Khách hàng",
+     comm_col_currency:"Loại tiền tệ HĐ", comm_f_currency:"Loại tiền tệ HĐ", comm_cur_rmb:"Nhân dân tệ RMB", comm_cur_usd:"Đô USD", comm_cur_vnd:"Việt Nam đồng VND",
+     comm_f_equip_rmb:"Giá trị TB RMB", comm_f_equip_usd:"Giá trị TB USD",     comm_f_equip_vnd:"Giá trị TB VND", comm_f_deposit:"Ngày trả đặt cọc",
+     fin_tab_vn_report:"Báo cáo tài chính Việt Nam", fin_tab_cn_report:"Báo cáo tài chính Trung Quốc", fin_tab_merge_report:"Báo cáo tài chính tổng hợp", fin_panel_placeholder:"Nội dung đang xây dựng, vui lòng chờ.",
++    fin_cn_hint:"Cùng logic bảng như báo cáo Việt Nam; Excel chỉ có một sheet \u201cChi thực tế\u201d. Nhớ bấm Lưu sau khi nhập.", fin_title_save_cn:"Lưu thủ công lên máy chủ (báo cáo Trung Quốc: không tự động lưu)", fin_title_save_ro:"Chế độ chỉ đọc: dùng Nhập lại để tải xlsx mới",
+     fin_btn_load:"Tải lại báo cáo", fin_btn_save:"Lưu", fin_btn_snapshot:"Ảnh chụp", fin_btn_export:"Xuất xlsx", fin_btn_reimport:"Nhập lại", fin_btn_filter:"Lọc", fin_btn_sort_asc:"Tăng", fin_btn_sort_desc:"Giảm", fin_btn_restore:"Khôi phục", fin_btn_date_fmt:"Sắp xếp theo ngày-tháng-năm", fin_btn_ins_rows:"Chèn dòng bên dưới", fin_btn_ins_rows_above:"Chèn dòng bên trên",
+     fin_btn_report:"Tra cứu báo cáo", fin_rpt_title:"Tra cứu báo cáo", fin_rpt_year:"Năm", fin_rpt_month:"Tháng", fin_rpt_note0:"Chọn 0 nghĩa là chỉ xem báo cáo theo năm!", fin_rpt_ok:"Xác nhận", fin_rpt_cancel:"Hủy", fin_rpt_restore:"Khôi phục",
+     fin_status_rpt_filtered:"Đã lọc: ", fin_status_rpt_empty:"Không có dữ liệu cho ",
+     fin_rpt_period_line:"Phát sinh {p} · số dư đến {e}", fin_rpt_period_remark:"Đến {e}",
+     fin_menu_sort_asc:"Sắp xếp A → Z", fin_menu_sort_desc:"Sắp xếp Z → A", fin_menu_sort_reset:"Khôi phục thứ tự", fin_cur_none:"Tiền tệ",
+     fin_status_not_loaded:"Chưa tải", fin_status_engine:"Đang tải công cụ bảng…", fin_status_importing:"Đang nhập báo cáo…", fin_status_loaded:"Đã tải báo cáo", fin_status_ready:"Sẵn sàng",

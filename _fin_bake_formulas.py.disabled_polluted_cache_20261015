@@ -1,0 +1,134 @@
+# -*- coding: utf-8 -*-
+"""一次性脚本：恢复收支明细(Chi tiết thu-chi)的滚动余额公式并烘焙进当前 vn_report 快照。
+规则：每个工作区(A 列标题行分隔)独立滚动，F(r) = F(上一行/上一笔) + D(r) - E(r)。
+三套账本(块1 列{3,4,5}/块2 列{13,14,15}/块3 列{23,24,25})行对齐、同逻辑、强制同步。
+★已知数据修复：row 94 为一笔“存入款”但导入时 D(收入) 丢失(为空)，导致其后的静态余额整体偏移 +150,000,000。
+  这里在该格确为空时还原 D(94)=150,000,000（三套 D 列均补），否则滚动公式无法复现账上余额。
+标题行与期初余额行原样保留(F 不动)；只给“日期交易行”写公式。先备份，再写 f+v，并按工作区比对现有静态余额。
+"""
+import json, glob, os, io, sys, shutil
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
+SHEET_NAME = 'Chi tiết thu-chi'
+BLOCKS = [(3, 4, 5), (13, 14, 15), (23, 24, 25)]  # (D, E, F)
+# 已知导入丢失的收入：row 94 缺一笔 150,000,000 存入（摘要=“Hà Minh Cường nộp tiền vào”）
+MISSING_D_ROW = 94
+MISSING_D_VAL = 150000000.0
+
+def col_l(c):
+    s = ''; c += 1
+    while c > 0:
+        m = (c - 1) % 26; s = chr(65 + m) + s; c = (c - 1) // 26
+    return s
+
+def is_num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+def fnum(v):
+    return float(v) if (v is not None and is_num(v)) else 0.0
+
+files = sorted(glob.glob('finance_data/vn_report.snapshot.*.json'))
+if not files:
+    print('未找到 vn_report 快照'); sys.exit(1)
+print('待处理快照:', files)
+
+grand_written = 0
+for path in files:
+    bak = path + '.bak_before_ledger'
+    if not os.path.exists(bak):
+        shutil.copy2(path, bak)
+        print('已备份 ->', bak)
+    d = json.load(open(path, encoding='utf-8'))
+    sid = None
+    for k, s in d.get('sheets', {}).items():
+        if s.get('name') == SHEET_NAME:
+            sid = k; break
+    if sid is None:
+        print(path, '-> 无', SHEET_NAME, '表，跳过'); continue
+    sh = d['sheets'][sid]; cd = sh.get('cellData', {})
+
+    def cell(r, c):
+        x = cd.get(str(r), {}).get(str(c))
+        return x if isinstance(x, dict) else None
+
+    # ---- 修复导入丢失的 D(row94) ----
+    restored = []
+    for (D, E, F) in BLOCKS:
+        cc = cell(MISSING_D_ROW, D)
+        cur = cc.get('v') if cc else None
+        if cur is None or (is_num(cur) and abs(float(cur) - MISSING_D_VAL) > 1):
+            if cc is None:
+                if str(MISSING_D_ROW) not in cd:
+                    cd[str(MISSING_D_ROW)] = {}
+                cc = {}; cd[str(MISSING_D_ROW)][str(D)] = cc
+            cc['v'] = MISSING_D_VAL
+            restored.append((MISSING_D_ROW, D, cur))
+    if restored:
+        print('★ 已还原导入丢失的收入 D(row94):', restored)
+
+    # ---- 检测标题行 ----
+    titles = []
+    for r in sorted(int(x) for x in cd):
+        c0 = cell(r, 0)
+        a = c0.get('v') if c0 else None
+        if a is None or a == '':
+            continue
+        if is_num(a):
+            continue
+        dv = cell(r, 3); ev = cell(r, 4)
+        if dv and dv.get('v') not in (None, ''):
+            continue
+        if ev and ev.get('v') not in (None, ''):
+            continue
+        titles.append(r)
+    titles.sort()
+    maxr = max((int(x) for x in cd), default=0)
+    bounds = titles + [maxr + 1]
+
+    written = 0
+    mismatch_by_region = {}
+    for i, t in enumerate(titles):
+        lo = t + 1
+        hi = (bounds[i + 1] - 1 if i + 1 < len(bounds) else maxr)
+        drows = [r for r in range(lo, hi + 1) if (lambda c0: c0 is not None and is_num(c0.get('v')) if c0 else False)(cell(r, 0))]
+        if not drows:
+            continue
+        reg_mis = 0
+        for (D, E, F) in BLOCKS:
+            prev_row = None
+            for idx, r in enumerate(drows):
+                ref = (r - 1) if idx == 0 else prev_row
+                dv = cell(r, D); ev = cell(r, E)
+                dvn = fnum(dv.get('v')) if dv else 0.0
+                evn = fnum(ev.get('v')) if ev else 0.0
+                pc = cell(ref, F)
+                pv = fnum(pc.get('v')) if pc else 0.0
+                val = pv + dvn - evn
+                f = '={}{}+{}{}-{}{}'.format(col_l(F), ref, col_l(D), r, col_l(E), r)
+                existing = cell(r, F)
+                exist_v = existing.get('v') if existing else None
+                if exist_v is not None and is_num(exist_v) and abs(val - float(exist_v)) > 1:
+                    reg_mis += 1
+                    if reg_mis <= 10:
+                        print('  差异 区标题@{} row{} block(F{}) ref{} calc={} exist={} (D={},E={},pv={})'.format(
+                            t, r, F, ref, val, exist_v, dvn, evn, pv))
+                target = existing if existing is not None else {}
+                target['f'] = f
+                target['v'] = val
+                if cell(r, F) is None:
+                    if str(r) not in cd:
+                        cd[str(r)] = {}
+                    cd[str(r)][str(F)] = target
+                written += 1
+                prev_row = r
+        if reg_mis:
+            mismatch_by_region[t] = reg_mis
+    json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
+    print('{} -> 标题行{} 写入公式 {} 处'.format(path.split('/')[-1], titles, written))
+    if mismatch_by_region:
+        print('  仍有差异的工作区(标题行->差异数):', mismatch_by_region)
+    else:
+        print('  ✓ 全部工作区滚动值均与现有静态余额一致（差异=0）')
+    grand_written += written
+
+print('\n合计写入 {} 处公式'.format(grand_written))

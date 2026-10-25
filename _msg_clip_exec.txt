@@ -1,0 +1,30 @@
+fix(clip): Ctrl+C/X 真正写入系统剪贴板（Univer 的 clipboard.write 被拒后无人补写）
+
+实测证据（playwright + 真实 Chrome，财务报表 #univer_container）
+- activeElement = DIV.univer-editor，焦点正常；
+- Ctrl+C / Ctrl+X 的 keydown defaultPrevented = true（Univer 认了快捷键）；
+- 但 document 的 copy / cut 事件【一次都没触发】→ Univer 改走 navigator.clipboard.write()；
+- 该 Promise 被浏览器以 NotAllowedError 拒绝，又被页面顶部"忽略噪声"分支静默吞掉；
+- 结果：剪贴板恒为空，复制/剪切"完全没反应"，粘贴自然也粘不出东西。
+
+修复
+- finExcelKeysBind 的 keydown 里，C/X 放行 Univer 之后再用【同步 document.execCommand('copy')】
+  把选区内容写一次剪贴板：不依赖安全上下文 / clipboard 权限，且在 user gesture 同步栈里必然允许。
+  不 preventDefault、不 stopPropagation，Univer 的命令照常执行（写两次内容相同，无副作用）。
+- 新增 fin_clipMatrixText()：TSV 序列化选区；选区口径改为优先命令流记录的 finStatSel
+  （门面 getSelection().getRanges() 这版常常只给"活动单元格"一格），与统计栏同源。
+- 新增 fin_clipWrite()：临时 textarea + execCommand('copy')，失败再降级 navigator.clipboard；
+  ★结束时必须把焦点还原给原元素（textarea.select() 会抢焦点，否则之后方向键/回车全打到 body）。
+- 排障钩子 window.__finClipLast = { len, ok }。
+
+验证
+- 全选 440 格后 Ctrl+C：剪贴板拿到完整 TSV（含「越南 CHOICE SLATS 有限公司」「₫799,056,508」）；
+- Ctrl+V 的 paste 事件取到 1112 字符数据；execCommand 返回 ok: true。
+
+锁
+- check_fin_excel_keys_lock.py 不变量⑧ 扩展为 ⑧-b：fin_clipWrite / fin_clipMatrixText 必须存在、
+  必须用同步 execCommand('copy')、C/X 分支必须调用 fin_clipWrite(fin_clipMatrixText())、
+  必须归还焦点；分支体内（剥掉注释后）不得出现 preventDefault / stopPropagation。
+- _lock_reverse_test_clip.py 扩到 8 个用例（删放行段 / 加 preventDefault / 删自愈 /
+  pointerup 改冒泡 / 去焦点归还 / 删 execCommand / 不调 fin_clipWrite / 不还焦点）—— 8/8 全拦截。
+- 新增 _pw_clip_fin.py：可以随时用真实浏览器回归复测复制/剪切/粘贴链路。
