@@ -1139,20 +1139,27 @@ window.__finShakeReport = function (ms) {
         var h = location.hostname;
         var okCtx = (location.protocol === 'https:') || h === 'localhost' || h === '127.0.0.1';
         if (!okCtx) return;
-        window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
-        });
+        /* ★FIX-20261025：旧 SW 会经 HTTP 缓存返回旧页面（照片仍是 target=_blank 新开页）。
+           这里主动注销全部 SW 并清空所有缓存；注销后下次加载即从服务器拉最新页面。 */
+        navigator.serviceWorker.getRegistrations().then(function (rs) {
+          rs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
+        }).catch(function () {});
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (ks) {
+            ks.forEach(function (k) { try { caches.delete(k); } catch (e) {} });
+          }).catch(function () {});
+        }
       } catch (e) {}
     })();
   </script>
   <!-- ===== /PWA ===== -->
-  <!-- 版本号：V2026.09.10.06 - 确认新代码已加载 -->
-  <title>CHOICE SLATS VIET NAM v2026.09.10.06</title>
+  <!-- 版本号：V2026.10.25.2 - 照片同页灯箱 / 清除旧SW -->
+  <title>CHOICE SLATS VIET NAM v2026.10.25.2</title>
   <script>
     // 版本号标记（仅用于控制台确认代码已更新，不再触发跳转）
     // 说明：原 _bust 强制跳转是本地开发时"改了代码看不到效果"的临时手段，
     // 部署到 Cloudflare Pages 后每次部署都是新地址，该跳转只会导致重复加载、变慢，已移除。
-    window._DASH_VER = '20260910.06';
+    window._DASH_VER = '20261025.2';
     console.log('[DASH_VER] OK = ' + window._DASH_VER);
   </script>
   <script>
@@ -4018,7 +4025,7 @@ window.__finShakeReport = function (ms) {
       <button class="login-link" onclick="openAuthModal('reset')" data-i18n="login_link_reset">Reset Password</button>
       <button class="login-link" onclick="openAuthModal('forget')" data-i18n="login_link_forget">Forget Password</button>
     </div>
-    <div class="login-footer"><span>CHOICE SLATS VIET NAM</span> · <span id="loginVer">V2026.09.10.06</span></div>
+    <div class="login-footer"><span>CHOICE SLATS VIET NAM</span> · <span id="loginVer">V2026.10.25.2</span></div>
   </div>
 </div>
 
@@ -9984,7 +9991,7 @@ var WL_FLOW_IMG = {
         if(!arr.length){ sel.innerHTML = ''; }
         else {
           sel.innerHTML = arr.map(function(p,i){
-            return '<a href="/uploads/'+prod_esc(p)+'" target="_blank" class="photo-thumb-item" title="'+prod_esc(p)+'">'
+            return '<a href="/uploads/'+prod_esc(p)+'" class="photo-thumb-item" title="'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;">'
               + '<img src="/uploads/'+prod_esc(p)+'">'
               + '<button type="button" class="photo-thumb-del" data-i18n-title="btn_remove_photo" onclick="event.preventDefault();event.stopPropagation();prodReceiptPhotoRemove('+i+')" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
               + '</a>';
@@ -10061,7 +10068,7 @@ var WL_FLOW_IMG = {
         if(!arr.length){ sel.innerHTML = ''; }
         else {
           sel.innerHTML = arr.map(function(p,i){
-            return '<a href="/uploads/'+prod_esc(p)+'" target="_blank" class="photo-thumb-item" title="'+prod_esc(p)+'">'
+            return '<a href="/uploads/'+prod_esc(p)+'" class="photo-thumb-item" title="'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;">'
               + '<img src="/uploads/'+prod_esc(p)+'">'
               + '<button type="button" class="photo-thumb-del" data-i18n-title="btn_remove_photo" onclick="event.preventDefault();event.stopPropagation();prodProdPhotoRemove('+i+')" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
               + '</a>';
@@ -10155,7 +10162,7 @@ var WL_FLOW_IMG = {
         + '<div class="modal-content inst-photo-modal" style="max-width:900px;" onclick="event.stopPropagation()">'
         + '<div class="modal-header"><span>'+prod_esc(pt('prod_lbl_photos'))+' · '+prod_esc(dd)+'</span><div class="modal-actions"><button class="close" type="button" onclick="prod_closePhotoViewer()">×</button></div></div>'
         + '<div class="inst-photo-viewer-body"><div class="inst-photo-grid">'
-        + arr.map(function(p){ return '<div class="inst-photo-item"><a href="/uploads/'+prod_esc(p)+'" target="_blank"><img src="/uploads/'+prod_esc(p)+'" alt="'+prod_esc(p)+'"></a></div>'; }).join('')
+        + arr.map(function(p){ return '<div class="inst-photo-item"><a href="/uploads/'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;"><img src="/uploads/'+prod_esc(p)+'" alt="'+prod_esc(p)+'"></a></div>'; }).join('')
         + '</div></div></div></div>';
       var existing = document.querySelector('.inst-photo-viewer-overlay'); if(existing) existing.remove();
       document.body.insertAdjacentHTML('beforeend', html);
@@ -11260,7 +11267,7 @@ var WL_FLOW_IMG = {
           + '<td>'+prod_esc(rw.qty)+'</td><td>'+prod_esc(prodRcNoteVal(rw))+'</td></tr>';
       }).join('');
       var totalRow = '<tr class="rc-total"><td colspan="4"><b data-i18n="thr_total2">'+pt('thr_total2')+'</b></td><td><b>'+prod_esc(prodFormatMoney(totalV,'VND'))+'</b></td><td><b>'+prod_esc(prodFormatMoney(totalR,'RMB'))+'</b></td><td><b>'+prod_esc(prodFormatMoney(totalU,'USD'))+'</b></td><td><b>'+prod_esc(totalQ)+'</b></td><td></td></tr>';
-      var _ph=(r.photos||[]).map(function(p){return '<a href="/uploads/'+encodeURIComponent(p)+'" target="_blank"><img src="/uploads/'+encodeURIComponent(p)+'" class="thumb"></a>';}).join('');
+      var _ph=(r.photos||[]).map(function(p){return '<a href="/uploads/'+encodeURIComponent(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;"><img src="/uploads/'+encodeURIComponent(p)+'" class="thumb"></a>';}).join('');
       return '<div class="receipt-card'+(r.status==='confirmed'?' confirmed':'')+'"'+cardStyle+'>'
         + collapseBtn
         + '<div class="rc-top">'+ordinalBadge+'<b><span data-i18n="sec_receipt">'+pt('sec_receipt')+'</span> #'+(r.id||idx)+'</b> · <span class="rc-date">'+prod_esc(ymdToDmy(r.date||''))+'</span> '+st+reeditBtn+cardToggle+delBtn+'</div>'
@@ -39332,7 +39339,7 @@ function applyTopbarLang() {
   var t = T(); var nav = t.nav || {};
   // 手机横屏（矮屏）下改用短标签（如 "Potential Projects" → "Potential"），
   // 这是"6 个标签一个不少地显示在同一行"的关键：原名太长会挤掉后面的标签。
-  var shortNav = (topbarCompact() && t.nav_short) ? t.nav_short : null;
+  var shortNav = t.nav_short ? t.nav_short : null;
   var menuMap = { dashboard:'dashboard', crm:'crm', won:'won', lost:'lost',
                   worklog:'worklog', production:'production', install:'install',
                   finance:'finance', library:'library', equity:'equity',
@@ -39451,7 +39458,7 @@ function fitTopbarFontsNow() {
   for (var _mk in _map) {
     var _b = menu.querySelector('.tb-item[data-view="'+_map[_mk]+'"]');
     if (!_b || _b.style.display === 'none') continue;
-    var _pref = (!isVi && compact && _short && _short[_mk]) ? _short[_mk] : (_nav[_mk] || '');
+    var _pref = (!isVi && _short && _short[_mk]) ? _short[_mk] : (_nav[_mk] || '');
     if (!_pref) continue;
     var _lb = _b.querySelector('.tb-label');
     if (_lb) { if (_lb.textContent !== _pref) _lb.textContent = _pref; }
@@ -45516,7 +45523,7 @@ function prodApprReceiptHtml(pl){
   var photosArr = Array.isArray(pl.photos) ? pl.photos : [];
   var photosHtml = photosArr.length
     ? '<div class="photo-list">'+photosArr.map(function(p){
-        return '<a href="/uploads/'+encodeURIComponent(p)+'" target="_blank"><img src="/uploads/'+encodeURIComponent(p)+'" class="thumb"></a>';
+        return '<a href="/uploads/'+encodeURIComponent(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;"><img src="/uploads/'+encodeURIComponent(p)+'" class="thumb"></a>';
       }).join('')+'</div>'
     : '';
   return floorsHtml + housesHtml
@@ -70855,7 +70862,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       if(!arr.length){ sel.innerHTML = ''; }
       else {
         sel.innerHTML = arr.map(function(p,i){
-          return '<a href="/uploads/'+prod_esc(p)+'" target="_blank" class="photo-thumb-item" title="'+prod_esc(p)+'">'
+          return '<a href="/uploads/'+prod_esc(p)+'" class="photo-thumb-item" title="'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;">'
             + '<img src="/uploads/'+prod_esc(p)+'">'
             + '<button type="button" class="photo-thumb-del" onclick="event.preventDefault();event.stopPropagation();inst_zonePhotoRemove(\''+zoneNum+'\','+i+')" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
             + '</a>';
@@ -71018,7 +71025,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     } else {
       html += '<div class="inst-photo-grid">';
       arr.forEach(function(p){
-        html += '<div class="inst-photo-item"><a href="/uploads/'+prod_esc(p)+'" target="_blank"><img src="/uploads/'+prod_esc(p)+'" loading="lazy"></a></div>';
+        html += '<div class="inst-photo-item"><a href="/uploads/'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;"><img src="/uploads/'+prod_esc(p)+'" loading="lazy"></a></div>';
       });
       html += '</div>';
     }
@@ -73297,6 +73304,229 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       clearInterval(timer);
     } else if (tries > 60) { clearInterval(timer); }
   }, 500);
+})();
+</script>
+
+<!-- ===== 响应式修复 2026-10-25 v2：竖屏/横屏领航缩写全显 + 收货单宽表可横滑 =====
+     仅新增响应式规则，不改动任何既有逻辑 / 锁死区（FROZEN）契约。 -->
+<style id="rwd-fix-20261025">
+  /* 全方向：整页禁止左右滑屏（过宽内容只在卡片内部消化，绝不整页平移） */
+  html, body { overflow-x: hidden !important; max-width: 100vw !important; }
+  body { position: relative; }
+  /* 手机（竖屏 ≤640 宽 或 横屏 高≤560）统一：顶栏分两行——
+     第 1 行：10 个领航标签（JS 强制用 nav_short 缩写）平分整行、全部可见；
+     第 2 行：右侧控件（语言/用户/退出）右对齐。
+     这样右侧控件不再挤压导航，2 字缩写也不会被裁。 */
+  @media (max-width: 640px), (orientation: landscape) and (max-height: 560px) {
+    #topbar {
+      height: auto !important;
+      min-height: 0 !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+      gap: 4px !important;
+      padding: 4px max(6px, env(safe-area-inset-left)) 4px max(6px, env(safe-area-inset-right)) !important;
+    }
+    .tb-logo { display: none !important; }
+    .tb-menu {
+      display: flex !important;
+      flex: 1 1 100% !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      overflow: visible !important;
+      gap: 2px !important;
+      padding: 0 !important;
+      order: 1 !important;
+    }
+    .tb-item {
+      flex: 1 1 0 !important;
+      box-sizing: border-box !important;
+      width: auto !important;
+      min-width: 0 !important;
+      height: auto !important;
+      min-height: 26px !important;
+      padding: 3px 1px !important;
+      font-size: 10px !important;
+      line-height: 1.15 !important;
+      white-space: normal !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      word-break: break-word !important;
+      text-align: center !important;
+    }
+    .tb-item.active { padding: 3px 1px !important; margin: 0 !important; border-radius: 12px !important; }
+    .tb-item .tb-label { white-space: normal !important; overflow: visible !important; }
+    .tb-item.has-pend-badge { padding-right: 6px !important; }
+    .tb-item.active.has-pend-badge { padding-right: 6px !important; }
+    .tb-right {
+      flex: 1 1 100% !important;
+      width: 100% !important;
+      justify-content: flex-end !important;
+      flex-wrap: wrap !important;
+      gap: 6px !important;
+      order: 2 !important;
+    }
+    .tb-user-role { display: none !important; }
+    .lang-switch-label { display: none !important; }
+    /* 顶栏高度由文件末尾脚本按实际测量设置（登录后/换语言/旋转都会校正），此处给保守兜底 */
+    .app-body { margin-top: calc(104px + env(safe-area-inset-top)) !important; }
+  }
+
+  /* 竖屏（正屏）：领航 5 列 × 2 行，每格约 1/5 宽，2 字缩写宽松可见 */
+  @media (max-width: 640px) and (orientation: portrait) {
+    .tb-menu {
+      display: grid !important;
+      grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+      gap: 4px !important;
+    }
+    .tb-item { flex: none !important; width: 100% !important; }
+  }
+
+  /* 收货确认记录：卡片内部横向可滑动（页面本身不横滑）；横屏由下方媒体查询改为整表全显 */
+  .rc-list-scroll { overflow-x: hidden !important; max-width: 100% !important; }
+  .receipt-card { max-width: 100% !important; }
+  .receipt-card .rc-body {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-width: 100% !important;
+    touch-action: pan-x pan-y !important;
+  }
+  .receipt-card .prod-table {
+    width: max-content !important;
+    min-width: 1000px !important;
+    table-layout: auto !important;
+  }
+  .receipt-card .prod-table th,
+  .receipt-card .prod-table td {
+    white-space: nowrap !important;
+    font-size: 12px !important;
+    padding: 5px 8px !important;
+    vertical-align: middle !important;
+  }
+  /* 其它宽数据框：容器内横向可滑动，避免右侧列被裁 */
+  .tbl-scroll, .table-scroll, .scroll-x, .prod-table-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  /* 审批中心收货单明细：容器内横滑 */
+  .usr-diff-box { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+  .usr-diff-box .prod-table { width: max-content !important; min-width: 900px !important; table-layout: auto !important; }
+  .usr-diff-box .prod-table th,
+  .usr-diff-box .prod-table td { white-space: nowrap !important; }
+
+  /* 横屏：禁止页面级横向滚动；宽表压缩到一屏 */
+  @media (orientation: landscape) and (max-height: 560px) {
+    html, body { overflow-x: hidden !important; }
+    table { table-layout: fixed !important; width: 100% !important; }
+    col { width: auto !important; }
+    table th, table td {
+      white-space: normal !important;
+      word-break: break-word !important;
+      overflow-wrap: break-word !important;
+      font-size: 11px !important;
+      padding: 4px 6px !important;
+    }
+    input, select, textarea, .form-control {
+      max-width: 100% !important; box-sizing: border-box !important;
+    }
+    .won-scroll-container { overflow-x: hidden !important; }
+    .tbl-scroll, .table-scroll, .scroll-x, .prod-table-scroll { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+  }
+
+  /* 横屏（含平板/桌面）：收货单 9 列压缩到卡片内全显，不出现横向滑动 */
+  @media (orientation: landscape) {
+    .receipt-card .rc-body { overflow-x: hidden !important; }
+    .receipt-card .prod-table { width: 100% !important; min-width: 0 !important; table-layout: fixed !important; }
+    .receipt-card .prod-table th,
+    .receipt-card .prod-table td {
+      white-space: normal !important;
+      word-break: break-word !important;
+      overflow-wrap: anywhere !important;
+      font-size: 11px !important;
+      padding: 4px 4px !important;
+    }
+  }
+</style>
+
+<script id="rwd-fix-20261025-js">
+(function(){
+  function isMobile(){ return (window.innerWidth <= 640) || (window.innerHeight <= 560 && window.innerWidth > window.innerHeight); }
+  function sync(){
+    var tb = document.getElementById('topbar');
+    var app = document.querySelector('.app-body');
+    if (!tb || !app) return;
+    if (!isMobile()) { app.style.removeProperty('margin-top'); return; }
+    var h = tb.offsetHeight || 0;
+    if (h > 0) app.style.setProperty('margin-top', (h + 6) + 'px', 'important');
+  }
+  window.addEventListener('resize', sync);
+  window.addEventListener('orientationchange', sync);
+  document.addEventListener('app:langchange', sync);
+  document.addEventListener('DOMContentLoaded', sync);
+  setTimeout(sync, 200); setTimeout(sync, 800); setTimeout(sync, 2000);
+  try { var _tb = document.getElementById('topbar'); if (_tb && window.ResizeObserver) new ResizeObserver(sync).observe(_tb); } catch(e){}
+})();
+</script>
+
+<script id="img-lightbox-20261025">
+/* 全局图片灯箱：点击任何 /uploads 图片 → 全屏等比显示（不溢屏），右上角 × 关闭 */
+(function(){
+  function close(ov){
+    if(!ov) return;
+    ov.remove();
+    if(ov._esc){ document.removeEventListener('keydown', ov._esc, true); }
+  }
+  function open(src){
+    if(!src) return;
+    var old = document.querySelector('.img-lightbox-20261025'); if(old){ close(old); }
+    var ov = document.createElement('div');
+    ov.className = 'img-lightbox-20261025';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:relative;display:inline-block;max-width:100%;max-height:100%;line-height:0;';
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.setAttribute('aria-label','关闭'); btn.title = '关闭'; btn.innerHTML = '&times;';
+    btn.style.cssText = 'position:absolute;top:8px;right:8px;width:44px;height:44px;border-radius:50%;border:2px solid #fff;background:#e53935;color:#fff;font-size:30px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 14px rgba(0,0,0,.65);cursor:pointer;z-index:3;';
+    var img = document.createElement('img');
+    img.src = src; img.alt = '';
+    img.style.cssText = 'display:block;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);width:auto;height:auto;object-fit:contain;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.55);background:#111;';
+    wrap.appendChild(img); wrap.appendChild(btn);
+    ov.appendChild(wrap);
+    btn.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); close(ov); }, true);
+    ov.addEventListener('click', function(e){ if(e.target === ov) close(ov); });
+    img.addEventListener('click', function(e){ e.stopPropagation(); });
+    var onEsc = function(e){ if(e.key === 'Escape'){ e.stopPropagation(); close(ov); } };
+    ov._esc = onEsc; document.addEventListener('keydown', onEsc, true);
+    document.body.appendChild(ov);
+  }
+  window.win_imgLightbox = open;
+  /* 捕获阶段接管“图片链接”，阻止 WebView 打开原图新页面（会溢屏、无关闭按钮） */
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    var a = (t && t.closest) ? t.closest('a[href]') : null;
+    if(!a) return;
+    var href = a.getAttribute('href') || '';
+    var hasImg = !!a.querySelector('img');
+    var isImg = /\.(png|jpe?g|webp|gif|bmp|svg)(\?|#|$)/i.test(href);
+    if(!(hasImg || isImg)) return;
+    e.preventDefault(); e.stopPropagation();
+    open(href);
+  }, true);
+  /* 兼容：其它用 window.open 打开图片的入口，也走同一灯箱（图片右上角有关闭按钮） */
+  try {
+    var _wo = window.open;
+    window.open = function(url){
+      try {
+        var u = String(url || '');
+        if (/\.(png|jpe?g|webp|gif|bmp)(\?|#|$)/i.test(u)) { open(u); return null; }
+      } catch(e){}
+      return _wo.apply(window, arguments);
+    };
+  } catch(e){}
+  /* 兼容旧的收货/生产照片查看函数，统一走灯箱（图片右上角关闭） */
+  try {
+    window.prodReceiptPhotoView = function(fn){ open('/uploads/' + encodeURIComponent(fn)); };
+    window.prodProdPhotoView = function(fn){ open('/uploads/' + encodeURIComponent(fn)); };
+  } catch(e){}
 })();
 </script>
 </body>
