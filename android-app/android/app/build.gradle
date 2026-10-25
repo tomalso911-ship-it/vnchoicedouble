@@ -1,5 +1,8 @@
 apply plugin: 'com.android.application'
 
+def APP_NAME = "ChoiceVN"
+def APP_VERSION = "2026.10.25-V4"
+
 android {
     namespace "com.choicelats.pm"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +10,8 @@ android {
         applicationId "com.choicelats.pm"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 4
+        versionName APP_VERSION
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -20,6 +23,15 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+// 让构建产物直接命名为 ChoiceVN-<版本>.apk（而非 app-debug.apk）
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set("${APP_NAME}-${APP_VERSION}.apk")
         }
     }
 }
