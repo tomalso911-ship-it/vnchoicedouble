@@ -5975,6 +5975,9 @@ var WL_FLOW_IMG = {
       .badge.pend{background:#fff3cd;color:#8a6d00;}
       .badge.ok{background:#d7f0db;color:#1f7a35;}
       .badge.warn{background:#ffe0b2;color:#8a4b00;}
+      /* ★BADGE-REJ-RED-20261026：收货单被「拒绝」= 红底白字（用户要求"改成红色填充"），
+         与「待采购确认(黄)」「待重新填写(浅橙)」一眼区分开。 */
+      .badge.rej{background:#E53935;color:#fff;font-weight:700;}
       .photo-upload-mock{display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;min-height:34px;}
       .photo-upload-mock:hover{border-color:#aaa;}
       .photo-mock-btn{flex:none;padding:4px 10px;border:1px solid #E53935;border-radius:4px;background:#E53935;font-size:12px;color:#fff;cursor:pointer;font-weight:600;}
@@ -11244,7 +11247,9 @@ var WL_FLOW_IMG = {
       var statusKey = r.status==='confirmed' ? 'status_confirmed'
                     : (r.status==='returned' ? 'status_returned'
                     : (r.status==='need_edit' ? 'status_need_edit' : 'status_pending'));
-      var _badge = r.status==='confirmed' ? 'ok' : (r.status==='need_edit' ? 'warn' : 'pend');
+      var _badge = r.status==='confirmed' ? 'ok'
+                 : (r.status==='returned' ? 'rej'          /* 已驳回：红色填充（BADGE-REJ-RED-20261026） */
+                 : (r.status==='need_edit' ? 'warn' : 'pend'));
       var st = '<span class="badge '+_badge+'" data-i18n="'+statusKey+'">'+pt(statusKey)+'</span>';
       var _me = (typeof authUser!=='undefined' && authUser && authUser.username) ? String(authUser.username) : '';
       var _tri = (typeof TRI_APPROVERS!=='undefined' && TRI_APPROVERS) ? TRI_APPROVERS : ['tom','cuong','james'];
