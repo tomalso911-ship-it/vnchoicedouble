@@ -157,6 +157,17 @@
 #                                 ⑨ 财务侧必须暴露 __finFormulaMods + fin_ensureFormulaPatch
 #                                 ⑩ 补丁核心 skip(1) 不得删
 #
+#   19) check_py_name_lock.py —— 后端 app.py【函数名/调用名一致性】硬锁
+#                                 （PY-NAME-LOCK-20261026，线上 500 事故复盘）：
+#                                 ① 顶层函数不得重名（除非刻意覆盖 —— 顶掉的那个必然失效）
+#                                 ② 不得调用「app.py 里从未定义/赋值/导入」的私有名字
+#                                 事故原样：中国报表每日备份函数被改名成 _fin_daily_backup，
+#                                 既顶掉了越南报表的同名函数，又让三处 _cn_daily_backup() 变
+#                                 NameError → POST /api/finance/cn-report/save 恒 500。
+#                                 这类错误 compile 不报，只有跑到那行才炸，且发生在
+#                                 os.replace 之后（数据已写、却报错），必须静态拦住。
+#                                 反向测试：python _lock_reverse_test_pyname.py（5/5）
+#
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
 #   但会在提交时打印，便于及时发现并修复。CI 中建议作为独立步骤做硬阻断。
@@ -184,7 +195,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py check_clip_robust_lock.py check_undo_everystep_lock.py check_eq_geom_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py check_clip_robust_lock.py check_undo_everystep_lock.py check_eq_geom_lock.py check_py_name_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then

@@ -5133,17 +5133,33 @@ def _fin_loss_guard(kind, old_path, new_path):
         return False, ""
 
 
-def _fin_daily_backup():
-    """每改一次中国报表就留一份当日备份（同一天只留一份，滚动 30 份）。"""
+def _cn_daily_backup():
+    """每改一次中国报表就留一份当日备份（同一天只留一份，滚动 30 份）。
+    ★名字必须保持 _cn_ 前缀：越南报表那份叫 _fin_daily_backup（见文件上方），
+      两者同名会互相覆盖同名函数——曾因被误改成 _fin_daily_backup，
+      导致本函数把越南报表的 _fin_daily_backup 顶掉，且 3 处调用 _cn_daily_backup()
+      变成 NameError → /api/finance/cn-report/save 恒返回 500（2026-10-26 修复）。"""
     try:
         if not os.path.isfile(CN_REPORT):
             return
         os.makedirs(FIN_BACKUP_DIR, exist_ok=True)
-        stamp = _fdt.date.today().isoformat()
+        stamp = _fdt.date.today().strftime("%Y%m%d")
         dest = os.path.join(FIN_BACKUP_DIR, "cn_report_%s.xlsx.bak" % stamp)
         shutil.copyfile(CN_REPORT, dest)
-        olds = sorted(fn for fn in os.listdir(FIN_BACKUP_DIR)
-                      if fn.startswith("cn_report_") and fn.endswith(".xlsx.bak"))
+        # ★滚动清理必须按【修改时间】排序，不能按文件名排序：
+        #   历史文件名混用了 20261013_xxxx（紧凑）与 2026-10-13（带横线）两种写法，
+        #   横线 '-' 的 ASCII 比数字小 ⇒ 当天那份永远排在最前，会被当成"最旧"立刻删掉，
+        #   于是"每日备份"事实上不存在（2026-10-26 发现并修复）。
+        olds = [fn for fn in os.listdir(FIN_BACKUP_DIR)
+                if fn.startswith("cn_report_") and fn.endswith(".xlsx.bak")]
+
+        def _bak_mtime(fn):
+            try:
+                return os.path.getmtime(os.path.join(FIN_BACKUP_DIR, fn))
+            except OSError:
+                return 0
+
+        olds.sort(key=_bak_mtime)
         for fn in olds[:-30]:
             try:
                 os.remove(os.path.join(FIN_BACKUP_DIR, fn))
