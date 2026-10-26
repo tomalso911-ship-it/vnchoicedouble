@@ -168,6 +168,17 @@
 #                                 os.replace 之后（数据已写、却报错），必须静态拦住。
 #                                 反向测试：python _lock_reverse_test_pyname.py（5/5）
 #
+#   20) check_appr_need_edit_lock.py —— 收货单审批「返回重新填写」闭环锁死区
+#                                 （APPR-RETURN-LOCK-20261026，用户 2026-10-26 报障）：
+#                                 ① prodApprLoadFactory 取到服务端快照后必须置
+#                                    window.__PROD_SYNCED[pid]=true（否则回写被门禁丢弃）
+#                                 ② prodApprSaveFactory 必须先强制置位再 prod_save(f)
+#                                 ③ ApplyInbound / MarkReturned / MarkNeedEdit 三个回写
+#                                    必须走 prodApprSaveFactory，禁止裸 prod_save(f)
+#                                 ④ 收货单卡片 need_edit → ✎ 重新填写（prod_reeditReceipt）不得删
+#                                 历史 BUG：审批返回后收货单仍是 pending，申请人看不到按钮，
+#                                 流程无法闭环。反向测试：python _lock_reverse_test_appr.py
+#
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
 #   但会在提交时打印，便于及时发现并修复。CI 中建议作为独立步骤做硬阻断。
@@ -195,7 +206,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py check_clip_robust_lock.py check_undo_everystep_lock.py check_eq_geom_lock.py check_py_name_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py check_clip_robust_lock.py check_undo_everystep_lock.py check_eq_geom_lock.py check_py_name_lock.py check_appr_need_edit_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then

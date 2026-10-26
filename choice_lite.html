@@ -45602,18 +45602,53 @@ function prodApprLoadFactory(pid, cb){
   if(!me){ cb(prod_get(pid)); return; }
   fetch('/api/prod-factory/'+encodeURIComponent(pid)+'?me='+encodeURIComponent(me))
     .then(function(r){ return r.ok? r.json():null; })
-    .then(function(d){ cb((d && d.ok && d.data) ? d.data : prod_get(pid)); })
+    .then(function(d){
+      var f=(d && d.ok && d.data) ? d.data : prod_get(pid);
+      /* ★APPR-RETURN-LOCK-20261026：这里拿到的就是【服务器权威快照】，
+         必须立刻把该项目标记为"已同步"，否则下面 prod_save() 会被
+         prod_pushToServer 的首次同步门禁(__PROD_SYNCED)静默拦掉 ——
+         症状就是审批人点「返回重新填写」后，服务端收货单仍是 pending，
+         申请人列表里永远看不到「✎ 重新填写」按钮（2026-10-26 线上 BUG）。 */
+      if(d && d.ok && d.data){
+        try{
+          if(!window.__PROD_SYNCED) window.__PROD_SYNCED={};
+          window.__PROD_SYNCED[pid]=true;
+          if(window.__PROD_SYNC_INFLIGHT) delete window.__PROD_SYNC_INFLIGHT[pid];
+          if(!window.__PROD_SRV_W) window.__PROD_SRV_W={};
+          window.__PROD_SRV_W[pid]=Math.max(prod_factoryWeight(f), window.__PROD_SRV_W[pid]||0);
+        }catch(_){}
+      }
+      cb(f);
+    })
     .catch(function(){ cb(prod_get(pid)); });
 }
 /* 依据审批载荷确保收货单存在（服务端缺失时用载荷补建，保证提交内容+照片不丢） */
 function prodApprEnsureReceipt(f, pl){
-  f.materials=f.materials||{items:[],inbound:[],outbound:[],receipts:[]};
-  var rec=(f.materials.receipts||[]).find(function(r){return r.id===pl.receiptId;});
+  f.materials=f.materials||{};
+  /* ★ receipts/inbound 等数组必须逐个补齐：旧写法只在 f.materials 整体缺失时初始化，
+     一旦 materials 已存在但没有 receipts 键，push 会抛 TypeError，整笔回写被中断。 */
+  ['items','inbound','outbound','receipts'].forEach(function(k){
+    if(!Array.isArray(f.materials[k])) f.materials[k]=[];
+  });
+  var rec=f.materials.receipts.find(function(r){return r && r.id===pl.receiptId;});
   if(!rec){
-    rec={id:pl.receiptId, date:pl.date||'', floors:pl.floors||[], houses:pl.houses||[], photos:pl.photos||[], rows:pl.rows||[], status:'pending', approvedBy:'', createdAt:''};
+    rec={id:pl.receiptId, date:pl.date||'', floors:pl.floors||[], houses:pl.houses||[], photos:pl.photos||[], rows:pl.rows||[], status:'pending', approvedBy:'', createdAt:'', by:(pl.requester||'')};
     f.materials.receipts.push(rec);
   }
   return rec;
+}
+/* ★ 审批回写专用保存：这次 f 来自服务端权威快照（prodApprLoadFactory），
+   只改了状态字段，必须绕开"首次同步前不推送"的门禁，保证一定落到服务器。 */
+function prodApprSaveFactory(pid, f){
+  try{
+    if(!window.__PROD_SYNCED) window.__PROD_SYNCED={};
+    window.__PROD_SYNCED[pid]=true;
+    if(window.__PROD_SYNC_INFLIGHT) delete window.__PROD_SYNC_INFLIGHT[pid];
+    if(!window.__PROD_SRV_W) window.__PROD_SRV_W={};
+    window.__PROD_SRV_W[pid]=Math.max(prod_factoryWeight(f), window.__PROD_SRV_W[pid]||0);
+  }catch(_){}
+  try{ PROD_MEM[pid]=f; }catch(_){}
+  return prod_save(f);
 }
 function prodApprApplyInbound(pl){
   var pid=pl.project; if(!pid) return;
@@ -45634,7 +45669,7 @@ function prodApprApplyInbound(pl){
     (pl.rows||[]).forEach(function(rw){
       f.materials.inbound.push({date:rec.date, name:rw.material, qty:rw.qty, note:'收货确认: '+(rw.spec||'')+(rec.floors&&rec.floors.length?(' '+rec.floors.join('、')):'')});
     });
-    prod_save(f); if(PROD_CUR===pid && typeof prod_renderTab==='function') prod_renderTab('D');
+    prodApprSaveFactory(pid, f); if(PROD_CUR===pid && typeof prod_renderTab==='function') prod_renderTab('D');
   });
 }
 function prodApprMarkReturned(pl){
@@ -45643,7 +45678,7 @@ function prodApprMarkReturned(pl){
     if(!f) return;
     var rec=prodApprEnsureReceipt(f, pl);
     rec.status='returned';
-    prod_save(f); if(PROD_CUR===pid && typeof prod_renderTab==='function') prod_renderTab('D');
+    prodApprSaveFactory(pid, f); if(PROD_CUR===pid && typeof prod_renderTab==='function') prod_renderTab('D');
   });
 }
 /* 第三种结果：返回重新填写 → 收货单置为 need_edit，提交人可在列表点「重新填写」载入表单修改后重提 */
@@ -45653,7 +45688,9 @@ function prodApprMarkNeedEdit(pl){
     if(!f) return;
     var rec=prodApprEnsureReceipt(f, pl);
     rec.status='need_edit';
-    prod_save(f); if(PROD_CUR===pid && typeof prod_renderTab==='function') prod_renderTab('D');
+    /* ★APPR-RETURN-LOCK-20261026：必须走 prodApprSaveFactory（强制落库），
+       用 prod_save 会被首次同步门禁拦掉 → 服务端仍是 pending → 申请人看不到「重新填写」按钮 */
+    prodApprSaveFactory(pid, f); if(PROD_CUR===pid && typeof prod_renderTab==='function') prod_renderTab('D');
   });
 }
 function applyApprovalsLang(){
