@@ -7047,7 +7047,16 @@ var WL_FLOW_IMG = {
               /* ★ 谁更新用谁：服务端的时间戳更新（别的标签页/设备刚存过）→ 以服务端为准；
                  否则保留本地（避免用旧副本把刚录入的数据覆盖掉）。 */
               var sStamp = +((d.data && d.data.__savedAt)||0), lStamp = +((localF && localF.__savedAt)||0);
-              merged = (sStamp > lStamp) ? prod_mergeFactory(d.data, localF) : prod_mergeFactory(localF, d.data);
+              /* ★FACTORY-MERGE-BASE-20261026（重要，别再把两个参数写反）：
+                 prod_mergeFactory(localF, serverF) 的语义是「以【第 2 个参数】为基底」，
+                 第 1 个只用来补基底里没有的条目（同 id 时以基底为准）。
+                 所以：
+                   服务端更新(sStamp>lStamp) → 基底必须是服务端 → prod_mergeFactory(localF, d.data)
+                   本地更新                  → 基底必须是本地 → prod_mergeFactory(d.data, localF)
+                 原先这里是反的：服务端明明更新了（审批把收货单改成 confirmed/rejected/need_edit），
+                 合并后仍保留本地镜像里的 pending —— 表现就是「审批已经拒绝/通过了，
+                 生产-原料库存里收货单还是『待采购确认』」（2026-10-26 用户报障）。 */
+              merged = (sStamp > lStamp) ? prod_mergeFactory(localF, d.data) : prod_mergeFactory(d.data, localF);
               /* ★ 服务器关键数据明显更多时，直接以服务器为准，避免旧本地快照把新恢复数据冲淡。 */
               var sHo = Object.keys((d.data && d.data.houseOut)||{}).length;
               var lHo = Object.keys((localF && localF.houseOut)||{}).length;

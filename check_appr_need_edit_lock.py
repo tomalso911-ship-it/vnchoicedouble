@@ -154,6 +154,25 @@ def main():
         else:
             ok("prodApprEnsureReceipt 逐个补齐 materials 数组")
 
+    # ⑥ prod_syncFromServer 的时间戳合并方向：
+    #    prod_mergeFactory(localF, serverF) 以【第 2 个参数】为基底，
+    #    服务端更新时基底必须是服务端 → prod_mergeFactory(localF, d.data)
+    b = func_body(src, "prod_syncFromServer")
+    if b is None:
+        fail("找不到 function prod_syncFromServer")
+    else:
+        s = b.replace(" ", "")
+        good = ("(sStamp>lStamp)?prod_mergeFactory(localF,d.data):prod_mergeFactory(d.data,localF)")
+        bad = ("(sStamp>lStamp)?prod_mergeFactory(d.data,localF):prod_mergeFactory(localF,d.data)")
+        if bad in s:
+            fail("prod_syncFromServer 的合并方向写反了：服务端更新时基底却不是服务端 → "
+                 "审批结果（confirmed/rejected/need_edit）永远同步不到前端，收货单一直显示「待采购确认」")
+        elif good not in s:
+            fail("prod_syncFromServer 的时间戳合并语句被改动/删除（应为 "
+                 "(sStamp>lStamp)?prod_mergeFactory(localF,d.data):prod_mergeFactory(d.data,localF)）")
+        else:
+            ok("prod_syncFromServer 合并方向正确（谁新用谁当基底）")
+
     if FAILS:
         print("\n✗ 失败 %d 项：APPR-RETURN-LOCK-20261026 契约被破坏。" % len(FAILS))
         return 1
