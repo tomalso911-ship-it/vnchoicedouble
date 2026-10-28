@@ -1153,8 +1153,8 @@ window.__finShakeReport = function (ms) {
     })();
   </script>
   <!-- ===== /PWA ===== -->
-  <!-- 版本号：V2026.10.26-V5 - 与 APK versionName 对齐 / 审批闭环+驳回红色徽章 -->
-  <title>CHOICE SLATS VIET NAM v2026.10.26-V5</title>
+  <!-- 版本号：V2026.10.28-V1 - 与 APK versionName 对齐 / 看板人数卡片修复 + 手机触摸目标 -->
+  <title>CHOICE SLATS VIET NAM v2026.10.28-V1</title>
   <script>
     // 版本号标记（仅用于控制台确认代码已更新，不再触发跳转）
     // 说明：原 _bust 强制跳转是本地开发时"改了代码看不到效果"的临时手段，
@@ -4025,7 +4025,7 @@ window.__finShakeReport = function (ms) {
       <button class="login-link" onclick="openAuthModal('reset')" data-i18n="login_link_reset">Reset Password</button>
       <button class="login-link" onclick="openAuthModal('forget')" data-i18n="login_link_forget">Forget Password</button>
     </div>
-    <div class="login-footer"><span>CHOICE SLATS VIET NAM</span> · <span id="loginVer">V2026.10.26-V5</span></div>
+    <div class="login-footer"><span>CHOICE SLATS VIET NAM</span> · <span id="loginVer">V2026.10.28-V1</span></div>
   </div>
 </div>
 
@@ -34041,6 +34041,22 @@ var PROD_EQUIP_FAULT_KB = {
     .bd-row3 .bd-ph{ min-height:440px !important; }
     .bd-row3 .bd-ph .bd-ph-body{ min-height:400px; }
     .bd-photo-card .bd-card-name{ font-size:12px; padding:10px; }
+    /* 13) ★MOBILE-TOUCH-20261028（用户要求）：手机端触摸目标放大。
+       实测排序箭头只有 5×14、图标按钮 26×34，手指很难点准。这里只放大【非表格内】的
+       图标按钮与表头排序箭头，避免影响生产表格里被硬锁的 table-layout:fixed 列宽。 */
+    #app .icon-btn, #app .mmax-btn, #app .btn-action-sm,
+    #app .pm-btn, #app .ad-view-btn, #app .appr-drawer-close{
+      min-width:32px !important; min-height:32px !important;
+    }
+    #app table th [onclick], #app table th span[onclick]{
+      min-width:18px !important; min-height:18px !important;
+      display:inline-block; padding:5px 3px !important;
+    }
+    /* 看板卡片内的轮播箭头/币种切换（← 28×34 等）同样放大到 32px */
+    #app .bd-card button, #app .bd-card [onclick],
+    #app #topbar button, #app #topbar a{
+      min-width:32px !important; min-height:32px !important;
+    }
   }
 </style>
 
@@ -55266,6 +55282,13 @@ function boardLoadAll(sec) {
       boardRenderTotal(list);
       boardRenderTop10(list);
       boardRenderInstallProg(list);
+      /* ★DASH-WORKERS-FIX-20261028（用户要求修复）：手机端每次进入看板都会重建外壳，
+         而「安装人数 / 生产人数」原先只在 boardSyncFactories 的聚合回调里渲染；一旦
+         prod_syncFromServer 因已完成同步而提前 return（不回调），pending 永远不归零，
+         两张卡就永久停在「（待接入：数据模块未就绪）」。这里先用本地缓存立即渲染一次，
+         聚合回调里再刷新一遍，保证任何情况都有内容。 */
+      boardRenderInstallWorkers(list);
+      boardRenderProdWorkers(list);
       /* ★ 同步每个项目的工厂数据后，再刷新依赖生产/安装明细的卡片 */
       boardSyncFactories(list, function(){
         window.__bdProjProgressCache = {};
@@ -55281,12 +55304,18 @@ function boardLoadAll(sec) {
 }
 function boardSyncFactories(list, cb){
   if(!list || !list.length){ if(cb) cb(); return; }
+  /* ★DASH-WORKERS-FIX-20261028：原实现要求每个项目的 prod_syncFromServer 都回调一次才
+     触发 cb；只要有一个走「已同步」早退分支不回调，cb 就永不执行，依赖它的卡片全部停在
+     占位。这里加 once 守护 + 8 秒兜底，保证 cb 一定执行且只执行一次。 */
+  var done = false;
+  function fin(){ if(done) return; done = true; if(cb) cb(); }
+  try { setTimeout(fin, 8000); } catch(e) {}
   var pending = list.length;
   list.forEach(function(p){
     if(typeof prod_syncFromServer === 'function'){
-      prod_syncFromServer(p.id, function(){ if(--pending===0 && cb) cb(); });
+      prod_syncFromServer(p.id, function(){ if(--pending===0) fin(); });
     } else {
-      if(--pending===0 && cb) cb();
+      if(--pending===0) fin();
     }
   });
 }
