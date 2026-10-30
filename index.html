@@ -448,7 +448,14 @@ function _ovLoadChartLib(cb){
     .ov-btn:hover { background:#e2e2e2; }
     .ov-btn-export { background:#E53935; color:white; font-weight:600; box-shadow:0 2px 6px rgba(211,47,47,.3); }
     .ov-btn-export:hover { background:#C62828; box-shadow:0 3px 10px rgba(211,47,47,.45); transform:translateY(-1px); }
-    .won-scroll-container { max-height:85vh; overflow:auto; border:1px solid #bbb; border-radius:8px; background:white; position:relative; }
+    /* ★ 抗"切语言白闪"（2026-10-30）：
+       本容器 background:white + overflow:auto + border-radius:8px 是"白底"的来源——
+       圆角裁切会让 Chrome 在内容变化时重建裁切层，重建那一帧整块表格区域会先露出白底；
+       数据行本来就是白/浅蓝底（看不出），只有彩色表头那条带子会明显"白一下"。
+       translateZ(0) 把它提升为稳定的独立合成层：内容/宽度变化的重新栅格化在该层内部
+       原子完成，旧画面保持显示直到新画面就绪，不再出现"先露白再画"。
+       ⛔ 删除本行会重现白闪；同时不要再给表头单元格单独加 will-change（会和本层打架）。 */
+    .won-scroll-container { max-height:85vh; overflow:auto; border:1px solid #bbb; border-radius:8px; background:white; position:relative; transform:translateZ(0); }
     /* ===== 移动到失败项目弹窗 ===== */
     #crmMoveToLostModal { position:fixed; top:56px; left:0; right:0; bottom:0; z-index:1100; display:none; align-items:flex-start; justify-content:center; padding:10px 12px 12px 12px; background:rgba(0,0,0,.45); font-family:inherit; }
     #crmMoveToLostModal.on { display:flex; }
@@ -478,7 +485,24 @@ function _ovLoadChartLib(cb){
     .won-hscroll .won-hscroll-inner { position:absolute; top:3px; left:0; height:12px; min-width:24px; background:#E53935; border-radius:6px; cursor:grab; }
     .won-hscroll .won-hscroll-inner:active { cursor:grabbing; }
     .won-scroll-container table { border-collapse:collapse; min-width:100%; font-size:11px; table-layout:auto; width:max-content; max-width:none; position:relative; }
-    .won-scroll-container th, .won-scroll-container td { border:1px solid #bbb; padding:4px 5px; vertical-align:middle; text-align:center; white-space:nowrap; background:inherit; }
+    .won-scroll-container th, .won-scroll-container td { border:1px solid #bbb; padding:4px 5px; vertical-align:middle; text-align:center; white-space:nowrap; background:inherit; line-height:13px; }
+    /* ==================================================================
+       ★ 抗"切语言表头白闪"（2026-10-29，CRM/LOST/POT 三表共用）
+       根因：line-height 原为 normal（随字体变化）。中文字体与拉丁字体的行盒高度天然
+       差 1~2px，而切语言时大量单元格是"中文↔拉丁"互换（省份/BU/建设情况/备注/View↔查看）
+       → 60 行每行高度都微变 → 整表高度变化数百 px → sticky 表头带（thead top:0、
+       二级假表头 top:22px）被整体重排+重绘 → Chromium 重绘那一帧里表头带露出容器白底，
+       即用户看到的"表头白一下"。
+       锁定 px 行高后：表头恒 22px、数据行行高恒定，切语言只重绘被改动的文字。
+       ★ 2026-10-30 追加：二级假表头已按用户要求【取消纵向粘性】（见下方 fake-header-row
+       规则），彻底移除 top:22px 这个"固定偏移 + 表头高度波动 = 露白"的组合。
+       ⛔ 不得改回 normal / 1.x / em（会重现白闪）；
+       ⛔ 若改动 thead 的 padding/font-size，必须同步重算：height = line-height + 8 + 1，
+          并同步二级假表头的 top 偏移。
+       ================================================================== */
+    .won-scroll-container tbody tr.fake-header-row td { line-height:11px; }
+    /* 注：表头单元格【不要】单独加 will-change/translateZ —— 与滚动容器那一层会打架，
+       反而更容易露白。整块由 .won-scroll-container 的合成层统一处理。 */
     .won-scroll-container thead th { font-weight:700; border-bottom:none; position:sticky; top:0; z-index:20; }
     .won-scroll-container tbody td { border-top:1px solid #bbb; }
 
@@ -513,11 +537,24 @@ function _ovLoadChartLib(cb){
     }
 
     /* ===== 伪二级表头行 (第二行) 渲染控制 ===== */
+    /* ★ 2026-10-30 用户明确要求：取消二级假表头的粘性。
+       原为 position:sticky; top:22px —— 切语言时它必须跟着 thead 一起被重排重绘，
+       且它贴在 top:22px 的固定偏移上，thead 高度一有 1px 波动就会露出容器白底
+       （用户看到"表头那一条发白一闪"）。改为普通行后：
+         · 纵向随数据行一起滚走，只有一级表头（thead）保持粘性
+         · 第 0/1 列仍保留横向 left 钉住，与数据行固定列对齐（见下方单独规则）
+       ⛔ 不得改回纵向 position:sticky / top:22px（会重现白闪）。 */
     .won-scroll-container tbody tr.fake-header-row td {
       font-weight:700; font-size:9px; padding:3px 4px; vertical-align:middle;
-      position:sticky; top:22px; z-index:9; border-top:none; border-bottom:2px solid #999;
+      position:static; border-top:none; border-bottom:2px solid #999;
       background: #f3eaff !important;
       pointer-events: none;
+    }
+    /* 第 0/1 列只保留【横向】粘性（left 钉住，与数据行一致），
+       纵向用 top:auto 彻底解除 —— 出问题的正是这个纵向的 top:22px 固定偏移。 */
+    .won-scroll-container tbody tr.fake-header-row td.col-fixed,
+    .won-scroll-container tbody tr.fake-header-row td.col-fixed-2 {
+      position: sticky !important; top: auto !important; z-index: 19 !important;
     }
     .won-scroll-container tbody tr.fake-header-row:hover td { background: #f3eaff !important; color: inherit !important; }
 
@@ -7813,7 +7850,12 @@ function sweepI18n(root) {
   if (document.getElementById('slatsSpecTable')) refreshSlatsSelectOptions();
 }
 window.sweepI18n = sweepI18n;
-function fmtMoney(n, c) { var v=Math.round(Number(n)||0); if(c==='RMB'||c==='rmb') return '¥'+v.toLocaleString('en-US'); if(c==='USD'||c==='usd') return '$'+v.toLocaleString('en-US'); if(c==='VND'||c==='vnd') return '₫'+v.toLocaleString('en-US'); return v.toLocaleString('en-US'); }
+/* 纯字符串千分位（不依赖 Intl/ICU）：用于大表渲染，避免 Number.toLocaleString 的高频开销
+   ★ 2026-10-29 与 choice_lite.html 对齐：CRM 表 60行×23 个金额/汇率格 = 每次渲染约 1380 次
+   toLocaleString 调用，每次都会新建 Intl.NumberFormat（数百 ms 级开销）；纯字符串实现输出
+   完全一致（四舍五入后的整数 + 逗号千分位 + 负数负号在前）。 */
+function fmtThousands(v){ v=Math.round(Number(v)||0); var s=String(v); var neg=(s.charAt(0)==='-'); if(neg) s=s.slice(1); return (neg?'-':'') + s.replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function fmtMoney(n, c) { var v=Math.round(Number(n)||0); if(c==='RMB'||c==='rmb') return '¥'+fmtThousands(v); if(c==='USD'||c==='usd') return '$'+fmtThousands(v); if(c==='VND'||c==='vnd') return '₫'+fmtThousands(v); return fmtThousands(v); }
 function stripToNumber(str) { return parseInt(String(str||'').replace(/[^0-9-]/g,'')||'0',10); }
 
 // ===== 货币符号 → 纯数字 =====
@@ -13964,8 +14006,8 @@ function _isObserverPos(u){
 //       后加载覆盖同名函数的 html2canvas+jsPDF 旧导出实现，改为真正的 window.print()。
 // 版本命名规则：V<年>.<月>.<日>.<当日序号> / build <年>-<月>-<日>-Z<序号>；
 // 跨天日期必须重新起算（当日序号归 1），否则会出现"日期还是昨天"的错误版本号。
-// 当前：2026-09-05 第 104 版
-const PERM_BUILD = "build 2026-09-06-Z112";  // 版本标记：用于确认浏览器加载的是最新代码
+// 当前：2026-10-29 第 114 版（CRM 切语言白闪治理 CRM-PATCH-TBODY-20261029 + 金额渲染去 Intl 开销）
+const PERM_BUILD = "build 2026-10-30-Z123";  // 版本标记：用于确认浏览器加载的是最新代码（Z123 = HEAD-LOCK 定稿，移除 TEMP-DIAG 诊断浮层）
 // 统一身份头：CRM/LOST 等模块的所有请求必须携带，服务端据此写 owner_user_id（记录归属）并按数据范围过滤。
 // 缺失会导致：新建行 owner 为空 → 数据范围匹配退化为 salesperson 文本 → 自己的行（尤其 AGI-GS Internal 符号人行）不可见。
 function authHeaders(extra){
