@@ -59743,6 +59743,13 @@ function submitAuth() {
     layers:      { zh:'钢网层数', en:'Mesh layers', vi:'Số lớp lưới' },
     upLayer:     { zh:'上', en:'Upper', vi:'Trên' },
     loLayer:     { zh:'下', en:'Lower', vi:'Dưới' },
+    // ★CC-DUAL-NOHSCROLL-20261104：双层表 12 个短表头（第一行上/下，第二行字段；完整名称放 title）
+    dBarL:       { zh:'条数·长', en:'Bars·L', vi:'Thanh·L' },
+    dDiaL:       { zh:'φ·长', en:'Ø·L', vi:'Ø·L' },
+    dSizeL:      { zh:'mm·长', en:'mm·L', vi:'mm·L' },
+    dBarW:       { zh:'条数·宽', en:'Bars·W', vi:'Thanh·W' },
+    dDiaW:       { zh:'φ·宽', en:'Ø·W', vi:'Ø·W' },
+    dSizeW:      { zh:'mm·宽', en:'mm·W', vi:'mm·W' },
     dualNote:    { zh:'注：钢网层数=2 时，上层与下层按各自条数/直径分别计算钢筋用量后相加，不再额外乘钢网层数；层数≠2 的行下层灰显留空、不参与计算。', en:'Note: when mesh layers = 2, upper and lower meshes are calculated separately and added (no extra layer multiplier); rows with layers ≠ 2 have greyed-out, empty lower columns.', vi:'Lưu ý: khi số lớp lưới = 2, lớp trên và lớp dưới được tính riêng rồi cộng lại (không nhân thêm số lớp); dòng có số lớp ≠ 2 để trống và làm mờ các cột lớp dưới.' },
     barsL:       { zh:'条/长度方向', en:'Bars / length dir.', vi:'Thanh / chiều dài' },
     rDiaL:       { zh:'长度方向钢筋尺寸', en:'Rebar Ø / length dir.', vi:'Cỡ thép / chiều dài' },
@@ -60028,6 +60035,13 @@ function submitAuth() {
       // ★CC-DUAL-20261104：层数为 1 的行，下层 6 列灰显留空（禁用输入，数据不丢）
       '.cc-tb-spec td.cc-offcell{background:#eceff3 !important;}',
       '.cc-tb-spec td.cc-offcell input.cc-in.cc-offin{background:#eceff3 !important;color:#9aa3ad !important;border:1px solid #dfe4ea !important;}',
+      // ★CC-DUAL-NOHSCROLL-20261104：双层表 18 列固定布局自适应容器宽度，绝不出现横向滚动条
+      '.cc-tb-spec.cc-dual{table-layout:fixed;width:100%;min-width:0;}',
+      '.cc-tb-spec.cc-dual th{white-space:normal;overflow-wrap:anywhere;word-break:break-all;font-size:11px;line-height:1.3;padding:3px 2px;text-align:center;}',
+      '.cc-tb-spec.cc-dual td{padding:2px 2px;font-size:11px;overflow-wrap:anywhere;overflow:hidden;}',
+      '.cc-tb-spec.cc-dual .cc-in,.cc-tb-spec.cc-dual select.cc-in{width:100%;min-width:0;padding:2px 2px;font-size:11px;}',
+      '.cc-tb-spec.cc-dual .cc-subcell{font-size:11px;padding-right:2px;}',
+      '.cc-tb-spec.cc-dual .cc-icn{margin:0 1px;padding:1px 2px;}',
       '.cc-tb tfoot td{font-weight:700;background:#f2f4f7;white-space:nowrap;}',
       '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
       '.cc-icn:hover{background:#f5f5f5;}',
@@ -60252,9 +60266,17 @@ function submitAuth() {
       '<button class="cc-add" data-act="addspec" style="margin:0;">' + ccT('addRow2') + '</button></div>';
     // ★CC-DUAL-20261104：单层表原样；任一行层数=2 时整表切 13 列双层表（上层6列+下层6列+层数列）
     var specDual = ccSpecDualMode();
-    var dBars = function(pre, key, w){ return '<th style="width:' + w + 'px;">' + ccT(pre) + '-' + ccT(key) + '</th>'; };
-    h += (specDual ? '<div style="overflow-x:auto;">' : '') +
-      '<table class="cc-tb cc-tb-spec"' + (specDual ? ' style="min-width:1840px;"' : '') + '><thead><tr>' +
+    // ★CC-DUAL-NOHSCROLL-20261104：表头压成 2 行（上/下 + 短字段），完整字段名保留在 title；18 列按百分比等分，表格永远等于容器宽度
+    var dTh = function(pre, key, sh){
+      var full = (ccT(pre) + '-' + ccT(key)).replace(/"/g, '&quot;');
+      return '<th title="' + full + '">' + ccT(pre) + '<br>' + ccT(sh) + '</th>';
+    };
+    var dColW = [6, 6, 6, 6, 5];
+    for(var ci = 0; ci < 12; ci++) dColW.push(5.4167);
+    dColW.push(6); // 3 尺寸 + 数量 + 层数 + 12 钢筋 + 操作 = 18 列，合计 100%（操作列留够 2 个按钮）
+    var dCols = '<colgroup>' + dColW.map(function(w){ return '<col style="width:' + w + '%;">'; }).join('') + '</colgroup>';
+    h += '<table class="cc-tb cc-tb-spec' + (specDual ? ' cc-dual' : '') + '">' +
+      (specDual ? dCols : '') + '<thead><tr>' +
       '<th colspan="3">' + ccT('specDim') + '</th>' +
       '<th rowspan="2" style="width:80px;">' + ccT('qty') + '</th>' +
       '<th colspan="' + (specDual ? 13 : 7) + '">' + ccT('rebarCfg') + '</th>' +
@@ -60262,10 +60284,10 @@ function submitAuth() {
       '<tr><th style="width:90px;">' + ccT('specLen') + '</th><th style="width:90px;">' + ccT('specWid') + '</th><th style="width:90px;">' + ccT('specHei') + '</th>' +
       '<th style="width:80px;">' + ccT('layers') + '</th>' +
       (specDual ?
-        dBars('upLayer','barsL',90) + dBars('upLayer','rDiaL',95) + dBars('upLayer','rebarL',105) +
-        dBars('upLayer','barsW',90) + dBars('upLayer','rDiaW',95) + dBars('upLayer','rebarW',105) +
-        dBars('loLayer','barsL',90) + dBars('loLayer','rDiaL',95) + dBars('loLayer','rebarL',105) +
-        dBars('loLayer','barsW',90) + dBars('loLayer','rDiaW',95) + dBars('loLayer','rebarW',105)
+        dTh('upLayer','barsL','dBarL') + dTh('upLayer','rDiaL','dDiaL') + dTh('upLayer','rebarL','dSizeL') +
+        dTh('upLayer','barsW','dBarW') + dTh('upLayer','rDiaW','dDiaW') + dTh('upLayer','rebarW','dSizeW') +
+        dTh('loLayer','barsL','dBarL') + dTh('loLayer','rDiaL','dDiaL') + dTh('loLayer','rebarL','dSizeL') +
+        dTh('loLayer','barsW','dBarW') + dTh('loLayer','rDiaW','dDiaW') + dTh('loLayer','rebarW','dSizeW')
         :
         '<th style="width:100px;">' + ccT('barsL') + '</th><th style="width:110px;">' + ccT('rDiaL') + '</th><th style="width:120px;">' + ccT('rebarL') + '</th>' +
         '<th style="width:100px;">' + ccT('barsW') + '</th><th style="width:110px;">' + ccT('rDiaW') + '</th><th style="width:120px;">' + ccT('rebarW') + '</th>'
@@ -60295,7 +60317,7 @@ function submitAuth() {
       '<td colspan="3" style="text-align:right;">' + ccT('totalAll') + '</td>' +
       '<td style="text-align:right;" id="cc_v_blocks_ft">0</td>' +
       '<td colspan="' + (specDual ? 14 : 8) + '"></td></tr></tfoot></table>' +
-      (specDual ? '</div><div class="cc-note">' + ccT('dualNote') + '</div>' : '');
+      (specDual ? '<div class="cc-note">' + ccT('dualNote') + '</div>' : '');
     // ★CC-SPEC-SUMMARY-20261104：需求信息表底部总概括（材料/钢筋/单方指标，按智能报告公式）
     h += '<div id="cc_v_summary" style="font-size:12px;color:#333;line-height:1.9;margin:8px 0 2px;padding:8px 10px;border:1px solid #000;background:#fffdf0;"></div>';
 
