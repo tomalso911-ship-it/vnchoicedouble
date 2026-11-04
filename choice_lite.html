@@ -59790,6 +59790,9 @@ function submitAuth() {
     moldDedic:   { zh:'单独开模', en:'dedicated mold', vi:'khuôn riêng' },
     moldCombo:   { zh:'组合开模（条带式）', en:'combined mold (strip layout)', vi:'khuôn kết hợp (dải)' },
     moldFin:     { zh:'完成全部工作', en:'Finish ALL work', vi:'Hoàn thành toàn bộ công việc' },
+    moldPick:    { zh:'根据以下分析，最终选择：', en:'Based on the analysis above, final choice:', vi:'Dựa trên phân tích trên, lựa chọn cuối cùng:' },
+    moldOptA:    { zh:'方案A', en:'Plan A', vi:'Phương án A' },
+    moldOptB:    { zh:'方案B', en:'Plan B', vi:'Phương án B' },
     totalBlocks: { zh:'总块数', en:'Total pcs', vi:'Tổng số tấm' },
     blocks:      { zh:'数量（块）', en:'Quantity (pcs)', vi:'Số lượng (tấm)' },
     areaBlk:     { zh:'单块面积（㎡）', en:'Area per piece (㎡)', vi:'Diện tích mỗi tấm (㎡)' },
@@ -60089,8 +60092,14 @@ function submitAuth() {
     // ★CC-CPD-20261104：模/天改为可输入框（demand.moldCpd，默认40），所有方案实时跟随重算
     h += '<div style="font-size:12px;color:#555;margin:4px 0 6px;line-height:1.6;">' + ccT('moldNote1') +
       ' <input class="cc-in" id="cc_mold_cpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric" autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"> ' + ccT('moldNote2') + '</div>';
-    function ccMoldCard(title, calcId, pro, con, grow){
-      return '<div style="border:2px solid #000;border-radius:6px;padding:8px 12px;background:#fff;flex:' + grow + ';min-width:320px;">' +
+    // ★CC-PICK-20261104：根据分析最终选择方案（下拉，选中方案卡片淡粉背景）
+    var pick = CC_DATA.demand.moldPick === 'B' ? 'B' : 'A';
+    h += '<div style="font-size:12px;color:#333;font-weight:600;margin:2px 0 8px;line-height:1.8;">' + ccT('moldPick') +
+      ' <select id="cc_mold_pick" style="padding:2px 8px;border:1px solid #c8ced6;border-radius:4px;font-size:12px;background:#fff;">' +
+      '<option value="A"' + (pick === 'A' ? ' selected' : '') + '>' + ccT('moldOptA') + '</option>' +
+      '<option value="B"' + (pick === 'B' ? ' selected' : '') + '>' + ccT('moldOptB') + '</option></select></div>';
+    function ccMoldCard(title, calcId, pro, con, grow, bg, cardId){
+      return '<div id="' + cardId + '" style="border:2px solid #000;border-radius:6px;padding:8px 12px;background:' + (bg || '#fff') + ';flex:' + grow + ';min-width:320px;">' +
         '<div style="font-weight:700;">' + title + '</div>' +
         '<div id="' + calcId + '" style="font-size:12px;color:#1a56b0;font-weight:700;margin:4px 0;">—</div>' +
         '<div style="font-size:12px;color:#2e7d32;margin:2px 0;">' + pro + '</div>' +
@@ -60098,8 +60107,8 @@ function submitAuth() {
         '</div>';
     }
     h += '<div style="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin:8px 0 0;">' +
-      ccMoldCard(ccT('moldA'), 'cc_mold_a', ccT('moldAp'), ccT('moldAc'), 1) +
-      ccMoldCard(ccT('moldC'), 'cc_mold_c', ccT('moldCp'), ccT('moldCc'), 1.4) +
+      ccMoldCard(ccT('moldA'), 'cc_mold_a', ccT('moldAp'), ccT('moldAc'), 1, pick === 'A' ? '#fdecec' : '#fff', 'cc_card_a') +
+      ccMoldCard(ccT('moldC'), 'cc_mold_c', ccT('moldCp'), ccT('moldCc'), 1.4, pick === 'B' ? '#fdecec' : '#fff', 'cc_card_b') +
       '</div>';
 
     h += '<div class="cc-sec">' + ccT('dir1') + '</div>' + ccMachGroup('mech', 'd11') + ccMachGroup('veh', 'd12') + ccMachGroup('tools', 'd13') +
@@ -60361,6 +60370,19 @@ function submitAuth() {
       cpd.disabled = false;
       cpd.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
       cpd.addEventListener('input', function(){ ccCpdSet(this.value); });
+    })();
+    // ★CC-PICK-20261104：最终选择下拉 — 保存 demand.moldPick 并切换卡片淡粉背景
+    (function(){
+      var pk = document.getElementById('cc_mold_pick');
+      if(!pk) return;
+      pk.addEventListener('change', function(){
+        if(!CC_DATA) return;
+        CC_DATA.demand.moldPick = pk.value === 'B' ? 'B' : 'A';
+        var ea = document.getElementById('cc_card_a'), eb = document.getElementById('cc_card_b');
+        if(ea) ea.style.background = CC_DATA.demand.moldPick === 'A' ? '#fdecec' : '#fff';
+        if(eb) eb.style.background = CC_DATA.demand.moldPick === 'B' ? '#fdecec' : '#fff';
+        ccScheduleSave();
+      });
     })();
     // ★CC-FMT-20261104：数字输入失焦时补千位符（名称列与利润率/VAT 除外）
     host.onfocusout = function(ev){
