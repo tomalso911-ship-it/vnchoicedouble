@@ -59857,6 +59857,7 @@ function submitAuth() {
     feeMonth:    { zh:'费用/月', en:'Cost / month', vi:'Chi phí / tháng' },
     periodMonth: { zh:'发生周期(月)', en:'Period (months)', vi:'Chu kỳ phát sinh (tháng)' },
     subAmount:   { zh:'小计金额', en:'Subtotal amount', vi:'Thành tiền' },
+    feeLabel:    { zh:'费用', en:'Cost', vi:'Chi phí' },
     headcount:   { zh:'人数', en:'Headcount', vi:'Số người' },
     wageDaily:   { zh:'日薪(含保险及税金)', en:'Daily wage (incl. insurance & tax)', vi:'Lương ngày (gồm BHXH & thuế)' },
     endSalary:   { zh:'项目结束薪资(含保险及税金)', en:'Project-end salary (incl. insurance & tax)', vi:'Lương kết thúc dự án (gồm BHXH & thuế)' },
@@ -59916,7 +59917,7 @@ function submitAuth() {
         inst:[ {k:'tractor',qty:0,sal:0}, {k:'tractorAs',qty:0,sal:0}, {k:'installer',qty:0,sal:0} ]
       },
       opex:{ power:0, water:0, cons:0, dorm:0, food:0, car:0 },
-      ind:{ flight:0, hotel:0, meal:0, mkt:0, office:0 },
+      ind:{ flight:0, hotel:0, meal:0, mkt:0 },
       margin:0, vat:0
     };
   }
@@ -59928,6 +59929,7 @@ function submitAuth() {
         if(saved[k] && typeof saved[k] === 'object') base[k] = Object.assign({}, base[k], saved[k]);
       });
       ['margin','vat'].forEach(function(k){ if(saved[k] !== undefined) base[k] = Number(saved[k]) || 0; });
+      delete base.ind.office; // ★CC-INDHEAD-20261104：办公室员工管理费已下线，旧存档残留值不参与合计
       // ★CC-SPEC-20261104：需求信息 = 规格行列表；旧版(blocks/area)自动迁移成一行规格
       if(saved.demand){
         var d0 = saved.demand;
@@ -60106,10 +60108,16 @@ function submitAuth() {
       '<td class="cc-subcell" data-fx="opex.' + f + '" data-cur="usd">—</td>' +
       '<td class="cc-subcell" data-sub="opex.' + f + '">0</td></tr>';
   }
+  // ★CC-INDHEAD-20261104：名称|费用(RMB/USD/VND)，VND可编辑，RMB/USD自动换算
+  function ccIndHead(){
+    return '<tr><th rowspan="2">' + ccT('name') + '</th><th colspan="3">' + ccT('feeLabel') + '</th></tr>' +
+      '<tr>' + ['curRmb', 'curUsd', 'curVnd'].map(function(k){ return '<th style="width:150px;">' + ccT(k) + '</th>'; }).join('') + '</tr>';
+  }
   function ccIndRow(f, labelKey){
     return '<tr><td>' + ccT(labelKey) + '</td>' +
-      '<td style="width:170px;">' + ccInNum('ind', f, CC_DATA.ind[f] || 0) + '</td>' +
-      '<td class="cc-subcell" data-sub="ind.' + f + '">0</td></tr>';
+      '<td class="cc-subcell" style="color:#666;" data-fx="ind.' + f + '" data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" style="color:#666;" data-fx="ind.' + f + '" data-cur="usd">—</td>' +
+      '<td style="width:170px;">' + ccInNum('ind', f, CC_DATA.ind[f] || 0) + '</td></tr>';
   }
   function ccSpecTd(f, sp, i){
     return '<td>' + ccInNum('demand.specs', f, sp[f] || 0, i) + '</td>';
@@ -60238,10 +60246,9 @@ function submitAuth() {
       '</tbody></table><div class="cc-note">' + ccT('laborNote') + '</div>';
 
     // #4 间接
-    h += '<div class="cc-sec">' + ccT('dir4') + '</div><table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th>' +
-      '<th style="width:170px;">' + ccT('amount') + '</th></tr></thead><tbody>' +
+    h += '<div class="cc-sec">' + ccT('dir4') + '</div><table class="cc-tb"><thead>' + ccIndHead() + '</thead><tbody>' +
       ccIndRow('flight', 'indFlight') + ccIndRow('hotel', 'indHotel') + ccIndRow('meal', 'indMeal') +
-      ccIndRow('mkt', 'indMkt') + ccIndRow('office', 'indOffice') +
+      ccIndRow('mkt', 'indMkt') +
       '</tbody></table>';
 
     // 报价计算
@@ -60387,7 +60394,7 @@ function submitAuth() {
     }); });
     Object.keys(CC_DATA.opex).forEach(function(k){ opex += Number(CC_DATA.opex[k]) || 0; });
     opex *= ccOpexPeriod(); // ★CC-OPEXPERIOD：运营费用 = Σ费用/月 × ROUNDUP((生产天数+30)/30,1)
-    Object.keys(CC_DATA.ind).forEach(function(k){ ind += Number(CC_DATA.ind[k]) || 0; });
+    Object.keys(CC_DATA.ind).forEach(function(k){ if(k !== 'office') ind += Number(CC_DATA.ind[k]) || 0; });
     // 行小计（VND 带货币符号）
     host.querySelectorAll('[data-sub]').forEach(function(el){ el.textContent = '₫ ' + ccNum(ccRowVal(el.getAttribute('data-sub'))); });
     // ★CC-FXCELL-20261104：RMB/USD 只读换算列刷新（VND÷汇率，带货币符号）
