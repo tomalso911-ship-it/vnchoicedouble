@@ -40747,7 +40747,10 @@ function applyCommissionLang(){
 
   renderCommission();
   renderBeneficiaryTable();
-  renderCommissionAppr();
+  // ★WON-GRID-20261104-fix：renderCommissionAppr 已随「个人佣金[查看与审批]移除」删除，
+  //   这里残留的裸调用会在登录/切语言时抛 ReferenceError，打断 applyTopbarLang→showMainContent
+  //   启动链，导致签约表格列宽自适应没跑完、表头被挤成竖排。已删除该调用；
+  //   54777 行的 loadCommissionAppr 调用自带 typeof 守卫，无需处理。
   // 放大镜按钮：纯图标按钮，只更新 title 属性（三语），绝不动按钮内容（内容是 SVG 图标）
   var _zb = document.getElementById('repAllZoomBtn');
   if (_zb) _zb.title = t.rep_zoom_title || '查看';
