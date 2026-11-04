@@ -60087,7 +60087,7 @@ function submitAuth() {
     h += '<div class="cc-sec" style="margin-top:14px;">' + ccT('moldSec') + '</div>';
     // ★CC-CPD-20261104：模/天改为可输入框（demand.moldCpd，默认40），所有方案实时跟随重算
     h += '<div style="font-size:12px;color:#555;margin:4px 0 6px;line-height:1.6;">' + ccT('moldNote1') +
-      ' <input class="cc-in" id="cc_mold_cpd" data-g="demand" data-f="moldCpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric" min="1"' + (ro ? ' disabled' : '') + ' style="width:56px;text-align:center;padding:1px 4px;"> ' + ccT('moldNote2') + '</div>';
+      ' <input class="cc-in" id="cc_mold_cpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric" autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"> ' + ccT('moldNote2') + '</div>';
     function ccMoldCard(title, calcId, pro, con, grow){
       return '<div style="border:2px solid #000;border-radius:6px;padding:8px 12px;background:#fff;flex:' + grow + ';min-width:320px;">' +
         '<div style="font-weight:700;">' + title + '</div>' +
@@ -60148,6 +60148,12 @@ function submitAuth() {
     var parts = path.split('.'), o = CC_DATA;
     for(var i = 0; i < parts.length - 1; i++){ o = o[parts[i]]; }
     o[parts[parts.length - 1]] = val;
+  }
+  // ★CC-CPD3-20261104：模/天专用setter — 独立于委托绑定,任何模式都可编辑,输入即重算
+  function ccCpdSet(v){
+    if(!CC_DATA) return;
+    CC_DATA.demand.moldCpd = parseFloat(String(v).replace(/[^0-9.]/g, '')) || 0;
+    ccRecalc(); ccScheduleSave();
   }
   function ccRowVal(path){
     // path 例：mach.mech.0 / agg.sand / labor.work.2 / opex.power / ind.flight
@@ -60345,6 +60351,14 @@ function submitAuth() {
       ccRecalc(); ccScheduleSave();
     };
     host.onchange = host.oninput; // select 下拉兼容
+    // ★CC-CPD3-20261104：模/天输入框单独直绑（点击全选、输入即重算、始终可编辑）
+    (function(){
+      var cpd = document.getElementById('cc_mold_cpd');
+      if(!cpd) return;
+      cpd.disabled = false;
+      cpd.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
+      cpd.addEventListener('input', function(){ ccCpdSet(this.value); });
+    })();
     // ★CC-FMT-20261104：数字输入失焦时补千位符（名称列与利润率/VAT 除外）
     host.onfocusout = function(ev){
       var el = ev.target;
