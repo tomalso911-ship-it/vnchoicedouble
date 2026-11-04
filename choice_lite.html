@@ -60310,10 +60310,25 @@ function submitAuth() {
     if(p[0] === 'ind'){ return Number(CC_DATA.ind[p[1]]) || 0; }
     return 0;
   }
+  // ★CC-WD3-20261104：安装效率计算（总块数/日产能/安装天数/4%余量/实际天数），项目天数与汇总行共用
+  function ccInstCalc(){
+    var d = CC_DATA && CC_DATA.demand ? CC_DATA.demand : {}, c = d.crew || {};
+    var total = 0; (d.specs || []).forEach(function(sp){ total += Number(sp && sp.qty) || 0; });
+    var daily = (Number(c.groups) || 0) * (Number(c.perDay) || 0);
+    var days = daily > 0 ? Math.ceil(total / daily) : 0;
+    var buf = Math.ceil(days * 0.04);
+    return { total: total, daily: daily, days: days, buf: buf, real: days + buf };
+  }
   function ccRecalc(){
     var host = document.getElementById('lib-cost-body'); if(!host || !CC_DATA) return;
     var months = Number(CC_DATA.demand.months) || 0;
-    var wd = Number(CC_DATA.demand.workDays) || 0; // ★CC-WD-20261104：项目天数
+    // ★CC-WD3-20261104：项目天数 = 实际需要安装天数（安装效率 + 4%非安装余量），如 238 天
+    var wd = ccInstCalc().real;
+    if(Number(CC_DATA.demand.workDays) !== wd){
+      CC_DATA.demand.workDays = wd;
+      var wdi0 = document.getElementById('cc_work_days'); if(wdi0) wdi0.value = wd;
+      ccScheduleSave();
+    }
     // ★CC-SPEC-20261104：总面积 = Σ(长×宽×数量)/1e6（旧迁移行无长宽时用旧单块面积×数量）
     var blocks = 0, area = 0, usedDia = {};
     (CC_DATA.demand.specs || []).forEach(function(sp, i){
@@ -60447,14 +60462,6 @@ function submitAuth() {
         var pdExt = Math.ceil(pdBase * 0.05);
         var pdTotal = pdBase + pdExt;
         pdEl.innerHTML = '📅 ' + ccT('pickDay1') + ccNum(pdBase) + ccT('pickDay2') + ccNum(pdExt) + ccT('pickDay3') + ccNum(pdTotal) + ccT('pickDay4');
-        // ★CC-WD2-20261104：项目天数 = 完成全部项目总天数(自动同步, 含5%余量)
-        if(Number(CC_DATA.demand.workDays) !== pdTotal){
-          CC_DATA.demand.workDays = pdTotal;
-          var wdi2 = document.getElementById('cc_work_days');
-          if(wdi2) wdi2.value = pdTotal;
-          ccScheduleSave();
-          return ccRecalc(); // 用新项目天数重算人工(第二次进来已相等,不再递归)
-        }
       }
     }
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
@@ -60538,12 +60545,10 @@ function submitAuth() {
         var out = (Number(c.groups) || 0) * (Number(c.perDay) || 0);
         var put = function(id, v){ var e = document.getElementById(id); if(e) e.textContent = ccNum(v); };
         put('cc_crew_total', tot); put('cc_crew_out', out);
-        // ★CC-INSTDAYS-20261104：总块数(规格表数量之和) → 安装天数 + ROUNDUP(天数×0.04) 非安装余量
-        var bl = 0; ((CC_DATA && CC_DATA.demand && CC_DATA.demand.specs) || []).forEach(function(sp){ bl += Number(sp && sp.qty) || 0; });
-        var days = out > 0 ? Math.ceil(bl / out) : 0;
-        var buf = Math.ceil(days * 0.04);
-        put('cc_inst_total', bl); put('cc_inst_daily', out); put('cc_inst_days', days);
-        put('cc_inst_buf', buf); put('cc_inst_real', days + buf);
+        // ★CC-INSTDAYS-20261104：与项目天数同源（ccInstCalc）
+        var ic = ccInstCalc();
+        put('cc_inst_total', ic.total); put('cc_inst_daily', ic.daily); put('cc_inst_days', ic.days);
+        put('cc_inst_buf', ic.buf); put('cc_inst_real', ic.real);
       }
       window.__ccCrewRefresh = ccCrewRefresh;
       var box = document.getElementById('lib-cost-body');
@@ -60553,7 +60558,7 @@ function submitAuth() {
           if(!CC_DATA) return;
           if(!CC_DATA.demand.crew) CC_DATA.demand.crew = { size:5, driver:1, assist:1, indoor:3, perDay:200, groups:2 };
           CC_DATA.demand.crew[inp.getAttribute('data-ck')] = parseFloat(String(inp.value).replace(/[^0-9.]/g, '')) || 0;
-          ccCrewRefresh(); ccScheduleSave();
+          ccRecalc(); ccScheduleSave(); // ★CC-WD3：小组参数变化同步刷新项目天数与人工薪资
         });
       });
       ccCrewRefresh();
