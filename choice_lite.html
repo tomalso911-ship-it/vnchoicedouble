@@ -60087,7 +60087,7 @@ function submitAuth() {
     h += '<div class="cc-sec" style="margin-top:14px;">' + ccT('moldSec') + '</div>';
     // ★CC-CPD-20261104：模/天改为可输入框（demand.moldCpd，默认40），所有方案实时跟随重算
     h += '<div style="font-size:12px;color:#555;margin:4px 0 6px;line-height:1.6;">' + ccT('moldNote1') +
-      ' <input class="cc-in" id="cc_mold_cpd" data-g="demand" data-f="moldCpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric"' + (ro ? ' disabled' : '') + ' style="width:56px;text-align:right;padding:1px 4px;"> ' + ccT('moldNote2') + '</div>';
+      ' <input class="cc-in" id="cc_mold_cpd" data-g="demand" data-f="moldCpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric" min="1"' + (ro ? ' disabled' : '') + ' style="width:56px;text-align:center;padding:1px 4px;"> ' + ccT('moldNote2') + '</div>';
     function ccMoldCard(title, calcId, pro, con, grow){
       return '<div style="border:2px solid #000;border-radius:6px;padding:8px 12px;background:#fff;flex:' + grow + ';min-width:320px;">' +
         '<div style="font-weight:700;">' + title + '</div>' +
@@ -60310,12 +60310,13 @@ function submitAuth() {
     // ★CC-CLR-20261104：数字输入框判定（名称/φ下拉/利润率/VAT 除外）
     function ccIsNumIn(el){
       if(!el || el.tagName !== 'INPUT' || !el.classList || !el.classList.contains('cc-in')) return false;
-      if(el.id === 'cc_margin' || el.id === 'cc_vat') return false;
+      if(el.id === 'cc_margin' || el.id === 'cc_vat' || el.id === 'cc_mold_cpd') return false;
       var f = el.dataset ? el.dataset.f : null;
       return !!f && f !== 'n' && f !== 'rL' && f !== 'rW';
     }
     // ★CC-CLR-20261104：鼠标/焦点进入数字输入框 → 立即清空（不再带着默认 0 输入）
     host.onfocusin = function(ev){
+      if(ev.target && ev.target.id === 'cc_mold_cpd'){ try{ ev.target.select(); }catch(e){} return; } // ★CC-CPD：全选便于直接改数
       if(ccIsNumIn(ev.target)) ev.target.value = '';
     };
     host.oninput = function(ev){
