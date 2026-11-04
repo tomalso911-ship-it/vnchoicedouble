@@ -59859,6 +59859,10 @@ function submitAuth() {
     subAmount:   { zh:'小计金额', en:'Subtotal amount', vi:'Thành tiền' },
     feeLabel:    { zh:'费用', en:'Cost', vi:'Chi phí' },
     costLabel:   { zh:'成本', en:'Cost', vi:'Chi phí' },
+    specLabel:   { zh:'规格', en:'Spec', vi:'Quy cách' },
+    perBlock:    { zh:'每块', en:'per slab', vi:'mỗi tấm' },
+    unitM2:      { zh:'/㎡', en:'/m²', vi:'/m²' },
+    unitBlock:   { zh:'/块', en:'/slab', vi:'/tấm' },
     headcount:   { zh:'人数', en:'Headcount', vi:'Số người' },
     wageDaily:   { zh:'日薪(含保险及税金)', en:'Daily wage (incl. insurance & tax)', vi:'Lương ngày (gồm BHXH & thuế)' },
     endSalary:   { zh:'项目结束薪资(含保险及税金)', en:'Project-end salary (incl. insurance & tax)', vi:'Lương kết thúc dự án (gồm BHXH & thuế)' },
@@ -60174,6 +60178,14 @@ function submitAuth() {
             '<td class="cc-val" id="' + id + '">0</td>'
           : '<td colspan="3"></td>') + '</tr>';
   }
+  // ★CC-PERBLOCK-20261104：每个规格一行「规格 L×W×H 每块」，三币单价 = 每㎡含税价 × 单块面积
+  function ccBlockRow(sp, i){
+    var dim = [sp.len, sp.wid, sp.hei].map(function(x){ return ccNum(x); }).join('×');
+    return '<tr><td class="cc-lbl">📏 ' + ccT('specLabel') + ' ' + dim + ' ' + ccT('perBlock') + '</td>' +
+      '<td class="cc-val cc-fx" data-block="' + i + '" data-cur="rmb">—</td>' +
+      '<td class="cc-val cc-fx" data-block="' + i + '" data-cur="usd">—</td>' +
+      '<td class="cc-val" data-blockv="' + i + '">—</td></tr>';
+  }
   function ccHtml(){
     ccStyle();
     var ro = ccCanEdit();
@@ -60290,6 +60302,9 @@ function submitAuth() {
       ccSumRow(ccT('vat') + '：<input class="cc-in cc-pct" id="cc_vat" value="' + (Number(CC_DATA.vat) || 0) + '" inputmode="decimal"' + roAttr + '> %', null) +
       ccSumRow('🧾 ' + ccT('priceVat'), 'cc_v_pvat', 'cc-big') +
       ccSumRow(ccT('perM2'), 'cc_v_m2') +
+      (CC_DATA.demand.specs || []).map(function(sp, i){
+        return ((Number(sp.len) || 0) > 0 && (Number(sp.wid) || 0) > 0) ? ccBlockRow(sp, i) : '';
+      }).join('') +
       '</tbody></table>';
     return h;
   }
@@ -60455,7 +60470,7 @@ function submitAuth() {
     var profit = total * margin / 100;
     var pNoVat = total + profit;
     var pVat = pNoVat * (1 + vat / 100);
-    var set = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = '₫ ' + ccNum(v); }; // ★CC-SUMHEAD：VND 列带货币符号
+    var set = function(id, v, unit){ var el = document.getElementById(id); if(el) el.textContent = '₫ ' + ccNum(v) + (unit || ''); }; // ★CC-SUMHEAD：VND 列带货币符号
     set('cc_v_blocks', blocks);
     set('cc_v_blocks_ft', blocks);
     set('cc_v_area', area);
@@ -60544,7 +60559,7 @@ function submitAuth() {
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
     set('cc_v_mgmt', mgmtAmt); // ★CC-MGMT2：#5 右侧数值 = 管理费金额(前四项×百分比)
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
-    set('cc_v_m2', area > 0 ? pVat / area : 0);
+    set('cc_v_m2', area > 0 ? pVat / area : 0, ccT('unitM2')); // ★CC-PERBLOCK：每㎡价带 /㎡
     // ★CC-SUMHEAD-20261104：汇总表 RMB/USD 列按汇率自动换算
     var sumVals = {
       cc_v_mach: mach, cc_v_agg: agg, cc_v_labor: labor + opex, cc_v_ind: ind,
@@ -60552,10 +60567,25 @@ function submitAuth() {
       cc_v_pnovat: pNoVat, cc_v_pvat: pVat, cc_v_m2: (area > 0 ? pVat / area : 0)
     };
     var fx2 = ccFx();
+    var num2 = function(v){ return Math.abs(v) >= 100 ? ccNum(v) : (Math.round(v * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }); };
     host.querySelectorAll('[data-sumfx]').forEach(function(el){
-      var v = sumVals[el.getAttribute('data-sumfx')] || 0;
+      var key = el.getAttribute('data-sumfx'), v = sumVals[key] || 0;
       var usd = el.getAttribute('data-cur') === 'usd', r = usd ? fx2.usd : fx2.rmb;
-      el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + ccNum(v / r) : '—';
+      var u = key === 'cc_v_m2' ? ccT('unitM2') : '';
+      var fmt = key === 'cc_v_m2' ? num2 : ccNum;
+      el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + fmt(v / r) + u : '—';
+    });
+    // ★CC-PERBLOCK-20261104：每个规格每块价 = 每㎡含税单价 × 单块面积(㎡)，三币带 /块
+    var m2Price = area > 0 ? pVat / area : 0;
+    var specA = function(sp){ var l = Number(sp && sp.len) || 0, w = Number(sp && sp.wid) || 0; return (l > 0 && w > 0) ? l * w / 1e6 : (Number(sp && sp.larea) || 0); };
+    var blockVal = function(idx){ var sp = (CC_DATA.demand.specs || [])[idx] || {}; return m2Price * specA(sp); };
+    host.querySelectorAll('[data-block]').forEach(function(el){
+      var usd = el.getAttribute('data-cur') === 'usd', r = usd ? fx2.usd : fx2.rmb;
+      var v = blockVal(Number(el.getAttribute('data-block')));
+      el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + num2(v / r) + ccT('unitBlock') : '—';
+    });
+    host.querySelectorAll('[data-blockv]').forEach(function(el){
+      el.textContent = '₫ ' + num2(blockVal(Number(el.getAttribute('data-blockv')))) + ccT('unitBlock');
     });
     if(window.__ccCrewRefresh) window.__ccCrewRefresh(); // ★CC-INSTDAYS：规格/汇率等任何重算都刷新安装天数行
   }
