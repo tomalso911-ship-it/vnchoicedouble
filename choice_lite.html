@@ -59863,6 +59863,12 @@ function submitAuth() {
     perBlock:    { zh:'每块', en:'per slab', vi:'mỗi tấm' },
     unitM2:      { zh:'/㎡', en:'/m²', vi:'/m²' },
     unitBlock:   { zh:'/块', en:'/slab', vi:'/tấm' },
+    ccSumSpec:   { zh:'全场共{0}种规格的水泥漏缝地板，共计{1}块，{2} m²，混凝土总体积：{3} m³；', en:'The farm has {0} specs of concrete slatted floor, {1} slabs totaling {2} m²; concrete volume: {3} m³.', vi:'Toàn trại có {0} quy cách sàn bê tông khe hở, tổng {1} tấm, {2} m²; thể tích bê tông: {3} m³.' },
+    ccSumMat:    { zh:'材料需求：水泥{0}吨、黄砂{1}吨（{2}方）、石子{3}吨（{4}方）；', en:'Materials: cement {0} t, sand {1} t ({2} m³), gravel {3} t ({4} m³);', vi:'Vật liệu: xi măng {0} tấn, cát {1} tấn ({2} khối), đá {3} tấn ({4} khối);' },
+    ccSumRebar:  { zh:'钢筋：', en:'Rebar:', vi:'Cốt thép:' },
+    ccSumRRow:   { zh:'规格{0}：小计 {1} 吨、小计长度 {2} m', en:'Spec {0}: subtotal {1} t, total length {2} m', vi:'Quy cách {0}: tiểu kế {1} tấn, tổng chiều dài {2} m' },
+    ccSumRAll:   { zh:'钢筋合计 {0} 吨、总长 {1} m；', en:'Rebar total {0} t / {1} m;', vi:'Tổng cốt thép {0} tấn, tổng chiều dài {1} m;' },
+    ccSumSteel:  { zh:'全部水泥板每平米含钢量 {0} kg/m²，平均板厚 {1} mm。', en:'Steel content {0} kg/m², average slab thickness {1} mm.', vi:'Hàm lượng thép {0} kg/m², chiều dày tấm trung bình {1} mm.' },
     headcount:   { zh:'人数', en:'Headcount', vi:'Số người' },
     wageDaily:   { zh:'日薪(含保险及税金)', en:'Daily wage (incl. insurance & tax)', vi:'Lương ngày (gồm BHXH & thuế)' },
     endSalary:   { zh:'项目结束薪资(含保险及税金)', en:'Project-end salary (incl. insurance & tax)', vi:'Lương kết thúc dự án (gồm BHXH & thuế)' },
@@ -60227,6 +60233,8 @@ function submitAuth() {
       '<td colspan="3" style="text-align:right;">' + ccT('totalAll') + '</td>' +
       '<td style="text-align:right;" id="cc_v_blocks_ft">0</td>' +
       '<td colspan="8"></td></tr></tfoot></table>';
+    // ★CC-SPEC-SUMMARY-20261104：需求信息表底部总概括（材料/钢筋/单方指标，按智能报告公式）
+    h += '<div id="cc_v_summary" style="font-size:12px;color:#333;line-height:1.9;margin:8px 0 2px;padding:8px 10px;border:1px solid #000;background:#fffdf0;"></div>';
 
     // ★CC-MOLD-20261104：模具需求信息（三种摆放方案 + 按当前规格表实时估算）
     h += '<div class="cc-sec" style="margin-top:14px;">' + ccT('moldSec') + '</div>';
@@ -60410,8 +60418,11 @@ function submitAuth() {
     var iid = document.getElementById('cc_inst_days_top'); if(iid) iid.value = instD;
     // ★CC-SPEC-20261104：总面积 = Σ(长×宽×数量)/1e6（旧迁移行无长宽时用旧单块面积×数量）
     var blocks = 0, area = 0, usedDia = {};
+    // ★CC-SPEC-SUMMARY-20261104：材料系数来自智能报告(标准板 1500×600×70=0.063m³ → 水泥24.4kg/黄砂22.6kg/石子68kg)
+    var ccRW = (typeof SLATS_REBAR_WEIGHT !== 'undefined') ? SLATS_REBAR_WEIGHT : { '6':0.222, '8':0.395, '10':0.617, '12':0.888 };
+    var ccVol = 0, ccCem = 0, ccSand = 0, ccGrav = 0, ccRTon = 0, ccRLen = 0, ccSpecN = 0, ccRRows = [];
     (CC_DATA.demand.specs || []).forEach(function(sp, i){
-      var l = Number(sp.len) || 0, w = Number(sp.wid) || 0, q = Number(sp.qty) || 0;
+      var l = Number(sp.len) || 0, w = Number(sp.wid) || 0, q = Number(sp.qty) || 0, h3 = Number(sp.hei) || 0;
       blocks += q;
       area += (l > 0 && w > 0) ? (l * w * q / 1e6) : ((Number(sp.larea) || 0) * q);
       // ★CC-REBAR-AUTO-20261104：钢筋尺寸(长度方向)=长−9，(宽度方向)=宽−9（mm），自动计算只读
@@ -60421,6 +60432,25 @@ function submitAuth() {
       var eW = host.querySelector('[data-dwid="' + i + '"]'); if(eW) eW.textContent = ccNum(sp.dw);
       if(sp.rL) usedDia[String(sp.rL)] = 1;
       if(sp.rW) usedDia[String(sp.rW)] = 1;
+      // 混凝土体积 m³ = 长×宽×高(mm)/1e9 × 数量
+      var v = (l > 0 && w > 0 && h3 > 0) ? (l * w * h3 / 1e9) : 0;
+      ccVol += v * q;
+      var std = v / 0.063;
+      ccCem += std * 24.4 * q / 1000;
+      ccSand += std * 22.6 * q / 1000;
+      ccGrav += std * 68 * q / 1000;
+      // 钢筋：按成本核算表口径 (L−9)/1000、(W−9)/1000 米 × 根数 × 钢网层数 × 块数
+      var lyr = Number(sp.layers) || 0;
+      var lenL = (sp.dl / 1000) * (Number(sp.nl) || 0) * lyr * q;
+      var lenW = (sp.dw / 1000) * (Number(sp.nw) || 0) * lyr * q;
+      var tonL = lenL * (ccRW[String(sp.rL || '')] || 0) / 1000; // 未选直径不计重量（与智能报告一致）
+      var tonW = lenW * (ccRW[String(sp.rW || '')] || 0) / 1000;
+      var rTon = tonL + tonW, rLen = lenL + lenW;
+      ccRTon += rTon; ccRLen += rLen;
+      if(l > 0 && w > 0 && q > 0){
+        ccSpecN++;
+        ccRRows.push({ dim: ccNum(l) + '×' + ccNum(w) + '×' + ccNum(h3), ton: rTon, len: rLen });
+      }
     });
     // ★CC-AGG-HIDE-20261104：骨料表 φ6/φ8/φ10/φ12 行按上方规格表实际选用的直径自动隐藏
     host.querySelectorAll('tr[data-aggd]').forEach(function(tr){
@@ -60587,6 +60617,20 @@ function submitAuth() {
     host.querySelectorAll('[data-blockv]').forEach(function(el){
       el.textContent = '₫ ' + num2(blockVal(Number(el.getAttribute('data-blockv')))) + ccT('unitBlock');
     });
+    // ★CC-SPEC-SUMMARY-20261104：需求信息表底部总概括（三语，随规格输入实时刷新）
+    var sumEl = document.getElementById('cc_v_summary');
+    if(sumEl){
+      var ccTpl = function(k, a){ return ccT(k).replace(/\{(\d+)\}/g, function(m, i){ return a[Number(i)] !== undefined ? a[Number(i)] : m; }); };
+      var f2 = function(v){ return (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+      var f1 = function(v){ return (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); };
+      var s1 = ccTpl('ccSumSpec', [ccSpecN, ccNum(blocks), ccNum(area), f2(ccVol)]);
+      var s2 = ccTpl('ccSumMat', [f2(ccCem), f2(ccSand), f1(ccSand / 1.45), f2(ccGrav), f1(ccGrav / 1.5)]);
+      var s3 = '<b>' + ccT('ccSumRebar') + '</b>';
+      ccRRows.forEach(function(r){ s3 += '<div style="padding-left:16px;">' + ccTpl('ccSumRRow', [r.dim, f2(r.ton), ccNum(r.len)]) + '</div>'; });
+      var s4 = ccTpl('ccSumRAll', [f2(ccRTon), ccNum(ccRLen)]) + ' ' +
+        ccTpl('ccSumSteel', [f2(area > 0 ? ccRTon * 1000 / area : 0), f1(area > 0 ? ccVol / area * 1000 : 0)]);
+      sumEl.innerHTML = '<div>' + s1 + '</div><div>' + s2 + '</div><div>' + s3 + '</div><div>' + s4 + '</div>';
+    }
     if(window.__ccCrewRefresh) window.__ccCrewRefresh(); // ★CC-INSTDAYS：规格/汇率等任何重算都刷新安装天数行
   }
   function ccScheduleSave(){
