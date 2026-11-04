@@ -59741,6 +59741,9 @@ function submitAuth() {
     specHei:     { zh:'高', en:'H', vi:'Cao' },
     rebarCfg:    { zh:'钢筋网片配置信息', en:'Rebar mesh configuration', vi:'Cấu hình lưới thép' },
     layers:      { zh:'钢网层数', en:'Mesh layers', vi:'Số lớp lưới' },
+    upLayer:     { zh:'上', en:'Upper', vi:'Trên' },
+    loLayer:     { zh:'下', en:'Lower', vi:'Dưới' },
+    dualNote:    { zh:'注：钢网层数=2 时，上层与下层按各自条数/直径分别计算钢筋用量后相加，不再额外乘钢网层数；层数≠2 的行下层灰显留空、不参与计算。', en:'Note: when mesh layers = 2, upper and lower meshes are calculated separately and added (no extra layer multiplier); rows with layers ≠ 2 have greyed-out, empty lower columns.', vi:'Lưu ý: khi số lớp lưới = 2, lớp trên và lớp dưới được tính riêng rồi cộng lại (không nhân thêm số lớp); dòng có số lớp ≠ 2 để trống và làm mờ các cột lớp dưới.' },
     barsL:       { zh:'条/长度方向', en:'Bars / length dir.', vi:'Thanh / chiều dài' },
     rDiaL:       { zh:'长度方向钢筋尺寸', en:'Rebar Ø / length dir.', vi:'Cỡ thép / chiều dài' },
     rebarL:      { zh:'钢筋尺寸/长度方向', en:'Rebar size / length dir.', vi:'Cỡ thép / chiều dài' },
@@ -59928,7 +59931,7 @@ function submitAuth() {
   }
   function ccDef(){
     return {
-      demand:{ months:1, workDays:0, prodDays:0, instDays:0, crew:{ size:5, driver:1, assist:1, indoor:3, perDay:200, groups:2 }, specs:[{ len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0 }] },
+      demand:{ months:1, workDays:0, prodDays:0, instDays:0, crew:{ size:5, driver:1, assist:1, indoor:3, perDay:200, groups:2 }, specs:[{ len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0, nl2:0, rL2:'', nw2:0, rW2:'', d2mod:0 }] },
       mach:{ mech:[{n:'',qty:1,price:0}], veh:[{n:'',qty:1,price:0}], tools:[{n:'',qty:1,price:0}] },
       agg:{ sand:{qty:0,price:0}, cement:{qty:0,price:0}, stone:{qty:0,price:0},
             r6:{qty:0,price:0}, r8:{qty:0,price:0}, r10:{qty:0,price:0}, r12:{qty:0,price:0} },
@@ -59959,13 +59962,19 @@ function submitAuth() {
         if(Array.isArray(d0.specs)){
           base.demand.specs = d0.specs.map(function(s){
             s = s || {};
+            var _rL = (s.rL===undefined||s.rL===null)?'':String(s.rL), _rW = (s.rW===undefined||s.rW===null)?'':String(s.rW);
+            // ★CC-DUAL-20261104：旧存档没有下层字段时，自动由上层复制一份（旧数据不丢、汇总口径不变）
             return { len:Number(s.len)||0, wid:Number(s.wid)||0, hei:Number(s.hei)||0, qty:Number(s.qty)||0,
-                     layers:Number(s.layers)||0, nl:Number(s.nl)||0, rL:(s.rL===undefined||s.rL===null)?'':String(s.rL),
-                     nw:Number(s.nw)||0, rW:(s.rW===undefined||s.rW===null)?'':String(s.rW),
-                     larea:Number(s.larea)||0 };
+                     layers:Number(s.layers)||0, nl:Number(s.nl)||0, rL:_rL,
+                     nw:Number(s.nw)||0, rW:_rW,
+                     nl2:(s.nl2===undefined||s.nl2===null)?Number(s.nl)||0:Number(s.nl2)||0,
+                     rL2:(s.rL2===undefined||s.rL2===null)?_rL:String(s.rL2),
+                     nw2:(s.nw2===undefined||s.nw2===null)?Number(s.nw)||0:Number(s.nw2)||0,
+                     rW2:(s.rW2===undefined||s.rW2===null)?_rW:String(s.rW2),
+                     d2mod:Number(s.d2mod)||0, larea:Number(s.larea)||0 };
           });
         } else if(d0.blocks !== undefined || d0.area !== undefined){
-          base.demand.specs = [{ len:0, wid:0, hei:0, qty:Number(d0.blocks)||0, layers:2, nl:0, dl:0, nw:0, dw:0, larea:Number(d0.area)||0 }];
+          base.demand.specs = [{ len:0, wid:0, hei:0, qty:Number(d0.blocks)||0, layers:2, nl:0, dl:0, nw:0, dw:0, nl2:0, rL2:'', nw2:0, rW2:'', d2mod:0, larea:Number(d0.area)||0 }];
         }
         delete base.demand.blocks; delete base.demand.area;
       }
@@ -60016,6 +60025,9 @@ function submitAuth() {
       '.cc-tb-spec tbody tr:nth-child(even) td{background:#eaf3fb;}',
       '.cc-tb-spec th,.cc-tb-spec td,.cc-tb-spec tfoot td{border:1px solid #000;}',
       '.cc-tb-spec .cc-in{background:transparent;}',
+      // ★CC-DUAL-20261104：层数为 1 的行，下层 6 列灰显留空（禁用输入，数据不丢）
+      '.cc-tb-spec td.cc-offcell{background:#eceff3 !important;}',
+      '.cc-tb-spec td.cc-offcell input.cc-in.cc-offin{background:#eceff3 !important;color:#9aa3ad !important;border:1px solid #dfe4ea !important;}',
       '.cc-tb tfoot td{font-weight:700;background:#f2f4f7;white-space:nowrap;}',
       '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
       '.cc-icn:hover{background:#f5f5f5;}',
@@ -60161,7 +60173,22 @@ function submitAuth() {
   function ccSpecTd(f, sp, i){
     return '<td>' + ccInNum('demand.specs', f, sp[f] || 0, i) + '</td>';
   }
-  function ccSpecDef(){ return { len:0, wid:0, hei:0, qty:0, layers:2, nl:0, rL:'', dl:0, nw:0, rW:'', dw:0 }; }
+  function ccSpecOff(f, i){ // ★CC-DUAL-20261104：层数≠2 的行下层格灰显留空（disabled，不写数据）
+    return '<td class="cc-offcell"><input class="cc-in cc-offin" data-g="demand.specs" data-f="' + f + '" data-i="' + i + '" value="" disabled></td>';
+  }
+  function ccSpecDef(){ return { len:0, wid:0, hei:0, qty:0, layers:2, nl:0, rL:'', dl:0, nw:0, rW:'', dw:0, nl2:0, rL2:'', nw2:0, rW2:'', d2mod:0 }; }
+  // ★CC-DUAL-20261104：任一行「钢网层数=2」整表切双层；全部≠2 时维持原单层表
+  function ccSpecDualMode(){
+    var s = (CC_DATA && CC_DATA.demand && CC_DATA.demand.specs) || [];
+    for(var i = 0; i < s.length; i++){ if(Number(s[i] && s[i].layers) === 2) return true; }
+    return false;
+  }
+  // ★CC-DUAL-20261104：切到双层瞬间把上层条数与 φ 直径复制到下层；下层已被用户独立改过则不覆盖
+  function ccSpecEnsureDual(sp){
+    if(!sp || Number(sp.d2mod) === 1) return;
+    sp.nl2 = Number(sp.nl) || 0; sp.rL2 = sp.rL || '';
+    sp.nw2 = Number(sp.nw) || 0; sp.rW2 = sp.rW || '';
+  }
   // ★CC-MOLD-20261104：单模具摆放数估算（模具基本面 1.5m 宽 × 3.5m 长；mixed=true 时允许横竖混排补空）
   function ccMoldPer(L, W, mixed){
     if(!(L > 0) || !(W > 0)) return 0;
@@ -60223,16 +60250,28 @@ function submitAuth() {
       '<span style="white-space:nowrap;font-size:12px;">' + ccT('totalBlocks') + '：<b id="cc_v_blocks" style="color:#d32f2f;">0</b></span>' +
       '<span style="white-space:nowrap;font-size:12px;">' + ccT('totalArea') + '：<b id="cc_v_area" style="color:#d32f2f;">0</b> ㎡</span>' +
       '<button class="cc-add" data-act="addspec" style="margin:0;">' + ccT('addRow2') + '</button></div>';
-    h += '<table class="cc-tb cc-tb-spec"><thead><tr>' +
+    // ★CC-DUAL-20261104：单层表原样；任一行层数=2 时整表切 13 列双层表（上层6列+下层6列+层数列）
+    var specDual = ccSpecDualMode();
+    var dBars = function(pre, key, w){ return '<th style="width:' + w + 'px;">' + ccT(pre) + '-' + ccT(key) + '</th>'; };
+    h += (specDual ? '<div style="overflow-x:auto;">' : '') +
+      '<table class="cc-tb cc-tb-spec"' + (specDual ? ' style="min-width:1840px;"' : '') + '><thead><tr>' +
       '<th colspan="3">' + ccT('specDim') + '</th>' +
       '<th rowspan="2" style="width:80px;">' + ccT('qty') + '</th>' +
-      '<th colspan="7">' + ccT('rebarCfg') + '</th>' +
+      '<th colspan="' + (specDual ? 13 : 7) + '">' + ccT('rebarCfg') + '</th>' +
       '<th rowspan="2" style="width:64px;">' + ccT('op') + '</th></tr>' +
       '<tr><th style="width:90px;">' + ccT('specLen') + '</th><th style="width:90px;">' + ccT('specWid') + '</th><th style="width:90px;">' + ccT('specHei') + '</th>' +
       '<th style="width:80px;">' + ccT('layers') + '</th>' +
-      '<th style="width:100px;">' + ccT('barsL') + '</th><th style="width:110px;">' + ccT('rDiaL') + '</th><th style="width:120px;">' + ccT('rebarL') + '</th>' +
-      '<th style="width:100px;">' + ccT('barsW') + '</th><th style="width:110px;">' + ccT('rDiaW') + '</th><th style="width:120px;">' + ccT('rebarW') + '</th></tr></thead><tbody>';
+      (specDual ?
+        dBars('upLayer','barsL',90) + dBars('upLayer','rDiaL',95) + dBars('upLayer','rebarL',105) +
+        dBars('upLayer','barsW',90) + dBars('upLayer','rDiaW',95) + dBars('upLayer','rebarW',105) +
+        dBars('loLayer','barsL',90) + dBars('loLayer','rDiaL',95) + dBars('loLayer','rebarL',105) +
+        dBars('loLayer','barsW',90) + dBars('loLayer','rDiaW',95) + dBars('loLayer','rebarW',105)
+        :
+        '<th style="width:100px;">' + ccT('barsL') + '</th><th style="width:110px;">' + ccT('rDiaL') + '</th><th style="width:120px;">' + ccT('rebarL') + '</th>' +
+        '<th style="width:100px;">' + ccT('barsW') + '</th><th style="width:110px;">' + ccT('rDiaW') + '</th><th style="width:120px;">' + ccT('rebarW') + '</th>'
+      ) + '</tr></thead><tbody>';
     specs.forEach(function(sp, i){
+      var offLower = specDual && Number(sp.layers) !== 2;
       h += '<tr>' +
         ccSpecTd('len', sp, i) + ccSpecTd('wid', sp, i) + ccSpecTd('hei', sp, i) +
         ccSpecTd('qty', sp, i) + ccSpecTd('layers', sp, i) +
@@ -60240,13 +60279,23 @@ function submitAuth() {
         '<td class="cc-subcell" data-dlen="' + i + '">0</td>' +
         ccSpecTd('nw', sp, i) + '<td>' + ccInSel('rW', sp.rW, i) + '</td>' +
         '<td class="cc-subcell" data-dwid="' + i + '">0</td>' +
+        (specDual ? (offLower ?
+          ccSpecOff('nl2', i) + ccSpecOff('rL2', i) + '<td class="cc-offcell">&nbsp;</td>' +
+          ccSpecOff('nw2', i) + ccSpecOff('rW2', i) + '<td class="cc-offcell">&nbsp;</td>'
+          :
+          ccSpecTd('nl2', sp, i) + '<td>' + ccInSel('rL2', sp.rL2, i) + '</td>' +
+          '<td class="cc-subcell" data-dlen="' + i + '">0</td>' +
+          ccSpecTd('nw2', sp, i) + '<td>' + ccInSel('rW2', sp.rW2, i) + '</td>' +
+          '<td class="cc-subcell" data-dwid="' + i + '">0</td>'
+        ) : '') +
         '<td style="text-align:center;white-space:nowrap;">' + ccIcnCopy(i) + ccIcnDel(i) + '</td>' +
         '</tr>';
     });
     h += '</tbody><tfoot><tr>' +
       '<td colspan="3" style="text-align:right;">' + ccT('totalAll') + '</td>' +
       '<td style="text-align:right;" id="cc_v_blocks_ft">0</td>' +
-      '<td colspan="8"></td></tr></tfoot></table>';
+      '<td colspan="' + (specDual ? 14 : 8) + '"></td></tr></tfoot></table>' +
+      (specDual ? '</div><div class="cc-note">' + ccT('dualNote') + '</div>' : '');
     // ★CC-SPEC-SUMMARY-20261104：需求信息表底部总概括（材料/钢筋/单方指标，按智能报告公式）
     h += '<div id="cc_v_summary" style="font-size:12px;color:#333;line-height:1.9;margin:8px 0 2px;padding:8px 10px;border:1px solid #000;background:#fffdf0;"></div>';
 
@@ -60437,6 +60486,7 @@ function submitAuth() {
     // ★CC-SPEC-SUMMARY-20261104：材料系数来自智能报告(标准板 1500×600×70=0.063m³ → 水泥24.4kg/黄砂22.6kg/石子68kg)
     var ccRW = (typeof SLATS_REBAR_WEIGHT !== 'undefined') ? SLATS_REBAR_WEIGHT : { '6':0.222, '8':0.395, '10':0.617, '12':0.888 };
     var ccVol = 0, ccCem = 0, ccSand = 0, ccGrav = 0, ccRTon = 0, ccRLen = 0, ccSpecN = 0, ccRRows = [], ccDia = {};
+    var ccDual = ccSpecDualMode(); // ★CC-DUAL-20261104：整表双层时汇总口径同步切换
     (CC_DATA.demand.specs || []).forEach(function(sp, i){
       var l = Number(sp.len) || 0, w = Number(sp.wid) || 0, q = Number(sp.qty) || 0, h3 = Number(sp.hei) || 0;
       blocks += q;
@@ -60444,10 +60494,14 @@ function submitAuth() {
       // ★CC-REBAR-AUTO-20261104：钢筋尺寸(长度方向)=长−9，(宽度方向)=宽−9（mm），自动计算只读
       sp.dl = l > 0 ? l - 9 : 0;
       sp.dw = w > 0 ? w - 9 : 0;
-      var eD = host.querySelector('[data-dlen="' + i + '"]'); if(eD) eD.textContent = ccNum(sp.dl);
-      var eW = host.querySelector('[data-dwid="' + i + '"]'); if(eW) eW.textContent = ccNum(sp.dw);
+      host.querySelectorAll('[data-dlen="' + i + '"]').forEach(function(e){ e.textContent = ccNum(sp.dl); });
+      host.querySelectorAll('[data-dwid="' + i + '"]').forEach(function(e){ e.textContent = ccNum(sp.dw); });
       if(sp.rL) usedDia[String(sp.rL)] = 1;
       if(sp.rW) usedDia[String(sp.rW)] = 1;
+      if(ccDual && (Number(sp.layers) || 0) === 2){
+        if(sp.rL2) usedDia[String(sp.rL2)] = 1;
+        if(sp.rW2) usedDia[String(sp.rW2)] = 1;
+      }
       // 混凝土体积 m³ = 长×宽×高(mm)/1e9 × 数量
       var v = (l > 0 && w > 0 && h3 > 0) ? (l * w * h3 / 1e9) : 0;
       ccVol += v * q;
@@ -60455,7 +60509,8 @@ function submitAuth() {
       ccCem += std * 24.4 * q / 1000;
       ccSand += std * 22.6 * q / 1000;
       ccGrav += std * 68 * q / 1000;
-      // 钢筋：按成本核算表口径 (L−9)/1000、(W−9)/1000 米 × 根数 × 钢网层数 × 块数；按 φ 直径分组合并
+      // ★CC-DUAL-20261104：钢筋按成本核算表口径 (L−9)/1000、(W−9)/1000 米 × 根数 × 块数；
+      //   单层表沿用「×钢网层数」；双层表则上层 + 下层各自计算后相加，不再额外乘层数；按 φ 直径分组合并
       var lyr = Number(sp.layers) || 0, grp = {};
       var addR = function(d, mm, bars, lenM, ton){
         if(!d) return; // 未选直径不计（与智能报告一致）
@@ -60466,14 +60521,24 @@ function submitAuth() {
         if(!ccDia[d]) ccDia[d] = { len: 0, ton: 0 };
         ccDia[d].len += lenM; ccDia[d].ton += ton;
       };
-      var dL = String(sp.rL || ''), dW = String(sp.rW || '');
-      var wL = ccRW[dL] || 0, wW = ccRW[dW] || 0;
-      var barsL = (Number(sp.nl) || 0) * lyr * q, barsW = (Number(sp.nw) || 0) * lyr * q;
-      var lenL = wL ? (sp.dl / 1000) * barsL : 0, lenW = wW ? (sp.dw / 1000) * barsW : 0;
-      var tonL = lenL * wL / 1000, tonW = lenW * wW / 1000;
-      addR(dL, sp.dl, barsL, lenL, tonL);
-      addR(dW, sp.dw, barsW, lenW, tonW);
-      var rTon = tonL + tonW, rLen = lenL + lenW, rBars = (wL ? barsL : 0) + (wW ? barsW : 0);
+      var part = function(nF, dF, wF, dWF, mult){
+        var dL = String(sp[dF] || ''), dW = String(sp[dWF] || '');
+        var wL = ccRW[dL] || 0, wW = ccRW[dW] || 0;
+        var barsL = (Number(sp[nF]) || 0) * mult * q, barsW = (Number(sp[wF]) || 0) * mult * q;
+        var lenL = wL ? (sp.dl / 1000) * barsL : 0, lenW = wW ? (sp.dw / 1000) * barsW : 0;
+        var tonL = lenL * wL / 1000, tonW = lenW * wW / 1000;
+        addR(dL, sp.dl, barsL, lenL, tonL);
+        addR(dW, sp.dw, barsW, lenW, tonW);
+        return { ton: tonL + tonW, len: lenL + lenW, bars: (wL ? barsL : 0) + (wW ? barsW : 0) };
+      };
+      var rTon = 0, rLen = 0, rBars = 0;
+      var addPart = function(p){ rTon += p.ton; rLen += p.len; rBars += p.bars; };
+      if(ccDual && lyr === 2){
+        addPart(part('nl', 'rL', 'nw', 'rW', 1));           // 上层
+        addPart(part('nl2', 'rL2', 'nw2', 'rW2', 1));        // 下层
+      } else {
+        addPart(part('nl', 'rL', 'nw', 'rW', lyr));          // 单层表口径不变
+      }
       ccRTon += rTon; ccRLen += rLen;
       if(l > 0 && w > 0 && q > 0){
         ccSpecN++;
@@ -60715,7 +60780,7 @@ function submitAuth() {
       if(!el || el.tagName !== 'INPUT' || !el.classList || !el.classList.contains('cc-in')) return false;
       if(el.id === 'cc_margin' || el.id === 'cc_vat' || el.id === 'cc_mold_cpd') return false;
       var f = el.dataset ? el.dataset.f : null;
-      return !!f && f !== 'n' && f !== 'rL' && f !== 'rW';
+      return !!f && f !== 'n' && f !== 'rL' && f !== 'rW' && f !== 'rL2' && f !== 'rW2';
     }
     // ★CC-CLR-20261104：鼠标/焦点进入数字输入框 → 立即清空（不再带着默认 0 输入）
     host.onfocusin = function(ev){
@@ -60732,18 +60797,37 @@ function submitAuth() {
         while(idx < el.value.length && cnt < digs){ if(/[0-9.\-]/.test(el.value[idx])) cnt++; idx++; }
         try{ el.setSelectionRange(idx, idx); }catch(e){}
       }
-      var f = el.dataset.f;
+      var f = el.dataset.f, g = el.dataset.g;
+      var rowIdx = (g === 'demand.specs' && el.dataset.i !== undefined) ? Number(el.dataset.i) : -1;
+      // ★CC-DUAL-20261104：层数变化会切换整表结构，先记录切换前状态
+      var layPrevDual = false, layPrev2 = false, layRow = null;
+      if(f === 'layers' && rowIdx >= 0){
+        layPrevDual = ccSpecDualMode();
+        layRow = (CC_DATA.demand.specs || [])[rowIdx] || null;
+        layPrev2 = !!layRow && Number(layRow.layers) === 2;
+      }
       if(el.id === 'cc_margin'){ CC_DATA.margin = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
       else if(el.id === 'cc_vat'){ CC_DATA.vat = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
-      else if(el.dataset.g){
+      else if(g){
         var v;
-        if(f === 'n' || f === 'rL' || f === 'rW'){ v = el.value; }
+        if(f === 'n' || f === 'rL' || f === 'rW' || f === 'rL2' || f === 'rW2'){ v = el.value; }
         else { v = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
         // ★数组行的字段路径是 g.i.f（如 mach.mech.0.qty），标量组是 g.f（如 agg.sand.qty）
-        var path = el.dataset.g + '.';
+        var path = g + '.';
         if(el.dataset.i !== undefined) path += el.dataset.i + '.';
         path += f;
         ccPathSet(path, v);
+        // ★CC-DUAL-20261104：下层一旦被用户独立编辑，之后切层不再用上层覆盖（旧数据不丢）
+        if(rowIdx >= 0 && (f === 'nl2' || f === 'rL2' || f === 'nw2' || f === 'rW2')){
+          var sx = (CC_DATA.demand.specs || [])[rowIdx]; if(sx) sx.d2mod = 1;
+        }
+        if(f === 'layers' && layRow){
+          var now2 = Number(layRow.layers) === 2;
+          if(now2 && !layPrev2) ccSpecEnsureDual(layRow); // 切到双层瞬间：上层条数与 φ 直径复制到下层
+          if(layPrevDual !== ccSpecDualMode() || now2 !== layPrev2){
+            lib_renderCostBody(); ccScheduleSave(); return; // 表结构变化 → 整表重建（自带重算）
+          }
+        }
       } else { return; }
       ccRecalc(); ccScheduleSave();
     };
