@@ -60090,14 +60090,15 @@ function submitAuth() {
     // ★CC-MOLD-20261104：模具需求信息（三种摆放方案 + 按当前规格表实时估算）
     h += '<div class="cc-sec" style="margin-top:14px;">' + ccT('moldSec') + '</div>';
     // ★CC-CPD-20261104：模/天改为可输入框（demand.moldCpd，默认40），所有方案实时跟随重算
-    h += '<div style="font-size:12px;color:#555;margin:4px 0 6px;line-height:1.6;">' + ccT('moldNote1') +
-      ' <input class="cc-in" id="cc_mold_cpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric" autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"> ' + ccT('moldNote2') + '</div>';
-    // ★CC-PICK-20261104：根据分析最终选择方案（下拉，选中方案卡片淡粉背景）
+    // ★CC-PICK-20261104：根据分析最终选择方案（下拉与备注同行，选中方案卡片淡粉背景）
     var pick = CC_DATA.demand.moldPick === 'B' ? 'B' : 'A';
-    h += '<div style="font-size:12px;color:#333;font-weight:600;margin:2px 0 8px;line-height:1.8;">' + ccT('moldPick') +
-      ' <select id="cc_mold_pick" style="padding:2px 8px;border:1px solid #c8ced6;border-radius:4px;font-size:12px;background:#fff;">' +
+    h += '<div style="font-size:12px;color:#555;margin:4px 0 6px;line-height:1.9;display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;">' +
+      '<span>' + ccT('moldNote1') +
+      ' <input class="cc-in" id="cc_mold_cpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric" autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"> ' + ccT('moldNote2') + '</span>' +
+      '<span style="color:#333;font-weight:600;">' + ccT('moldPick') +
+      ' <select id="cc_mold_pick" style="padding:2px 8px;border:1px solid #7aa7d4;border-radius:4px;font-size:12px;background:#eaf3fb;">' +
       '<option value="A"' + (pick === 'A' ? ' selected' : '') + '>' + ccT('moldOptA') + '</option>' +
-      '<option value="B"' + (pick === 'B' ? ' selected' : '') + '>' + ccT('moldOptB') + '</option></select></div>';
+      '<option value="B"' + (pick === 'B' ? ' selected' : '') + '>' + ccT('moldOptB') + '</option></select></span></div>';
     function ccMoldCard(title, calcId, pro, con, grow, bg, cardId){
       return '<div id="' + cardId + '" style="border:2px solid #000;border-radius:6px;padding:8px 12px;background:' + (bg || '#fff') + ';flex:' + grow + ';min-width:320px;">' +
         '<div style="font-weight:700;">' + title + '</div>' +
