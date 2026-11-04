@@ -59867,6 +59867,12 @@ function submitAuth() {
     crewLine7:   { zh:'块漏缝地板；需要', en:' slatted floor panels per day; crews needed:', vi:' tấm sàn khe hẹp mỗi ngày; cần' },
     crewLine8:   { zh:'小组；每天可以安装', en:' crews; daily installation capacity:', vi:' tổ; mỗi ngày có thể lắp' },
     crewLine9:   { zh:'块水泥板！', en:' concrete slabs per day!', vi:' tấm bê tông mỗi ngày!' },
+    instLine1:   { zh:'根据这个安装效率，总计水泥板的数量为：', en:'Based on this installation rate, total concrete slabs:', vi:'Theo hiệu suất lắp đặt này, tổng số tấm bê tông:' },
+    instLine2:   { zh:'块，每天安装', en:' slabs; installed per day:', vi:' tấm, mỗi ngày lắp' },
+    instLine3:   { zh:'块，共计需要', en:' slabs; total installation time needed:', vi:' tấm, tổng cộng cần' },
+    instLine4:   { zh:'天，计算上非安装天数（天气/道路/人员等）的影响：ROUNDUP(安装天数*0.04)＝', en:' days. Adding non-installation days (weather / roads / manpower etc.): ROUNDUP(install days × 0.04) = ', vi:' ngày, tính thêm ngày không lắp đặt (thời tiết / đường xá / nhân sự...): ROUNDUP(số ngày lắp × 0,04) = ' },
+    instLine5:   { zh:'天，所以实际需要安装天数：', en:' days; therefore the actual installation period required:', vi:' ngày, vậy số ngày lắp đặt thực tế cần:' },
+    instLine6:   { zh:'天！', en:' days!', vi:' ngày!' },
     subtotal:    { zh:'小计（VND）', en:'Subtotal (VND)', vi:'Thành tiền (VND)' },
     subTotalRow: { zh:'小计', en:'Subtotal', vi:'Cộng lại' },
     op:          { zh:'操作', en:'Action', vi:'Thao tác' },
@@ -60042,7 +60048,13 @@ function submitAuth() {
       ccT('crewLine1') + ' ' + cin('size', 5) + ' ' + ccT('crewLine2') + ' ' + cin('driver', 1) + ' ' + ccT('crewLine3') + ' ' +
       cin('assist', 1) + ' ' + ccT('crewLine4') + ' ' + cin('indoor', 3) + ' ' + ccT('crewLine5') +
       ' <b id="cc_crew_total" style="color:#1565c0;">—</b> ' + ccT('crewLine6') + ' ' + cin('perDay', 200) + ' ' + ccT('crewLine7') + ' ' +
-      cin('groups', 2) + ' ' + ccT('crewLine8') + ' <b id="cc_crew_out" style="color:#d32f2f;">—</b> ' + ccT('crewLine9') + '</div>';
+      cin('groups', 2) + ' ' + ccT('crewLine8') + ' <b id="cc_crew_out" style="color:#d32f2f;">—</b> ' + ccT('crewLine9') + '</div>' +
+      '<div style="font-size:12px;color:#333;font-weight:600;margin:2px 0 8px;line-height:2.2;">📐 ' +
+      ccT('instLine1') + ' <b id="cc_inst_total" style="color:#1565c0;">—</b> ' + ccT('instLine2') +
+      ' <b id="cc_inst_daily" style="color:#1565c0;">—</b> ' + ccT('instLine3') +
+      ' <b id="cc_inst_days" style="color:#1565c0;">—</b> ' + ccT('instLine4') +
+      ' <b id="cc_inst_buf" style="color:#d32f2f;">—</b> ' + ccT('instLine5') +
+      ' <b id="cc_inst_real" style="color:#d32f2f;">—</b> ' + ccT('instLine6') + '</div>';
   }
   function ccLaborGroup(gkey, labelKey){
     var arr = CC_DATA.labor[gkey] || [];
@@ -60448,6 +60460,7 @@ function submitAuth() {
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
     set('cc_v_m2', area > 0 ? pVat / area : 0);
+    if(window.__ccCrewRefresh) window.__ccCrewRefresh(); // ★CC-INSTDAYS：规格/汇率等任何重算都刷新安装天数行
   }
   function ccScheduleSave(){
     if(!ccCanEdit()) return;
@@ -60523,8 +60536,14 @@ function submitAuth() {
         var c = (CC_DATA && CC_DATA.demand && CC_DATA.demand.crew) || {};
         var tot = (Number(c.driver) || 0) + (Number(c.assist) || 0) + (Number(c.indoor) || 0);
         var out = (Number(c.groups) || 0) * (Number(c.perDay) || 0);
-        var e1 = document.getElementById('cc_crew_total'); if(e1) e1.textContent = ccNum(tot);
-        var e2 = document.getElementById('cc_crew_out'); if(e2) e2.textContent = ccNum(out);
+        var put = function(id, v){ var e = document.getElementById(id); if(e) e.textContent = ccNum(v); };
+        put('cc_crew_total', tot); put('cc_crew_out', out);
+        // ★CC-INSTDAYS-20261104：总块数(规格表数量之和) → 安装天数 + ROUNDUP(天数×0.04) 非安装余量
+        var bl = 0; ((CC_DATA && CC_DATA.demand && CC_DATA.demand.specs) || []).forEach(function(sp){ bl += Number(sp && sp.qty) || 0; });
+        var days = out > 0 ? Math.ceil(bl / out) : 0;
+        var buf = Math.ceil(days * 0.04);
+        put('cc_inst_total', bl); put('cc_inst_daily', out); put('cc_inst_days', days);
+        put('cc_inst_buf', buf); put('cc_inst_real', days + buf);
       }
       window.__ccCrewRefresh = ccCrewRefresh;
       var box = document.getElementById('lib-cost-body');
