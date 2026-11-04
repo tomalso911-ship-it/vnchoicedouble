@@ -59876,6 +59876,10 @@ function submitAuth() {
     ccSumRSpec:  { zh:'规格{0}：', en:'Spec {0}:', vi:'Quy cách {0}:' },
     ccSumRDet:   { zh:'φ{0} · 单根尺寸 {1} mm · 共 {2} 根 · 小计长度 {3} m · 小计 {4} 吨', en:'φ{0} · bar length {1} mm · {2} bars · total length {3} m · subtotal {4} t', vi:'φ{0} · chiều dài thanh {1} mm · {2} thanh · tổng chiều dài {3} m · tiểu kế {4} tấn' },
     ccSumRTotal: { zh:'本规格合计：共 {0} 根 · 小计长度 {1} m · 小计 {2} 吨', en:'Spec subtotal: {0} bars · total length {1} m · subtotal {2} t', vi:'Tiểu kế quy cách: {0} thanh · tổng chiều dài {1} m · tiểu kế {2} tấn' },
+    ccDiaTitle:  { zh:'按钢筋规格汇总（便于成本核算）：', en:'Rebar by diameter (for costing):', vi:'Tổng hợp cốt thép theo đường kính (phục vụ tính giá):' },
+    ccDiaSpec:   { zh:'规格', en:'Diameter', vi:'Đường kính' },
+    ccDiaLen:    { zh:'总长(m)', en:'Total length (m)', vi:'Tổng chiều dài (m)' },
+    ccDiaTon:    { zh:'总重(吨)', en:'Total weight (t)', vi:'Tổng khối lượng (tấn)' },
     headcount:   { zh:'人数', en:'Headcount', vi:'Số người' },
     wageDaily:   { zh:'日薪(含保险及税金)', en:'Daily wage (incl. insurance & tax)', vi:'Lương ngày (gồm BHXH & thuế)' },
     endSalary:   { zh:'项目结束薪资(含保险及税金)', en:'Project-end salary (incl. insurance & tax)', vi:'Lương kết thúc dự án (gồm BHXH & thuế)' },
@@ -60432,7 +60436,7 @@ function submitAuth() {
     var blocks = 0, area = 0, usedDia = {};
     // ★CC-SPEC-SUMMARY-20261104：材料系数来自智能报告(标准板 1500×600×70=0.063m³ → 水泥24.4kg/黄砂22.6kg/石子68kg)
     var ccRW = (typeof SLATS_REBAR_WEIGHT !== 'undefined') ? SLATS_REBAR_WEIGHT : { '6':0.222, '8':0.395, '10':0.617, '12':0.888 };
-    var ccVol = 0, ccCem = 0, ccSand = 0, ccGrav = 0, ccRTon = 0, ccRLen = 0, ccSpecN = 0, ccRRows = [];
+    var ccVol = 0, ccCem = 0, ccSand = 0, ccGrav = 0, ccRTon = 0, ccRLen = 0, ccSpecN = 0, ccRRows = [], ccDia = {};
     (CC_DATA.demand.specs || []).forEach(function(sp, i){
       var l = Number(sp.len) || 0, w = Number(sp.wid) || 0, q = Number(sp.qty) || 0, h3 = Number(sp.hei) || 0;
       blocks += q;
@@ -60458,6 +60462,9 @@ function submitAuth() {
         if(!grp[d]) grp[d] = { dia: d, mm: [], bars: 0, len: 0, ton: 0 };
         if(mm > 0 && grp[d].mm.indexOf(mm) < 0) grp[d].mm.push(mm);
         grp[d].bars += bars; grp[d].len += lenM; grp[d].ton += ton;
+        // ★CC-DIATABLE-20261104：全场按 φ 直径再次累计总长/总重
+        if(!ccDia[d]) ccDia[d] = { len: 0, ton: 0 };
+        ccDia[d].len += lenM; ccDia[d].ton += ton;
       };
       var dL = String(sp.rL || ''), dW = String(sp.rW || '');
       var wL = ccRW[dL] || 0, wW = ccRW[dW] || 0;
@@ -60662,7 +60669,21 @@ function submitAuth() {
       });
       var s4 = ccTpl('ccSumRAll', [f2(ccRTon), ccNum(ccRLen)]) + ' ' +
         ccTpl('ccSumSteel', [f2(area > 0 ? ccRTon * 1000 / area : 0), f1(area > 0 ? ccVol / area * 1000 : 0)]);
-      sumEl.innerHTML = '<div>' + s1 + '</div><div>' + s2 + '</div><div>' + s3 + '</div><div>' + s4 + '</div>';
+      // ★CC-DIATABLE-20261104：末尾按 φ 直径小表（规格 | 总长(m) | 总重(吨)），只列实际用到的直径
+      var s5 = '';
+      var diaList = ['6', '8', '10', '12'].filter(function(d){ return ccDia[d] && (ccDia[d].len > 0 || ccDia[d].ton > 0); });
+      if(diaList.length){
+        s5 = '<div style="margin:6px 0 0;font-weight:600;">' + ccT('ccDiaTitle') + '</div>' +
+          '<table class="cc-tb" style="width:auto;min-width:340px;margin:4px 0 2px 16px;"><thead><tr>' +
+          '<th>' + ccT('ccDiaSpec') + '</th><th>' + ccT('ccDiaLen') + '</th><th>' + ccT('ccDiaTon') + '</th></tr></thead><tbody>';
+        diaList.forEach(function(d){
+          s5 += '<tr><td style="text-align:center;">φ' + d + '</td>' +
+            '<td style="text-align:right;">' + ccNum(ccDia[d].len) + '</td>' +
+            '<td style="text-align:right;">' + f2(ccDia[d].ton) + '</td></tr>';
+        });
+        s5 += '</tbody></table>';
+      }
+      sumEl.innerHTML = '<div>' + s1 + '</div><div>' + s2 + '</div><div>' + s3 + '</div><div>' + s4 + '</div>' + s5;
     }
     if(window.__ccCrewRefresh) window.__ccCrewRefresh(); // ★CC-INSTDAYS：规格/汇率等任何重算都刷新安装天数行
   }
