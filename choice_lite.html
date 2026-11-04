@@ -60214,22 +60214,28 @@ function submitAuth() {
       days.slice().sort(function(a, b){ return b - a; }).forEach(function(d){ if(L[0] <= L[1]) L[0] += d; else L[1] += d; });
       return Math.max(L[0], L[1]);
     }
-    // ★CC-FX-20261104：投资三币显示 ￥(蓝)/$(红)/đ(黄)，汇率与全 app 同源(/api/fx-rates → eq_fx_server_v1)
+    // ★CC-FX2-20261104：投资三币显示 ￥(蓝)/$(红)/đ(黄) — 金额(CNY)×cny_vnd=đ，đ÷usd_vnd=$；每次刷新拉最新汇率
     function ccMoneyHtml(wan){
       var rmb = 0, usd = 0;
       try { var o = JSON.parse(localStorage.getItem('eq_fx_server_v1') || '{}'); if(o){ rmb = +o.RMB || 0; usd = +o.USD || 0; } } catch(e){}
       var cny = wan * 10000;
+      var vnd = rmb > 0 ? cny * rmb : 0;                       // 1 CNY = rmb VND
+      var usdAmt = (vnd > 0 && usd > 0) ? vnd / usd : 0;       // 1 USD = usd VND
       var s = '<span style="color:#1a56b0;">￥' + ccNum(cny) + '</span>';
-      if(usd > 0) s += ' / <span style="color:#d32f2f;">$' + ccNum(Math.round(cny / usd)) + '</span>';
-      if(rmb > 0) s += ' / <span style="color:#e6a700;">đ' + ccNum(Math.round(cny / rmb / 1000) * 1000) + '</span>';
-      if(rmb <= 0 || usd <= 0 && !window.__CC_FX_FETCHED){
+      if(usdAmt > 0) s += ' / <span style="color:#d32f2f;">$' + ccNum(Math.round(usdAmt)) + '</span>';
+      if(vnd > 0) s += ' / <span style="color:#e6a700;">đ' + ccNum(Math.round(vnd / 1000) * 1000) + '</span>';
+      if(!window.__CC_FX_FETCHED){
         window.__CC_FX_FETCHED = true;
         try { fetch('/api/fx-rates').then(function(r){ return r.json(); }).then(function(j){
           try {
             if(!j || !j.ok || !j.series) return;
             var last = function(arr){ if(!arr || !arr.length) return 0; for(var i = arr.length - 1; i >= 0; i--){ var v = parseFloat(String(arr[i]).replace(/[^\d.\-]/g, '')); if(v > 0) return v; } return 0; };
             var c = last(j.series.cny_vnd), u = last(j.series.usd_vnd);
-            if(c > 0 && u > 0){ try { localStorage.setItem('eq_fx_server_v1', JSON.stringify({ RMB: c, USD: u })); } catch(e){} ccRecalc(); }
+            if(c > 0 && u > 0){
+              var old = ''; try { old = localStorage.getItem('eq_fx_server_v1') || ''; } catch(e){}
+              var nw = JSON.stringify({ RMB: c, USD: u });
+              if(old !== nw){ try { localStorage.setItem('eq_fx_server_v1', nw); } catch(e){} ccRecalc(); }
+            }
           } catch(e){}
         }).catch(function(){}); } catch(e){}
       }
