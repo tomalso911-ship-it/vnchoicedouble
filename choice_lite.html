@@ -59746,6 +59746,7 @@ function submitAuth() {
     barsW:       { zh:'条/宽度方向', en:'Bars / width dir.', vi:'Thanh / chiều rộng' },
     rebarW:      { zh:'钢筋尺寸/宽度方向', en:'Rebar size / width dir.', vi:'Cỡ thép / chiều rộng' },
     addRow2:     { zh:'增加行', en:'Add row', vi:'Thêm dòng' },
+    copyRow:     { zh:'复制', en:'Copy', vi:'Sao chép' },
     totalBlocks: { zh:'总块数', en:'Total pcs', vi:'Tổng số tấm' },
     blocks:      { zh:'数量（块）', en:'Quantity (pcs)', vi:'Số lượng (tấm)' },
     areaBlk:     { zh:'单块面积（㎡）', en:'Area per piece (㎡)', vi:'Diện tích mỗi tấm (㎡)' },
@@ -59890,7 +59891,7 @@ function submitAuth() {
       '.cc-sec{margin:18px 0 8px;font-weight:700;font-size:15px;color:#1a3c6e;border-left:4px solid #d32f2f;padding-left:8px;}',
       '.cc-sub{margin:10px 0 4px;font-weight:600;font-size:13px;color:#444;}',
       '.cc-tb{width:100%;border-collapse:collapse;font-size:13px;}',
-      '.cc-tb th{background:#f2f4f7;border:1px solid #d9dee5;padding:5px 6px;font-weight:600;white-space:nowrap;}',
+      '.cc-tb th{background:#ffff00;border:1px solid #d9b900;padding:5px 6px;font-weight:600;white-space:nowrap;}',
       '.cc-tb td{border:1px solid #d9dee5;padding:3px 4px;}',
       '.cc-in{width:100%;box-sizing:border-box;border:1px solid #c8ced6;border-radius:4px;padding:3px 6px;font-size:13px;text-align:right;}',
       'input.cc-tx{text-align:left;}',
@@ -59994,7 +59995,9 @@ function submitAuth() {
         ccSpecTd('qty', sp, i) + ccSpecTd('layers', sp, i) +
         ccSpecTd('nl', sp, i) + ccSpecTd('dl', sp, i) +
         ccSpecTd('nw', sp, i) + ccSpecTd('dw', sp, i) +
-        '<td style="text-align:center;"><button class="cc-del" data-act="delspec" data-i="' + i + '" title="✕">✕</button></td>' +
+        '<td style="text-align:center;white-space:nowrap;">' +
+        '<button class="cc-del" data-act="copyspec" data-i="' + i + '" title="' + ccT('copyRow') + '" style="color:#1a3c6e;font-size:12px;">' + ccT('copyRow') + '</button>' +
+        '<button class="cc-del" data-act="delspec" data-i="' + i + '" title="✕">✕</button></td>' +
         '</tr>';
     });
     h += '</tbody></table>';
@@ -60112,7 +60115,7 @@ function submitAuth() {
           })
           .catch(function(){ var s3 = document.getElementById('cc_savest'); if(s3){ s3.textContent = 'save failed'; s3.style.color = '#d32f2f'; } });
       }catch(e){}
-    }, 800);
+    }, 300);
   }
   function ccBind(){
     var host = document.getElementById('lib-cost-body'); if(!host) return;
@@ -60148,6 +60151,12 @@ function submitAuth() {
       } else if(act === 'addspec'){
         // ★CC-SPEC-20261104：需求信息规格行 增加行/删除
         CC_DATA.demand.specs.push(ccSpecDef());
+        lib_renderCostBody(); ccScheduleSave();
+      } else if(act === 'copyspec'){
+        // ★CC-SPEC-20261104：复制该规格行并插到下一行
+        var sps2 = CC_DATA.demand.specs;
+        var si = Number(el.getAttribute('data-i'));
+        if(sps2[si]){ sps2.splice(si + 1, 0, JSON.parse(JSON.stringify(sps2[si]))); }
         lib_renderCostBody(); ccScheduleSave();
       } else if(act === 'delspec'){
         var sps = CC_DATA.demand.specs;
