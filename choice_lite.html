@@ -59858,6 +59858,15 @@ function submitAuth() {
     wageDaily:   { zh:'日薪(含保险及税金)', en:'Daily wage (incl. insurance & tax)', vi:'Lương ngày (gồm BHXH & thuế)' },
     endSalary:   { zh:'项目结束薪资(含保险及税金)', en:'Project-end salary (incl. insurance & tax)', vi:'Lương kết thúc dự án (gồm BHXH & thuế)' },
     workDays:    { zh:'项目天数', en:'Project days', vi:'Số ngày dự án' },
+    crewLine1:   { zh:'一个小组，需要', en:'One crew requires', vi:'Một tổ cần' },
+    crewLine2:   { zh:'人，其中，司机', en:' people, including drivers', vi:' người, trong đó tài xế' },
+    crewLine3:   { zh:'人，跟车员', en:' people, vehicle assistants', vi:' người, phụ xe' },
+    crewLine4:   { zh:'人，室内安装工人', en:' people, indoor installers', vi:' người, công nhân lắp đặt trong nhà' },
+    crewLine5:   { zh:'人，总计', en:' people, total', vi:' người, tổng cộng' },
+    crewLine6:   { zh:'人；每个小组每天可以安装', en:' people. Each crew can install', vi:' người; mỗi tổ mỗi ngày có thể lắp' },
+    crewLine7:   { zh:'块漏缝地板；需要', en:' slatted floor panels per day; crews needed:', vi:' tấm sàn khe hẹp mỗi ngày; cần' },
+    crewLine8:   { zh:'小组；每天可以安装', en:' crews; daily installation capacity:', vi:' tổ; mỗi ngày có thể lắp' },
+    crewLine9:   { zh:'块水泥板！', en:' concrete slabs per day!', vi:' tấm bê tông mỗi ngày!' },
     subtotal:    { zh:'小计（VND）', en:'Subtotal (VND)', vi:'Thành tiền (VND)' },
     subTotalRow: { zh:'小计', en:'Subtotal', vi:'Cộng lại' },
     op:          { zh:'操作', en:'Action', vi:'Thao tác' },
@@ -59884,7 +59893,7 @@ function submitAuth() {
   }
   function ccDef(){
     return {
-      demand:{ months:1, workDays:0, specs:[{ len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0 }] },
+      demand:{ months:1, workDays:0, crew:{ size:5, driver:1, assist:1, indoor:3, perDay:200, groups:2 }, specs:[{ len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0 }] },
       mach:{ mech:[{n:'',qty:1,price:0}], veh:[{n:'',qty:1,price:0}], tools:[{n:'',qty:1,price:0}] },
       agg:{ sand:{qty:0,price:0}, cement:{qty:0,price:0}, stone:{qty:0,price:0},
             r6:{qty:0,price:0}, r8:{qty:0,price:0}, r10:{qty:0,price:0}, r12:{qty:0,price:0} },
@@ -60180,6 +60189,16 @@ function submitAuth() {
     h += '<div class="cc-sec">' + ccT('dir3') + '</div>' +
       '<div style="font-size:12px;color:#555;margin:0 0 6px;">' + ccT('workDays') + '：<input class="cc-in" id="cc_work_days" value="' + (Number(CC_DATA.demand.workDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</div>' +
       ccLaborGroup('mgmt', 'd31') + ccLaborGroup('work', 'd32') + ccLaborGroup('inst', 'd33') +
+    // ★CC-CREW-20261104：3.3下方安装小组配置（人数/构成/日产能，全部可改）
+    (function(){
+      var cr = (CC_DATA.demand.crew || {}); var gv = function(k, d){ return (Number(cr[k]) !== undefined && !isNaN(Number(cr[k]))) ? Number(cr[k]) : d; };
+      var cin = function(k, d){ return '<input class="cc-in cc-crew" data-ck="' + k + '" value="' + gv(k, d) + '" inputmode="numeric" autocomplete="off" style="width:50px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;">'; };
+      return '<div style="font-size:12px;color:#333;margin:4px 0 8px;line-height:2.2;">' +
+        ccT('crewLine1') + ' ' + cin('size', 5) + ' ' + ccT('crewLine2') + ' ' + cin('driver', 1) + ' ' + ccT('crewLine3') + ' ' +
+        cin('assist', 1) + ' ' + ccT('crewLine4') + ' ' + cin('indoor', 3) + ' ' + ccT('crewLine5') +
+        ' <b id="cc_crew_total" style="color:#1565c0;">—</b> ' + ccT('crewLine6') + ' ' + cin('perDay', 200) + ' ' + ccT('crewLine7') + ' ' +
+        cin('groups', 2) + ' ' + ccT('crewLine8') + ' <b id="cc_crew_out" style="color:#d32f2f;">—</b> ' + ccT('crewLine9') + '</div>';
+    })() +
       '<div class="cc-sub">' + ccT('d34') + '</div><table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th>' +
       '<th style="width:170px;">' + ccT('amount') + '</th><th style="width:170px;">× ' + ccT('months') + '</th></tr></thead><tbody>' +
       ccOpexRow('power', 'opPower') + ccOpexRow('water', 'opWater') + ccOpexRow('cons', 'opCons') +
@@ -60495,6 +60514,28 @@ function submitAuth() {
       cpd.disabled = false;
       cpd.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
       cpd.addEventListener('input', function(){ ccCpdSet(this.value); });
+    })();
+    // ★CC-CREW-20261104：安装小组输入直绑 + 总计/日产能自动求和
+    (function(){
+      function ccCrewRefresh(){
+        var c = (CC_DATA && CC_DATA.demand && CC_DATA.demand.crew) || {};
+        var tot = (Number(c.driver) || 0) + (Number(c.assist) || 0) + (Number(c.indoor) || 0);
+        var out = (Number(c.groups) || 0) * (Number(c.perDay) || 0);
+        var e1 = document.getElementById('cc_crew_total'); if(e1) e1.textContent = ccNum(tot);
+        var e2 = document.getElementById('cc_crew_out'); if(e2) e2.textContent = ccNum(out);
+      }
+      window.__ccCrewRefresh = ccCrewRefresh;
+      var box = document.getElementById('lib-cost-body');
+      if(box) box.querySelectorAll('.cc-crew').forEach(function(inp){
+        inp.disabled = false;
+        inp.addEventListener('input', function(){
+          if(!CC_DATA) return;
+          if(!CC_DATA.demand.crew) CC_DATA.demand.crew = { size:5, driver:1, assist:1, indoor:3, perDay:200, groups:2 };
+          CC_DATA.demand.crew[inp.getAttribute('data-ck')] = parseFloat(String(inp.value).replace(/[^0-9.]/g, '')) || 0;
+          ccCrewRefresh(); ccScheduleSave();
+        });
+      });
+      ccCrewRefresh();
     })();
     // ★CC-PICK-20261104：最终选择下拉 — 保存 demand.moldPick 并切换卡片淡粉背景
     (function(){
