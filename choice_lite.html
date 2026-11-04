@@ -59895,7 +59895,7 @@ function submitAuth() {
     priceVat:    { zh:'含税卖价', en:'Price incl. VAT', vi:'Giá gồm VAT' },
     perM2:       { zh:'折合每㎡单价（含税）', en:'Price per ㎡ (incl. VAT)', vi:'Đơn giá mỗi ㎡ (gồm VAT)' },
     machNote:    { zh:'注：机械类为一次性投入，全额计入本单总成本。', en:'Note: machinery is a one-time investment, fully counted in total cost.', vi:'Lưu ý: máy móc là đầu tư một lần, tính toàn bộ vào tổng chi phí.' },
-    laborNote:   { zh:'注：人工按「项目天数」、运营费用按「生产周期（月）」自动乘算。', en:'Note: labor is multiplied by project days; opex by the production period (months).', vi:'Lưu ý: nhân công nhân theo số ngày dự án; vận hành nhân theo số tháng sản xuất.' }
+    laborNote:   { zh:'注：人工按「项目天数」（生产/安装分别计算）、运营费用按 ROUNDUP((生产项目天数+30)/30, 1) 个月自动乘算。', en:'Note: labor uses project days (production / installation separately); opex uses ROUNDUP((production days + 30)/30, 1) months.', vi:'Lưu ý: nhân công tính theo số ngày dự án (sản xuất / lắp đặt riêng); vận hành nhân theo ROUNDUP((số ngày sản xuất + 30)/30, 1) tháng.' }
   };
   function ccT(k){
     var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh';
@@ -60325,7 +60325,7 @@ function submitAuth() {
       var l = (CC_DATA.labor[p[1]] || [])[Number(p[2])] || {};
       return (Number(l.qty) || 0) * (Number(l.sal) || 0) * w;
     }
-    if(p[0] === 'opex'){ return (Number(CC_DATA.opex[p[1]]) || 0) * (Number(CC_DATA.demand.months) || 0); }
+    if(p[0] === 'opex'){ return (Number(CC_DATA.opex[p[1]]) || 0) * ccOpexPeriod(); } // ★CC-OPEXPERIOD：费用/月 × 发生周期
     if(p[0] === 'ind'){ return Number(CC_DATA.ind[p[1]]) || 0; }
     return 0;
   }
@@ -60338,6 +60338,12 @@ function submitAuth() {
     var buf = Math.ceil(days * 0.04);
     return { total: total, daily: daily, days: days, buf: buf, real: days + buf };
   }
+  // ★CC-OPEXPERIOD-20261104：发生周期(月) = ROUNDUP((生产项目天数+30)/30, 1)，如 (176+30)/30=6.87 → 6.9
+  function ccOpexPeriod(){
+    var d = CC_DATA && CC_DATA.demand ? (Number(CC_DATA.demand.prodDays) || 0) : 0;
+    return Math.ceil((d + 30) / 3 - 1e-9) / 10;
+  }
+  function ccOpexPeriodTxt(){ return (Math.round(ccOpexPeriod() * 10) / 10).toFixed(1); }
   // ★CC-DAYS2-20261104：3.1/3.2 用生产日(176)，3.3 用安装日(238)
   function ccLaborDays(g){
     var d = CC_DATA && CC_DATA.demand ? CC_DATA.demand : {};
@@ -60380,7 +60386,7 @@ function submitAuth() {
       labor += (Number(l.qty) || 0) * (Number(l.sal) || 0) * ccLaborDays(g); // ★CC-DAYS2：各组按各自天数
     }); });
     Object.keys(CC_DATA.opex).forEach(function(k){ opex += Number(CC_DATA.opex[k]) || 0; });
-    opex *= months;
+    opex *= ccOpexPeriod(); // ★CC-OPEXPERIOD：运营费用 = Σ费用/月 × ROUNDUP((生产天数+30)/30,1)
     Object.keys(CC_DATA.ind).forEach(function(k){ ind += Number(CC_DATA.ind[k]) || 0; });
     // 行小计（VND 带货币符号）
     host.querySelectorAll('[data-sub]').forEach(function(el){ el.textContent = '₫ ' + ccNum(ccRowVal(el.getAttribute('data-sub'))); });
@@ -60397,7 +60403,7 @@ function submitAuth() {
     });
     host.querySelectorAll('[data-wd]').forEach(function(el){ el.textContent = ccNum(prodD); });   // 3.1/3.2 生产日
     host.querySelectorAll('[data-wdi]').forEach(function(el){ el.textContent = ccNum(instD); }); // 3.3 安装日
-    host.querySelectorAll('[data-mon]').forEach(function(el){ el.textContent = ccNum(months); }); // ★CC-OPEXHEAD：发生周期(月)
+    host.querySelectorAll('[data-mon]').forEach(function(el){ el.textContent = ccOpexPeriodTxt(); }); // ★CC-OPEXPERIOD：发生周期(月) 6.9
     // ★CC-SUBROW-20261104：表尾小计行（三币带货币符号）
     var machG = function(g){ var s = 0; (CC_DATA.mach[g] || []).forEach(function(it){ s += (Number(it.qty) || 0) * (Number(it.price) || 0); }); return s; };
     var laborG = function(g){ var s = 0; (CC_DATA.labor[g] || []).forEach(function(l){ s += (Number(l.qty) || 0) * (Number(l.sal) || 0); }); return s * ccLaborDays(g); };
