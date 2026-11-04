@@ -59730,6 +59730,13 @@ function submitAuth() {
       lib_renderProjectCards();
       return;
     }
+    // ★LIB-COST-BLANK-20261104（用户要求）：成本核算页清空文件库内容
+    //   （面包屑/上传按钮/上传文件夹/拖拽提示/搜索框/视图切换/文件列表/「共 N 个项目」状态条
+    //   全部不渲染），只留一个空挂载容器，后续由用户注入新内容。
+    if(LIB_TAB === 'cost'){
+      body.innerHTML = '<div id="lib-cost-body"></div>';
+      return;
+    }
     var html = lib_crumbHtml() + lib_toolbarHtml();
     html += '<div id="lib-files-wrap"></div>';
     html += '<div class="lib-statusbar">' +
