@@ -59869,6 +59869,10 @@ function submitAuth() {
     ccSumRRow:   { zh:'规格{0}：小计 {1} 吨、小计长度 {2} m', en:'Spec {0}: subtotal {1} t, total length {2} m', vi:'Quy cách {0}: tiểu kế {1} tấn, tổng chiều dài {2} m' },
     ccSumRAll:   { zh:'钢筋合计 {0} 吨、总长 {1} m；', en:'Rebar total {0} t / {1} m;', vi:'Tổng cốt thép {0} tấn, tổng chiều dài {1} m;' },
     ccSumSteel:  { zh:'全部水泥板每平米含钢量 {0} kg/m²，平均板厚 {1} mm。', en:'Steel content {0} kg/m², average slab thickness {1} mm.', vi:'Hàm lượng thép {0} kg/m², chiều dày tấm trung bình {1} mm.' },
+    ccSumWaste:  { zh:'（已含5%损耗）', en:' (incl. 5% waste/transport loss)', vi:' (đã gồm 5% hao hụt sản xuất & vận chuyển)' },
+    ccSumRSpec:  { zh:'规格{0}：', en:'Spec {0}:', vi:'Quy cách {0}:' },
+    ccSumRDet:   { zh:'φ{0} · 单根尺寸 {1} mm · 共 {2} 根 · 小计长度 {3} m · 小计 {4} 吨', en:'φ{0} · bar length {1} mm · {2} bars · total length {3} m · subtotal {4} t', vi:'φ{0} · chiều dài thanh {1} mm · {2} thanh · tổng chiều dài {3} m · tiểu kế {4} tấn' },
+    ccSumRTotal: { zh:'本规格合计：共 {0} 根 · 小计长度 {1} m · 小计 {2} 吨', en:'Spec subtotal: {0} bars · total length {1} m · subtotal {2} t', vi:'Tiểu kế quy cách: {0} thanh · tổng chiều dài {1} m · tiểu kế {2} tấn' },
     headcount:   { zh:'人数', en:'Headcount', vi:'Số người' },
     wageDaily:   { zh:'日薪(含保险及税金)', en:'Daily wage (incl. insurance & tax)', vi:'Lương ngày (gồm BHXH & thuế)' },
     endSalary:   { zh:'项目结束薪资(含保险及税金)', en:'Project-end salary (incl. insurance & tax)', vi:'Lương kết thúc dự án (gồm BHXH & thuế)' },
@@ -60439,19 +60443,32 @@ function submitAuth() {
       ccCem += std * 24.4 * q / 1000;
       ccSand += std * 22.6 * q / 1000;
       ccGrav += std * 68 * q / 1000;
-      // 钢筋：按成本核算表口径 (L−9)/1000、(W−9)/1000 米 × 根数 × 钢网层数 × 块数
-      var lyr = Number(sp.layers) || 0;
-      var lenL = (sp.dl / 1000) * (Number(sp.nl) || 0) * lyr * q;
-      var lenW = (sp.dw / 1000) * (Number(sp.nw) || 0) * lyr * q;
-      var tonL = lenL * (ccRW[String(sp.rL || '')] || 0) / 1000; // 未选直径不计重量（与智能报告一致）
-      var tonW = lenW * (ccRW[String(sp.rW || '')] || 0) / 1000;
-      var rTon = tonL + tonW, rLen = lenL + lenW;
+      // 钢筋：按成本核算表口径 (L−9)/1000、(W−9)/1000 米 × 根数 × 钢网层数 × 块数；按 φ 直径分组合并
+      var lyr = Number(sp.layers) || 0, grp = {};
+      var addR = function(d, mm, bars, lenM, ton){
+        if(!d) return; // 未选直径不计（与智能报告一致）
+        if(!grp[d]) grp[d] = { dia: d, mm: [], bars: 0, len: 0, ton: 0 };
+        if(mm > 0 && grp[d].mm.indexOf(mm) < 0) grp[d].mm.push(mm);
+        grp[d].bars += bars; grp[d].len += lenM; grp[d].ton += ton;
+      };
+      var dL = String(sp.rL || ''), dW = String(sp.rW || '');
+      var wL = ccRW[dL] || 0, wW = ccRW[dW] || 0;
+      var barsL = (Number(sp.nl) || 0) * lyr * q, barsW = (Number(sp.nw) || 0) * lyr * q;
+      var lenL = wL ? (sp.dl / 1000) * barsL : 0, lenW = wW ? (sp.dw / 1000) * barsW : 0;
+      var tonL = lenL * wL / 1000, tonW = lenW * wW / 1000;
+      addR(dL, sp.dl, barsL, lenL, tonL);
+      addR(dW, sp.dw, barsW, lenW, tonW);
+      var rTon = tonL + tonW, rLen = lenL + lenW, rBars = (wL ? barsL : 0) + (wW ? barsW : 0);
       ccRTon += rTon; ccRLen += rLen;
       if(l > 0 && w > 0 && q > 0){
         ccSpecN++;
-        ccRRows.push({ dim: ccNum(l) + '×' + ccNum(w) + '×' + ccNum(h3), ton: rTon, len: rLen });
+        var gs = Object.keys(grp).map(function(k){ return grp[k]; });
+        if(!gs.length) gs = [{ dia: '—', mm: [], bars: 0, len: 0, ton: 0 }];
+        ccRRows.push({ dim: ccNum(l) + '×' + ccNum(w) + '×' + ccNum(h3), groups: gs, ton: rTon, len: rLen, bars: rBars });
       }
     });
+    // ★CC-WASTE-20261104：生产浪费 + 运输损失 → 水泥/黄砂/石子统一上浮 5%（吨与方同步）
+    ccCem *= 1.05; ccSand *= 1.05; ccGrav *= 1.05;
     // ★CC-AGG-HIDE-20261104：骨料表 φ6/φ8/φ10/φ12 行按上方规格表实际选用的直径自动隐藏
     host.querySelectorAll('tr[data-aggd]').forEach(function(tr){
       tr.style.display = usedDia[tr.getAttribute('data-aggd')] ? '' : 'none';
@@ -60624,9 +60641,17 @@ function submitAuth() {
       var f2 = function(v){ return (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
       var f1 = function(v){ return (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); };
       var s1 = ccTpl('ccSumSpec', [ccSpecN, ccNum(blocks), ccNum(area), f2(ccVol)]);
-      var s2 = ccTpl('ccSumMat', [f2(ccCem), f2(ccSand), f1(ccSand / 1.45), f2(ccGrav), f1(ccGrav / 1.5)]);
+      var s2 = ccTpl('ccSumMat', [f2(ccCem), f2(ccSand), f1(ccSand / 1.45), f2(ccGrav), f1(ccGrav / 1.5)]) + ccT('ccSumWaste');
       var s3 = '<b>' + ccT('ccSumRebar') + '</b>';
-      ccRRows.forEach(function(r){ s3 += '<div style="padding-left:16px;">' + ccTpl('ccSumRRow', [r.dim, f2(r.ton), ccNum(r.len)]) + '</div>'; });
+      ccRRows.forEach(function(r){
+        s3 += '<div style="padding-left:16px;font-weight:600;">' + ccTpl('ccSumRSpec', [r.dim]) + '</div>';
+        r.groups.forEach(function(g){
+          s3 += '<div style="padding-left:32px;">' + ccTpl('ccSumRDet', [
+            g.dia, g.mm.length ? g.mm.map(ccNum).join(' / ') : '—', ccNum(g.bars), ccNum(g.len), f2(g.ton)
+          ]) + '</div>';
+        });
+        if(r.groups.length > 1) s3 += '<div style="padding-left:32px;">' + ccTpl('ccSumRTotal', [ccNum(r.bars), ccNum(r.len), f2(r.ton)]) + '</div>';
+      });
       var s4 = ccTpl('ccSumRAll', [f2(ccRTon), ccNum(ccRLen)]) + ' ' +
         ccTpl('ccSumSteel', [f2(area > 0 ? ccRTon * 1000 / area : 0), f1(area > 0 ? ccVol / area * 1000 : 0)]);
       sumEl.innerHTML = '<div>' + s1 + '</div><div>' + s2 + '</div><div>' + s3 + '</div><div>' + s4 + '</div>';
