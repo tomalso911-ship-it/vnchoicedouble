@@ -59747,6 +59747,7 @@ function submitAuth() {
     rebarW:      { zh:'钢筋尺寸/宽度方向', en:'Rebar size / width dir.', vi:'Cỡ thép / chiều rộng' },
     addRow2:     { zh:'增加行', en:'Add row', vi:'Thêm dòng' },
     copyRow:     { zh:'复制', en:'Copy', vi:'Sao chép' },
+    totalAll:    { zh:'总计', en:'Total', vi:'Tổng cộng' },
     totalBlocks: { zh:'总块数', en:'Total pcs', vi:'Tổng số tấm' },
     blocks:      { zh:'数量（块）', en:'Quantity (pcs)', vi:'Số lượng (tấm)' },
     areaBlk:     { zh:'单块面积（㎡）', en:'Area per piece (㎡)', vi:'Diện tích mỗi tấm (㎡)' },
@@ -59905,7 +59906,9 @@ function submitAuth() {
       '.cc-sum tr.cc-big td{font-size:16px;color:#d32f2f;font-weight:800;border-top:2px solid #d32f2f;}',
       '.cc-note{font-size:12px;color:#888;margin-top:4px;}',
       '.cc-pct{width:70px !important;text-align:right;}',
-      '.cc-ro .cc-del,.cc-ro .cc-add{display:none !important;}'
+      '.cc-tb-spec tbody tr:nth-child(even) td{background:#eaf3fb;}',
+      '.cc-tb-spec .cc-in{background:transparent;}',
+      '.cc-tb tfoot td{font-weight:700;background:#f2f4f7;white-space:nowrap;}',
     ].join('');
     document.head.appendChild(s);
   }
@@ -59963,6 +59966,10 @@ function submitAuth() {
     return '<td>' + ccInNum('demand.specs', f, sp[f] || 0, i) + '</td>';
   }
   function ccSpecDef(){ return { len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0 }; }
+  function ccFmtIn(v){
+    var n = Number(String(v).replace(/[^0-9.\-]/g, '')) || 0;
+    try{ return n.toLocaleString('en-US', { maximumFractionDigits: 6 }); }catch(e){ return String(n); }
+  }
   function ccHtml(){
     ccStyle();
     var ro = ccCanEdit();
@@ -59976,12 +59983,11 @@ function submitAuth() {
     var specs = CC_DATA.demand.specs || [];
     h += '<div class="cc-sec">' + ccT('demand') + '</div>';
     h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0;">' +
-      '<span style="white-space:nowrap;">' + ccT('months') + '</span><span style="width:80px;">' + ccInNum('demand', 'months', months) + '</span>' +
       '<span style="flex:1;"></span>' +
       '<span style="white-space:nowrap;">' + ccT('totalBlocks') + '：<b id="cc_v_blocks">0</b></span>' +
       '<span style="white-space:nowrap;">' + ccT('totalArea') + '：<b id="cc_v_area">0</b> ㎡</span>' +
       '<button class="cc-add" data-act="addspec" style="margin:0;">' + ccT('addRow2') + '</button></div>';
-    h += '<table class="cc-tb"><thead><tr>' +
+    h += '<table class="cc-tb cc-tb-spec"><thead><tr>' +
       '<th colspan="3">' + ccT('specDim') + '</th>' +
       '<th rowspan="2" style="width:80px;">' + ccT('qty') + '</th>' +
       '<th colspan="5">' + ccT('rebarCfg') + '</th>' +
@@ -60000,9 +60006,10 @@ function submitAuth() {
         '<button class="cc-del" data-act="delspec" data-i="' + i + '" title="✕">✕</button></td>' +
         '</tr>';
     });
-    h += '</tbody></table>';
-
-    // #1 机械类
+    h += '</tbody><tfoot><tr>' +
+      '<td colspan="3" style="text-align:right;">' + ccT('totalAll') + '</td>' +
+      '<td style="text-align:right;" id="cc_v_blocks_ft">0</td>' +
+      '<td colspan="6"></td></tr></tfoot></table>';
     h += '<div class="cc-sec">' + ccT('dir1') + '</div>' + ccMachGroup('mech', 'd11') + ccMachGroup('veh', 'd12') + ccMachGroup('tools', 'd13') +
       '<div class="cc-note">' + ccT('machNote') + '</div>';
 
@@ -60092,6 +60099,7 @@ function submitAuth() {
     var pVat = pNoVat * (1 + vat / 100);
     var set = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = ccNum(v); };
     set('cc_v_blocks', blocks);
+    set('cc_v_blocks_ft', blocks);
     set('cc_v_area', area);
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
@@ -60135,6 +60143,13 @@ function submitAuth() {
         ccPathSet(path, v);
       } else { return; }
       ccRecalc(); ccScheduleSave();
+    };
+    // ★CC-FMT-20261104：数字输入失焦时补千位符（名称列与利润率/VAT 除外）
+    host.onfocusout = function(ev){
+      var el = ev.target;
+      if(!el || !el.classList || !el.classList.contains('cc-in')) return;
+      if(el.id === 'cc_margin' || el.id === 'cc_vat') return;
+      if(el.dataset && el.dataset.g && el.dataset.f && el.dataset.f !== 'n'){ el.value = ccFmtIn(el.value); }
     };
     host.onclick = function(ev){
       var el = ev.target.closest ? ev.target.closest('[data-act]') : null; if(!el) return;
