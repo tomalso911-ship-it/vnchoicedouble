@@ -59888,6 +59888,7 @@ function submitAuth() {
     aggTotal:    { zh:'#2 骨料合计', en:'#2 Raw materials total', vi:'#2 Tổng vật liệu' },
     laborTotal:  { zh:'#3 人工合计（含运营费用 × 周期月数）', en:'#3 Labor total (incl. opex × months)', vi:'#3 Tổng nhân công (gồm vận hành × số tháng)' },
     indTotal:    { zh:'#4 间接成本合计', en:'#4 Indirect total', vi:'#4 Tổng gián tiếp' },
+    mgmtFee:     { zh:'#5 管理费用', en:'#5 Management overhead', vi:'#5 Chi phí quản lý' },
     totalCost:   { zh:'总成本', en:'Total cost', vi:'Tổng chi phí' },
     margin:      { zh:'利润率', en:'Profit margin', vi:'Tỷ lệ lợi nhuận' },
     vat:         { zh:'增值税（VAT）', en:'VAT', vi:'Thuế GTGT (VAT)' },
@@ -59918,7 +59919,7 @@ function submitAuth() {
       },
       opex:{ power:0, water:0, cons:0, dorm:0, food:0, car:0 },
       ind:{ flight:0, hotel:0, meal:0, mkt:0 },
-      margin:0, vat:0
+      margin:0, vat:0, mgmtPct:0
     };
   }
   function ccMerge(saved){
@@ -59928,7 +59929,7 @@ function submitAuth() {
       ['demand','mach','agg','labor','opex','ind'].forEach(function(k){
         if(saved[k] && typeof saved[k] === 'object') base[k] = Object.assign({}, base[k], saved[k]);
       });
-      ['margin','vat'].forEach(function(k){ if(saved[k] !== undefined) base[k] = Number(saved[k]) || 0; });
+      ['margin','vat','mgmtPct'].forEach(function(k){ if(saved[k] !== undefined) base[k] = Number(saved[k]) || 0; }); // ★CC-MGMT：管理费百分比
       delete base.ind.office; // ★CC-INDHEAD-20261104：办公室员工管理费已下线，旧存档残留值不参与合计
       // ★CC-SPEC-20261104：需求信息 = 规格行列表；旧版(blocks/area)自动迁移成一行规格
       if(saved.demand){
@@ -60258,6 +60259,9 @@ function submitAuth() {
       '<tr><td class="cc-lbl">' + ccT('aggTotal') + '</td><td class="cc-val" id="cc_v_agg">0</td></tr>' +
       '<tr><td class="cc-lbl">' + ccT('laborTotal') + '</td><td class="cc-val" id="cc_v_labor">0</td></tr>' +
       '<tr><td class="cc-lbl">' + ccT('indTotal') + '</td><td class="cc-val" id="cc_v_ind">0</td></tr>' +
+      // ★CC-MGMT-20261104：#5 管理费用 — 输入数值自动显示 X.XX%，右侧 = (#1+#2+#3+#4)×(1+百分比)
+      '<tr><td class="cc-lbl">' + ccT('mgmtFee') + '：<input class="cc-in" id="cc_mgmt_pct" value="' + (Number(CC_DATA.mgmtPct) || 0).toFixed(2) + '%" inputmode="decimal" autocomplete="off" style="width:80px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"></td>' +
+      '<td class="cc-val" id="cc_v_mgmt">0</td></tr>' +
       '<tr class="cc-big"><td class="cc-lbl">' + ccT('totalCost') + '</td><td class="cc-val" id="cc_v_total">0</td></tr>' +
       '<tr><td class="cc-lbl">' + ccT('margin') + '：<input class="cc-in cc-pct" id="cc_margin" value="' + (Number(CC_DATA.margin) || 0) + '" inputmode="decimal"' + roAttr + '> %</td>' +
       '<td class="cc-val" id="cc_v_profit">0</td></tr>' +
@@ -60422,7 +60426,8 @@ function submitAuth() {
       else if(cur === 'usd') el.textContent = fxc.usd > 0 ? '$ ' + ccNum(v / fxc.usd) : '—';
       else el.textContent = '₫ ' + ccNum(v);
     });
-    var total = mach + agg + labor + opex + ind;
+    var mgmtPct = Number(CC_DATA.mgmtPct) || 0;
+    var total = (mach + agg + labor + opex + ind) * (1 + mgmtPct / 100); // ★CC-MGMT：#5 = 前四项×(1+管理费%)
     var margin = Number(CC_DATA.margin) || 0, vat = Number(CC_DATA.vat) || 0;
     var profit = total * margin / 100;
     var pNoVat = total + profit;
@@ -60514,6 +60519,7 @@ function submitAuth() {
       }
     }
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
+    set('cc_v_mgmt', total); // ★CC-MGMT：#5 右侧数值 = 含管理费的总成本
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
     set('cc_v_m2', area > 0 ? pVat / area : 0);
     if(window.__ccCrewRefresh) window.__ccCrewRefresh(); // ★CC-INSTDAYS：规格/汇率等任何重算都刷新安装天数行
@@ -60585,6 +60591,22 @@ function submitAuth() {
       cpd.disabled = false;
       cpd.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
       cpd.addEventListener('input', function(){ ccCpdSet(this.value); });
+    })();
+    // ★CC-MGMT-20261104：#5 管理费用百分比 — 输入数值，失焦显示 X.XX%，输入即重算
+    (function(){
+      var mp = document.getElementById('cc_mgmt_pct');
+      if(!mp) return;
+      mp.disabled = false;
+      mp.addEventListener('focus', function(){
+        this.value = String(Number(CC_DATA.mgmtPct) || 0);
+        try{ this.select(); }catch(e){}
+      });
+      mp.addEventListener('blur', function(){ this.value = (Number(CC_DATA.mgmtPct) || 0).toFixed(2) + '%'; });
+      mp.addEventListener('input', function(){
+        if(!CC_DATA) return;
+        CC_DATA.mgmtPct = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || 0;
+        ccRecalc(); ccScheduleSave();
+      });
     })();
     // ★CC-CREW-20261104：安装小组输入直绑 + 总计/日产能自动求和
     (function(){
