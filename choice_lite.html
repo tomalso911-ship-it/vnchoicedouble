@@ -59735,6 +59735,18 @@ function submitAuth() {
     saved:       { zh:'已自动保存', en:'Saved', vi:'Đã lưu' },
     saving:      { zh:'保存中…', en:'Saving…', vi:'Đang lưu…' },
     demand:      { zh:'水泥漏缝地板需求信息', en:'Cement slatted floor demand', vi:'Nhu cầu sàn bê tông rỗng' },
+    specDim:     { zh:'水泥漏粪地板尺寸（mm）', en:'Slats dimensions (mm)', vi:'Kích thước sàn (mm)' },
+    specLen:     { zh:'长', en:'L', vi:'Dài' },
+    specWid:     { zh:'宽', en:'W', vi:'Rộng' },
+    specHei:     { zh:'高', en:'H', vi:'Cao' },
+    rebarCfg:    { zh:'钢筋网片配置信息', en:'Rebar mesh configuration', vi:'Cấu hình lưới thép' },
+    layers:      { zh:'钢网层数', en:'Mesh layers', vi:'Số lớp lưới' },
+    barsL:       { zh:'条/长度方向', en:'Bars / length dir.', vi:'Thanh / chiều dài' },
+    rebarL:      { zh:'钢筋尺寸/长度方向', en:'Rebar size / length dir.', vi:'Cỡ thép / chiều dài' },
+    barsW:       { zh:'条/宽度方向', en:'Bars / width dir.', vi:'Thanh / chiều rộng' },
+    rebarW:      { zh:'钢筋尺寸/宽度方向', en:'Rebar size / width dir.', vi:'Cỡ thép / chiều rộng' },
+    addRow2:     { zh:'增加行', en:'Add row', vi:'Thêm dòng' },
+    totalBlocks: { zh:'总块数', en:'Total pcs', vi:'Tổng số tấm' },
     blocks:      { zh:'数量（块）', en:'Quantity (pcs)', vi:'Số lượng (tấm)' },
     areaBlk:     { zh:'单块面积（㎡）', en:'Area per piece (㎡)', vi:'Diện tích mỗi tấm (㎡)' },
     totalArea:   { zh:'总面积（㎡）', en:'Total area (㎡)', vi:'Tổng diện tích (㎡)' },
@@ -59812,7 +59824,7 @@ function submitAuth() {
   }
   function ccDef(){
     return {
-      demand:{ blocks:0, area:0, months:1 },
+      demand:{ months:1, specs:[{ len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0 }] },
       mach:{ mech:[{n:'',qty:1,price:0}], veh:[{n:'',qty:1,price:0}], tools:[{n:'',qty:1,price:0}] },
       agg:{ sand:{qty:0,price:0}, cement:{qty:0,price:0}, stone:{qty:0,price:0},
             r6:{qty:0,price:0}, r8:{qty:0,price:0}, r10:{qty:0,price:0}, r12:{qty:0,price:0} },
@@ -59836,6 +59848,21 @@ function submitAuth() {
         if(saved[k] && typeof saved[k] === 'object') base[k] = Object.assign({}, base[k], saved[k]);
       });
       ['margin','vat'].forEach(function(k){ if(saved[k] !== undefined) base[k] = Number(saved[k]) || 0; });
+      // ★CC-SPEC-20261104：需求信息 = 规格行列表；旧版(blocks/area)自动迁移成一行规格
+      if(saved.demand){
+        var d0 = saved.demand;
+        if(Array.isArray(d0.specs)){
+          base.demand.specs = d0.specs.map(function(s){
+            s = s || {};
+            return { len:Number(s.len)||0, wid:Number(s.wid)||0, hei:Number(s.hei)||0, qty:Number(s.qty)||0,
+                     layers:Number(s.layers)||0, nl:Number(s.nl)||0, dl:Number(s.dl)||0,
+                     nw:Number(s.nw)||0, dw:Number(s.dw)||0, larea:Number(s.larea)||0 };
+          });
+        } else if(d0.blocks !== undefined || d0.area !== undefined){
+          base.demand.specs = [{ len:0, wid:0, hei:0, qty:Number(d0.blocks)||0, layers:2, nl:0, dl:0, nw:0, dw:0, larea:Number(d0.area)||0 }];
+        }
+        delete base.demand.blocks; delete base.demand.area;
+      }
       if(saved.mach) ['mech','veh','tools'].forEach(function(g){ if(Array.isArray(saved.mach[g])) base.mach[g] = saved.mach[g]; });
       // 人工岗位按 k 合并：默认岗位列表始终完整（新增岗位自动补进旧存档），已有数值不丢
       if(saved.labor) ['mgmt','work','inst'].forEach(function(g){
@@ -59931,23 +59958,46 @@ function submitAuth() {
       '<td style="width:170px;">' + ccInNum('ind', f, CC_DATA.ind[f] || 0) + '</td>' +
       '<td class="cc-subcell" data-sub="ind.' + f + '">0</td></tr>';
   }
+  function ccSpecTd(f, sp, i){
+    return '<td>' + ccInNum('demand.specs', f, sp[f] || 0, i) + '</td>';
+  }
+  function ccSpecDef(){ return { len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0 }; }
   function ccHtml(){
     ccStyle();
     var ro = ccCanEdit();
     var months = Number(CC_DATA.demand.months) || 0;
-    var area = (Number(CC_DATA.demand.blocks) || 0) * (Number(CC_DATA.demand.area) || 0);
     var h = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
       '<div style="font-weight:800;font-size:16px;color:#d32f2f;">💰 ' + ccT('title') + '</div>' +
       '<span id="cc_savest" style="font-size:12px;color:#2e7d32;"></span>' +
       (ro ? '' : '<span style="font-size:12px;color:#e53935;">🔒 ' + ccT('readonlyTip') + '</span>') + '</div>';
 
-    // 需求信息
-    h += '<div class="cc-sec">' + ccT('demand') + '</div><table class="cc-tb"><tbody><tr>' +
-      '<td>' + ccT('blocks') + '</td><td style="width:110px;">' + ccInNum('demand', 'blocks', CC_DATA.demand.blocks) + '</td>' +
-      '<td>' + ccT('areaBlk') + '</td><td style="width:110px;">' + ccInNum('demand', 'area', CC_DATA.demand.area) + '</td>' +
-      '<td>' + ccT('months') + '</td><td style="width:90px;">' + ccInNum('demand', 'months', months) + '</td>' +
-      '<td style="white-space:nowrap;padding-left:12px;">' + ccT('totalArea') + '：<b id="cc_v_area">0</b> ㎡</td>' +
-      '</tr></tbody></table>';
+    // 需求信息（★CC-SPEC-20261104）：规格行表格（长宽高/数量 + 钢筋网片配置），表头右上方「增加行」
+    var specs = CC_DATA.demand.specs || [];
+    h += '<div class="cc-sec">' + ccT('demand') + '</div>';
+    h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0;">' +
+      '<span style="white-space:nowrap;">' + ccT('months') + '</span><span style="width:80px;">' + ccInNum('demand', 'months', months) + '</span>' +
+      '<span style="flex:1;"></span>' +
+      '<span style="white-space:nowrap;">' + ccT('totalBlocks') + '：<b id="cc_v_blocks">0</b></span>' +
+      '<span style="white-space:nowrap;">' + ccT('totalArea') + '：<b id="cc_v_area">0</b> ㎡</span>' +
+      '<button class="cc-add" data-act="addspec" style="margin:0;">' + ccT('addRow2') + '</button></div>';
+    h += '<table class="cc-tb"><thead><tr>' +
+      '<th colspan="3">' + ccT('specDim') + '</th>' +
+      '<th rowspan="2" style="width:80px;">' + ccT('qty') + '</th>' +
+      '<th colspan="5">' + ccT('rebarCfg') + '</th>' +
+      '<th rowspan="2" style="width:44px;">' + ccT('op') + '</th></tr>' +
+      '<tr><th style="width:90px;">' + ccT('specLen') + '</th><th style="width:90px;">' + ccT('specWid') + '</th><th style="width:90px;">' + ccT('specHei') + '</th>' +
+      '<th style="width:80px;">' + ccT('layers') + '</th><th style="width:100px;">' + ccT('barsL') + '</th><th style="width:120px;">' + ccT('rebarL') + '</th>' +
+      '<th style="width:100px;">' + ccT('barsW') + '</th><th style="width:120px;">' + ccT('rebarW') + '</th></tr></thead><tbody>';
+    specs.forEach(function(sp, i){
+      h += '<tr>' +
+        ccSpecTd('len', sp, i) + ccSpecTd('wid', sp, i) + ccSpecTd('hei', sp, i) +
+        ccSpecTd('qty', sp, i) + ccSpecTd('layers', sp, i) +
+        ccSpecTd('nl', sp, i) + ccSpecTd('dl', sp, i) +
+        ccSpecTd('nw', sp, i) + ccSpecTd('dw', sp, i) +
+        '<td style="text-align:center;"><button class="cc-del" data-act="delspec" data-i="' + i + '" title="✕">✕</button></td>' +
+        '</tr>';
+    });
+    h += '</tbody></table>';
 
     // #1 机械类
     h += '<div class="cc-sec">' + ccT('dir1') + '</div>' + ccMachGroup('mech', 'd11') + ccMachGroup('veh', 'd12') + ccMachGroup('tools', 'd13') +
@@ -60015,7 +60065,13 @@ function submitAuth() {
   function ccRecalc(){
     var host = document.getElementById('lib-cost-body'); if(!host || !CC_DATA) return;
     var months = Number(CC_DATA.demand.months) || 0;
-    var area = (Number(CC_DATA.demand.blocks) || 0) * (Number(CC_DATA.demand.area) || 0);
+    // ★CC-SPEC-20261104：总面积 = Σ(长×宽×数量)/1e6（旧迁移行无长宽时用旧单块面积×数量）
+    var blocks = 0, area = 0;
+    (CC_DATA.demand.specs || []).forEach(function(sp){
+      var l = Number(sp.len) || 0, w = Number(sp.wid) || 0, q = Number(sp.qty) || 0;
+      blocks += q;
+      area += (l > 0 && w > 0) ? (l * w * q / 1e6) : ((Number(sp.larea) || 0) * q);
+    });
     var mach = 0, agg = 0, labor = 0, opex = 0, ind = 0;
     ['mech', 'veh', 'tools'].forEach(function(g){ (CC_DATA.mach[g] || []).forEach(function(it){ mach += (Number(it.qty) || 0) * (Number(it.price) || 0); }); });
     Object.keys(CC_DATA.agg).forEach(function(k){ var a = CC_DATA.agg[k]; agg += (Number(a.qty) || 0) * (Number(a.price) || 0); });
@@ -60032,6 +60088,7 @@ function submitAuth() {
     var pNoVat = total + profit;
     var pVat = pNoVat * (1 + vat / 100);
     var set = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = ccNum(v); };
+    set('cc_v_blocks', blocks);
     set('cc_v_area', area);
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
@@ -60087,6 +60144,15 @@ function submitAuth() {
         var arr = CC_DATA.mach[g.slice(5)];
         arr.splice(Number(el.getAttribute('data-i')), 1);
         if(!arr.length) arr.push({ n:'', qty:1, price:0 });
+        lib_renderCostBody(); ccScheduleSave();
+      } else if(act === 'addspec'){
+        // ★CC-SPEC-20261104：需求信息规格行 增加行/删除
+        CC_DATA.demand.specs.push(ccSpecDef());
+        lib_renderCostBody(); ccScheduleSave();
+      } else if(act === 'delspec'){
+        var sps = CC_DATA.demand.specs;
+        sps.splice(Number(el.getAttribute('data-i')), 1);
+        if(!sps.length) sps.push(ccSpecDef());
         lib_renderCostBody(); ccScheduleSave();
       }
     };
