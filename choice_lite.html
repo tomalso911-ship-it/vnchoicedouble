@@ -59742,8 +59742,10 @@ function submitAuth() {
     rebarCfg:    { zh:'钢筋网片配置信息', en:'Rebar mesh configuration', vi:'Cấu hình lưới thép' },
     layers:      { zh:'钢网层数', en:'Mesh layers', vi:'Số lớp lưới' },
     barsL:       { zh:'条/长度方向', en:'Bars / length dir.', vi:'Thanh / chiều dài' },
+    rDiaL:       { zh:'长度方向钢筋尺寸', en:'Rebar Ø / length dir.', vi:'Cỡ thép / chiều dài' },
     rebarL:      { zh:'钢筋尺寸/长度方向', en:'Rebar size / length dir.', vi:'Cỡ thép / chiều dài' },
     barsW:       { zh:'条/宽度方向', en:'Bars / width dir.', vi:'Thanh / chiều rộng' },
+    rDiaW:       { zh:'宽度方向钢筋尺寸', en:'Rebar Ø / width dir.', vi:'Cỡ thép / chiều rộng' },
     rebarW:      { zh:'钢筋尺寸/宽度方向', en:'Rebar size / width dir.', vi:'Cỡ thép / chiều rộng' },
     addRow2:     { zh:'增加行', en:'Add row', vi:'Thêm dòng' },
     copyRow:     { zh:'复制', en:'Copy', vi:'Sao chép' },
@@ -59857,8 +59859,9 @@ function submitAuth() {
           base.demand.specs = d0.specs.map(function(s){
             s = s || {};
             return { len:Number(s.len)||0, wid:Number(s.wid)||0, hei:Number(s.hei)||0, qty:Number(s.qty)||0,
-                     layers:Number(s.layers)||0, nl:Number(s.nl)||0, dl:Number(s.dl)||0,
-                     nw:Number(s.nw)||0, dw:Number(s.dw)||0, larea:Number(s.larea)||0 };
+                     layers:Number(s.layers)||0, nl:Number(s.nl)||0, rL:(s.rL===undefined||s.rL===null)?'':String(s.rL),
+                     nw:Number(s.nw)||0, rW:(s.rW===undefined||s.rW===null)?'':String(s.rW),
+                     larea:Number(s.larea)||0 };
           });
         } else if(d0.blocks !== undefined || d0.area !== undefined){
           base.demand.specs = [{ len:0, wid:0, hei:0, qty:Number(d0.blocks)||0, layers:2, nl:0, dl:0, nw:0, dw:0, larea:Number(d0.area)||0 }];
@@ -59909,6 +59912,9 @@ function submitAuth() {
       '.cc-tb-spec tbody tr:nth-child(even) td{background:#eaf3fb;}',
       '.cc-tb-spec .cc-in{background:transparent;}',
       '.cc-tb tfoot td{font-weight:700;background:#f2f4f7;white-space:nowrap;}',
+      '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
+      '.cc-icn:hover{background:#f5f5f5;}',
+      '.cc-sel{text-align:center;}',
     ].join('');
     document.head.appendChild(s);
   }
@@ -59931,9 +59937,9 @@ function submitAuth() {
     h += '</tbody></table><button class="cc-add" data-act="add" data-g="mach.' + key + '">' + ccT('addRow') + '</button>';
     return h;
   }
-  function ccAggRow(gkey, labelKey){
+  function ccAggRow(gkey, labelKey, d){
     var it = CC_DATA.agg[gkey] || {qty:0, price:0};
-    return '<tr><td>' + ccT(labelKey) + '</td>' +
+    return '<tr' + (d ? ' data-aggd="' + d + '"' : '') + '><td>' + ccT(labelKey) + '</td>' +
       '<td style="width:110px;">' + ccInNum('agg.' + gkey, 'qty', it.qty) + '</td>' +
       '<td style="width:150px;">' + ccInNum('agg.' + gkey, 'price', it.price) + '</td>' +
       '<td class="cc-subcell" data-sub="agg.' + gkey + '">0</td></tr>';
@@ -59965,7 +59971,21 @@ function submitAuth() {
   function ccSpecTd(f, sp, i){
     return '<td>' + ccInNum('demand.specs', f, sp[f] || 0, i) + '</td>';
   }
-  function ccSpecDef(){ return { len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0 }; }
+  function ccSpecDef(){ return { len:0, wid:0, hei:0, qty:0, layers:2, nl:0, rL:'', dl:0, nw:0, rW:'', dw:0 }; }
+  function ccInSel(f, val, i){
+    var ro = ccCanEdit() ? '' : ' disabled';
+    var o = '<option value="">—</option>';
+    ['6','8','10','12'].forEach(function(d){ o += '<option value="' + d + '"' + (String(val) === d ? ' selected' : '') + '>φ' + d + '</option>'; });
+    return '<select class="cc-in cc-sel" data-g="demand.specs" data-f="' + f + '" data-i="' + i + '"' + ro + '>' + o + '</select>';
+  }
+  function ccIcnCopy(i){
+    return '<button class="cc-icn" data-act="copyspec" data-i="' + i + '" title="' + ccT('copyRow') + '">' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c2419a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15H4.5A2.5 2.5 0 0 1 2 12.5v-8A2.5 2.5 0 0 1 4.5 2h8A2.5 2.5 0 0 1 15 4.5V5"/></svg></button>';
+  }
+  function ccIcnDel(i){
+    return '<button class="cc-icn" data-act="delspec" data-i="' + i + '" title="✕">' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>';
+  }
   function ccFmtIn(v){
     var n = Number(String(v).replace(/[^0-9.\-]/g, '')) || 0;
     try{ return n.toLocaleString('en-US', { maximumFractionDigits: 6 }); }catch(e){ return String(n); }
@@ -59990,26 +60010,27 @@ function submitAuth() {
     h += '<table class="cc-tb cc-tb-spec"><thead><tr>' +
       '<th colspan="3">' + ccT('specDim') + '</th>' +
       '<th rowspan="2" style="width:80px;">' + ccT('qty') + '</th>' +
-      '<th colspan="5">' + ccT('rebarCfg') + '</th>' +
-      '<th rowspan="2" style="width:44px;">' + ccT('op') + '</th></tr>' +
+      '<th colspan="7">' + ccT('rebarCfg') + '</th>' +
+      '<th rowspan="2" style="width:64px;">' + ccT('op') + '</th></tr>' +
       '<tr><th style="width:90px;">' + ccT('specLen') + '</th><th style="width:90px;">' + ccT('specWid') + '</th><th style="width:90px;">' + ccT('specHei') + '</th>' +
-      '<th style="width:80px;">' + ccT('layers') + '</th><th style="width:100px;">' + ccT('barsL') + '</th><th style="width:120px;">' + ccT('rebarL') + '</th>' +
-      '<th style="width:100px;">' + ccT('barsW') + '</th><th style="width:120px;">' + ccT('rebarW') + '</th></tr></thead><tbody>';
+      '<th style="width:80px;">' + ccT('layers') + '</th>' +
+      '<th style="width:100px;">' + ccT('barsL') + '</th><th style="width:110px;">' + ccT('rDiaL') + '</th><th style="width:120px;">' + ccT('rebarL') + '</th>' +
+      '<th style="width:100px;">' + ccT('barsW') + '</th><th style="width:110px;">' + ccT('rDiaW') + '</th><th style="width:120px;">' + ccT('rebarW') + '</th></tr></thead><tbody>';
     specs.forEach(function(sp, i){
       h += '<tr>' +
         ccSpecTd('len', sp, i) + ccSpecTd('wid', sp, i) + ccSpecTd('hei', sp, i) +
         ccSpecTd('qty', sp, i) + ccSpecTd('layers', sp, i) +
-        ccSpecTd('nl', sp, i) + ccSpecTd('dl', sp, i) +
-        ccSpecTd('nw', sp, i) + ccSpecTd('dw', sp, i) +
-        '<td style="text-align:center;white-space:nowrap;">' +
-        '<button class="cc-del" data-act="copyspec" data-i="' + i + '" title="' + ccT('copyRow') + '" style="color:#1a3c6e;font-size:12px;">' + ccT('copyRow') + '</button>' +
-        '<button class="cc-del" data-act="delspec" data-i="' + i + '" title="✕">✕</button></td>' +
+        ccSpecTd('nl', sp, i) + ccInSel('rL', sp.rL, i) +
+        '<td class="cc-subcell" data-dlen="' + i + '">0</td>' +
+        ccSpecTd('nw', sp, i) + ccInSel('rW', sp.rW, i) +
+        '<td class="cc-subcell" data-dwid="' + i + '">0</td>' +
+        '<td style="text-align:center;white-space:nowrap;">' + ccIcnCopy(i) + ccIcnDel(i) + '</td>' +
         '</tr>';
     });
     h += '</tbody><tfoot><tr>' +
       '<td colspan="3" style="text-align:right;">' + ccT('totalAll') + '</td>' +
       '<td style="text-align:right;" id="cc_v_blocks_ft">0</td>' +
-      '<td colspan="6"></td></tr></tfoot></table>';
+      '<td colspan="8"></td></tr></tfoot></table>';
     h += '<div class="cc-sec">' + ccT('dir1') + '</div>' + ccMachGroup('mech', 'd11') + ccMachGroup('veh', 'd12') + ccMachGroup('tools', 'd13') +
       '<div class="cc-note">' + ccT('machNote') + '</div>';
 
@@ -60017,7 +60038,7 @@ function submitAuth() {
     h += '<div class="cc-sec">' + ccT('dir2') + '</div><table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th>' +
       '<th style="width:110px;">' + ccT('qty') + '</th><th style="width:150px;">' + ccT('unitPrice') + '</th><th style="width:150px;">' + ccT('subtotal') + '</th></tr></thead><tbody>' +
       ccAggRow('sand', 'sand') + ccAggRow('cement', 'cement') + ccAggRow('stone', 'stone') +
-      ccAggRow('r6', 'r6') + ccAggRow('r8', 'r8') + ccAggRow('r10', 'r10') + ccAggRow('r12', 'r12') +
+      ccAggRow('r6', 'r6', '6') + ccAggRow('r8', 'r8', '8') + ccAggRow('r10', 'r10', '10') + ccAggRow('r12', 'r12', '12') +
       '</tbody></table>';
 
     // #3 人工
@@ -60076,11 +60097,22 @@ function submitAuth() {
     var host = document.getElementById('lib-cost-body'); if(!host || !CC_DATA) return;
     var months = Number(CC_DATA.demand.months) || 0;
     // ★CC-SPEC-20261104：总面积 = Σ(长×宽×数量)/1e6（旧迁移行无长宽时用旧单块面积×数量）
-    var blocks = 0, area = 0;
-    (CC_DATA.demand.specs || []).forEach(function(sp){
+    var blocks = 0, area = 0, usedDia = {};
+    (CC_DATA.demand.specs || []).forEach(function(sp, i){
       var l = Number(sp.len) || 0, w = Number(sp.wid) || 0, q = Number(sp.qty) || 0;
       blocks += q;
       area += (l > 0 && w > 0) ? (l * w * q / 1e6) : ((Number(sp.larea) || 0) * q);
+      // ★CC-REBAR-AUTO-20261104：钢筋尺寸(长度方向)=长−9，(宽度方向)=宽−9（mm），自动计算只读
+      sp.dl = l > 0 ? l - 9 : 0;
+      sp.dw = w > 0 ? w - 9 : 0;
+      var eD = host.querySelector('[data-dlen="' + i + '"]'); if(eD) eD.textContent = ccNum(sp.dl);
+      var eW = host.querySelector('[data-dwid="' + i + '"]'); if(eW) eW.textContent = ccNum(sp.dw);
+      if(sp.rL) usedDia[String(sp.rL)] = 1;
+      if(sp.rW) usedDia[String(sp.rW)] = 1;
+    });
+    // ★CC-AGG-HIDE-20261104：骨料表 φ6/φ8/φ10/φ12 行按上方规格表实际选用的直径自动隐藏
+    host.querySelectorAll('tr[data-aggd]').forEach(function(tr){
+      tr.style.display = usedDia[tr.getAttribute('data-aggd')] ? '' : 'none';
     });
     var mach = 0, agg = 0, labor = 0, opex = 0, ind = 0;
     ['mech', 'veh', 'tools'].forEach(function(g){ (CC_DATA.mach[g] || []).forEach(function(it){ mach += (Number(it.qty) || 0) * (Number(it.price) || 0); }); });
@@ -60134,7 +60166,7 @@ function submitAuth() {
       else if(el.id === 'cc_vat'){ CC_DATA.vat = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
       else if(el.dataset.g){
         var v;
-        if(f === 'n'){ v = el.value; }
+        if(f === 'n' || f === 'rL' || f === 'rW'){ v = el.value; }
         else { v = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
         // ★数组行的字段路径是 g.i.f（如 mach.mech.0.qty），标量组是 g.f（如 agg.sand.qty）
         var path = el.dataset.g + '.';
@@ -60144,6 +60176,7 @@ function submitAuth() {
       } else { return; }
       ccRecalc(); ccScheduleSave();
     };
+    host.onchange = host.oninput; // select 下拉兼容
     // ★CC-FMT-20261104：数字输入失焦时补千位符（名称列与利润率/VAT 除外）
     host.onfocusout = function(ev){
       var el = ev.target;
