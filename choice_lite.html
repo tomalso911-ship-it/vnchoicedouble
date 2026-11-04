@@ -59766,6 +59766,7 @@ function submitAuth() {
     forklift:    { zh:'叉车工', en:'Forklift driver', vi:'Tài xế xe nâng' },
     loader:      { zh:'铲车工', en:'Loader driver', vi:'Tài xế máy ủi' },
     machinist:   { zh:'设备维修工', en:'Equipment mechanic', vi:'Thợ sửa thiết bị' },
+    stripGrind:  { zh:'水泥板起板&打磨工', en:'Slats demolding & grinding worker', vi:'Công nhân lấy tấm & mài nhám' },
     tractor:     { zh:'拖拉机司机', en:'Tractor driver', vi:'Tài xế máy kéo' },
     tractorAs:   { zh:'拖拉机随车员', en:'Tractor assistant', vi:'Phụ xe máy kéo' },
     installer:   { zh:'安装工人', en:'Installation worker', vi:'Công nhân lắp đặt' },
@@ -59818,7 +59819,8 @@ function submitAuth() {
       labor:{
         mgmt:[ {k:'foreman',qty:0,sal:0}, {k:'cook',qty:0,sal:0} ],
         work:[ {k:'welder',qty:0,sal:0}, {k:'welderAs',qty:0,sal:0}, {k:'presser',qty:0,sal:0}, {k:'repairer',qty:0,sal:0},
-               {k:'mixerOp',qty:0,sal:0}, {k:'forklift',qty:0,sal:0}, {k:'loader',qty:0,sal:0}, {k:'machinist',qty:0,sal:0} ],
+               {k:'mixerOp',qty:0,sal:0}, {k:'forklift',qty:0,sal:0}, {k:'loader',qty:0,sal:0}, {k:'machinist',qty:0,sal:0},
+               {k:'stripGrind',qty:0,sal:0} ],
         inst:[ {k:'tractor',qty:0,sal:0}, {k:'tractorAs',qty:0,sal:0}, {k:'installer',qty:0,sal:0} ]
       },
       opex:{ power:0, water:0, cons:0, dorm:0, food:0 },
@@ -59835,7 +59837,12 @@ function submitAuth() {
       });
       ['margin','vat'].forEach(function(k){ if(saved[k] !== undefined) base[k] = Number(saved[k]) || 0; });
       if(saved.mach) ['mech','veh','tools'].forEach(function(g){ if(Array.isArray(saved.mach[g])) base.mach[g] = saved.mach[g]; });
-      if(saved.labor) ['mgmt','work','inst'].forEach(function(g){ if(Array.isArray(saved.labor[g])) base.labor[g] = saved.labor[g]; });
+      // 人工岗位按 k 合并：默认岗位列表始终完整（新增岗位自动补进旧存档），已有数值不丢
+      if(saved.labor) ['mgmt','work','inst'].forEach(function(g){
+        var s = Array.isArray(saved.labor[g]) ? saved.labor[g] : [], map = {};
+        s.forEach(function(it){ if(it && it.k) map[it.k] = it; });
+        base.labor[g] = base.labor[g].map(function(d){ return map[d.k] ? Object.assign({}, d, map[d.k]) : d; });
+      });
     }catch(e){}
     return base;
   }
