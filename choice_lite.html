@@ -59724,17 +59724,402 @@ function submitAuth() {
     return html;
   }
 
+  /* ==================== ★LIB-COST-CALC-20261104 成本核算报价器 ====================
+     数据存服务端 prod_kv（键 cost_calc_v1）；权限沿用「资料-成本核算」：
+     查看=只读，编辑=可修改（自动保存），三人组/超管恒可编辑。 */
+  var CC_KEY = 'cost_calc_v1';
+  var CC_DATA = null, CC_LOADED = false, CC_DIRTY = false, CC_SAVE_T = null;
+  var CC_LANG = {
+    title:       { zh:'成本核算', en:'Cost Accounting', vi:'Kế toán chi phí' },
+    readonlyTip: { zh:'只读模式（需「资料-成本核算=编辑」权限才能修改）', en:'Read-only (needs Cost Accounting = edit permission)', vi:'Chỉ đọc (cần quyền "Kế toán chi phí = Sửa")' },
+    saved:       { zh:'已自动保存', en:'Saved', vi:'Đã lưu' },
+    saving:      { zh:'保存中…', en:'Saving…', vi:'Đang lưu…' },
+    demand:      { zh:'第一项 · 录入：水泥漏缝地板需求信息', en:'1. Cement slatted floor demand', vi:'1. Nhu cầu sàn bê tông rỗng' },
+    blocks:      { zh:'数量（块）', en:'Quantity (pcs)', vi:'Số lượng (tấm)' },
+    areaBlk:     { zh:'单块面积（㎡）', en:'Area per piece (㎡)', vi:'Diện tích mỗi tấm (㎡)' },
+    totalArea:   { zh:'总面积（㎡）', en:'Total area (㎡)', vi:'Tổng diện tích (㎡)' },
+    months:      { zh:'生产周期（月）', en:'Production period (months)', vi:'Thời gian sản xuất (tháng)' },
+    dir1:        { zh:'直接成本 · #1 机械类', en:'Direct cost · #1 Machinery', vi:'Chi phí trực tiếp · #1 Máy móc' },
+    d11:         { zh:'1.1 生产机械 & 设备', en:'1.1 Production machinery & equipment', vi:'1.1 Máy móc & thiết bị sản xuất' },
+    d12:         { zh:'1.2 工程车辆', en:'1.2 Engineering vehicles', vi:'1.2 Xe công trình' },
+    d13:         { zh:'1.3 工具 & 耗材', en:'1.3 Tools & consumables', vi:'1.3 Dụng cụ & vật tư' },
+    dir2:        { zh:'直接成本 · #2 生产骨料', en:'Direct cost · #2 Raw materials', vi:'Chi phí trực tiếp · #2 Vật liệu' },
+    sand:        { zh:'黄砂', en:'Sand', vi:'Cát' },
+    cement:      { zh:'水泥', en:'Cement', vi:'Xi măng' },
+    stone:       { zh:'石子', en:'Crushed stone', vi:'Đá dăm' },
+    r6:          { zh:'钢筋 φ6', en:'Rebar φ6', vi:'Thép φ6' },
+    r8:          { zh:'钢筋 φ8', en:'Rebar φ8', vi:'Thép φ8' },
+    r10:         { zh:'钢筋 φ10', en:'Rebar φ10', vi:'Thép φ10' },
+    r12:         { zh:'钢筋 φ12', en:'Rebar φ12', vi:'Thép φ12' },
+    dir3:        { zh:'直接成本 · #3 生产工人成本', en:'Direct cost · #3 Labor', vi:'Chi phí trực tiếp · #3 Nhân công' },
+    d31:         { zh:'3.1 生产管理类', en:'3.1 Production management', vi:'3.1 Quản lý sản xuất' },
+    d32:         { zh:'3.2 生产工人', en:'3.2 Production workers', vi:'3.2 Công nhân sản xuất' },
+    d33:         { zh:'3.3 安装水泥板工人', en:'3.3 Slab installation workers', vi:'3.3 Công nhân lắp tấm bê tông' },
+    d34:         { zh:'3.4 运营费用（每月）', en:'3.4 Operating costs (monthly)', vi:'3.4 Chi phí vận hành (hằng tháng)' },
+    foreman:     { zh:'生产厂长', en:'Plant manager', vi:'Quản đương xưởng' },
+    cook:        { zh:'厨师', en:'Cook', vi:'Đầu bếp' },
+    welder:      { zh:'电焊工', en:'Welder', vi:'Thợ hàn' },
+    welderAs:    { zh:'电焊工下手', en:'Welder assistant', vi:'Trợ thợ hàn' },
+    presser:     { zh:'打板工', en:'Slab presser', vi:'Thợ ép tấm' },
+    repairer:    { zh:'修板工', en:'Slab repairer', vi:'Thợ sửa tấm' },
+    mixerOp:     { zh:'搅拌机操作工', en:'Mixer operator', vi:'Thợ vận hành máy trộn' },
+    forklift:    { zh:'叉车工', en:'Forklift driver', vi:'Tài xế xe nâng' },
+    loader:      { zh:'铲车工', en:'Loader driver', vi:'Tài xế máy ủi' },
+    machinist:   { zh:'设备维修工', en:'Equipment mechanic', vi:'Thợ sửa thiết bị' },
+    tractor:     { zh:'拖拉机司机', en:'Tractor driver', vi:'Tài xế máy kéo' },
+    tractorAs:   { zh:'拖拉机随车员', en:'Tractor assistant', vi:'Phụ xe máy kéo' },
+    installer:   { zh:'安装工人', en:'Installation worker', vi:'Công nhân lắp đặt' },
+    opPower:     { zh:'每月生产电费', en:'Monthly power', vi:'Tiền điện sản xuất / tháng' },
+    opWater:     { zh:'每月生产水费', en:'Monthly water', vi:'Tiền nước sản xuất / tháng' },
+    opCons:      { zh:'每月生产耗材费（焊条/润滑油/脱模剂/常规易损件）', en:'Monthly consumables (rods/lubricant/release agent/wear parts)', vi:'Vật tư sản xuất / tháng (que hàn/dầu mỡ/dầu khuôn/phụ tùng)' },
+    opDorm:      { zh:'每月租赁员工宿舍费用', en:'Monthly staff dormitory rent', vi:'Tiền thuê ký túc xá / tháng' },
+    opFood:      { zh:'每月员工伙食费', en:'Monthly staff meals', vi:'Tiền ăn nhân viên / tháng' },
+    dir4:        { zh:'#4 间接成本', en:'#4 Indirect costs', vi:'#4 Chi phí gián tiếp' },
+    indFlight:   { zh:'机票费', en:'Flights', vi:'Vé máy bay' },
+    indHotel:    { zh:'住宿费', en:'Accommodation', vi:'Chi phí lưu trú' },
+    indMeal:     { zh:'餐饮费', en:'Meals', vi:'Chi phí ăn uống' },
+    indMkt:      { zh:'市场营销费', en:'Marketing', vi:'Chi phí tiếp thị' },
+    indOffice:   { zh:'办公室员工管理费', en:'Office staff management', vi:'Chi phí quản lý văn phòng' },
+    name:        { zh:'名称', en:'Name', vi:'Tên' },
+    qty:         { zh:'数量', en:'Qty', vi:'Số lượng' },
+    unitPrice:   { zh:'单价（VND）', en:'Unit price (VND)', vi:'Đơn giá (VND)' },
+    mSalary:     { zh:'月薪（VND）', en:'Monthly salary (VND)', vi:'Lương tháng (VND)' },
+    amount:      { zh:'金额（VND）', en:'Amount (VND)', vi:'Số tiền (VND)' },
+    headcount:   { zh:'人数', en:'Headcount', vi:'Số người' },
+    subtotal:    { zh:'小计（VND）', en:'Subtotal (VND)', vi:'Thành tiền (VND)' },
+    op:          { zh:'操作', en:'Action', vi:'Thao tác' },
+    addRow:      { zh:'＋ 添加行', en:'＋ Add row', vi:'＋ Thêm dòng' },
+    calc:        { zh:'报价计算', en:'Quote calculation', vi:'Tính giá báo' },
+    machTotal:   { zh:'#1 机械类合计', en:'#1 Machinery total', vi:'#1 Tổng máy móc' },
+    aggTotal:    { zh:'#2 骨料合计', en:'#2 Raw materials total', vi:'#2 Tổng vật liệu' },
+    laborTotal:  { zh:'#3 人工合计（含运营费用 × 周期月数）', en:'#3 Labor total (incl. opex × months)', vi:'#3 Tổng nhân công (gồm vận hành × số tháng)' },
+    indTotal:    { zh:'#4 间接成本合计', en:'#4 Indirect total', vi:'#4 Tổng gián tiếp' },
+    totalCost:   { zh:'总成本', en:'Total cost', vi:'Tổng chi phí' },
+    margin:      { zh:'利润率', en:'Profit margin', vi:'Tỷ lệ lợi nhuận' },
+    vat:         { zh:'增值税（VAT）', en:'VAT', vi:'Thuế GTGT (VAT)' },
+    profit:      { zh:'利润额', en:'Profit', vi:'Lợi nhuận' },
+    priceNoVat:  { zh:'未税卖价', en:'Price excl. VAT', vi:'Giá chưa VAT' },
+    priceVat:    { zh:'含税卖价', en:'Price incl. VAT', vi:'Giá gồm VAT' },
+    perM2:       { zh:'折合每㎡单价（含税）', en:'Price per ㎡ (incl. VAT)', vi:'Đơn giá mỗi ㎡ (gồm VAT)' },
+    machNote:    { zh:'注：机械类为一次性投入，全额计入本单总成本。', en:'Note: machinery is a one-time investment, fully counted in total cost.', vi:'Lưu ý: máy móc là đầu tư một lần, tính toàn bộ vào tổng chi phí.' },
+    laborNote:   { zh:'注：人工与运营费用按「生产周期（月）」自动乘算。', en:'Note: labor & opex are multiplied by the production period (months).', vi:'Lưu ý: nhân công & vận hành nhân theo số tháng sản xuất.' }
+  };
+  function ccT(k){
+    var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh';
+    var d = CC_LANG[k]; if(!d) return k;
+    return d[L] || d.zh;
+  }
+  function ccDef(){
+    return {
+      demand:{ blocks:0, area:0, months:1 },
+      mach:{ mech:[{n:'',qty:1,price:0}], veh:[{n:'',qty:1,price:0}], tools:[{n:'',qty:1,price:0}] },
+      agg:{ sand:{qty:0,price:0}, cement:{qty:0,price:0}, stone:{qty:0,price:0},
+            r6:{qty:0,price:0}, r8:{qty:0,price:0}, r10:{qty:0,price:0}, r12:{qty:0,price:0} },
+      labor:{
+        mgmt:[ {k:'foreman',qty:0,sal:0}, {k:'cook',qty:0,sal:0} ],
+        work:[ {k:'welder',qty:0,sal:0}, {k:'welderAs',qty:0,sal:0}, {k:'presser',qty:0,sal:0}, {k:'repairer',qty:0,sal:0},
+               {k:'mixerOp',qty:0,sal:0}, {k:'forklift',qty:0,sal:0}, {k:'loader',qty:0,sal:0}, {k:'machinist',qty:0,sal:0} ],
+        inst:[ {k:'tractor',qty:0,sal:0}, {k:'tractorAs',qty:0,sal:0}, {k:'installer',qty:0,sal:0} ]
+      },
+      opex:{ power:0, water:0, cons:0, dorm:0, food:0 },
+      ind:{ flight:0, hotel:0, meal:0, mkt:0, office:0 },
+      margin:0, vat:0
+    };
+  }
+  function ccMerge(saved){
+    var base = ccDef();
+    if(!saved || typeof saved !== 'object') return base;
+    try{
+      ['demand','mach','agg','labor','opex','ind'].forEach(function(k){
+        if(saved[k] && typeof saved[k] === 'object') base[k] = Object.assign({}, base[k], saved[k]);
+      });
+      ['margin','vat'].forEach(function(k){ if(saved[k] !== undefined) base[k] = Number(saved[k]) || 0; });
+      if(saved.mach) ['mech','veh','tools'].forEach(function(g){ if(Array.isArray(saved.mach[g])) base.mach[g] = saved.mach[g]; });
+      if(saved.labor) ['mgmt','work','inst'].forEach(function(g){ if(Array.isArray(saved.labor[g])) base.labor[g] = saved.labor[g]; });
+    }catch(e){}
+    return base;
+  }
+  function ccNum(v){ v = Math.round(Number(v) || 0); try{ return v.toLocaleString('en-US'); }catch(e){ return String(v); } }
+  function ccMe(){
+    return (typeof authUser !== 'undefined' && authUser && authUser.username) ? String(authUser.username) : '';
+  }
+  function ccCanEdit(){ return lib_canEdit(); }
+  function ccInNum(g, f, val, i){
+    var ro = ccCanEdit() ? '' : ' disabled';
+    var di = (i === undefined) ? '' : ' data-i="' + i + '"';
+    return '<input class="cc-in" data-g="' + g + '" data-f="' + f + '"' + di + ' value="' + ccNum(val) + '" inputmode="decimal"' + ro + '>';
+  }
+  function ccStyle(){
+    if(document.getElementById('cc-style')) return;
+    var s = document.createElement('style'); s.id = 'cc-style';
+    s.textContent = [
+      '.cc-sec{margin:18px 0 8px;font-weight:700;font-size:15px;color:#1a3c6e;border-left:4px solid #d32f2f;padding-left:8px;}',
+      '.cc-sub{margin:10px 0 4px;font-weight:600;font-size:13px;color:#444;}',
+      '.cc-tb{width:100%;border-collapse:collapse;font-size:13px;}',
+      '.cc-tb th{background:#f2f4f7;border:1px solid #d9dee5;padding:5px 6px;font-weight:600;white-space:nowrap;}',
+      '.cc-tb td{border:1px solid #d9dee5;padding:3px 4px;}',
+      '.cc-in{width:100%;box-sizing:border-box;border:1px solid #c8ced6;border-radius:4px;padding:3px 6px;font-size:13px;text-align:right;}',
+      'input.cc-tx{text-align:left;}',
+      '.cc-tb .cc-subcell{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-right:8px;}',
+      '.cc-add{margin:6px 0 0;padding:3px 12px;border:1px dashed #c8ced6;border-radius:5px;background:#fff;cursor:pointer;font-size:12px;}',
+      '.cc-del{border:none;background:none;color:#d32f2f;cursor:pointer;font-size:14px;padding:2px 6px;}',
+      '.cc-sum{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px;}',
+      '.cc-sum td{padding:5px 8px;border-bottom:1px solid #eee;}',
+      '.cc-sum .cc-lbl{color:#555;}',
+      '.cc-sum .cc-val{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}',
+      '.cc-sum tr.cc-big td{font-size:16px;color:#d32f2f;font-weight:800;border-top:2px solid #d32f2f;}',
+      '.cc-note{font-size:12px;color:#888;margin-top:4px;}',
+      '.cc-pct{width:70px !important;text-align:right;}',
+      '.cc-ro .cc-del,.cc-ro .cc-add{display:none !important;}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+  function ccRowMach(g, it, i){
+    var ro = ccCanEdit() ? '' : ' disabled';
+    return '<tr>' +
+      '<td><input class="cc-in cc-tx" data-g="' + g + '" data-f="n" data-i="' + i + '" value="' + esc(it.n || '') + '"' + ro + '></td>' +
+      '<td style="width:90px;">' + ccInNum(g, 'qty', it.qty || 0, i) + '</td>' +
+      '<td style="width:150px;">' + ccInNum(g, 'price', it.price || 0, i) + '</td>' +
+      '<td class="cc-subcell" data-sub="' + g + '.' + i + '">0</td>' +
+      '<td style="width:40px;text-align:center;"><button class="cc-del" data-act="del" data-g="' + g + '" data-i="' + i + '" title="✕">✕</button></td>' +
+      '</tr>';
+  }
+  function ccMachGroup(key, labelKey){
+    var arr = CC_DATA.mach[key] || [];
+    var h = '<div class="cc-sub">' + ccT(labelKey) + '</div>' +
+      '<table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th><th style="width:90px;">' + ccT('qty') + '</th>' +
+      '<th style="width:150px;">' + ccT('unitPrice') + '</th><th style="width:150px;">' + ccT('subtotal') + '</th><th style="width:40px;"></th></tr></thead><tbody>';
+    arr.forEach(function(it, i){ h += ccRowMach('mach.' + key, it, i); });
+    h += '</tbody></table><button class="cc-add" data-act="add" data-g="mach.' + key + '">' + ccT('addRow') + '</button>';
+    return h;
+  }
+  function ccAggRow(gkey, labelKey){
+    var it = CC_DATA.agg[gkey] || {qty:0, price:0};
+    return '<tr><td>' + ccT(labelKey) + '</td>' +
+      '<td style="width:110px;">' + ccInNum('agg.' + gkey, 'qty', it.qty) + '</td>' +
+      '<td style="width:150px;">' + ccInNum('agg.' + gkey, 'price', it.price) + '</td>' +
+      '<td class="cc-subcell" data-sub="agg.' + gkey + '">0</td></tr>';
+  }
+  function ccLaborGroup(gkey, labelKey){
+    var arr = CC_DATA.labor[gkey] || [];
+    var h = '<div class="cc-sub">' + ccT(labelKey) + '</div>' +
+      '<table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th><th style="width:90px;">' + ccT('headcount') + '</th>' +
+      '<th style="width:150px;">' + ccT('mSalary') + '</th><th style="width:170px;">' + ccT('subtotal') + '</th></tr></thead><tbody>';
+    arr.forEach(function(it, i){
+      h += '<tr><td>' + ccT(it.k) + '</td>' +
+        '<td>' + ccInNum('labor.' + gkey, 'qty', it.qty, i) + '</td>' +
+        '<td>' + ccInNum('labor.' + gkey, 'sal', it.sal, i) + '</td>' +
+        '<td class="cc-subcell" data-sub="labor.' + gkey + '.' + i + '">0</td></tr>';
+    });
+    h += '</tbody></table>';
+    return h;
+  }
+  function ccOpexRow(f, labelKey){
+    return '<tr><td>' + ccT(labelKey) + '</td>' +
+      '<td style="width:170px;">' + ccInNum('opex', f, CC_DATA.opex[f] || 0) + '</td>' +
+      '<td class="cc-subcell" data-sub="opex.' + f + '">0</td></tr>';
+  }
+  function ccIndRow(f, labelKey){
+    return '<tr><td>' + ccT(labelKey) + '</td>' +
+      '<td style="width:170px;">' + ccInNum('ind', f, CC_DATA.ind[f] || 0) + '</td>' +
+      '<td class="cc-subcell" data-sub="ind.' + f + '">0</td></tr>';
+  }
+  function ccHtml(){
+    ccStyle();
+    var ro = ccCanEdit();
+    var months = Number(CC_DATA.demand.months) || 0;
+    var area = (Number(CC_DATA.demand.blocks) || 0) * (Number(CC_DATA.demand.area) || 0);
+    var h = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+      '<div style="font-weight:800;font-size:16px;color:#d32f2f;">💰 ' + ccT('title') + '</div>' +
+      '<span id="cc_savest" style="font-size:12px;color:#2e7d32;"></span>' +
+      (ro ? '' : '<span style="font-size:12px;color:#e53935;">🔒 ' + ccT('readonlyTip') + '</span>') + '</div>';
+
+    // 需求信息
+    h += '<div class="cc-sec">' + ccT('demand') + '</div><table class="cc-tb"><tbody><tr>' +
+      '<td>' + ccT('blocks') + '</td><td style="width:110px;">' + ccInNum('demand', 'blocks', CC_DATA.demand.blocks) + '</td>' +
+      '<td>' + ccT('areaBlk') + '</td><td style="width:110px;">' + ccInNum('demand', 'area', CC_DATA.demand.area) + '</td>' +
+      '<td>' + ccT('months') + '</td><td style="width:90px;">' + ccInNum('demand', 'months', months) + '</td>' +
+      '<td style="white-space:nowrap;padding-left:12px;">' + ccT('totalArea') + '：<b id="cc_v_area">0</b> ㎡</td>' +
+      '</tr></tbody></table>';
+
+    // #1 机械类
+    h += '<div class="cc-sec">' + ccT('dir1') + '</div>' + ccMachGroup('mech', 'd11') + ccMachGroup('veh', 'd12') + ccMachGroup('tools', 'd13') +
+      '<div class="cc-note">' + ccT('machNote') + '</div>';
+
+    // #2 骨料
+    h += '<div class="cc-sec">' + ccT('dir2') + '</div><table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th>' +
+      '<th style="width:110px;">' + ccT('qty') + '</th><th style="width:150px;">' + ccT('unitPrice') + '</th><th style="width:150px;">' + ccT('subtotal') + '</th></tr></thead><tbody>' +
+      ccAggRow('sand', 'sand') + ccAggRow('cement', 'cement') + ccAggRow('stone', 'stone') +
+      ccAggRow('r6', 'r6') + ccAggRow('r8', 'r8') + ccAggRow('r10', 'r10') + ccAggRow('r12', 'r12') +
+      '</tbody></table>';
+
+    // #3 人工
+    h += '<div class="cc-sec">' + ccT('dir3') + '</div>' +
+      ccLaborGroup('mgmt', 'd31') + ccLaborGroup('work', 'd32') + ccLaborGroup('inst', 'd33') +
+      '<div class="cc-sub">' + ccT('d34') + '</div><table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th>' +
+      '<th style="width:170px;">' + ccT('amount') + '</th><th style="width:170px;">× ' + ccT('months') + '</th></tr></thead><tbody>' +
+      ccOpexRow('power', 'opPower') + ccOpexRow('water', 'opWater') + ccOpexRow('cons', 'opCons') +
+      ccOpexRow('dorm', 'opDorm') + ccOpexRow('food', 'opFood') +
+      '</tbody></table><div class="cc-note">' + ccT('laborNote') + '</div>';
+
+    // #4 间接
+    h += '<div class="cc-sec">' + ccT('dir4') + '</div><table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th>' +
+      '<th style="width:170px;">' + ccT('amount') + '</th></tr></thead><tbody>' +
+      ccIndRow('flight', 'indFlight') + ccIndRow('hotel', 'indHotel') + ccIndRow('meal', 'indMeal') +
+      ccIndRow('mkt', 'indMkt') + ccIndRow('office', 'indOffice') +
+      '</tbody></table>';
+
+    // 报价计算
+    var roAttr = ro ? '' : ' disabled';
+    h += '<div class="cc-sec">' + ccT('calc') + '</div><table class="cc-sum"><tbody>' +
+      '<tr><td class="cc-lbl">' + ccT('machTotal') + '</td><td class="cc-val" id="cc_v_mach">0</td></tr>' +
+      '<tr><td class="cc-lbl">' + ccT('aggTotal') + '</td><td class="cc-val" id="cc_v_agg">0</td></tr>' +
+      '<tr><td class="cc-lbl">' + ccT('laborTotal') + '</td><td class="cc-val" id="cc_v_labor">0</td></tr>' +
+      '<tr><td class="cc-lbl">' + ccT('indTotal') + '</td><td class="cc-val" id="cc_v_ind">0</td></tr>' +
+      '<tr class="cc-big"><td class="cc-lbl">' + ccT('totalCost') + '</td><td class="cc-val" id="cc_v_total">0</td></tr>' +
+      '<tr><td class="cc-lbl">' + ccT('margin') + '：<input class="cc-in cc-pct" id="cc_margin" value="' + (Number(CC_DATA.margin) || 0) + '" inputmode="decimal"' + roAttr + '> %</td>' +
+      '<td class="cc-val" id="cc_v_profit">0</td></tr>' +
+      '<tr><td class="cc-lbl">' + ccT('priceNoVat') + '</td><td class="cc-val" id="cc_v_pnovat">0</td></tr>' +
+      '<tr><td class="cc-lbl">' + ccT('vat') + '：<input class="cc-in cc-pct" id="cc_vat" value="' + (Number(CC_DATA.vat) || 0) + '" inputmode="decimal"' + roAttr + '> %</td></tr>' +
+      '<tr class="cc-big"><td class="cc-lbl">🧾 ' + ccT('priceVat') + '</td><td class="cc-val" id="cc_v_pvat">0</td></tr>' +
+      '<tr><td class="cc-lbl">' + ccT('perM2') + '</td><td class="cc-val" id="cc_v_m2">0</td></tr>' +
+      '</tbody></table>';
+    return h;
+  }
+  function ccPathSet(path, val){
+    var parts = path.split('.'), o = CC_DATA;
+    for(var i = 0; i < parts.length - 1; i++){ o = o[parts[i]]; }
+    o[parts[parts.length - 1]] = val;
+  }
+  function ccRowVal(path){
+    // path 例：mach.mech.0 / agg.sand / labor.work.2 / opex.power / ind.flight
+    var p = path.split('.');
+    if(p[0] === 'mach'){ var it = (CC_DATA.mach[p[1]] || [])[Number(p[2])] || {}; return (Number(it.qty) || 0) * (Number(it.price) || 0); }
+    if(p[0] === 'agg'){ var a = CC_DATA.agg[p[1]] || {}; return (Number(a.qty) || 0) * (Number(a.price) || 0); }
+    if(p[0] === 'labor'){
+      var m = Number(CC_DATA.demand.months) || 0;
+      var l = (CC_DATA.labor[p[1]] || [])[Number(p[2])] || {};
+      return (Number(l.qty) || 0) * (Number(l.sal) || 0) * m;
+    }
+    if(p[0] === 'opex'){ return (Number(CC_DATA.opex[p[1]]) || 0) * (Number(CC_DATA.demand.months) || 0); }
+    if(p[0] === 'ind'){ return Number(CC_DATA.ind[p[1]]) || 0; }
+    return 0;
+  }
+  function ccRecalc(){
+    var host = document.getElementById('lib-cost-body'); if(!host || !CC_DATA) return;
+    var months = Number(CC_DATA.demand.months) || 0;
+    var area = (Number(CC_DATA.demand.blocks) || 0) * (Number(CC_DATA.demand.area) || 0);
+    var mach = 0, agg = 0, labor = 0, opex = 0, ind = 0;
+    ['mech', 'veh', 'tools'].forEach(function(g){ (CC_DATA.mach[g] || []).forEach(function(it){ mach += (Number(it.qty) || 0) * (Number(it.price) || 0); }); });
+    Object.keys(CC_DATA.agg).forEach(function(k){ var a = CC_DATA.agg[k]; agg += (Number(a.qty) || 0) * (Number(a.price) || 0); });
+    ['mgmt', 'work', 'inst'].forEach(function(g){ (CC_DATA.labor[g] || []).forEach(function(l){ labor += (Number(l.qty) || 0) * (Number(l.sal) || 0); }); });
+    labor *= months;
+    Object.keys(CC_DATA.opex).forEach(function(k){ opex += Number(CC_DATA.opex[k]) || 0; });
+    opex *= months;
+    Object.keys(CC_DATA.ind).forEach(function(k){ ind += Number(CC_DATA.ind[k]) || 0; });
+    // 行小计
+    host.querySelectorAll('[data-sub]').forEach(function(el){ el.textContent = ccNum(ccRowVal(el.getAttribute('data-sub'))); });
+    var total = mach + agg + labor + opex + ind;
+    var margin = Number(CC_DATA.margin) || 0, vat = Number(CC_DATA.vat) || 0;
+    var profit = total * margin / 100;
+    var pNoVat = total + profit;
+    var pVat = pNoVat * (1 + vat / 100);
+    var set = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = ccNum(v); };
+    set('cc_v_area', area);
+    set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
+    set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
+    set('cc_v_m2', area > 0 ? pVat / area : 0);
+  }
+  function ccScheduleSave(){
+    if(!ccCanEdit()) return;
+    CC_DIRTY = true;
+    var st = document.getElementById('cc_savest');
+    if(st){ st.textContent = ccT('saving'); st.style.color = '#e65100'; }
+    if(CC_SAVE_T) clearTimeout(CC_SAVE_T);
+    CC_SAVE_T = setTimeout(function(){
+      try{
+        fetch('/api/prod-kv/' + encodeURIComponent(CC_KEY), { method:'PUT', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ requester: ccMe(), data: CC_DATA }) })
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            CC_DIRTY = false;
+            var s2 = document.getElementById('cc_savest');
+            if(s2){ s2.textContent = (j && j.ok) ? ccT('saved') : 'save failed'; s2.style.color = (j && j.ok) ? '#2e7d32' : '#d32f2f'; }
+          })
+          .catch(function(){ var s3 = document.getElementById('cc_savest'); if(s3){ s3.textContent = 'save failed'; s3.style.color = '#d32f2f'; } });
+      }catch(e){}
+    }, 800);
+  }
+  function ccBind(){
+    var host = document.getElementById('lib-cost-body'); if(!host) return;
+    host.oninput = function(ev){
+      var el = ev.target; if(!el || !el.dataset || !el.dataset.f) return;
+      var f = el.dataset.f;
+      if(el.id === 'cc_margin'){ CC_DATA.margin = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
+      else if(el.id === 'cc_vat'){ CC_DATA.vat = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
+      else if(el.dataset.g){
+        var v;
+        if(f === 'n'){ v = el.value; }
+        else { v = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
+        // ★数组行的字段路径是 g.i.f（如 mach.mech.0.qty），标量组是 g.f（如 agg.sand.qty）
+        var path = el.dataset.g + '.';
+        if(el.dataset.i !== undefined) path += el.dataset.i + '.';
+        path += f;
+        ccPathSet(path, v);
+      } else { return; }
+      ccRecalc(); ccScheduleSave();
+    };
+    host.onclick = function(ev){
+      var el = ev.target.closest ? ev.target.closest('[data-act]') : null; if(!el) return;
+      if(!ccCanEdit()) return;
+      var act = el.getAttribute('data-act'), g = el.getAttribute('data-g');
+      if(act === 'add' && g && g.indexOf('mach.') === 0){
+        CC_DATA.mach[g.slice(5)].push({ n:'', qty:1, price:0 });
+        lib_renderCostBody(); ccScheduleSave();
+      } else if(act === 'del' && g && g.indexOf('mach.') === 0){
+        var arr = CC_DATA.mach[g.slice(5)];
+        arr.splice(Number(el.getAttribute('data-i')), 1);
+        if(!arr.length) arr.push({ n:'', qty:1, price:0 });
+        lib_renderCostBody(); ccScheduleSave();
+      }
+    };
+  }
+  function ccLoad(){
+    if(CC_LOADED){ ccRecalc(); return; }
+    try{
+      fetch('/api/prod-kv/' + encodeURIComponent(CC_KEY) + '?me=' + encodeURIComponent(ccMe()))
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          CC_LOADED = true;
+          if(j && j.ok && j.data){ CC_DATA = ccMerge(j.data); }
+          if(!CC_DIRTY && LIB_TAB === 'cost') lib_renderCostBody();
+          else ccRecalc();
+        })
+        .catch(function(){ CC_LOADED = true; });
+    }catch(e){ CC_LOADED = true; }
+  }
+  function lib_renderCostBody(){
+    var host = document.getElementById('lib-cost-body'); if(!host) return;
+    if(!CC_DATA) CC_DATA = ccDef();
+    host.innerHTML = ccHtml();
+    host.classList.toggle('cc-ro', !ccCanEdit());
+    ccBind();
+    ccRecalc();
+    ccLoad();
+  }
+
   function lib_renderFiles(){
     var body = document.getElementById('lib-body'); if(!body) return;
     if(LIB_TAB === 'project' && !LIB_PROJECT_ID){
       lib_renderProjectCards();
       return;
     }
-    // ★LIB-COST-BLANK-20261104（用户要求）：成本核算页清空文件库内容
-    //   （面包屑/上传按钮/上传文件夹/拖拽提示/搜索框/视图切换/文件列表/「共 N 个项目」状态条
-    //   全部不渲染），只留一个空挂载容器，后续由用户注入新内容。
+    // ★LIB-COST-BLANK-20261104（用户要求）：成本核算页清空文件库内容。
+    //   ★LIB-COST-CALC-20261104：注入「成本核算报价器」（需求信息/直接成本/间接成本/利润率/VAT→卖价），
+    //   数据存服务端 prod_kv，权限沿用「资料-成本核算」。
     if(LIB_TAB === 'cost'){
       body.innerHTML = '<div id="lib-cost-body"></div>';
+      lib_renderCostBody();
       return;
     }
     var html = lib_crumbHtml() + lib_toolbarHtml();
