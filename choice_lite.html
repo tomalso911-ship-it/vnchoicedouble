@@ -59793,6 +59793,10 @@ function submitAuth() {
     moldPick:    { zh:'根据以下分析，最终选择：', en:'Based on the analysis above, final choice:', vi:'Dựa trên phân tích trên, lựa chọn cuối cùng:' },
     moldOptA:    { zh:'方案A', en:'Plan A', vi:'Phương án A' },
     moldOptB:    { zh:'方案B', en:'Plan B', vi:'Phương án B' },
+    pickDay1:    { zh:'项目完成需要：', en:'Project completion requires: ', vi:'Hoàn thành dự án cần: ' },
+    pickDay2:    { zh:'天，算上不可控的设备调试/天气/停电/设备维修等因素，增加 ', en:' days. Allowing for uncontrollable factors (equipment commissioning / weather / power outages / equipment repairs), add ', vi:' ngày. Tính cả các yếu tố không kiểm soát (hiệu chỉnh thiết bị / thời tiết / mất điện / sửa chữa thiết bị), cộng thêm ' },
+    pickDay3:    { zh:' 天，完成全部项目需要 ', en:' days. Total to complete the entire project: ', vi:' ngày. Tổng cộng để hoàn thành toàn bộ dự án cần ' },
+    pickDay4:    { zh:' 天！', en:' days!', vi:' ngày!' },
     totalBlocks: { zh:'总块数', en:'Total pcs', vi:'Tổng số tấm' },
     blocks:      { zh:'数量（块）', en:'Quantity (pcs)', vi:'Số lượng (tấm)' },
     areaBlk:     { zh:'单块面积（㎡）', en:'Area per piece (㎡)', vi:'Diện tích mỗi tấm (㎡)' },
@@ -60142,6 +60146,8 @@ function submitAuth() {
       ' <select id="cc_mold_pick" style="padding:2px 8px;border:1px solid #7aa7d4;border-radius:4px;font-size:12px;background:#eaf3fb;">' +
       '<option value="A"' + (pick === 'A' ? ' selected' : '') + '>' + ccT('moldOptA') + '</option>' +
       '<option value="B"' + (pick === 'B' ? ' selected' : '') + '>' + ccT('moldOptB') + '</option></select></span></div>';
+    // ★CC-PICKDAY-20261104：选中方案工期汇总 + 5%不可控余量（三语，重算时刷新）
+    h += '<div id="cc_pick_days" style="font-size:12px;color:#333;font-weight:600;margin:2px 0 8px;line-height:1.7;">…</div>';
     function ccMoldCard(title, calcId, pro, con, grow, bg, cardId){
       return '<div id="' + cardId + '" style="border:2px solid #000;border-radius:6px;padding:8px 12px;background:' + (bg || '#fff') + ';flex:' + grow + ';min-width:320px;">' +
         '<div style="font-weight:700;">' + title + '</div>' +
@@ -60400,6 +60406,14 @@ function submitAuth() {
       });
       htmlB += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkB + ' ' + ccT('moldDaysUnit') + '</div>';
       if(eMc) eMc.innerHTML = htmlB;
+      // ★CC-PICKDAY-20261104：最终选择方案的工期 + ROUNDUP(工期×0.05) 不可控余量
+      var pdEl = document.getElementById('cc_pick_days');
+      if(pdEl){
+        var pickSel = CC_DATA.demand.moldPick === 'B' ? 'B' : 'A';
+        var pdBase = pickSel === 'B' ? mkB : mkA;
+        var pdExt = Math.ceil(pdBase * 0.05);
+        pdEl.innerHTML = '📅 ' + ccT('pickDay1') + ccNum(pdBase) + ccT('pickDay2') + ccNum(pdExt) + ccT('pickDay3') + ccNum(pdBase + pdExt) + ccT('pickDay4');
+      }
     }
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
@@ -60495,6 +60509,7 @@ function submitAuth() {
         var ea = document.getElementById('cc_card_a'), eb = document.getElementById('cc_card_b');
         if(ea) ea.style.background = CC_DATA.demand.moldPick === 'A' ? '#fdecec' : '#fff';
         if(eb) eb.style.background = CC_DATA.demand.moldPick === 'B' ? '#fdecec' : '#fff';
+        ccRecalc(); // ★CC-PICKDAY：切换方案同步刷新工期汇总行
         ccScheduleSave();
       });
     })();
