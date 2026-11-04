@@ -59965,7 +59965,9 @@ function submitAuth() {
   function ccInNum(g, f, val, i){
     var ro = ccCanEdit() ? '' : ' disabled';
     var di = (i === undefined) ? '' : ' data-i="' + i + '"';
-    return '<input class="cc-in" data-g="' + g + '" data-f="' + f + '"' + di + ' value="' + ccNum(val) + '" inputmode="decimal"' + ro + '>';
+    // ★CC-VNDINPUT-20261104：金额类(VND单价/日薪/月费/间接费用)录入框统一淡黄色
+    var vnd = (f === 'price' || f === 'sal' || g === 'opex' || g === 'ind') ? ' cc-vnd' : '';
+    return '<input class="cc-in' + vnd + '" data-g="' + g + '" data-f="' + f + '"' + di + ' value="' + ccNum(val) + '" inputmode="decimal"' + ro + '>';
   }
   function ccStyle(){
     if(document.getElementById('cc-style')) return;
@@ -59996,6 +59998,11 @@ function submitAuth() {
       '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
       '.cc-icn:hover{background:#f5f5f5;}',
       '.cc-sel{text-align:center;}',
+      // ★CC-ZEBRA-20261104：所有表格白色/淡蓝斑马线 + 汇总表黑色网格线
+      '.cc-tb tbody tr:nth-child(odd) td,.cc-sum tbody tr:nth-child(odd) td{background:#fff;}',
+      '.cc-tb tbody tr:nth-child(even) td,.cc-sum tbody tr:nth-child(even) td{background:#eaf3fb;}',
+      '.cc-sum td{border:1px solid #000;}',
+      '.cc-tb input.cc-in.cc-vnd{background:#fff59d !important;border:1px solid #d9b900 !important;color:#5b4b00;}',
     ].join('');
     document.head.appendChild(s);
   }
