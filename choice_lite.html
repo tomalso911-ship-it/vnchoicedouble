@@ -59852,6 +59852,7 @@ function submitAuth() {
     amount:      { zh:'金额（VND）', en:'Amount (VND)', vi:'Số tiền (VND)' },
     headcount:   { zh:'人数', en:'Headcount', vi:'Số người' },
     subtotal:    { zh:'小计（VND）', en:'Subtotal (VND)', vi:'Thành tiền (VND)' },
+    subTotalRow: { zh:'小计', en:'Subtotal', vi:'Cộng lại' },
     op:          { zh:'操作', en:'Action', vi:'Thao tác' },
     addRow:      { zh:'＋ 添加行', en:'＋ Add row', vi:'＋ Thêm dòng' },
     calc:        { zh:'报价计算', en:'Quote calculation', vi:'Tính giá báo' },
@@ -59943,8 +59944,8 @@ function submitAuth() {
       '.cc-sec{margin:18px 0 8px;font-weight:700;font-size:15px;color:#1a3c6e;border-left:4px solid #d32f2f;padding-left:8px;}',
       '.cc-sub{margin:10px 0 4px;font-weight:600;font-size:13px;color:#444;}',
       '.cc-tb{width:100%;border-collapse:collapse;font-size:13px;}',
-      '.cc-tb th{background:#ffff00;border:1px solid #d9b900;padding:5px 6px;font-weight:600;white-space:nowrap;}',
-      '.cc-tb td{border:1px solid #d9dee5;padding:3px 4px;}',
+      '.cc-tb th{background:#ffff00;border:1px solid #000;padding:5px 6px;font-weight:600;white-space:nowrap;}',
+      '.cc-tb td{border:1px solid #000;padding:3px 4px;}',
       '.cc-in{width:100%;box-sizing:border-box;border:1px solid #c8ced6;border-radius:4px;padding:3px 6px;font-size:13px;text-align:right;}',
       'input.cc-tx{text-align:left;}',
       '.cc-tb .cc-subcell{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;padding-right:8px;}',
@@ -59979,15 +59980,22 @@ function submitAuth() {
       '<td class="cc-subcell" data-fx="' + g + '.' + i + '" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" data-fx="' + g + '.' + i + '" data-cur="usd">—</td>' +
       '<td class="cc-subcell" data-sub="' + g + '.' + i + '">0</td>' +
-      '<td style="width:40px;text-align:center;"><button class="cc-del" data-act="del" data-g="' + g + '" data-i="' + i + '" title="✕">✕</button></td>' +
       '</tr>';
   }
   function ccMachGroup(key, labelKey){
     var arr = CC_DATA.mach[key] || [];
     var h = '<div class="cc-sub">' + ccT(labelKey) + '</div>' +
-      '<table class="cc-tb"><thead>' + ccFxHead(true) + '</thead><tbody>';
+      '<table class="cc-tb"><thead>' + ccFxHead(false) + '</thead><tbody>';
     arr.forEach(function(it, i){ h += ccRowMach('mach.' + key, it, i); });
-    h += '</tbody></table><button class="cc-add" data-act="add" data-g="mach.' + key + '">' + ccT('addRow') + '</button>';
+    // ★CC-SUBROW-20261104：表尾小计行（三币带货币符号）
+    var gs = 'data-gsub="mach.' + key + '"';
+    h += '</tbody><tfoot><tr><td colspan="2" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      '<td class="cc-subcell" ' + gs + ' data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" ' + gs + ' data-cur="usd">—</td>' +
+      '<td class="cc-subcell" ' + gs + ' data-cur="vnd">—</td>' +
+      '<td class="cc-subcell" ' + gs + ' data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" ' + gs + ' data-cur="usd">—</td>' +
+      '<td class="cc-subcell" ' + gs + ' data-cur="vnd">—</td></tr></tfoot></table>';
     return h;
   }
   function ccAggRow(gkey, labelKey, d){
@@ -60131,7 +60139,13 @@ function submitAuth() {
     h += '<div class="cc-sec">' + ccT('dir2') + '</div><table class="cc-tb"><thead>' + ccFxHead(false) + '</thead><tbody>' +
       ccAggRow('sand', 'sand') + ccAggRow('cement', 'cement') + ccAggRow('stone', 'stone') +
       ccAggRow('r6', 'r6', '6') + ccAggRow('r8', 'r8', '8') + ccAggRow('r10', 'r10', '10') + ccAggRow('r12', 'r12', '12') +
-      '</tbody></table>';
+      '</tbody><tfoot><tr><td colspan="2" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      '<td class="cc-subcell" data-gsub="agg" data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" data-gsub="agg" data-cur="usd">—</td>' +
+      '<td class="cc-subcell" data-gsub="agg" data-cur="vnd">—</td>' +
+      '<td class="cc-subcell" data-gsub="agg" data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" data-gsub="agg" data-cur="usd">—</td>' +
+      '<td class="cc-subcell" data-gsub="agg" data-cur="vnd">—</td></tr></tfoot></table>';
 
     // #3 人工
     h += '<div class="cc-sec">' + ccT('dir3') + '</div>' +
@@ -60258,13 +60272,23 @@ function submitAuth() {
     Object.keys(CC_DATA.opex).forEach(function(k){ opex += Number(CC_DATA.opex[k]) || 0; });
     opex *= months;
     Object.keys(CC_DATA.ind).forEach(function(k){ ind += Number(CC_DATA.ind[k]) || 0; });
-    // 行小计
-    host.querySelectorAll('[data-sub]').forEach(function(el){ el.textContent = ccNum(ccRowVal(el.getAttribute('data-sub'))); });
-    // ★CC-FXCELL-20261104：RMB/USD 只读换算列刷新（VND÷汇率）
+    // 行小计（VND 带货币符号）
+    host.querySelectorAll('[data-sub]').forEach(function(el){ el.textContent = '₫ ' + ccNum(ccRowVal(el.getAttribute('data-sub'))); });
+    // ★CC-FXCELL-20261104：RMB/USD 只读换算列刷新（VND÷汇率，带货币符号）
     var fxc = ccFx();
     host.querySelectorAll('[data-fx]').forEach(function(el){
-      var r = el.getAttribute('data-cur') === 'usd' ? fxc.usd : fxc.rmb;
-      el.textContent = r > 0 ? ccNum(ccFxVal(el.getAttribute('data-fx')) / r) : '—';
+      var usd = el.getAttribute('data-cur') === 'usd', r = usd ? fxc.usd : fxc.rmb;
+      el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + ccNum(ccFxVal(el.getAttribute('data-fx')) / r) : '—';
+    });
+    // ★CC-SUBROW-20261104：表尾小计行（三币带货币符号）
+    var machG = function(g){ var s = 0; (CC_DATA.mach[g] || []).forEach(function(it){ s += (Number(it.qty) || 0) * (Number(it.price) || 0); }); return s; };
+    host.querySelectorAll('[data-gsub]').forEach(function(el){
+      var p = el.getAttribute('data-gsub').split('.');
+      var v = p[0] === 'mach' ? machG(p[1]) : agg;
+      var cur = el.getAttribute('data-cur');
+      if(cur === 'rmb') el.textContent = fxc.rmb > 0 ? '¥ ' + ccNum(v / fxc.rmb) : '—';
+      else if(cur === 'usd') el.textContent = fxc.usd > 0 ? '$ ' + ccNum(v / fxc.usd) : '—';
+      else el.textContent = '₫ ' + ccNum(v);
     });
     var total = mach + agg + labor + opex + ind;
     var margin = Number(CC_DATA.margin) || 0, vat = Number(CC_DATA.vat) || 0;
