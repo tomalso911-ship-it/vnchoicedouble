@@ -60532,10 +60532,11 @@ function submitAuth() {
     var profit = total * margin / 100;
     var pNoVat = total + profit;
     var pVat = pNoVat * (1 + vat / 100);
-    var set = function(id, v, unit){ var el = document.getElementById(id); if(el) el.textContent = '₫ ' + ccNum(v) + (unit || ''); }; // ★CC-SUMHEAD：VND 列带货币符号
-    set('cc_v_blocks', blocks);
-    set('cc_v_blocks_ft', blocks);
-    set('cc_v_area', area);
+    var set = function(id, v, unit){ var el = document.getElementById(id); if(el) el.textContent = '₫ ' + ccNum(v) + (unit || ''); }; // ★CC-SUMHEAD：仅金额用，带货币符号
+    var setPlain = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = ccNum(v); }; // ★CC-NOCUR-20261104：块数/面积等非金额，不带货币符号
+    setPlain('cc_v_blocks', blocks);
+    setPlain('cc_v_blocks_ft', blocks);
+    setPlain('cc_v_area', area);
     // ★CC-MOLD5-20261104：2条生产线并行 — 方案A=每规格专用模；方案B=主力规格专用模+小量规格组合模(放不下自动单独开模)
     var CPD = Number(CC_DATA.demand.moldCpd) || 40, MPRICE = 3; // 模/天(输入框可改,默认40) / 万元每套
     var sl = (CC_DATA.demand.specs || []).filter(function(sp){ return sp.len > 0 && sp.wid > 0 && (Number(sp.qty) || 0) > 0; });
