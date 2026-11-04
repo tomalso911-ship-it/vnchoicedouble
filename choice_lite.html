@@ -60178,7 +60178,7 @@ function submitAuth() {
 
     // #3 人工
     h += '<div class="cc-sec">' + ccT('dir3') + '</div>' +
-      '<div style="font-size:12px;color:#555;margin:0 0 6px;">' + ccT('workDays') + '：<input class="cc-in" id="cc_work_days" value="' + (Number(CC_DATA.demand.workDays) || 0) + '" inputmode="numeric" autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"> </div>' +
+      '<div style="font-size:12px;color:#555;margin:0 0 6px;">' + ccT('workDays') + '：<input class="cc-in" id="cc_work_days" value="' + (Number(CC_DATA.demand.workDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</div>' +
       ccLaborGroup('mgmt', 'd31') + ccLaborGroup('work', 'd32') + ccLaborGroup('inst', 'd33') +
       '<div class="cc-sub">' + ccT('d34') + '</div><table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th>' +
       '<th style="width:170px;">' + ccT('amount') + '</th><th style="width:170px;">× ' + ccT('months') + '</th></tr></thead><tbody>' +
@@ -60412,7 +60412,16 @@ function submitAuth() {
         var pickSel = CC_DATA.demand.moldPick === 'B' ? 'B' : 'A';
         var pdBase = pickSel === 'B' ? mkB : mkA;
         var pdExt = Math.ceil(pdBase * 0.05);
-        pdEl.innerHTML = '📅 ' + ccT('pickDay1') + ccNum(pdBase) + ccT('pickDay2') + ccNum(pdExt) + ccT('pickDay3') + ccNum(pdBase + pdExt) + ccT('pickDay4');
+        var pdTotal = pdBase + pdExt;
+        pdEl.innerHTML = '📅 ' + ccT('pickDay1') + ccNum(pdBase) + ccT('pickDay2') + ccNum(pdExt) + ccT('pickDay3') + ccNum(pdTotal) + ccT('pickDay4');
+        // ★CC-WD2-20261104：项目天数 = 完成全部项目总天数(自动同步, 含5%余量)
+        if(Number(CC_DATA.demand.workDays) !== pdTotal){
+          CC_DATA.demand.workDays = pdTotal;
+          var wdi2 = document.getElementById('cc_work_days');
+          if(wdi2) wdi2.value = pdTotal;
+          ccScheduleSave();
+          return ccRecalc(); // 用新项目天数重算人工(第二次进来已相等,不再递归)
+        }
       }
     }
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
@@ -60486,18 +60495,6 @@ function submitAuth() {
       cpd.disabled = false;
       cpd.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
       cpd.addEventListener('input', function(){ ccCpdSet(this.value); });
-    })();
-    // ★CC-WD-20261104：项目天数输入框直绑（点击全选、输入即重算、始终可编辑）
-    (function(){
-      var wdi = document.getElementById('cc_work_days');
-      if(!wdi) return;
-      wdi.disabled = false;
-      wdi.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
-      wdi.addEventListener('input', function(){
-        if(!CC_DATA) return;
-        CC_DATA.demand.workDays = parseFloat(String(this.value).replace(/[^0-9.]/g, '')) || 0;
-        ccRecalc(); ccScheduleSave();
-      });
     })();
     // ★CC-PICK-20261104：最终选择下拉 — 保存 demand.moldPick 并切换卡片淡粉背景
     (function(){
