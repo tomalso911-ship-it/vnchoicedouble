@@ -60159,8 +60159,27 @@ function submitAuth() {
   }
   function ccBind(){
     var host = document.getElementById('lib-cost-body'); if(!host) return;
+    // ★CC-CLR-20261104：数字输入框判定（名称/φ下拉/利润率/VAT 除外）
+    function ccIsNumIn(el){
+      if(!el || el.tagName !== 'INPUT' || !el.classList || !el.classList.contains('cc-in')) return false;
+      if(el.id === 'cc_margin' || el.id === 'cc_vat') return false;
+      var f = el.dataset ? el.dataset.f : null;
+      return !!f && f !== 'n' && f !== 'rL' && f !== 'rW';
+    }
+    // ★CC-CLR-20261104：鼠标/焦点进入数字输入框 → 立即清空（不再带着默认 0 输入）
+    host.onfocusin = function(ev){
+      if(ccIsNumIn(ev.target)) ev.target.value = '';
+    };
     host.oninput = function(ev){
       var el = ev.target; if(!el || !el.dataset || !el.dataset.f) return;
+      // ★CC-FMT2-20261104：数字框输入时即时千位符（保留光标位置）
+      if(ccIsNumIn(el) && el.value !== ''){
+        var pos = el.selectionStart || 0, digs = el.value.slice(0, pos).replace(/[^0-9.\-]/g, '').length;
+        el.value = ccFmtIn(el.value);
+        var idx = 0, cnt = 0;
+        while(idx < el.value.length && cnt < digs){ if(/[0-9.\-]/.test(el.value[idx])) cnt++; idx++; }
+        try{ el.setSelectionRange(idx, idx); }catch(e){}
+      }
       var f = el.dataset.f;
       if(el.id === 'cc_margin'){ CC_DATA.margin = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
       else if(el.id === 'cc_vat'){ CC_DATA.vat = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
@@ -60180,9 +60199,17 @@ function submitAuth() {
     // ★CC-FMT-20261104：数字输入失焦时补千位符（名称列与利润率/VAT 除外）
     host.onfocusout = function(ev){
       var el = ev.target;
-      if(!el || !el.classList || !el.classList.contains('cc-in')) return;
-      if(el.id === 'cc_margin' || el.id === 'cc_vat') return;
-      if(el.dataset && el.dataset.g && el.dataset.f && el.dataset.f !== 'n'){ el.value = ccFmtIn(el.value); }
+      if(!ccIsNumIn(el)) return;
+      // 空值离开时归 0（显示与数据同步）
+      if(el.value === '' || ccFmtIn(el.value) === '0'){
+        if(el.dataset.g){
+          var p0 = el.dataset.g + '.';
+          if(el.dataset.i !== undefined) p0 += el.dataset.i + '.';
+          p0 += el.dataset.f;
+          ccPathSet(p0, 0); ccRecalc(); ccScheduleSave();
+        }
+      }
+      el.value = ccFmtIn(el.value);
     };
     host.onclick = function(ev){
       var el = ev.target.closest ? ev.target.closest('[data-act]') : null; if(!el) return;
