@@ -27506,6 +27506,7 @@ var PROD_EQUIP_FAULT_KB = {
       <div class="lib-tabs" id="lib-tabs">
         <div class="lib-tab active" data-key="project" onclick="lib_switchTab('project')">独立项目资料</div>
         <div class="lib-tab" data-key="common" onclick="lib_switchTab('common')">公用资料</div>
+        <div class="lib-tab" data-key="cost" onclick="lib_switchTab('cost')">成本核算</div>
       </div>
       <div class="lib-body" id="lib-body">
         <div class="lib-empty">加载中…</div>
@@ -38710,7 +38711,11 @@ function wonDetailLinkCell(p, field, labelKey) {
     perm_c_usr_d2:         { zh: '新增用户', en: 'Add user', vi: 'Thêm người dùng' },
     perm_c_usr_d2_allow:   { zh: '允许新增', en: 'Allow add', vi: 'Cho phép thêm' },
     perm_c_usr_d3:         { zh: '删除/停用用户', en: 'Delete / disable user', vi: 'Xóa / ngừng người dùng' },
-    perm_c_usr_d3_allow:   { zh: '允许删除/停用', en: 'Allow delete/disable', vi: 'Cho phép xóa / ngừng' }
+    perm_c_usr_d3_allow:   { zh: '允许删除/停用', en: 'Allow delete/disable', vi: 'Cho phép xóa / ngừng' },
+    // ★LIB-COST-20261104：公共模块新增「资料 → 成本核算」权限项 + 资料库第三个子标签「成本核算」
+    perm_g_lib:      { zh: '资料', en: 'Documents', vi: 'Tài liệu' },
+    perm_c_lib_cost: { zh: '成本核算', en: 'Cost Accounting', vi: 'Kế toán chi phí' },
+    lib_tab_cost:    { zh: '成本核算', en: 'Cost Accounting', vi: 'Kế toán chi phí' }
   };
 
   // ---- 注入必要 CSS（强制单行 + 不换行 + 表头不折行）----
@@ -40254,7 +40259,7 @@ var VIEW_PERM_MAP = {
 // =====================================================================
 var SYS_COMMON_DEF = { dashboard:'view', won_list:'view', won_btn_add:'hide', won_btn_export:'hide',
   won_row_view:'hide', won_row_copy:'hide', won_row_edit:'hide', won_row_delete:'hide',
-  fin_vn:'view', fin_cn:'view', fin_rest:'view', eq_data:'view', eq_holders:'hide', eq_dividend:'hide' };
+  fin_vn:'view', fin_cn:'view', fin_rest:'view', lib_cost:'view', eq_data:'view', eq_holders:'hide', eq_dividend:'hide' };
   // ★PERM-V2-APP-PROJ-20261019：approval 已迁到按项目授权（默认 hide）
 var SYS_PROJ_DEF = { wl_daily:'view', wl_mywork:'view', prod_A:'view', prod_B:'view', prod_C:'view', prod_D:'view',
   prod_D_receipt:'hide', prod_E:'view', prod_H:'view', prod_F:'view', inst_A:'view', inst_B:'view', inst_C:'view',
@@ -44049,6 +44054,11 @@ var COMMON_PERM_DEFS = [
       {k:'fin_cn',   n:'中国财务报表',                o:['hide','view','edit'], d:'view'},
       {k:'fin_rest', n:'合并报表 / 越南看板 / 合并看板（三合一，只读）', o:['hide','view'], d:'view'}
   ]},
+  // ★LIB-COST-20261104（用户要求）：新增「资料 → 成本核算」公共权限项，
+  //   放在财务管理之下、股东权益之上；主/子序号由渲染函数自动重排。
+  { mod:'资料', rows:[
+      {k:'lib_cost', n:'成本核算', o:['hide','view','edit'], d:'view'}
+  ]},
   { mod:'股东权益', rows:[
       {k:'eq_data',     n:'总投资 / 中国投资 / 越南投资（三合一，不可隐藏）', o:['view','edit'], d:'view'},
       {k:'eq_holders',  n:'股东结构', o:['hide','view','edit'], d:'hide'},
@@ -44063,7 +44073,7 @@ var COMMON_PERM_DEFS = [
 ];
 var COMMON_LEVEL_LABEL = { hide:'隐藏', view:'查看（只读）', edit:'编辑（可修改）' };
 // 公共模块组名 → i18n key（中文即兜底）
-var COMMON_MOD_KEY = { '看板':'perm_g_dashboard', '签约项目':'perm_g_won', '财务管理':'perm_g_finance', '股东权益':'perm_g_equity', '用户与授权':'perm_g_usr' };
+var COMMON_MOD_KEY = { '看板':'perm_g_dashboard', '签约项目':'perm_g_won', '财务管理':'perm_g_finance', '资料':'perm_g_lib', '股东权益':'perm_g_equity', '用户与授权':'perm_g_usr' };
 
 // ★PERM-V2-20261018：颜色区分 —— 每组一个色系（标题色条 + 行底斑马纹），下拉按级别变色
 var PERM_GROUP_COLORS = [
@@ -59213,7 +59223,7 @@ function submitAuth() {
 <script>
 /* ===================== 资料库（Document Library） ===================== */
 (function(){
-  var LIB_TAB = 'project'; // 'project' | 'common'
+  var LIB_TAB = 'project'; // 'project' | 'common' | 'cost'（★LIB-COST-20261104 新增 cost）
   var LIB_PROJECT_ID = null;
   var LIB_PROJECTS = [];
   var LIB_FILES = [];
@@ -59243,17 +59253,34 @@ function submitAuth() {
   //   ★LIB-SALES-CONTRACT-20261019
   var LIB_EDIT_USERS = ['tom', 'cuong', 'james'];
   var LIB_SALES_DIR = '销售合同';           // 固定内部路径（界面按语言显示）
+  // ★LIB-COST-20261104：成本核算 = 公用资料存储下的固定根目录（复用 library_files 表与整套 UI）
+  var LIB_COST_DIR = '成本核算';            // 固定内部路径（界面按语言显示标签，内部路径恒定）
   function _libMe(){ return (typeof authUser !== 'undefined' && authUser && authUser.username ? String(authUser.username) : '').toLowerCase(); }
   function _libTriAdmin(){ return LIB_EDIT_USERS.indexOf(_libMe()) >= 0; }
   function lib_inSalesDir(p){
     var n = lib_normPath(p === undefined ? LIB_CWD : p);
     return n === LIB_SALES_DIR || n.indexOf(LIB_SALES_DIR + '/') === 0;
   }
+  function lib_inCostDir(p){
+    var n = lib_normPath(p === undefined ? LIB_CWD : p);
+    return n === LIB_COST_DIR || n.indexOf(LIB_COST_DIR + '/') === 0;
+  }
+  // cost 标签页内的 LIB_CWD 是【相对成本核算根目录】的路径；与后端/存储打交道时用绝对路径
+  function lib_cwdAbs(){
+    return (LIB_TAB === 'cost') ? lib_joinPath(LIB_COST_DIR, LIB_CWD) : LIB_CWD;
+  }
+  // 「成本核算」权限级别：三人组恒 edit；其余按公共模块 lib_cost（hide/view/edit）
+  function lib_costLv(){
+    if (_libTriAdmin()) return 'edit';
+    return (typeof permLvCommon === 'function') ? permLvCommon('lib_cost') : 'view';
+  }
   function lib_scopeKey(){
+    if (LIB_TAB === 'cost') return 'lib_cost';
     if (LIB_TAB !== 'project' || !LIB_PROJECT_ID) return null;
     return lib_inSalesDir() ? 'contract' : 'lib';
   }
   function lib_scopeLvForKey(k){
+    if (k === 'lib_cost') return lib_costLv();
     if (!LIB_PROJECT_ID) return _libTriAdmin() ? 'edit' : 'hide';
     if (_libTriAdmin()) return 'edit';
     return (typeof permLvProj === 'function') ? permLvProj(LIB_PROJECT_ID, k) : 'hide';
@@ -59263,15 +59290,17 @@ function submitAuth() {
     if (!k) return _libTriAdmin() ? 'edit' : 'hide';
     return lib_scopeLvForKey(k);
   }
-  // 单个文件级别：合同占位 / 销售合同目录 → contract；其它 → lib
+  // 单个文件级别：合同占位 / 销售合同目录 → contract；成本核算目录 → lib_cost；其它 → lib
   function lib_fileKey(f){
     if (!f) return 'lib';
     if (f.is_contract) return 'contract';
+    if (lib_inCostDir(lib_relPath(f))) return 'lib_cost';
     return lib_inSalesDir(lib_relPath(f)) ? 'contract' : 'lib';
   }
   function lib_fileCanEdit(f){
     if (_libTriAdmin()) return true;
     var k = lib_fileKey(f);
+    if (k === 'lib_cost') return lib_costLv() === 'edit';
     if (!LIB_PROJECT_ID) return false;
     return (typeof permLvProj === 'function') ? permLvProj(LIB_PROJECT_ID, k) === 'edit' : false;
   }
@@ -59290,15 +59319,23 @@ function submitAuth() {
   function lib_renderTabs(){
     var box = document.getElementById('lib-tabs'); if(!box) return;
     box.innerHTML = '';
+    // ★LIB-COST-20261104：第三个子标签「成本核算」（公用资料右侧）；权限=hide 时整 tab 不出现
     var tabs = [
       {k:'project', l:'lib_tab_project'},
-      {k:'common', l:'lib_tab_common'}
+      {k:'common',  l:'lib_tab_common'},
+      {k:'cost',    l:'lib_tab_cost', perm:'lib_cost'}
     ];
     tabs.forEach(function(t){
+      if (t.perm && !_libTriAdmin() && lib_costLv() === 'hide'){
+        if (LIB_TAB === t.k){ LIB_TAB = 'project'; }
+        return;
+      }
       var d = document.createElement('div');
       d.className = 'lib-tab' + (LIB_TAB === t.k ? ' active' : '');
       d.setAttribute('data-key', t.k);
-      d.textContent = lt(t.l);
+      // 取词顺序：__EXTRA_I18N → 主字典（lib_tab_cost 在 __EXTRA_I18N，不动锁死字典）
+      var txt = (typeof _permTr === 'function') ? _permTr(t.l, t.l) : lt(t.l);
+      d.textContent = (txt === t.l) ? lt(t.l) : txt;
       d.onclick = function(){ lib_switchTab(t.k); };
       box.appendChild(d);
     });
@@ -59480,7 +59517,7 @@ function submitAuth() {
       });
       return { folders: [], files: lib_sortFiles(hit), search: true };
     }
-    var cwdParts = lib_pathParts(LIB_CWD), depth = cwdParts.length;
+    var cwdParts = lib_pathParts(lib_cwdAbs()), depth = cwdParts.length;
     var files = [], map = {}, order = [];
     (LIB_FILES||[]).forEach(function(f){
       var parts = lib_pathParts(lib_relPath(f));
@@ -59525,9 +59562,10 @@ function submitAuth() {
     folders.sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); });
     return { folders: folders, files: lib_sortFiles(files), search: false };
   }
-  // 该文件夹（含所有子层级）下的全部文件
+  // 该文件夹（含所有子层级）下的全部文件（cost 页：入参为相对路径，需换算到成本核算根目录下）
   function lib_filesUnder(path){
     var pre = lib_normPath(path) + '/';
+    if (LIB_TAB === 'cost') pre = lib_joinPath(LIB_COST_DIR, path) + '/';
     return (LIB_FILES||[]).filter(function(f){ return lib_relPath(f).indexOf(pre) === 0; });
   }
   function lib_crumbHtml(){
@@ -59541,6 +59579,10 @@ function submitAuth() {
       } else {
         html += '<span class="cb-cur">' + lt('lib_tab_project') + '</span>';
       }
+    } else if (LIB_TAB === 'cost'){
+      // ★LIB-COST-20261104：成本核算页的面包屑根 = 成本核算（三语）
+      var _costLbl = (typeof _permTr === 'function') ? _permTr('lib_tab_cost', '成本核算') : lt('lib_tab_cost');
+      html += '<span class="cb-sep">›</span><span class="cb-item" onclick="lib_goDir(\'\')">' + _costLbl + '</span>';
     } else {
       html += '<span class="cb-sep">›</span><span class="cb-item" onclick="lib_goDir(\'\')">' + lt('lib_tab_common') + '</span>';
     }
@@ -59668,8 +59710,9 @@ function submitAuth() {
         '<td onclick="event.stopPropagation()">' +
         '<button class="lib-act-btn" onclick="lib_view(' + f.id + ')">' + lt('lib_view') + '</button>' +
         '<button class="lib-act-btn" onclick="lib_download(' + f.id + ')">' + lt('lib_download') + '</button>';
-      // ★LIB-SALES-CONTRACT-20261019：删除按「该文件所属项」判定（合同文档 view 不能删），重命名仍限三人组
-      if(_libTriAdmin()){
+      // ★LIB-SALES-CONTRACT-20261019：删除按「该文件所属项」判定（合同文档 view 不能删）；
+      //   ★LIB-COST-20261104：重命名在成本核算页放开给 lib_cost=edit 的用户
+      if(_libTriAdmin() || (LIB_TAB === 'cost' && lib_fileCanEdit(f))){
         html += '<button class="lib-act-btn" onclick="lib_rename(' + f.id + ')">' + lt('lib_rename') + '</button>';
       }
       if(lib_fileCanEdit(f)){
@@ -59999,7 +60042,8 @@ function submitAuth() {
       }
     } else if(_ceCtx || _libTriAdmin()){
       items += '<div class="cx-sep"></div>';
-      if(_libTriAdmin()){
+      // ★LIB-COST-20261104：重命名在成本核算页放开给 lib_cost=edit 的用户（其余页面仍限三人组）
+      if(_libTriAdmin() || (_ceCtx && LIB_TAB === 'cost')){
         items += '<div class="cx-item" onclick="lib_closeCtx();lib_rename(' + id + ')">✏️ ' + lt('lib_rename') + '</div>';
       }
       if(_ceCtx){
@@ -60308,6 +60352,13 @@ function submitAuth() {
     var url = '/api/library/files' + (LIB_PROJECT_ID ? '?project_id=' + LIB_PROJECT_ID : '');
     libApi(url).then(function(data){
       LIB_FILES = Array.isArray(data) ? data : [];
+      // ★LIB-COST-20261104：成本核算页只保留「成本核算/」目录下的文件
+      if (LIB_TAB === 'cost'){
+        LIB_FILES = LIB_FILES.filter(function(f){
+          var p = lib_relPath(f);
+          return p === LIB_COST_DIR || p.indexOf(LIB_COST_DIR + '/') === 0;
+        });
+      }
       lib_renderFiles();
     });
   };
@@ -60357,8 +60408,9 @@ function submitAuth() {
         .then(function(res){ cb(!!(res && res.ok)); })
         .catch(function(){ cb(false); });
     }
-    // 上传目标：始终落在"当前所在文件夹"之下（保留所选文件夹自身的层级）
-    function targetPath(rel){ return lib_joinPath(LIB_CWD, rel); }
+    // 上传目标：始终落在"当前所在文件夹"之下（保留所选文件夹自身的层级）；
+    // cost 页：换算到「成本核算」固定根目录之下（★LIB-COST-20261104）
+    function targetPath(rel){ return lib_joinPath(lib_cwdAbs(), rel); }
     // stream=true：直接用 File 引用（流式，不占内存）；false：先读进内存再发
     function sendBatch(batch, stream, cb){
       var fd = new FormData();

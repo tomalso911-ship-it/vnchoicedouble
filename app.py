@@ -324,6 +324,9 @@ def row_to_dict(row):
 CONTRACT_NAME = "合同-Contract-Hợp đồng"
 # ★LIB-SALES-CONTRACT-20261019：「销售合同」自由上传文件夹（固定内部路径，界面按语言显示名称）
 SALES_CONTRACT_DIR = "销售合同"
+# ★LIB-COST-20261104：资料库「成本核算」子标签 = 公用资料存储下的固定根目录；
+#   写操作（上传/删除/重命名）按公共模块权限 lib_cost（hide/view/edit）判定，三人组恒可。
+COST_DIR = "成本核算"
 
 
 def _seed_contract_docs(c):
@@ -6115,9 +6118,21 @@ def library_upload():
     _paths_contract = any(str(pp or "").replace("\\", "/").strip() == SALES_CONTRACT_DIR
                           or str(pp or "").replace("\\", "/").strip().startswith(SALES_CONTRACT_DIR + "/")
                           for pp in paths)
-    # 门控：公用资料写仍锁三人组（硬代码）；项目资料写按新权限判定
+    # 门控：公用资料写仍锁三人组（硬代码）；项目资料写按新权限判定；
+    #   ★LIB-COST-20261104：上传到「成本核算/」目录 → 按「资料-成本核算」edit 权限判定（三人组恒可）
+    _paths_cost = any(str(pp or "").replace("\\", "/").strip() == COST_DIR
+                      or str(pp or "").replace("\\", "/").strip().startswith(COST_DIR + "/")
+                      for pp in paths)
     if project_id is None:
-        if not _lib_can_edit():
+        if _paths_cost:
+            conn = get_db()
+            try:
+                _lv_cost, _a_cost = common_level(conn, _lib_user(), "lib_cost")
+            finally:
+                conn.close()
+            if not (_lib_can_edit() or _lv_cost == "edit"):
+                return jsonify({"error": "forbidden"}), 403
+        elif not _lib_can_edit():
             return jsonify({"error": "forbidden"}), 403
     else:
         if not _lib_can_edit_proj(project_id, bool(is_contract or _paths_contract)):
@@ -6198,7 +6213,14 @@ def library_delete(fid):
     _nm_del = str((row["original_name"] if "original_name" in row.keys() else "") or "").replace("\\", "/")
     _is_contract_ctx = bool(is_contract) or _nm_del == SALES_CONTRACT_DIR or _nm_del.startswith(SALES_CONTRACT_DIR + "/")
     if row["project_id"] is None:
-        if not _lib_can_edit():
+        # ★LIB-COST-20261104：「成本核算/」目录下的文件按公共权限 lib_cost 判定（三人组恒可）
+        _nm_cost = _nm_del == COST_DIR or _nm_del.startswith(COST_DIR + "/")
+        if _nm_cost:
+            _lv_cost, _a_cost = common_level(conn, _lib_user(), "lib_cost")
+            if not (_lib_can_edit() or _lv_cost == "edit"):
+                conn.close()
+                return jsonify({"error": "forbidden"}), 403
+        elif not _lib_can_edit():
             conn.close()
             return jsonify({"error": "forbidden"}), 403
     else:
@@ -6221,17 +6243,25 @@ def library_delete(fid):
 
 @app.route("/api/library/files/<int:fid>/rename", methods=["PUT"])
 def library_rename(fid):
-    if not _lib_can_edit():
-        return jsonify({"error": "forbidden"}), 403
     data = request.get_json(force=True, silent=True) or {}
     new_name = (data.get("original_name") or "").strip()
     if not new_name:
         return jsonify({"error": "empty name"}), 400
     conn = get_db()
-    row = conn.execute("SELECT id FROM library_files WHERE id=?", (fid,)).fetchone()
+    row = conn.execute("SELECT id, original_name FROM library_files WHERE id=?", (fid,)).fetchone()
     if not row:
         conn.close()
         return jsonify({"error": "not found"}), 404
+    # ★LIB-COST-20261104：「成本核算/」目录下的文件按公共权限 lib_cost 判定；其余仍锁三人组
+    _nm_rn = str(row["original_name"] or "").replace("\\", "/")
+    _is_cost = _nm_rn == COST_DIR or _nm_rn.startswith(COST_DIR + "/")
+    _allowed = _lib_can_edit()
+    if not _allowed and _is_cost:
+        _lv_rn, _a_rn = common_level(conn, _lib_user(), "lib_cost")
+        _allowed = (_lv_rn == "edit")
+    if not _allowed:
+        conn.close()
+        return jsonify({"error": "forbidden"}), 403
     conn.execute("UPDATE library_files SET original_name=? WHERE id=?", (new_name, fid))
     conn.commit()
     conn.close()
@@ -8123,6 +8153,7 @@ SYS_COMMON_DEFAULTS = {
     "fin_vn": "view",           # 越南财务报表
     "fin_cn": "view",           # 中国财务报表
     "fin_rest": "view",         # 合并 + 越南看板 + 合并看板（三合一，只读）
+    "lib_cost": "view",         # ★LIB-COST-20261104：资料库-成本核算（公用模块新增，财务管理之下）
     "eq_data": "view",          # 总投资/中国投资/越南投资（三合一）
     "eq_holders": "hide",       # 股东结构
     "eq_dividend": "hide",      # 分红记录
