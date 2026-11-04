@@ -59858,6 +59858,7 @@ function submitAuth() {
     periodMonth: { zh:'发生周期(月)', en:'Period (months)', vi:'Chu kỳ phát sinh (tháng)' },
     subAmount:   { zh:'小计金额', en:'Subtotal amount', vi:'Thành tiền' },
     feeLabel:    { zh:'费用', en:'Cost', vi:'Chi phí' },
+    costLabel:   { zh:'成本', en:'Cost', vi:'Chi phí' },
     headcount:   { zh:'人数', en:'Headcount', vi:'Số người' },
     wageDaily:   { zh:'日薪(含保险及税金)', en:'Daily wage (incl. insurance & tax)', vi:'Lương ngày (gồm BHXH & thuế)' },
     endSalary:   { zh:'项目结束薪资(含保险及税金)', en:'Project-end salary (incl. insurance & tax)', vi:'Lương kết thúc dự án (gồm BHXH & thuế)' },
@@ -60002,6 +60003,8 @@ function submitAuth() {
       '.cc-tb tbody tr:nth-child(odd) td,.cc-sum tbody tr:nth-child(odd) td{background:#fff;}',
       '.cc-tb tbody tr:nth-child(even) td,.cc-sum tbody tr:nth-child(even) td{background:#eaf3fb;}',
       '.cc-sum td{border:1px solid #000;}',
+      '.cc-sum th{background:#ffff00;border:1px solid #000;padding:5px 6px;font-weight:600;text-align:center;white-space:nowrap;}',
+      '.cc-sum td.cc-fx{text-align:right;color:#555;font-weight:600;white-space:nowrap;}',
       '.cc-tb input.cc-in.cc-vnd{background:#fff59d !important;border:1px solid #d9b900 !important;color:#5b4b00;}',
       // ★CC-ALLYELLOW-20261104：页面内所有输入框/下拉统一淡黄色底（覆盖行内淡蓝/灰/白）
       '.cc-in,input.cc-in,select.cc-in,#cc_mold_pick{background:#fff59d !important;}',
@@ -60161,6 +60164,14 @@ function submitAuth() {
     var n = Number(String(v).replace(/[^0-9.\-]/g, '')) || 0;
     try{ return n.toLocaleString('en-US', { maximumFractionDigits: 6 }); }catch(e){ return String(n); }
   }
+  // ★CC-SUMHEAD-20261104：报价计算汇总行 — 名称 | 成本(RMB/USD/VND)，VND为原值，RMB/USD自动换算
+  function ccSumRow(label, id, cls){
+    return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="cc-lbl">' + label + '</td>' +
+      (id ? '<td class="cc-val cc-fx" data-sumfx="' + id + '" data-cur="rmb">—</td>' +
+            '<td class="cc-val cc-fx" data-sumfx="' + id + '" data-cur="usd">—</td>' +
+            '<td class="cc-val" id="' + id + '">0</td>'
+          : '<td colspan="3"></td>') + '</tr>';
+  }
   function ccHtml(){
     ccStyle();
     var ro = ccCanEdit();
@@ -60263,21 +60274,20 @@ function submitAuth() {
 
     // 报价计算
     var roAttr = ro ? '' : ' disabled';
-    h += '<div class="cc-sec">' + ccT('calc') + '</div><table class="cc-sum"><tbody>' +
-      '<tr><td class="cc-lbl">' + ccT('machTotal') + '</td><td class="cc-val" id="cc_v_mach">0</td></tr>' +
-      '<tr><td class="cc-lbl">' + ccT('aggTotal') + '</td><td class="cc-val" id="cc_v_agg">0</td></tr>' +
-      '<tr><td class="cc-lbl">' + ccT('laborTotal') + '</td><td class="cc-val" id="cc_v_labor">0</td></tr>' +
-      '<tr><td class="cc-lbl">' + ccT('indTotal') + '</td><td class="cc-val" id="cc_v_ind">0</td></tr>' +
-      // ★CC-MGMT-20261104：#5 管理费用 — 输入数值自动显示 X.XX%，右侧 = (#1+#2+#3+#4)×(1+百分比)
-      '<tr><td class="cc-lbl">' + ccT('mgmtFee') + '：<input class="cc-in" id="cc_mgmt_pct" value="' + (Number(CC_DATA.mgmtPct) || 0).toFixed(2) + '%" inputmode="decimal" autocomplete="off" style="width:80px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"></td>' +
-      '<td class="cc-val" id="cc_v_mgmt">0</td></tr>' +
-      '<tr class="cc-big"><td class="cc-lbl">' + ccT('totalCost') + '</td><td class="cc-val" id="cc_v_total">0</td></tr>' +
-      '<tr><td class="cc-lbl">' + ccT('margin') + '：<input class="cc-in cc-pct" id="cc_margin" value="' + (Number(CC_DATA.margin) || 0) + '" inputmode="decimal"' + roAttr + '> %</td>' +
-      '<td class="cc-val" id="cc_v_profit">0</td></tr>' +
-      '<tr><td class="cc-lbl">' + ccT('priceNoVat') + '</td><td class="cc-val" id="cc_v_pnovat">0</td></tr>' +
-      '<tr><td class="cc-lbl">' + ccT('vat') + '：<input class="cc-in cc-pct" id="cc_vat" value="' + (Number(CC_DATA.vat) || 0) + '" inputmode="decimal"' + roAttr + '> %</td></tr>' +
-      '<tr class="cc-big"><td class="cc-lbl">🧾 ' + ccT('priceVat') + '</td><td class="cc-val" id="cc_v_pvat">0</td></tr>' +
-      '<tr><td class="cc-lbl">' + ccT('perM2') + '</td><td class="cc-val" id="cc_v_m2">0</td></tr>' +
+    h += '<div class="cc-sec">' + ccT('calc') + '</div><table class="cc-sum"><thead>' +
+      '<tr><th rowspan="2">' + ccT('name') + '</th><th colspan="3">' + ccT('costLabel') + '</th></tr>' +
+      '<tr><th>' + ccT('curRmb') + '</th><th>' + ccT('curUsd') + '</th><th>' + ccT('curVnd') + '</th></tr></thead><tbody>' +
+      ccSumRow(ccT('machTotal'), 'cc_v_mach') +
+      ccSumRow(ccT('aggTotal'), 'cc_v_agg') +
+      ccSumRow(ccT('laborTotal'), 'cc_v_labor') +
+      ccSumRow(ccT('indTotal'), 'cc_v_ind') +
+      ccSumRow(ccT('mgmtFee') + '：<input class="cc-in" id="cc_mgmt_pct" value="' + (Number(CC_DATA.mgmtPct) || 0).toFixed(2) + '%" inputmode="decimal" autocomplete="off" style="width:80px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;">', 'cc_v_mgmt') +
+      ccSumRow(ccT('totalCost'), 'cc_v_total', 'cc-big') +
+      ccSumRow(ccT('margin') + '：<input class="cc-in cc-pct" id="cc_margin" value="' + (Number(CC_DATA.margin) || 0) + '" inputmode="decimal"' + roAttr + '> %', 'cc_v_profit') +
+      ccSumRow(ccT('priceNoVat'), 'cc_v_pnovat') +
+      ccSumRow(ccT('vat') + '：<input class="cc-in cc-pct" id="cc_vat" value="' + (Number(CC_DATA.vat) || 0) + '" inputmode="decimal"' + roAttr + '> %', null) +
+      ccSumRow('🧾 ' + ccT('priceVat'), 'cc_v_pvat', 'cc-big') +
+      ccSumRow(ccT('perM2'), 'cc_v_m2') +
       '</tbody></table>';
     return h;
   }
@@ -60443,7 +60453,7 @@ function submitAuth() {
     var profit = total * margin / 100;
     var pNoVat = total + profit;
     var pVat = pNoVat * (1 + vat / 100);
-    var set = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = ccNum(v); };
+    var set = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = '₫ ' + ccNum(v); }; // ★CC-SUMHEAD：VND 列带货币符号
     set('cc_v_blocks', blocks);
     set('cc_v_blocks_ft', blocks);
     set('cc_v_area', area);
@@ -60533,6 +60543,18 @@ function submitAuth() {
     set('cc_v_mgmt', mgmtAmt); // ★CC-MGMT2：#5 右侧数值 = 管理费金额(前四项×百分比)
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
     set('cc_v_m2', area > 0 ? pVat / area : 0);
+    // ★CC-SUMHEAD-20261104：汇总表 RMB/USD 列按汇率自动换算
+    var sumVals = {
+      cc_v_mach: mach, cc_v_agg: agg, cc_v_labor: labor + opex, cc_v_ind: ind,
+      cc_v_mgmt: mgmtAmt, cc_v_total: total, cc_v_profit: profit,
+      cc_v_pnovat: pNoVat, cc_v_pvat: pVat, cc_v_m2: (area > 0 ? pVat / area : 0)
+    };
+    var fx2 = ccFx();
+    host.querySelectorAll('[data-sumfx]').forEach(function(el){
+      var v = sumVals[el.getAttribute('data-sumfx')] || 0;
+      var usd = el.getAttribute('data-cur') === 'usd', r = usd ? fx2.usd : fx2.rmb;
+      el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + ccNum(v / r) : '—';
+    });
     if(window.__ccCrewRefresh) window.__ccCrewRefresh(); // ★CC-INSTDAYS：规格/汇率等任何重算都刷新安装天数行
   }
   function ccScheduleSave(){
