@@ -60434,7 +60434,9 @@ function submitAuth() {
       else el.textContent = '₫ ' + ccNum(v);
     });
     var mgmtPct = Number(CC_DATA.mgmtPct) || 0;
-    var total = (mach + agg + labor + opex + ind) * (1 + mgmtPct / 100); // ★CC-MGMT：#5 = 前四项×(1+管理费%)
+    var baseCost = mach + agg + labor + opex + ind;
+    var mgmtAmt = baseCost * mgmtPct / 100;   // ★CC-MGMT2：#5 管理费用 = 前四项 × 百分比
+    var total = baseCost + mgmtAmt;           // 总成本 = 前四项 + 管理费(不重复相加)
     var margin = Number(CC_DATA.margin) || 0, vat = Number(CC_DATA.vat) || 0;
     var profit = total * margin / 100;
     var pNoVat = total + profit;
@@ -60526,7 +60528,7 @@ function submitAuth() {
       }
     }
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
-    set('cc_v_mgmt', total); // ★CC-MGMT：#5 右侧数值 = 含管理费的总成本
+    set('cc_v_mgmt', mgmtAmt); // ★CC-MGMT2：#5 右侧数值 = 管理费金额(前四项×百分比)
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
     set('cc_v_m2', area > 0 ? pVat / area : 0);
     if(window.__ccCrewRefresh) window.__ccCrewRefresh(); // ★CC-INSTDAYS：规格/汇率等任何重算都刷新安装天数行
