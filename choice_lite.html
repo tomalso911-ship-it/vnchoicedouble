@@ -59854,6 +59854,9 @@ function submitAuth() {
     curVnd:      { zh:'VND', en:'VND', vi:'VND' },
     mSalary:     { zh:'月薪（VND）', en:'Monthly salary (VND)', vi:'Lương tháng (VND)' },
     amount:      { zh:'金额（VND）', en:'Amount (VND)', vi:'Số tiền (VND)' },
+    feeMonth:    { zh:'费用/月', en:'Cost / month', vi:'Chi phí / tháng' },
+    periodMonth: { zh:'发生周期(月)', en:'Period (months)', vi:'Chu kỳ phát sinh (tháng)' },
+    subAmount:   { zh:'小计金额', en:'Subtotal amount', vi:'Thành tiền' },
     headcount:   { zh:'人数', en:'Headcount', vi:'Số người' },
     wageDaily:   { zh:'日薪(含保险及税金)', en:'Daily wage (incl. insurance & tax)', vi:'Lương ngày (gồm BHXH & thuế)' },
     endSalary:   { zh:'项目结束薪资(含保险及税金)', en:'Project-end salary (incl. insurance & tax)', vi:'Lương kết thúc dự án (gồm BHXH & thuế)' },
@@ -60083,9 +60086,22 @@ function submitAuth() {
       '<td class="cc-subcell" ' + gs + ' data-cur="vnd">—</td></tr></tfoot></table>';
     return h;
   }
+  // ★CC-OPEXHEAD-20261104：名称|费用/月(三币)|发生周期(月)|小计金额(三币)
+  function ccOpexHead(){
+    var sub = ['curRmb', 'curUsd', 'curVnd'].map(function(k){ return '<th style="width:95px;">' + ccT(k) + '</th>'; }).join('');
+    return '<tr><th rowspan="2">' + ccT('name') + '</th>' +
+      '<th colspan="3">' + ccT('feeMonth') + '</th>' +
+      '<th rowspan="2" style="width:90px;">' + ccT('periodMonth') + '</th>' +
+      '<th colspan="3">' + ccT('subAmount') + '</th></tr><tr>' + sub + sub + '</tr>';
+  }
   function ccOpexRow(f, labelKey){
     return '<tr><td>' + ccT(labelKey) + '</td>' +
-      '<td style="width:170px;">' + ccInNum('opex', f, CC_DATA.opex[f] || 0) + '</td>' +
+      '<td class="cc-subcell" style="color:#666;" data-fx="opex.' + f + '.price" data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" style="color:#666;" data-fx="opex.' + f + '.price" data-cur="usd">—</td>' +
+      '<td style="width:120px;">' + ccInNum('opex', f, CC_DATA.opex[f] || 0) + '</td>' +
+      '<td style="text-align:center;" data-mon>—</td>' +
+      '<td class="cc-subcell" data-fx="opex.' + f + '" data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" data-fx="opex.' + f + '" data-cur="usd">—</td>' +
       '<td class="cc-subcell" data-sub="opex.' + f + '">0</td></tr>';
   }
   function ccIndRow(f, labelKey){
@@ -60213,8 +60229,7 @@ function submitAuth() {
     h += '<div class="cc-sec">' + ccT('dir3') + '</div>' +
       '<div style="font-size:12px;color:#555;margin:0 0 6px;">' + ccT('workDays') + '：<input class="cc-in" id="cc_work_days" value="' + (Number(CC_DATA.demand.workDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</div>' +
       ccLaborGroup('mgmt', 'd31') + ccLaborGroup('work', 'd32') + ccLaborGroup('inst', 'd33') +
-      '<div class="cc-sub">' + ccT('d34') + '</div><table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th>' +
-      '<th style="width:170px;">' + ccT('amount') + '</th><th style="width:170px;">× ' + ccT('months') + '</th></tr></thead><tbody>' +
+      '<div class="cc-sub">' + ccT('d34') + '</div><table class="cc-tb"><thead>' + ccOpexHead() + '</thead><tbody>' +
       ccOpexRow('power', 'opPower') + ccOpexRow('water', 'opWater') + ccOpexRow('cons', 'opCons') +
       ccOpexRow('dorm', 'opDorm') + ccOpexRow('food', 'opFood') + ccOpexRow('car', 'opCar') +
       '</tbody></table><div class="cc-note">' + ccT('laborNote') + '</div>';
@@ -60277,6 +60292,7 @@ function submitAuth() {
       p.pop();
       if(p[0] === 'mach'){ var it = (CC_DATA.mach[p[1]] || [])[Number(p[2])] || {}; return Number(it.price) || 0; }
       if(p[0] === 'agg'){ var a = CC_DATA.agg[p[1]] || {}; return Number(a.price) || 0; }
+      if(p[0] === 'opex'){ return Number(CC_DATA.opex[p[1]]) || 0; } // ★CC-OPEXHEAD：费用/月
     }
     if(p[p.length - 1] === 'sal'){
       p.pop();
@@ -60369,6 +60385,7 @@ function submitAuth() {
       el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + ccNum(ccFxVal(el.getAttribute('data-lfx')) / r) : '—';
     });
     host.querySelectorAll('[data-wd]').forEach(function(el){ el.textContent = ccNum(wd); });
+    host.querySelectorAll('[data-mon]').forEach(function(el){ el.textContent = ccNum(months); }); // ★CC-OPEXHEAD：发生周期(月)
     // ★CC-SUBROW-20261104：表尾小计行（三币带货币符号）
     var machG = function(g){ var s = 0; (CC_DATA.mach[g] || []).forEach(function(it){ s += (Number(it.qty) || 0) * (Number(it.price) || 0); }); return s; };
     var laborG = function(g){ var s = 0; (CC_DATA.labor[g] || []).forEach(function(l){ s += (Number(l.qty) || 0) * (Number(l.sal) || 0); }); return s * wd; };
