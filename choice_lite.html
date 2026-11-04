@@ -60214,13 +60214,34 @@ function submitAuth() {
       days.slice().sort(function(a, b){ return b - a; }).forEach(function(d){ if(L[0] <= L[1]) L[0] += d; else L[1] += d; });
       return Math.max(L[0], L[1]);
     }
+    // ★CC-FX-20261104：投资三币显示 ￥(蓝)/$(红)/đ(黄)，汇率与全 app 同源(/api/fx-rates → eq_fx_server_v1)
+    function ccMoneyHtml(wan){
+      var rmb = 0, usd = 0;
+      try { var o = JSON.parse(localStorage.getItem('eq_fx_server_v1') || '{}'); if(o){ rmb = +o.RMB || 0; usd = +o.USD || 0; } } catch(e){}
+      var cny = wan * 10000;
+      var s = '<span style="color:#1a56b0;">￥' + ccNum(cny) + '</span>';
+      if(usd > 0) s += ' / <span style="color:#d32f2f;">$' + ccNum(Math.round(cny / usd)) + '</span>';
+      if(rmb > 0) s += ' / <span style="color:#e6a700;">đ' + ccNum(Math.round(cny / rmb / 1000) * 1000) + '</span>';
+      if(rmb <= 0 || usd <= 0 && !window.__CC_FX_FETCHED){
+        window.__CC_FX_FETCHED = true;
+        try { fetch('/api/fx-rates').then(function(r){ return r.json(); }).then(function(j){
+          try {
+            if(!j || !j.ok || !j.series) return;
+            var last = function(arr){ if(!arr || !arr.length) return 0; for(var i = arr.length - 1; i >= 0; i--){ var v = parseFloat(String(arr[i]).replace(/[^\d.\-]/g, '')); if(v > 0) return v; } return 0; };
+            var c = last(j.series.cny_vnd), u = last(j.series.usd_vnd);
+            if(c > 0 && u > 0){ try { localStorage.setItem('eq_fx_server_v1', JSON.stringify({ RMB: c, USD: u })); } catch(e){} ccRecalc(); }
+          } catch(e){}
+        }).catch(function(){}); } catch(e){}
+      }
+      return s;
+    }
     if(!sl.length){ if(eMa) eMa.textContent = '—'; if(eMc) eMc.textContent = '—'; }
     else{
       // 方案A：每个规格一套专用模
       var gA = sl.map(function(sp){ var cap = ccMoldPer(sp.len, sp.wid, false); return { sp: sp, pcs: cap }; });
       var mkA = ccSched(gA.map(function(m){ return Math.ceil((Number(m.sp.qty) || 0) / (m.pcs * CPD)); }));
       var htmlA = ccT('moldSum') + ' ' + sl.length + ' ' + ccT('moldSets') + ' · ' + ccT('moldPar') + ' ' + mkA + ' ' + ccT('moldDaysUnit') +
-        ' · ' + ccT('moldCost') + ' ' + (sl.length * MPRICE) + ' ' + ccT('moldWan');
+        ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(sl.length * MPRICE);
       gA.forEach(function(m){ htmlA += ccSpecLine(m, false); });
       if(eMa) eMa.innerHTML = htmlA;
       // 方案B：数量最大的规格单独开模，其余规格组合开模(条带式)；组合放不下的自动单独开模
@@ -60236,7 +60257,7 @@ function submitAuth() {
       combo.forEach(function(a){ if(a.k === 0) groups.push([{ sp: a.sp, pcs: ccMoldPer(a.sp.len, a.sp.wid, false) }]); });
       var mkB = ccSched(groups.map(function(g){ return Math.max.apply(null, g.map(function(m){ return Math.ceil((Number(m.sp.qty) || 0) / (m.pcs * CPD)); })); }));
       var htmlB = ccT('moldSum') + ' ' + groups.length + ' ' + ccT('moldSets') + ' · ' + ccT('moldPar') + ' ' + mkB + ' ' + ccT('moldDaysUnit') +
-        ' · ' + ccT('moldCost') + ' ' + (groups.length * MPRICE) + ' ' + ccT('moldWan');
+        ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(groups.length * MPRICE);
       groups.forEach(function(g){
         if(g.length === 1){
           htmlB += ccSpecLine(g[0], false, ccT('moldDedic') + ' → ');
