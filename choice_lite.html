@@ -59863,6 +59863,9 @@ function submitAuth() {
     perBlock:    { zh:'每块', en:'per slab', vi:'mỗi tấm' },
     unitM2:      { zh:'/㎡', en:'/m²', vi:'/m²' },
     unitBlock:   { zh:'/块', en:'/slab', vi:'/tấm' },
+    unitCol:     { zh:'单位', en:'Unit', vi:'Đơn vị' },
+    unitCubic:   { zh:'立方', en:'m³', vi:'khối' },
+    unitTon:     { zh:'吨', en:'t', vi:'tấn' },
     ccSumSpec:   { zh:'全场共{0}种规格的水泥漏缝地板，共计{1}块，{2} m²，混凝土总体积：{3} m³；', en:'The farm has {0} specs of concrete slatted floor, {1} slabs totaling {2} m²; concrete volume: {3} m³.', vi:'Toàn trại có {0} quy cách sàn bê tông khe hở, tổng {1} tấm, {2} m²; thể tích bê tông: {3} m³.' },
     ccSumMat:    { zh:'材料需求：水泥{0}吨、黄砂{1}吨（{2}方）、石子{3}吨（{4}方）；', en:'Materials: cement {0} t, sand {1} t ({2} m³), gravel {3} t ({4} m³);', vi:'Vật liệu: xi măng {0} tấn, cát {1} tấn ({2} khối), đá {3} tấn ({4} khối);' },
     ccSumRebar:  { zh:'钢筋：', en:'Rebar:', vi:'Cốt thép:' },
@@ -60058,7 +60061,10 @@ function submitAuth() {
   }
   function ccAggRow(gkey, labelKey, d){
     var it = CC_DATA.agg[gkey] || {qty:0, price:0};
+    // ★CC-UNITCOL-20261104：黄砂/石子=立方，水泥/钢筋=吨
+    var u = (gkey === 'sand' || gkey === 'stone') ? ccT('unitCubic') : ccT('unitTon');
     return '<tr' + (d ? ' data-aggd="' + d + '"' : '') + '><td>' + ccT(labelKey) + '</td>' +
+      '<td style="text-align:center;">' + u + '</td>' +
       '<td style="width:70px;">' + ccInNum('agg.' + gkey, 'qty', it.qty) + '</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="agg.' + gkey + '.price" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="agg.' + gkey + '.price" data-cur="usd">—</td>' +
@@ -60271,10 +60277,10 @@ function submitAuth() {
       '<div class="cc-note">' + ccT('machNote') + '</div>';
 
     // #2 骨料
-    h += '<div class="cc-sec">' + ccT('dir2') + '</div><table class="cc-tb"><thead>' + ccFxHead(false) + '</thead><tbody>' +
+    h += '<div class="cc-sec">' + ccT('dir2') + '</div><table class="cc-tb"><thead>' + ccFxHead(false, true) + '</thead><tbody>' +
       ccAggRow('sand', 'sand') + ccAggRow('cement', 'cement') + ccAggRow('stone', 'stone') +
       ccAggRow('r6', 'r6', '6') + ccAggRow('r8', 'r8', '8') + ccAggRow('r10', 'r10', '10') + ccAggRow('r12', 'r12', '12') +
-      '</tbody><tfoot><tr><td colspan="2" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      '</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
       '<td class="cc-subcell" data-gsub="agg" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" data-gsub="agg" data-cur="usd">—</td>' +
       '<td class="cc-subcell" data-gsub="agg" data-cur="vnd">—</td>' +
@@ -60362,9 +60368,11 @@ function submitAuth() {
     }
     return ccRowVal(path);
   }
-  function ccFxHead(withDel){ // 两行表头：名称|数量|单价(RMB/USD/VND)|小计价格(RMB/USD/VND)
+  function ccFxHead(withDel, withUnit){ // 两行表头：名称|[单位]|数量|单价(RMB/USD/VND)|小计价格(RMB/USD/VND)
     var sub = ['curRmb', 'curUsd', 'curVnd'].map(function(k){ return '<th style="width:95px;">' + ccT(k) + '</th>'; }).join('');
-    return '<tr><th rowspan="2">' + ccT('name') + '</th><th rowspan="2" style="width:70px;">' + ccT('qty') + '</th>' +
+    return '<tr><th rowspan="2">' + ccT('name') + '</th>' +
+      (withUnit ? '<th rowspan="2" style="width:70px;">' + ccT('unitCol') + '</th>' : '') +
+      '<th rowspan="2" style="width:70px;">' + ccT('qty') + '</th>' +
       '<th colspan="3">' + ccT('unitPrice') + '</th><th colspan="3">' + ccT('subPrice') + '</th>' +
       (withDel ? '<th rowspan="2" style="width:40px;"></th>' : '') + '</tr><tr>' + sub + sub + '</tr>';
   }
