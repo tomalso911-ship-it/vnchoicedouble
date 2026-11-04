@@ -60033,9 +60033,21 @@ function submitAuth() {
       '<th rowspan="2" style="width:80px;">' + ccT('workDays') + '</th>' +
       '<th colspan="3">' + ccT('endSalary') + '</th></tr><tr>' + sub + sub + '</tr>';
   }
+  // ★CC-CREW-20261104：安装小组配置行（3.3标题下、表格上方）
+  function ccCrewHtml(){
+    var cr = (CC_DATA.demand.crew || {});
+    var gv = function(k, d){ return (Number(cr[k]) !== undefined && !isNaN(Number(cr[k]))) ? Number(cr[k]) : d; };
+    var cin = function(k, d){ return '<input class="cc-in cc-crew" data-ck="' + k + '" value="' + gv(k, d) + '" inputmode="numeric" autocomplete="off" style="width:50px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;">'; };
+    return '<div style="font-size:12px;color:#333;margin:4px 0 8px;line-height:2.2;">' +
+      ccT('crewLine1') + ' ' + cin('size', 5) + ' ' + ccT('crewLine2') + ' ' + cin('driver', 1) + ' ' + ccT('crewLine3') + ' ' +
+      cin('assist', 1) + ' ' + ccT('crewLine4') + ' ' + cin('indoor', 3) + ' ' + ccT('crewLine5') +
+      ' <b id="cc_crew_total" style="color:#1565c0;">—</b> ' + ccT('crewLine6') + ' ' + cin('perDay', 200) + ' ' + ccT('crewLine7') + ' ' +
+      cin('groups', 2) + ' ' + ccT('crewLine8') + ' <b id="cc_crew_out" style="color:#d32f2f;">—</b> ' + ccT('crewLine9') + '</div>';
+  }
   function ccLaborGroup(gkey, labelKey){
     var arr = CC_DATA.labor[gkey] || [];
     var h = '<div class="cc-sub">' + ccT(labelKey) + '</div>' +
+      (gkey === 'inst' ? ccCrewHtml() : '') +
       '<table class="cc-tb"><thead>' + ccLaborHead() + '</thead><tbody>';
     arr.forEach(function(it, i){
       h += '<tr><td>' + ccT(it.k) + '</td>' +
@@ -60189,16 +60201,6 @@ function submitAuth() {
     h += '<div class="cc-sec">' + ccT('dir3') + '</div>' +
       '<div style="font-size:12px;color:#555;margin:0 0 6px;">' + ccT('workDays') + '：<input class="cc-in" id="cc_work_days" value="' + (Number(CC_DATA.demand.workDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</div>' +
       ccLaborGroup('mgmt', 'd31') + ccLaborGroup('work', 'd32') + ccLaborGroup('inst', 'd33') +
-    // ★CC-CREW-20261104：3.3下方安装小组配置（人数/构成/日产能，全部可改）
-    (function(){
-      var cr = (CC_DATA.demand.crew || {}); var gv = function(k, d){ return (Number(cr[k]) !== undefined && !isNaN(Number(cr[k]))) ? Number(cr[k]) : d; };
-      var cin = function(k, d){ return '<input class="cc-in cc-crew" data-ck="' + k + '" value="' + gv(k, d) + '" inputmode="numeric" autocomplete="off" style="width:50px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;">'; };
-      return '<div style="font-size:12px;color:#333;margin:4px 0 8px;line-height:2.2;">' +
-        ccT('crewLine1') + ' ' + cin('size', 5) + ' ' + ccT('crewLine2') + ' ' + cin('driver', 1) + ' ' + ccT('crewLine3') + ' ' +
-        cin('assist', 1) + ' ' + ccT('crewLine4') + ' ' + cin('indoor', 3) + ' ' + ccT('crewLine5') +
-        ' <b id="cc_crew_total" style="color:#1565c0;">—</b> ' + ccT('crewLine6') + ' ' + cin('perDay', 200) + ' ' + ccT('crewLine7') + ' ' +
-        cin('groups', 2) + ' ' + ccT('crewLine8') + ' <b id="cc_crew_out" style="color:#d32f2f;">—</b> ' + ccT('crewLine9') + '</div>';
-    })() +
       '<div class="cc-sub">' + ccT('d34') + '</div><table class="cc-tb"><thead><tr><th>' + ccT('name') + '</th>' +
       '<th style="width:170px;">' + ccT('amount') + '</th><th style="width:170px;">× ' + ccT('months') + '</th></tr></thead><tbody>' +
       ccOpexRow('power', 'opPower') + ccOpexRow('water', 'opWater') + ccOpexRow('cons', 'opCons') +
