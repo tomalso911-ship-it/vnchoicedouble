@@ -59752,7 +59752,7 @@ function submitAuth() {
     totalAll:    { zh:'总计', en:'Total', vi:'Tổng cộng' },
     // ★CC-MOLD-20261104：模具需求信息（三语）
     moldSec:     { zh:'模具需求信息', en:'Mold demand information', vi:'Thông tin nhu cầu khuôn' },
-    moldNote:    { zh:'备注：干法工艺，约 10 分钟脱模 ≈ 48 模/天；一种规格使用一个模具（整块铁板 CNC 雕刻，约 3 万元/套）。', en:'Note: dry-cast, ~10 min per cycle ≈ 48 cycles/day; one mold (CNC-carved steel plate, ≈ CNY 30k) per spec.', vi:'Lưu ý: công nghệ khô, ~10 phút/lô ≈ 48 khuôn/ngày; mỗi quy cách một khuôn (tấm thép khắc CNC, ≈ 30.000 NDT).' },
+    moldNote:    { zh:'备注：干法工艺，约 10 分钟脱模 ≈ 40 模/天。', en:'Note: dry-cast, ~10 min per cycle ≈ 40 cycles/day.', vi:'Lưu ý: công nghệ khô, ~10 phút/lô ≈ 40 khuôn/ngày.' },
     moldA:       { zh:'方案A · 单规格专用模具（一种规格一套）', en:'Plan A · Dedicated mold per spec (one spec per mold set)', vi:'Phương án A · Khuôn chuyên dùng cho một quy cách' },
     moldAd:      { zh:'每种规格单独雕刻一套型腔，一种规格一块铁板，型腔全同方向。', en:'Each spec gets its own carved mold plate; all cavities in one direction.', vi:'Mỗi quy cách khắc một bộ khuôn riêng, các hốc cùng một hướng.' },
     moldAp:      { zh:'优势：CNC 雕刻最简单、费用最低、不易出错', en:'Pros: simplest carving, lowest cost, fewest errors', vi:'Ưu: khắc đơn giản nhất, chi phí thấp, ít nhầm' },
@@ -59780,6 +59780,11 @@ function submitAuth() {
     moldSets:    { zh:'套', en:'mold(s)', vi:'bộ' },
     moldCost:    { zh:'投资', en:'investment', vi:'đầu tư' },
     moldWan:     { zh:'万元', en:'×10k CNY', vi:'vạn NDT' },
+    moldDesign:  { zh:'模具设计（条带式：按规格从长到短，在 1.5m 宽度上分配条带，每条带沿 3.5m 长度排腔）：', en:'Mold design (strip layout: longest spec first, strips across the 1.5 m width, cavities along the 3.5 m length):', vi:'Thiết kế khuôn (dải: quy cách dài nhất trước, chia dải trên rộng 1,5 m, hốc xếp dọc 3,5 m):' },
+    moldStrip:   { zh:'条带', en:'strip(s)', vi:'dải' },
+    moldCav:     { zh:'腔', en:'cavity(ies)', vi:'hốc' },
+    moldNeedDays:{ zh:'需', en:'needs', vi:'cần' },
+    moldNoFit:   { zh:'宽度不足，无法与其它规格同模（建议单独开模）', en:'not enough width to share this mold (use a dedicated mold)', vi:'thiếu bề rộng, không ghép được (nên làm khuôn riêng)' },
     totalBlocks: { zh:'总块数', en:'Total pcs', vi:'Tổng số tấm' },
     blocks:      { zh:'数量（块）', en:'Quantity (pcs)', vi:'Số lượng (tấm)' },
     areaBlk:     { zh:'单块面积（㎡）', en:'Area per piece (㎡)', vi:'Diện tích mỗi tấm (㎡)' },
@@ -60076,17 +60081,18 @@ function submitAuth() {
     // ★CC-MOLD-20261104：模具需求信息（三种摆放方案 + 按当前规格表实时估算）
     h += '<div class="cc-sec" style="margin-top:14px;">' + ccT('moldSec') + '</div>';
     h += '<div style="font-size:12px;color:#555;margin:4px 0 6px;line-height:1.6;">' + ccT('moldNote') + '</div>';
-    function ccMoldCard(title, calcId, pro, con){
-      return '<div style="border:1px solid #d9dee5;border-left:4px solid #1a56b0;border-radius:6px;padding:8px 12px;margin:8px 0;background:#fff;">' +
+    function ccMoldCard(title, calcId, pro, con, grow){
+      return '<div style="border:1px solid #d9dee5;border-left:4px solid #1a56b0;border-radius:6px;padding:8px 12px;background:#fff;flex:' + grow + ';min-width:320px;">' +
         '<div style="font-weight:700;">' + title + '</div>' +
         '<div id="' + calcId + '" style="font-size:12px;color:#1a56b0;font-weight:700;margin:4px 0;">—</div>' +
         '<div style="font-size:12px;color:#2e7d32;margin:2px 0;">' + pro + '</div>' +
         '<div style="font-size:12px;color:#b26a00;margin:2px 0;">' + con + '</div>' +
         '</div>';
     }
-    h += ccMoldCard(ccT('moldA'), 'cc_mold_a', ccT('moldAp'), ccT('moldAc'));
-    h += ccMoldCard(ccT('moldB'), 'cc_mold_b', ccT('moldBp'), ccT('moldBc'));
-    h += ccMoldCard(ccT('moldC'), 'cc_mold_c', ccT('moldCp'), ccT('moldCc'));
+    h += '<div style="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin:8px 0 0;">' +
+      ccMoldCard(ccT('moldA'), 'cc_mold_a', ccT('moldAp'), ccT('moldAc'), 1) +
+      ccMoldCard(ccT('moldC'), 'cc_mold_c', ccT('moldCp'), ccT('moldCc'), 1.4) +
+      '</div>';
 
     h += '<div class="cc-sec">' + ccT('dir1') + '</div>' + ccMachGroup('mech', 'd11') + ccMachGroup('veh', 'd12') + ccMachGroup('tools', 'd13') +
       '<div class="cc-note">' + ccT('machNote') + '</div>';
@@ -60190,19 +60196,18 @@ function submitAuth() {
     set('cc_v_blocks', blocks);
     set('cc_v_blocks_ft', blocks);
     set('cc_v_area', area);
-    // ★CC-MOLD3-20261104：一种规格一个模具 — 按产能自动推算天数(各规格顺序生产累加)
-    var CPD = 48, MPRICE = 3; // 每天模次 / 万元每套
-    var exSp = null, nSpec = 0, workA = 0, workB = 0;
+    // ★CC-MOLD4-20261104：40模/天；方案A=每规格1套顺序生产累加天数；方案C=条带式组合型腔并给设计说明
+    var CPD = 40, MPRICE = 3; // 每天模次 / 万元每套
+    var exSp = null, nSpec = 0, workA = 0;
     (CC_DATA.demand.specs || []).forEach(function(sp){
       var q = Number(sp.qty) || 0;
       if(!(sp.len > 0 && sp.wid > 0) || q <= 0) return;
       if(!exSp) exSp = sp;
       nSpec++;
-      var pa = ccMoldPer(sp.len, sp.wid, false), pb = ccMoldPer(sp.len, sp.wid, true);
+      var pa = ccMoldPer(sp.len, sp.wid, false);
       if(pa > 0) workA += q / (pa * CPD);
-      if(pb > 0) workB += q / (pb * CPD);
     });
-    var daysA = Math.ceil(workA), daysB = Math.ceil(workB), daysC = Math.ceil(area / (5.25 * 0.85 * CPD));
+    var daysA = Math.ceil(workA);
     var ccMoldLine = function(per, sets, days){
       if(!exSp) return '—';
       return ccNum(exSp.len) + '×' + ccNum(exSp.wid) + '：' + ccT('moldPer') + ' ' + per + ' ' + ccT('moldPcs') +
@@ -60211,9 +60216,30 @@ function submitAuth() {
         ' · ' + ccT('moldCost') + ' ' + ccNum(sets * MPRICE) + ' ' + ccT('moldWan');
     };
     var eMa = document.getElementById('cc_mold_a'); if(eMa) eMa.textContent = ccMoldLine(exSp ? ccMoldPer(exSp.len, exSp.wid, false) : 0, nSpec, daysA);
-    var eMb = document.getElementById('cc_mold_b'); if(eMb) eMb.textContent = ccMoldLine(exSp ? ccMoldPer(exSp.len, exSp.wid, true) : 0, nSpec, daysB);
+    // 方案C：条带式组合型腔 — 按规格从长到短分条带(每规格至多2条)，余量再补第2条
+    var combo = (CC_DATA.demand.specs || []).filter(function(sp){ return sp.len > 0 && sp.wid > 0 && (Number(sp.qty) || 0) > 0; })
+      .sort(function(a, b){ return b.len - a.len; })
+      .map(function(sp){ return { sp: sp, k: 0, rows: Math.floor(3.5 / (sp.len / 1000) + 1e-9) }; });
+    var leftW = 1.5;
+    combo.forEach(function(a){ var w = a.sp.wid / 1000; if(a.rows > 0 && leftW >= w - 1e-9){ a.k = 1; leftW -= w; } });
+    combo.forEach(function(a){ var w = a.sp.wid / 1000; if(a.rows > 0 && a.k > 0 && a.k < 2 && leftW >= w - 1e-9){ a.k++; leftW -= w; } });
+    var totC = 0, daysC = 0, rowsHtml = '';
+    combo.forEach(function(a){
+      var pcs = a.k * a.rows, q = Number(a.sp.qty) || 0;
+      if(a.k === 0){
+        rowsHtml += '<div style="color:#b26a00;margin:2px 0;">' + ccNum(a.sp.len) + '×' + ccNum(a.sp.wid) + '：' + ccT('moldNoFit') + '</div>';
+        return;
+      }
+      var dSp = Math.ceil(q / (pcs * CPD));
+      totC += pcs; if(dSp > daysC) daysC = dSp;
+      rowsHtml += '<div style="margin:2px 0;">' + ccNum(a.sp.len) + '×' + ccNum(a.sp.wid) + '：' + a.k + ' ' + ccT('moldStrip') + ' × ' + a.rows + ' ' + ccT('moldCav') +
+        ' → ' + ccT('moldPer') + ' ' + pcs + ' ' + ccT('moldPcs') + ' · ' + ccT('moldDaily') + ' ' + ccNum(pcs * CPD) + ' ' + ccT('moldPcs') +
+        ' · ' + ccT('moldNeedDays') + ' ' + dSp + ' ' + ccT('moldDaysUnit') + '</div>';
+    });
     var eMc = document.getElementById('cc_mold_c');
-    if(eMc) eMc.textContent = ccT('moldDaily') + ' ≈ ' + ccNum(5.25 * 0.85 * CPD) + ' ㎡ ｜ ' + ccT('moldSum') + ' 1 ' + ccT('moldSets') + ' · ' + ccT('moldAbout') + ' ' + daysC + ' ' + ccT('moldDaysUnit') + ' · ' + ccT('moldCost') + ' ' + MPRICE + ' ' + ccT('moldWan');
+    if(eMc) eMc.innerHTML = ccT('moldSum') + ' 1 ' + ccT('moldSets') + ' · ' + ccT('moldPer') + ' ' + totC + ' ' + ccT('moldPcs') +
+      ' · ' + ccT('moldAbout') + ' ' + daysC + ' ' + ccT('moldDaysUnit') + ' · ' + ccT('moldCost') + ' ' + MPRICE + ' ' + ccT('moldWan') +
+      '<div style="font-weight:400;color:#555;margin:3px 0 1px;">' + ccT('moldDesign') + '</div>' + rowsHtml;
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
     set('cc_v_m2', area > 0 ? pVat / area : 0);
