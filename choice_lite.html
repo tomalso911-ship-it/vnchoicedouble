@@ -59877,6 +59877,16 @@ function submitAuth() {
     unitCol:     { zh:'单位', en:'Unit', vi:'Đơn vị' },
     unitCubic:   { zh:'立方', en:'m³', vi:'khối' },
     unitTon:     { zh:'吨', en:'t', vi:'tấn' },
+    // ★CC-MACH-UNIT-20261105：1.1/1.2/1.3 设备默认单位（专业量词三语）
+    uPc:         { zh:'个', en:'pc', vi:'cái' },
+    uUnit:       { zh:'台', en:'unit', vi:'cái' },
+    uMeter:      { zh:'m', en:'m', vi:'m' },
+    uPanel:      { zh:'面', en:'panel', vi:'tấm' },
+    uSet:        { zh:'套', en:'set', vi:'bộ' },
+    uBlock:      { zh:'座', en:'block', vi:'xưởng' },
+    uItem:       { zh:'项', en:'item', vi:'hạng mục' },
+    uVeh:        { zh:'辆', en:'veh', vi:'chiếc' },
+    uLot:        { zh:'批', en:'lot', vi:'lô' },
     ccSumSpec:   { zh:'全场共{0}种规格的水泥漏缝地板，共计{1}块，{2} m²，混凝土总体积：{3} m³；', en:'The farm has {0} specs of concrete slatted floor, {1} slabs totaling {2} m²; concrete volume: {3} m³.', vi:'Toàn trại có {0} quy cách sàn bê tông khe hở, tổng {1} tấm, {2} m²; thể tích bê tông: {3} m³.' },
     ccSumMat:    { zh:'材料需求：水泥{0}吨、黄砂{1}吨（{2}方）、石子{3}吨（{4}方）；', en:'Materials: cement {0} t, sand {1} t ({2} m³), gravel {3} t ({4} m³);', vi:'Vật liệu: xi măng {0} tấn, cát {1} tấn ({2} khối), đá {3} tấn ({4} khối);' },
     ccSumRebar:  { zh:'钢筋：', en:'Rebar:', vi:'Cốt thép:' },
@@ -59962,17 +59972,25 @@ function submitAuth() {
     var d = CC_LANG[k]; if(!d) return k;
     return d[L] || d.zh;
   }
-  // ★CC-MACH-PRESET-20261105：三张表的预设设备行（名称走 CC_LANG 三语键，数量/单价留给用户填）
-  var CC_MACH_KEYS = {
-    mech:  ['mSilo','mBatch3','mMixer','mSpreader','mVibTable','mPalletizer','mFlipper','mRail','mSteamCure',
-            'mSwitchgear','mSteelMould','mCompressor','mOverheadCrane','mSteelPallet','mTempWorkshop','mSiteContainer','mGroundHardening'],
-    veh:   ['vLoader','vForklift','vTractor','vMotorcycle'],
-    tools: ['tWelder','tPlasma','tConsumables']
+  // ★CC-MACH-UNIT-20261105：机械三表预设行 = 名称键 + 给定默认数量 + 三语单位键
+  var CC_MACH_DEF = {
+    mech: [
+      {k:'mSilo',qty:1,u:'uPc'},          {k:'mBatch3',qty:1,u:'uUnit'},      {k:'mMixer',qty:1,u:'uUnit'},
+      {k:'mSpreader',qty:1,u:'uUnit'},    {k:'mVibTable',qty:2,u:'uUnit'},    {k:'mPalletizer',qty:2,u:'uUnit'},
+      {k:'mFlipper',qty:2,u:'uUnit'},     {k:'mRail',qty:360,u:'uMeter'},     {k:'mSteamCure',qty:1,u:'uUnit'},
+      {k:'mSwitchgear',qty:4,u:'uPanel'}, {k:'mSteelMould',qty:3,u:'uSet'},   {k:'mCompressor',qty:1,u:'uSet'},
+      {k:'mOverheadCrane',qty:1,u:'uUnit'}, {k:'mSteelPallet',qty:90,u:'uPc'}, {k:'mTempWorkshop',qty:1,u:'uBlock'},
+      {k:'mSiteContainer',qty:1,u:'uPc'}, {k:'mGroundHardening',qty:1,u:'uItem'}
+    ],
+    veh:   [ {k:'vLoader',qty:1,u:'uUnit'}, {k:'vForklift',qty:1,u:'uUnit'}, {k:'vTractor',qty:2,u:'uUnit'}, {k:'vMotorcycle',qty:3,u:'uVeh'} ],
+    tools: [ {k:'tWelder',qty:4,u:'uUnit'}, {k:'tPlasma',qty:1,u:'uUnit'}, {k:'tConsumables',qty:1,u:'uLot'} ]
   };
+  var CC_MACH_KEYS = {};
+  Object.keys(CC_MACH_DEF).forEach(function(g){ CC_MACH_KEYS[g] = CC_MACH_DEF[g].map(function(r){ return r.k; }); });
   function ccMachDef(){
     var o = {};
-    Object.keys(CC_MACH_KEYS).forEach(function(g){
-      o[g] = CC_MACH_KEYS[g].map(function(k){ return { k:k, qty:0, price:0 }; });
+    Object.keys(CC_MACH_DEF).forEach(function(g){
+      o[g] = CC_MACH_DEF[g].map(function(r){ return { k:r.k, qty:r.qty, price:0, u:r.u }; });
     });
     return o;
   }
@@ -60005,15 +60023,20 @@ function submitAuth() {
       if(saved.mach && typeof saved.mach === 'object'){
         Object.keys(CC_MACH_KEYS).forEach(function(g){
           var old = Array.isArray(saved.mach[g]) ? saved.mach[g] : [];
-          var byK = {}, extra = [];
+          var byK = {}, extra = [], defByK = {};
+          CC_MACH_DEF[g].forEach(function(d){ defByK[d.k] = d; });
           old.forEach(function(r){
             if(!r || typeof r !== 'object') return;
             if(r.k && CC_MACH_KEYS[g].indexOf(r.k) >= 0) byK[r.k] = r;
-            else if(String(r.n || r.k || '').trim()) extra.push({ n:String(r.n || r.k), qty:Number(r.qty)||0, price:Number(r.price)||0 });
+            else if(String(r.n || r.k || '').trim()) extra.push({ n:String(r.n || r.k), qty:Number(r.qty)||0, price:Number(r.price)||0, u:'' });
           });
+          // ★CC-MACH-UNIT-20261105：全新数据/旧版未填数量 → 套用给定默认值；用户已填数量或新版存档 → 一律保留，绝不覆盖已录入数据
           base.mach[g] = CC_MACH_KEYS[g].map(function(k){
-            var r = byK[k] || {};
-            return { k:k, qty:Number(r.qty)||0, price:Number(r.price)||0 };
+            var r = byK[k] || {}, d = defByK[k] || {qty:0,u:''};
+            var legacy = !byK[k] || r.u === undefined || r.u === null;
+            var uq = Number(r.qty);
+            var keepUser = !legacy || (isFinite(uq) && uq !== 0);
+            return { k:k, qty:(keepUser ? (uq || 0) : d.qty), price:Number(r.price)||0, u:d.u };
           }).concat(extra);
         });
       }
@@ -60061,7 +60084,9 @@ function submitAuth() {
     var di = (i === undefined) ? '' : ' data-i="' + i + '"';
     // ★CC-VNDINPUT-20261104：金额类(VND单价/日薪/月费/间接费用)录入框统一淡黄色
     var vnd = (f === 'price' || f === 'sal' || g === 'opex' || g === 'ind') ? ' cc-vnd' : '';
-    return '<input class="cc-in' + vnd + '" data-g="' + g + '" data-f="' + f + '"' + di + ' value="' + ccNum(val) + '" inputmode="decimal"' + ro + '>';
+    // ★CC-MACH-UNIT-20261105：机械三表的数量录入框灰色 + 加大一号，仍可编辑；默认值=给定数量
+    var qtyCls = (f === 'qty' && typeof g === 'string' && g.indexOf('mach.') === 0) ? ' cc-qty' : '';
+    return '<input class="cc-in' + vnd + qtyCls + '" data-g="' + g + '" data-f="' + f + '"' + di + ' value="' + ccNum(val) + '" inputmode="decimal"' + ro + '>';
   }
   function ccStyle(){
     if(document.getElementById('cc-style')) return;
@@ -60107,6 +60132,9 @@ function submitAuth() {
       '.cc-tb td.cc-machname{padding:3px 6px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;}',
       // ★CC-NOCOL-20261105：序号列居中、固定窄宽
       '.cc-tb td.cc-no{width:44px;text-align:center;font-weight:600;color:#444;white-space:nowrap;}',
+      // ★CC-MACH-UNIT-20261105：数量默认值灰色 + 字号加大一号；单位列居中窄宽
+      '.cc-tb input.cc-in.cc-qty{color:#777 !important;font-size:14px !important;}',
+      '.cc-tb td.cc-unit{width:60px;text-align:center;overflow-wrap:anywhere;}',
       // ★CC-SUBRED-20261105：所有表格底部「小计」行的数值统一红色加粗（标签「小计」文字不动）
       '.cc-tb tfoot td.cc-subcell[data-gsub],.cc-tb tfoot td#cc_v_blocks_ft{color:#d32f2f !important;font-weight:700 !important;}',
       '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
@@ -60138,6 +60166,8 @@ function submitAuth() {
       : '<td><input class="cc-in cc-tx" data-g="' + g + '" data-f="n" data-i="' + i + '" value="' + esc(it.n || '') + '"' + ro + '></td>';
     return '<tr>' + ccNoTd(i) + nameCell +
       '<td style="width:70px;">' + ccInNum(g, 'qty', it.qty || 0, i) + '</td>' +
+      // ★CC-MACH-UNIT-20261105：单位列（三语）紧跟数量列
+      '<td class="cc-unit">' + (it.u ? ccT(it.u) : '') + '</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="' + g + '.' + i + '.price" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="' + g + '.' + i + '.price" data-cur="usd">—</td>' +
       '<td style="width:120px;">' + ccInNum(g, 'price', it.price || 0, i) + '</td>' +
@@ -60149,13 +60179,13 @@ function submitAuth() {
   function ccMachGroup(key, labelKey){
     var arr = CC_DATA.mach[key] || [];
     var h = '<div class="cc-sub">' + ccT(labelKey) + '</div>' +
-      '<table class="cc-tb"><thead>' + ccFxHead(false) + '</thead><tbody>';
+      '<table class="cc-tb"><thead>' + ccFxHead(false, false, true) + '</thead><tbody>';
     arr.forEach(function(it, i){ h += ccRowMach('mach.' + key, it, i); });
     // ★CC-SUBROW-20261104：表尾小计行（三币带货币符号）
     var gs = 'data-gsub="mach.' + key + '"';
     // ★CC-SUBTOTAL-ONLY-20261105：表尾只汇总「小计价格」三币；「单价」三列不求小计，留空
-    // ★CC-NOCOL-20261105：colspan +1（新增序号列）
-    h += '</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+    // ★CC-NOCOL / CC-MACH-UNIT-20261105：colspan 覆盖 序号+名称+数量+单位 共 4 列
+    h += '</tbody><tfoot><tr><td colspan="4" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
       '<td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="rmb">—</td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="usd">—</td>' +
@@ -60531,11 +60561,15 @@ function submitAuth() {
     }
     return ccRowVal(path);
   }
-  function ccFxHead(withDel, withUnit){ // 两行表头：名称|[单位]|数量|单价(RMB/USD/VND)|小计价格(RMB/USD/VND)
+  function ccFxHead(withDel, withUnit, unitAfterQty){ // 名称|[单位]|数量|[单位]|单价(三币)|小计价格(三币)
     var sub = ['curRmb', 'curUsd', 'curVnd'].map(function(k){ return '<th style="width:95px;">' + ccT(k) + '</th>'; }).join('');
+    var unitTh = '<th rowspan="2" style="width:60px;">' + ccT('unitCol') + '</th>';
+    var unitThName = '<th rowspan="2" style="width:70px;">' + ccT('unitCol') + '</th>';
     return '<tr>' + ccNoTh() + '<th rowspan="2">' + ccT('name') + '</th>' +
-      (withUnit ? '<th rowspan="2" style="width:70px;">' + ccT('unitCol') + '</th>' : '') +
+      (withUnit ? unitThName : '') +
       '<th rowspan="2" style="width:70px;">' + ccT('qty') + '</th>' +
+      // ★CC-MACH-UNIT-20261105：机械三表单位列插在「数量」与「单价」之间；#2 骨料表仍在名称之后
+      (unitAfterQty ? unitTh : '') +
       '<th colspan="3">' + ccT('unitPrice') + '</th><th colspan="3">' + ccT('subPrice') + '</th>' +
       (withDel ? '<th rowspan="2" style="width:40px;"></th>' : '') + '</tr><tr>' + sub + sub + '</tr>';
   }
