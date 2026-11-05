@@ -60287,7 +60287,17 @@ function submitAuth() {
       '<td class="cc-subcell" style="color:#666;" data-fx="ind.' + f + '" data-cur="usd">—</td>' +
       '<td style="width:170px;">' + ccInNum('ind', f, CC_DATA.ind[f] || 0) + '</td></tr>';
   }
+  // ★CC-LAYERS-SEL-20261105：钢网层数固定为 1/2 下拉；旧存档里的其它值保留为不可选空占位，不擅自改数据
+  function ccInLayers(sp, i){
+    var ro = ccCanEdit() ? '' : ' disabled';
+    var cur = Number(sp && sp.layers);
+    var o = '<option value="1"' + (cur === 1 ? ' selected' : '') + '>1</option>' +
+            '<option value="2"' + (cur === 2 ? ' selected' : '') + '>2</option>';
+    if(cur !== 1 && cur !== 2) o = '<option value="0" selected disabled hidden></option>' + o;
+    return '<select class="cc-in cc-sel cc-sel-lyr" data-g="demand.specs" data-f="layers" data-i="' + i + '"' + ro + '>' + o + '</select>';
+  }
   function ccSpecTd(f, sp, i){
+    if(f === 'layers') return '<td>' + ccInLayers(sp, i) + '</td>';
     return '<td>' + ccInNum('demand.specs', f, sp[f] || 0, i) + '</td>';
   }
   function ccSpecOff(f, i){ // ★CC-DUAL-20261104：层数≠2 的行下层格灰显留空（disabled，不写数据）
