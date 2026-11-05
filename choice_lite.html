@@ -60207,8 +60207,8 @@ function submitAuth() {
       // ★CC-MACH-UNIT-20261105：数量默认值灰色 + 字号加大一号；单位列居中窄宽
       '.cc-tb input.cc-in.cc-qty{color:#777 !important;font-size:14px !important;}',
       '.cc-tb td.cc-unit{width:60px;text-align:center;overflow-wrap:anywhere;}',
-      // ★CC-SUBRED-20261105：所有表格底部「小计」行的数值统一红色加粗（标签「小计」文字不动）
-      '.cc-tb tfoot td.cc-subcell[data-gsub],.cc-tb tfoot td#cc_v_blocks_ft{color:#d32f2f !important;font-weight:700 !important;}',
+      // ★CC-SUBTRI-20261105：表尾小计三币改蓝(¥)/红($)/绿(₫)配色，识别度更高（颜色由 ccRecalc 内联设置）；非货币小计(块数)仍红加粗
+      '.cc-tb tfoot td#cc_v_blocks_ft{color:#d32f2f !important;font-weight:700 !important;}',
       '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
       '.cc-icn:hover{background:#f5f5f5;}',
       '.cc-sel{text-align:center;}',
@@ -60941,6 +60941,8 @@ function submitAuth() {
             : (p[0] === 'opex' ? opex
             : (p[0] === 'ind' ? ind : agg)));
       var cur = el.getAttribute('data-cur');
+      // ★CC-SUBTRI-20261105：小计三币配色与 ccTriMoney 一致——¥ 蓝 / $ 红 / ₫ 绿
+      el.style.color = cur === 'rmb' ? '#1a56b0' : (cur === 'usd' ? '#d32f2f' : '#2e7d32');
       if(cur === 'rmb') el.textContent = fxc.rmb > 0 ? '¥ ' + ccNum2(v / fxc.rmb) : '—';
       else if(cur === 'usd') el.textContent = fxc.usd > 0 ? '$ ' + ccNum2(v / fxc.usd) : '—';
       else el.textContent = '₫ ' + ccNum(v);
