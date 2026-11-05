@@ -60031,7 +60031,7 @@ function submitAuth() {
       margin:0, vat:0, mgmtPct:0,
       // ★CC-PROVIDE-20261105：行路径 → Choice VN 是否提供；空对象=全部默认 √（兼容旧存档）
       provide:{},
-      // ★CC-DEPR-20261105：设备折旧块状态；years=折旧年限(年,默认2)，periodMonths=项目发生周期(月,0=用 ROUNDUP((生产天数+30)/30,1))
+      // ★CC-DEPR-20261105：设备折旧块状态；years=折旧年限(年,默认2,可编辑)；periodMonths 已弃用(20261105 周期改只读，恒=运营费用发生周期)
       depr:{ years:2, periodMonths:0 }
     };
   }
@@ -60249,6 +60249,11 @@ function submitAuth() {
       '.cc-depr td.cc-subcell{font-variant-numeric:tabular-nums;white-space:nowrap;}',
       '.cc-depr input.cc-depr-in{text-align:center;font-weight:700;background:#fff59d !important;border:1px solid #d9b900 !important;}',
       '.cc-depr-annual{color:#1a56b0;}', '.cc-depr-monthly{color:#1565c0;}',
+      // ★CC-DEPR-UI2-20261105：折旧块数据居中+字号加一号；单位(年/月)紧贴输入框右侧绝不换行；周期输入框只读灰底
+      '.cc-depr th,.cc-depr td{text-align:center;font-size:14px;}',
+      '.cc-depr-in{justify-content:center;font-size:14px;}',
+      '.cc-depr-in label{white-space:nowrap;}',
+      'input.cc-depr-ro{text-align:center;font-weight:700;background:#e6e6e6 !important;border:1px solid #b5b5b5 !important;color:#555 !important;}',
       // ★CC-PROVIDE-NOHSCROLL-20261105：新增列后窄屏(<=1199px)改用固定布局，保证所有列可见且绝不撑出横向滚动条
       '@media (max-width:1199px){',
       '.cc-tb:not(.cc-tb-spec){table-layout:fixed;width:100%;}',
@@ -60329,7 +60334,7 @@ function submitAuth() {
         '<span class="cc-depr-annual">' + ccT('deprAnnual') + '：<span id="cc_depr_annual">—</span></span>' +
         '<span style="color:#888;">→</span>' +
         '<span class="cc-depr-monthly">' + ccT('deprMonthly') + '：<span id="cc_depr_monthly">—</span></span>' +
-        '<label>' + ccT('deprPeriod') + '：<input class="cc-in cc-depr-in" id="cc_depr_period" value="' + per + '" inputmode="decimal" autocomplete="off"' + ro + '> ' + ccT('monthUnit') + '</label>' +
+        '<label>' + ccT('deprPeriod') + '：<input class="cc-depr-ro" id="cc_depr_period" value="' + per + '" readonly autocomplete="off"> ' + ccT('monthUnit') + '</label>' +
         '<span style="font-weight:800;color:#1565c0;">' + ccT('deprPeriodTotal') + '：<span id="cc_depr_total">—</span></span>' +
       '</div>';
   }
@@ -60943,7 +60948,7 @@ function submitAuth() {
     // ★CC-DEPR-20261105：设备折旧（机械三表已排除 × 行 → 总投资=mach）
     var deprP = CC_DATA.depr || {};
     var deprYears = Number(deprP.years) || 2;
-    var deprPer = Number(deprP.periodMonths) || ccOpexPeriod(); // 0=用项目发生周期默认 ROUNDUP((生产天数+30)/30,1)
+    var deprPer = ccOpexPeriod(); // ★CC-DEPR-UI2-20261105：项目发生周期只读，恒跟随运营费用表「发生周期(月)」= ROUNDUP((生产天数+30)/30,1)
     var deprInvest = mach; // 设备总投资（已排除 Choice VN × 行）
     var deprAnnual = deprYears > 0 ? deprInvest / deprYears : 0;
     var deprMonthly = deprAnnual / 12;
@@ -61056,11 +61061,9 @@ function submitAuth() {
       tri('cc_depr_annual', deprAnnual);
       tri('cc_depr_monthly', deprMonthly);
       tri('cc_depr_total', deprTotal);
-      // ★CC-DEPR-20261105：周期未手动填写(periodMonths=0)时，把实际 ROUNDUP 默认周期回填输入框，保证显示与计算一致
+      // ★CC-DEPR-UI2-20261105：周期只读——每次重算把实际发生周期回填输入框，保证显示与计算一致
       var perInp = document.getElementById('cc_depr_period');
-      if(perInp && (!CC_DATA.depr || !Number(CC_DATA.depr.periodMonths))){
-        perInp.value = (Math.round(deprPer * 10) / 10).toFixed(1);
-      }
+      if(perInp){ perInp.value = (Math.round(deprPer * 10) / 10).toFixed(1); }
     })();
     set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
     set('cc_v_mgmt', mgmtAmt); // ★CC-MGMT2：#5 右侧数值 = 管理费金额(前四项×百分比)
@@ -61261,23 +61264,19 @@ function submitAuth() {
         ccRecalc(); ccScheduleSave();
       });
     })();
-    // ★CC-DEPR-20261105：折旧年限 / 项目发生周期 输入框直绑（写入 CC_DATA.depr 并重算保存）
+    // ★CC-DEPR-UI2-20261105：仅折旧年限可编辑；项目发生周期已改只读（灰底，实时跟随运营费用表「发生周期(月)」）
     (function(){
       var y = document.getElementById('cc_depr_years');
-      var p = document.getElementById('cc_depr_period');
       function ensure(){ if(!CC_DATA) return; if(!CC_DATA.depr) CC_DATA.depr = { years:2, periodMonths:0 }; }
-      function bind(inp, key, dflt){
-        if(!inp) return;
-        inp.disabled = false;
-        inp.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
-        inp.addEventListener('input', function(){
+      if(y){
+        y.disabled = false;
+        y.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
+        y.addEventListener('input', function(){
           ensure();
-          CC_DATA.depr[key] = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || dflt;
+          CC_DATA.depr.years = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || 2;
           ccRecalc(); ccScheduleSave();
         });
       }
-      bind(y, 'years', 2);
-      bind(p, 'periodMonths', 0);
     })();
     // ★CC-CREW-20261104：安装小组输入直绑 + 总计/日产能自动求和
     (function(){
