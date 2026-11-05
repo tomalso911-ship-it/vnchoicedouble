@@ -59856,6 +59856,7 @@ function submitAuth() {
     indMkt:      { zh:'市场营销费', en:'Marketing', vi:'Chi phí tiếp thị' },
     indOffice:   { zh:'办公室员工管理费', en:'Office staff management', vi:'Chi phí quản lý văn phòng' },
     name:        { zh:'名称', en:'Name', vi:'Tên' },
+    colNo:       { zh:'序号', en:'No.', vi:'STT' },
     qty:         { zh:'数量', en:'Qty', vi:'Số lượng' },
     unitPrice:   { zh:'单价', en:'Unit price', vi:'Đơn giá' },
     subPrice:    { zh:'小计价格', en:'Subtotal', vi:'Thành tiền' },
@@ -60104,6 +60105,8 @@ function submitAuth() {
       '.cc-tb tfoot td{font-weight:700;background:#f2f4f7;white-space:nowrap;}',
       // ★CC-MACH-PRESET-20261105：预设设备名（三语只读）允许自动换行，避免长英文撑宽表格
       '.cc-tb td.cc-machname{padding:3px 6px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;}',
+      // ★CC-NOCOL-20261105：序号列居中、固定窄宽
+      '.cc-tb td.cc-no{width:44px;text-align:center;font-weight:600;color:#444;white-space:nowrap;}',
       // ★CC-SUBRED-20261105：所有表格底部「小计」行的数值统一红色加粗（标签「小计」文字不动）
       '.cc-tb tfoot td.cc-subcell[data-gsub],.cc-tb tfoot td#cc_v_blocks_ft{color:#d32f2f !important;font-weight:700 !important;}',
       '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
@@ -60124,13 +60127,16 @@ function submitAuth() {
     ].join('');
     document.head.appendChild(s);
   }
+  // ★CC-NOCOL-20261105：所有「名称」开头的表格，名称列左侧统一加三语「序号」列
+  function ccNoTh(){ return '<th rowspan="2" style="width:44px;">' + ccT('colNo') + '</th>'; }
+  function ccNoTd(i){ return '<td class="cc-no" style="text-align:center;">' + (i + 1) + '</td>'; }
   function ccRowMach(g, it, i){
     var ro = ccCanEdit() ? '' : ' disabled';
     // ★CC-MACH-PRESET-20261105：预设行名称按当前语言显示 CC_LANG 键（只读）；自定义行名称仍可编辑
     var nameCell = it.k
       ? '<td class="cc-machname">' + esc(ccT(it.k)) + '</td>'
       : '<td><input class="cc-in cc-tx" data-g="' + g + '" data-f="n" data-i="' + i + '" value="' + esc(it.n || '') + '"' + ro + '></td>';
-    return '<tr>' + nameCell +
+    return '<tr>' + ccNoTd(i) + nameCell +
       '<td style="width:70px;">' + ccInNum(g, 'qty', it.qty || 0, i) + '</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="' + g + '.' + i + '.price" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="' + g + '.' + i + '.price" data-cur="usd">—</td>' +
@@ -60148,18 +60154,19 @@ function submitAuth() {
     // ★CC-SUBROW-20261104：表尾小计行（三币带货币符号）
     var gs = 'data-gsub="mach.' + key + '"';
     // ★CC-SUBTOTAL-ONLY-20261105：表尾只汇总「小计价格」三币；「单价」三列不求小计，留空
-    h += '</tbody><tfoot><tr><td colspan="2" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+    // ★CC-NOCOL-20261105：colspan +1（新增序号列）
+    h += '</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
       '<td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="rmb">—</td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="usd">—</td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="vnd">—</td></tr></tfoot></table>';
     return h;
   }
-  function ccAggRow(gkey, labelKey, d){
+  function ccAggRow(gkey, labelKey, d, i){
     var it = CC_DATA.agg[gkey] || {qty:0, price:0};
     // ★CC-UNITCOL-20261104：黄砂/石子=立方，水泥/钢筋=吨
     var u = (gkey === 'sand' || gkey === 'stone') ? ccT('unitCubic') : ccT('unitTon');
-    return '<tr' + (d ? ' data-aggd="' + d + '"' : '') + '><td>' + ccT(labelKey) + '</td>' +
+    return '<tr' + (d ? ' data-aggd="' + d + '"' : '') + '>' + ccNoTd(i) + '<td>' + ccT(labelKey) + '</td>' +
       '<td style="text-align:center;">' + u + '</td>' +
       '<td style="width:70px;">' + ccInNum('agg.' + gkey, 'qty', it.qty) + '</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="agg.' + gkey + '.price" data-cur="rmb">—</td>' +
@@ -60172,7 +60179,7 @@ function submitAuth() {
   // ★CC-WD-20261104：人工表新结构 — 名称|人数|日薪(三币)|项目天数|项目结束薪资(三币)
   function ccLaborHead(){
     var sub = ['curRmb', 'curUsd', 'curVnd'].map(function(k){ return '<th style="width:95px;">' + ccT(k) + '</th>'; }).join('');
-    return '<tr><th rowspan="2">' + ccT('name') + '</th><th rowspan="2" style="width:70px;">' + ccT('headcount') + '</th>' +
+    return '<tr>' + ccNoTh() + '<th rowspan="2">' + ccT('name') + '</th><th rowspan="2" style="width:70px;">' + ccT('headcount') + '</th>' +
       '<th colspan="3">' + ccT('wageDaily') + '</th>' +
       '<th rowspan="2" style="width:80px;">' + ccT('workDays') + '</th>' +
       '<th colspan="3">' + ccT('endSalary') + '</th></tr><tr>' + sub + sub + '</tr>';
@@ -60200,7 +60207,7 @@ function submitAuth() {
       (gkey === 'inst' ? ccCrewHtml() : '') +
       '<table class="cc-tb"><thead>' + ccLaborHead() + '</thead><tbody>';
     arr.forEach(function(it, i){
-      h += '<tr><td>' + ccT(it.k) + '</td>' +
+      h += '<tr>' + ccNoTd(i) + '<td>' + ccT(it.k) + '</td>' +
         '<td style="width:70px;">' + ccInNum('labor.' + gkey, 'qty', it.qty, i) + '</td>' +
         '<td class="cc-subcell" style="color:#666;" data-lfx="labor.' + gkey + '.' + i + '.sal" data-cur="rmb">—</td>' +
         '<td class="cc-subcell" style="color:#666;" data-lfx="labor.' + gkey + '.' + i + '.sal" data-cur="usd">—</td>' +
@@ -60212,7 +60219,8 @@ function submitAuth() {
     });
     var gs = 'data-gsub="labor.' + gkey + '"';
     // ★CC-SUBTOTAL-ONLY-20261105：表尾只汇总「项目结束薪资/小计金额」三币；日薪三列不求小计
-    h += '</tbody><tfoot><tr><td colspan="2" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+    // ★CC-NOCOL-20261105：colspan +1（新增序号列）
+    h += '</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
       '<td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td>' +
       '<td></td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="rmb">—</td>' +
@@ -60223,13 +60231,13 @@ function submitAuth() {
   // ★CC-OPEXHEAD-20261104：名称|费用/月(三币)|发生周期(月)|小计金额(三币)
   function ccOpexHead(){
     var sub = ['curRmb', 'curUsd', 'curVnd'].map(function(k){ return '<th style="width:95px;">' + ccT(k) + '</th>'; }).join('');
-    return '<tr><th rowspan="2">' + ccT('name') + '</th>' +
+    return '<tr>' + ccNoTh() + '<th rowspan="2">' + ccT('name') + '</th>' +
       '<th colspan="3">' + ccT('feeMonth') + '</th>' +
       '<th rowspan="2" style="width:90px;">' + ccT('periodMonth') + '</th>' +
       '<th colspan="3">' + ccT('subAmount') + '</th></tr><tr>' + sub + sub + '</tr>';
   }
-  function ccOpexRow(f, labelKey){
-    return '<tr><td>' + ccT(labelKey) + '</td>' +
+  function ccOpexRow(f, labelKey, i){
+    return '<tr>' + ccNoTd(i) + '<td>' + ccT(labelKey) + '</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="opex.' + f + '.price" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="opex.' + f + '.price" data-cur="usd">—</td>' +
       '<td style="width:120px;">' + ccInNum('opex', f, CC_DATA.opex[f] || 0) + '</td>' +
@@ -60240,11 +60248,11 @@ function submitAuth() {
   }
   // ★CC-INDHEAD-20261104：名称|费用(RMB/USD/VND)，VND可编辑，RMB/USD自动换算
   function ccIndHead(){
-    return '<tr><th rowspan="2">' + ccT('name') + '</th><th colspan="3">' + ccT('feeLabel') + '</th></tr>' +
+    return '<tr>' + ccNoTh() + '<th rowspan="2">' + ccT('name') + '</th><th colspan="3">' + ccT('feeLabel') + '</th></tr>' +
       '<tr>' + ['curRmb', 'curUsd', 'curVnd'].map(function(k){ return '<th style="width:150px;">' + ccT(k) + '</th>'; }).join('') + '</tr>';
   }
-  function ccIndRow(f, labelKey){
-    return '<tr><td>' + ccT(labelKey) + '</td>' +
+  function ccIndRow(f, labelKey, i){
+    return '<tr>' + ccNoTd(i) + '<td>' + ccT(labelKey) + '</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="ind.' + f + '" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="ind.' + f + '" data-cur="usd">—</td>' +
       '<td style="width:170px;">' + ccInNum('ind', f, CC_DATA.ind[f] || 0) + '</td></tr>';
@@ -60418,10 +60426,11 @@ function submitAuth() {
 
     // #2 骨料
     h += '<div class="cc-sec">' + ccT('dir2') + '</div><table class="cc-tb"><thead>' + ccFxHead(false, true) + '</thead><tbody>' +
-      ccAggRow('sand', 'sand') + ccAggRow('cement', 'cement') + ccAggRow('stone', 'stone') +
-      ccAggRow('r6', 'r6', '6') + ccAggRow('r8', 'r8', '8') + ccAggRow('r10', 'r10', '10') + ccAggRow('r12', 'r12', '12') +
+      ccAggRow('sand', 'sand', null, 0) + ccAggRow('cement', 'cement', null, 1) + ccAggRow('stone', 'stone', null, 2) +
+      ccAggRow('r6', 'r6', '6', 3) + ccAggRow('r8', 'r8', '8', 4) + ccAggRow('r10', 'r10', '10', 5) + ccAggRow('r12', 'r12', '12', 6) +
       // ★CC-SUBTOTAL-ONLY-20261105：骨料表表尾只汇总「小计价格」三币；单价三列不求小计
-      '</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      // ★CC-NOCOL-20261105：colspan +1（新增序号列）
+      '</tbody><tfoot><tr><td colspan="4" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
       '<td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td>' +
       '<td class="cc-subcell" data-gsub="agg" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" data-gsub="agg" data-cur="usd">—</td>' +
@@ -60433,11 +60442,12 @@ function submitAuth() {
       '<div style="font-size:12px;color:#555;margin:0 0 6px;">' + ccT('instPrjDays') + '：<input class="cc-in" id="cc_inst_days_top" value="' + (Number(CC_DATA.demand.instDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</div>' +
       ccLaborGroup('mgmt', 'd31') + ccLaborGroup('work', 'd32') + ccLaborGroup('inst', 'd33') +
       '<div class="cc-sub">' + ccT('d34') + '</div><table class="cc-tb"><thead>' + ccOpexHead() + '</thead><tbody>' +
-      ccOpexRow('power', 'opPower') + ccOpexRow('water', 'opWater') + ccOpexRow('cons', 'opCons') +
-      ccOpexRow('dorm', 'opDorm') + ccOpexRow('food', 'opFood') + ccOpexRow('car', 'opCar') +
+      ccOpexRow('power', 'opPower', 0) + ccOpexRow('water', 'opWater', 1) + ccOpexRow('cons', 'opCons', 2) +
+      ccOpexRow('dorm', 'opDorm', 3) + ccOpexRow('food', 'opFood', 4) + ccOpexRow('car', 'opCar', 5) +
       // ★CC-OPEX-SUB-20261105：3.4 运营费用表尾小计 — 「费用/月」与「发生周期」列留空，只汇总「小计金额」三币
+      // ★CC-NOCOL-20261105：colspan +1（新增序号列）
       '</tbody><tfoot><tr>' +
-      '<td colspan="4" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      '<td colspan="5" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
       '<td></td>' +
       '<td class="cc-subcell" data-gsub="opex" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" data-gsub="opex" data-cur="usd">—</td>' +
@@ -60446,11 +60456,12 @@ function submitAuth() {
 
     // #4 间接
     h += '<div class="cc-sec">' + ccT('dir4') + '</div><table class="cc-tb"><thead>' + ccIndHead() + '</thead><tbody>' +
-      ccIndRow('flight', 'indFlight') + ccIndRow('hotel', 'indHotel') + ccIndRow('meal', 'indMeal') +
-      ccIndRow('mkt', 'indMkt') +
+      ccIndRow('flight', 'indFlight', 0) + ccIndRow('hotel', 'indHotel', 1) + ccIndRow('meal', 'indMeal', 2) +
+      ccIndRow('mkt', 'indMkt', 3) +
       // ★CC-IND-SUB-20261105：#4 间接成本表尾小计 — 汇总「费用」三币
+      // ★CC-NOCOL-20261105：表尾标签跨 2 列（序号 + 名称）
       '</tbody><tfoot><tr>' +
-      '<td style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      '<td colspan="2" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
       '<td class="cc-subcell" data-gsub="ind" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" data-gsub="ind" data-cur="usd">—</td>' +
       '<td class="cc-subcell" data-gsub="ind" data-cur="vnd">—</td>' +
@@ -60522,7 +60533,7 @@ function submitAuth() {
   }
   function ccFxHead(withDel, withUnit){ // 两行表头：名称|[单位]|数量|单价(RMB/USD/VND)|小计价格(RMB/USD/VND)
     var sub = ['curRmb', 'curUsd', 'curVnd'].map(function(k){ return '<th style="width:95px;">' + ccT(k) + '</th>'; }).join('');
-    return '<tr><th rowspan="2">' + ccT('name') + '</th>' +
+    return '<tr>' + ccNoTh() + '<th rowspan="2">' + ccT('name') + '</th>' +
       (withUnit ? '<th rowspan="2" style="width:70px;">' + ccT('unitCol') + '</th>' : '') +
       '<th rowspan="2" style="width:70px;">' + ccT('qty') + '</th>' +
       '<th colspan="3">' + ccT('unitPrice') + '</th><th colspan="3">' + ccT('subPrice') + '</th>' +
