@@ -59929,17 +59929,56 @@ function submitAuth() {
     priceVat:    { zh:'含税卖价', en:'Price incl. VAT', vi:'Giá gồm VAT' },
     perM2:       { zh:'折合每㎡单价（含税）', en:'Price per ㎡ (incl. VAT)', vi:'Đơn giá mỗi ㎡ (gồm VAT)' },
     machNote:    { zh:'注：机械类为一次性投入，全额计入本单总成本。', en:'Note: machinery is a one-time investment, fully counted in total cost.', vi:'Lưu ý: máy móc là đầu tư một lần, tính toàn bộ vào tổng chi phí.' },
-    laborNote:   { zh:'注：人工按「项目天数」（生产/安装分别计算）、运营费用按 ROUNDUP((生产项目天数+30)/30, 1) 个月自动乘算。', en:'Note: labor uses project days (production / installation separately); opex uses ROUNDUP((production days + 30)/30, 1) months.', vi:'Lưu ý: nhân công tính theo số ngày dự án (sản xuất / lắp đặt riêng); vận hành nhân theo ROUNDUP((số ngày sản xuất + 30)/30, 1) tháng.' }
+    laborNote:   { zh:'注：人工按「项目天数」（生产/安装分别计算）、运营费用按 ROUNDUP((生产项目天数+30)/30, 1) 个月自动乘算。', en:'Note: labor uses project days (production / installation separately); opex uses ROUNDUP((production days + 30)/30, 1) months.', vi:'Lưu ý: nhân công tính theo số ngày dự án (sản xuất / lắp đặt riêng); vận hành nhân theo ROUNDUP((số ngày sản xuất + 30)/30, 1) tháng.' },
+    // ★CC-MACH-PRESET-20261105：1.1 生产机械 & 设备 / 1.2 工程车辆 / 1.3 工具 & 耗材 预设行名称（专业术语三语）
+    mSilo:          { zh:'水泥筒仓', en:'Cement Silo', vi:'Silo chứa xi măng' },
+    mBatch3:        { zh:'三仓配料机', en:'Three-Hopper Batching Machine', vi:'Máy định lượng 3 phễu' },
+    mMixer:         { zh:'混凝土搅拌机', en:'Concrete Mixer', vi:'Máy trộn bê tông' },
+    mSpreader:      { zh:'布料机', en:'Concrete Spreader / Distributor', vi:'Máy rải bê tông' },
+    mVibTable:      { zh:'震动平台', en:'Vibrating Table', vi:'Bàn rung tạo hình' },
+    mPalletizer:    { zh:'垛码机', en:'Automatic Stacker / Palletizer', vi:'Máy xếp chồng tự động' },
+    mFlipper:       { zh:'翻板机', en:'Panel Flipping Machine', vi:'Máy lật tấm bê tông' },
+    mRail:          { zh:'地轨', en:'Floor-Mounted Rail System', vi:'Hệ thống ray sàn' },
+    mSteamCure:     { zh:'蒸养机', en:'Steam Curing System', vi:'Hệ thống bảo dưỡng bằng hơi nước' },
+    mSwitchgear:    { zh:'配电柜', en:'Power Distribution Cabinet', vi:'Tủ điện phân phối' },
+    mSteelMould:    { zh:'钢模具', en:'Steel Mould', vi:'Khuôn thép' },
+    mCompressor:    { zh:'空压机系统', en:'Air Compressor System', vi:'Hệ thống máy nén khí' },
+    mOverheadCrane: { zh:'桥式行车', en:'Overhead Travelling Crane', vi:'Cầu trục' },
+    mSteelPallet:   { zh:'铁托盘', en:'Steel Pallet', vi:'Pallet thép' },
+    mTempWorkshop:  { zh:'临时厂房', en:'Temporary Workshop', vi:'Nhà xưởng tạm' },
+    mSiteContainer: { zh:'现场办公集装箱', en:'Site Office Container', vi:'Container văn phòng công trường' },
+    mGroundHardening:{ zh:'场地硬化', en:'Site Ground Hardening (Concrete Paving)', vi:'Bê tông hóa mặt bằng' },
+    vLoader:        { zh:'铲车', en:'Wheel Loader', vi:'Máy xúc lật' },
+    vForklift:      { zh:'叉车', en:'Forklift Truck', vi:'Xe nâng hàng' },
+    vTractor:       { zh:'拖拉机', en:'Tractor', vi:'Máy kéo' },
+    vMotorcycle:    { zh:'摩托车', en:'Motorcycle', vi:'Xe máy' },
+    tWelder:        { zh:'焊机', en:'Welding Machine', vi:'Máy hàn' },
+    tPlasma:        { zh:'等离子切割机', en:'Plasma Cutting Machine', vi:'Máy cắt plasma' },
+    tConsumables:   { zh:'辅材 / 工具', en:'Consumables / Tools', vi:'Vật tư phụ / Dụng cụ' }
   };
   function ccT(k){
     var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh';
     var d = CC_LANG[k]; if(!d) return k;
     return d[L] || d.zh;
   }
+  // ★CC-MACH-PRESET-20261105：三张表的预设设备行（名称走 CC_LANG 三语键，数量/单价留给用户填）
+  var CC_MACH_KEYS = {
+    mech:  ['mSilo','mBatch3','mMixer','mSpreader','mVibTable','mPalletizer','mFlipper','mRail','mSteamCure',
+            'mSwitchgear','mSteelMould','mCompressor','mOverheadCrane','mSteelPallet','mTempWorkshop','mSiteContainer','mGroundHardening'],
+    veh:   ['vLoader','vForklift','vTractor','vMotorcycle'],
+    tools: ['tWelder','tPlasma','tConsumables']
+  };
+  function ccMachDef(){
+    var o = {};
+    Object.keys(CC_MACH_KEYS).forEach(function(g){
+      o[g] = CC_MACH_KEYS[g].map(function(k){ return { k:k, qty:0, price:0 }; });
+    });
+    return o;
+  }
   function ccDef(){
     return {
       demand:{ months:1, workDays:0, prodDays:0, instDays:0, crew:{ size:5, driver:1, assist:1, indoor:3, perDay:200, groups:2 }, specs:[{ len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0, nl2:0, rL2:'', nw2:0, rW2:'', d2mod:0 }] },
-      mach:{ mech:[{n:'',qty:1,price:0}], veh:[{n:'',qty:1,price:0}], tools:[{n:'',qty:1,price:0}] },
+      mach: ccMachDef(),
       agg:{ sand:{qty:0,price:0}, cement:{qty:0,price:0}, stone:{qty:0,price:0},
             r6:{qty:0,price:0}, r8:{qty:0,price:0}, r10:{qty:0,price:0}, r12:{qty:0,price:0} },
       labor:{
@@ -59961,6 +60000,22 @@ function submitAuth() {
       ['demand','mach','agg','labor','opex','ind'].forEach(function(k){
         if(saved[k] && typeof saved[k] === 'object') base[k] = Object.assign({}, base[k], saved[k]);
       });
+      // ★CC-MACH-PRESET-20261105：以预设行骨架合并存档 — 按 k 回填用户已填数量/单价，保留自定义名称行（旧数据不丢）
+      if(saved.mach && typeof saved.mach === 'object'){
+        Object.keys(CC_MACH_KEYS).forEach(function(g){
+          var old = Array.isArray(saved.mach[g]) ? saved.mach[g] : [];
+          var byK = {}, extra = [];
+          old.forEach(function(r){
+            if(!r || typeof r !== 'object') return;
+            if(r.k && CC_MACH_KEYS[g].indexOf(r.k) >= 0) byK[r.k] = r;
+            else if(String(r.n || r.k || '').trim()) extra.push({ n:String(r.n || r.k), qty:Number(r.qty)||0, price:Number(r.price)||0 });
+          });
+          base.mach[g] = CC_MACH_KEYS[g].map(function(k){
+            var r = byK[k] || {};
+            return { k:k, qty:Number(r.qty)||0, price:Number(r.price)||0 };
+          }).concat(extra);
+        });
+      }
       ['margin','vat','mgmtPct'].forEach(function(k){ if(saved[k] !== undefined) base[k] = Number(saved[k]) || 0; }); // ★CC-MGMT：管理费百分比
       delete base.ind.office; // ★CC-INDHEAD-20261104：办公室员工管理费已下线，旧存档残留值不参与合计
       // ★CC-SPEC-20261104：需求信息 = 规格行列表；旧版(blocks/area)自动迁移成一行规格
@@ -59985,7 +60040,7 @@ function submitAuth() {
         }
         delete base.demand.blocks; delete base.demand.area;
       }
-      if(saved.mach) ['mech','veh','tools'].forEach(function(g){ if(Array.isArray(saved.mach[g])) base.mach[g] = saved.mach[g]; });
+      // ★CC-MACH-PRESET-20261105：删除旧的「saved.mach 原样覆盖」逻辑，改由上方预设行骨架合并（否则会覆盖注入的 17/4/3 行）
       // 人工岗位按 k 合并：默认岗位列表始终完整（新增岗位自动补进旧存档），已有数值不丢
       if(saved.labor) ['mgmt','work','inst'].forEach(function(g){
         var s = Array.isArray(saved.labor[g]) ? saved.labor[g] : [], map = {};
@@ -60047,6 +60102,8 @@ function submitAuth() {
       // ★CC-DUAL-PINK-20261104：上层 6 格改淡粉色；下层 6 格保持天蓝色不变
       '.cc-tb-spec.cc-dual th.cc-th2.cc-th2-up{background:#FFD1DC;}',
       '.cc-tb tfoot td{font-weight:700;background:#f2f4f7;white-space:nowrap;}',
+      // ★CC-MACH-PRESET-20261105：预设设备名（三语只读）允许自动换行，避免长英文撑宽表格
+      '.cc-tb td.cc-machname{padding:3px 6px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;}',
       // ★CC-SUBRED-20261105：所有表格底部「小计」行的数值统一红色加粗（标签「小计」文字不动）
       '.cc-tb tfoot td.cc-subcell[data-gsub],.cc-tb tfoot td#cc_v_blocks_ft{color:#d32f2f !important;font-weight:700 !important;}',
       '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
@@ -60069,8 +60126,11 @@ function submitAuth() {
   }
   function ccRowMach(g, it, i){
     var ro = ccCanEdit() ? '' : ' disabled';
-    return '<tr>' +
-      '<td><input class="cc-in cc-tx" data-g="' + g + '" data-f="n" data-i="' + i + '" value="' + esc(it.n || '') + '"' + ro + '></td>' +
+    // ★CC-MACH-PRESET-20261105：预设行名称按当前语言显示 CC_LANG 键（只读）；自定义行名称仍可编辑
+    var nameCell = it.k
+      ? '<td class="cc-machname">' + esc(ccT(it.k)) + '</td>'
+      : '<td><input class="cc-in cc-tx" data-g="' + g + '" data-f="n" data-i="' + i + '" value="' + esc(it.n || '') + '"' + ro + '></td>';
+    return '<tr>' + nameCell +
       '<td style="width:70px;">' + ccInNum(g, 'qty', it.qty || 0, i) + '</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="' + g + '.' + i + '.price" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="' + g + '.' + i + '.price" data-cur="usd">—</td>' +
@@ -61928,6 +61988,8 @@ function submitAuth() {
     if(window.currentView === 'library' && typeof lib_refresh === 'function'){
       lib_refresh(true);
     }
+    // ★CC-MACH-PRESET-20261105：语言切换立即重绘成本表，保证预设设备名三语即时生效（不依赖文件列表异步请求）
+    try { if(LIB_TAB === 'cost' && document.getElementById('lib-cost-body')) lib_renderCostBody(); } catch(e){}
     // 兜底：切语言后若删除确认气泡被任何重渲染清掉，则就地重建并翻译
     setTimeout(function(){ try { if(typeof lib_confirmReassert === 'function') lib_confirmReassert(); } catch(e){} }, 40);
     setTimeout(function(){ try { if(typeof lib_confirmReassert === 'function') lib_confirmReassert(); } catch(e){} }, 400);
