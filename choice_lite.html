@@ -60900,11 +60900,13 @@ function submitAuth() {
     var shareBox = document.getElementById('cc_agg_share');
     if(shareBox){
       var aggKeys = ['sand', 'cement', 'stone', 'r6', 'r8', 'r10', 'r12'];
-      shareBox.innerHTML = '<div class="cc-share-title">' + ccT('aggShareTitle') + '</div>' +
-        aggKeys.map(function(k){
-          var pct2 = agg > 0 ? (Math.round((aggEach[k] || 0) / agg * 10000) / 100) : 0;
-          return '<div class="cc-share-line">' + ccT(k) + ' - ' + ccT('aggShare').replace('{0}', ccNum2(pct2)) + '</div>';
-        }).join('');
+      // ★CC-AGG-SHARE-HIDE0-20261105：占比 0% 的项自动隐藏（× 行/未用规格不出现在说明里）；全部为 0 时整框隐藏
+      var shareLines = aggKeys.map(function(k){
+        var pct2 = agg > 0 ? (Math.round((aggEach[k] || 0) / agg * 10000) / 100) : 0;
+        if(pct2 <= 0) return '';
+        return '<div class="cc-share-line">' + ccT(k) + ' - ' + ccT('aggShare').replace('{0}', ccNum2(pct2)) + '</div>';
+      }).join('');
+      shareBox.innerHTML = shareLines ? ('<div class="cc-share-title">' + ccT('aggShareTitle') + '</div>' + shareLines) : '';
     }
     // 行小计（VND 带货币符号）
     host.querySelectorAll('[data-sub]').forEach(function(el){ el.textContent = '₫ ' + ccNum(ccRowVal(el.getAttribute('data-sub'))); });
