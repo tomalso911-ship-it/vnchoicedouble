@@ -60373,13 +60373,26 @@ function submitAuth() {
       '<div class="cc-sub">' + ccT('d34') + '</div><table class="cc-tb"><thead>' + ccOpexHead() + '</thead><tbody>' +
       ccOpexRow('power', 'opPower') + ccOpexRow('water', 'opWater') + ccOpexRow('cons', 'opCons') +
       ccOpexRow('dorm', 'opDorm') + ccOpexRow('food', 'opFood') + ccOpexRow('car', 'opCar') +
-      '</tbody></table><div class="cc-note">' + ccT('laborNote') + '</div>';
+      // ★CC-OPEX-SUB-20261105：3.4 运营费用表尾小计 — 「费用/月」与「发生周期」列留空，只汇总「小计金额」三币
+      '</tbody><tfoot><tr>' +
+      '<td colspan="4" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      '<td></td>' +
+      '<td class="cc-subcell" data-gsub="opex" data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" data-gsub="opex" data-cur="usd">—</td>' +
+      '<td class="cc-subcell" data-gsub="opex" data-cur="vnd">—</td>' +
+      '</tr></tfoot></table><div class="cc-note">' + ccT('laborNote') + '</div>';
 
     // #4 间接
     h += '<div class="cc-sec">' + ccT('dir4') + '</div><table class="cc-tb"><thead>' + ccIndHead() + '</thead><tbody>' +
       ccIndRow('flight', 'indFlight') + ccIndRow('hotel', 'indHotel') + ccIndRow('meal', 'indMeal') +
       ccIndRow('mkt', 'indMkt') +
-      '</tbody></table>';
+      // ★CC-IND-SUB-20261105：#4 间接成本表尾小计 — 汇总「费用」三币
+      '</tbody><tfoot><tr>' +
+      '<td style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      '<td class="cc-subcell" data-gsub="ind" data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" data-gsub="ind" data-cur="usd">—</td>' +
+      '<td class="cc-subcell" data-gsub="ind" data-cur="vnd">—</td>' +
+      '</tr></tfoot></table>';
 
     // 报价计算
     var roAttr = ro ? '' : ' disabled';
@@ -60607,7 +60620,11 @@ function submitAuth() {
     var laborG = function(g){ var s = 0; (CC_DATA.labor[g] || []).forEach(function(l){ s += (Number(l.qty) || 0) * (Number(l.sal) || 0); }); return s * ccLaborDays(g); };
     host.querySelectorAll('[data-gsub]').forEach(function(el){
       var p = el.getAttribute('data-gsub').split('.');
-      var v = p[0] === 'mach' ? machG(p[1]) : (p[0] === 'labor' ? laborG(p[1]) : agg);
+      // ★CC-OPEX-IND-SUB-20261105：opex=运营费用小计金额合计，ind=间接成本费用合计（均已在上方算好）
+      var v = p[0] === 'mach' ? machG(p[1])
+            : (p[0] === 'labor' ? laborG(p[1])
+            : (p[0] === 'opex' ? opex
+            : (p[0] === 'ind' ? ind : agg)));
       var cur = el.getAttribute('data-cur');
       if(cur === 'rmb') el.textContent = fxc.rmb > 0 ? '¥ ' + ccNum(v / fxc.rmb) : '—';
       else if(cur === 'usd') el.textContent = fxc.usd > 0 ? '$ ' + ccNum(v / fxc.usd) : '—';
