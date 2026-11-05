@@ -59975,25 +59975,26 @@ function submitAuth() {
     var d = CC_LANG[k]; if(!d) return k;
     return d[L] || d.zh;
   }
-  // ★CC-MACH-UNIT-20261105：机械三表预设行 = 名称键 + 给定默认数量 + 三语单位键
+  // ★CC-MACH-PRICE-20261105：机械三表预设行 = 名称键 + 给定默认数量 + 三语单位 + 默认 VND 单价(p，可改)
   var CC_MACH_DEF = {
     mech: [
-      {k:'mSilo',qty:1,u:'uPc'},          {k:'mBatch3',qty:1,u:'uUnit'},      {k:'mMixer',qty:1,u:'uUnit'},
-      {k:'mSpreader',qty:1,u:'uUnit'},    {k:'mVibTable',qty:2,u:'uUnit'},    {k:'mPalletizer',qty:2,u:'uUnit'},
-      {k:'mFlipper',qty:2,u:'uUnit'},     {k:'mRail',qty:360,u:'uMeter'},     {k:'mSteamCure',qty:1,u:'uUnit'},
-      {k:'mSwitchgear',qty:4,u:'uPanel'}, {k:'mSteelMould',qty:3,u:'uSet'},   {k:'mCompressor',qty:1,u:'uSet'},
-      {k:'mOverheadCrane',qty:1,u:'uUnit'}, {k:'mSteelPallet',qty:90,u:'uPc'}, {k:'mTempWorkshop',qty:1,u:'uBlock'},
-      {k:'mSiteContainer',qty:1,u:'uPc'}, {k:'mGroundHardening',qty:1,u:'uItem'}
+      {k:'mSilo',qty:1,u:'uPc',p:328270000},       {k:'mBatch3',qty:1,u:'uUnit',p:193100000},   {k:'mMixer',qty:1,u:'uUnit',p:173790000},
+      {k:'mSpreader',qty:1,u:'uUnit',p:289650000}, {k:'mVibTable',qty:2,u:'uUnit',p:100412000}, {k:'mPalletizer',qty:2,u:'uUnit',p:579300000},
+      {k:'mFlipper',qty:2,u:'uUnit',p:193100000},  {k:'mRail',qty:360,u:'uMeter',p:536818},     {k:'mSteamCure',qty:1,u:'uUnit',p:38620000},
+      {k:'mSwitchgear',qty:4,u:'uPanel',p:9655000}, {k:'mSteelMould',qty:3,u:'uSet',p:115860000}, {k:'mCompressor',qty:1,u:'uSet',p:15448000},
+      {k:'mOverheadCrane',qty:1,u:'uUnit',p:115860000}, {k:'mSteelPallet',qty:90,u:'uPc',p:10299954}, {k:'mTempWorkshop',qty:1,u:'uBlock',p:386200000},
+      {k:'mSiteContainer',qty:1,u:'uPc',p:77240000}, {k:'mGroundHardening',qty:1,u:'uItem',p:30896000}
     ],
-    veh:   [ {k:'vLoader',qty:1,u:'uUnit'}, {k:'vForklift',qty:1,u:'uUnit'}, {k:'vTractor',qty:2,u:'uUnit'}, {k:'vMotorcycle',qty:3,u:'uVeh'} ],
-    tools: [ {k:'tWelder',qty:4,u:'uUnit'}, {k:'tPlasma',qty:1,u:'uUnit'}, {k:'tConsumables',qty:1,u:'uLot'} ]
+    veh:   [ {k:'vLoader',qty:1,u:'uUnit',p:262616000}, {k:'vForklift',qty:1,u:'uUnit',p:173790000},
+             {k:'vTractor',qty:2,u:'uUnit',p:115860000}, {k:'vMotorcycle',qty:3,u:'uVeh',p:7724000} ],
+    tools: [ {k:'tWelder',qty:4,u:'uUnit',p:11586000}, {k:'tPlasma',qty:1,u:'uUnit',p:30896000}, {k:'tConsumables',qty:1,u:'uLot',p:57930000} ]
   };
   var CC_MACH_KEYS = {};
   Object.keys(CC_MACH_DEF).forEach(function(g){ CC_MACH_KEYS[g] = CC_MACH_DEF[g].map(function(r){ return r.k; }); });
   function ccMachDef(){
     var o = {};
     Object.keys(CC_MACH_DEF).forEach(function(g){
-      o[g] = CC_MACH_DEF[g].map(function(r){ return { k:r.k, qty:r.qty, price:0, u:r.u }; });
+      o[g] = CC_MACH_DEF[g].map(function(r){ return { k:r.k, qty:r.qty, price:r.p || 0, u:r.u }; });
     });
     return o;
   }
@@ -60043,7 +60044,8 @@ function submitAuth() {
             var legacy = !byK[k] || r.u === undefined || r.u === null;
             var uq = Number(r.qty);
             var keepUser = !legacy || (isFinite(uq) && uq !== 0);
-            return { k:k, qty:(keepUser ? (uq || 0) : d.qty), price:Number(r.price)||0, u:d.u };
+            // ★CC-MACH-PRICE-20261105：单价为 0/缺失 → 用给定默认值；用户已填的非 0 单价一律保留
+            return { k:k, qty:(keepUser ? (uq || 0) : d.qty), price:(Number(r.price) || d.p || 0), u:d.u };
           }).concat(extra);
         });
       }
@@ -60095,6 +60097,11 @@ function submitAuth() {
     return (typeof authUser !== 'undefined' && authUser && authUser.username) ? String(authUser.username) : '';
   }
   function ccCanEdit(){ return lib_canEdit(); }
+  // ★CC-VNDSYM-20261105：统一解析带 ₫/¥/$ 符号与千位符的金额（绝不能 parseFloat 直读，"₫ 3,850" 会变成 3）
+  function ccParseVnd(v){
+    var n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+    return isFinite(n) ? n : 0;
+  }
   function ccInNum(g, f, val, i, extra){
     var ro = ccCanEdit() ? '' : ' disabled';
     var di = (i === undefined) ? '' : ' data-i="' + i + '"';
@@ -60102,7 +60109,8 @@ function submitAuth() {
     var vnd = (f === 'price' || f === 'sal' || g === 'opex' || g === 'ind') ? ' cc-vnd' : '';
     // ★CC-MACH-UNIT-20261105：机械三表的数量录入框灰色 + 加大一号，仍可编辑；默认值=给定数量
     var qtyCls = (f === 'qty' && typeof g === 'string' && g.indexOf('mach.') === 0) ? ' cc-qty' : '';
-    return '<input class="cc-in' + vnd + qtyCls + (extra || '') + '" data-g="' + g + '" data-f="' + f + '"' + di + ' value="' + ccNum(val) + '" inputmode="decimal"' + ro + '>';
+    // ★CC-VNDSYM-20261105：所有 VND 录入框（含预填默认价）显示 ₫ + 千位符，仍可编辑
+    return '<input class="cc-in' + vnd + qtyCls + (extra || '') + '" data-g="' + g + '" data-f="' + f + '"' + di + ' value="' + (vnd ? '₫ ' : '') + ccNum(val) + '" inputmode="decimal"' + ro + '>';
   }
   function ccInAutoNum(g, f, val){ // 骨料数量：自动取汇总值、只读、灰字
     return '<input class="cc-in cc-auto" data-g="' + g + '" data-f="' + f + '" value="' + ccNum2(val) + '" readonly>';
@@ -60167,6 +60175,8 @@ function submitAuth() {
       '.cc-sum td.cc-fx{text-align:right;color:#555;font-weight:600;white-space:nowrap;}',
       // ★CC-VNDRED-20261105：所有 VND 录入框字体红色、加大一号(13→14px)、加粗
       '.cc-tb input.cc-in.cc-vnd{background:#fff59d !important;border:1px solid #d9b900 !important;color:#d32f2f !important;font-size:14px !important;font-weight:700 !important;}',
+      // ★CC-VNDSYM-20261105：宽屏留足宽度显示 ₫ + 长金额；窄屏保持原布局，绝不撑出横向滚动条
+      '@media (min-width:1200px){.cc-tb input.cc-in.cc-vnd{min-width:135px;}}',
       // ★CC-AGG-AUTO-20261105：骨料表自动数量(只读)与参考单价(可改)统一灰字加大一号，仅此表覆盖 VND 红字
       '.cc-tb input.cc-in.cc-auto,.cc-tb input.cc-in.cc-ref{color:#777 !important;font-size:14px !important;font-weight:600 !important;}',
       // ★CC-ALLYELLOW-20261104：页面内所有输入框/下拉统一淡黄色底（覆盖行内淡蓝/灰/白）
@@ -60757,14 +60767,15 @@ function submitAuth() {
     host.querySelectorAll('[data-sub]').forEach(function(el){ el.textContent = '₫ ' + ccNum(ccRowVal(el.getAttribute('data-sub'))); });
     // ★CC-FXCELL-20261104：RMB/USD 只读换算列刷新（VND÷汇率，带货币符号）
     var fxc = ccFx();
+    // ★CC-VNDSYM-20261105：RMB/USD = VND ÷ 汇率，保留最多 2 位小数（不再取整丢精度），带符号 + 千位符
     host.querySelectorAll('[data-fx]').forEach(function(el){
       var usd = el.getAttribute('data-cur') === 'usd', r = usd ? fxc.usd : fxc.rmb;
-      el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + ccNum(ccFxVal(el.getAttribute('data-fx')) / r) : '—';
+      el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + ccNum2(ccFxVal(el.getAttribute('data-fx')) / r) : '—';
     });
     // ★CC-WD-20261104：人工表换算列 + 项目天数列刷新
     host.querySelectorAll('[data-lfx]').forEach(function(el){
       var usd = el.getAttribute('data-cur') === 'usd', r = usd ? fxc.usd : fxc.rmb;
-      el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + ccNum(ccFxVal(el.getAttribute('data-lfx')) / r) : '—';
+      el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + ccNum2(ccFxVal(el.getAttribute('data-lfx')) / r) : '—';
     });
     host.querySelectorAll('[data-wd]').forEach(function(el){ el.textContent = ccNum(prodD); });   // 3.1/3.2 生产日
     host.querySelectorAll('[data-wdi]').forEach(function(el){ el.textContent = ccNum(instD); }); // 3.3 安装日
@@ -60780,8 +60791,8 @@ function submitAuth() {
             : (p[0] === 'opex' ? opex
             : (p[0] === 'ind' ? ind : agg)));
       var cur = el.getAttribute('data-cur');
-      if(cur === 'rmb') el.textContent = fxc.rmb > 0 ? '¥ ' + ccNum(v / fxc.rmb) : '—';
-      else if(cur === 'usd') el.textContent = fxc.usd > 0 ? '$ ' + ccNum(v / fxc.usd) : '—';
+      if(cur === 'rmb') el.textContent = fxc.rmb > 0 ? '¥ ' + ccNum2(v / fxc.rmb) : '—';
+      else if(cur === 'usd') el.textContent = fxc.usd > 0 ? '$ ' + ccNum2(v / fxc.usd) : '—';
       else el.textContent = '₫ ' + ccNum(v);
     });
     var mgmtPct = Number(CC_DATA.mgmtPct) || 0;
@@ -60979,10 +60990,22 @@ function submitAuth() {
       return !!f && f !== 'n' && f !== 'rL' && f !== 'rW' && f !== 'rL2' && f !== 'rW2';
     }
     // ★CC-CLR-20261104：鼠标/焦点进入数字输入框 → 立即清空（不再带着默认 0 输入）
-    host.onfocusin = function(ev){
-      if(ev.target && ev.target.id === 'cc_mold_cpd'){ try{ ev.target.select(); }catch(e){} return; } // ★CC-CPD：全选便于直接改数
-      if(ccIsNumIn(ev.target)) ev.target.value = '';
-    };
+    // ★CC-VNDSYM-20261105：用 focusin/focusout 事件监听（on* 属性在部分浏览器不生效），只绑一次防重复
+    if(!host.__ccFocusBound){
+      host.__ccFocusBound = true;
+      host.addEventListener('focusin', function(ev){
+        if(ev.target && ev.target.id === 'cc_mold_cpd'){ try{ ev.target.select(); }catch(e){} return; }
+        if(ccIsNumIn(ev.target)){ ev.target.dataset.ccPrev = ev.target.value; ev.target.value = ''; }
+      });
+      host.addEventListener('focusout', function(ev){
+        var el = ev.target;
+        if(!el || !el.dataset || el.dataset.ccPrev === undefined) return;
+        var prev = el.dataset.ccPrev; delete el.dataset.ccPrev;
+        var raw = String(el.value).replace(/[^0-9.\-]/g, '');
+        if(raw === ''){ el.value = prev; return; } // 点进去没改 → 原样还原，绝不把默认值清空
+        el.value = (el.classList.contains('cc-vnd') ? '₫ ' : '') + ccFmtIn(raw);
+      });
+    }
     host.oninput = function(ev){
       var el = ev.target; if(!el || !el.dataset || !el.dataset.f) return;
       // ★CC-FMT2-20261104：数字框输入时即时千位符（保留光标位置）
@@ -61002,12 +61025,12 @@ function submitAuth() {
         layRow = (CC_DATA.demand.specs || [])[rowIdx] || null;
         layPrev2 = !!layRow && Number(layRow.layers) === 2;
       }
-      if(el.id === 'cc_margin'){ CC_DATA.margin = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
-      else if(el.id === 'cc_vat'){ CC_DATA.vat = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
+      if(el.id === 'cc_margin'){ CC_DATA.margin = ccParseVnd(el.value); }
+      else if(el.id === 'cc_vat'){ CC_DATA.vat = ccParseVnd(el.value); }
       else if(g){
         var v;
         if(f === 'n' || f === 'rL' || f === 'rW' || f === 'rL2' || f === 'rW2'){ v = el.value; }
-        else { v = parseFloat(String(el.value).replace(/[^0-9.\-]/g, '')) || 0; }
+        else { v = ccParseVnd(el.value); }
         // ★数组行的字段路径是 g.i.f（如 mach.mech.0.qty），标量组是 g.f（如 agg.sand.qty）
         var path = g + '.';
         if(el.dataset.i !== undefined) path += el.dataset.i + '.';
