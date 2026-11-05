@@ -5879,6 +5879,9 @@ var WL_FLOW_IMG = {
       @media (max-width:680px){ .receipt-form{grid-template-columns:1fr;} .receipt-form .prod-field{grid-column:1 / -1 !important;grid-row:auto !important;} .receipt-form .prod-field.rc-right{display:block;height:auto;} }
       .rc-lines{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding-bottom:4px;}
       .rc-line-card{border:1px solid #e2e2e2;border-radius:8px;background:#fff;padding:8px;display:grid;grid-template-columns:minmax(min-content,auto) minmax(min-content,auto) minmax(min-content,auto) minmax(40px,1fr) repeat(6,minmax(40px,1fr)) minmax(80px,1fr) 26px;gap:8px;align-items:end;width:100%;min-width:0;}
+      /* ★CC-RC-ZEBRA-20261105：收货单每行白/淡蓝斑马线，便于逐行阅读 */
+      .rc-lines .rc-line-card:nth-child(odd){background:#fff;}
+      .rc-lines .rc-line-card:nth-child(even){background:#eaf3fb;}
       .rc-col{display:flex;flex-direction:column;gap:2px;}
       .rc-col label{font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;padding-right:2px;}
       .rc-col input,.rc-col select{width:100%;padding:3px 4px;border:1px solid #999;border-radius:4px;font-size:12px;color:#333;background:#fff;box-sizing:border-box;min-width:0;text-align:center;}
@@ -59998,8 +60001,7 @@ function submitAuth() {
     return {
       demand:{ months:1, workDays:0, prodDays:0, instDays:0, crew:{ size:5, driver:1, assist:1, indoor:3, perDay:200, groups:2 }, specs:[{ len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0, nl2:0, rL2:'', nw2:0, rW2:'', d2mod:0 }] },
       mach: ccMachDef(),
-      agg:{ sand:{qty:0,price:0}, cement:{qty:0,price:0}, stone:{qty:0,price:0},
-            r6:{qty:0,price:0}, r8:{qty:0,price:0}, r10:{qty:0,price:0}, r12:{qty:0,price:0} },
+      agg:(function(){ var o={}; Object.keys(CC_AGG_DEF_PRICE).forEach(function(k){ o[k]={qty:0,price:CC_AGG_DEF_PRICE[k]}; }); return o; })(),
       labor:{
         mgmt:[ {k:'foreman',qty:0,sal:0}, {k:'cook',qty:0,sal:0} ],
         work:[ {k:'welder',qty:0,sal:0}, {k:'welderAs',qty:0,sal:0}, {k:'presser',qty:0,sal:0}, {k:'repairer',qty:0,sal:0},
@@ -60018,6 +60020,11 @@ function submitAuth() {
     try{
       ['demand','mach','agg','labor','opex','ind'].forEach(function(k){
         if(saved[k] && typeof saved[k] === 'object') base[k] = Object.assign({}, base[k], saved[k]);
+      });
+      // ★CC-AGG-AUTO-20261105：旧存档单价为 0/缺失时补收货单参考价；用户已填的非 0 价格原样保留
+      Object.keys(CC_AGG_DEF_PRICE).forEach(function(k){
+        if(!base.agg[k]) base.agg[k] = {qty:0, price:CC_AGG_DEF_PRICE[k]};
+        if(!Number(base.agg[k].price)) base.agg[k].price = CC_AGG_DEF_PRICE[k];
       });
       // ★CC-MACH-PRESET-20261105：以预设行骨架合并存档 — 按 k 回填用户已填数量/单价，保留自定义名称行（旧数据不丢）
       if(saved.mach && typeof saved.mach === 'object'){
@@ -60075,18 +60082,30 @@ function submitAuth() {
     return base;
   }
   function ccNum(v){ v = Math.round(Number(v) || 0); try{ return v.toLocaleString('en-US'); }catch(e){ return String(v); } }
+  // ★CC-AGG-AUTO-20261105：骨料表默认单价 = 收货确认 D 区 prodRcDefPriceVnd 的 7 组参考价（吨/方口径，一一对应）
+  var CC_AGG_DEF_PRICE = {
+    sand:730000, cement:1480000, stone:850000,
+    r6:17000000, r8:17000000, r10:17450000, r12:17250000
+  };
+  function ccNum2(v){ // 自动数量带小数，ccNum 会取整不能用
+    var n = Number(v) || 0;
+    try{ return n.toLocaleString('en-US', {maximumFractionDigits:2}); }catch(e){ return String(Math.round(n * 100) / 100); }
+  }
   function ccMe(){
     return (typeof authUser !== 'undefined' && authUser && authUser.username) ? String(authUser.username) : '';
   }
   function ccCanEdit(){ return lib_canEdit(); }
-  function ccInNum(g, f, val, i){
+  function ccInNum(g, f, val, i, extra){
     var ro = ccCanEdit() ? '' : ' disabled';
     var di = (i === undefined) ? '' : ' data-i="' + i + '"';
     // ★CC-VNDINPUT-20261104：金额类(VND单价/日薪/月费/间接费用)录入框统一淡黄色
     var vnd = (f === 'price' || f === 'sal' || g === 'opex' || g === 'ind') ? ' cc-vnd' : '';
     // ★CC-MACH-UNIT-20261105：机械三表的数量录入框灰色 + 加大一号，仍可编辑；默认值=给定数量
     var qtyCls = (f === 'qty' && typeof g === 'string' && g.indexOf('mach.') === 0) ? ' cc-qty' : '';
-    return '<input class="cc-in' + vnd + qtyCls + '" data-g="' + g + '" data-f="' + f + '"' + di + ' value="' + ccNum(val) + '" inputmode="decimal"' + ro + '>';
+    return '<input class="cc-in' + vnd + qtyCls + (extra || '') + '" data-g="' + g + '" data-f="' + f + '"' + di + ' value="' + ccNum(val) + '" inputmode="decimal"' + ro + '>';
+  }
+  function ccInAutoNum(g, f, val){ // 骨料数量：自动取汇总值、只读、灰字
+    return '<input class="cc-in cc-auto" data-g="' + g + '" data-f="' + f + '" value="' + ccNum2(val) + '" readonly>';
   }
   function ccStyle(){
     if(document.getElementById('cc-style')) return;
@@ -60148,6 +60167,8 @@ function submitAuth() {
       '.cc-sum td.cc-fx{text-align:right;color:#555;font-weight:600;white-space:nowrap;}',
       // ★CC-VNDRED-20261105：所有 VND 录入框字体红色、加大一号(13→14px)、加粗
       '.cc-tb input.cc-in.cc-vnd{background:#fff59d !important;border:1px solid #d9b900 !important;color:#d32f2f !important;font-size:14px !important;font-weight:700 !important;}',
+      // ★CC-AGG-AUTO-20261105：骨料表自动数量(只读)与参考单价(可改)统一灰字加大一号，仅此表覆盖 VND 红字
+      '.cc-tb input.cc-in.cc-auto,.cc-tb input.cc-in.cc-ref{color:#777 !important;font-size:14px !important;font-weight:600 !important;}',
       // ★CC-ALLYELLOW-20261104：页面内所有输入框/下拉统一淡黄色底（覆盖行内淡蓝/灰/白）
       '.cc-in,input.cc-in,select.cc-in,#cc_mold_pick{background:#fff59d !important;}',
       // ★CC-GRAYDAYS-20261104：生产/安装项目天数为自动计算、不可编辑，唯独这两个保持灰底
@@ -60198,10 +60219,10 @@ function submitAuth() {
     var u = (gkey === 'sand' || gkey === 'stone') ? ccT('unitCubic') : ccT('unitTon');
     return '<tr' + (d ? ' data-aggd="' + d + '"' : '') + '>' + ccNoTd(i) + '<td>' + ccT(labelKey) + '</td>' +
       '<td style="text-align:center;">' + u + '</td>' +
-      '<td style="width:70px;">' + ccInNum('agg.' + gkey, 'qty', it.qty) + '</td>' +
+      '<td style="width:80px;">' + ccInAutoNum('agg.' + gkey, 'qty', it.qty) + '</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="agg.' + gkey + '.price" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" style="color:#666;" data-fx="agg.' + gkey + '.price" data-cur="usd">—</td>' +
-      '<td style="width:120px;">' + ccInNum('agg.' + gkey, 'price', it.price) + '</td>' +
+      '<td style="width:120px;">' + ccInNum('agg.' + gkey, 'price', it.price, undefined, ' cc-ref') + '</td>' +
       '<td class="cc-subcell" data-fx="agg.' + gkey + '" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" data-fx="agg.' + gkey + '" data-cur="usd">—</td>' +
       '<td class="cc-subcell" data-sub="agg.' + gkey + '">0</td></tr>';
@@ -60703,6 +60724,22 @@ function submitAuth() {
     });
     // ★CC-WASTE-20261104：生产浪费 + 运输损失 → 水泥/黄砂/石子统一上浮 5%（吨与方同步）
     ccCem *= 1.05; ccSand *= 1.05; ccGrav *= 1.05;
+    // ★CC-AGG-AUTO-20261105：骨料数量自动对应下方汇总（水泥/钢筋=吨，黄砂/石子=方），随规格表实时刷新、只读
+    var ccAggQty = {
+      sand:  Math.round(ccSand / 1.45 * 10) / 10,
+      cement:Math.round(ccCem * 100) / 100,
+      stone: Math.round(ccGrav / 1.5 * 10) / 10,
+      r6:    Math.round((ccDia['6']  ? ccDia['6'].ton  : 0) * 100) / 100,
+      r8:    Math.round((ccDia['8']  ? ccDia['8'].ton  : 0) * 100) / 100,
+      r10:   Math.round((ccDia['10'] ? ccDia['10'].ton : 0) * 100) / 100,
+      r12:   Math.round((ccDia['12'] ? ccDia['12'].ton : 0) * 100) / 100
+    };
+    Object.keys(ccAggQty).forEach(function(k){
+      if(!CC_DATA.agg[k]) CC_DATA.agg[k] = {qty:0, price:CC_AGG_DEF_PRICE[k]};
+      CC_DATA.agg[k].qty = ccAggQty[k];
+      var inp = host.querySelector('input.cc-auto[data-g="agg.' + k + '"][data-f="qty"]');
+      if(inp) inp.value = ccNum2(ccAggQty[k]);
+    });
     // ★CC-AGG-HIDE-20261104：骨料表 φ6/φ8/φ10/φ12 行按上方规格表实际选用的直径自动隐藏
     host.querySelectorAll('tr[data-aggd]').forEach(function(tr){
       tr.style.display = usedDia[tr.getAttribute('data-aggd')] ? '' : 'none';
@@ -60936,6 +60973,7 @@ function submitAuth() {
     // ★CC-CLR-20261104：数字输入框判定（名称/φ下拉/利润率/VAT 除外）
     function ccIsNumIn(el){
       if(!el || el.tagName !== 'INPUT' || !el.classList || !el.classList.contains('cc-in')) return false;
+      if(el.classList.contains('cc-auto')) return false; // ★CC-AGG-AUTO：只读自动数量不允许聚焦清空/格式化
       if(el.id === 'cc_margin' || el.id === 'cc_vat' || el.id === 'cc_mold_cpd') return false;
       var f = el.dataset ? el.dataset.f : null;
       return !!f && f !== 'n' && f !== 'rL' && f !== 'rW' && f !== 'rL2' && f !== 'rW2';
