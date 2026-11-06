@@ -59972,6 +59972,8 @@ function submitAuth() {
     // ★CC-PROVIDE-20261105：「Choice VN」固定不翻译；只翻译「提供吗？」，表头由 ccProvTh() 拼装
     provideQ:      { zh:'提供吗？', en:'Provided?', vi:'Cung cấp không?' },
     aggShareTitle: { zh:'骨料投入占比', en:'Aggregate investment share', vi:'Tỷ trọng đầu tư cốt liệu' },
+    // ★CC-FOLD-20261106：钢筋/规格汇总框折叠标题
+    ccFoldSummary: { zh:'钢筋与规格汇总', en:'Rebar & spec summary', vi:'Tổng hợp thép & quy cách' },
     aggShare:      { zh:'占整个骨料投资的 {0} %', en:'{0} % of total aggregate investment', vi:'Chiếm {0} % tổng vốn đầu tư cốt liệu' },
     // ★CC-DEPR-20261105：设备折旧块（机械三表下方）——三系统占比 / 折旧年限 / 年·月折旧（三币蓝红绿）/ 项目发生周期 / 期间总折旧
     deprTitle:      { zh:'全套设备-工程机械-工具总投资', en:'Total Equipment · Machinery · Tools Investment', vi:'Tổng đầu tư Thiết bị · Máy móc · Dụng cụ' },
@@ -60243,6 +60245,12 @@ function submitAuth() {
       '.cc-tb input.cc-in.cc-zero{color:#d32f2f !important;font-weight:800 !important;background:#fff !important;border:1px solid #d32f2f !important;}',
       // ★CC-AGG-SHARE-20261105：骨料投资占比说明块
       '.cc-share-box{margin:6px 0 0;padding:6px 10px;border:1px solid #d9dee5;background:#fffdf0;font-size:12px;line-height:1.8;color:#333;}',
+      // ★CC-FOLD-20261106：区块折叠（+/- 按钮，默认展开）
+      '.cc-fold{margin:2px 0;}',
+      '.cc-fold-head{display:flex;align-items:center;gap:6px;}',
+      '.cc-fold-btn{flex:0 0 auto;width:20px;height:20px;line-height:16px;text-align:center;border:1px solid #888;border-radius:4px;background:#fff;font-weight:800;font-size:14px;color:#333;cursor:pointer;user-select:none;padding:0;}',
+      '.cc-fold-btn:hover{background:#eef2ff;}',
+      '.cc-fold-body{display:block;}',
       '.cc-share-title{font-weight:700;color:#1a3c6e;margin-bottom:2px;}',
       '.cc-share-line{color:#b26a00;}',
       // ★CC-DEPR-20261105：设备折旧块
@@ -60290,7 +60298,9 @@ function submitAuth() {
   }
   function ccMachGroup(key, labelKey){
     var arr = CC_DATA.mach[key] || [];
-    var h = '<div class="cc-sub">' + ccT(labelKey) + '</div>' +
+    // ★CC-FOLD-20261106：区块可折叠（+/- 按钮，默认展开）
+    var h = '<div class="cc-fold"><div class="cc-fold-head"><button type="button" class="cc-fold-btn">−</button>' +
+      '<div class="cc-sub">' + ccT(labelKey) + '</div></div><div class="cc-fold-body">' +
       '<table class="cc-tb"><thead>' + ccFxHead(false, false, true) + '</thead><tbody>';
     arr.forEach(function(it, i){ h += ccRowMach('mach.' + key, it, i); });
     // ★CC-SUBROW-20261104：表尾小计行（三币带货币符号）
@@ -60301,7 +60311,7 @@ function submitAuth() {
       '<td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="rmb">—</td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="usd">—</td>' +
-      '<td class="cc-subcell" ' + gs + ' data-cur="vnd">—</td><td class="cc-prov"></td></tr></tfoot></table>';
+      '<td class="cc-subcell" ' + gs + ' data-cur="vnd">—</td><td class="cc-prov"></td></tr></tfoot></table></div></div>';
     return h;
   }
   // ★CC-DEPR-20261105：三币蓝(¥)/红($)/绿(₫) 显示（年/月折旧、总投资、系统占比共用）
@@ -60381,7 +60391,9 @@ function submitAuth() {
   }
   function ccLaborGroup(gkey, labelKey){
     var arr = CC_DATA.labor[gkey] || [];
-    var h = '<div class="cc-sub">' + ccT(labelKey) + '</div>' +
+    // ★CC-FOLD-20261106：区块可折叠（+/- 按钮，默认展开；inst 的安装小组说明包含在折叠体内）
+    var h = '<div class="cc-fold"><div class="cc-fold-head"><button type="button" class="cc-fold-btn">−</button>' +
+      '<div class="cc-sub">' + ccT(labelKey) + '</div></div><div class="cc-fold-body">' +
       (gkey === 'inst' ? ccCrewHtml() : '') +
       '<table class="cc-tb"><thead>' + ccLaborHead() + '</thead><tbody>';
     arr.forEach(function(it, i){
@@ -60404,7 +60416,7 @@ function submitAuth() {
       '<td></td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="rmb">—</td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="usd">—</td>' +
-      '<td class="cc-subcell" ' + gs + ' data-cur="vnd">—</td><td class="cc-prov"></td></tr></tfoot></table>';
+      '<td class="cc-subcell" ' + gs + ' data-cur="vnd">—</td><td class="cc-prov"></td></tr></tfoot></table></div></div>';
     return h;
   }
   // ★CC-OPEXHEAD-20261104：名称|费用/月(三币)|发生周期(月)|小计金额(三币)
@@ -60583,10 +60595,15 @@ function submitAuth() {
       '<td colspan="' + (specDual ? 14 : 8) + '"></td></tr></tfoot></table>' +
       (specDual ? '<div class="cc-note">' + ccT('dualNote') + '</div>' : '');
     // ★CC-SPEC-SUMMARY-20261104：需求信息表底部总概括（材料/钢筋/单方指标，按智能报告公式）
-    h += '<div id="cc_v_summary" style="font-size:12px;color:#333;line-height:1.9;margin:8px 0 2px;padding:8px 10px;border:1px solid #000;background:#fffdf0;"></div>';
+    // ★CC-FOLD-20261106：钢筋/规格汇总框可折叠
+    h += '<div class="cc-fold"><div class="cc-fold-head"><button type="button" class="cc-fold-btn">−</button>' +
+      '<div class="cc-sub">' + ccT('ccFoldSummary') + '</div></div><div class="cc-fold-body">' +
+      '<div id="cc_v_summary" style="font-size:12px;color:#333;line-height:1.9;margin:8px 0 2px;padding:8px 10px;border:1px solid #000;background:#fffdf0;"></div></div></div>';
 
     // ★CC-MOLD-20261104：模具需求信息（三种摆放方案 + 按当前规格表实时估算）
-    h += '<div class="cc-sec" style="margin-top:14px;">' + ccT('moldSec') + '</div>';
+    // ★CC-FOLD-20261106：模具需求信息框可折叠（备注行/方案卡片都在折叠体内）
+    h += '<div class="cc-fold" style="margin-top:14px;"><div class="cc-fold-head"><button type="button" class="cc-fold-btn">−</button>' +
+      '<div class="cc-sec">' + ccT('moldSec') + '</div></div><div class="cc-fold-body">';
     // ★CC-CPD-20261104：模/天改为可输入框（demand.moldCpd，默认40），所有方案实时跟随重算
     // ★CC-PICK-20261104：根据分析最终选择方案（下拉与备注同行，选中方案卡片淡粉背景）
     var pick = CC_DATA.demand.moldPick === 'B' ? 'B' : 'A';
@@ -60610,7 +60627,7 @@ function submitAuth() {
     h += '<div style="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin:8px 0 0;">' +
       ccMoldCard(ccT('moldA'), 'cc_mold_a', ccT('moldAp'), ccT('moldAc'), 1, pick === 'A' ? '#fdecec' : '#fff', 'cc_card_a') +
       ccMoldCard(ccT('moldC'), 'cc_mold_c', ccT('moldCp'), ccT('moldCc'), 1.4, pick === 'B' ? '#fdecec' : '#fff', 'cc_card_b') +
-      '</div>';
+      '</div></div></div>';
 
     h += '<div class="cc-sec">' + ccT('dir1') + '</div>' + ccMachGroup('mech', 'd11') + ccMachGroup('veh', 'd12') + ccMachGroup('tools', 'd13') +
       '<div class="cc-note">' + ccT('machNote') + '</div>' +
@@ -60627,14 +60644,19 @@ function submitAuth() {
       '<td class="cc-subcell" data-gsub="agg" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" data-gsub="agg" data-cur="usd">—</td>' +
       '<td class="cc-subcell" data-gsub="agg" data-cur="vnd">—</td><td class="cc-prov"></td></tr></tfoot></table>' +
-      '<div id="cc_agg_share" class="cc-share-box"></div>'; // ★CC-AGG-SHARE-20261105：逐项骨料投资占比（三语，ccRecalc 实时刷新）
+      // ★CC-FOLD-20261106：骨料投入占比框可折叠（标题移入折叠头；全部 0% 时整个折叠区隐藏）
+      '<div class="cc-fold"><div class="cc-fold-head"><button type="button" class="cc-fold-btn">−</button>' +
+      '<div class="cc-share-title">' + ccT('aggShareTitle') + '</div></div><div class="cc-fold-body">' +
+      '<div id="cc_agg_share" class="cc-share-box"></div></div></div>'; // ★CC-AGG-SHARE-20261105：逐项骨料投资占比（三语，ccRecalc 实时刷新）
 
     // #3 人工
     h += '<div class="cc-sec">' + ccT('dir3') + '</div>' +
       '<div style="font-size:12px;color:#555;margin:0 0 3px;">' + ccT('prodDays') + '：<input class="cc-in" id="cc_prod_days" value="' + (Number(CC_DATA.demand.prodDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</div>' +
       '<div style="font-size:12px;color:#555;margin:0 0 6px;">' + ccT('instPrjDays') + '：<input class="cc-in" id="cc_inst_days_top" value="' + (Number(CC_DATA.demand.instDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</div>' +
       ccLaborGroup('mgmt', 'd31') + ccLaborGroup('work', 'd32') + ccLaborGroup('inst', 'd33') +
-      '<div class="cc-sub">' + ccT('d34') + '</div><table class="cc-tb"><thead>' + ccOpexHead() + '</thead><tbody>' +
+      // ★CC-FOLD-20261106：3.4 运营费用表可折叠
+      '<div class="cc-fold"><div class="cc-fold-head"><button type="button" class="cc-fold-btn">−</button>' +
+      '<div class="cc-sub">' + ccT('d34') + '</div></div><div class="cc-fold-body"><table class="cc-tb"><thead>' + ccOpexHead() + '</thead><tbody>' +
       ccOpexRow('power', 'opPower', 0) + ccOpexRow('water', 'opWater', 1) + ccOpexRow('cons', 'opCons', 2) +
       ccOpexRow('dorm', 'opDorm', 3) + ccOpexRow('food', 'opFood', 4) + ccOpexRow('car', 'opCar', 5) +
       // ★CC-OPEX-SUB-20261105：3.4 运营费用表尾小计 — 「费用/月」与「发生周期」列留空，只汇总「小计金额」三币
@@ -60646,10 +60668,12 @@ function submitAuth() {
       '<td class="cc-subcell" data-gsub="opex" data-cur="usd">—</td>' +
       '<td class="cc-subcell" data-gsub="opex" data-cur="vnd">—</td>' +
       '<td class="cc-prov"></td>' +
-      '</tr></tfoot></table><div class="cc-note">' + ccT('laborNote') + '</div>';
+      '</tr></tfoot></table></div></div><div class="cc-note">' + ccT('laborNote') + '</div>';
 
     // #4 间接
-    h += '<div class="cc-sec">' + ccT('dir4') + '</div><table class="cc-tb"><thead>' + ccIndHead() + '</thead><tbody>' +
+    // ★CC-FOLD-20261106：#4 间接成本表可折叠
+    h += '<div class="cc-fold"><div class="cc-fold-head"><button type="button" class="cc-fold-btn">−</button>' +
+      '<div class="cc-sec">' + ccT('dir4') + '</div></div><div class="cc-fold-body"><table class="cc-tb"><thead>' + ccIndHead() + '</thead><tbody>' +
       ccIndRow('flight', 'indFlight', 0) + ccIndRow('hotel', 'indHotel', 1) + ccIndRow('meal', 'indMeal', 2) +
       ccIndRow('mkt', 'indMkt', 3) +
       // ★CC-IND-SUB-20261105：#4 间接成本表尾小计 — 汇总「费用」三币
@@ -60660,7 +60684,7 @@ function submitAuth() {
       '<td class="cc-subcell" data-gsub="ind" data-cur="usd">—</td>' +
       '<td class="cc-subcell" data-gsub="ind" data-cur="vnd">—</td>' +
       '<td class="cc-prov"></td>' +
-      '</tr></tfoot></table>';
+      '</tr></tfoot></table></div></div>';
 
     // 报价计算
     var roAttr = ro ? '' : ' disabled';
@@ -60912,7 +60936,10 @@ function submitAuth() {
         if(pct2 <= 0) return '';
         return '<div class="cc-share-line">' + ccT(k) + ' - ' + ccT('aggShare').replace('{0}', ccNum2(pct2)) + '</div>';
       }).join('');
-      shareBox.innerHTML = shareLines ? ('<div class="cc-share-title">' + ccT('aggShareTitle') + '</div>' + shareLines) : '';
+      // ★CC-FOLD-20261106：标题已移入折叠头；全部 0% 时隐藏整个折叠区块
+      shareBox.innerHTML = shareLines;
+      var _sfold = shareBox.closest ? shareBox.closest('.cc-fold') : null;
+      if(_sfold) _sfold.style.display = shareLines ? '' : 'none';
     }
     // 行小计（VND 带货币符号）
     host.querySelectorAll('[data-sub]').forEach(function(el){ el.textContent = '₫ ' + ccNum(ccRowVal(el.getAttribute('data-sub'))); });
@@ -61272,6 +61299,19 @@ function submitAuth() {
         if(!CC_DATA) return;
         CC_DATA.mgmtPct = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || 0;
         ccRecalc(); ccScheduleSave();
+      });
+    })();
+    // ★CC-FOLD-20261106：区块 +/- 折叠——document 级事件委托，一次注册（点 + 展开、点 − 收缩，按钮符号随状态切换）
+    (function(){
+      if(window.__ccFoldBound) return; window.__ccFoldBound = true;
+      document.addEventListener('click', function(e){
+        var btn = e.target && e.target.closest ? e.target.closest('.cc-fold-btn') : null;
+        if(!btn) return;
+        var fold = btn.closest('.cc-fold'); if(!fold) return;
+        var body = fold.querySelector('.cc-fold-body'); if(!body) return;
+        var open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : 'block';
+        btn.textContent = open ? '+' : '−';
       });
     })();
     // ★CC-DEPR-UI2-20261105：仅折旧年限可编辑；项目发生周期已改只读（灰底，实时跟随运营费用表「发生周期(月)」）
