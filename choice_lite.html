@@ -61146,6 +61146,42 @@ function submitAuth() {
       var slowest = Math.max.apply(null, cycles);
       return Math.max(Math.ceil(total / (CPD * LINES)), Math.ceil(slowest / (CPD * LINES)));
     }
+    // ★CC-SCHEDSMART-20261106：生产线永不停机模拟——jobCyc=各模具设计脱模次数列表(组合模=max成员)。
+    //   每条线做完当前规格立刻换下一套模具：优先装「剩余工作量最大且当前未被占用」的设计；若无空闲可装的规格(其余都已挂在别的线上)，
+    //   则自动复制该最大剩余规格的第2/第N套模具顶上空线。目标=工期最短，套数=按需复制后的实际套数。
+    function ccSchedSmart(jobCyc, LINES, CPD){
+      var rem = jobCyc.slice(), molds = rem.length, mounted = [], li;
+      for(li = 0; li < LINES; li++) mounted.push(-1);
+      var t = 0, rate = CPD; // 每条线 模/天
+      function pick(){
+        for(li = 0; li < LINES; li++){
+          if(mounted[li] >= 0) continue;
+          var best = -1, bv = 0;
+          for(var s = 0; s < rem.length; s++){
+            if(rem[s] <= 0 || mounted.indexOf(s) >= 0) continue; // 已在别的线上(只有1套模具)
+            if(rem[s] > bv){ bv = rem[s]; best = s; }
+          }
+          if(best < 0){ // 没有可独占装的规格 → 复制余量最大的规格顶上空线
+            var mx = -1, mv = 0;
+            for(var ss = 0; ss < rem.length; ss++){ if(rem[ss] > mv){ mv = rem[ss]; mx = ss; } }
+            if(mx >= 0){ molds++; mounted[li] = mx; }
+          } else { mounted[li] = best; }
+        }
+      }
+      while(true){
+        var any = false; for(var s = 0; s < rem.length; s++){ if(rem[s] > 0){ any = true; break; } }
+        if(!any) break;
+        pick();
+        var cnt = {}; // 统计每规格当前挂在几条线上(复制套数) → 实际产能=线数×模/天
+        for(li = 0; li < LINES; li++){ var s = mounted[li]; if(s >= 0 && rem[s] > 0){ cnt[s] = (cnt[s] || 0) + 1; } }
+        if(!Object.keys(cnt).length) break;
+        var dt = Infinity;
+        for(var sk in cnt){ dt = Math.min(dt, rem[sk] / (cnt[sk] * rate)); }
+        t += dt;
+        for(li = 0; li < LINES; li++){ var s2 = mounted[li]; if(s2 >= 0 && rem[s2] > 0){ rem[s2] -= dt * rate; if(rem[s2] < 1e-9){ rem[s2] = 0; mounted[li] = -1; } } }
+      }
+      return { days: Math.ceil(t - 1e-9), molds: molds };
+    }
     // ★CC-FX2-20261104：投资三币显示 ￥(蓝)/$(红)/đ(黄) — 金额(CNY)×cny_vnd=đ，đ÷usd_vnd=$；每次刷新拉最新汇率
     function ccMoneyHtml(wan){
       var rmb = 0, usd = 0;
@@ -61161,11 +61197,10 @@ function submitAuth() {
     }
     if(!sl.length){ if(eMa) eMa.textContent = '—'; if(eMc) eMc.textContent = '—'; }
     else{
-      // ★CC-MOLDSAVY-20261106：方案A——每规格1套设计；脱模周期最大的「主导规格」复制 LINES 套(每线1套)占满所有线并行，其余规格各1套共享余下线时(套数最省、工期达下界)
+      // ★CC-SCHEDSMART-20261106：方案A——每规格1套设计；用永不停机模拟求最短工期+实际套数(余量最大者自动复制占满空线)
       var gA = sl.map(function(sp){ var cap = ccMoldPer(sp.len, sp.wid, false); return { sp: sp, pcs: cap, cyc: (Number(sp.qty) || 0) / cap }; });
-      var wa = gA.reduce(function(a, m){ return a + m.cyc; }, 0);
-      var mkA = Math.ceil(wa / (CPD * LINES));   // 主导已占满线 → 工期=全部脱模周期÷全线产能(理论下界)
-      var setsA = LINES + (sl.length - 1);        // 主导LINES套 + 其余各1套
+      var simA = ccSchedSmart(gA.map(function(m){ return m.cyc; }), LINES, CPD);
+      var mkA = simA.days, setsA = simA.molds;
       var htmlA = ccT('moldSum') + ' ' + setsA + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkA + ' ' + ccT('moldDaysUnit') +
         ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsA * MPRICE);
       gA.forEach(function(m){ htmlA += ccSpecLine(m, false); });
@@ -61185,9 +61220,8 @@ function submitAuth() {
       if(comboOk.length) groups.push(comboOk);
       combo.forEach(function(a){ if(a.k === 0) groups.push([mkW(a.sp, ccMoldPer(a.sp.len, a.sp.wid, false))]); });
       var cycB = groups.map(function(g){ return Math.max.apply(null, g.map(function(m){ return m.cyc; })); }); // 组合模每组周期=max(成员qty/pcs)
-      var wb = cycB.reduce(function(a, b){ return a + b; }, 0);
-      var mkB = Math.ceil(wb / (CPD * LINES));
-      var setsB = LINES + (groups.length - 1);    // 主导LINES套 + 其余组各1套
+      var simB = ccSchedSmart(cycB, LINES, CPD);  // ★CC-SCHEDSMART-20261106：永不停机模拟
+      var mkB = simB.days, setsB = simB.molds;
       var htmlB = ccT('moldSum') + ' ' + setsB + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkB + ' ' + ccT('moldDaysUnit') +
         ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsB * MPRICE);
       groups.forEach(function(g){
