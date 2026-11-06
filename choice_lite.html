@@ -2005,9 +2005,12 @@ window.__finShakeReport = function (ms) {
     body.printing-cost .library-page > .lib-tabs,
     body.printing-cost .lib-drag-overlay{display:none !important;}
     body.printing-cost #lib-body{display:block !important;border:none !important;border-radius:0 !important;background:none !important;padding:0 !important;margin:0 !important;min-height:0 !important;height:auto !important;max-height:none !important;overflow:visible !important;}
+    /* ★CC-PRINTPDF2-20261106：打印不出现「增加行」「打印PDF」按钮（表头行两个操作按钮） */
+    body.printing-cost #lib-cost-body button[data-act="addspec"],
+    body.printing-cost #lib-cost-body #cc_print_btn{display:none !important;}
     html,body{height:auto !important;overflow:visible !important;}
     #lib-cost-body,#lib-cost-body *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}
-    @page { size: auto; margin: 8mm; }
+    @page { size: A4 landscape; margin: 8mm; } /* ★CC-PRINTPDF2-20261106：默认横向纸面 */
   }
     /* ===== 操作列：上下移动按钮（美观化 · 单个 ⇅ 图标） ===== */
     .won-actions { display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
@@ -60591,7 +60594,7 @@ function submitAuth() {
       '<span style="white-space:nowrap;font-size:12px;">' + ccT('totalBlocks') + '：<b id="cc_v_blocks" style="color:#d32f2f;">0</b></span>' +
       '<span style="white-space:nowrap;font-size:12px;">' + ccT('totalArea') + '：<b id="cc_v_area" style="color:#d32f2f;">0</b> ㎡</span>' +
       '<button class="cc-add" data-act="addspec" style="margin:0;">' + ccT('addRow2') + '</button>' +
-      '<button class="cc-add" onclick="ccPrintPdf()" style="margin:0;background:#1a56b0;border-color:#1a56b0;color:#fff;">🖨 ' + ccT('printPdf') + '</button></div>'; // ★CC-PRINTPDF-20261106：右上角打印PDF（只读也可用，故不走 data-act）
+      '<button class="cc-add" id="cc_print_btn" onclick="ccPrintPdf()" style="margin:0;background:#1a56b0;border-color:#1a56b0;color:#fff;">🖨 ' + ccT('printPdf') + '</button></div>'; // ★CC-PRINTPDF-20261106：右上角打印PDF（只读也可用，故不走 data-act）
     // ★CC-DUAL-20261104：单层表原样；任一行层数=2 时整表切 13 列双层表（上层6列+下层6列+层数列）
     var specDual = ccSpecDualMode();
     // ★CC-DUAL-NOHSCROLL-20261104：表头压成 2 行（上/下 + 短字段），完整字段名保留在 title；18 列按百分比等分，表格永远等于容器宽度
