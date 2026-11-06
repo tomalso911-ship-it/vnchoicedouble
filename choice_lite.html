@@ -59784,7 +59784,8 @@ function submitAuth() {
     // ★CC-MOLD-20261104：模具需求信息（三语）
     moldSec:     { zh:'模具需求信息', en:'Mold demand information', vi:'Thông tin nhu cầu khuôn' },
     moldNote1:   { zh:'备注：干法工艺，约 10 分钟脱模 ≈', en:'Note: dry-cast, ~10 min per cycle ≈', vi:'Lưu ý: công nghệ khô, ~10 phút/lô ≈' },
-    moldNote2:   { zh:'模/天。', en:'cycles/day.', vi:'khuôn/ngày.' },
+    moldNote2:   { zh:'模/天/生产线；两条生产线共计脱模', en:'cycles/day per line; two lines together demold a total of', vi:'khuôn/ngày/dây; hai dây song song tổng cộng' }, // ★CC-MOLDLINES-20261106
+    moldNote3:   { zh:'次/天。', en:'cycles/day in total.', vi:'lần/ngày.' }, // ★CC-MOLDLINES-20261106
     moldA:       { zh:'方案A · 单规格专用模具（每规格 1 套 · 2 条线并行）', en:'Plan A · Dedicated mold per spec (2 lines in parallel)', vi:'Phương án A · Khuôn riêng cho từng quy cách (2 dây song song)' },
     moldAd:      { zh:'每种规格单独雕刻一套型腔，一种规格一块铁板，型腔全同方向。', en:'Each spec gets its own carved mold plate; all cavities in one direction.', vi:'Mỗi quy cách khắc một bộ khuôn riêng, các hốc cùng một hướng.' },
     moldAp:      { zh:'优势：CNC 雕刻最简单、费用最低、不易出错', en:'Pros: simplest carving, lowest cost, fewest errors', vi:'Ưu: khắc đơn giản nhất, chi phí thấp, ít nhầm' },
@@ -60666,7 +60667,8 @@ function submitAuth() {
     var pick = CC_DATA.demand.moldPick === 'B' ? 'B' : 'A';
     h += '<div style="font-size:12px;color:#555;margin:4px 0 6px;line-height:1.9;display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;">' +
       '<span>' + ccT('moldNote1') +
-      ' <input class="cc-in" id="cc_mold_cpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric" autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"> ' + ccT('moldNote2') + '</span>' +
+      ' <input class="cc-in" id="cc_mold_cpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric" autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"> ' + ccT('moldNote2') +
+      ' <span id="cc_mold_total" style="font-weight:700;color:#d32f2f;">—</span> ' + ccT('moldNote3') + '</span>' + // ★CC-MOLDLINES-20261106：共计=每线×2条，ccRecalc 实时刷新
       '<span style="color:#333;font-weight:600;">' + ccT('moldPick') +
       ' <select id="cc_mold_pick" style="padding:2px 8px;border:1px solid #7aa7d4;border-radius:4px;font-size:12px;background:#eaf3fb;">' +
       '<option value="A"' + (pick === 'A' ? ' selected' : '') + '>' + ccT('moldOptA') + '</option>' +
@@ -61121,7 +61123,8 @@ function submitAuth() {
     setPlain('cc_v_blocks_ft', blocks);
     setPlain('cc_v_area', area);
     // ★CC-MOLD5-20261104：2条生产线并行 — 方案A=每规格专用模；方案B=主力规格专用模+小量规格组合模(放不下自动单独开模)
-    var CPD = Number(CC_DATA.demand.moldCpd) || 40, MPRICE = 3; // 模/天(输入框可改,默认40) / 万元每套
+    var CPD = Number(CC_DATA.demand.moldCpd) || 40, MPRICE = 3; // 模/天/生产线(输入框可改,默认40) / 万元每套
+    var mtEl = document.getElementById('cc_mold_total'); if(mtEl) mtEl.textContent = ccNum(CPD * 2); // ★CC-MOLDLINES-20261106：两条生产线共计脱模次数
     var sl = (CC_DATA.demand.specs || []).filter(function(sp){ return sp.len > 0 && sp.wid > 0 && (Number(sp.qty) || 0) > 0; });
     var eMa = document.getElementById('cc_mold_a'), eMc = document.getElementById('cc_mold_c');
     function ccSpecLine(m, ind, prefix){
