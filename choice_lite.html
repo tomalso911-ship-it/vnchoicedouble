@@ -61161,11 +61161,13 @@ function submitAuth() {
     }
     if(!sl.length){ if(eMa) eMa.textContent = '—'; if(eMc) eMc.textContent = '—'; }
     else{
-      // 方案A：每个规格一套设计 · 每线 1 套（★CC-MOLDLINES2-20261106）
-      var gA = sl.map(function(sp){ var cap = ccMoldPer(sp.len, sp.wid, false); return { sp: sp, pcs: cap }; });
-      var mkA = ccMk(gA.map(function(m){ return (Number(m.sp.qty) || 0) / m.pcs; })); // 脱模周期(次)
-      var htmlA = ccT('moldSum') + ' ' + (sl.length * LINES) + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkA + ' ' + ccT('moldDaysUnit') +
-        ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(sl.length * LINES * MPRICE);
+      // ★CC-MOLDSAVY-20261106：方案A——每规格1套设计；脱模周期最大的「主导规格」复制 LINES 套(每线1套)占满所有线并行，其余规格各1套共享余下线时(套数最省、工期达下界)
+      var gA = sl.map(function(sp){ var cap = ccMoldPer(sp.len, sp.wid, false); return { sp: sp, pcs: cap, cyc: (Number(sp.qty) || 0) / cap }; });
+      var wa = gA.reduce(function(a, m){ return a + m.cyc; }, 0);
+      var mkA = Math.ceil(wa / (CPD * LINES));   // 主导已占满线 → 工期=全部脱模周期÷全线产能(理论下界)
+      var setsA = LINES + (sl.length - 1);        // 主导LINES套 + 其余各1套
+      var htmlA = ccT('moldSum') + ' ' + setsA + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkA + ' ' + ccT('moldDaysUnit') +
+        ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsA * MPRICE);
       gA.forEach(function(m){ htmlA += ccSpecLine(m, false); });
       htmlA += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkA + ' ' + ccT('moldDaysUnit') + '</div>';
       if(eMa) eMa.innerHTML = htmlA;
@@ -61176,13 +61178,18 @@ function submitAuth() {
       var leftW = 1.5;
       combo.forEach(function(a){ var w = a.sp.wid / 1000; if(a.rows > 0 && leftW >= w - 1e-9){ a.k = 1; leftW -= w; } });
       combo.forEach(function(a){ var w = a.sp.wid / 1000; if(a.rows > 0 && a.k > 0 && a.k < 2 && leftW >= w - 1e-9){ a.k++; leftW -= w; } });
-      var groups = [[{ sp: main, pcs: ccMoldPer(main.len, main.wid, false) }]];
-      var comboOk = combo.filter(function(a){ return a.k > 0; }).map(function(a){ return { sp: a.sp, pcs: a.k * a.rows }; });
+      // ★CC-MOLDSAVY-20261106：方案B——主导组(数量最大规格)复制 LINES 套占满线并行；其余组合组各1套(小规格组合模很快做完, 余下线时继续跑主导)
+      function mkW(sp, pcs){ return { sp: sp, pcs: pcs, cyc: (Number(sp.qty) || 0) / pcs }; }
+      var groups = [[mkW(main, ccMoldPer(main.len, main.wid, false))]];
+      var comboOk = combo.filter(function(a){ return a.k > 0; }).map(function(a){ return mkW(a.sp, a.k * a.rows); });
       if(comboOk.length) groups.push(comboOk);
-      combo.forEach(function(a){ if(a.k === 0) groups.push([{ sp: a.sp, pcs: ccMoldPer(a.sp.len, a.sp.wid, false) }]); });
-      var mkB = ccMk(groups.map(function(g){ return Math.max.apply(null, g.map(function(m){ return (Number(m.sp.qty) || 0) / m.pcs; })); })); // 每组脱模周期(次)=max(成员qty/pcs)
-      var htmlB = ccT('moldSum') + ' ' + (groups.length * LINES) + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkB + ' ' + ccT('moldDaysUnit') +
-        ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(groups.length * LINES * MPRICE);
+      combo.forEach(function(a){ if(a.k === 0) groups.push([mkW(a.sp, ccMoldPer(a.sp.len, a.sp.wid, false))]); });
+      var cycB = groups.map(function(g){ return Math.max.apply(null, g.map(function(m){ return m.cyc; })); }); // 组合模每组周期=max(成员qty/pcs)
+      var wb = cycB.reduce(function(a, b){ return a + b; }, 0);
+      var mkB = Math.ceil(wb / (CPD * LINES));
+      var setsB = LINES + (groups.length - 1);    // 主导LINES套 + 其余组各1套
+      var htmlB = ccT('moldSum') + ' ' + setsB + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkB + ' ' + ccT('moldDaysUnit') +
+        ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsB * MPRICE);
       groups.forEach(function(g){
         if(g.length === 1){
           htmlB += ccSpecLine(g[0], false, ccT('moldDedic') + ' → ');
