@@ -61435,29 +61435,44 @@ function submitAuth() {
         });
       });
     })();
-    // ★CC-ARROWNAV-20261106：数据录入框 ↑/↓ 键 Excel 式跳转——同列优先、最近行优先（只接管 .cc-in 文本框；下拉框不接管，方向键仍切换选项）
+    // ★CC-ARROWNAV2-20261106：数据录入框 ↑↓←→ 全方向 Excel 式跳转——上下=同列优先/最近行优先；左右=表格行序(DOM序)前一格/后一格(行尾自动绕到下一行行首)；越界行 focus 自动滚入视野（只接管 .cc-in 文本框；下拉框不接管，方向键仍切换选项）
     (function(){
       if(window.__ccArrowNavBound) return; window.__ccArrowNavBound = true;
       document.addEventListener('keydown', function(e){
-        if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
         var el = e.target;
         if(!el || el.tagName !== 'INPUT' || !el.classList || !el.classList.contains('cc-in') || el.disabled || el.readOnly) return;
         var host = document.getElementById('lib-cost-body');
         if(!host || !host.contains(el)) return;
-        var r0 = el.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
-        var same = null, sGap = Infinity, near = null, nGap = Infinity;
-        host.querySelectorAll('input.cc-in').forEach(function(o){
-          if(o === el || o.disabled || o.readOnly) return;
-          var r = o.getBoundingClientRect();
-          if(!r.width || !r.height || r.bottom < 0 || r.top > window.innerHeight) return;
-          var oy = r.top + r.height / 2, ox = r.left + r.width / 2;
-          if(e.key === 'ArrowUp' ? oy >= cy - 2 : oy <= cy + 2) return; // 只取上一行/下一行
-          var dy = Math.abs(oy - cy), dx = Math.abs(ox - cx);
-          if(dx <= Math.max(r0.width, 80) * 0.6){ if(dy < sGap){ sGap = dy; same = o; } } // 同列（水平有重叠）
-          var g = dx * 2 + dy;
-          if(g < nGap){ nGap = g; near = o; }
-        });
-        var to = same || near;
+        var to = null;
+        if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){
+          var r0 = el.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+          var up = e.key === 'ArrowUp';
+          var same = null, sGap = Infinity, near = null, nGap = Infinity;
+          host.querySelectorAll('input.cc-in').forEach(function(o){
+            if(o === el || o.disabled || o.readOnly) return;
+            var r = o.getBoundingClientRect();
+            if(!r.width || !r.height) return; // 折叠块内的框跳过
+            var oy = r.top + r.height / 2, ox = r.left + r.width / 2;
+            if(up ? oy >= cy - 2 : oy <= cy + 2) return; // 只取上一行/下一行
+            var dy = Math.abs(oy - cy), dx = Math.abs(ox - cx);
+            if(dx <= Math.max(r0.width, 80) * 0.6){ if(dy < sGap){ sGap = dy; same = o; } } // 同列（水平有重叠）
+            var g = dx * 2 + dy;
+            if(g < nGap){ nGap = g; near = o; }
+          });
+          to = same || near;
+        } else {
+          // 左右：全模块 DOM 行序（Excel 网格行序——行尾往右自动到下一行第一格，行首往左自动到上一行最后一格）
+          var all = [];
+          host.querySelectorAll('input.cc-in').forEach(function(o){
+            if(o.disabled || o.readOnly) return;
+            var r = o.getBoundingClientRect();
+            if(!r.width || !r.height) return;
+            all.push(o);
+          });
+          var i = all.indexOf(el);
+          if(i >= 0) to = all[e.key === 'ArrowRight' ? i + 1 : i - 1] || null;
+        }
         if(to){ e.preventDefault(); to.focus(); try{ to.select(); }catch(err){} }
       });
     })();
