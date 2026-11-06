@@ -61262,6 +61262,20 @@ function submitAuth() {
       });
       htmlB += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkB + ' ' + ccT('moldDaysUnit') + '</div>';
       if(eMc) eMc.innerHTML = htmlB;
+      // ★CC-MOLDSYNC-20261106：机械表「钢模具」数量自动跟随所选方案的套数——选方案A→setsA，选方案B→setsB；切换下拉/改规格/线数/模天均实时同步
+      var msWant = (CC_DATA.demand.moldPick === 'B') ? setsB : setsA;
+      var msArr = CC_DATA.mach.mech || [];
+      for(var mi = 0; mi < msArr.length; mi++){
+        if(msArr[mi].k !== 'mSteelMould') continue;
+        if(Number(msArr[mi].qty) !== msWant){
+          msArr[mi].qty = msWant;
+          var msInp = document.querySelector('input[data-g="mach.mech"][data-f="qty"][data-i="' + mi + '"]');
+          if(msInp) msInp.value = msWant;
+          ccScheduleSave();
+          return ccRecalc(); // 机械合计在本遍已算过 → 二次重算刷新(套数已相等,不再递归)
+        }
+        break;
+      }
       // ★CC-PICKDAY-20261104：最终选择方案的工期 + ROUNDUP(工期×0.05) 不可控余量
       var pdEl = document.getElementById('cc_pick_days');
       if(pdEl){
