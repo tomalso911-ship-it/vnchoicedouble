@@ -60964,7 +60964,8 @@ function submitAuth() {
     var profit = total * margin / 100;
     var pNoVat = total + profit;
     var pVat = pNoVat * (1 + vat / 100);
-    var set = function(id, v, unit){ var el = document.getElementById(id); if(el) el.textContent = '₫ ' + ccNum(v) + (unit || ''); }; // ★CC-SUMHEAD：仅金额用，带货币符号
+    // ★CC-SUMTRI-20261106：汇总表价格三色——VND 列绿（红粗强调行 tr.cc-big 保持红色，不覆盖）
+    var set = function(id, v, unit){ var el = document.getElementById(id); if(!el) return; el.textContent = '₫ ' + ccNum(v) + (unit || ''); if(!el.closest || !el.closest('tr.cc-big')) el.style.color = '#2e7d32'; }; // ★CC-SUMHEAD：仅金额用，带货币符号
     var setPlain = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = ccNum(v); }; // ★CC-NOCUR-20261104：块数/面积等非金额，不带货币符号
     setPlain('cc_v_blocks', blocks);
     setPlain('cc_v_blocks_ft', blocks);
@@ -61087,6 +61088,8 @@ function submitAuth() {
       var u = key === 'cc_v_m2' ? ccT('unitM2') : '';
       var fmt = key === 'cc_v_m2' ? num2 : ccNum;
       el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + fmt(v / r) + u : '—';
+      // ★CC-SUMTRI-20261106：RMB 蓝 / USD 红（红粗强调行除外）
+      if(!el.closest || !el.closest('tr.cc-big')) el.style.color = usd ? '#d32f2f' : '#1a56b0';
     });
     // ★CC-PERBLOCK-20261104：每个规格每块价 = 每㎡含税单价 × 单块面积(㎡)，三币带 /块
     var m2Price = area > 0 ? pVat / area : 0;
@@ -61096,9 +61099,13 @@ function submitAuth() {
       var usd = el.getAttribute('data-cur') === 'usd', r = usd ? fx2.usd : fx2.rmb;
       var v = blockVal(Number(el.getAttribute('data-block')));
       el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + num2(v / r) + ccT('unitBlock') : '—';
+      // ★CC-SUMTRI-20261106：每块价 RMB 蓝 / USD 红
+      if(!el.closest || !el.closest('tr.cc-big')) el.style.color = usd ? '#d32f2f' : '#1a56b0';
     });
     host.querySelectorAll('[data-blockv]').forEach(function(el){
       el.textContent = '₫ ' + num2(blockVal(Number(el.getAttribute('data-blockv')))) + ccT('unitBlock');
+      // ★CC-SUMTRI-20261106：每块价 VND 绿
+      if(!el.closest || !el.closest('tr.cc-big')) el.style.color = '#2e7d32';
     });
     // ★CC-SPEC-SUMMARY-20261104：需求信息表底部总概括（三语，随规格输入实时刷新）
     var sumEl = document.getElementById('cc_v_summary');
