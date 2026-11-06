@@ -1995,6 +1995,20 @@ window.__finShakeReport = function (ms) {
     body.printing-dashboard .header-btns,
     body.printing-dashboard .dash-cur-switch{display:none !important;}
   }
+  /* ===== 成本核算打印PDF（CC-PRINTPDF-20261106）：按页面当前实际状态打印——已收缩的块保持收缩，不强行展开 ===== */
+  @media print{
+    body.printing-cost > *:not(#app){display:none !important;}
+    body.printing-cost #app{display:block !important;position:static !important;height:auto !important;max-height:none !important;overflow:visible !important;background:none !important;padding:0 !important;margin:0 !important;}
+    body.printing-cost #app > *:not(#view-library){display:none !important;}
+    body.printing-cost #view-library{display:block !important;position:static !important;height:auto !important;max-height:none !important;overflow:visible !important;background:none !important;padding:0 !important;margin:0 !important;}
+    body.printing-cost .library-page > .page-header,
+    body.printing-cost .library-page > .lib-tabs,
+    body.printing-cost .lib-drag-overlay{display:none !important;}
+    body.printing-cost #lib-body{display:block !important;border:none !important;border-radius:0 !important;background:none !important;padding:0 !important;margin:0 !important;min-height:0 !important;height:auto !important;max-height:none !important;overflow:visible !important;}
+    html,body{height:auto !important;overflow:visible !important;}
+    #lib-cost-body,#lib-cost-body *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}
+    @page { size: auto; margin: 8mm; }
+  }
     /* ===== 操作列：上下移动按钮（美观化 · 单个 ⇅ 图标） ===== */
     .won-actions { display:inline-flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; }
     .btn-move {
@@ -59761,6 +59775,7 @@ function submitAuth() {
     rDiaW:       { zh:'宽度方向钢筋尺寸', en:'Rebar Ø / width dir.', vi:'Cỡ thép / chiều rộng' },
     rebarW:      { zh:'钢筋尺寸/宽度方向', en:'Rebar size / width dir.', vi:'Cỡ thép / chiều rộng' },
     addRow2:     { zh:'增加行', en:'Add row', vi:'Thêm dòng' },
+ printPdf:    { zh:'打印PDF', en:'Print PDF', vi:'In PDF' }, // ★CC-PRINTPDF-20261106
     copyRow:     { zh:'复制', en:'Copy', vi:'Sao chép' },
     totalAll:    { zh:'总计', en:'Total', vi:'Tổng cộng' },
     // ★CC-MOLD-20261104：模具需求信息（三语）
@@ -60575,7 +60590,8 @@ function submitAuth() {
       '<span style="flex:1;"></span>' +
       '<span style="white-space:nowrap;font-size:12px;">' + ccT('totalBlocks') + '：<b id="cc_v_blocks" style="color:#d32f2f;">0</b></span>' +
       '<span style="white-space:nowrap;font-size:12px;">' + ccT('totalArea') + '：<b id="cc_v_area" style="color:#d32f2f;">0</b> ㎡</span>' +
-      '<button class="cc-add" data-act="addspec" style="margin:0;">' + ccT('addRow2') + '</button></div>';
+      '<button class="cc-add" data-act="addspec" style="margin:0;">' + ccT('addRow2') + '</button>' +
+      '<button class="cc-add" onclick="ccPrintPdf()" style="margin:0;background:#1a56b0;border-color:#1a56b0;color:#fff;">🖨 ' + ccT('printPdf') + '</button></div>'; // ★CC-PRINTPDF-20261106：右上角打印PDF（只读也可用，故不走 data-act）
     // ★CC-DUAL-20261104：单层表原样；任一行层数=2 时整表切 13 列双层表（上层6列+下层6列+层数列）
     var specDual = ccSpecDualMode();
     // ★CC-DUAL-NOHSCROLL-20261104：表头压成 2 行（上/下 + 短字段），完整字段名保留在 title；18 列按百分比等分，表格永远等于容器宽度
@@ -61567,6 +61583,13 @@ function submitAuth() {
         })
         .catch(function(){ CC_LOADED = true; });
     }catch(e){ CC_LOADED = true; }
+  }
+  // ★CC-PRINTPDF-20261106：打印成本核算页——按页面当前实际状态打印（收缩的块保持收缩，绝不强行展开）；打印完自动摘掉 body 标记
+  function ccPrintPdf(){
+    document.body.classList.add('printing-cost');
+    var done = function(){ document.body.classList.remove('printing-cost'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    setTimeout(function(){ try{ window.print(); }catch(e){} setTimeout(done, 1500); }, 60);
   }
   function lib_renderCostBody(){
     var host = document.getElementById('lib-cost-body'); if(!host) return;
