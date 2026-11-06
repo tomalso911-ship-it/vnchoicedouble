@@ -40437,6 +40437,25 @@ function applyFinPerms(){
 }
 // ---- 股东权益：eq_data 控制写入；股东结构 / 分红记录 隐藏 Univer 底部工作簿标签 ----
 function applyEqPerms(){
+  /* ★EQ-NAV-GATE-20261106（根因修复）：顶栏「股东权益」导航按钮此前从未被权限门控——
+     旧逻辑只藏 Univer 里的工作簿标签/容器，三项全「隐藏」后入口仍可点入空页面。
+     现在：三项全 hide → 隐藏导航按钮 + 藏容器/工具栏 + 若正停在权益视图则跳回 Dashboard。 */
+  var _eqAllHide = (permLvCommon('eq_data') === 'hide' &&
+                    permLvCommon('eq_holders') === 'hide' &&
+                    permLvCommon('eq_dividend') === 'hide');
+  var _navEq = document.querySelector('#tbMenu .tb-item[data-view="equity"]');
+  if (_navEq) _navEq.style.display = _eqAllHide ? 'none' : '';
+  if (_eqAllHide){
+    try{
+      var _ve0 = document.getElementById('view-equity');
+      if (_ve0 && _ve0.classList.contains('active') && typeof switchView === 'function') switchView('dashboard');
+    }catch(e){}
+    _hideSel('#equity_container', true);
+    _hideSel('#eq_toolbar', true);
+    return;
+  }
+  try{ var _ecR = document.getElementById('equity_container'); if(_ecR && _ecR.style.display === 'none') _ecR.style.display = ''; }catch(e){}
+  try{ var _tbR = document.getElementById('eq_toolbar'); if(_tbR && _tbR.style.display === 'none') _tbR.style.display = ''; }catch(e){}
   _hideSel('#eq_toolbar [onclick*="save"]', permLvCommon('eq_data') !== 'edit');
   // ★EQ-RO-LOCK-20261019：把「每张表的级别」暴露给权益模块（整表保护 / 命令锁用）。
   //   三张投资表 = eq_data；股东结构 = eq_holders；分红记录 = eq_dividend。
