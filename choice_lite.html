@@ -60044,7 +60044,7 @@ function submitAuth() {
       },
       opex:{ power:60000000, water:1000000, cons:15000000, dorm:7000000, food:10000000, car:270000000 },
       ind:{ flight:80000000, hotel:18000000, meal:20000000, mkt:500000000 },
-      margin:0, vat:0, mgmtPct:0,
+      margin:30, vat:8, mgmtPct:0, // ★CC-DEFVAL2-20261106：利润率 30% / 增值税 8% 默认（可编辑；存档 0/缺失时 ccMerge 补默认）
       // ★CC-PROVIDE-20261105：行路径 → Choice VN 是否提供；空对象=全部默认 √（兼容旧存档）
       provide:{},
       // ★CC-DEPR-20261105：设备折旧块状态；years=折旧年限(年,默认2,可编辑)；periodMonths 已弃用(20261105 周期改只读，恒=运营费用发生周期)
@@ -60085,7 +60085,8 @@ function submitAuth() {
           }).concat(extra);
         });
       }
-      ['margin','vat','mgmtPct'].forEach(function(k){ if(saved[k] !== undefined) base[k] = Number(saved[k]) || 0; }); // ★CC-MGMT：管理费百分比
+      // ★CC-DEFVAL2-20261106：利润率30/增值税8 默认（可编辑）——存档值非 0 原样保留，0/缺失补默认（与人工预设同策略）
+      ['margin','vat','mgmtPct'].forEach(function(k){ if(saved[k] !== undefined && Number(saved[k])) base[k] = Number(saved[k]); }); // ★CC-MGMT：管理费百分比
       // ★CC-DEFVAL-20261106：人工/运营/间接默认值——存档值为 0/缺失时套预设默认（用户已填非 0 原样保留；与机械预设同策略）
       (function(){
         var DEF2 = ccDef();
@@ -61413,6 +61414,32 @@ function submitAuth() {
           else CC_DATA.vat = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || 0;
           ccRecalc(); ccScheduleSave();
         });
+      });
+    })();
+    // ★CC-ARROWNAV-20261106：数据录入框 ↑/↓ 键 Excel 式跳转——同列优先、最近行优先（只接管 .cc-in 文本框；下拉框不接管，方向键仍切换选项）
+    (function(){
+      if(window.__ccArrowNavBound) return; window.__ccArrowNavBound = true;
+      document.addEventListener('keydown', function(e){
+        if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        var el = e.target;
+        if(!el || el.tagName !== 'INPUT' || !el.classList || !el.classList.contains('cc-in') || el.disabled || el.readOnly) return;
+        var host = document.getElementById('lib-cost-body');
+        if(!host || !host.contains(el)) return;
+        var r0 = el.getBoundingClientRect(), cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+        var same = null, sGap = Infinity, near = null, nGap = Infinity;
+        host.querySelectorAll('input.cc-in').forEach(function(o){
+          if(o === el || o.disabled || o.readOnly) return;
+          var r = o.getBoundingClientRect();
+          if(!r.width || !r.height || r.bottom < 0 || r.top > window.innerHeight) return;
+          var oy = r.top + r.height / 2, ox = r.left + r.width / 2;
+          if(e.key === 'ArrowUp' ? oy >= cy - 2 : oy <= cy + 2) return; // 只取上一行/下一行
+          var dy = Math.abs(oy - cy), dx = Math.abs(ox - cx);
+          if(dx <= Math.max(r0.width, 80) * 0.6){ if(dy < sGap){ sGap = dy; same = o; } } // 同列（水平有重叠）
+          var g = dx * 2 + dy;
+          if(g < nGap){ nGap = g; near = o; }
+        });
+        var to = same || near;
+        if(to){ e.preventDefault(); to.focus(); try{ to.select(); }catch(err){} }
       });
     })();
     // ★CC-FOLD-20261106：区块 +/- 折叠——document 级事件委托，一次注册（点 + 展开、点 − 收缩，按钮符号随状态切换）
