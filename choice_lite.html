@@ -61078,9 +61078,10 @@ function submitAuth() {
     var deprMonthly = deprAnnual / 12;
     var deprTotal = deprMonthly * deprPer; // 项目期间折旧总额
     var mgmtPct = Number(CC_DATA.mgmtPct) || 0;
-    var baseCost = mach + agg + labor + opex + ind;
+    // ★CC-DEPR-ACC-20261106：会计口径——设备按「项目期间折旧额」计入项目成本（不按采购全款），故不再单独 +deprTotal（折旧已含在设备成本中）
+    var baseCost = deprTotal + agg + labor + opex + ind;
     var mgmtAmt = baseCost * mgmtPct / 100;   // ★CC-MGMT2：#5 管理费用 = 前四项 × 百分比
-    var total = baseCost + mgmtAmt + deprTotal; // ★CC-DEPR：总成本含项目期间设备折旧
+    var total = baseCost + mgmtAmt;
     var margin = Number(CC_DATA.margin) || 0, vat = Number(CC_DATA.vat) || 0;
     var profit = total * margin / 100;
     var pNoVat = total + profit;
@@ -61190,14 +61191,14 @@ function submitAuth() {
       var perInp = document.getElementById('cc_depr_period');
       if(perInp){ perInp.value = (Math.round(deprPer * 10) / 10).toFixed(1); }
     })();
-    set('cc_v_mach', mach); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind);
+    set('cc_v_mach', deprTotal); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind); // ★CC-DEPR-ACC-20261106：#1 机械类合计 = 项目期间折旧价值（会计口径，不填设备采购全额）
     set('cc_v_mgmt', mgmtAmt); // ★CC-MGMT2：#5 右侧数值 = 管理费金额(前四项×百分比)
     set('cc_v_depr', deprTotal); // ★CC-DEPR-20261105：#6 项目期间设备折旧
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
     set('cc_v_m2', area > 0 ? pVat / area : 0, ccT('unitM2')); // ★CC-PERBLOCK：每㎡价带 /㎡
     // ★CC-SUMHEAD-20261104：汇总表 RMB/USD 列按汇率自动换算
     var sumVals = {
-      cc_v_mach: mach, cc_v_agg: agg, cc_v_labor: labor + opex, cc_v_ind: ind,
+      cc_v_mach: deprTotal, cc_v_agg: agg, cc_v_labor: labor + opex, cc_v_ind: ind,
       cc_v_mgmt: mgmtAmt, cc_v_depr: deprTotal, cc_v_total: total, cc_v_profit: profit,
       cc_v_pnovat: pNoVat, cc_v_pvat: pVat, cc_v_m2: (area > 0 ? pVat / area : 0)
     };
