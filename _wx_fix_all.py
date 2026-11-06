@@ -13,6 +13,9 @@ sys.stdout.reconfigure(encoding="utf-8")
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(BASE, "agi_pm.db")
 SRV = "http://127.0.0.1:5050"
+for _a in sys.argv[1:]:          # ★支持 --srv=http://... 指定服务端（服务器上默认端口 5060）
+    if _a.startswith("--srv="):
+        SRV = _a.split("=", 1)[1]
 ME = "tom"
 APPLY = "--apply" in sys.argv
 

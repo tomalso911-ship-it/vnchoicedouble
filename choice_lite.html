@@ -9327,7 +9327,30 @@ var WL_FLOW_IMG = {
           var f = (d && d.ok && d.data) ? d.data : null;
           if(!f){ done(0); return; }
           var slots = prodWxPendingSlots(f);
-          if(!slots.length){ done(0); return; }
+          if(!slots.length){
+            /* ★CC-WXCACHE-20261106：服务端已无缺口 ≠ 本地无缺口。
+               本地旧快照(PROD_MEM/localStorage)可能缺天气 → 报告页读本地副本永远显示'—'。
+               此时仍要把服务端最新副本合并进本地缓存（workers/production 按日期并集、
+               同日期以服务端为准 → 天气/记录自动补齐），只合并不回写服务器。 */
+            try{
+              var lc = (typeof PROD_MEM!=='undefined' && PROD_MEM[pid]) || null;
+              if(!lc){ try{ lc = JSON.parse(localStorage.getItem(PROD_LS+pid)); }catch(_){ lc = null; } }
+              if(lc){
+                var locSlots = prodWxPendingSlots(lc);
+                if(locSlots.length){
+                  if(f.id==null || f.id==='') f.id = pid;
+                  var mf = prod_mergeFactory(lc, f);
+                  if(mf){
+                    if(mf.id==null || mf.id==='') mf.id = pid;
+                    if(typeof PROD_MEM!=='undefined') PROD_MEM[pid] = mf;
+                    try{ localStorage.setItem(PROD_LS+pid, JSON.stringify(mf)); }catch(_){}
+                    done(locSlots.length); return;  // 本地已刷新(无服务器写入)
+                  }
+                }
+              }
+            }catch(_){}
+            done(0); return;
+          }
           var start='', end='';
           slots.forEach(function(s){ if(!start || s.ymd<start) start=s.ymd; if(!end || s.ymd>end) end=s.ymd; });
           prodWxFetchRange(prov, start, end, function(hr){
@@ -9392,6 +9415,8 @@ var WL_FLOW_IMG = {
             if(fixedProjects){
               try{ console.log('[prodWxAutoFixAll] 已自动补齐天气：项目 '+fixedProjects+' 个 / 记录 '+fixedRows+' 条'); }catch(_){}
               try{ if(typeof prod_renderProduction==='function' && window.currentView==='production' && PROD_ACTIVE_TAB && PROD_CUR) prod_renderTab(PROD_ACTIVE_TAB); }catch(_){}
+              try{ /* ★CC-WXCACHE-20261106：每日记录报告页也自动刷新——补齐后立即看到天气，无需重进 */ 
+                if(window.currentView==='worklog' && typeof WL_CUR!=='undefined' && WL_CUR && typeof wl_renderTab==='function' && typeof WL_ACTIVE_TAB!=='undefined') wl_renderTab(WL_ACTIVE_TAB); }catch(_){}
             }
           }
         });
