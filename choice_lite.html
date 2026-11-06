@@ -40648,6 +40648,11 @@ function viewAllowed(name){
                              && _myCommonLevel('fin_cn','view')   === 'hide'
                              && _myCommonLevel('fin_rest','view') === 'hide') return false;
     if (name === 'approvals' && !_anyProjApproval()) return false;
+    // ★EQ-VIEW-GATE-20261106（根因修复）：股东权益三项（总投资三合一/股东结构/分红记录）全「隐藏」
+    //   → 整页不可见、导航入口消失（之前 viewAllowed 漏了 equity，永远返回 true，导航按钮被 applyAllPermVisibility 强行显示）。
+    if (name === 'equity'    && _myCommonLevel('eq_data','view')     === 'hide'
+                             && _myCommonLevel('eq_holders','view')  === 'hide'
+                             && _myCommonLevel('eq_dividend','view') === 'hide') return false;
   }
   // 空领航标签：始终显示，不依赖看板区块权限
   if (name === 'dashboard') {
