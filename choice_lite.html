@@ -59820,6 +59820,10 @@ function submitAuth() {
     moldNeedDays:{ zh:'需', en:'needs', vi:'cần' },
     moldNoFit:   { zh:'组合放不下，改为单独开模', en:'does not fit the combined mold — dedicated mold instead', vi:'không vừa khuôn kết hợp — làm khuôn riêng' },
     moldPar:     { zh:'线并行约', en:'lines in parallel ≈', vi:'dây song song ≈' }, // ★CC-MOLDLINES2-20261106：前面拼线数——「N 线并行约 X 天」
+   moldDetail:  { zh:'模具明细（每线 1 套）', en:'Mold breakdown (1 set per line)', vi:'Chi tiết khuôn (1 bộ/mỗi dây)' }, // ★CC-MOLDDETAIL-20261106
+   moldPlate1:  { zh:'单规格整板（1 副模具只出 1 种规格）', en:'single-spec plate (one spec per mold)', vi:'thẻ nguyên 1 quy cách (1 khuôn chỉ ra 1 quy cách)' }, // ★CC-MOLDDETAIL-20261106
+   moldPlate2:  { zh:'混拼板（1 副模具拼多种规格 · 同一次脱模一齐出）', en:'mixed plate (several specs combined in one mold, demolded together)', vi:'thẻ ghép nhiều quy cách trong 1 khuôn, ép ra cùng lúc' }, // ★CC-MOLDDETAIL-20261106
+   moldMulti:   { zh:'每线 1 套 · 同规格多线并行', en:'1 set per line · same spec on parallel lines', vi:'1 bộ/mỗi dây · cùng quy cách song song' }, // ★CC-MOLDDETAIL-20261106
     moldDedic:   { zh:'单独开模', en:'dedicated mold', vi:'khuôn riêng' },
     moldCombo:   { zh:'组合开模（条带式）', en:'combined mold (strip layout)', vi:'khuôn kết hợp (dải)' },
     moldFin:     { zh:'完成全部工作', en:'Finish ALL work', vi:'Hoàn thành toàn bộ công việc' },
@@ -61151,6 +61155,7 @@ function submitAuth() {
     //   则自动复制该最大剩余规格的第2/第N套模具顶上空线。目标=工期最短，套数=按需复制后的实际套数。
     function ccSchedSmart(jobCyc, LINES, CPD){
       var rem = jobCyc.slice(), molds = rem.length, mounted = [], li;
+      var copies = rem.map(function(){ return 1; }); // ★CC-MOLDDETAIL-20261106：每副设计实际用的套数(复制后>1)，sum(copies)=molds
       for(li = 0; li < LINES; li++) mounted.push(-1);
       var t = 0, rate = CPD; // 每条线 模/天
       function pick(){
@@ -61164,7 +61169,7 @@ function submitAuth() {
           if(best < 0){ // 没有可独占装的规格 → 复制余量最大的规格顶上空线
             var mx = -1, mv = 0;
             for(var ss = 0; ss < rem.length; ss++){ if(rem[ss] > mv){ mv = rem[ss]; mx = ss; } }
-            if(mx >= 0){ molds++; mounted[li] = mx; }
+            if(mx >= 0){ molds++; copies[mx]++; mounted[li] = mx; }
           } else { mounted[li] = best; }
         }
       }
@@ -61180,7 +61185,7 @@ function submitAuth() {
         t += dt;
         for(li = 0; li < LINES; li++){ var s2 = mounted[li]; if(s2 >= 0 && rem[s2] > 0){ rem[s2] -= dt * rate; if(rem[s2] < 1e-9){ rem[s2] = 0; mounted[li] = -1; } } }
       }
-      return { days: Math.ceil(t - 1e-9), molds: molds };
+      return { days: Math.ceil(t - 1e-9), molds: molds, copies: copies };
     }
     // ★CC-FX2-20261104：投资三币显示 ￥(蓝)/$(红)/đ(黄) — 金额(CNY)×cny_vnd=đ，đ÷usd_vnd=$；每次刷新拉最新汇率
     function ccMoneyHtml(wan){
@@ -61198,12 +61203,21 @@ function submitAuth() {
     if(!sl.length){ if(eMa) eMa.textContent = '—'; if(eMc) eMc.textContent = '—'; }
     else{
       // ★CC-SCHEDSMART-20261106：方案A——每规格1套设计；用永不停机模拟求最短工期+实际套数(余量最大者自动复制占满空线)
+      // ★CC-MOLDDETAIL-20261106：逐套模具明细——第几副模具、什么设计、单规格整板还是混拼板、几条线用、本模需几天
+      var CN = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'];
       var gA = sl.map(function(sp){ var cap = ccMoldPer(sp.len, sp.wid, false); return { sp: sp, pcs: cap, cyc: (Number(sp.qty) || 0) / cap }; });
       var simA = ccSchedSmart(gA.map(function(m){ return m.cyc; }), LINES, CPD);
-      var mkA = simA.days, setsA = simA.molds;
+      var mkA = simA.days, setsA = simA.molds, copA = simA.copies;
       var htmlA = ccT('moldSum') + ' ' + setsA + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkA + ' ' + ccT('moldDaysUnit') +
         ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsA * MPRICE);
-      gA.forEach(function(m){ htmlA += ccSpecLine(m, false); });
+      htmlA += '<div style="font-weight:700;color:#1a56b0;margin:6px 0 2px;">📋 ' + ccT('moldDetail') + '</div>';
+      gA.forEach(function(m, i){
+        var cp = copA[i], d = Math.ceil(m.cyc / (CPD * cp)); // 本模(组)生产耗时=周期÷(线数×模/天)
+        htmlA += '<div style="margin:2px 0 2px 14px;">' + (CN[i] || (i + 1)) + ' ' + ccNum(m.sp.len) + '×' + ccNum(m.sp.wid) + ' ' + ccT('moldDedic') +
+          ' × ' + cp + ' ' + ccT('moldSets') + ' — ' + ccT('moldPlate1') + ' · ' + ccT('moldPer') + ' ' + m.pcs + ' ' + ccT('moldPcs') +
+          (cp > 1 ? ' · <span style="color:#d32f2f;font-weight:700;">' + ccT('moldMulti') + '</span>' : '') +
+          ' · ' + ccT('moldNeedDays') + ' ' + d + ' ' + ccT('moldDaysUnit') + '</div>';
+      });
       htmlA += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkA + ' ' + ccT('moldDaysUnit') + '</div>';
       if(eMa) eMa.innerHTML = htmlA;
       // 方案B：数量最大的规格单独开模，其余规格组合开模(条带式)；组合放不下的自动单独开模
@@ -61221,18 +61235,29 @@ function submitAuth() {
       combo.forEach(function(a){ if(a.k === 0) groups.push([mkW(a.sp, ccMoldPer(a.sp.len, a.sp.wid, false))]); });
       var cycB = groups.map(function(g){ return Math.max.apply(null, g.map(function(m){ return m.cyc; })); }); // 组合模每组周期=max(成员qty/pcs)
       var simB = ccSchedSmart(cycB, LINES, CPD);  // ★CC-SCHEDSMART-20261106：永不停机模拟
-      var mkB = simB.days, setsB = simB.molds;
+      var mkB = simB.days, setsB = simB.molds, copB = simB.copies;
       var htmlB = ccT('moldSum') + ' ' + setsB + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkB + ' ' + ccT('moldDaysUnit') +
         ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsB * MPRICE);
-      groups.forEach(function(g){
+      // ★CC-MOLDDETAIL-20261106：逐套模具明细——主力=单规格整板×N套(每线1套)；小规格=混拼板(条带×腔, 同次脱模一齐出)
+      htmlB += '<div style="font-weight:700;color:#1a56b0;margin:6px 0 2px;">📋 ' + ccT('moldDetail') + '</div>';
+      groups.forEach(function(g, k){
+        var cp = copB[k], gCyc = Math.max.apply(null, g.map(function(m){ return m.cyc; }));
+        var d = Math.ceil(gCyc / (CPD * cp)); // 本模(组)生产耗时
         if(g.length === 1){
-          htmlB += ccSpecLine(g[0], false, ccT('moldDedic') + ' → ');
+          var m0 = g[0];
+          htmlB += '<div style="margin:2px 0 2px 14px;">' + (CN[k] || (k + 1)) + ' ' + ccNum(m0.sp.len) + '×' + ccNum(m0.sp.wid) + ' ' + ccT('moldDedic') +
+            ' × ' + cp + ' ' + ccT('moldSets') + ' — ' + ccT('moldPlate1') + ' · ' + ccT('moldPer') + ' ' + m0.pcs + ' ' + ccT('moldPcs') +
+            (cp > 1 ? ' · <span style="color:#d32f2f;font-weight:700;">' + ccT('moldMulti') + '</span>' : '') +
+            ' · ' + ccT('moldNeedDays') + ' ' + d + ' ' + ccT('moldDaysUnit') + '</div>';
         } else {
-          htmlB += '<div style="font-weight:400;margin:2px 0;">' + g.map(function(m){ return ccNum(m.sp.len) + '×' + ccNum(m.sp.wid); }).join(' ＋ ') + '：' + ccT('moldCombo') + '</div>';
+          htmlB += '<div style="margin:2px 0 0 14px;">' + (CN[k] || (k + 1)) + ' ' + ccT('moldCombo') + ' × ' + cp + ' ' + ccT('moldSets') + ' — <b>' + ccT('moldPlate2') + '</b>：</div>';
           g.forEach(function(m){
             var cm = combo.filter(function(a){ return a.sp === m.sp; })[0];
-            htmlB += ccSpecLine(m, true, cm ? (cm.k + ' ' + ccT('moldStrip') + ' × ' + cm.rows + ' ' + ccT('moldCav') + ' → ') : '');
+            htmlB += '<div style="margin:2px 0 2px 28px;">· ' + ccNum(m.sp.len) + '×' + ccNum(m.sp.wid) +
+              (cm ? '（' + cm.k + ' ' + ccT('moldStrip') + ' × ' + cm.rows + ' ' + ccT('moldCav') + '）' : '') +
+              '：' + ccT('moldPer') + ' ' + m.pcs + ' ' + ccT('moldPcs') + '</div>';
           });
+          htmlB += '<div style="margin:0 0 2px 28px;color:#1a56b0;">· ' + ccT('moldNeedDays') + ' ' + d + ' ' + ccT('moldDaysUnit') + '</div>';
         }
       });
       htmlB += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkB + ' ' + ccT('moldDaysUnit') + '</div>';
