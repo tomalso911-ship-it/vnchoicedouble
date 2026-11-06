@@ -8154,7 +8154,7 @@ SYS_COMMON_DEFAULTS = {
     "fin_cn": "view",           # 中国财务报表
     "fin_rest": "view",         # 合并 + 越南看板 + 合并看板（三合一，只读）
     "lib_cost": "view",         # ★LIB-COST-20261104：资料库-成本核算（公用模块新增，财务管理之下）
-    "eq_data": "view",          # 总投资/中国投资/越南投资（三合一）
+    "eq_data": "hide",          # 总投资/中国投资/越南投资（三合一）★EQ-DATA-HIDE-20261106：默认隐藏
     "eq_holders": "hide",       # 股东结构
     "eq_dividend": "hide",      # 分红记录
     # ★PERM-V2-APP-PROJ-20261019：审批已迁到「按项目授权」（审批因项目而异），公共模块不再有该项
@@ -8175,7 +8175,7 @@ SYS_PROJ_DEFAULTS = {
 # 受限选项集（缺省 = hide/view/edit 全支持）
 COMMON_OPTION_SETS = {
     "fin_rest": ("hide", "view"),   # 合并/两个看板：只读
-    "eq_data": ("view", "edit"),    # 三个投资表：不可隐藏
+    "eq_data": ("hide", "view", "edit"),  # ★EQ-DATA-HIDE-20261106：三张投资表允许隐藏（默认隐藏）
 }
 
 _PERM_ALIAS = {

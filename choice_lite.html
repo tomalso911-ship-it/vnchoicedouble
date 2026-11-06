@@ -38702,7 +38702,7 @@ function wonDetailLinkCell(p, field, labelKey) {
     perm_c_fin_vn:         { zh: '越南财务报表', en: 'Vietnam report', vi: 'Báo cáo VN' },
     perm_c_fin_cn:         { zh: '中国财务报表', en: 'China report', vi: 'Báo cáo TQ' },
     perm_c_fin_rest:       { zh: '合并报表 / 越南看板 / 合并看板（三合一，只读）', en: 'Merge + dashboards (read-only)', vi: 'Hợp nhất + dashboard (chỉ đọc)' },
-    perm_c_eq_data:        { zh: '总投资 / 中国投资 / 越南投资（三合一，不可隐藏）', en: 'Investment sheets (cannot hide)', vi: 'Bảng đầu tư (không thể ẩn)' },
+    perm_c_eq_data:        { zh: '总投资 / 中国投资 / 越南投资（三合一）', en: 'Investment sheets (combined)', vi: 'Bảng đầu tư (kết hợp)' },
     perm_c_eq_holders:     { zh: '股东结构', en: 'Shareholder structure', vi: 'Cơ cấu cổ đông' },
     perm_c_eq_dividend:    { zh: '分红记录', en: 'Dividend records', vi: 'Hồ sơ cổ tức' },
     // ★PERM-V2-APP-PROJ-20261019：审批已迁到「按项目授权」，公共模块不再有该项（键保留仅作兼容）
@@ -40304,7 +40304,7 @@ var VIEW_PERM_MAP = {
 // =====================================================================
 var SYS_COMMON_DEF = { dashboard:'view', won_list:'view', won_btn_add:'hide', won_btn_export:'hide',
   won_row_view:'hide', won_row_copy:'hide', won_row_edit:'hide', won_row_delete:'hide',
-  fin_vn:'view', fin_cn:'view', fin_rest:'view', lib_cost:'view', eq_data:'view', eq_holders:'hide', eq_dividend:'hide' };
+  fin_vn:'view', fin_cn:'view', fin_rest:'view', lib_cost:'view', eq_data:'hide', eq_holders:'hide', eq_dividend:'hide' };
   // ★PERM-V2-APP-PROJ-20261019：approval 已迁到按项目授权（默认 hide）
 var SYS_PROJ_DEF = { wl_daily:'view', wl_mywork:'view', prod_A:'view', prod_B:'view', prod_C:'view', prod_D:'view',
   prod_D_receipt:'hide', prod_E:'view', prod_H:'view', prod_F:'view', inst_A:'view', inst_B:'view', inst_C:'view',
@@ -40446,18 +40446,24 @@ function applyEqPerms(){
     if (name === '分红记录' || name === 'Dividend Records' || name === 'Cổ tức') return permLvCommon('eq_dividend');
     return permLvCommon('eq_data');
   };
+  // ★EQ-DATA-HIDE-20261106：eq_data 也允许「隐藏」——三张投资表标签一并藏掉
+  var invNames = ['总投资数据','Total Investment','Tổng đầu tư',
+                  '中国投资数据','China Investment','Đầu tư Trung Quốc',
+                  '越南投资数据','Vietnam Investment','Đầu tư Việt Nam'];
+  var holdNames = ['股东结构','Shareholder Structure','Cơ cấu cổ đông'];
+  var divNames  = ['分红记录','Dividend Records','Cổ tức'];
   var hideNames = [];
-  if (permLvCommon('eq_holders') === 'hide')  hideNames = hideNames.concat(['股东结构','Shareholder Structure','Cơ cấu cổ đông']);
-  if (permLvCommon('eq_dividend') === 'hide') hideNames = hideNames.concat(['分红记录','Dividend Records','Cổ tức']);
+  if (permLvCommon('eq_data') === 'hide')     hideNames = hideNames.concat(invNames);
+  if (permLvCommon('eq_holders') === 'hide')  hideNames = hideNames.concat(holdNames);
+  if (permLvCommon('eq_dividend') === 'hide') hideNames = hideNames.concat(divNames);
   // ★EQ-PERM-TABLOCK-20261019：必须只取【#equity_container 内】的标签条。
   //   旧写法 document.querySelector('.univer-sheet-bar') 全局取第一个 —— 财务、股东权益
   //   两套 Univer 并存时经常抓到财务的标签条，股东权益的标签一个都藏不掉（用户报 BUG 根因）。
   var bar = document.querySelector('#equity_container .univer-sheet-bar') ||
             document.querySelector('#view-equity [class*="sheet-bar"]');
   if (!hideNames.length || !bar) return;
-  var visNames = ['总投资数据','Total Investment','Tổng đầu tư',
-                  '中国投资数据','China Investment','Đầu tư Trung Quốc',
-                  '越南投资数据','Vietnam Investment','Đầu tư Việt Nam'];
+  /* 候补激活表：任意未被隐藏的表名（含股东结构/分红记录）——三张投资表被藏时也能落到可见表 */
+  var visNames = invNames.concat(holdNames, divNames);
   var items = bar.querySelectorAll('div, span, li');
   var activeHidden = false, firstVis = null;
   for (var i=0;i<items.length;i++){
@@ -40485,6 +40491,15 @@ function applyEqPerms(){
   // 激活表被隐藏 → 自动切到第一个可见表（点叶子节点，事件自然冒泡到 Univer 的切换处理）
   if (activeHidden && firstVis){
     try { firstVis.click(); } catch(e){}
+  } else if (activeHidden){
+    /* ★EQ-DATA-HIDE-20261106：连一张可见表都没有（如默认 eq_data/holders/dividend 全 hide）
+       → 整块 Univer 容器 + 工具栏一并隐藏，避免「标签藏了但激活表内容仍显示」 */
+    try{ var _ec = document.getElementById('equity_container'); if(_ec) _ec.style.display = 'none'; }catch(e){}
+    try{ var _tb = document.getElementById('eq_toolbar'); if(_tb) _tb.style.display = 'none'; }catch(e){}
+  } else {
+    /* 权限放宽后恢复显示（applyEqPerms 会被反复调用） */
+    try{ var _ec2 = document.getElementById('equity_container'); if(_ec2 && _ec2.style.display === 'none') _ec2.style.display = ''; }catch(e){}
+    try{ var _tb2 = document.getElementById('eq_toolbar'); if(_tb2 && _tb2.style.display === 'none') _tb2.style.display = ''; }catch(e){}
   }
 }
 // ---- 通用：按项目对某组子标签做「隐藏 + 只读」----
@@ -44105,7 +44120,7 @@ var COMMON_PERM_DEFS = [
       {k:'lib_cost', n:'成本核算', o:['hide','view','edit'], d:'view'}
   ]},
   { mod:'股东权益', rows:[
-      {k:'eq_data',     n:'总投资 / 中国投资 / 越南投资（三合一，不可隐藏）', o:['view','edit'], d:'view'},
+      {k:'eq_data',     n:'总投资 / 中国投资 / 越南投资（三合一）', o:['hide','view','edit'], d:'hide'},
       {k:'eq_holders',  n:'股东结构', o:['hide','view','edit'], d:'hide'},
       {k:'eq_dividend', n:'分红记录', o:['hide','view','edit'], d:'hide'}
   ]},
