@@ -59974,6 +59974,18 @@ function submitAuth() {
     aggShareTitle: { zh:'骨料投入占比', en:'Aggregate investment share', vi:'Tỷ trọng đầu tư cốt liệu' },
     // ★CC-FOLD-20261106：钢筋/规格汇总框折叠标题
     ccFoldSummary: { zh:'钢筋与规格汇总', en:'Rebar & spec summary', vi:'Tổng hợp thép & quy cách' },
+    // ★CC-LABDESC-20261106：#3 人工汇总描述
+    labDesc1: { zh:'整场共使用工人 {0} 名（{1}）', en:'Total workers on site: {0} ({1})', vi:'Tổng số công nhân toàn trường: {0} ({1})' },
+    labDesc2: { zh:'每天的人工费用开支：', en:'Daily labor cost: ', vi:'Chi phí nhân công mỗi ngày: ' },
+    labDesc3: { zh:'每一个月的人工费用开支：', en:'Monthly labor cost: ', vi:'Chi phí nhân công mỗi tháng: ' },
+    labDesc4: { zh:'整个生产周期 {0} 天，预计总生产人工费用：', en:'Production period {0} days, estimated total production labor cost: ', vi:'Toàn bộ chu kỳ sản xuất {0} ngày, tổng chi phí nhân công sản xuất dự kiến: ' },
+    labDesc5: { zh:'安装期间 {0} 天，预计总安装人工费用：', en:'Installation period {0} days, estimated total installation labor cost: ', vi:'Thời gian lắp đặt {0} ngày, tổng chi phí nhân công lắp đặt dự kiến: ' },
+    labDesc6: { zh:'生产和安装全部项目周期总计需要：', en:'Grand total for the entire production + installation period: ', vi:'Tổng cộng toàn bộ chu kỳ sản xuất + lắp đặt cần: ' },
+    // ★CC-AGGDESC-20261106：骨料占比行扩展描述
+    aggDescTotal: { zh:'总计费用：', en:'Total cost: ', vi:'Tổng chi phí: ' },
+    aggDescDay:   { zh:'平均每天费用：', en:'Avg cost/day: ', vi:'Chi phí TB/ngày: ' },
+    aggDescMonth: { zh:'平均每月费用：', en:'Avg cost/month: ', vi:'Chi phí TB/tháng: ' },
+    aggDescProj:  { zh:'整个项目期间购买骨料的费用：', en:'Aggregate purchase cost for the whole project period: ', vi:'Chi phí mua cốt liệu trong toàn bộ thời gian dự án: ' },
     aggShare:      { zh:'占整个骨料投资的 {0} %', en:'{0} % of total aggregate investment', vi:'Chiếm {0} % tổng vốn đầu tư cốt liệu' },
     // ★CC-DEPR-20261105：设备折旧块（机械三表下方）——三系统占比 / 折旧年限 / 年·月折旧（三币蓝红绿）/ 项目发生周期 / 期间总折旧
     deprTitle:      { zh:'全套设备-工程机械-工具总投资', en:'Total Equipment · Machinery · Tools Investment', vi:'Tổng đầu tư Thiết bị · Máy móc · Dụng cụ' },
@@ -60021,15 +60033,16 @@ function submitAuth() {
       demand:{ months:1, workDays:0, prodDays:0, instDays:0, crew:{ size:5, driver:1, assist:1, indoor:3, perDay:200, groups:2 }, specs:[{ len:0, wid:0, hei:0, qty:0, layers:2, nl:0, dl:0, nw:0, dw:0, nl2:0, rL2:'', nw2:0, rW2:'', d2mod:0 }] },
       mach: ccMachDef(),
       agg:(function(){ var o={}; Object.keys(CC_AGG_DEF_PRICE).forEach(function(k){ o[k]={qty:0,price:CC_AGG_DEF_PRICE[k]}; }); return o; })(),
+      // ★CC-DEFVAL-20261106：人工/运营/间接预设默认值（可编辑；存档 0/缺失时在 ccMerge 补默认）
       labor:{
-        mgmt:[ {k:'foreman',qty:0,sal:0}, {k:'cook',qty:0,sal:0} ],
-        work:[ {k:'welder',qty:0,sal:0}, {k:'welderAs',qty:0,sal:0}, {k:'presser',qty:0,sal:0}, {k:'repairer',qty:0,sal:0},
-               {k:'mixerOp',qty:0,sal:0}, {k:'forklift',qty:0,sal:0}, {k:'loader',qty:0,sal:0}, {k:'machinist',qty:0,sal:0},
-               {k:'stripGrind',qty:0,sal:0} ],
-        inst:[ {k:'tractor',qty:0,sal:0}, {k:'tractorAs',qty:0,sal:0}, {k:'installer',qty:0,sal:0} ]
+        mgmt:[ {k:'foreman',qty:1,sal:1000000}, {k:'cook',qty:1,sal:500000} ],
+        work:[ {k:'welder',qty:4,sal:700000}, {k:'welderAs',qty:1,sal:500000}, {k:'presser',qty:4,sal:620000}, {k:'repairer',qty:4,sal:450000},
+               {k:'mixerOp',qty:1,sal:600000}, {k:'forklift',qty:1,sal:600000}, {k:'loader',qty:1,sal:600000}, {k:'machinist',qty:1,sal:650000},
+               {k:'stripGrind',qty:1,sal:550000} ],
+        inst:[ {k:'tractor',qty:2,sal:600000}, {k:'tractorAs',qty:2,sal:500000}, {k:'installer',qty:6,sal:580000} ]
       },
-      opex:{ power:0, water:0, cons:0, dorm:0, food:0, car:0 },
-      ind:{ flight:0, hotel:0, meal:0, mkt:0 },
+      opex:{ power:60000000, water:1000000, cons:15000000, dorm:7000000, food:10000000, car:270000000 },
+      ind:{ flight:80000000, hotel:18000000, meal:20000000, mkt:500000000 },
       margin:0, vat:0, mgmtPct:0,
       // ★CC-PROVIDE-20261105：行路径 → Choice VN 是否提供；空对象=全部默认 √（兼容旧存档）
       provide:{},
@@ -60072,6 +60085,24 @@ function submitAuth() {
         });
       }
       ['margin','vat','mgmtPct'].forEach(function(k){ if(saved[k] !== undefined) base[k] = Number(saved[k]) || 0; }); // ★CC-MGMT：管理费百分比
+      // ★CC-DEFVAL-20261106：人工/运营/间接默认值——存档值为 0/缺失时套预设默认（用户已填非 0 原样保留；与机械预设同策略）
+      (function(){
+        var DEF2 = ccDef();
+        Object.keys(DEF2.labor).forEach(function(g){
+          var defByK = {}; DEF2.labor[g].forEach(function(r){ defByK[r.k] = r; });
+          var arr = Array.isArray(base.labor[g]) ? base.labor[g] : [];
+          var seen = {};
+          base.labor[g] = arr.map(function(r){
+            if(!r || typeof r !== 'object' || !r.k || !defByK[r.k]) return r;
+            seen[r.k] = 1;
+            var d = defByK[r.k];
+            return { k:r.k, qty:(Number(r.qty) || d.qty), sal:(Number(r.sal) || d.sal) };
+          });
+          DEF2.labor[g].forEach(function(d){ if(!seen[d.k]) base.labor[g].push({ k:d.k, qty:d.qty, sal:d.sal }); });
+        });
+        Object.keys(DEF2.opex).forEach(function(k){ if(!Number(base.opex[k])) base.opex[k] = DEF2.opex[k]; });
+        Object.keys(DEF2.ind).forEach(function(k){ if(!Number(base.ind[k])) base.ind[k] = DEF2.ind[k]; });
+      })();
       delete base.ind.office; // ★CC-INDHEAD-20261104：办公室员工管理费已下线，旧存档残留值不参与合计
       // ★CC-DEPR-20261105：折旧状态合并（旧存档缺省→默认 years:2 / periodMonths:0）
       if(saved.depr && typeof saved.depr === 'object') base.depr = Object.assign({}, base.depr, saved.depr);
@@ -60411,7 +60442,9 @@ function submitAuth() {
     var gs = 'data-gsub="labor.' + gkey + '"';
     // ★CC-SUBTOTAL-ONLY-20261105：表尾只汇总「项目结束薪资/小计金额」三币；日薪三列不求小计
     // ★CC-NOCOL-20261105：colspan +1（新增序号列）
-    h += '</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+    // ★CC-QTYSUB-20261106：表尾小计行同时汇总「人数」列
+    h += '</tbody><tfoot><tr><td colspan="2" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      '<td class="cc-subcell" style="font-weight:700;" data-gqty="labor.' + gkey + '">0</td>' +
       '<td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td><td class="cc-subcell">&nbsp;</td>' +
       '<td></td>' +
       '<td class="cc-subcell" ' + gs + ' data-cur="rmb">—</td>' +
@@ -60651,8 +60684,13 @@ function submitAuth() {
 
     // #3 人工
     h += '<div class="cc-sec">' + ccT('dir3') + '</div>' +
-      '<div style="font-size:12px;color:#555;margin:0 0 3px;">' + ccT('prodDays') + '：<input class="cc-in" id="cc_prod_days" value="' + (Number(CC_DATA.demand.prodDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</div>' +
-      '<div style="font-size:12px;color:#555;margin:0 0 6px;">' + ccT('instPrjDays') + '：<input class="cc-in" id="cc_inst_days_top" value="' + (Number(CC_DATA.demand.instDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</div>' +
+      // ★CC-DAYS1LINE-20261106：生产/安装项目天数放同一行
+      '<div style="display:flex;gap:4px 22px;align-items:center;flex-wrap:wrap;font-size:12px;color:#555;margin:0 0 4px;">' +
+      '<span>' + ccT('prodDays') + '：<input class="cc-in" id="cc_prod_days" value="' + (Number(CC_DATA.demand.prodDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</span>' +
+      '<span>' + ccT('instPrjDays') + '：<input class="cc-in" id="cc_inst_days_top" value="' + (Number(CC_DATA.demand.instDays) || 0) + '" disabled autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eef2f7;border:1px solid #7aa7d4;color:#333;"> ' + ccT('moldDaysUnit') + '</span>' +
+      '</div>' +
+      // ★CC-LABDESC-20261106：#3 人工汇总描述（整场人数/工种、日/月开支、生产与安装周期总费用，三币三色，ccRecalc 实时刷新）
+      '<div id="cc_labor_summary" class="cc-share-box" style="margin:2px 0 8px;"></div>' +
       ccLaborGroup('mgmt', 'd31') + ccLaborGroup('work', 'd32') + ccLaborGroup('inst', 'd33') +
       // ★CC-FOLD-20261106：3.4 运营费用表可折叠
       '<div class="cc-fold"><div class="cc-fold-head"><button type="button" class="cc-fold-btn">−</button>' +
@@ -60662,7 +60700,11 @@ function submitAuth() {
       // ★CC-OPEX-SUB-20261105：3.4 运营费用表尾小计 — 「费用/月」与「发生周期」列留空，只汇总「小计金额」三币
       // ★CC-NOCOL-20261105：colspan +1（新增序号列）
       '</tbody><tfoot><tr>' +
-      '<td colspan="5" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      // ★CC-FEESUB-20261106：小计行同时汇总「费用/月」三币列
+      '<td colspan="2" style="text-align:right;font-weight:700;background:#ffff00;">' + ccT('subTotalRow') + '</td>' +
+      '<td class="cc-subcell" data-gfees="opex" data-cur="rmb">—</td>' +
+      '<td class="cc-subcell" data-gfees="opex" data-cur="usd">—</td>' +
+      '<td class="cc-subcell" data-gfees="opex" data-cur="vnd">—</td>' +
       '<td></td>' +
       '<td class="cc-subcell" data-gsub="opex" data-cur="rmb">—</td>' +
       '<td class="cc-subcell" data-gsub="opex" data-cur="usd">—</td>' +
@@ -60934,7 +60976,14 @@ function submitAuth() {
       var shareLines = aggKeys.map(function(k){
         var pct2 = agg > 0 ? (Math.round((aggEach[k] || 0) / agg * 10000) / 100) : 0;
         if(pct2 <= 0) return '';
-        return '<div class="cc-share-line">' + ccT(k) + ' - ' + ccT('aggShare').replace('{0}', ccNum2(pct2)) + '</div>';
+        // ★CC-AGGDESC-20261106：每行追加 总计费用 / 平均每天 / 平均每月 / 整个项目期间购买费用（三币三色）
+        var tot = aggEach[k] || 0;
+        var perD = prodD > 0 ? tot / prodD : 0, perM = perD * 30;
+        return '<div class="cc-share-line">' + ccT(k) + ' - ' + ccT('aggShare').replace('{0}', ccNum2(pct2)) + '，' +
+          ccT('aggDescTotal') + ccTriMoney(tot) + '；' +
+          ccT('aggDescDay') + ccTriMoney(perD) + '，' +
+          ccT('aggDescMonth') + ccTriMoney(perM) + '；' +
+          ccT('aggDescProj') + ccTriMoney(tot) + '</div>';
       }).join('');
       // ★CC-FOLD-20261106：标题已移入折叠头；全部 0% 时隐藏整个折叠区块
       shareBox.innerHTML = shareLines;
@@ -60958,6 +61007,41 @@ function submitAuth() {
     host.querySelectorAll('[data-wd]').forEach(function(el){ el.textContent = ccNum(prodD); });   // 3.1/3.2 生产日
     host.querySelectorAll('[data-wdi]').forEach(function(el){ el.textContent = ccNum(instD); }); // 3.3 安装日
     host.querySelectorAll('[data-mon]').forEach(function(el){ el.textContent = ccOpexPeriodTxt(); }); // ★CC-OPEXPERIOD：发生周期(月) 6.9
+    // ★CC-QTYSUB-20261106：人工三表表尾「人数」合计（× 行不计）
+    host.querySelectorAll('[data-gqty]').forEach(function(el){
+      var g = el.getAttribute('data-gqty').split('.')[1], s = 0;
+      (CC_DATA.labor[g] || []).forEach(function(l, i){ if(!ccProv('labor.' + g + '.' + i)) return; s += Number(l.qty) || 0; });
+      el.textContent = ccNum(s);
+    });
+    // ★CC-FEESUB-20261106：运营费用表尾「费用/月」三币合计（= Σ费用/月，× 行不计）
+    var opexFee = 0;
+    Object.keys(CC_DATA.opex).forEach(function(k){ if(!ccProv('opex.' + k)) return; opexFee += Number(CC_DATA.opex[k]) || 0; });
+    host.querySelectorAll('[data-gfees]').forEach(function(el){
+      var cur = el.getAttribute('data-cur');
+      el.style.color = cur === 'rmb' ? '#1a56b0' : (cur === 'usd' ? '#d32f2f' : '#2e7d32');
+      if(cur === 'rmb') el.textContent = fxc.rmb > 0 ? '¥ ' + ccNum2(opexFee / fxc.rmb) : '—';
+      else if(cur === 'usd') el.textContent = fxc.usd > 0 ? '$ ' + ccNum2(opexFee / fxc.usd) : '—';
+      else el.textContent = '₫ ' + ccNum(opexFee);
+    });
+    // ★CC-LABDESC-20261106：#3 人工汇总描述——整场人数/工种、日/月开支、生产与安装周期总费用（三币三色）
+    var labSum = document.getElementById('cc_labor_summary');
+    if(labSum){
+      var dailyG = function(g){ var s = 0; (CC_DATA.labor[g] || []).forEach(function(l, i){ if(!ccProv('labor.' + g + '.' + i)) return; s += (Number(l.qty) || 0) * (Number(l.sal) || 0); }); return s; };
+      var dProd = dailyG('mgmt') + dailyG('work'), dInst = dailyG('inst'), dAll = dProd + dInst;
+      var wN = 0, wParts = [];
+      ['mgmt', 'work', 'inst'].forEach(function(g){ (CC_DATA.labor[g] || []).forEach(function(l, i){
+        if(!ccProv('labor.' + g + '.' + i)) return;
+        var q = Number(l.qty) || 0; if(q <= 0) return;
+        wN += q; wParts.push(ccT(l.k) + '×' + ccNum(q));
+      }); });
+      labSum.innerHTML =
+        '<div class="cc-share-line">' + ccT('labDesc1').replace('{0}', ccNum(wN)).replace('{1}', wParts.join('、')) + '</div>' +
+        '<div class="cc-share-line">' + ccT('labDesc2') + ccTriMoney(dAll) + '</div>' +
+        '<div class="cc-share-line">' + ccT('labDesc3') + ccTriMoney(dAll * 30) + '</div>' +
+        '<div class="cc-share-line">' + ccT('labDesc4').replace('{0}', ccNum(prodD)) + ccTriMoney(dProd * prodD) + '</div>' +
+        '<div class="cc-share-line">' + ccT('labDesc5').replace('{0}', ccNum(instD)) + ccTriMoney(dInst * instD) + '</div>' +
+        '<div class="cc-share-line" style="font-weight:700;color:#333;">' + ccT('labDesc6') + ccTriMoney(dProd * prodD + dInst * instD) + '</div>';
+    }
     // ★CC-SUBROW-20261104：表尾小计行（三币带货币符号）
     var machG = function(g){ var s = 0; (CC_DATA.mach[g] || []).forEach(function(it, i){ if(!ccProv('mach.' + g + '.' + i)) return; s += (Number(it.qty) || 0) * (Number(it.price) || 0); }); return s; };
     var laborG = function(g){ var s = 0; (CC_DATA.labor[g] || []).forEach(function(l, i){ if(!ccProv('labor.' + g + '.' + i)) return; s += (Number(l.qty) || 0) * (Number(l.sal) || 0); }); return s * ccLaborDays(g); };
