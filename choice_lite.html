@@ -60213,7 +60213,8 @@ function submitAuth() {
       '.cc-sum td{padding:5px 8px;border-bottom:1px solid #eee;}',
       '.cc-sum .cc-lbl{color:#555;}',
       '.cc-sum .cc-val{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}',
-      '.cc-sum tr.cc-big td{font-size:16px;color:#d32f2f;font-weight:800;border-top:2px solid #d32f2f;}',
+      '.cc-sum tr.cc-big td{font-size:16px;font-weight:800;border-top:2px solid #d32f2f;}',
+      '.cc-sum tr.cc-big td.cc-lbl{color:#d32f2f;}', // ★CC-SUMTRI2-20261106：强调行数值改三色(¥蓝/$红/₫绿)，仅标签保持红色
       '.cc-note{font-size:12px;color:#888;margin-top:4px;}',
       '.cc-pct{width:70px !important;text-align:right;}',
       '.cc-tb-spec tbody tr:nth-child(even) td{background:#eaf3fb;}',
@@ -60743,7 +60744,7 @@ function submitAuth() {
       ccSumRow(ccT('totalCost'), 'cc_v_total', 'cc-big') +
       ccSumRow(ccT('margin') + '：<input class="cc-in cc-pct" id="cc_margin" value="' + (Number(CC_DATA.margin) || 0) + '" inputmode="decimal"' + roAttr + '> %', 'cc_v_profit') +
       ccSumRow(ccT('priceNoVat'), 'cc_v_pnovat') +
-      ccSumRow(ccT('vat') + '：<input class="cc-in cc-pct" id="cc_vat" value="' + (Number(CC_DATA.vat) || 0) + '" inputmode="decimal"' + roAttr + '> %', null) +
+      ccSumRow(ccT('vat') + '：<input class="cc-in cc-pct" id="cc_vat" value="' + (Number(CC_DATA.vat) || 0) + '" inputmode="decimal"' + roAttr + '> %', 'cc_v_vat') + // ★CC-VATROW-20261106：增值税行填入三币数值(=未税卖价×税率)
       ccSumRow('🧾 ' + ccT('priceVat'), 'cc_v_pvat', 'cc-big') +
       ccSumRow(ccT('perM2'), 'cc_v_m2') +
       (CC_DATA.demand.specs || []).map(function(sp, i){
@@ -61083,11 +61084,14 @@ function submitAuth() {
     var mgmtAmt = baseCost * mgmtPct / 100;   // ★CC-MGMT2：#5 管理费用 = 前四项 × 百分比
     var total = baseCost + mgmtAmt;
     var margin = Number(CC_DATA.margin) || 0, vat = Number(CC_DATA.vat) || 0;
-    var profit = total * margin / 100;
-    var pNoVat = total + profit;
-    var pVat = pNoVat * (1 + vat / 100);
-    // ★CC-SUMTRI-20261106：汇总表价格三色——VND 列绿（红粗强调行 tr.cc-big 保持红色，不覆盖）
-    var set = function(id, v, unit){ var el = document.getElementById(id); if(!el) return; el.textContent = '₫ ' + ccNum(v) + (unit || ''); if(!el.closest || !el.closest('tr.cc-big')) el.style.color = '#2e7d32'; }; // ★CC-SUMHEAD：仅金额用，带货币符号
+    // ★CC-MARKUP-20261106：加价口径——未税卖价 = 总成本/(1-利润率)，利润 = 未税卖价 - 总成本
+    var mF = 1 - margin / 100;
+    var pNoVat = mF > 0 ? total / mF : 0;
+    var profit = pNoVat - total;
+    var vatAmt = pNoVat * vat / 100; // ★CC-VATROW-20261106：增值税额 = 未税卖价 × 增值税税率
+    var pVat = pNoVat + vatAmt;
+    // ★CC-SUMTRI2-20261106：汇总表价格三色（含总成本/含税卖价强调行）——¥蓝/$红/₫绿，仅行标签保持红色粗体
+    var set = function(id, v, unit){ var el = document.getElementById(id); if(!el) return; el.textContent = '₫ ' + ccNum(v) + (unit || ''); el.style.color = '#2e7d32'; }; // ★CC-SUMHEAD：仅金额用，带货币符号
     var setPlain = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = ccNum(v); }; // ★CC-NOCUR-20261104：块数/面积等非金额，不带货币符号
     setPlain('cc_v_blocks', blocks);
     setPlain('cc_v_blocks_ft', blocks);
@@ -61194,13 +61198,13 @@ function submitAuth() {
     set('cc_v_mach', deprTotal); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind); // ★CC-DEPR-ACC-20261106：#1 机械类合计 = 项目期间折旧价值（会计口径，不填设备采购全额）
     set('cc_v_mgmt', mgmtAmt); // ★CC-MGMT2：#5 右侧数值 = 管理费金额(前四项×百分比)
     set('cc_v_depr', deprTotal); // ★CC-DEPR-20261105：#6 项目期间设备折旧
-    set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
+    set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_vat', vatAmt); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
     set('cc_v_m2', area > 0 ? pVat / area : 0, ccT('unitM2')); // ★CC-PERBLOCK：每㎡价带 /㎡
     // ★CC-SUMHEAD-20261104：汇总表 RMB/USD 列按汇率自动换算
     var sumVals = {
       cc_v_mach: deprTotal, cc_v_agg: agg, cc_v_labor: labor + opex, cc_v_ind: ind,
       cc_v_mgmt: mgmtAmt, cc_v_depr: deprTotal, cc_v_total: total, cc_v_profit: profit,
-      cc_v_pnovat: pNoVat, cc_v_pvat: pVat, cc_v_m2: (area > 0 ? pVat / area : 0)
+      cc_v_pnovat: pNoVat, cc_v_vat: vatAmt, cc_v_pvat: pVat, cc_v_m2: (area > 0 ? pVat / area : 0)
     };
     var fx2 = ccFx();
     var num2 = function(v){ return Math.abs(v) >= 100 ? ccNum(v) : (Math.round(v * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }); };
@@ -61210,8 +61214,8 @@ function submitAuth() {
       var u = key === 'cc_v_m2' ? ccT('unitM2') : '';
       var fmt = key === 'cc_v_m2' ? num2 : ccNum;
       el.textContent = r > 0 ? (usd ? '$ ' : '¥ ') + fmt(v / r) + u : '—';
-      // ★CC-SUMTRI-20261106：RMB 蓝 / USD 红（红粗强调行除外）
-      if(!el.closest || !el.closest('tr.cc-big')) el.style.color = usd ? '#d32f2f' : '#1a56b0';
+      // ★CC-SUMTRI2-20261106：RMB 蓝 / USD 红（强调行数值同样三色）
+      el.style.color = usd ? '#d32f2f' : '#1a56b0';
     });
     // ★CC-PERBLOCK-20261104：每个规格每块价 = 每㎡含税单价 × 单块面积(㎡)，三币带 /块
     var m2Price = area > 0 ? pVat / area : 0;
@@ -61394,6 +61398,21 @@ function submitAuth() {
         if(!CC_DATA) return;
         CC_DATA.mgmtPct = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || 0;
         ccRecalc(); ccScheduleSave();
+      });
+    })();
+    // ★CC-MARKUP-20261106：利润率/增值税率输入框单独直绑（原依赖 host.oninput 但无 data-f 提前 return，是死代码）——输入即重算
+    (function(){
+      ['cc_margin', 'cc_vat'].forEach(function(id){
+        var el = document.getElementById(id);
+        if(!el) return;
+        el.disabled = false;
+        el.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
+        el.addEventListener('input', function(){
+          if(!CC_DATA) return;
+          if(id === 'cc_margin') CC_DATA.margin = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || 0;
+          else CC_DATA.vat = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || 0;
+          ccRecalc(); ccScheduleSave();
+        });
       });
     })();
     // ★CC-FOLD-20261106：区块 +/- 折叠——document 级事件委托，一次注册（点 + 展开、点 − 收缩，按钮符号随状态切换）
