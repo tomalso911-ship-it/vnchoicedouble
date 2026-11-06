@@ -59982,6 +59982,7 @@ function submitAuth() {
     labDesc5: { zh:'安装期间 {0} 天，预计总安装人工费用：', en:'Installation period {0} days, estimated total installation labor cost: ', vi:'Thời gian lắp đặt {0} ngày, tổng chi phí nhân công lắp đặt dự kiến: ' },
     labDesc6: { zh:'生产和安装全部项目周期总计需要：', en:'Grand total for the entire production + installation period: ', vi:'Tổng cộng toàn bộ chu kỳ sản xuất + lắp đặt cần: ' },
     // ★CC-AGGDESC-20261106：骨料占比行扩展描述
+    aggDescSum:   { zh:'全部骨料合计 - ', en:'All aggregates total - ', vi:'Tổng cộng tất cả cốt liệu - ' },
     aggDescTotal: { zh:'总计费用：', en:'Total cost: ', vi:'Tổng chi phí: ' },
     aggDescDay:   { zh:'平均每天费用：', en:'Avg cost/day: ', vi:'Chi phí TB/ngày: ' },
     aggDescMonth: { zh:'平均每月费用：', en:'Avg cost/month: ', vi:'Chi phí TB/tháng: ' },
@@ -60985,6 +60986,15 @@ function submitAuth() {
           ccT('aggDescMonth') + ccTriMoney(perM) + '；' +
           ccT('aggDescProj') + ccTriMoney(tot) + '</div>';
       }).join('');
+      // ★CC-AGGSUM-20261106：底部追加「全部骨料合计」行——总计/平均每天/平均每月/整个项目期间费用（三币三色，加粗）
+      if(shareLines){
+        var perDA = prodD > 0 ? agg / prodD : 0;
+        shareLines += '<div class="cc-share-line" style="font-weight:700;border-top:1px solid #c9b96a;margin-top:3px;padding-top:3px;">' +
+          ccT('aggDescSum') + ccT('aggDescTotal') + ccTriMoney(agg) + '；' +
+          ccT('aggDescDay') + ccTriMoney(perDA) + '，' +
+          ccT('aggDescMonth') + ccTriMoney(perDA * 30) + '；' +
+          ccT('aggDescProj') + ccTriMoney(agg) + '</div>';
+      }
       // ★CC-FOLD-20261106：标题已移入折叠头；全部 0% 时隐藏整个折叠区块
       shareBox.innerHTML = shareLines;
       var _sfold = shareBox.closest ? shareBox.closest('.cc-fold') : null;
