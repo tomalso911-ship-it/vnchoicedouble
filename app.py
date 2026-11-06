@@ -8254,6 +8254,8 @@ PROJ_PERM_TEMPLATE = {
     "prod_D_receipt": {"decision": "approve", "approvers": ["thuong"]},
     "prod_E": "edit", "prod_H": "edit", "prod_F": "edit",
     "inst_A": "edit", "inst_B": "edit", "inst_C": "edit",
+    # ★PROJ-TPL-LIB-20261106（用户要求）：4 资料库/合同 —— 独立项目资料、合同文档 = 查看（只读）
+    "lib": "view", "contract": "view",
 }
 
 
