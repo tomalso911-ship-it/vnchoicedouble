@@ -2690,6 +2690,14 @@ def create_project():
     cur = conn.execute(sql, vals)
     new_id = cur.lastrowid
     conn.execute("UPDATE won_projects SET updated_at=datetime('now','localtime') WHERE id=?", (new_id,))
+    # ★PROJ-TPL-THUONG-20261106：新项目自动给 thuong 套用按项目授权标准（只补缺不覆盖）
+    try:
+        _apply_new_project_perm_template(conn, new_id)
+    except Exception as _e:
+        try:
+            print("[PROJ-TPL] 新项目权限模板写入失败 pid=%s: %s" % (new_id, _e))
+        except Exception:
+            pass
     row = conn.execute("SELECT * FROM won_projects WHERE id=?", (new_id,)).fetchone()
     conn.commit()
     conn.close()
@@ -8231,6 +8239,60 @@ def load_perms(conn, username):
     except Exception:
         raw = {}
     return _split_perms(raw)
+
+
+# ★PROJ-TPL-THUONG-20261106（用户要求）：thuong 使用独立项目、按项目授权。
+#   以后所有【新建项目】自动按此标准给 thuong 写入按项目授权（= DABACO 003 项目同款）：
+#   整个项目=显示；工作日志(每日记录报告/我的工作)=编辑；生产管理 A~H 全编辑；
+#   D区「提交收货单审核」=发起审批(审批人 thuong)；安装管理 A/B/C=编辑。
+#   只补缺、绝不覆盖该用户已有的显式设置。
+PROJ_PERM_TEMPLATE_USERS = ("thuong",)
+PROJ_PERM_TEMPLATE = {
+    "whole": "view",
+    "wl_daily": "edit", "wl_mywork": "edit",
+    "prod_A": "edit", "prod_B": "edit", "prod_C": "edit", "prod_D": "edit",
+    "prod_D_receipt": {"decision": "approve", "approvers": ["thuong"]},
+    "prod_E": "edit", "prod_H": "edit", "prod_F": "edit",
+    "inst_A": "edit", "inst_B": "edit", "inst_C": "edit",
+}
+
+
+def _apply_new_project_perm_template(conn, pid):
+    """新建项目时，把 PROJ_PERM_TEMPLATE 自动写入模板用户（thuong）的按项目授权。
+    已有该项目显式授权（whole 已设置）则整体跳过，绝不覆盖。"""
+    for _u in PROJ_PERM_TEMPLATE_USERS:
+        uname = (_u or "").strip().lower()
+        if not uname:
+            continue
+        row = conn.execute("SELECT id, perms FROM users WHERE lower(username)=?", (uname,)).fetchone()
+        if not row:
+            continue
+        try:
+            raw = json.loads(row["perms"]) if row["perms"] else {}
+        except Exception:
+            raw = {}
+        st = _split_perms(raw)
+        projs = st["projects"]
+        entry = projs.get(str(pid))
+        if isinstance(entry, dict) and entry.get("whole"):
+            continue
+        entry = dict(entry) if isinstance(entry, dict) else {}
+        for k, v in PROJ_PERM_TEMPLATE.items():
+            if k not in entry:
+                entry[k] = v
+        projs[str(pid)] = entry
+        raw2 = dict(raw)
+        raw2["blocks"] = st["blocks"]
+        raw2["common"] = st["common"]
+        raw2["proj_default"] = st["proj_default"]
+        raw2["projects"] = projs
+        raw2["lib_file_overrides"] = st["lib_file_overrides"]
+        conn.execute("UPDATE users SET perms=? WHERE id=?",
+                     (json.dumps(raw2, ensure_ascii=False), row["id"]))
+        try:
+            bump_perm_version(uname)
+        except Exception:
+            pass
 
 
 def _level_of(val, default_level):
