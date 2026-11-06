@@ -70784,13 +70784,16 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
           if(!(dd && dd.ok && dd.data)) return;
           var cur = null; try{ cur = JSON.parse(localStorage.getItem('prod_factory_'+id)||'null'); }catch(e){}
           var _cnt = function(o){ return Object.keys(((o||{}).installation||{}).workers||{}).length; };
+          var _wxc = function(o){ var w=((o||{}).installation||{}).workers||{}, n=0; for(var k in w){ if(w[k] && w[k].weatherAm && w[k].weatherAm.v===2 && w[k].weatherPm && w[k].weatherPm.v===2) n++; } return n; };
           var sInst = _cnt(dd.data), lInst = _cnt(cur);
           var sHo = Object.keys((dd.data.houseOut)||{}).length, lHo = Object.keys(((cur||{}).houseOut)||{}).length;
-          /* 服务器安装天数或出库规格明显更多 → 直接用服务器数据覆盖本机旧缓存 */
-          if(lInst === 0 || sInst > lInst || (lHo > 0 && sHo > lHo)){
+          var sWx = _wxc(dd.data), lWx = _wxc(cur);
+          /* ★CC-INSTWX-20261106：打开安装项目时，若服务器同批安装日里天气更完整(本机旧缓存天数相同但缺天气)，
+             直接用服务器数据覆盖本机缓存——否则会沿用旧快照、安装卡片天气永远显示'—'。仅在服务器更完整时覆盖，绝不丢弃本机已录入数据。 */
+          if(lInst === 0 || sInst > lInst || sWx > lWx || (lHo > 0 && sHo > lHo)){
             try{ localStorage.setItem('prod_factory_'+id, JSON.stringify(dd.data)); }catch(e){}
             try{ if(typeof PROD_MEM!=='undefined') PROD_MEM[id] = dd.data; }catch(e){}
-            try{ console.log('[inst_openProject] 已用服务器数据刷新本机缓存 houseOut='+sHo+' installDays='+sInst); }catch(_){}
+            try{ console.log('[inst_openProject] 已用服务器数据刷新本机缓存 houseOut='+sHo+' installDays='+sInst+' wxComplete '+lWx+'->'+sWx); }catch(_){}
             if(INST_CUR===id) inst_renderTabs(INST_ACTIVE_TAB||'A');
           }
         })
