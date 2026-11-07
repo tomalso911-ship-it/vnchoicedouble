@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!-- ⛔ FROZEN (2026-09-08) V2026.09.10.06：本文件全部逻辑已锁定，未经用户明确同意禁止修改。仅 CRM / LOST / WON / 个人佣金 四个模块内的“样板数据 / 演示数据”允许清理（仅删数据、不改逻辑），其余一切逻辑（看板、用户与授权、秘密空间、用量监控、清理残留、语言、表格渲染等）均正确并禁止改动。 -->
 <html lang="en">
 <head>
@@ -39,6 +39,29 @@
       } catch (e) {}
       return res;
     }
+    // ★BTN-LAG-20261107：统一请求超时，杜绝"点了没反应"（读12s/写25s/上传90s）。
+    // 调用方自带 signal（如汇率懒采集6s）时不干预，避免双重取消。
+    function _withTimeout(input, init) {
+      if (init && init.signal) return _origFetch(input, init);
+      if (typeof AbortController === 'undefined') return _origFetch(input, init);
+      var m = String((init && init.method) || 'GET').toUpperCase();
+      var up = !!(init && init.body && typeof FormData !== 'undefined' && init.body instanceof FormData);
+      var ms = up ? 90000 : ((m === 'GET' || m === 'HEAD') ? 12000 : 25000);
+      var c, timer;
+      try {
+        c = new AbortController();
+        timer = setTimeout(function(){ try{ c.abort(); }catch(e){} }, ms);
+      } catch(e) { return _origFetch(input, init); }
+      init = init || {};
+      init.signal = c.signal;
+      return _origFetch(input, init).then(
+        function(res){ clearTimeout(timer); return res; },
+        function(err){
+          clearTimeout(timer);
+          if (err && err.name === 'AbortError') throw new Error('NET_TIMEOUT_' + ms);
+          throw err;
+        });
+    }
     window.fetch = function (input, init) {
       var _routed = false;
       try {
@@ -77,10 +100,10 @@
             } catch (ignored) {}
           }
 
-          return _origFetch(CLOUD_API + u, init).then(_quotaLockGuard);
+          return _withTimeout(CLOUD_API + u, init).then(_quotaLockGuard);
         }
       } catch (e) { /* 出错则走原逻辑 */ }
-      return _origFetch(input, init).then(_quotaLockGuard);
+      return _withTimeout(input, init).then(_quotaLockGuard);
     };
   }
 })();
@@ -3181,6 +3204,12 @@ window.__finShakeReport = function (ms) {
 .bd-t10-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .bd-t10-amt { text-align:right; }
 .bd-t10-prog { text-align:center; color:#aab4c0; font-size:11px; }
+/* ★20261107：安装/生产人数卡片改为列表式（对齐生产进度列表），不再横向轮播 */
+#bdWorkers .bd-sq-body, #bdProd .bd-sq-body { display:block; text-align:left; overflow-y:auto; }
+#bdWorkers .bd-sq-body .bd-loading, #bdProd .bd-sq-body .bd-loading { display:flex; height:100%; align-items:center; justify-content:center; }
+.bd-t10-num { text-align:right; font-weight:700; color:#39e6ff; font-size:13px; }
+.bd-t10-row.bd-click { cursor:pointer; }
+.bd-t10-row.bd-click:hover { background:rgba(255,255,255,0.05); }
 /* 进度条（生产/安装进度 TOP10） */
 .bd-progress-bar { height:8px; background:rgba(255,255,255,0.15); border-radius:4px; overflow:hidden; position:relative; }
 .bd-progress-fill { height:100%; background:linear-gradient(90deg,#00e5ff,#39e6ff); border-radius:4px; }
@@ -3445,8 +3474,9 @@ window.__finShakeReport = function (ms) {
     color: #fff !important;
   }
   /* 贴边：抵消各自盒体 padding（负 margin = 盒体 padding），顶部圆角与盒体一致 */
-  /* 表头字号 13.2px（在原有 11px 基础上放大 20%）；按钮绝对定位 top:11px(高26→底37)，表头 12px padding 刚好框住、不露白 */
-  .modal > h2                { margin: -24px -24px 16px !important; padding: 12px 24px !important; border-radius: 13px 13px 0 0 !important; font-size: 13.2px !important; }
+  /* ★20261107：用户要求红条标题栏文字与 □/× 按钮整体下移一点 → 上下内边距 12px→17px（上下对称+5px）。
+     按钮在 .modal-actions 内用 top:50%+translateY(-50%) 自动居中，随红条增高同步下移，且始终与标题同一水平线（勿改按钮 top/right）。 */
+  .modal > h2                { margin: -24px -24px 16px !important; padding: 17px 24px !important; border-radius: 13px 13px 0 0 !important; font-size: 13.2px !important; }
   .detail-view-box > .dv-title { margin: -22px -24px 14px !important; padding: 12px 24px !important; border-radius: 13px 13px 0 0 !important; font-size: 13.2px !important; }
   .pt-editor-box > .pt-title  { margin: -24px -26px 16px !important; padding: 6px 26px !important; border-radius: 13px 13px 0 0 !important; text-align:left !important; font-size: 13.2px !important; }
   .auth-modal > h3            { margin: -28px -30px 18px !important; padding: 6px 30px !important; border-radius: 13px 13px 0 0 !important; display:flex; justify-content:space-between; align-items:center; font-size: 13.2px !important; }
@@ -20591,6 +20621,7 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function fin_undoPaint(force){
       try {
+        if (!force && document.hidden) return;   // ★BTN-LAG：后台标签暂停300ms轮询
         var now = Date.now();
         if (!force && now - fin_undoBtnSyncAt < 100) return;
         fin_undoBtnSyncAt = now;
@@ -26301,6 +26332,7 @@ var PROD_EQUIP_FAULT_KB = {
     }
     function sheetLockHideDeleteMenus(){
       try {
+        if (document.hidden) return;   // ★BTN-LAG：后台标签不做无谓DOM扫描
         if (sheetLockIsTriAdmin()) return;
         var items = document.querySelectorAll('.univer-sheet-bar-menu .univer-sheet-bar-menu-item, .univer-sheet-bar-menu li');
         for (var i = 0; i < items.length; i++){
@@ -32514,7 +32546,9 @@ var PROD_EQUIP_FAULT_KB = {
   .transfer-modal { width:460px; max-width:96vw; }
   .transfer-hint { font-size:13px; color:#777; margin:0 0 14px; background:var(--appr-orange-l,#FDECEA); border:1px solid #ffe2c4; border-radius:8px; padding:10px 12px; }
   .transfer-name { font-weight:600; color:#C62828; }
-  .modal-header { background:#E53935; color:#fff; padding:7px 18px; display:flex; align-items:center; justify-content:space-between; cursor:move; user-select:none; }
+  /* ★20261107：用户要求红条标题栏的文字和 □/× 按钮整体再往下挪一点 → 上内边距 7px→12px。
+     按钮居中仍由 .modal-actions 的 top:50%+translateY(-50%) 随红条高度自动接管（勿改按钮 top/right）。 */
+  .modal-header { background:#E53935; color:#fff; padding:12px 18px 8px; display:flex; align-items:center; justify-content:space-between; cursor:move; user-select:none; }
   .modal-header span { font-size:11px; font-weight:600; }
   .modal-header .close { cursor:pointer; font-size:22px; line-height:1; }
   /* 编辑用户权限弹窗：最大化/关闭按钮放进同一 flex 容器，确保真正一行、垂直居中 */
@@ -32562,6 +32596,9 @@ var PROD_EQUIP_FAULT_KB = {
   .modal-tabs { display:flex; background:#fafafa; border-bottom:1px solid #eee; }
   .modal-tabs .tab { padding:10px 16px; cursor:pointer; font-size:14px; color:#666; border-bottom:2px solid transparent; }
   .modal-tabs .tab.active { color:#E53935; border-bottom-color:#E53935; background:#fff; font-weight:600; }
+  /* ★BTN-LAG-20261107：按下即时视觉反馈；保存中明确禁用态，杜绝"点了没反应"的观感 */
+  .modal-tabs .tab:active, #userBtnSave:active, #userBtnCancel:active { filter:brightness(.9); transform:scale(.97); }
+  #userBtnSave:disabled { opacity:.6; cursor:progress; }
   .modal-body { padding:16px 20px; overflow:auto; flex:1; font-size:14px; }
   .modal-footer { padding:12px 18px; border-top:1px solid #eee; display:flex; align-items:center; justify-content:space-between; background:#fcfcfc; position:relative; z-index:7; padding-right:28px; }
   .modal-footer .hint { font-size:12px; color:#999; }
@@ -34841,7 +34878,7 @@ var I18N = {
  bd_fx_title:"汇率", bd_fx_cny_vnd:"人民币 → 越南盾", bd_fx_usd_vnd:"美元 → 越南盾", bd_fx_usd_cny:"美元 → 人民币", bd_fx_range:"区间",
  bd_clock_title:"日期 · 时间 · 天气", bd_wx_clear:"晴", bd_wx_cloudy:"多云", bd_wx_fog:"雾", bd_wx_rain:"雨", bd_wx_snow:"雪", bd_wx_shower:"阵雨", bd_wx_storm:"雷暴", bd_wx_na:"—", bd_wx_offline:"天气需联网获取", bd_wx_hum:"湿度", bd_wx_wind:"风力", bd_wx_wind_unit:"级",
  bd_next_holiday:"下一个大假", bd_hol_days:"天", bd_hol_legend:"假日图例", bd_prodprog_title:"安装进度",
- bd_mat_rebar:"钢筋价格曲线", bd_mat_cement:"水泥价格曲线", bd_mat_sand:"黄砂价格曲线", bd_mat_gravel:"石子价格曲线", bd_src_live:"实时", bd_src_demo:"示例", dash_crm_rate_rmb:"RMB-VND 汇率走势", dash_crm_rate_usd:"USD-VND 汇率走势",
+ dash_crm_rate_rmb:"RMB-VND 汇率走势", dash_crm_rate_usd:"USD-VND 汇率走势",
              dash_won_section:"签约项目", dash_won_bu_bar:"各BU累计销售 vs 当年", dash_won_bu_pie_all:"各BU历年销售占比",
              dash_won_bu_pie_year:"各BU当年销售占比", dash_won_contract:"各年设备合同金额/实付/尚未支付",
              dash_won_contract_total:"累计设备合同金额/实付/尚未支付", dash_won_commission:"各年佣金：总佣金/已支付/尚未支付",
@@ -35661,7 +35698,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
  bd_fx_title:"Exchange Rates", bd_fx_cny_vnd:"CNY → VND", bd_fx_usd_vnd:"USD → VND", bd_fx_usd_cny:"USD → CNY", bd_fx_range:"Range",
  bd_clock_title:"Date · Time · Weather", bd_wx_clear:"Clear", bd_wx_cloudy:"Cloudy", bd_wx_fog:"Fog", bd_wx_rain:"Rain", bd_wx_snow:"Snow", bd_wx_shower:"Showers", bd_wx_storm:"Thunderstorm", bd_wx_na:"—", bd_wx_offline:"Weather needs internet", bd_wx_hum:"Humidity", bd_wx_wind:"Wind", bd_wx_wind_unit:"lvl",
  bd_next_holiday:"Next Holiday", bd_hol_days:"d", bd_hol_legend:"Holidays", bd_prodprog_title:"Installation Progress",
- bd_mat_rebar:"Rebar Price Trend", bd_mat_cement:"Cement Price Trend", bd_mat_sand:"Sand Price Trend", bd_mat_gravel:"Gravel Price Trend", bd_src_live:"Live", bd_src_demo:"Demo", dash_crm_rate_rmb:"RMB-VND Rate Trend", dash_crm_rate_usd:"USD-VND Rate Trend",
+ dash_crm_rate_rmb:"RMB-VND Rate Trend", dash_crm_rate_usd:"USD-VND Rate Trend",
              dash_won_section:"Signed Projects", dash_won_bu_bar:"BU Cumulative vs Current Year", dash_won_bu_pie_all:"BU Historical Sales Share",
              dash_won_bu_pie_year:"BU Current Year Sales Share", dash_won_contract:"Annual Contract Amount/Paid/Unpaid",
              dash_won_contract_total:"Total Contract Amount/Paid/Unpaid", dash_won_commission:"Annual Commission: Total/Paid/Remaining",
@@ -36484,7 +36521,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
  bd_fx_title:"Tỷ giá hối đoái", bd_fx_cny_vnd:"CNY → VND", bd_fx_usd_vnd:"USD → VND", bd_fx_usd_cny:"USD → CNY", bd_fx_range:"Khoảng",
  bd_clock_title:"Ngày · Giờ · Thời tiết", bd_wx_clear:"Trời quang", bd_wx_cloudy:"Nhiều mây", bd_wx_fog:"Sương mù", bd_wx_rain:"Mưa", bd_wx_snow:"Tuyết", bd_wx_shower:"Mưa rào", bd_wx_storm:"Dông", bd_wx_na:"—", bd_wx_offline:"Thời tiết cần kết nối mạng", bd_wx_hum:"Độ ẩm", bd_wx_wind:"Gió", bd_wx_wind_unit:"cấp",
  bd_next_holiday:"Kỳ nghỉ lớn tới", bd_hol_days:"ngày", bd_hol_legend:"Chú thích ngày lễ", bd_prodprog_title:"Tiến độ lắp đặt",
- bd_mat_rebar:"Đường giá thép", bd_mat_cement:"Đường giá xi măng", bd_mat_sand:"Đường giá cát vàng", bd_mat_gravel:"Đường giá đá dăm", bd_src_live:"Thực", bd_src_demo:"Mẫu", dash_crm_rate_rmb:"Xu hướng RMB-VND", dash_crm_rate_usd:"Xu hướng USD-VND",
+ dash_crm_rate_rmb:"Xu hướng RMB-VND", dash_crm_rate_usd:"Xu hướng USD-VND",
              dash_won_section:"Dự án đã ký", dash_won_bu_bar:"BU Tích lũy vs Năm nay", dash_won_bu_pie_all:"Tỷ lệ BU các năm",
              dash_won_bu_pie_year:"Tỷ lệ BU năm nay", dash_won_contract:"Hợp đồng/Thanh toán/Chưa thanh toán theo năm",
              dash_won_contract_total:"Tổng Hợp đồng/Thanh toán/Chưa thanh toán", dash_won_commission:"Hoa hồng theo năm: Tổng/Đã trả/Còn lại",
@@ -43639,12 +43676,36 @@ function openModal(uid, copyFrom){
   // 因此编辑模式下强制 loadUsers() 重新拉全量（含该用户最新 perms 与基础资料），再渲染弹窗，
   // 保证第二个有权限的人再次打开时，看到的是"最后一次保存、完完整整的最新配置"（最后写入者胜出）。
   // 新增 / 复制模式不依赖他人最新数据，走本地缓存即可，无需等待网络。
-  if (curUid) {
-    loadUsers().then(function(){ _renderUserModal(uid, copyFrom, src); })
-               .catch(function(){ _renderUserModal(uid, copyFrom, src); }); // 网络失败兜底：仍用本地缓存打开
-    return;
+  // ★BTN-LAG-20261107：先立即渲染（点击零等待），最新权限由后台异步刷新。
+  // 旧逻辑把弹窗渲染挂在 loadUsers() 之后，网络一慢点「编辑权限」就像死了一样。
+  window.__userModalDirty = false;
+  if (!window.__usrDirtyBound){
+    window.__usrDirtyBound = true;
+    var _mk = document.getElementById('mask');
+    if (_mk) ['input','change'].forEach(function(ev){
+      _mk.addEventListener(ev, function(e){ if (e && e.isTrusted) window.__userModalDirty = true; }, true);
+    });
   }
   _renderUserModal(uid, copyFrom, src);
+  if (curUid) {
+    try {
+      var _before = JSON.stringify(usersData || []);
+      loadUsers().then(function(){
+        // ★BTN-LAG2-20261107：后台刷新只同步全局数据。
+        // 上一轮在这里无条件 buildCommonPerm/buildProjPerm，导致每次打开弹窗把
+        // 几十/几百个项目的整片 DOM 重建两遍，并触发全局 MutationObserver 的
+        // 强制布局循环 —— 这才是"编辑框里干什么都慢"的真凶。
+        var mask = document.getElementById('mask');
+        if (!mask || !mask.classList.contains('show') || window.__userModalDirty) return;
+        if (JSON.stringify(usersData || []) === _before) return;  // 数据没变，一个 DOM 都不动
+        // 确实有别的设备改过：才重建一次，并保留当前页签
+        var _act = document.querySelector('.modal-tabs .tab.active');
+        var _tab = _act ? _act.getAttribute('data-tab') : null;
+        _renderUserModal(uid, copyFrom, src);
+        if (_tab && typeof switchTab === 'function') switchTab(_tab);
+      }).catch(function(){});
+    } catch(e){}
+  }
 }
 
 function _renderUserModal(uid, copyFrom, src){
@@ -44363,19 +44424,65 @@ function _projStateFor(uid){
 }
 
 var _PROJ_CACHE = null;
+var _PROJ_URL = '/api/library/projects';
+var _PROJ_PENDING = null;
+var _PROJ_HTML = {};    // pid -> 明细行 HTML 字符串（展开时才插入 DOM）
+var _PROJ_PRIOR = {};   // pid -> 内存里原有权限（未展开时保存沿用，绝不清空）
 async function _ensureProjList(){
-  if (_PROJ_CACHE) return _PROJ_CACHE;
-  try{
-    const r = await fetch('/api/library/projects', { headers: (typeof authHeaders === 'function' ? authHeaders() : {}) });
-    const d = await r.json();
-    _PROJ_CACHE = Array.isArray(d) ? d : [];
-  }catch(e){ _PROJ_CACHE = []; }
-  return _PROJ_CACHE;
+  if (_PROJ_CACHE !== null) return _PROJ_CACHE;
+  // ★BTN-LAG2：并发复用同一次请求，避免两次 buildProjPerm 各跑一遍 404 + 77KB 拉取
+  if (_PROJ_PENDING) return _PROJ_PENDING;
+  // 两套后端接口不同：Flask 版用 /api/library/projects，
+  // node 版该路径是 404「接口不存在」，真实数据在 /api/won-projects。
+  var urls = (_PROJ_URL === '/api/library/projects')
+    ? ['/api/library/projects', '/api/won-projects'] : [_PROJ_URL];
+  _PROJ_PENDING = (async function(){
+    for (var i = 0; i < urls.length; i++){
+      try{
+        const r = await fetch(urls[i], { headers: (typeof authHeaders === 'function' ? authHeaders() : {}) });
+        if (!r.ok) continue;
+        const d = await r.json();
+        const arr = Array.isArray(d) ? d
+          : (Array.isArray(d && d.projects) ? d.projects
+          : (Array.isArray(d && d.data) ? d.data : null));
+        if (!arr) continue;
+        _PROJ_URL = urls[i];
+        _PROJ_CACHE = arr;
+        return _PROJ_CACHE;
+      }catch(e){}
+    }
+    return [];   // 失败/超时不缓存，下次进入可自动重试
+  })();
+  try { return await _PROJ_PENDING; } finally { _PROJ_PENDING = null; }
 }
 
+// ★BTN-LAG2-20261107：<details> 展开时才把明细行插进 DOM。
+// 实测 13 个项目全量预渲染 221 个 select 需 1502ms；懒渲染后首屏只有 13 个。
+function _fillProjBody(dEl){
+  var body = dEl && dEl.querySelector('.pproj-body');
+  if (!body || body.getAttribute('data-filled')) return;
+  var pid = dEl.getAttribute('data-pid');
+  body.innerHTML = _PROJ_HTML[pid] || '';
+  body.setAttribute('data-filled', '1');
+  body.querySelectorAll('select.pperm-sel').forEach(function(sel){
+    if (typeof _syncProjSel === 'function') _syncProjSel(sel);
+  });
+}
+function _syncProjSel(sel){
+  var row = sel.closest ? sel.closest('.pperm-row') : null;
+  if (!row) return;
+  var k = row.getAttribute('data-key'), scope = row.getAttribute('data-scope');
+  var appr = document.querySelector('.p-appr[data-scope="' + scope + '"][data-key="' + k + '"]');
+  if (appr) appr.style.display = (sel.value === 'approve') ? 'block' : 'none';
+  sel.style.background = _permSelColor(sel.value);
+}
+
+var _PROJ_RENDER_TOKEN = 0;
 async function buildProjPerm(uid){
   const wrap = document.getElementById('projPerm');
   if(!wrap) return;
+  // 并发去重：多次调用（打开弹窗 + 后台刷新）只让最后一次真正渲染
+  var _myToken = ++_PROJ_RENDER_TOKEN;
   const st = _projStateFor(uid);
   // ★PERM-KEEP-OPEN-20261019（用户要求：点保存后下拉列表不要收缩回去，保持原样）：
   //   重建表格前先记下「已展开的项目 / 搜索词 / 滚动位置」，渲染完成后原样还原。
@@ -44391,9 +44498,13 @@ async function buildProjPerm(uid){
   }catch(_e){}
   wrap.innerHTML = `<div style="padding:6px;color:#888;font-size:12px;">${_permTr('perm_proj_loading','项目列表加载中…')}</div>`;
   const list = await _ensureProjList();
+  if (_myToken !== _PROJ_RENDER_TOKEN) return;   // 已有更新的渲染，放弃本次
 
   const projHtml = list.map(function(p, _pi){
     const store = st.prj[String(p.id)] || {};
+    // ★BTN-LAG2：明细行只生成 HTML 字符串，展开时才插入 DOM（首屏不再建 221 个 select）
+    _PROJ_HTML[String(p.id)] = _renderProjRows(String(p.id), store, 'proj');
+    _PROJ_PRIOR[String(p.id)] = store;
     const title = [p.contract_no, p.customer, p.province].filter(Boolean).join(' · ') || ('PID ' + p.id);
     // ★PERM-V2-WHOLE-20261019：标题行「整个项目：隐藏/查看」（默认隐藏）
     const wholeCur = _projLevelOf(store, { k:'whole', o:['hide','view'] }).decision;
@@ -44409,7 +44520,7 @@ async function buildProjPerm(uid){
           </select>
         </span>
       </summary>
-      <div class="pproj-body" style="padding:4px 10px 8px;">${_renderProjRows(String(p.id), store, 'proj')}</div>
+      <div class="pproj-body" style="padding:4px 10px 8px;"></div>
     </details>`;
   }).join('');
 
@@ -44438,19 +44549,15 @@ async function buildProjPerm(uid){
       });
     });
   }
-  // 联动：只有选「发起审批」才显示审批人多选；同时同步级别底色
-  wrap.querySelectorAll('select.pperm-sel').forEach(function(sel){
-    const row = sel.closest('.pperm-row');
-    if (!row) return;
-    const k = row.getAttribute('data-key');
-    const scope = row.getAttribute('data-scope');
-    const appr = wrap.querySelector('.p-appr[data-scope="' + scope + '"][data-key="' + k + '"]');
-    const sync = function(){
-      if (appr) appr.style.display = (sel.value === 'approve') ? 'block' : 'none';
-      sel.style.background = _permSelColor(sel.value);
-    };
-    sel.addEventListener('change', sync);
-    sync();
+  // ★BTN-LAG2-20261107：明细行是展开时才插入的，联动必须改成事件委托
+  wrap.addEventListener('change', function(e){
+    var sel = e.target;
+    if (sel && sel.matches && sel.matches('select.pperm-sel')) _syncProjSel(sel);
+  });
+  wrap.querySelectorAll('select.pperm-sel').forEach(_syncProjSel);
+  // toggle 不冒泡：逐个绑定，仅在展开时把该项目明细插入 DOM
+  wrap.querySelectorAll('.pproj').forEach(function(dEl){
+    dEl.addEventListener('toggle', function(){ if (dEl.open) _fillProjBody(dEl); });
   });
   // ★PERM-KEEP-OPEN-20261019：还原「已展开的项目 / 搜索词 / 滚动位置」，
   //   保存后重建表格时保持用户原来的样子，不让下拉（折叠）收缩回去。
@@ -44462,7 +44569,7 @@ async function buildProjPerm(uid){
     if (_prevOpen.length){
       _prevOpen.forEach(function(pid){
         const d = wrap.querySelector('.pproj[data-pid="' + pid + '"]');
-        if (d) d.open = true;
+        if (d) { d.open = true; _fillProjBody(d); }   // 还原展开态时同步补上明细
       });
     }
     wrap.scrollTop = _prevWrapScroll;
@@ -44485,6 +44592,13 @@ function collectProjects(){
   const out = {};
   document.querySelectorAll('#projList .pproj').forEach(function(pEl){
     const pid = pEl.getAttribute('data-pid');
+    // ★BTN-LAG2-20261107：未展开的项目明细没有渲染，直接沿用内存原值。
+    // 否则保存会把这些项目已配好的权限当成"未设置"清空 —— 数据事故，绝不能发生。
+    if (!pEl.querySelector('.pperm-row')){
+      const prior = _PROJ_PRIOR[pid];
+      if (prior && Object.keys(prior).length) out[pid] = prior;
+      return;
+    }
     const obj = {};
     pEl.querySelectorAll('.pperm-row').forEach(function(row){
       const k = row.getAttribute('data-key');
@@ -44505,6 +44619,13 @@ function collectProjects(){
 }
 
 async function saveModal(){
+  // ★BTN-LAG-20261107：点击瞬间给反馈、禁用防重复；finally 保证成功/失败/超时后必定恢复
+  if (window.__userSaving) return;
+  window.__userSaving = true;
+  var _svBtn = document.getElementById('userBtnSave');
+  var _svTxt = _svBtn ? _svBtn.textContent : '';
+  if (_svBtn){ _svBtn.disabled = true; _svBtn.textContent = '… 保存中'; }
+  try {
   if (managerLogins.length === 0) {
     try {
       const r = await fetch('/api/managers', {headers:(typeof authHeaders==='function'?authHeaders():{})});
@@ -44643,7 +44764,7 @@ async function saveModal(){
     const _bid = curUid ? 'USR-D1' : 'USR-D2';
     const _bname = curUid ? (t.perm_name_USR_D1||'编辑用户权限') : (t.perm_name_USR_D2||'新增用户');
     const _title = (curUid ? (t.usr_diff_title||'权限变更对比') : (t.usr_add_card_title||'新增用户申请')) + '：' + name + '（' + login + '）';
-    fetch('/api/approval-requests', {
+    return fetch('/api/approval-requests', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ requester:(authUser&&authUser.username)||'', requester_name:(authUser&&authUser.real_name)||'', block_id:_bid, block_name:_bname, title:_title, content:'', persist:'persistent', target_id: curUid? String(curUid):'', approvers:TRI, payload: JSON.stringify(_pl) })
     }).then(function(r){ return r.json(); }).then(function(d){
@@ -44662,7 +44783,7 @@ async function saveModal(){
     }
     const endpoint = curUid ? ('/api/users/'+curUid) : '/api/users';
     const method = curUid ? 'PUT' : 'POST';
-    fetch(endpoint, { method:method, headers:(typeof authHeaders==='function'?authHeaders({'Content-Type':'application/json'}):{'Content-Type':'application/json'}), body:JSON.stringify(payload) })
+    return fetch(endpoint, { method:method, headers:(typeof authHeaders==='function'?authHeaders({'Content-Type':'application/json'}):{'Content-Type':'application/json'}), body:JSON.stringify(payload) })
       .then(function(r){ return r.json(); })
       .then(function(d){
         if(d&&d.ok){
@@ -44677,22 +44798,24 @@ async function saveModal(){
                 //   新增成功后把 curUid 切换为新记录 id，之后再次点保存走 PUT（编辑），
                 //   避免重复创建同一用户。
                 if (!curUid && d && d.id) { curUid = d.id; }
-                loadUsers();
-                // ★PERM-V2-20261018：立即把本次保存的权限写回内存。
-                //   原因：loadUsers() 是异步的，若保存后马上重开弹窗，PERMS_STATE 还是旧值，
-                //   界面就会显示成"默认"（实际已入库） —— 这就是"保存后变回默认"的根因。
+                // ★BTN-LAG2-20261107：保存后弹窗保持打开，用户当前看到的就是刚填的值，
+                // 不需要（也绝不该）重建两片权限面板 —— 那是整片 innerHTML 重写，会触发
+                // 全局 MutationObserver 的强制布局循环，表现为"保存完卡好几秒"。
+                // 这里只把权限写回内存（防止重开弹窗显示默认值），其余延后到浏览器空闲。
                 try{
                   const _tUid = curUid || (d && d.id) || null;
                   if (_tUid && typeof PERMS_STATE !== 'undefined'){
                     const _pp = (typeof payload.perms === 'string') ? JSON.parse(payload.perms || '{}') : (payload.perms || {});
                     PERMS_STATE[_tUid] = _pp;
-                    if (typeof buildCommonPerm === 'function') buildCommonPerm(_tUid);
-                    if (typeof buildProjPerm === 'function') buildProjPerm(_tUid);
-                    // 改的是自己 → 立刻对自己的界面生效（导航显隐等）
+                    var _idle = window.requestIdleCallback
+                      ? window.requestIdleCallback.bind(window)
+                      : function(fn){ return setTimeout(fn, 300); };
                     if (authUser && String(authUser.id) === String(_tUid)){
-                      authUser.perms = _pp;
-                      if (typeof applyAllPermVisibility === 'function'){ try{ applyAllPermVisibility(); }catch(e){} }
+                      _idle(function(){
+                        try { authUser.perms = _pp; if (typeof applyAllPermVisibility === 'function') applyAllPermVisibility(); } catch(e){}
+                      }, { timeout: 2000 });
                     }
+                    _idle(function(){ try { loadUsers(); } catch(e){} }, { timeout: 2000 });
                   }
                 }catch(_e){}
               } else {
@@ -44706,7 +44829,11 @@ async function saveModal(){
       .catch(function(){ showToast(curUid ? (t.user_save_fail||'保存失败，请检查网络') : (t.user_add_fail||'新增失败，请检查网络')); });
   }
 
-  _finishSave();
+  return await _finishSave();
+  } finally {
+    window.__userSaving = false;
+    if (_svBtn){ _svBtn.disabled = false; _svBtn.textContent = _svTxt || '保存'; }
+  }
 }
 
 // ---------- Toast（橙色居中） ----------
@@ -55217,10 +55344,6 @@ function loadDashboard(force) {
   boardStartClock();
   boardRenderCalendar(sec, new Date().getFullYear(), new Date().getMonth());
   boardLoadFx(sec);
-  // 建材价格历史曲线（Chart.js 就绪后绘制）
-  if (typeof bdEnsureChart === 'function') {
-    bdEnsureChart().then(function(){ bdLoadMaterialPrices(); }).catch(function(){});
-  }
 }
 
 // ==================== 新版看板（深蓝科技风 Grid，替代旧 livestock/价格看板） ====================
@@ -55244,12 +55367,6 @@ function renderBoardShell() {
   +     '<div class="bd-card bd-sq bd-fx-tile"><div class="bd-card-h"><span class="bd-dot"></span><span>RMB-VND</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdFx1C"></canvas></div><div class="bd-fx-cur" id="bdFx1V">…</div></div>'
   +     '<div class="bd-card bd-sq bd-fx-tile"><div class="bd-card-h"><span class="bd-dot"></span><span>USD-VND</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdFx2C"></canvas></div><div class="bd-fx-cur" id="bdFx2V">…</div></div>'
   +     '<div class="bd-card bd-sq bd-fx-tile"><div class="bd-card-h"><span class="bd-dot"></span><span>USD-RMB</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdFx3C"></canvas></div><div class="bd-fx-cur" id="bdFx3V">…</div></div>'
-  +   '</div>'
-  +   '<div class="bd-row4">'
-  +     '<div class="bd-card bd-sq" id="bdMatRebar"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_mat_rebar','钢筋价格曲线')+'</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdMatRebarC"></canvas></div></div>'
-  +     '<div class="bd-card bd-sq" id="bdMatCement"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_mat_cement','水泥价格曲线')+'</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdMatCementC"></canvas></div></div>'
-  +     '<div class="bd-card bd-sq" id="bdMatSand"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_mat_sand','黄砂价格曲线')+'</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdMatSandC"></canvas></div></div>'
-  +     '<div class="bd-card bd-sq" id="bdMatGravel"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_mat_gravel','石子价格曲线')+'</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdMatGravelC"></canvas></div></div>'
   +   '</div>'
   + '</div>';
 }
@@ -55482,7 +55599,7 @@ function bdPhotoCard(it){
     + '<div class="bd-photo-wrap"><img src="'+escBd(it.url)+'" loading="lazy" alt=""></div>'
     + '<div class="bd-card-name">'+escBd(it.name)+' <span class="bd-photo-meta">'+escBd(it.date)+' · '+escBd(it.zone)+'</span></div></div>';
 }
-// 第四张：安装人数轮播（每项目最新有数据的安装日总人工）
+// 第四张：安装人数列表（每项目最新有数据的安装日总人工，★20261107 由横向轮播改为列表式）
 function boardRenderInstallWorkers(list){
   var body = document.querySelector('#bdWorkers .bd-sq-body'); if(!body) return;
   var items = [];
@@ -55492,10 +55609,16 @@ function boardRenderInstallWorkers(list){
     if(w.total > 0) items.push({ pid:p.id, name: bdProjName(p), total: w.total, date: w.date });
   });
   if(!items.length){ body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
-  var cards = items.map(function(it){ return bdWorkerCard(it, 'bd_worker_title', 'onclick="bdOpenInstallProject(\''+it.pid+'\',\''+escBd(it.date)+'\')"'); }).join('');
-  body.innerHTML = '<div class="bd-carousel"><div class="bd-carousel-track">'+cards+cards+'</div></div>';
+  items.sort(function(a,b){ return b.total - a.total; });
+  var head = '<div class="bd-t10-head"><span>#</span><span>'+i18nVal('bd_t10_name','项目')+'</span><span>'+i18nVal('bd_worker_title','安装人数')+'</span></div>';
+  body.innerHTML = head + items.map(function(it,i){
+    return '<div class="bd-t10-row bd-click" onclick="bdOpenInstallProject(\''+it.pid+'\',\''+escBd(it.date)+'\')">'
+      + '<span class="bd-t10-rank">'+(i+1)+'</span>'
+      + '<span class="bd-t10-name" title="'+escBd(it.name)+'">'+escBd(it.name)+'</span>'
+      + '<span class="bd-t10-num">'+it.total+'</span></div>';
+  }).join('');
 }
-// 第五张：生产人数轮播（每项目最新有数据的生产日总人工）
+// 第五张：生产人数列表（每项目最新有数据的生产日总人工，★20261107 由横向轮播改为列表式）
 function boardRenderProdWorkers(list){
   var body = document.querySelector('#bdProd .bd-sq-body'); if(!body) return;
   var items = [];
@@ -55505,14 +55628,14 @@ function boardRenderProdWorkers(list){
     if(w.total > 0) items.push({ pid:p.id, name: bdProjName(p), total: w.total, date: w.date });
   });
   if(!items.length){ body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
-  var cards = items.map(function(it){ return bdWorkerCard(it, 'bd_prod_title', 'onclick="bdOpenProductionProject(\''+it.pid+'\')"'); }).join('');
-  body.innerHTML = '<div class="bd-carousel"><div class="bd-carousel-track">'+cards+cards+'</div></div>';
-}
-function bdWorkerCard(it, labelKey, onclickAttr){
-  return '<div class="bd-carousel-card bd-worker-card" '+onclickAttr+'>'
-    + '<div class="bd-worker-num">'+it.total+'</div>'
-    + '<div class="bd-worker-label">'+i18nVal(labelKey,'人数')+'</div>'
-    + '<div class="bd-card-name">'+escBd(it.name)+'</div></div>';
+  items.sort(function(a,b){ return b.total - a.total; });
+  var head = '<div class="bd-t10-head"><span>#</span><span>'+i18nVal('bd_t10_name','项目')+'</span><span>'+i18nVal('bd_prod_title','生产人数')+'</span></div>';
+  body.innerHTML = head + items.map(function(it,i){
+    return '<div class="bd-t10-row bd-click" onclick="bdOpenProductionProject(\''+it.pid+'\')">'
+      + '<span class="bd-t10-rank">'+(i+1)+'</span>'
+      + '<span class="bd-t10-name" title="'+escBd(it.name)+'">'+escBd(it.name)+'</span>'
+      + '<span class="bd-t10-num">'+it.total+'</span></div>';
+  }).join('');
 }
 function prod_totalWorkers(f){
   var total = 0, date = '';
@@ -56233,7 +56356,7 @@ function bdSetCur(cur) {
     btns[i].className = (btns[i].textContent === cur) ? 'on' : '';
   }
   if (typeof bdEnsureChart === 'function') {
-    bdEnsureChart().then(function(){ bdLoadMaterialPrices(); drawBdFxCharts(); }).catch(function(){});
+    bdEnsureChart().then(drawBdFxCharts).catch(function(){});
   }
 }
 
@@ -56242,122 +56365,16 @@ function bdEnsureChart() {
   return bdLoadScript('/vendor/chart.umd.min.js')
     .catch(function(){ return bdLoadScript('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'); });
 }
-// 4 个建材价格历史曲线：X=年/月(2021-01~2026-09) Y=价格
-function drawBdMaterials() {
-  var mp = window.MATERIAL_PRICES; if (!mp) return;
-  var defs = [
-    { id:'bdMatRebarC',  key:'rebar',  color:'#39e6ff' },
-    { id:'bdMatCementC', key:'cement', color:'#ffd166' },
-    { id:'bdMatSandC',   key:'sand',   color:'#2bcbba' },
-    { id:'bdMatGravelC', key:'gravel', color:'#ff6b81' }
-  ];
-  window.__bdMatCharts = window.__bdMatCharts || {};
-  defs.forEach(function(d) {
-    var cv = document.getElementById(d.id); if (!cv) return;
-    var mode = window.bdCur || 'VND';
-    var data = ((mp.series || {})[d.key] || []).slice();
-    // 按所选计价货币逐月换算（RMB/USD 用当月真实汇率；VND 为原始计价）
-    if (mode !== 'VND' && typeof bdFxAll === 'function') {
-      var rmap = {};
-      bdFxAll().forEach(function(r) {
-        if (mode === 'RMB') rmap[r.ym] = r.rmbVnd;
-        else if (mode === 'USD') rmap[r.ym] = r.usdVnd;
-      });
-      var lbs = mp.labels || [];
-      data = data.map(function(v, i) {
-        var r = rmap[lbs[i]];
-        return r ? +(v / r).toFixed(2) : v;
-      });
-    }
-    if (window.__bdMatCharts[d.id]) { try { window.__bdMatCharts[d.id].destroy(); } catch(e){} }
-    var unit = ((mp.units || {})[d.key] || '').replace('VND', mode);
-    window.__bdMatCharts[d.id] = new Chart(cv.getContext('2d'), {
-      type: 'line',
-      data: { labels: mp.labels || [], datasets: [{
-        data: data, borderColor: d.color, backgroundColor: 'transparent',
-        fill: false, pointRadius: 0, borderWidth: 1.6, tension: 0.25
-      }]},
-      options: {
-        responsive: true, maintainAspectRatio: false, animation: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { backgroundColor:'#1b222b', borderColor:'#474e57', titleColor:'#eceff2', bodyColor:'#eceff2',
-                     displayColors:false, callbacks: { label: function(it){ return it.parsed.y + ' ' + unit; } } },
-          ovDataLabels: { display: false }
-        },
-        // 悬停曲线正上方也显示该月真实数字（不必精确压在线上）
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-          x: { ticks:{ color:'#aab4c0', fontSize:9, maxTicksLimit:5, maxRotation:0 }, grid:{ color:'rgba(120,130,145,0.15)' } },
-          y: { ticks:{ color:'#aab4c0', fontSize:9, maxTicksLimit:4 }, grid:{ color:'rgba(120,130,145,0.15)' } }
-        }
-      }
-    });
-  });
-}
-
-// 建材价格：优先从后端 /api/material-prices 拉取实时市场价，失败则用前端内置示例数据
-function bdLoadMaterialPrices() {
-  function draw() { if (typeof drawBdMaterials === 'function') drawBdMaterials(); }
-  function markSrc(live) {
-    var host = document.querySelector('#bdMatRebar .bd-card-h');
-    if (!host) return;
-    var b = document.getElementById('bdMatSrc');
-    if (!b) {
-      b = document.createElement('span');
-      b.id = 'bdMatSrc';
-      b.style.cssText = 'margin-left:auto;font-size:10px;font-weight:700;padding-left:6px;';
-      host.appendChild(b);
-    }
-    b.textContent = live ? '● ' + (pt('bd_src_live') || '实时') : '○ ' + (pt('bd_src_demo') || '示例');
-    b.style.color = live ? '#2bcbba' : '#9aa6b2';
-  }
-  if (typeof fetch !== 'function') { markSrc(false); draw(); return; }
-  var base = (typeof crmApiBase === 'function') ? crmApiBase() : (typeof API_BASE !== 'undefined' ? API_BASE : '');
-  fetch(base + '/api/material-prices', { credentials: 'include' })
-    .then(function(r){ return r.json().catch(function(){ return {}; }); })
-    .then(function(j){
-      if (j && j.ok && j.data_source === 'live' && j.labels && j.series) {
-        window.MATERIAL_PRICES = { labels: j.labels, units: j.units || {}, series: j.series };
-        markSrc(true);
-      } else {
-        markSrc(false);
-      }
-      draw();
-    })
-    .catch(function(){ markSrc(false); draw(); });
-}
-
 function boardLoadFx(sec) {
-  // 汇率已历史化固化：window.FX_HISTORY = 2021-01 ~ 2026-09 每月1号数据（真实API采集生成）
-  // 历史数据不再请求任何接口；仅当跨月（如进入 2026-10）时才用真实API懒采集当月汇率，
-  // 采集结果固化到 localStorage，之后同样不再请求
+  // 汇率已历史化固化：window.FX_HISTORY 由真实API采集并固化到当前月（服务器按源重新生成），
+  // 本地不再依赖任何网络请求即可出图。仅当跨月且该月未采集时，才异步、带超时地懒采集当月汇率，
+  // 结果固化到 localStorage。★20261107 锁死：无论网络成功/失败/超时，都先立即用已有数据渲染，绝不阻塞。
   var h = (window.FX_HISTORY || []).slice();
   try { h = h.concat(JSON.parse(localStorage.getItem('bdFxExtra') || '[]')); } catch(e) {}
   if (!h.length) return;
   h.sort(function(a,b){ return a.ym < b.ym ? -1 : 1; });
   var last = h[h.length-1];
-  var d0 = new Date();
-  var nowYm = d0.getFullYear()+'-'+('0'+(d0.getMonth()+1)).slice(-2);
-  if (last.ym < nowYm && !window.__bdfxFetching) {
-    window.__bdfxFetching = true;
-    fetch('https://open.er-api.com/v6/latest/USD')
-      .then(function(r){ return r.json(); })
-      .then(function(j){
-        var usdVnd = j.rates.VND, usdCny = j.rates.CNY;
-        var rec = { ym: nowYm, rmbVnd: +(usdVnd/usdCny).toFixed(1), usdVnd: +usdVnd.toFixed(1), usdRmb: +usdCny.toFixed(4) };
-        var extra = [];
-        try { extra = JSON.parse(localStorage.getItem('bdFxExtra') || '[]'); } catch(e) {}
-        if (!extra.some(function(x){ return x.ym === nowYm; })) {
-          extra.push(rec);
-          localStorage.setItem('bdFxExtra', JSON.stringify(extra));
-        }
-        window.__bdfxFetching = false;
-        boardLoadFx();
-      })
-      .catch(function(){ window.__bdfxFetching = false; });
-    return;
-  }
+  // —— 核心：先用已有数据立即渲染（不卡网络）——
   var set = function(vId, val) {
     var v = document.getElementById(vId);
     if (v) v.textContent = val;
@@ -56368,8 +56385,35 @@ function boardLoadFx(sec) {
   if (typeof bdEnsureChart === 'function') {
     bdEnsureChart().then(drawBdFxCharts).catch(function(){});
   }
+  // —— 异步、带超时(6s)的懒采集：仅补充缺失的当前月，回来后再重绘一次 ——
+  var d0 = new Date();
+  var nowYm = d0.getFullYear()+'-'+('0'+(d0.getMonth()+1)).slice(-2);
+  if (last.ym < nowYm && !window.__bdfxFetching) {
+    window.__bdfxFetching = true;
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var to = ctrl ? setTimeout(function(){ try { ctrl.abort(); } catch(e){} }, 6000) : null;
+    fetch('https://open.er-api.com/v6/latest/USD', ctrl ? {signal: ctrl.signal} : {})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (to) clearTimeout(to);
+        var usdVnd = j && j.rates && j.rates.VND, usdCny = j && j.rates && j.rates.CNY;
+        if (usdVnd == null || usdCny == null) { window.__bdfxFetching = false; return; }
+        var rec = { ym: nowYm, rmbVnd: +(usdVnd/usdCny).toFixed(1), usdVnd: +usdVnd.toFixed(1), usdRmb: +usdCny.toFixed(4) };
+        var extra = [];
+        try { extra = JSON.parse(localStorage.getItem('bdFxExtra') || '[]'); } catch(e) {}
+        if (!extra.some(function(x){ return x.ym === nowYm; })) {
+          extra.push(rec);
+          localStorage.setItem('bdFxExtra', JSON.stringify(extra));
+        }
+        window.__bdfxFetching = false;
+        boardLoadFx();   // 用新数据重绘一次
+      })
+      .catch(function(){ if (to) clearTimeout(to); window.__bdfxFetching = false; });
+  }
 }
 // 合并固化历史 + 懒采集追加月，按时间排序
+// "2026-11" -> "11-2026"（看板曲线日期统一 MM-YYYY 显示）★20261107
+function bdFmtYm(ym){ var s = String(ym || ''); return /^\d{4}-\d{2}$/.test(s) ? (s.slice(5,7) + '-' + s.slice(0,4)) : s; }
 function bdFxAll() {
   var h = (window.FX_HISTORY || []).slice();
   try { h = h.concat(JSON.parse(localStorage.getItem('bdFxExtra') || '[]')); } catch(e) {}
@@ -56379,7 +56423,7 @@ function bdFxAll() {
 // 3 条汇率真实月度曲线：X=年/月(2021-01~最新) Y=汇率
 function drawBdFxCharts() {
   var h = bdFxAll(); if (!h.length) return;
-  var labels = h.map(function(r){ return r.ym; });
+  var labels = h.map(function(r){ return bdFmtYm(r.ym); });
   var defs = [
     { id:'bdFx1C', key:'rmbVnd', color:'#39e6ff' },
     { id:'bdFx2C', key:'usdVnd', color:'#ffd166' },
@@ -56429,7 +56473,7 @@ function boardRenderFx(d) {
     if (l) l.textContent = c.label;
   });
   var rangeEl = document.getElementById('bdFxRange');
-  if (rangeEl) rangeEl.textContent = i18nVal('bd_fx_range','区间') + ': ' + (labels.length ? labels[0] : '') + ' – ' + (labels.length ? labels[labels.length-1] : '');
+  if (rangeEl) rangeEl.textContent = i18nVal('bd_fx_range','区间') + ': ' + (labels.length ? bdFmtYm(labels[0]) : '') + ' – ' + (labels.length ? bdFmtYm(labels[labels.length-1]) : '');
 }
 function drawBdFx(labels, s) {
   var cv = document.getElementById('bdFxChart'); if (!cv) return;
@@ -58657,6 +58701,7 @@ function startPermWatch(intervalMs){
   var _iv = Math.max(4000, parseInt(intervalMs, 10) || 6000);
   var tick = function(){
     if(!authUser || !authUser.username) return;
+    if(document.hidden) return;   // ★BTN-LAG：后台标签不发轮询，减少主线程被唤醒
     fetch(API_BASE + '/api/perm-version?username=' + encodeURIComponent(_un) + '&_t=' + Date.now(), pvOpts)
       .then(function(r){ return r.json(); })
       .then(function(d){
@@ -68174,8 +68219,7 @@ window.refreshMoveBtnState = function () {
   else window.addEventListener('load', preload);
 })();
 </script>
-<script src="vendor/fx_history.js"></script>
-<script src="vendor/material_prices.js"></script>
+<script src="vendor/fx_history.js?v=20261107"></script>
 <script src="vn_provinces.js"></script>
   <template id="instGanttTpl">
 <html lang="zh-CN">

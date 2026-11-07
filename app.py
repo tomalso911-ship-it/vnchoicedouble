@@ -128,6 +128,11 @@ DEMO_SNAPSHOT = os.path.join(DATA_DIR, "demo_snapshot.json")
 app = Flask(__name__)
 CORS(app)
 
+# ★20261107 三人组与管理员同权（用户 2026-11-07 指定）：tom/cuong/james 无论
+# managers 表如何变动，永远按管理员处理（is_admin=True），什么内容都可见。
+# 注意：必须定义在 init_db() 调用（模块加载期）之前，否则启动即 NameError 崩溃循环。
+ALWAYS_MANAGERS = ("tom", "cuong", "james")
+
 # ===================== 权限变更实时推送（轻量级版本号机制）=====================
 # 每个用户的权限/角色/状态发生变更时，bump 其版本号。
 # 前端轮询 /api/perm-version?username= 检测版本变化，变化时立即刷新本地会话缓存，
@@ -976,8 +981,9 @@ def init_db():
                   ("tom", "66668888", "Tom", "admin", "active", time.strftime("%Y-%m-%d %H:%M:%S")))
         print("[init_db] 已创建种子用户 tom / 66668888")
 
-    # 确保 tom 始终在管理员名单中
-    c.execute("INSERT OR IGNORE INTO managers (username) VALUES (?)", ("tom",))
+    # 确保 tom/cuong/james 始终在管理员名单中（三人组与管理员同权）★20261107
+    for _m in ALWAYS_MANAGERS:
+        c.execute("INSERT OR IGNORE INTO managers (username) VALUES (?)", (_m,))
     # 迁移旧逻辑中的 gm1/gm2（若存在）到管理员表，保证平滑过渡
     for old_mgr in ("gm1", "gm2"):
         exists = c.execute("SELECT 1 FROM users WHERE username=?", (old_mgr,)).fetchone()
@@ -1530,6 +1536,9 @@ def _cloud_mirror_login(conn, username, password):
             pass
         if not is_admin and (row["role"] or "") == "管理员":
             is_admin = True
+        # 三人组永远与管理员同权（云登录路径）★20261107
+        if not is_admin and (username or "").strip().lower() in ALWAYS_MANAGERS:
+            is_admin = True
         def _ids(raw):
             try:
                 v = json.loads(raw or "[]")
@@ -1631,9 +1640,11 @@ def login():
 
 
 def _is_manager(conn, username):
-    """判断用户是否为管理员：在自由任命的管理员表中，或角色为“管理员”。"""
+    """判断用户是否为管理员：三人组硬编码名单 / 自由任命的管理员表 / 角色为“管理员”。"""
     if not username:
         return False
+    if username.strip().lower() in ALWAYS_MANAGERS:
+        return True
     row = conn.execute("SELECT 1 FROM managers WHERE username=?", (username,)).fetchone()
     if row:
         return True
@@ -1648,7 +1659,13 @@ def _manager_usernames(conn):
         "INNER JOIN users u ON lower(u.username) = lower(m.username) "
         "ORDER BY m.username"
     ).fetchall()
-    return [r["username"] for r in rows]
+    names = [r["username"] for r in rows]
+    # 三人组永远列入管理员名单（managers 表被误删也保证角标/入口显示）★20261107
+    lower_names = {n.lower() for n in names}
+    for m in ALWAYS_MANAGERS:
+        if m not in lower_names:
+            names.append(m)
+    return names
 
 
 @app.route("/api/me", methods=["GET"])
@@ -6570,6 +6587,31 @@ def _lite_build_min_if_stale():
         pass
 
 
+# ===== /lite 响应压缩缓存（Brotli 优先）★BROTLI-20261107 =====
+_LITE_ENC_CACHE = {"hv": None, "gzip": None, "br": None}
+
+
+def _lite_encoded(hv, raw, kind):
+    """按内容哈希缓存压缩结果：同一版本只压一次，避免每请求重压 ~3.7MB。"""
+    try:
+        if _LITE_ENC_CACHE.get("hv") != hv:
+            _LITE_ENC_CACHE.update({"hv": hv, "gzip": None, "br": None})
+        hit = _LITE_ENC_CACHE.get(kind)
+        if hit is not None:
+            return hit
+        if kind == "br":
+            import brotli
+            # q9 实测 918KB / 0.245s；q11 只再省 68KB 却要 6.1s CPU，不划算
+            data = brotli.compress(raw, quality=9, lgwin=22)
+        else:
+            import gzip as _gzip
+            data = _gzip.compress(raw, 6)
+        _LITE_ENC_CACHE[kind] = data
+        return data
+    except Exception:
+        return None
+
+
 @app.route("/lite")
 def index_lite():
     """精简版页面：页签只保留「看板 / 签约项目」，表格样式与主站一致。
@@ -6600,25 +6642,36 @@ def index_lite():
         #   这里 URL 已带内容哈希 (?v=<md5>)，天然内容寻址：内容一变 hash 就变、
         #   URL 也变 → 可安全长缓存（内容不会过期）；同时对响应做 gzip 压缩（约 -75%）。
         body = html.encode("utf-8")
+        ae = (request.headers.get("Accept-Encoding", "") or "").lower()
+        # ★BROTLI-20261107：客户端支持 br 时优先 Brotli（比 gzip 再小 25~30%），
+        # 否则 gzip，最后原文；压缩结果按内容哈希缓存，同版本只压一次。
+        enc = ""
+        if "br" in ae:
+            packed = _lite_encoded(hv, body, "br")
+            if packed is not None:
+                body, enc = packed, "br"
+        if not enc and "gzip" in ae:
+            packed = _lite_encoded(hv, body, "gzip")
+            if packed is not None:
+                body, enc = packed, "gzip"
+        etag = '"' + hv + (("-" + enc) if enc else "") + '"'
         headers = {
-            # ★FIX-2026-10-17：原来用 immutable —— 浏览器一旦缓存 /lite?v=<hash> 就再也不发请求，
-            #   导致前端每次改动（删表锁/水平滚动条等）在普通 F5 刷新下永远看不到（只有 Ctrl+F5 才生效）。
-            #   改成 no-cache：浏览器每次刷新都带 If-None-Match 问服务器；
-            #   内容没变 → 304 秒回（不重下），内容变了 → 服务器发现 hash 不一致、自动 302 重定向到新 ?v=HASH → 必拉最新。
-            #   既保留 ETag 的"内容寻址"语义，又让前端改动 100% 可见。
             "Cache-Control": "public, no-cache",
-            "ETag": '"' + hv + '"',
-            # ★PERF：标记本轮响应为"内容寻址、可长缓存"，供全局 after_request 放行
+            "ETag": etag,
             "X-Lite-Cache": "1",
         }
-        if "gzip" in (request.headers.get("Accept-Encoding", "") or "").lower():
-            try:
-                import gzip as _gzip
-                body = _gzip.compress(body, 6)
-                headers["Content-Encoding"] = "gzip"
-                headers["Vary"] = "Accept-Encoding"
-            except Exception:
-                body = html.encode("utf-8")
+        if enc:
+            headers["Content-Encoding"] = enc
+            headers["Vary"] = "Accept-Encoding"
+        # ★BROTLI-20261107：真正落实 304 —— 之前只有注释没有实现，
+        # 浏览器每次刷新都白下 1.1MB；现在内容/编码未变即零字节回包。
+        inm = request.headers.get("If-None-Match", "") or ""
+        if etag in inm or ('"' + hv + '"') in inm:
+            h304 = {"Cache-Control": "public, no-cache", "ETag": etag,
+                    "X-Lite-Cache": "1"}
+            if enc:
+                h304["Vary"] = "Accept-Encoding"
+            return Response(status=304, headers=h304)
         return Response(body, mimetype="text/html", headers=headers)
     except Exception:
         return send_from_directory(BASE_DIR, "choice_lite.html")
@@ -7164,8 +7217,9 @@ def api_seed_users():
         if is_admin:
             conn.execute("INSERT OR IGNORE INTO managers (username) VALUES (?)", (username,))
         inserted += 1
-    # 保证 tom 始终为管理员
-    conn.execute("INSERT OR IGNORE INTO managers (username) VALUES (?)", ("tom",))
+    # 保证 tom/cuong/james 始终为管理员（三人组同权）★20261107
+    for _m in ALWAYS_MANAGERS:
+        conn.execute("INSERT OR IGNORE INTO managers (username) VALUES (?)", (_m,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "inserted": inserted, "total_defined": len(SEED_USERS)})
@@ -10317,6 +10371,52 @@ def api_feed_test():
     return jsonify(result)
 
 
+# ===== 建材价格快照（price_snapshot.json：团队维护 / mat_scraper.py 自动回填）=====
+_MATERIAL_SNAPSHOT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "price_snapshot.json")
+_material_snapshot_cache = {"mtime": None, "data": None}
+
+
+def _material_snapshot_mtime():
+    """快照文件修改时间（用于缓存失效判断）；文件不存在返回 None。"""
+    try:
+        return os.path.getmtime(_MATERIAL_SNAPSHOT_PATH)
+    except OSError:
+        return None
+
+
+def _load_material_snapshot():
+    """读取 price_snapshot.json（按 mtime 缓存），结构无效或缺失返回 None。
+
+    期望结构：{labels:[...], units:{...}, series:{rebar:[],cement:[],sand:[],gravel:[]},
+              _updated:"...", _source:"..."}
+    """
+    mtime = _material_snapshot_mtime()
+    if mtime is None:
+        return None
+    if _material_snapshot_cache["mtime"] == mtime and _material_snapshot_cache["data"] is not None:
+        return _material_snapshot_cache["data"]
+    try:
+        with open(_MATERIAL_SNAPSHOT_PATH, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        labels = d.get("labels") or []
+        units = d.get("units") or {}
+        series = d.get("series") or {}
+        need = ("rebar", "cement", "sand", "gravel")
+        if not labels:
+            return None
+        for k in need:
+            arr = series.get(k)
+            if not isinstance(arr, list) or len(arr) != len(labels):
+                return None
+        out = {"labels": labels, "units": units, "series": series,
+               "_updated": d.get("_updated", ""), "_source": d.get("_source", "")}
+        _material_snapshot_cache["mtime"] = mtime
+        _material_snapshot_cache["data"] = out
+        return out
+    except Exception:
+        return None
+
+
 @app.route("/api/material-prices")
 def api_material_prices():
     """建材（钢筋/水泥/黄砂/石子）市场价格指数 API。
@@ -10335,7 +10435,8 @@ def api_material_prices():
     """
     cache_key = "material_prices"
     cached = _API_CACHE.get(cache_key)
-    if cached and (time.time() - cached[0] < 3600):
+    snap_mtime = _material_snapshot_mtime()
+    if cached and (time.time() - cached[0] < 3600) and (cached[2] if len(cached) > 2 else None) == snap_mtime:
         return jsonify(cached[1])
 
     url = os.environ.get("VN_MAT_API_URL")
@@ -10351,14 +10452,22 @@ def api_material_prices():
             if data:
                 out = {"ok": True, "data_source": "live", "use_bundled": False,
                        "labels": data["labels"], "units": data["units"], "series": data["series"]}
-                _API_CACHE[cache_key] = (time.time(), out)
+                _API_CACHE[cache_key] = (time.time(), out, snap_mtime)
                 return jsonify(out)
         except Exception as e:
             app.logger.warning("material-prices live fetch failed: %s", e)
-    # 回退：使用前端内置示例数据
+    # 2) 优先用磁盘上的真实数据快照（团队维护 / 爬虫自动回填）：price_snapshot.json
+    snap = _load_material_snapshot()
+    if snap:
+        out = {"ok": True, "data_source": "snapshot", "use_bundled": False,
+               "labels": snap["labels"], "units": snap["units"], "series": snap["series"],
+               "_updated": snap["_updated"], "_source": snap["_source"]}
+        _API_CACHE[cache_key] = (time.time(), out, snap_mtime)
+        return jsonify(out)
+    # 3) 回退：使用前端内置示例数据
     out = {"ok": True, "data_source": "demo", "use_bundled": True,
            "labels": [], "units": {}, "series": {}}
-    _API_CACHE[cache_key] = (time.time(), out)
+    _API_CACHE[cache_key] = (time.time(), out, snap_mtime)
     return jsonify(out)
 
 
