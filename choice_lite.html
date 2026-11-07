@@ -7791,7 +7791,7 @@ var WL_FLOW_IMG = {
         var due = dueYmd ? ymdToDmy(dueYmd) : '—';
         var produced = 0, delivered = 0;
         for(var s in (f.finished||{})){ produced += (+f.finished[s].produced||0); delivered += (+f.finished[s].delivered||0); }
-        h += '<div class="prod-card" onclick="prod_open(\''+id+'\')">'
+        h += '<div class="prod-card" onclick="prod_open(\''+id+'\')" onmouseenter="prod_preloadFactory('+id+')">'
           + '<div class="pc-title">'+prod_esc(client)+(prov?' · '+prod_esc(prov):'')+'</div>'
           + '<span class="pc-chip">'+pt('card_contract')+' '+prod_esc(String(code))+'</span>'
           + '<span class="pc-chip">'+pt('card_spec')+' '+prod_esc(spec)+'</span>'
@@ -7801,6 +7801,20 @@ var WL_FLOW_IMG = {
           + '</div>';
       });
       box.innerHTML = h;
+    }
+    function prod_preloadFactory(id){
+      /* ★PERF-PROJCARD-20261107：鼠标悬停卡片即后台预载该项目工厂数据，点开时直接命中缓存、瞬间打开。
+         已对齐过 / 内存或本地已有缓存则跳过，避免重复请求。 */
+      try{
+        if(!id) return;
+        if(!window.__PROD_PRELOAD_TRIED) window.__PROD_PRELOAD_TRIED = {};
+        if(window.__PROD_PRELOAD_TRIED[id]) return;
+        window.__PROD_PRELOAD_TRIED[id] = 1;
+        if(window.__PROD_SYNCED && window.__PROD_SYNCED[id]) return;
+        if(PROD_MEM[id]) return;
+        try { if(localStorage.getItem(PROD_LS+id)) return; } catch(e){}
+        prod_syncFromServer(id, function(){});
+      }catch(e){}
     }
     function prod_open(id){
       /* ★PERM-V2-WHOLE-20261019：整个项目=隐藏 → 禁止进入（含旧链接/跨模块跳转兜底） */
@@ -7828,7 +7842,20 @@ var WL_FLOW_IMG = {
         }catch(e){}
       }
       prod_pullSpecsFromServer();
-      prod_syncFromServer(id, function(){ prod_renderTabs(window.__PROD_OPEN_TAB || 'A'); window.__PROD_OPEN_TAB = null; });
+      /* ★PERF-PROJCARD-20261107：刷新登录后点开项目卡片「瞬间出现内容」。
+         localStorage / 内存已是上一会话的最新数据 → 先立即渲染（不阻塞在网络上），
+         再在后台静默与服务端对齐；仅当本地完全没有该项目任何缓存时才维持原行为（等网络返回再渲染）。 */
+      var _hasCache = false;
+      try { _hasCache = !!localStorage.getItem(PROD_LS+id) || !!PROD_MEM[id]; } catch(e){}
+      if(_hasCache){
+        var _renderedAt = +(((PROD_MEM[id] && PROD_MEM[id].__savedAt) || (function(){ try { return (JSON.parse(localStorage.getItem(PROD_LS+id))||{}).__savedAt||0; } catch(e){ return 0; } })()) || 0);
+        prod_renderTabs(window.__PROD_OPEN_TAB || 'A'); window.__PROD_OPEN_TAB = null;
+        prod_syncFromServer(id, function(){   /* 后台对齐，不阻塞首屏；仅当服务端数据更新时才静默重渲染当前标签 */
+          try{ if(PROD_CUR===id){ var _f=prod_get(id); if(_f && +(_f.__savedAt||0) > _renderedAt) prod_renderTab(PROD_ACTIVE_TAB); } }catch(e){}
+        });
+      } else {
+        prod_syncFromServer(id, function(){ prod_renderTabs(window.__PROD_OPEN_TAB || 'A'); window.__PROD_OPEN_TAB = null; });
+      }
     }
     function prod_back(){
       /* ★ 「← 返回」：按页面历史原路退回上一个页面（像浏览器后退）。
