@@ -128,10 +128,51 @@ DEMO_SNAPSHOT = os.path.join(DATA_DIR, "demo_snapshot.json")
 app = Flask(__name__)
 CORS(app)
 
-# ★20261107 三人组与管理员同权（用户 2026-11-07 指定）：tom/cuong/james 无论
-# managers 表如何变动，永远按管理员处理（is_admin=True），什么内容都可见。
+# ★FULL-ACCESS-20261107（用户 2026-11-07 指定）：tom/admin/cuong/james 四人最高授权。
+# 无论 managers 表如何变动，永远 is_admin=True，且所有模块/项目恒为语义最高级。
 # 注意：必须定义在 init_db() 调用（模块加载期）之前，否则启动即 NameError 崩溃循环。
-ALWAYS_MANAGERS = ("tom", "cuong", "james")
+SUPER_USERS = ("tom", "admin", "cuong", "james")
+ALWAYS_MANAGERS = SUPER_USERS
+
+
+def _is_full_access(username):
+    """★FULL-ACCESS-20261107：唯一的最高授权判定（大小写不敏感，仅这四个用户名）。"""
+    return (username or "").strip().lower() in SUPER_USERS
+
+
+def _full_perms_for_super(conn):
+    """★FULL-ACCESS-20261107：读时归一化，不落库、不塞几百行记录。
+    按当前全部公共模块键 + 全部项目逐键取「语义最高级」，新增项目/模块天然覆盖。
+    不改级别体系：whole 仍 hide/view（取 view=显示）、prod_D_receipt 取 approve、
+    USR-* 旧 flat 区块取 allow/company。"""
+    common = {}
+    for key in SYS_COMMON_DEFAULTS:
+        opts = COMMON_OPTION_SETS.get(key, ("hide", "view", "edit"))
+        common[key] = "edit" if "edit" in opts else "view"
+    blocks = {
+        "USR-L1": {"decision": "company"},
+        "USR-D1": {"decision": "allow"},
+        "USR-D2": {"decision": "allow"},
+        "USR-D3": {"decision": "allow"},
+    }
+    proj = {}
+    for key in SYS_PROJ_DEFAULTS:
+        proj[key] = ({"decision": "approve", "approvers": ["tom"]}
+                     if key == "prod_D_receipt" else "edit")
+    proj["whole"] = "view"
+    projects = {}
+    try:
+        for r in conn.execute("SELECT id FROM won_projects").fetchall():
+            projects[str(r["id"])] = dict(proj)
+    except Exception:
+        pass
+    return {
+        "blocks": blocks,
+        "common": common,
+        "proj_default": dict(proj),
+        "projects": projects,
+        "lib_file_overrides": {},
+    }
 
 # ===================== 权限变更实时推送（轻量级版本号机制）=====================
 # 每个用户的权限/角色/状态发生变更时，bump 其版本号。
@@ -1536,9 +1577,11 @@ def _cloud_mirror_login(conn, username, password):
             pass
         if not is_admin and (row["role"] or "") == "管理员":
             is_admin = True
-        # 三人组永远与管理员同权（云登录路径）★20261107
-        if not is_admin and (username or "").strip().lower() in ALWAYS_MANAGERS:
+        # 四人最高授权（云登录路径）★FULL-ACCESS-20261107
+        _full = _is_full_access(username)
+        if _full:
             is_admin = True
+            perms = _full_perms_for_super(conn)
         def _ids(raw):
             try:
                 v = json.loads(raw or "[]")
@@ -1551,6 +1594,7 @@ def _cloud_mirror_login(conn, username, password):
             "role": row["role"] or "",
             "position": row["position"] or "",
             "is_admin": bool(is_admin),
+            "is_super": bool(_full),
             "status": "active",
             "vis_he_can_see": _ids(row["vis_he_can_see"]),
             "vis_can_see_me": _ids(row["vis_can_see_me"]),
@@ -1618,6 +1662,9 @@ def login():
     except Exception:
         perms = {}
     perms = _norm_user_perms(perms, conn)
+    _full = _is_full_access(_col("username"))
+    if _full:
+        perms = _full_perms_for_super(conn)
     def _ids(raw):
         try:
             v = json.loads(raw or "[]")
@@ -1630,8 +1677,9 @@ def login():
         "real_name": _col("real_name"),
         "role": role_val,
         "position": _col("position"),
-        "is_admin": bool(is_admin),
-        "status": _col("status", "active"),
+        "is_admin": bool(is_admin or _full),
+        "is_super": bool(_full),
+        "status": "active" if _full else _col("status", "active"),
         "vis_he_can_see": _ids(_col("vis_he_can_see", "[]")),
         "vis_can_see_me": _ids(_col("vis_can_see_me", "[]")),
         # 操作权限决策：{bid: {decision, approvers}}，前端据此做界面拦截
@@ -1693,6 +1741,9 @@ def api_me():
     except Exception:
         perms = {}
     perms = _norm_user_perms(perms, conn)
+    _full = _is_full_access(_col("username"))
+    if _full:
+        perms = _full_perms_for_super(conn)
     def _ids(raw):
         try:
             v = json.loads(raw or "[]")
@@ -1705,8 +1756,9 @@ def api_me():
         "real_name": _col("real_name"),
         "role": _col("role"),
         "position": _col("position"),
-        "is_admin": bool(is_admin),
-        "status": _col("status", "active"),
+        "is_admin": bool(is_admin or _full),
+        "is_super": bool(_full),
+        "status": "active" if _full else _col("status", "active"),
         "vis_he_can_see": _ids(_col("vis_he_can_see", "[]")),
         "vis_can_see_me": _ids(_col("vis_can_see_me", "[]")),
         "perms": perms
@@ -6072,7 +6124,7 @@ def _lib_user():
     return (request.headers.get("X-User-Name") or "").strip().lower()
 
 def _lib_can_edit():
-    return _lib_user() in TRI_APPROVERS
+    return _is_full_access(_lib_user())
 
 def _lib_safe_ext(filename):
     ext = os.path.splitext(filename or "")[1].lower()
@@ -6978,7 +7030,7 @@ def health():
 @app.route("/api/admin/purge-report")
 def admin_purge_report():
     """只读报告：磁盘文件总数、孤儿文件数与样例。"""
-    if (request.headers.get("X-User-Name") or "").strip().lower() != "tom":
+    if not _is_full_access((request.headers.get("X-User-Name") or "").strip()):
         return jsonify({"error": "forbidden: owner only"}), 403
     conn = get_db()
     refs = _collect_referenced_files(conn)
@@ -7001,7 +7053,7 @@ def admin_purge_report():
 @app.route("/api/admin/purge-orphans", methods=["POST", "GET"])
 def admin_purge_orphans():
     """清理 uploads/ 下没有任何数据库记录引用的孤儿文件（vault/ 不在此列）。"""
-    if (request.headers.get("X-User-Name") or "").strip().lower() != "tom":
+    if not _is_full_access((request.headers.get("X-User-Name") or "").strip()):
         return jsonify({"error": "forbidden: owner only"}), 403
     data = request.get_json(force=True, silent=True) or {}
     dry = bool(data.get("dryRun"))
@@ -7030,7 +7082,7 @@ def admin_purge_orphans():
 @app.route("/api/admin/storage-report")
 def admin_storage_report():
     """本地 uploads/ 容量分布（与云端 /api/admin/storage-report 对称），离线桌面版也显示饼图。仅 tom 可用。"""
-    if (request.headers.get("X-User-Name") or "").strip().lower() != "tom":
+    if not _is_full_access((request.headers.get("X-User-Name") or "").strip()):
         return jsonify({"error": "forbidden: owner only"}), 403
     conn = get_db()
     # 按表收集被引用的文件名（用于把 uploads 文件归类到 won/crm/lost）
@@ -7877,7 +7929,7 @@ def api_db_backup_now():
     """手动生成一份整库快照（仅 tom）。"""
     body = request.get_json(force=True, silent=True) or {}
     me = (body.get("requester") or "").strip().lower()
-    if me != "tom":
+    if not _is_full_access(me):
         return jsonify({"ok": False, "msg": "仅 tom 可操作"}), 403
     fn = _auto_backup_db("manual")
     return jsonify({"ok": bool(fn), "file": os.path.basename(fn) if fn else None})
@@ -7887,7 +7939,7 @@ def api_db_backup_now():
 def api_db_backup():
     """下载整库快照（仅 tom）。"""
     me = (request.args.get("me") or "").strip().lower()
-    if me != "tom":
+    if not _is_full_access(me):
         return jsonify({"ok": False, "msg": "仅 tom 可操作"}), 403
     return send_from_directory(
         os.path.dirname(DB_PATH), os.path.basename(DB_PATH), as_attachment=True,
@@ -7965,7 +8017,7 @@ def api_approval_resolve(rid):
         conn.close(); return jsonify({"ok": False, "msg": "已处理"}), 409
     approvers = _norm_approver_list(json.loads(row["approvers"]) if row["approvers"] else [], conn)
     # 校验 resolver 是否是指定审批人，或审批人已离职且 resolver 是其代理人
-    allowed = resolver in approvers
+    allowed = (resolver in approvers) or _is_full_access(resolver)
     if not allowed:
         delegated = {d["username"] for d in conn.execute(
             "SELECT username FROM users WHERE delegate_to=? AND status<>'active' AND username IN (%s)"
@@ -8143,7 +8195,7 @@ def _can_delete_approval(conn, username):
     不再硬编码任何具体账号（如 gm*/dgm*）。"""
     if not username:
         return False
-    if username == "tom":
+    if _is_full_access(username):
         return True
     u = conn.execute("SELECT role FROM users WHERE username=?", (username,)).fetchone()
     role = (u["role"] or "") if u else ""
@@ -8179,6 +8231,11 @@ def api_users_list():
     users = [_row_to_user(r, managers) for r in rows]
     for u in users:
         u["perms"] = _norm_user_perms(u.get("perms", {}) or {}, conn)
+        # ★FULL-ACCESS-20261107：四人读时归一化，面板/接口/导出看到全放开
+        if _is_full_access(u.get("username")):
+            u["perms"] = _full_perms_for_super(conn)
+            u["is_admin"] = True
+            u["status"] = "active"
     conn.close()
     return jsonify({"ok": True, "users": users, "managers": sorted(managers)})
 
@@ -8249,18 +8306,9 @@ _PERM_ALIAS = {
 
 
 def _is_super(conn, username):
-    """超级用户：三人组 + managers 管理员 —— 无视一切权限项，恒定可看可编辑。"""
-    u = (username or "").strip().lower()
-    if not u:
-        return False
-    if u in [str(x).lower() for x in TRI_APPROVERS]:
-        return True
-    try:
-        if _is_manager(conn, u):
-            return True
-    except Exception:
-        pass
-    return False
+    """★FULL-ACCESS-20261107：超级用户收紧为仅四人白名单；
+    其他 is_admin 管理员回到各自 perms 的原权限逻辑。"""
+    return _is_full_access(username)
 
 
 def _split_perms(raw):
@@ -8460,7 +8508,7 @@ def _usr_op_gate(conn, op, bid):
     """用户管理写操作闸门。
     返回 'direct'（三人组/管理员，直接执行）、'allow'（被授权，前端应走暂存审批）、'deny'（无权限）。
     未配置的 USR-D* 一律视为隐藏（deny）。"""
-    if (op or "").strip().lower() in [x.lower() for x in TRI_APPROVERS]:
+    if _is_full_access(op):
         return "direct"
     try:
         if _is_manager(conn, op):
@@ -8655,10 +8703,15 @@ def api_users_update(uid):
     perms = _norm_user_perms(perms, conn)
     perms = _force_sales_locked_perms(perms, position)
     perms = _force_observer_perms(perms, position)
-    row = conn.execute("SELECT id, position, perms FROM users WHERE id=?", (uid,)).fetchone()
+    row = conn.execute("SELECT id, username, position, perms FROM users WHERE id=?", (uid,)).fetchone()
     if not row:
         conn.close()
         return jsonify({"ok": False, "message": "用户不存在"})
+    # ★FULL-ACCESS-20261107：四人账号完全锁定 —— 禁止降权 / 禁用；
+    #   perms 强制回写全放开；姓名/密码/职位等资料仍照常可改。
+    if _is_full_access(row["username"]):
+        status = "active"
+        perms = _full_perms_for_super(conn)
     # WON-L1 职位联动兜底：职位从 销售/销售总监 改为其他职位时，
     # 若 WON-L1 决策仍为销售缺省的 hide，则自动改回 default（不覆盖其他决策值）。
     try:
@@ -8714,6 +8767,10 @@ def api_users_delete(uid):
     if _gate != "direct":
         return jsonify({"ok": False, "message": "无权限：删除/停用用户未对你开放" if _gate == "deny" else "该操作需经审批流程，请在页面中提交申请"}), 403
     conn = get_db()
+    _target = conn.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()
+    if _target and _is_full_access(_target["username"]):
+        conn.close()
+        return jsonify({"ok": False, "message": "该账号为系统最高授权用户，不可删除"}), 403
     conn.execute("DELETE FROM users WHERE id=?", (uid,))
     conn.commit()
     conn.close()
@@ -8726,7 +8783,7 @@ def api_users_reorder():
     data = request.get_json(force=True, silent=True) or {}
     _op = (request.headers.get("X-User-Name") or "").strip()
     conn = get_db()
-    if _op.lower() not in [x.lower() for x in TRI_APPROVERS] and not _is_manager(conn, _op):
+    if not _is_full_access(_op) and not _is_manager(conn, _op):
         conn.close()
         return jsonify({"ok": False, "message": "无权限：仅管理员或指定审批人可调整顺序"}), 403
     orders = data.get("orders") or []

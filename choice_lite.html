@@ -25963,10 +25963,7 @@ var PROD_EQUIP_FAULT_KB = {
        只有 tom / cuong / james 才可以删除，其他人一律不允许）★★
        与全站既有的三人组判定同一口径（authUser.username，小写比对）。 */
     function finIsTriAdmin(){
-      try {
-        var u = (typeof authUser !== 'undefined' && authUser && authUser.username) ? String(authUser.username).trim().toLowerCase() : '';
-        return (u === 'tom' || u === 'cuong' || u === 'james' || u === 'tomcuong');
-      } catch(e){ return false; }
+      try { return _isSuperUser(); } catch(e){ return false; }
     }
     /* ★★FIN/EQ-HSCROLL-20261017（用户 2026-10-17：「财务报表/股东权益所有表格里加类似 EXCEL 那种水平滚动条」）★★
        Univer 0.5.5 自带的滚动条是画在 canvas 上的，DOM 里没有元素、CSS 改不了，且只在内容溢出时才显示。
@@ -40018,7 +40015,8 @@ function deleteUser(id) {
   const TRI = (typeof TRI_APPROVERS!=='undefined')?TRI_APPROVERS:[];
   const _meName = ((authUser&&authUser.username)||'').toLowerCase();
   const _triPass = TRI.map(function(s){ return String(s).toLowerCase(); }).indexOf(_meName)>=0;
-  const _admPass = !!(authUser && authUser.is_admin);
+  const _admPass = _isSuperUser();
+  if (isFullAccessUser(u.login)) { showAlert('该账号为系统最高授权用户，不可删除'); return; }
   const _needApprove = (!(_triPass||_admPass)) && curRawDecision('USR-D3')==='allow';
   if (!(_triPass||_admPass||_needApprove)) { showAlert(t.usr_perm_no_right || '无权限：该项未对你开放'); return; }
   showCrmOrangeConfirm(
@@ -40182,7 +40180,7 @@ function curRawDecision(bid){
 // "保留默认"下的可见性：A 类默认显示；C 类默认隐藏；S 类仅管理员可见
 // 管理员在"保留默认"下始终可见所有区块，避免测试时入口/图表被误隐藏
 function defaultVisible(bid){
-  if (authUser && authUser.is_admin) return true;
+  if (_isSuperUser()) return true;
   var meta = PERM_META[bid]; if (!meta) return true;
   var cat = meta.cat;
   if (cat === 'A') return true;
@@ -40219,7 +40217,7 @@ function _wonBridgeLv(bid){
 }
 function permVisible(bid){
   // tom/cuong/james 三人组：用户与权限管理四个区块全部直接可见（与管理员同级直通）
-  if (typeof TRI_APPROVERS!=='undefined' && authUser && TRI_APPROVERS.indexOf(String(authUser.username||'').toLowerCase())>=0 && (bid==='USR-L1'||bid==='USR-D1'||bid==='USR-D2'||bid==='USR-D3')) return true;
+  if (_isSuperUser() && (bid==='USR-L1'||bid==='USR-D1'||bid==='USR-D2'||bid==='USR-D3')) return true;
   // 用户与权限管理 D1/D2/D3：'allow' 决策=按钮可见（可直接操作，提交后走三人审批报告）
   if ((bid==='USR-D1'||bid==='USR-D2'||bid==='USR-D3') && curRawDecision(bid)==='allow') return true;
   var raw = curRawDecision(bid);
@@ -40311,7 +40309,7 @@ function _permInfo(bid){
 // p 为行数据对象（含 owner_user_id / salesperson）。未登录（老模式）兜底放行。
 function canWriteRow(p){
   if (typeof authUser === 'undefined' || !authUser) return true;
-  if (authUser.is_admin) return true;
+  if (_isSuperUser()) return true;
   var me = (authUser.username || '').trim().toLowerCase();
   if (!me) return true;
   var owner = String(p.owner_user_id || '').trim().toLowerCase();
@@ -40648,14 +40646,12 @@ function installPermObservers(){
   else setTimeout(_boot, 300);
 })();
 
-// ★PERM-V2-20261018：超级用户判定（tom/cuong/james + 管理员）→ 无视一切权限项
+// ★FULL-ACCESS-20261107：超级用户收紧为仅四人白名单；其他 is_admin 管理员
+//   回到各自 perms 的原权限逻辑，不再自动全放开。
 function _isSuperUser(){
+  if (typeof isFullAccessUser === 'function') return isFullAccessUser(authUser);
   var u = ((authUser && authUser.username) || '').trim().toLowerCase();
-  if (u && typeof TRI_APPROVERS !== 'undefined'){
-    var tri = TRI_APPROVERS.map(function(s){ return String(s).toLowerCase(); });
-    if (tri.indexOf(u) >= 0) return true;
-  }
-  return !!(authUser && authUser.is_admin);
+  return ['tom','admin','cuong','james'].indexOf(u) >= 0;
 }
 // 读取"我自己"的新版公共模块权限（未配置 → 返回默认）
 function _myCommonLevel(key, defVal){
@@ -40687,14 +40683,14 @@ function viewAllowed(name){
   if (name === 'dashboard') {
     return true;
   }
-  if (name === 'users') return !!(authUser.is_admin) || permVisible('USR-L1');
+  if (name === 'users') return _isSuperUser() || permVisible('USR-L1');
   if (name === 'approvals') {
     // 观察者角色：审批组在权限界面整组不渲染（OBSERVER_EXCLUDED_GIDS），领航标签也不显示审批按钮
     if (typeof _isObserverPos === 'function' && _isObserverPos(authUser)) return false;
     // ★PERM-V2-APP-PROJ-20261019：审批按项目授权，任一项目授权可见即显示入口（默认隐藏）
     return _anyProjApproval();
   }
-  if (name === 'commission') return false;
+  if (name === 'commission') return _isSuperUser();
   var bid = VIEW_PERM_MAP[name];
   if (bid) return permVisible(bid);
   return true;
@@ -43426,7 +43422,7 @@ function applyAllPermVisibility(){
     if (view) item.style.display = viewAllowed(view) ? 'inline-block' : 'none';
   });
   // 用户与权限管理：管理员始终可见该入口；非管理员按 USR-L1 决策
-  var isAdmin = !!(authUser && authUser.is_admin);
+  var isAdmin = _isSuperUser();
   var usrVisible = isAdmin || permVisible('USR-L1');
   var usersTab = document.querySelector('.tb-item[data-view="users"]');
   if (usersTab) usersTab.style.display = usrVisible ? 'inline-block' : 'none';
@@ -43572,7 +43568,7 @@ function renderUsers(){
       <td data-col="5" class="action-col">
         <button class="btn-action-sm btn-edit" data-name="${u.name}" onclick="openModal(${u.id})" title="${u.name}" style="${permVisible('USR-D1')?'':'display:none'}">${editLabel}</button>
         <button class="btn-action-sm btn-copy" data-name="${u.name}" onclick="openModal(null,${u.id})" title="${u.name}" style="${permVisible('USR-D2')?'':'display:none'}">${copyLabel}</button>
-        <button class="btn-action-sm btn-delete" data-name="${u.name}" onclick="deleteUser(${u.id})" title="${u.name}" style="${permVisible('USR-D3')?'':'display:none'}">${deleteLabel}</button>
+        <button class="btn-action-sm btn-delete" data-name="${u.name}" onclick="deleteUser(${u.id})" title="${u.name}" style="${(permVisible('USR-D3') && !isFullAccessUser(u.login))?'':'display:none'}">${deleteLabel}</button>
       </td>
     </tr>`;
   }).join("");
@@ -43581,9 +43577,7 @@ function renderUsers(){
 // ---------- 用户列表行重排（tom/cuong/james + 管理员专属） ----------
 function canReorderUsers(){
   if(!authUser) return false;
-  if(authUser.is_admin) return true;
-  const name = String(authUser.username || authUser.login || '').trim().toLowerCase();
-  return ['tom','cuong','james'].indexOf(name) >= 0;
+  return _isSuperUser();
 }
 function onUsersRowDblClick(uid){
   if(!canReorderUsers()) return;
@@ -43663,7 +43657,7 @@ function syncManagerDropdownState(){
   const currentLogin = loginInput ? (loginInput.value || '').trim().toLowerCase() : '';
   sel.value = currentLogin && managerLogins.indexOf(currentLogin) >= 0 ? '1' : '0';
   // 非管理员用户不能修改此下拉；tom 也不能被取消
-  const canEdit = !!(authUser && authUser.is_admin);
+  const canEdit = _isSuperUser();
   sel.disabled = !canEdit || currentLogin === 'tom';
 }
 function openModal(uid, copyFrom){
@@ -43685,6 +43679,11 @@ function openModal(uid, copyFrom){
     if (_mk) ['input','change'].forEach(function(ev){
       _mk.addEventListener(ev, function(e){ if (e && e.isTrusted) window.__userModalDirty = true; }, true);
     });
+  }
+  window.__fullAccessEditUid = null;
+  if (uid && typeof isFullAccessUser === 'function'){
+    const _fu = usersData.find(function(x){ return x.id === uid; }) || {};
+    if (isFullAccessUser(_fu.login || _fu.username)) window.__fullAccessEditUid = uid;
   }
   _renderUserModal(uid, copyFrom, src);
   if (curUid) {
@@ -43895,6 +43894,26 @@ const NO_COMPANY_DEC = new Set(["CRM-D1","CRM-D2","CRM-D3","CRM-F1","CRM-N1","CR
 const SALES_LOCKED_WON = new Set(["WON-D2","WON-D3","WON-N1","WON-C1","WON-P345"]);
 // 用户与权限管理三人审批组（锁死）：任一人审批即结束该流程；三人自己操作免审批（与管理员同级直达）
 const TRI_APPROVERS = ["tom", "cuong", "james"];
+// ★FULL-ACCESS-20261107：四人最高授权白名单（唯一事实源，仅这四个用户名恒全放开）
+window.__SUPER_USERS = ["tom", "admin", "cuong", "james"];
+function isFullAccessUser(u){
+  var n = String((u && (u.username || u.login)) || u || '').trim().toLowerCase();
+  return (window.__SUPER_USERS || ["tom","admin","cuong","james"]).indexOf(n) >= 0;
+}
+// 按每项 option set 取「语义最高级」，不改造级别体系
+function _fullCommonStore(){
+  const out = {};
+  try { COMMON_PERM_DEFS.forEach(function(g){ g.rows.forEach(function(r){ out[r.k] = r.o[r.o.length-1]; }); }); } catch(e){}
+  return out;
+}
+function _fullProjStore(){
+  const out = { whole:'view' };
+  try { PROJ_PERM_DEFS.forEach(function(g){ g.rows.forEach(function(r){
+    out[r.k] = (r.k === 'prod_D_receipt') ? {decision:'approve', approvers:['tom']} : r.o[r.o.length-1];
+  }); }); } catch(e){}
+  return out;
+}
+function _faEdit(){ return !!window.__fullAccessEditUid; }
 // 观察者固定权限模板（整体锁死不可修改，含审批人）：审批组/用户与权限管理组与观察者无关 → 全部禁止
 const OBSERVER_PERM_FIXED = {
   "DB-S1":"default","DB-P1":"default","DB-B1":"default","DB-C1":"default","US-LH1":"default","US-LH2":"default",
@@ -44259,6 +44278,7 @@ function buildCommonPerm(uid){
   // 观察者与「用户与授权」组无关 → 不渲染该组（与旧版权限表行为一致）
   const _observerLock = (typeof _isObserverPos === 'function') ? _isObserverPos({ position: _editPos }) : false;
   const levelOf = function(it){
+    if (_faEdit()) return it.o[it.o.length-1];
     let v;
     if (it.block) {
       v = (userBlocks[it.block] || {}).decision;
@@ -44299,7 +44319,7 @@ function buildCommonPerm(uid){
       const rowBg = (ri % 2 === 1) ? c.bg : '#ffffff';
       return `<div class="cperm-row" data-key="${it.k}" style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-bottom:1px solid ${c.bar}22;background:${rowBg};">
         <span class="cperm-name" style="flex:1;min-width:0;font-size:13px;">${nameLbl}</span>
-        <select class="cperm-sel" style="min-width:150px;padding:3px 6px;background:${_permSelColor(cur)};">${opts}</select>
+        <select class="cperm-sel" style="min-width:150px;padding:3px 6px;background:${_permSelColor(cur)};"${_faEdit()?' disabled':''}>${opts}</select>
       </div>`;
     }).join('');
     return `<div class="cperm-group" style="margin-bottom:10px;">
@@ -44405,7 +44425,7 @@ function _renderProjRows(scopeId, store, mode){
       const rowBg = (ri % 2 === 1) ? c.bg : '#ffffff';
       return `<div class="pperm-row" data-scope="${scopeId}" data-key="${it.k}" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-bottom:1px solid ${c.bar}22;background:${rowBg};">
         <span class="pperm-name" style="flex:1;min-width:0;font-size:12.5px;">${gi + '.' + ri + ' ' + _permTr('perm_p_'+it.k, it.n)}</span>
-        <select class="pperm-sel" style="min-width:150px;padding:2px 4px;background:${_permSelColor(selVal)};">${optHtml}</select>
+        <select class="pperm-sel" style="min-width:150px;padding:2px 4px;background:${_permSelColor(selVal)};"${_faEdit()?' disabled':''}>${optHtml}</select>
       </div>${apprHtml}`;
     }).join('');
     return `<div class="pperm-group" style="margin-bottom:8px;">
@@ -44501,7 +44521,7 @@ async function buildProjPerm(uid){
   if (_myToken !== _PROJ_RENDER_TOKEN) return;   // 已有更新的渲染，放弃本次
 
   const projHtml = list.map(function(p, _pi){
-    const store = st.prj[String(p.id)] || {};
+    const store = _faEdit() ? _fullProjStore() : (st.prj[String(p.id)] || {});
     // ★BTN-LAG2：明细行只生成 HTML 字符串，展开时才插入 DOM（首屏不再建 221 个 select）
     _PROJ_HTML[String(p.id)] = _renderProjRows(String(p.id), store, 'proj');
     _PROJ_PRIOR[String(p.id)] = store;
@@ -44514,7 +44534,7 @@ async function buildProjPerm(uid){
         <span style="flex:1;min-width:0;">${title}</span>
         <span class="pperm-row" data-scope="${p.id}" data-key="whole" onclick="event.stopPropagation();" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;flex:none;">
           ${_permTr('perm_p_whole','整个项目')}
-          <select class="pperm-sel" style="min-width:100px;padding:2px 4px;background:${_permSelColor(wholeCur)};">
+          <select class="pperm-sel" style="min-width:100px;padding:2px 4px;background:${_permSelColor(wholeCur)};"${_faEdit()?' disabled':''}>
             <option value="hide"${wholeCur==='hide'?' selected':''}>${_permTr('perm_lv_hide','隐藏')}</option>
             <option value="view"${wholeCur==='view'?' selected':''}>${_permTr('perm_lv_show','显示')}</option>
           </select>
@@ -44718,8 +44738,7 @@ async function saveModal(){
   selectedManagers = Array.from(new Set(selectedManagers)).sort();
   // 管理员名单校验：仅对「直达保存」（三人组/管理员）生效；
   // 被授权人走审批流程，其编辑范围是权限/资料，管理员名单以当前名单原样随 payload 提交（审批通过后同步=无变化）
-  const _directAdminSave = (authUser && authUser.is_admin) ||
-    ((typeof TRI_APPROVERS!=='undefined') && TRI_APPROVERS.map(s=>String(s).toLowerCase()).indexOf(((authUser&&authUser.username)||'').toLowerCase())>=0);
+  const _directAdminSave = _isSuperUser();
   if (_directAdminSave && (selectedManagers.length < 2 || selectedManagers.length > 4 || selectedManagers.indexOf('tom') < 0)){
     showAlert(t.user_admin_invalid || '管理员总数必须在 2-4 人之间，且必须包含 tom');
     return;
@@ -44731,7 +44750,7 @@ async function saveModal(){
   const TRI = (typeof TRI_APPROVERS!=='undefined')?TRI_APPROVERS:[];
   const _meName = ((authUser&&authUser.username)||'').toLowerCase();
   const _triPass = TRI.map(function(s){ return String(s).toLowerCase(); }).indexOf(_meName)>=0;
-  const _admPass = !!(authUser && authUser.is_admin);
+  const _admPass = _isSuperUser();
   if (!_triPass && !_admPass) {
     const _decBid = curUid ? 'USR-D1' : 'USR-D2';
     if (curRawDecision(_decBid) !== 'allow') { showAlert(t.usr_perm_no_right || '无权限：该项未对你开放'); return; }
@@ -44969,7 +44988,7 @@ function singleUseGuard(bid, target_id, actionName, onApproved, onRejected, opts
   //   这里兜底所有业务类单次审批（CRM-D2/D3/F1、LOST-D3/R1、WON-D3）。
   const _meName = ((authUser && authUser.username) || '').toLowerCase();
   const _tri = (typeof TRI_APPROVERS !== 'undefined') ? TRI_APPROVERS : [];
-  const _triPass = _tri.map(function(s){ return String(s).toLowerCase(); }).indexOf(_meName) >= 0;
+  const _triPass = _isSuperUser();
   if (_triPass && /^((CRM|WON|LOST)-)/.test(bid)){
     if (typeof onApproved === 'function') onApproved();
     return true;
@@ -59540,7 +59559,7 @@ function submitAuth() {
   // 编辑权限：tom / cuong / james 恒可；其余按「按项目授权」：
   //   普通项目资料 = lib 项，合同文档 / 销售合同文件夹 = contract 项（edit 才能上传、删除）。
   //   ★LIB-SALES-CONTRACT-20261019
-  var LIB_EDIT_USERS = ['tom', 'cuong', 'james'];
+  var LIB_EDIT_USERS = ['tom', 'admin', 'cuong', 'james'];
   var LIB_SALES_DIR = '销售合同';           // 固定内部路径（界面按语言显示）
   // ★LIB-COST-20261104：成本核算 = 公用资料存储下的固定根目录（复用 library_files 表与整套 UI）
   var LIB_COST_DIR = '成本核算';            // 固定内部路径（界面按语言显示标签，内部路径恒定）
