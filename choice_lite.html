@@ -6000,7 +6000,7 @@ var WL_FLOW_IMG = {
       .prod-report-sec{margin-top:14px;}
       .prod-report-sec-t{font-size:13px;font-weight:700;color:#E53935;border-left:4px solid #E53935;padding-left:8px;margin-bottom:8px;}
       .prod-report-tbl{width:100%;border-collapse:collapse;font-size:11px;}
-      .prod-report-tbl th,.prod-report-tbl td{border:1px solid #e6e6e6;padding:4px 6px;text-align:right;white-space:nowrap;}
+      .prod-report-tbl th,.prod-report-tbl td{border:1px solid #000;padding:4px 6px;text-align:right;white-space:nowrap;}
       /* ★PROD-REPORT-STYLE-20261107：表头红底白字；行斑马线 白/淡蓝；合计行保持淡红 */
       .prod-report-tbl th{background:#E53935;color:#fff;font-weight:600;text-align:center;}
       .prod-report-tbl tbody tr{background:#fff;}
@@ -9611,11 +9611,10 @@ var WL_FLOW_IMG = {
         /* ★PROD-REPORT-INLINE-20261107：报告直接挂在按钮下方（不再弹模态框），右侧 +/− 可折叠 */
         + '<div class="prod-report-inline">'
         +   '<div class="prod-report-inline-head">'
-        +     '<button class="prod-btn" type="button" style="display:inline-block;background:#E53935;color:#fff;border-color:#E53935;font-weight:600;" data-i18n="btn_report" onclick="prodReportOpen()">'+pt('btn_report')+'</button>'
-        +     '<button type="button" id="prod_report_toggle" class="inst-vis-toggle" style="margin-left:0" onclick="prodReportToggle()" title="'+prod_esc(pt('btn_expand_all'))+'">+</button>'
+        +     '<div class="prod-sec-title" style="margin:0;" data-i18n="rpt_title">'+prod_esc(pt('rpt_title'))+'</div>'
+        +     '<button type="button" id="prod_report_toggle" class="inst-vis-toggle" style="margin-left:auto" onclick="prodReportToggle()" title="'+prod_esc(pt('btn_expand_all'))+'">+</button>'
         +   '</div>'
         +   '<div id="prod_report_panel" class="prod-report-panel" style="display:none">'
-        +     '<div class="prod-report-panel-title" data-i18n="rpt_title">'+prod_esc(pt('rpt_title'))+'</div>'
         +     '<div class="modal-body prod-report-body" id="prod_report_body"></div>'
         +   '</div>'
         + '</div>';
@@ -9763,8 +9762,9 @@ var WL_FLOW_IMG = {
     function prodReportSetCur(c, btn){
       PROD_REPORT_CUR=c;
       document.querySelectorAll('.prc-btn').forEach(function(b){ b.classList.remove('on'); });
-      btn.classList.add('on');
-      prodReportRenderBody();
+      if(btn) btn.classList.add('on');
+      /* ★PERF-CUR-20261107：先让按钮高亮态立刻上屏，再在下一帧重建表格/图表——点击瞬间有反馈，不再卡顿 */
+      requestAnimationFrame(function(){ setTimeout(prodReportRenderBody, 0); });
     }
     function prodReportClose(){
       PROD_REPORT_OPEN=false;
