@@ -39062,6 +39062,14 @@ function __langGuard(snap){
 function setLangDebug(lang) {
   if(!I18N[lang]) { console.warn('[lang] unsupported:', lang); return; }
 
+  // ★USR-CTX-LANG-20261107：切语言期间给「用户右键弹跳框」上保护窗口。
+  // 与 initUsrCtx 的 outside-close 排除规则配套：scroll/resize/重渲染不得把弹跳框关掉。
+  try {
+    var _ucPop0 = document.getElementById('usrCtxPop');
+    window.__usrCtxWasOpenAtSwitch = !!window.__usrCtxWasOpenAtSwitch || !!(_ucPop0 && _ucPop0.style.display === 'block');
+    window.__usrCtxLangGuardUntil = Math.max(Date.now() + 1200, window.__usrCtxLangGuardUntil || 0);
+  } catch(e){}
+
   // ---- 第零步：备注三语快照（切语言前，此时 CUR_LANG 还是旧语言）----
   // 未保存的可见框输入先归属到旧语言 hidden，防止重渲染丢失
   var __rmSnapWon = null, __rmSnapCrm = null;
@@ -39115,6 +39123,9 @@ function setLangDebug(lang) {
     document.querySelectorAll('.inst-del-pop').forEach(function(el){
       __langPreserveList.push({type:'style', el:el, display:'block'});
     });
+    // ★USR-CTX-LANG-20261107：用户右键删除弹跳框同样纳入「切语言保活」清单
+    var _ucKeep = document.getElementById('usrCtxPop');
+    if (_ucKeep && _ucKeep.style.display === 'block') __langPreserveList.push({type:'style', el:_ucKeep, display:'block'});
   } catch(e) {}
   window.__langPreserveList = __langPreserveList;
 
@@ -39313,6 +39324,9 @@ function setLangDebug(lang) {
     }
   }
   __restoreLangPreserve();
+  // ★USR-CTX-LANG-20261107：setLangDebug 是切语言唯一必经之路，这里显式保活弹跳框
+  // （不依赖 app:langchange 监听是否注册/事件时序），只原地刷新文字、按保存坐标显示。
+  try { if (typeof window.__usrCtxLocalize === 'function') window.__usrCtxLocalize(); } catch(e){}
 
   // ---- 语言切换后：全局恢复表单字段 + 强制校验（锁死，仅 console 报错）----
   try {
@@ -43599,6 +43613,9 @@ function renderUsers(){
   }
   function L(k){
     var fb = (FB[k] || [k,k,k])[langIdx()];
+    // ★USR-CTX-LANG-20261107：优先直读 I18N[CUR_LANG]，不经过 T() 代理缓存。
+    // setLangDebug 先派发 app:langchange、后清 _tI18nProxyCache，走 T() 会拿到旧语言文案。
+    try { var _I = window.I18N, _lg = window.CUR_LANG; if (_I && _I[_lg] && _I[_lg][k] != null) return _I[_lg][k]; } catch(e){}
     try { var t = (typeof T === 'function') ? T() : null; if (t && t[k]) return t[k]; } catch(e){}
     return fb;
   }
@@ -43652,7 +43669,7 @@ function renderUsers(){
       cfm = pop.querySelector('#usrCtxConfirm'), del = pop.querySelector('#usrCtxDel'),
       cancel = pop.querySelector('#usrCtxCancel'), msg = pop.querySelector('#usrCtxMsg'),
       noBtn = pop.querySelector('#usrCtxNo'), yesBtn = pop.querySelector('#usrCtxYes');
-  var curId = null, curUser = null, state = 'menu';
+  var curId = null, curUser = null, state = 'menu', usrCtxPos = null;
 
   function userName(){ return (curUser && (curUser.name || curUser.login)) || ''; }
   function isProtected(){
@@ -43682,8 +43699,34 @@ function renderUsers(){
     if (top + h > window.innerHeight - 8) top = window.innerHeight - h - 8;
     pop.style.left = Math.max(4, left) + 'px';
     pop.style.top = Math.max(4, top) + 'px';
+    // ★USR-CTX-LANG-20261107：记住首次打开的坐标（切语言只原地刷新文字，绝不重算位置）
+    usrCtxPos = { left:pop.style.left, top:pop.style.top };
+    window.__usrCtxPos = usrCtxPos;
+    window.__usrCtxOpen = true;
+    window.__usrCtxWasOpenAtSwitch = false;
   }
-  function hide(){ pop.style.display = 'none'; state = 'menu'; }
+  /* ★USR-CTX-LANG-20261107（用户 2026-11-07 要求：切语言时弹跳框不能丢失）
+     三道防线：①点语言按钮的 mousedown 不触发 outside-close；
+     ②语言切换窗口内 scroll/resize/外部 mousedown 一律不自动关闭；
+     ③即使被其它逻辑隐藏/摘除，__usrCtxLocalize 也只按保存坐标把【同一个节点】挂回并原地刷新文字。
+     绝不删除重建、绝不 getBoundingClientRect 重算坐标。 */
+  function hide(force){
+    if (!force && window.__usrCtxWasOpenAtSwitch && Date.now() < (window.__usrCtxLangGuardUntil || 0)) return;
+    pop.style.display = 'none'; state = 'menu';
+    window.__usrCtxOpen = false;
+    window.__usrCtxWasOpenAtSwitch = false;
+  }
+  window.__usrCtxLocalize = function(){
+    if (!window.__usrCtxWasOpenAtSwitch && !window.__usrCtxOpen) return;
+    if (!pop.parentNode) document.body.appendChild(pop);   // 同一个节点挂回，不重建
+    if (usrCtxPos || window.__usrCtxPos){
+      var _p = usrCtxPos || window.__usrCtxPos;
+      pop.style.left = _p.left; pop.style.top = _p.top;
+    }
+    pop.style.display = 'block';
+    window.__usrCtxOpen = true;
+    refreshText();   // 原地换文字，保留 state(menu/confirm)/curId/curUser
+  };
 
   document.addEventListener('contextmenu', function(e){
     var tr = (e.target && e.target.closest) ? e.target.closest('#usersTbody tr[data-id]') : null;
@@ -43700,10 +43743,10 @@ function renderUsers(){
   }, true);
 
   del.onclick = function(){ if (state !== 'menu' || isProtected()) return; state = 'confirm'; refreshText(); };
-  cancel.onclick = hide;
-  noBtn.onclick = hide;
+  cancel.onclick = function(){ hide(true); };
+  noBtn.onclick = function(){ hide(true); };
   yesBtn.onclick = function(){
-    if (state !== 'confirm' || isProtected()) { hide(); return; }
+    if (state !== 'confirm' || isProtected()) { hide(true); return; }
     var id = curId;
     fetch('/api/users/' + Number(id), { method:'DELETE', headers:(typeof authHeaders==='function'?authHeaders():{}) })
       .then(function(r){ return r.json(); })
@@ -43716,19 +43759,29 @@ function renderUsers(){
         }
       })
       .catch(function(){ if (typeof showToast === 'function') showToast(L('users_delete_failed')); });
-    hide();
+    hide(true);
   };
   document.addEventListener('mousedown', function(e){
     if (pop.style.display === 'none') return;
     if (pop.contains(e.target)) return;
+    // ★USR-CTX-LANG-20261107：点语言切换按钮绝不关闭弹跳框（根因：原 outside-close 抢在 setLangDebug 之前）
+    if (e.target && e.target.closest && e.target.closest(
+        '#langSwitch, #loginLangSwitch, .lang-switch, .login-lang-switch, [onclick*="setLangDebug"]')) {
+      window.__usrCtxWasOpenAtSwitch = true;
+      window.__usrCtxLangGuardUntil = Date.now() + 1500;
+      return;
+    }
     hide();
   }, true);
-  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') hide(); }, true);
-  window.addEventListener('resize', hide);
-  window.addEventListener('scroll', hide, true);
-  // 语言切换：只原地刷新文字，不删除/重建弹跳框、不重算坐标
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') hide(true); }, true);
+  window.addEventListener('resize', function(){ hide(); });
+  window.addEventListener('scroll', function(){ hide(); }, true);
+  // 语言切换：只原地刷新文字 + 按保存坐标保活，不删除/重建弹跳框、不重算坐标
   window.addEventListener('app:langchange', function(){
-    if (pop.style.display !== 'none') refreshText();
+    try { if (typeof window.__usrCtxLocalize === 'function') window.__usrCtxLocalize(); } catch(e){}
+    // 切语言过程中若有延迟重渲染再次动到弹窗，做两次滞后兜底（仍只原地刷新）
+    setTimeout(function(){ try { if (typeof window.__usrCtxLocalize === 'function') window.__usrCtxLocalize(); } catch(e){} }, 0);
+    setTimeout(function(){ try { if (typeof window.__usrCtxLocalize === 'function') window.__usrCtxLocalize(); } catch(e){} }, 320);
   });
 })();
 
@@ -49656,6 +49709,59 @@ function slatsApplyLowerState(tr){
     else { inp.readOnly=true; inp.disabled=true; cell.classList.add('slats-spec-disabled'); }
   });
 }
+
+/* ★SLATS-SOLID-HL-20261107（用户 2026-11-07 指定）：
+   「实心板?」选 YES 时，该行从 长/宽/高(oci=8) 到 实心板列(单层22/双层28)
+   的所有数据（输入框 + 计算值 + 下拉）统一红色加粗；不含左侧序号/猪舍列与右侧操作列。
+   纯显示层：只加/去 class，不改任何值、不写库、不影响 serialize。 */
+function slatsSolidOci(tr){ return slatsIsDualRow(tr) ? 28 : 22; }
+function slatsEnsureSolidCss(){
+  if (window.__slatsSolidCss || !document.head) return;
+  window.__slatsSolidCss = true;
+  var st = document.createElement('style');
+  st.id = 'slatsSolidHlStyle';
+  st.textContent =
+    '.slats-spec-table td.slats-solid-hl,' +
+    '.slats-spec-table td.slats-solid-hl input,' +
+    '.slats-spec-table td.slats-solid-hl select,' +
+    '.slats-spec-table td.slats-solid-hl span,' +
+    '.slats-spec-table td.slats-solid-hl input.slats-default-value' +
+    '{color:#ff0000 !important;font-weight:700 !important;}' +
+    '.slats-spec-table td.slats-solid-hl.slats-spec-disabled{opacity:1 !important;}';
+  document.head.appendChild(st);
+}
+function slatsApplySolidRowStyle(tr){
+  if (!tr) return;
+  slatsEnsureSolidCss();
+  var end = slatsSolidOci(tr);
+  var sel = tr.querySelector('td[data-oci="' + end + '"] select');
+  var yes = !!(sel && String(sel.value || '').trim().toUpperCase() === 'YES');
+  for (var ci = 8; ci <= end; ci++) {
+    var td = tr.querySelector('td[data-oci="' + ci + '"]');
+    if (!td) continue;
+    if (yes) td.classList.add('slats-solid-hl');
+    else td.classList.remove('slats-solid-hl');
+  }
+}
+function slatsApplySolidAllStyles(){
+  var root = document.querySelector('.slats-spec-table');
+  if (!root) return;
+  var trs = root.querySelectorAll('tbody tr');
+  Array.prototype.forEach.call(trs, slatsApplySolidRowStyle);
+}
+if (!window.__slatsSolidBound) {
+  window.__slatsSolidBound = true;
+  document.addEventListener('change', function(e){
+    var sel = e.target;
+    if (!sel || sel.tagName !== 'SELECT' || !sel.closest) return;
+    var td = sel.closest('td[data-oci]');
+    if (!td) return;
+    var tr = td.closest('tr');
+    if (!tr || !tr.closest || !tr.closest('.slats-spec-table')) return;
+    if (Number(td.getAttribute('data-oci')) !== slatsSolidOci(tr)) return;
+    slatsApplySolidRowStyle(tr);
+  }, true);
+}
 function slatsOnLayersChange(){
   var data=slatsSpecSerialize();
   data.forEach(function(r){
@@ -49687,6 +49793,7 @@ function slatsRenderAll(rows){
   slatsRecalcAll();
   slatsUpdateFirstRowDelete();
   if(typeof fitSlatsSpecTable==='function'){ try{ fitSlatsSpecTable(); }catch(e0){} }
+  if(typeof slatsApplySolidAllStyles==='function'){ try{ slatsApplySolidAllStyles(); }catch(e0){} }
 }
 
 function slatsBuildRow(dual, groupId, idx, values){
@@ -49749,6 +49856,7 @@ function slatsBuildRow(dual, groupId, idx, values){
   }
   slatsApplyDefaultState(tr);
   slatsApplyLowerState(tr);
+  slatsApplySolidRowStyle(tr);
   return tr;
 }
 function slatsApplyDefaultState(tr){
