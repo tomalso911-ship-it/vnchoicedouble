@@ -4489,6 +4489,9 @@ window.__finShakeReport = function (ms) {
       .wl-cal-sel{background:#E53935;color:#fff;font-weight:700;}
       .wl-cal-dot{position:absolute;right:6px;bottom:5px;width:6px;height:6px;border-radius:50%;background:#E53935;}
       .wl-cal-sel .wl-cal-dot{background:#fff;}
+      /* ★WL-CAL-FUTURE-20261107：今天之后的日期灰色、不可选（重要级压过 hover/sel） */
+      .wl-cal-cell.wl-cal-future{color:#b6bec7 !important;background:#f2f4f6 !important;border-color:#eceff2 !important;cursor:not-allowed;pointer-events:none;}
+      .wl-cal-cell.wl-cal-future .wl-cal-dot{display:none;}
       .wl-cal-compact .wl-cal{width:430px;max-width:100%;padding:10px 14px;box-shadow:none;border-color:#e8edf2;}
       .wl-cal-compact .wl-cal-cell{padding:6px 0;font-size:12.5px;border-radius:6px;}
       .wl-cal-compact .wl-cal-wk{font-size:11.5px;padding:3px 0;}
@@ -4745,13 +4748,18 @@ window.__finShakeReport = function (ms) {
       wl_renderDaily();
     }
     function wl_pickDate(dmy){
+      // ★WL-CAL-FUTURE-20261107：兜底拦截，任何入口都不允许把报告日期切到未来
+      if(dmyToYmd(dmy) > prod_today()) return;
       WL_CUR_DATE = dmy;
       var p = dmy.split('/'); WL_CAL_MONTH = { y:+p[2], m:+p[1]-1 };
       wl_renderDaily();
     }
     function wl_repStep(dir){
       var f = wl_factory(); if(!f) return;
-      var dates = wl_reportDates(f); if(!dates.length) return;
+      // ★WL-CAL-FUTURE-20261107：上/下一天只在「今天及之前」的有记录日期间移动
+      var tYmd = prod_today();
+      var dates = wl_reportDates(f).filter(function(d){ return dmyToYmd(d) <= tYmd; });
+      if(!dates.length) return;
       var idx = dates.indexOf(WL_CUR_DATE);
       if(idx<0){ WL_CUR_DATE = dates[0]; }
       else { var ni = idx - dir; if(ni<0) ni=0; if(ni>=dates.length) ni=dates.length-1; WL_CUR_DATE = dates[ni]; }
@@ -4762,18 +4770,23 @@ window.__finShakeReport = function (ms) {
       var daysInMonth = new Date(ym.y, ym.m+1, 0).getDate();
       var startDay = new Date(ym.y, ym.m, 1).getDay();
       var lead = (startDay+6)%7;
-      var todayDmy = ymdToDmy(prod_today());
+      var todayYmd = prod_today();
+      var todayDmy = ymdToDmy(todayYmd);
       var has = {}; dates.forEach(function(d){ has[d]=1; });
       var cells='';
       for(var i=0;i<lead;i++) cells += '<div class="wl-cal-cell wl-cal-empty"></div>';
       for(var d=1; d<=daysInMonth; d++){
         var dd=(d<10?'0':'')+d; var dm=(ym.m+1<10?'0':'')+(ym.m+1);
         var dmy = dd+'/'+dm+'/'+ym.y;
+        // ★WL-CAL-FUTURE-20261107：今天之后 = 灰色 + 不写 onclick（含今天可选）
+        var isFuture = (ym.y+'-'+dm+'-'+dd) > todayYmd;
         var cls='wl-cal-cell';
         if(dmy===todayDmy) cls+=' wl-cal-today';
-        if(dmy===WL_CUR_DATE) cls+=' wl-cal-sel';
-        var dot = has[dmy] ? '<span class="wl-cal-dot"></span>' : '';
-        cells += '<div class="'+cls+'" data-dmy="'+dmy+'" onclick="wl_pickDate(\''+dmy+'\')">'+d+dot+'</div>';
+        if(dmy===WL_CUR_DATE && !isFuture) cls+=' wl-cal-sel';
+        if(isFuture) cls+=' wl-cal-future';
+        var dot = (!isFuture && has[dmy]) ? '<span class="wl-cal-dot"></span>' : '';
+        var click = isFuture ? '' : ' onclick="wl_pickDate(\''+dmy+'\')"';
+        cells += '<div class="'+cls+'" data-dmy="'+dmy+'"'+click+'>'+d+dot+'</div>';
       }
       var wk = String(wl_i18n('wl_week_min','一,二,三,四,五,六,日')).split(',');
       var head = wk.map(function(w){ return '<div class="wl-cal-wk">'+w+'</div>'; }).join('');
@@ -4842,7 +4855,11 @@ window.__finShakeReport = function (ms) {
       var f = wl_factory();
       if(!f){ body.innerHTML='<div class="wl-empty">'+wl_i18n('wl_rep_no_data')+'</div>'; return; }
       var dates = wl_reportDates(f);
-      if(!WL_CUR_DATE){ WL_CUR_DATE = dates.length ? dates[0] : ymdToDmy(prod_today()); }
+      // ★WL-CAL-FUTURE-20261107：默认落在最近一条「今天及之前」的记录；脏数据里的未来日期夹回今天
+      var tYmd = prod_today();
+      var past = dates.filter(function(d){ return dmyToYmd(d) <= tYmd; });
+      if(!WL_CUR_DATE){ WL_CUR_DATE = past.length ? past[0] : ymdToDmy(tYmd); }
+      if(dmyToYmd(WL_CUR_DATE) > tYmd) WL_CUR_DATE = ymdToDmy(tYmd);
       if(!WL_CAL_MONTH){ var p=WL_CUR_DATE.split('/'); WL_CAL_MONTH={ y:+p[2], m:+p[1]-1 }; }
       WL_CHARTS = [];
       body.innerHTML = '<div id="wl-report"></div>';
