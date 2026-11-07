@@ -7423,8 +7423,17 @@ var WL_FLOW_IMG = {
         var mesh=_num(r.mesh_layers);
         var kLen=String(r.rebar_size_len||'').replace(/[^0-9.]/g,'');
         var kWid=String(r.rebar_size_wid||'').replace(/[^0-9.]/g,'');
-        if(kLen && SLATS_REBAR_WEIGHT[kLen]!==undefined){ var lm=((L-100)/1000)*_num(r.bar_len)*mesh*qty; o.rebar[kLen]+=lm; sizeMeters[kLen]+=lm; }
-        if(kWid && SLATS_REBAR_WEIGHT[kWid]!==undefined){ var wm=((W-80)/1000)*_num(r.bar_wid)*mesh*qty; o.rebar[kWid]+=wm; sizeMeters[kWid]+=wm; }
+        var kLen2=String(r.rebar_size_len2||'').replace(/[^0-9.]/g,'');
+        var kWid2=String(r.rebar_size_wid2||'').replace(/[^0-9.]/g,'');
+        if(_num(r.mesh_layers)===2){
+          if(kLen && SLATS_REBAR_WEIGHT[kLen]!==undefined){ var lm=((L-100)/1000)*_num(r.bar_len)*qty; o.rebar[kLen]+=lm; sizeMeters[kLen]+=lm; }
+          if(kWid && SLATS_REBAR_WEIGHT[kWid]!==undefined){ var wm=((W-80)/1000)*_num(r.bar_wid)*qty; o.rebar[kWid]+=wm; sizeMeters[kWid]+=wm; }
+          if(kLen2 && SLATS_REBAR_WEIGHT[kLen2]!==undefined){ var lm2=((L-100)/1000)*_num(r.bar_len2)*qty; o.rebar[kLen2]+=lm2; sizeMeters[kLen2]+=lm2; }
+          if(kWid2 && SLATS_REBAR_WEIGHT[kWid2]!==undefined){ var wm2=((W-80)/1000)*_num(r.bar_wid2)*qty; o.rebar[kWid2]+=wm2; sizeMeters[kWid2]+=wm2; }
+        } else {
+          if(kLen && SLATS_REBAR_WEIGHT[kLen]!==undefined){ var lm=((L-100)/1000)*_num(r.bar_len)*mesh*qty; o.rebar[kLen]+=lm; sizeMeters[kLen]+=lm; }
+          if(kWid && SLATS_REBAR_WEIGHT[kWid]!==undefined){ var wm=((W-80)/1000)*_num(r.bar_wid)*mesh*qty; o.rebar[kWid]+=wm; sizeMeters[kWid]+=wm; }
+        }
         // 水泥/黄砂/石子：单块体积→折算标准板(1500×600×70)→耗量
         var vol=(L*W*H)/1e9, std=vol/0.063;
         o.cement+=std*24.4*qty/1000; o.sand+=std*22.6*qty/1000; o.gravel+=std*68*qty/1000;
@@ -33241,6 +33250,10 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-spec-btn-merge:hover { background: #fff3e0; border-color: #FF9800; }
 .slats-spec-select { appearance:none; -webkit-appearance:none; -moz-appearance:none; padding:2px 0; cursor:pointer; text-align:center; text-align-last:center; }
 .slats-spec-remark { text-align:left; }
+  .slats-th-up{background:#fdeef0;color:#b03a4b;}
+  .slats-th-lo{background:#e3f0fb;color:#1f6fb2;}
+  .slats-spec-sub-up input, .slats-spec-sub-up select{background:#fdeef0;}
+  .slats-spec-sub-lo input, .slats-spec-sub-lo select{background:#e3f0fb;}
 /* 猪舍后缀 + 按钮与浮层 */
 .slats-ph-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:100%;width:100%;}
 .slats-ph-wrap select.slats-spec-select{width:100%;text-align:center;text-align-last:center;}
@@ -48452,16 +48465,22 @@ function openSlatsReportModal(){
     specDist[specKey]+=qty;
     if(!matMap[specKey]) matMap[specKey]={ key:specKey, L:slatsParseNum(r.floor_len), W:slatsParseNum(r.floor_wid), H:slatsParseNum(r.floor_hgt), qty:0 };
     matMap[specKey].qty+=qty;
-    // 钢筋：L1 = (长-100)/1000 × 条/长度方向 × 钢网层数 × 数量/整场
-    //       L2 = (宽-80)/1000 × 条/宽度方向 × 钢网层数 × 数量/整场（单位：米）
+    // 钢筋用量（双层＝上层+下层分别计算后相加，不再乘钢网层数；单层＝×(钢网层数)）
     var mesh=slatsParseNum(r.mesh_layers);
+    var qtyR=slatsParseNum(r.qty_whole);
+    var flR=slatsParseNum(r.floor_len), fwR=slatsParseNum(r.floor_wid);
     var kLen=String(r.rebar_size_len||'').replace(/[^0-9.]/g,'');
-    if(kLen && SLATS_REBAR_WEIGHT[kLen]!==undefined){
-      rebarLen[kLen]+=((slatsParseNum(r.floor_len)-100)/1000)*slatsParseNum(r.bar_len)*mesh*slatsParseNum(r.qty_whole);
-    }
     var kWid=String(r.rebar_size_wid||'').replace(/[^0-9.]/g,'');
-    if(kWid && SLATS_REBAR_WEIGHT[kWid]!==undefined){
-      rebarLen[kWid]+=((slatsParseNum(r.floor_wid)-80)/1000)*slatsParseNum(r.bar_wid)*mesh*slatsParseNum(r.qty_whole);
+    var kLen2=String(r.rebar_size_len2||'').replace(/[^0-9.]/g,'');
+    var kWid2=String(r.rebar_size_wid2||'').replace(/[^0-9.]/g,'');
+    if(Number(mesh)===2){
+      if(kLen && SLATS_REBAR_WEIGHT[kLen]!==undefined) rebarLen[kLen]+=((flR-100)/1000)*slatsParseNum(r.bar_len)*qtyR;
+      if(kWid && SLATS_REBAR_WEIGHT[kWid]!==undefined) rebarLen[kWid]+=((fwR-80)/1000)*slatsParseNum(r.bar_wid)*qtyR;
+      if(kLen2 && SLATS_REBAR_WEIGHT[kLen2]!==undefined) rebarLen[kLen2]+=((flR-100)/1000)*slatsParseNum(r.bar_len2)*qtyR;
+      if(kWid2 && SLATS_REBAR_WEIGHT[kWid2]!==undefined) rebarLen[kWid2]+=((fwR-80)/1000)*slatsParseNum(r.bar_wid2)*qtyR;
+    } else {
+      if(kLen && SLATS_REBAR_WEIGHT[kLen]!==undefined) rebarLen[kLen]+=((flR-100)/1000)*slatsParseNum(r.bar_len)*mesh*qtyR;
+      if(kWid && SLATS_REBAR_WEIGHT[kWid]!==undefined) rebarLen[kWid]+=((fwR-80)/1000)*slatsParseNum(r.bar_wid)*mesh*qtyR;
     }
     totalBuildings+=bc; totalQty+=qty; totalSqm+=sqm;
   });
@@ -48475,6 +48494,7 @@ function openSlatsReportModal(){
   });
 
   // 渲染概述表（带合并单元格）
+  var rDual = slatsSpecDual(rows);
   var ovHtml='<table class="slats-report-table"><thead>'+
     '<tr>'+
     '<th rowspan="2" data-i18n="slats_table_no">'+_e(t.slats_table_no)+'</th>'+
@@ -48484,8 +48504,8 @@ function openSlatsReportModal(){
     '<th colspan="4" data-i18n="slats_table_house_info">'+_e(t.slats_table_house_info)+'</th>'+
     '<th colspan="3" data-i18n="slats_table_size_title">'+_e(t.slats_table_size_title)+'</th>'+
     '<th colspan="4" data-i18n="slats_table_usage_title">'+_e(t.slats_table_usage_title)+'</th>'+
-    '<th colspan="5" data-i18n="slats_table_rebar_title">'+_e(t.slats_table_rebar_title)+'</th>'+
-    '<th rowspan="2" data-i18n="slats_table_remark">'+_e(t.slats_table_remark)+'</th>'+
+    '<th colspan="'+(rDual?13:7)+'" data-i18n="slats_table_rebar_title">'+_e(t.slats_table_rebar_title)+'</th>'+
+    '<th rowspan="2" data-i18n="slats_solid_slat">'+_e(t.slats_solid_slat)+'</th>'+
     '</tr><tr>'+
     '<th data-i18n="slats_table_unit_per_building">'+_e(t.slats_table_unit_per_building)+'</th>'+
     '<th data-i18n="slats_table_len_unit">'+_e(t.slats_table_len_unit)+'</th>'+
@@ -48499,10 +48519,29 @@ function openSlatsReportModal(){
     '<th data-i18n="slats_table_sqm_unit">'+_e(t.slats_table_sqm_unit)+'</th>'+
     '<th data-i18n="slats_table_sqm_whole">'+_e(t.slats_table_sqm_whole)+'</th>'+
     '<th data-i18n="slats_table_mesh_layers">'+_e(t.slats_table_mesh_layers)+'</th>'+
-    '<th data-i18n="slats_table_bar_len">'+_e(t.slats_table_bar_len)+'</th>'+
-    '<th data-i18n="slats_table_rebar_size_len">'+_e(t.slats_table_rebar_size_len)+'</th>'+
-    '<th data-i18n="slats_table_bar_wid">'+_e(t.slats_table_bar_wid)+'</th>'+
-    '<th data-i18n="slats_table_rebar_size_wid">'+_e(t.slats_table_rebar_size_wid)+'</th>'+
+    (rDual?(
+      '<th data-i18n="upLayer" class="slats-th-up">'+_e(t.upLayer)+'</th>'+
+      '<th data-i18n="slats_table_bar_len">'+_e(t.slats_table_bar_len)+'</th>'+
+      '<th data-i18n="slats_table_rebar_size_len">'+_e(t.slats_table_rebar_size_len)+'</th>'+
+      '<th data-i18n="dSizeL">'+_e(t.dSizeL)+'</th>'+
+      '<th data-i18n="slats_table_bar_wid">'+_e(t.slats_table_bar_wid)+'</th>'+
+      '<th data-i18n="slats_table_rebar_size_wid">'+_e(t.slats_table_rebar_size_wid)+'</th>'+
+      '<th data-i18n="dSizeW">'+_e(t.dSizeW)+'</th>'+
+      '<th data-i18n="loLayer" class="slats-th-lo">'+_e(t.loLayer)+'</th>'+
+      '<th data-i18n="slats_table_bar_len">'+_e(t.slats_table_bar_len)+'</th>'+
+      '<th data-i18n="slats_table_rebar_size_len">'+_e(t.slats_table_rebar_size_len)+'</th>'+
+      '<th data-i18n="dSizeL">'+_e(t.dSizeL)+'</th>'+
+      '<th data-i18n="slats_table_bar_wid">'+_e(t.slats_table_bar_wid)+'</th>'+
+      '<th data-i18n="slats_table_rebar_size_wid">'+_e(t.slats_table_rebar_size_wid)+'</th>'+
+      '<th data-i18n="dSizeW">'+_e(t.dSizeW)+'</th>'
+    ):(
+      '<th data-i18n="slats_table_bar_len">'+_e(t.slats_table_bar_len)+'</th>'+
+      '<th data-i18n="slats_table_rebar_size_len">'+_e(t.slats_table_rebar_size_len)+'</th>'+
+      '<th data-i18n="dSizeL">'+_e(t.dSizeL)+'</th>'+
+      '<th data-i18n="slats_table_bar_wid">'+_e(t.slats_table_bar_wid)+'</th>'+
+      '<th data-i18n="slats_table_rebar_size_wid">'+_e(t.slats_table_rebar_size_wid)+'</th>'+
+      '<th data-i18n="dSizeW">'+_e(t.dSizeW)+'</th>'
+    ))+
     '</tr></thead><tbody>';
   groups.forEach(function(g, gIdx){
     var rs=g.rows.length;
@@ -48532,11 +48571,28 @@ function openSlatsReportModal(){
         '<td>'+slatsFmtNum(slatsParseNum(r.sqm_unit),0)+'</td>'+
         '<td>'+slatsFmtNum(slatsParseNum(r.sqm_whole),0)+'</td>'+
         '<td data-i18n="'+meshKey+'">'+_e(_rebarLabel(r.mesh_layers))+'</td>'+
-        '<td>'+slatsFmtNum(slatsParseNum(r.bar_len),0)+'</td>'+
-        '<td data-i18n="'+rebKeyLen+'">'+_e(_rebarLabel(r.rebar_size_len))+'</td>'+
-        '<td>'+slatsFmtNum(slatsParseNum(r.bar_wid),0)+'</td>'+
-        '<td data-i18n="'+rebKeyWid+'">'+_e(_rebarLabel(r.rebar_size_wid))+'</td>'+
-        '<td>'+_e(r.remark||'')+'</td></tr>';
+        (rDual?(
+          '<td>'+slatsFmtNum(slatsParseNum(r.bar_len),0)+'</td>'+
+          '<td data-i18n="'+rebKeyLen+'">'+_e(_rebarLabel(r.rebar_size_len))+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.floor_len)-9,0)+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.bar_wid),0)+'</td>'+
+          '<td data-i18n="'+rebKeyWid+'">'+_e(_rebarLabel(r.rebar_size_wid))+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.floor_wid)-9,0)+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.bar_len2),0)+'</td>'+
+          '<td data-i18n="slats_rebar_'+String(r.rebar_size_len2||'').trim()+'">'+_e(_rebarLabel(r.rebar_size_len2))+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.floor_len)-9,0)+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.bar_wid2),0)+'</td>'+
+          '<td data-i18n="slats_rebar_'+String(r.rebar_size_wid2||'').trim()+'">'+_e(_rebarLabel(r.rebar_size_wid2))+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.floor_wid)-9,0)+'</td>'
+        ):(
+          '<td>'+slatsFmtNum(slatsParseNum(r.bar_len),0)+'</td>'+
+          '<td data-i18n="'+rebKeyLen+'">'+_e(_rebarLabel(r.rebar_size_len))+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.floor_len)-9,0)+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.bar_wid),0)+'</td>'+
+          '<td data-i18n="'+rebKeyWid+'">'+_e(_rebarLabel(r.rebar_size_wid))+'</td>'+
+          '<td>'+slatsFmtNum(slatsParseNum(r.floor_wid)-9,0)+'</td>'
+        ))+
+        '<td>'+_e(r.solid_slat||'NO')+'</td></tr>';
     });
   });
   ovHtml+='<tr class="slats-report-total"><td colspan="3">'+_e(t.slats_report_total||'总计')+'</td>'+
@@ -48547,7 +48603,7 @@ function openSlatsReportModal(){
     '<td>'+slatsFmtNum(totalQty,0)+'</td>'+
     '<td></td>'+
     '<td>'+slatsFmtNum(totalSqm,0)+'</td>'+
-    '<td colspan="6"></td></tr></tbody></table>';
+    '<td colspan="20"></td></tr></tbody></table>';
   el('slatsReportOverview').innerHTML=ovHtml;
 
   // 文字说明
@@ -49491,7 +49547,7 @@ function rebuildSlatsGroups(){
 function addSlatsSpecRow(){
   var tbody=el('slatsSpecTable')?el('slatsSpecTable').querySelector('tbody'):null;
   if(!tbody) return;
-  tbody.appendChild(slatsBuildRow(slatsNextGroupId(), 1));
+  tbody.appendChild(slatsBuildRow(false, slatsNextGroupId(), 1, []));
   rebuildSlatsGroups();
 }
 function deleteSlatsSpecRow(btn){
@@ -49505,7 +49561,8 @@ function copySlatsSpecRow(btn){
   var tr=btn && btn.closest?btn.closest('tr'):null;
   if(!tr) return;
   var values=slatsGetRowValues(tr);
-  var newRow=slatsBuildRow(slatsNextGroupId(), 1, values);
+  var curDual=!!tr.querySelector('[data-f="bar_len2"]');
+  var newRow=slatsBuildRow(curDual, slatsNextGroupId(), 1, values);
   slatsInsertAfterGroup(newRow, tr);
   rebuildSlatsGroups();
   sweepI18n(newRow);
@@ -49514,8 +49571,9 @@ function mergeSlatsSpecRow(btn){
   var tr=btn && btn.closest?btn.closest('tr'):null;
   if(!tr) return;
   var values=slatsGetRowValues(tr);
+  var curDual=!!tr.querySelector('[data-f="bar_len2"]');
   var groupId=tr.getAttribute('data-slats-group')||'0';
-  var newRow=slatsBuildRow(groupId, 1, values);
+  var newRow=slatsBuildRow(curDual, groupId, 1, values);
   slatsInsertAfterGroup(newRow, tr);
   rebuildSlatsGroups();
   sweepI18n(newRow);
