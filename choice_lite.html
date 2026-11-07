@@ -720,32 +720,46 @@ if (typeof window.__deferInit === 'function') window.__deferInit(window.__prodPr
     try { window.__popupStable = { ver: VER, w: w, h: h, t: t, l: l, at: Date.now() }; } catch (e) {}
   }
 
+  /* ★PERF-IDLE-20261108：原来每帧都跑一次 panels()（对 body>div 逐个 getComputedStyle
+     + getBoundingClientRect，全是强制重排），实测空闲 6s 内 panels 63.8ms + visible 48.1ms
+     + querySelectorAll 104ms，且「只要有任一浮层被钉住 → recs.length>0 → rAF 永不停」，
+     导致主线程长期被占 → 用户点任何按钮都要等。三处修正：
+     ① 扫描降到 ~7 次/秒（钉住判定本来就要等 420ms，降到 150ms 完全不影响效果）；
+     ② 没有「未完成」的记录时立即停掉 rAF（已钉住的无需再盯，!important 已压住内联样式）；
+     ③ MutationObserver 只在靠近 body 顶层的插入才唤醒（应用内部大量文本变更不再触发）。 */
+  var _lastScan = 0;
   function tick() {
     var now = Date.now(), i, list;
     if (window.__popupStableOff) { rafOn = false; return; }
-    try {
-      list = panels();
-      for (i = 0; i < list.length; i++) {
-        var el = list[i], rec = null, j;
-        for (j = 0; j < recs.length; j++) if (recs[j].el === el) { rec = recs[j]; break; }
-        var r = el.getBoundingClientRect();
-        if (!rec) { recs.push({ el: el, t0: now, best: { w: r.width, h: r.height, t: r.top, l: r.left }, done: false }); continue; }
-        if (rec.done) continue;                       /* 已钉住：Univer 改内联样式也压不过 !important */
-        if (r.height > rec.best.h + 0.5) {            /* 只认「更高的那一帧」= 内容完整的自然状态 */
-          rec.best = { w: r.width, h: r.height, t: r.top, l: r.left };
+    if (now - _lastScan >= 150) {
+      _lastScan = now;
+      try {
+        list = panels();
+        for (i = 0; i < list.length; i++) {
+          var el = list[i], rec = null, j;
+          for (j = 0; j < recs.length; j++) if (recs[j].el === el) { rec = recs[j]; break; }
+          var r = el.getBoundingClientRect();
+          if (!rec) { recs.push({ el: el, t0: now, best: { w: r.width, h: r.height, t: r.top, l: r.left }, done: false }); continue; }
+          if (rec.done) continue;                       /* 已钉住：Univer 改内联样式也压不过 !important */
+          if (r.height > rec.best.h + 0.5) {            /* 只认「更高的那一帧」= 内容完整的自然状态 */
+            rec.best = { w: r.width, h: r.height, t: r.top, l: r.left };
+          }
+          if (now - rec.t0 >= SAMPLE_MS) { pin(el, rec.best); rec.done = true; }
         }
-        if (now - rec.t0 >= SAMPLE_MS) { pin(el, rec.best); rec.done = true; }
-      }
-      /* 清掉已消失的节点记录 */
-      for (i = recs.length - 1; i >= 0; i--) {
-        if (!recs[i].el.isConnected) recs.splice(i, 1);
-        else {
-          var cs2; try { cs2 = getComputedStyle(recs[i].el); } catch (e4) { cs2 = null; }
-          if (cs2 && (cs2.display === 'none' || cs2.visibility === 'hidden')) recs.splice(i, 1);
+        /* 清掉已消失的节点记录 */
+        for (i = recs.length - 1; i >= 0; i--) {
+          if (!recs[i].el.isConnected) recs.splice(i, 1);
+          else {
+            var cs2; try { cs2 = getComputedStyle(recs[i].el); } catch (e4) { cs2 = null; }
+            if (cs2 && (cs2.display === 'none' || cs2.visibility === 'hidden')) recs.splice(i, 1);
+          }
         }
-      }
-    } catch (e) {}
-    if (Date.now() < burstUntil || recs.length) { requestAnimationFrame(tick); }
+      } catch (e) {}
+    }
+    /* 只有「还在采样中」的记录或 burst 窗口才继续；全部钉住后立刻停，避免空转 rAF */
+    var _pending = 0;
+    for (i = 0; i < recs.length; i++) { if (!recs[i].done) { _pending = 1; break; } }
+    if (Date.now() < burstUntil || _pending) { requestAnimationFrame(tick); }
     else { rafOn = false; }
   }
 
@@ -756,8 +770,39 @@ if (typeof window.__deferInit === 'function') window.__deferInit(window.__prodPr
     requestAnimationFrame(tick);
   }
 
+  /* ★PERF-IDLE-20261108：原来 body 子树任何 childList 变化都 kick(900)——
+     应用里表格/时间/滚动的文本更新极频繁，等于永远把 burst 一直续上、rAF 常在。
+     改为：只在「挂到 body 顶层的疑似浮层」出现时才唤醒（浮层都是 position:fixed/absolute 的 body>div）。 */
   try {
-    new MutationObserver(function () { kick(900); }).observe(document.body, { childList: true, subtree: true });
+    var _looksLikeOverlay = function (nd){
+      if (!nd || nd.nodeType !== 1) return false;
+      var id = nd.id || '', cls = (nd.className && typeof nd.className === 'string') ? nd.className : '';
+      if (/^(inst_|fin_|prod_|eq_|auth_|bd_|bd[A-Z])/.test(id)) return false;
+      if (id === '__clip_engine_ta' || id === '__global_err_box__') return false;
+      var st = nd.style || {};
+      if (st.position === 'fixed' || st.position === 'absolute') return true;
+      return /(modal|overlay|popup|popover|dropdown|menu|confirm|dialog|sheet)/i.test(id + ' ' + cls);
+    };
+    /* ★PERF-IDLE-20261108：本脚本位于 <head>（早于 <body>），此前直接 observe(document.body)
+       在 body 尚不存在时抛异常被 try/catch 吞掉 → 观察器其实从未注册成功（浮层只在启动那 1.2s
+       内被扫到过，之后弹出的浮层根本没被钉住）。这里等 DOM 就绪再真正注册。 */
+    var _startOverlayObserver = function () {
+      try {
+        if (!document.body) return;
+        new MutationObserver(function (muts) {
+          for (var i = 0; i < muts.length; i++) {
+            var added = muts[i].addedNodes || [];
+            for (var j = 0; j < added.length; j++) {
+              if (_looksLikeOverlay(added[j])) { kick(900); return; }
+            }
+          }
+        }).observe(document.body, { childList: true });
+        kick(400);
+      } catch (e) {}
+    };
+    if (document.body) _startOverlayObserver();
+    else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _startOverlayObserver);
+    else _startOverlayObserver();
   } catch (e) {}
   /* 关掉：控制台 window.__popupStableOff = true（排障用） */
   window.__popupStableToggle = function (off) { window.__popupStableOff = !!off; };
@@ -21125,6 +21170,8 @@ var PROD_EQUIP_FAULT_KB = {
         if (!finEditPollTimer){
           finEditPollTimer = setInterval(function(){
             if (document.hidden || !finReady || !finSheet) return;
+            /* ★PERF-IDLE-20261108：财务页没打开时不必逐格比对快照（单次可达 97ms）。 */
+            try { if (!__viewActive('finance')) return; } catch(e){}
             try { fin_scanEdits(); } catch(e){}
           }, 1200);
         }
@@ -22538,7 +22585,12 @@ var PROD_EQUIP_FAULT_KB = {
           /* ★FIN-FIT-20261017：轮询保底——只要财务视图可见就每 400ms 校正一次高度，
              彻底摆脱"初始化时机不对导致没跑到"的问题（之前就是这里没生效）。 */
           if (!window.__finFitTimer){
-            window.__finFitTimer = setInterval(function(){ try { window.__finHScrollTicks = (window.__finHScrollTicks||0)+1; finFitHeight(); } catch(e){} try { if (window.makeHScroll) window.makeHScroll('univer_container', function(){ return finUniverAPI; }, function(){ return window.__finCmdSvc; }); else { window.__mhMissing = true; } } catch(e){} }, 400);
+            window.__finFitTimer = setInterval(function(){
+              /* ★PERF-IDLE-20261108：财务页不显示时整轮跳过（2 个 getBoundingClientRect + 样式写入 ×2.5 次/秒，纯白烧）。 */
+              try { if (!__viewActive('finance')) return; } catch(e){}
+              try { window.__finHScrollTicks = (window.__finHScrollTicks||0)+1; finFitHeight(); } catch(e){}
+              try { if (window.makeHScroll) window.makeHScroll('univer_container', function(){ return finUniverAPI; }, function(){ return window.__finCmdSvc; }); else { window.__mhMissing = true; } } catch(e){}
+            }, 400);
           }
         }
         /* ★锁死区自检（FIN-FORMULA-STACK-20261013）：确认「无回放转发外壳」真的装上了。
@@ -24316,7 +24368,9 @@ var PROD_EQUIP_FAULT_KB = {
         if (finHiPollTimer) clearInterval(finHiPollTimer);
         finHiPollTimer = setInterval(function(){
           if (!finReady || !finSheet) return;
-          console.log('[hi] poll');
+          /* ★PERF-IDLE-20261108：财务页没打开时不做整簿快照比对（实测单次 finHiRecompute 达 165ms，
+             2 秒一次即长期霸占主线程 → 其它页面点按钮都要等）。切回财务页时会立即补跑一次。 */
+          try { if (!__viewActive('finance')) return; } catch(e){}
           try { finHiRecompute(); } catch(e){ console.warn('[hi] poll error', e); }
           /* ★FIN-MERGE-CN-BLUE-GUARD-20261015：每轮兜底补蓝 —— 万一某次撤高亮把中国行写黑，
              这里 2 秒内就能自己修回来（只作用于合并分组视图，其它报表直接返回 0）。 */
@@ -29553,10 +29607,11 @@ var PROD_EQUIP_FAULT_KB = {
       try { eq_statBind(); } catch(e){}                /* ★底部统计栏（计数/总计/平均/最大/最小）*/
       try { eq_bindContextMenuOnce(); } catch(e){}    /* ★右键「插入行」菜单补丁：限定在权益容器内，插入作用于当前表格 */
       /* ★EQ-SHEET-CUR-20261016：轮询同步工作簿默认币种（中国投资数据→RMB，其余→VND） */
-      if (!window.__eqCurPoll){ window.__eqCurPoll = setInterval(function(){ try { eqSyncCurToActiveSheet(); } catch(e){} }, 600); }
+      if (!window.__eqCurPoll){ window.__eqCurPoll = setInterval(function(){ try { if (!__viewActive('equity')) return; } catch(e){} try { eqSyncCurToActiveSheet(); } catch(e){} }, 600); }
       /* ★EQ-FIT-20261017：轮询保底——只要权益视图可见就每 400ms 校正一次高度，
-         保证 Univer 自带的横/纵滚动条（Excel 观感）始终落在表格下沿/右沿、页面不跟着滚。 */
-      if (!window.__eqFitTimer){ window.__eqFitTimer = setInterval(function(){ try { eqFitHeight(); } catch(e){} try { if (window.makeHScroll) window.makeHScroll('equity_container', function(){ return api; }, function(){ return window.__eqCmdSvc; }); } catch(e){} }, 400); }
+         保证 Univer 自带的横/纵滚动条（Excel 观感）始终落在表格下沿/右沿、页面不跟着滚。
+         ★PERF-IDLE-20261108：权益页不显示时整轮跳过（eqFitHeight + makeHScroll 都含强制重排）。 */
+      if (!window.__eqFitTimer){ window.__eqFitTimer = setInterval(function(){ try { if (!__viewActive('equity')) return; } catch(e){} try { eqFitHeight(); } catch(e){} try { if (window.makeHScroll) window.makeHScroll('equity_container', function(){ return api; }, function(){ return window.__eqCmdSvc; }); } catch(e){} }, 400); }
     } catch(e){
       inited = false;
       st('引擎加载失败：' + e.message);
@@ -38991,6 +39046,14 @@ function wonDetailLinkCell(p, field, labelKey) {
 
   function fitOne(el) {
     if (!el || el.nodeType !== 1) return;
+    /* ★PERF-IDLE-20261108：SPA 里所有视图的 DOM 都常驻（非当前页只是不 active）。
+       对这 11 个视图里隐藏页的成百上千个 [data-i18n]/th 逐个 getComputedStyle + 3 次测宽，
+       纯属白烧（实测一次点击里 measureText 达 85ms）。隐藏视图直接跳过即可——
+       等切到该页时会重新适配（切页会触发 applyLangFit）。 */
+    try {
+      var _v = el.closest && el.closest('.view');
+      if (_v && !_v.classList.contains('active')) return;
+    } catch (e) {}
     var cs0 = getComputedStyle(el);
     if (cs0.display === 'none' || cs0.visibility === 'hidden') return;
     // 恢复基础字号（清除上次缩放内联），保证测量基于基准字号，避免缩放累积
@@ -55050,6 +55113,16 @@ var VAULT_TOKEN = '';  // M10 安全加固：服务端签发的会话 token（�
   };
 })();
 
+/* ★PERF-IDLE-20261108：判断某业务视图当前是否可见，供后台轮询做「不可见就跳过」的门禁。
+   各模块的 400ms/600ms/1.2s/2s 轮询此前无条件空转（含整簿快照比对与强制重排），
+   是「点任何按钮都要等一下」的主因；只在真正显示该页时才跑，切过去时立即补跑一次。 */
+function __viewActive(name){
+  try {
+    var v = document.getElementById('view-' + name);
+    return !!(v && v.classList.contains('active'));
+  } catch (e) { return false; }
+}
+window.__viewActive = __viewActive;
 function hideMainContent() {
   var top = document.getElementById('topbar');
   var app = document.getElementById('app');
@@ -55434,6 +55507,14 @@ function switchView(name) {
   for (var j = 0; j < items.length; j++) {
     items[j].classList.toggle('active', items[j].getAttribute('data-view') === name);
   }
+  /* ★PERF-IDLE-20261108：语言自适应现在跳过隐藏视图（省下大量 getComputedStyle+测宽），
+     因此切到这个视图时必须补做一次，否则文字可能超出被裁。延后一帧等布局落定。 */
+  try {
+    var _nv = document.getElementById('view-' + name);
+    if (_nv && typeof applyLangFit === 'function') {
+      setTimeout(function(){ try { applyLangFit(_nv); } catch(e){} }, 0);
+    }
+  } catch(e){}
   // 切到佣金页后表格才可见（此前的测量值全为 0）→ 显示后重测列宽与容器高度
   if (name === 'commission' && typeof autoFitCommissionTable === 'function') {
     setTimeout(autoFitCommissionTable, 0);
@@ -55453,6 +55534,13 @@ function switchView(name) {
     if (window.__FIN_PREWARM_STARTED) {
       setTimeout(function(){ try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 80);
     }
+    /* ★PERF-IDLE-20261108：后台轮询在财务页不可见时是跳过的，进入财务页立刻补跑一轮，
+       避免"刚点进来还是旧高亮/旧高度"要等下一拍（2 秒）。 */
+    setTimeout(function(){
+      try { if (typeof finFitHeight === 'function') finFitHeight(); } catch(e){}
+      try { if (window.makeHScroll) window.makeHScroll('univer_container', function(){ return window.finUniverAPI; }, function(){ return window.__finCmdSvc; }); } catch(e){}
+      try { if (typeof window.finHiForceRecompute === 'function') window.finHiForceRecompute(); } catch(e){}
+    }, 120);
   }
   // 记住当前视图，刷新后仍停留在该标签页
   try { sessionStorage.setItem('won_current_view', name); } catch(e){}
