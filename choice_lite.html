@@ -33177,10 +33177,12 @@ var PROD_EQUIP_FAULT_KB = {
 <style>
 /* ===== 水泥漏缝地板规格表格 ===== */
 #slatsSpecModal .modal { width: min(1900px, 99vw); padding: 14px 16px; }
+/* 标题栏负边距必须与弹窗padding一致，否则红条顶部被裁10px、标题和按钮整体偏上不居中 */
+#slatsSpecModal .modal > h2 { margin: -14px -16px 12px; }
 .slats-spec-wrap { margin-top: 8px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .slats-spec-toolbar { margin-bottom: 10px; text-align: right; flex-shrink: 0; display: flex; justify-content: flex-end; gap: 8px; }
 .slats-spec-table-scroll { overflow: auto; flex: 1 1 auto; min-height: 0; border: 1px solid #e8e8e8; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-.slats-spec-table { width: 100%; min-width: 920px; border-collapse: separate; border-spacing: 0; font-size: 9px; background: #fff; }
+.slats-spec-table { width: 100%; min-width: 828px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 9px; background: #fff; }
 .slats-spec-table th,
 .slats-spec-table td { border-right: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; padding: 2px 1px; text-align: center; vertical-align: middle; }
 .slats-spec-table th:last-child,
@@ -33192,8 +33194,7 @@ var PROD_EQUIP_FAULT_KB = {
 /* 二级表头固定在一级表头下方；z-index 必须比一级高，避免被 rowspan 单元格压住 */
 /* 加高并放开行高，避免“栋数/整场”这类两行表头被裁切（两行 11px 文本需要约 30px 内容区） */
 .slats-spec-header-sub th { background: #ff8a80; color: #fff; font-weight: 500; font-size: 8px; top: 46px; height: 38px; line-height: 1.25; padding: 3px 2px; z-index: 4; }
-  /* 二级表头配色：必须用更高优先级压过 .slats-spec-table thead th 的红色规则，否则上/下粉蓝底永远不生效 */
-  .slats-spec-table thead .slats-spec-header-sub th { background: #ff8a80; color: #fff; }
+  /* 二级表头配色：非上下层列继承一级表头的深红渐变；上/下层用更高优先级(0,2,2)覆盖为粉/蓝 */
   .slats-spec-table thead th.slats-th-up { background: #f7b6c2; color: #8f1d2c; font-weight: 700; }
   .slats-spec-table thead th.slats-th-lo { background: #b8d3f0; color: #174e7d; font-weight: 700; }
   .slats-spec-sub-lo input, .slats-spec-sub-lo select{background:#e8f1fb;}
@@ -33205,7 +33206,7 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-spec-table tbody tr:hover { background: #ffebee; }
 .slats-spec-table tbody tr:last-child td:first-child { border-radius: 0 0 0 10px; }
 .slats-spec-table tbody tr:last-child td:last-child { border-radius: 0 0 10px 0; }
-.slats-spec-input { width: 100%; min-width: 30px; height: 22px; padding: 2px 1px; border: 1px solid #d0d0d0; border-radius: 0; font-size: 9px; text-align: center; box-sizing: border-box; background: #fff; transition: border-color .15s, box-shadow .15s; }
+.slats-spec-input { width: 100%; min-width: 12px; height: 22px; padding: 2px 1px; border: 1px solid #d0d0d0; border-radius: 0; font-size: 9px; text-align: center; box-sizing: border-box; background: #fff; transition: border-color .15s, box-shadow .15s; }
 .slats-spec-input:focus { border-color: #E53935; outline: none; box-shadow: inset 0 0 0 1px rgba(229,57,53,.35); }
 .slats-spec-input.slats-spec-computed { background: #f0f0f0; color: #333; cursor: default; }
 .slats-spec-input.slats-default-value { color: #D32F2F; font-weight: 600; }
@@ -33217,8 +33218,8 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-spec-table tr.slats-group > td.slats-spec-idx { border-left: 3px solid #000; }
 .slats-spec-table tr.slats-group > td:last-child { border-right: 3px solid #000; }
 .slats-spec-idx { font-weight: 700; color: #E53935; padding: 6px 4px; }
-.slats-spec-actions { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-.slats-spec-iconbtn { width: 24px; height: 24px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: all .15s; padding: 0; }
+.slats-spec-actions { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+.slats-spec-iconbtn { width: 18px; height: 18px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 10px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: all .15s; padding: 0; }
 .slats-spec-iconbtn:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,.12); }
 .slats-spec-iconbtn:disabled { cursor: not-allowed; opacity: .35; transform: none; box-shadow: none; }
 .slats-spec-btn-delete { color: #E53935; }
@@ -49296,13 +49297,14 @@ function slatsRenderHeader(dual){
 }
 function slatsRenderColgroup(dual){
   var cg=el('slatsColgroup'); if(!cg) return;
-  /* 极限压缩：双层总宽≈994px（短表头 条数长/φ长/mm长…），fitSlatsSpecTable 会按容器宽自动等比缩放保证整表可见 */
-  var w=[26,86,40,24,34,34,34,32,34,34,34,40,40,40,44,34];
-  if(dual){ w=w.concat([24,26,28,24,26,28,24,26,28,24,26,28]); }
-  else { w=w.concat([24,26,28,24,26,28]); }
-  w=w.concat([36,36]);
+  /* 猪舍108保越南语全称；信息/用量组与钢筋组收窄；操作60容纳3个18px按钮；table-layout:fixed下宽度精确，
+     fitSlatsSpecTable 按容器宽自动等比缩放 → 无水平滚动条 */
+  var w=[26,108,40,22,32,32,30,28,32,32,32,36,38,36,40,28];
+  if(dual){ w=w.concat([20,22,28,20,22,28,20,22,28,20,22,28]); }
+  else { w=w.concat([20,22,28,20,22,28]); }
+  w=w.concat([36,60]);
   cg.innerHTML=w.map(function(x){ return '<col style="width:'+x+'px">'; }).join('');
-  var tbl=document.querySelector('.slats-spec-table'); if(tbl){ tbl.style.minWidth=(dual?994:838)+'px'; tbl.setAttribute('data-minw', dual?994:838); }
+  var tbl=document.querySelector('.slats-spec-table'); if(tbl){ tbl.style.minWidth=(dual?968:828)+'px'; tbl.setAttribute('data-minw', dual?968:828); }
 }
 function slatsApplyLowerState(tr){
   if(!slatsIsDualRow(tr)) return;
