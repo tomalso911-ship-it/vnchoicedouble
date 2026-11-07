@@ -33082,7 +33082,7 @@ var PROD_EQUIP_FAULT_KB = {
                 <th colspan="5" data-i18n="slats_table_house_info">房舍信息</th>
                 <th colspan="3" data-i18n="slats_table_size_title">水泥漏缝地板尺寸(单位：毫米)</th>
                 <th colspan="4" data-i18n="slats_table_usage_title">漏缝地板用量</th>
-                <th id="slatsRebarMainTh" colspan="5" data-i18n="slats_table_rebar_title">钢筋网片配置信息</th>
+                <th id="slatsRebarMainTh" colspan="7" data-i18n="slats_table_rebar_title">钢筋网片配置信息</th>
                 <th rowspan="2" data-i18n="slats_table_remark">备注</th>
                 <th rowspan="2" data-i18n="slats_table_op">操作</th>
               </tr>
@@ -33176,10 +33176,11 @@ var PROD_EQUIP_FAULT_KB = {
 
 <style>
 /* ===== 水泥漏缝地板规格表格 ===== */
+#slatsSpecModal .modal { width: min(1900px, 99vw); padding: 14px 16px; }
 .slats-spec-wrap { margin-top: 8px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .slats-spec-toolbar { margin-bottom: 10px; text-align: right; flex-shrink: 0; display: flex; justify-content: flex-end; gap: 8px; }
 .slats-spec-table-scroll { overflow: auto; flex: 1 1 auto; min-height: 0; border: 1px solid #e8e8e8; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-.slats-spec-table { width: 100%; min-width: 1520px; border-collapse: separate; border-spacing: 0; font-size: 11px; background: #fff; }
+.slats-spec-table { width: 100%; min-width: 1560px; border-collapse: separate; border-spacing: 0; font-size: 11px; background: #fff; }
 .slats-spec-table th,
 .slats-spec-table td { border-right: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; padding: 2px 1px; text-align: center; vertical-align: middle; }
 .slats-spec-table th:last-child,
@@ -48187,7 +48188,7 @@ function slatsSpecSerialize(){
   var tbody=el('slatsSpecTable')?el('slatsSpecTable').querySelector('tbody'):null;
   if(!tbody) return [];
   var groups=slatsGroupInfo();
-  var dual=!!(tbody.querySelector('td[data-oci="22"]'));
+  var dual=!!(tbody.querySelector('td[data-oci="27"]'));
   var out=[];
   groups.forEach(function(g){
     g.rows.forEach(function(row){
@@ -48198,8 +48199,8 @@ function slatsSpecSerialize(){
         floor_len: vals[8], floor_wid: vals[9], floor_hgt: vals[10],
         qty_unit: vals[11], qty_whole: vals[12], sqm_unit: vals[13], sqm_whole: vals[14],
         mesh_layers: vals[15],
-        bar_len: vals[16], rebar_size_len: vals[17], bar_wid: vals[18], rebar_size_wid: vals[19],
-        solid_slat: vals[dual?28:20]
+        bar_len: vals[16], rebar_size_len: vals[17], bar_wid: vals[19], rebar_size_wid: vals[20],
+        solid_slat: vals[dual?28:22]
       };
       if(dual){
         rec.bar_len2=vals[22]; rec.rebar_size_len2=vals[23]; rec.bar_wid2=vals[25]; rec.rebar_size_wid2=vals[26];
@@ -48215,10 +48216,10 @@ function slatsSpecValidate(){
   var firstBad=null;
   // 必填列索引：猪舍(1)、单元/栋(3)、长/单元(4)、宽/单元(5)、高/单元(6)、栋数/整场(7)、长(8)、宽(9)、高(10)、数量/单元(11)、钢网层数(15)、条/长度方向(16)、钢筋尺寸/长度方向(17)、条/宽度方向(18)、钢筋尺寸/宽度方向(19)
   var _tb=el('slatsSpecTable')?el('slatsSpecTable').querySelector('tbody'):null;
-  var _dual=!!(_tb && _tb.querySelector('td[data-oci="22"]'));
+  var _dual=!!(_tb && _tb.querySelector('td[data-oci="27"]'));
   var requiredIdx=[1,3,4,5,6,7,8,9,10,11,15];
   if(_dual){ requiredIdx=requiredIdx.concat([16,17,19,20,22,23,25,26]); }
-  else { requiredIdx=requiredIdx.concat([16,17,18,19]); }
+  else { requiredIdx=requiredIdx.concat([16,17,19,20]); }
   groups.forEach(function(g){
     g.rows.forEach(function(row){
       var vals=slatsGetRowValues(row);
@@ -48293,6 +48294,7 @@ function openSlatsReportModal(){
   var rows=[];
   try{ rows=JSON.parse(raw); if(!Array.isArray(rows)) rows=[]; }catch(e){ rows=[]; }
   rows=rows.filter(function(r){ return r && String(r.pig_house||'').trim()!==''; });
+  rows=slatsSanitizeSpecRows(rows);
   var rDual = rows.some(function(r){ return Number(r.mesh_layers)===2; });
   var _rebarSub = rDual ? (
     '<th data-i18n="slats_table_mesh_layers">'+_e(t.slats_table_mesh_layers)+'</th>'+
@@ -48312,8 +48314,10 @@ function openSlatsReportModal(){
     '<th data-i18n="slats_table_mesh_layers">'+_e(t.slats_table_mesh_layers)+'</th>'+
     '<th data-i18n="slats_table_bar_len">'+_e(t.slats_table_bar_len)+'</th>'+
     '<th data-i18n="slats_table_rebar_size_len">'+_e(t.slats_table_rebar_size_len)+'</th>'+
+    '<th data-i18n="slats_table_mm_len">'+_e(t.slats_table_mm_len)+'</th>'+
     '<th data-i18n="slats_table_bar_wid">'+_e(t.slats_table_bar_wid)+'</th>'+
-    '<th data-i18n="slats_table_rebar_size_wid">'+_e(t.slats_table_rebar_size_wid)+'</th>'
+    '<th data-i18n="slats_table_rebar_size_wid">'+_e(t.slats_table_rebar_size_wid)+'</th>'+
+    '<th data-i18n="slats_table_mm_wid">'+_e(t.slats_table_mm_wid)+'</th>'
   );
   function _rebarCells(r){
     var mmLen=Math.max(0, slatsParseNum(r.floor_len)-9), mmWid=Math.max(0, slatsParseNum(r.floor_wid)-9);
@@ -48340,8 +48344,10 @@ function openSlatsReportModal(){
     return '<td data-i18n="'+meshKey+'">'+_e(_rebarLabel(r.mesh_layers))+'</td>'+
       '<td>'+slatsFmtNum(slatsParseNum(r.bar_len),0)+'</td>'+
       '<td data-i18n="'+rkL+'">'+_e(_rebarLabel(r.rebar_size_len))+'</td>'+
+      '<td>'+slatsFmtNum(mmLen,0)+'</td>'+
       '<td>'+slatsFmtNum(slatsParseNum(r.bar_wid),0)+'</td>'+
-      '<td data-i18n="'+rkW+'">'+_e(_rebarLabel(r.rebar_size_wid))+'</td>';
+      '<td data-i18n="'+rkW+'">'+_e(_rebarLabel(r.rebar_size_wid))+'</td>'+
+      '<td>'+slatsFmtNum(mmWid,0)+'</td>';
   }
 
   if(rows.length===0){
@@ -48474,7 +48480,7 @@ function openSlatsReportModal(){
     '<th colspan="4" data-i18n="slats_table_house_info">'+_e(t.slats_table_house_info)+'</th>'+
     '<th colspan="3" data-i18n="slats_table_size_title">'+_e(t.slats_table_size_title)+'</th>'+
     '<th colspan="4" data-i18n="slats_table_usage_title">'+_e(t.slats_table_usage_title)+'</th>'+
-    '<th colspan="'+(rDual?13:5)+'" data-i18n="slats_table_rebar_title">'+_e(t.slats_table_rebar_title)+'</th>'+
+    '<th colspan="'+(rDual?13:7)+'" data-i18n="slats_table_rebar_title">'+_e(t.slats_table_rebar_title)+'</th>'+
     '<th rowspan="2" data-i18n="slats_table_remark">'+_e(t.slats_table_remark)+'</th>'+
     '</tr><tr>'+
     '<th data-i18n="slats_table_unit_per_building">'+_e(t.slats_table_unit_per_building)+'</th>'+
@@ -48529,7 +48535,7 @@ function openSlatsReportModal(){
     '<td>'+slatsFmtNum(totalQty,0)+'</td>'+
     '<td></td>'+
     '<td>'+slatsFmtNum(totalSqm,0)+'</td>'+
-    '<td colspan="'+(rDual?14:6)+'"></td></tr></tbody></table>';
+    '<td colspan="'+(rDual?14:8)+'"></td></tr></tbody></table>';
   el('slatsReportOverview').innerHTML=ovHtml;
 
   // 文字说明
@@ -49209,7 +49215,25 @@ function slatsPigHouseCell(initVal){
 }
 
 function slatsSpecDual(rows){ return rows.some(function(r){ return Number(r.mesh_layers)===2; }); }
-function slatsIsDualRow(tr){ return !!(tr && tr.querySelector('td[data-oci="22"]')); }
+/* 加载消毒：条数必须是1~50的小整数（历史版本曾把mm长写进bar_wid），钢筋φ必须在选项内 */
+function slatsSanitizeSpecRows(rows){
+  if(!Array.isArray(rows)) return [];
+  var okR=function(v){ return SLATS_REBAR.indexOf(String(v==null?'':v).trim())>=0; };
+  var okI=function(v, def){ var n=parseInt(String(v==null?'':v).replace(/[^0-9]/g,''),10); return (n>=1&&n<=50)?String(n):def; };
+  rows.forEach(function(r){
+    if(!r || typeof r!=='object') return;
+    r.bar_len=okI(r.bar_len,'6');
+    r.bar_wid=okI(r.bar_wid,'3');
+    if(!okR(r.rebar_size_len)) r.rebar_size_len=okR(r.rebar_size_wid)?r.rebar_size_wid:(SLATS_REBAR[0]||'');
+    if(!okR(r.rebar_size_wid)) r.rebar_size_wid=r.rebar_size_len;
+    if(r.bar_len2!=null) r.bar_len2=okI(r.bar_len2,'6');
+    if(r.bar_wid2!=null) r.bar_wid2=okI(r.bar_wid2,'3');
+    if(r.rebar_size_len2!=null && !okR(r.rebar_size_len2)) r.rebar_size_len2=r.rebar_size_len;
+    if(r.rebar_size_wid2!=null && !okR(r.rebar_size_wid2)) r.rebar_size_wid2=r.rebar_size_wid;
+  });
+  return rows;
+}
+function slatsIsDualRow(tr){ return !!(tr && tr.querySelector('td[data-oci="27"]')); }
 function slatsRowToValues(r, dual){
   var v=[];
   v[0]=''; v[1]=r.pig_house||''; v[2]=r.house_code||''; v[3]=r.unit_per_building||'';
@@ -49219,8 +49243,8 @@ function slatsRowToValues(r, dual){
   v[15]=r.mesh_layers||'';
   var solid=r.solid_slat||''; if(solid!=='YES'&&solid!=='NO') solid='NO';
   if(!dual){
-    v[16]=r.bar_len||''; v[17]=r.rebar_size_len||''; v[18]=r.bar_wid||''; v[19]=r.rebar_size_wid||'';
-    v[20]=solid;
+    v[16]=r.bar_len||''; v[17]=r.rebar_size_len||''; v[18]=''; v[19]=r.bar_wid||''; v[20]=r.rebar_size_wid||''; v[21]='';
+    v[22]=solid;
   } else {
     v[16]=r.bar_len||''; v[17]=r.rebar_size_len||''; v[18]=''; v[19]=r.bar_wid||''; v[20]=r.rebar_size_wid||''; v[21]='';
     v[22]=r.bar_len2||''; v[23]=r.rebar_size_len2||''; v[24]=''; v[25]=r.bar_wid2||''; v[26]=r.rebar_size_wid2||''; v[27]='';
@@ -49229,7 +49253,7 @@ function slatsRowToValues(r, dual){
   return v;
 }
 function slatsRenderHeader(dual){
-  var main=el('slatsRebarMainTh'); if(main) main.setAttribute('colspan', dual?13:5);
+  var main=el('slatsRebarMainTh'); if(main) main.setAttribute('colspan', dual?13:7);
   var sub=el('slatsRebarSub'); if(!sub) return;
   var t=T();
   var e=function(x){ return String(x==null?'':x); };
@@ -49255,21 +49279,24 @@ function slatsRenderHeader(dual){
   } else {
     h+='<th data-i18n="slats_table_bar_len">'+e(t.slats_table_bar_len)+'</th>';
     h+='<th data-i18n="slats_table_rebar_size_len">'+e(t.slats_table_rebar_size_len)+'</th>';
+    h+='<th data-i18n="slats_table_mm_len">'+e(t.slats_table_mm_len)+'</th>';
     h+='<th data-i18n="slats_table_bar_wid">'+e(t.slats_table_bar_wid)+'</th>';
     h+='<th data-i18n="slats_table_rebar_size_wid">'+e(t.slats_table_rebar_size_wid)+'</th>';
+    h+='<th data-i18n="slats_table_mm_wid">'+e(t.slats_table_mm_wid)+'</th>';
   }
   sub.innerHTML=h;
   if(typeof sweepI18n==='function'){ try{ sweepI18n(sub); }catch(e2){} }
 }
 function slatsRenderColgroup(dual){
   var cg=el('slatsColgroup'); if(!cg) return;
-  var w=[46,110,100,48,55,55,55,60,48,48,48,78,60,78,78];
-  if(dual){ w=w.concat([60,60,60,52,60,60,52,60,60,52,60,60,52]); }
-  else { w=w.concat([60,64,70,64,70]); }
-  w=w.concat([90,90]);
+  var w=[46,132,92,48,55,55,55,60,48,48,48,78,60,78,78];
+  if(dual){ w=w.concat([58,58,62,50,58,62,50,58,62,50,58,62,50]); }
+  else { w=w.concat([58,58,62,50,58,62,50]); }
+  w=w.concat([86,86]);
   cg.innerHTML=w.map(function(x){ return '<col style="width:'+x+'px">'; }).join('');
 }
 function slatsApplyLowerState(tr){
+  if(!slatsIsDualRow(tr)) return;
   var mesh=slatsParseNum(slatsGetInputValue(tr,15));
   var active=(Number(mesh)===2);
   [22,23,24,25,26,27].forEach(function(ci){
@@ -49294,6 +49321,7 @@ function slatsOnLayersChange(){
 function slatsRenderAll(rows){
   var tbody=el('slatsSpecTable'); if(!tbody) return;
   var tb=tbody.querySelector('tbody'); if(!tb) return;
+  rows=slatsSanitizeSpecRows(rows);
   var dual=slatsSpecDual(rows);
   slatsRenderHeader(dual);
   slatsRenderColgroup(dual);
@@ -49337,8 +49365,10 @@ function slatsBuildRow(dual, groupId, idx, values){
   if(!dual){
     tr.appendChild(slatsInputCell('int','', {defaultValue:'6', tooltipKey:'slats_default_bar_len_tip'}));
     tr.appendChild(slatsSelectCell('slats_rebar_', SLATS_REBAR, (values&&values[17])?values[17]:''));
+    tr.appendChild(slatsInputCell('computed_mm',''));
     tr.appendChild(slatsInputCell('int','', {defaultValue:'3', tooltipKey:'slats_default_bar_wid_tip'}));
-    tr.appendChild(slatsSelectCell('slats_rebar_', SLATS_REBAR, (values&&values[19])?values[19]:''));
+    tr.appendChild(slatsSelectCell('slats_rebar_', SLATS_REBAR, (values&&values[20])?values[20]:''));
+    tr.appendChild(slatsInputCell('computed_mm',''));
   } else {
     tr.appendChild(slatsInputCell('int','', {defaultValue:'6', tooltipKey:'slats_default_bar_len_tip'}));
     tr.appendChild(slatsSelectCell('slats_rebar_', SLATS_REBAR, (values&&values[17])?values[17]:''));
@@ -49353,7 +49383,7 @@ function slatsBuildRow(dual, groupId, idx, values){
     tr.appendChild(_mkS());
     tr.appendChild(_mkM());
   }
-  var sv=(values&&values[dual?28:20])?(values[dual?28:20]):'NO';
+  var sv=(values&&values[dual?28:22])?(values[dual?28:22]):'NO';
   tr.appendChild(slatsSelectCell('slats_solid_', ['YES','NO'], sv));
   tr.appendChild(slatsActionCell());
   for(var _oci=0;_oci<tr.children.length;_oci++){ tr.children[_oci].setAttribute('data-oci', _oci); }
@@ -49420,7 +49450,7 @@ function slatsFindGroupForRow(tr){
 }
 function slatsGetRowValues(tr){
   var dual=slatsIsDualRow(tr);
-  var n=dual?30:22;
+  var n=dual?30:24;
   var vals=[];
   var group=slatsFindGroupForRow(tr);
   var header=group?group.rows[0]:tr;
