@@ -34912,7 +34912,7 @@ var I18N = {
              users_add_btn:"+ 新增用户",
              users_col_name:"姓名", users_col_no:"序号", users_col_account:"登录账号", users_col_role:"职位标签", users_col_status:"状态", users_col_range:"数据范围", users_col_action:"操作",
              users_status_active:"活跃", users_status_inactive:"离职/停用", users_status_admin:"管理员",
-             users_status_active:"启用", users_status_disabled:"禁用", users_edit_perm:"编辑权限", users_delete:"删除", users_copy:"复制", user_modal_title_copy:"复制用户", users_no_data:"暂无数据", user_reorder_hint:"双击行选择，↑↓ 移动；按 ESC 或点外部取消",
+             users_status_active:"启用", users_status_disabled:"禁用", users_edit_perm:"编辑权限", users_delete:"删除", usr_ctx_title:"用户操作", usr_ctx_delete:"删除用户", usr_ctx_cancel:"取消", usr_ctx_confirm:"确认删除", usr_ctx_del_title:"删除用户", usr_ctx_msg:"确定要删除用户 %s 吗？此操作不可撤销。", usr_ctx_protected:"该账号受保护，不可删除",  users_copy:"复制", user_modal_title_copy:"复制用户", users_no_data:"暂无数据", user_reorder_hint:"双击行选择，↑↓ 移动；按 ESC 或点外部取消",
              user_delete_confirm:"确定要删除该用户吗？", err_readonly:"只读授权：他人数据仅可查看，不能修改或删除",
 
              users_delete_success:"删除成功", users_delete_failed:"删除失败",
@@ -35733,7 +35733,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
              users_add_btn:"+ Add User",
              users_col_name:"Name", users_col_no:"No.", users_col_account:"Account", users_col_role:"Role", users_col_status:"Status", users_col_range:"Data Scope", users_col_action:"Action",
              users_status_active:"Active", users_status_inactive:"Left/Disabled", users_status_admin:"Admin",
-             users_status_active:"Active", users_status_disabled:"Disabled", users_edit_perm:"Edit Permission", users_delete:"Delete", users_copy:"Copy", user_modal_title_copy:"Duplicate User", users_no_data:"No data", user_reorder_hint:"Double-click row to select, ↑↓ to move; ESC or click outside to cancel",
+             users_status_active:"Active", users_status_disabled:"Disabled", users_edit_perm:"Edit Permission", users_delete:"Delete", usr_ctx_title:"User actions", usr_ctx_delete:"Delete user", usr_ctx_cancel:"Cancel", usr_ctx_confirm:"Delete", usr_ctx_del_title:"Delete user", usr_ctx_msg:"Delete user %s? This cannot be undone.", usr_ctx_protected:"This account is protected and cannot be deleted",  users_copy:"Copy", user_modal_title_copy:"Duplicate User", users_no_data:"No data", user_reorder_hint:"Double-click row to select, ↑↓ to move; ESC or click outside to cancel",
              user_delete_confirm:"Are you sure to delete this user?", err_readonly:"Read-only access: other users' data is view-only and cannot be modified or deleted",
 
              users_delete_success:"Deleted", users_delete_failed:"Delete failed",
@@ -36556,7 +36556,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
              users_add_btn:"+ Thêm người dùng",
              users_col_name:"Tên", users_col_no:"STT", users_col_account:"Tài khoản", users_col_role:"Vai trò", users_col_status:"Trạng thái", users_col_range:"Phạm vi dữ liệu", users_col_action:"Thao tác",
              users_status_active:"Hoạt động", users_status_inactive:"Nghỉ việc/Vô hiệu", users_status_admin:"Quản trị viên",
-             users_status_active:"Bật", users_status_disabled:"Tắt", users_edit_perm:"Sửa quyền", users_delete:"Xóa", users_copy:"Sao chép", user_modal_title_copy:"Nhân bản người dùng", users_no_data:"Chưa có dữ liệu", user_reorder_hint:"Nhấn đúp để chọn, ↑↓ để di chuyển; ESC hoặc nhấn ra ngoài để hủy",
+             users_status_active:"Bật", users_status_disabled:"Tắt", users_edit_perm:"Sửa quyền", users_delete:"Xóa", usr_ctx_title:"Thao tác người dùng", usr_ctx_delete:"Xóa người dùng", usr_ctx_cancel:"Hủy", usr_ctx_confirm:"Xóa", usr_ctx_del_title:"Xóa người dùng", usr_ctx_msg:"Xóa người dùng %s? Không thể hoàn tác.", usr_ctx_protected:"Tài khoản được bảo vệ, không thể xóa",  users_copy:"Sao chép", user_modal_title_copy:"Nhân bản người dùng", users_no_data:"Chưa có dữ liệu", user_reorder_hint:"Nhấn đúp để chọn, ↑↓ để di chuyển; ESC hoặc nhấn ra ngoài để hủy",
              user_delete_confirm:"Bạn chắc chắn muốn xóa người dùng này?", err_readonly:"Quyền chỉ xem: dữ liệu của người khác chỉ được xem, không thể sửa hoặc xóa",
 
              users_delete_success:"Đã xóa", users_delete_failed:"Xóa thất bại",
@@ -43568,11 +43568,169 @@ function renderUsers(){
       <td data-col="5" class="action-col">
         <button class="btn-action-sm btn-edit" data-name="${u.name}" onclick="openModal(${u.id})" title="${u.name}" style="${permVisible('USR-D1')?'':'display:none'}">${editLabel}</button>
         <button class="btn-action-sm btn-copy" data-name="${u.name}" onclick="openModal(null,${u.id})" title="${u.name}" style="${permVisible('USR-D2')?'':'display:none'}">${copyLabel}</button>
-        <button class="btn-action-sm btn-delete" data-name="${u.name}" onclick="deleteUser(${u.id})" title="${u.name}" style="${(permVisible('USR-D3') && !isFullAccessUser(u.login))?'':'display:none'}">${deleteLabel}</button>
       </td>
     </tr>`;
   }).join("");
 }
+
+// ★USR-CTX-20261107（用户 2026-11-07 指定）：删除按钮下线；
+//   tom / admin 右键单击用户行 → 经典色系（Windows 经典灰蓝）三语弹跳框进行删除。
+//   弹跳框常驻 DOM、语言切换只原地刷新文字（不重建、不重算坐标）。
+(function initUsrCtx(){
+  if (window.__usrCtxBound) return;
+  if (!document.body) { setTimeout(initUsrCtx, 30); return; }
+  window.__usrCtxBound = true;
+
+  var FB = {
+    usr_ctx_title:['用户操作','User actions','Thao tác người dùng'],
+    usr_ctx_delete:['删除用户','Delete user','Xóa người dùng'],
+    usr_ctx_cancel:['取消','Cancel','Hủy'],
+    usr_ctx_confirm:['确认删除','Delete','Xóa'],
+    usr_ctx_del_title:['删除用户','Delete user','Xóa người dùng'],
+    usr_ctx_msg:['确定要删除用户 %s 吗？此操作不可撤销。','Delete user %s? This cannot be undone.','Xóa người dùng %s? Không thể hoàn tác.'],
+    usr_ctx_protected:['该账号受保护，不可删除','This account is protected and cannot be deleted','Tài khoản được bảo vệ, không thể xóa'],
+    users_delete_success:['删除成功','Deleted','Đã xóa'],
+    users_delete_failed:['删除失败','Delete failed','Xóa thất bại']
+  };
+  function langIdx(){
+    var g = window.CUR_LANG || window.__lang || 'zh';
+    if (typeof g === 'string') { try { g = JSON.parse(g); } catch(e){} }
+    return (g === 'en') ? 1 : (g === 'vi') ? 2 : 0;
+  }
+  function L(k){
+    var fb = (FB[k] || [k,k,k])[langIdx()];
+    try { var t = (typeof T === 'function') ? T() : null; if (t && t[k]) return t[k]; } catch(e){}
+    return fb;
+  }
+
+  var css = document.createElement('style');
+  css.id = 'usrCtxStyle';
+  css.textContent = [
+    '#usrCtxPop{position:fixed;z-index:99999;min-width:208px;max-width:290px;display:none;',
+    'background:#f2f2f2;border:1px solid #808080;box-shadow:2px 2px 6px rgba(0,0,0,.3);',
+    'padding:3px;color:#1a1a1a;font:12px/1.5 "Segoe UI",Tahoma,Arial,sans-serif}',
+    '#usrCtxPop .uc-hd{background:#e4e4e4;border-bottom:1px solid #c2c2c2;padding:5px 9px;',
+    'font-weight:600;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '#usrCtxPop .uc-item{padding:6px 12px;cursor:pointer;white-space:nowrap;user-select:none}',
+    '#usrCtxPop .uc-item:hover{background:#316ac5;color:#fff}',
+    '#usrCtxPop .uc-item.uc-danger{color:#9b1c1c}',
+    '#usrCtxPop .uc-item.uc-danger:hover{background:#9b1c1c;color:#fff}',
+    '#usrCtxPop .uc-item.uc-disabled{color:#8c8c8c;cursor:not-allowed}',
+    '#usrCtxPop .uc-item.uc-disabled:hover{background:transparent;color:#8c8c8c}',
+    '#usrCtxPop .uc-sep{height:1px;background:#c7c7c7;border-top:1px solid #fff;margin:3px 2px}',
+    '#usrCtxPop .uc-msg{padding:9px 11px;line-height:1.6;color:#333;word-break:break-word}',
+    '#usrCtxPop .uc-ft{display:flex;gap:6px;justify-content:flex-end;padding:5px 9px 8px}',
+    '#usrCtxPop .uc-btn{min-width:72px;padding:4px 10px;border:1px solid #7a7a7a;',
+    'background:linear-gradient(#fff,#e7e7e7);color:#222;font:12px "Segoe UI",Tahoma,Arial,sans-serif;cursor:pointer}',
+    '#usrCtxPop .uc-btn:hover{border-color:#316ac5;background:#e9f0fb}',
+    '#usrCtxPop .uc-btn.uc-ok{border-color:#8b1a1a;background:linear-gradient(#fff,#f4dada);color:#8b1a1a;font-weight:600}',
+    '#usrCtxPop .uc-btn.uc-ok:hover{background:#8b1a1a;color:#fff}'
+  ].join('');
+  (document.head || document.documentElement).appendChild(css);
+
+  var pop = document.createElement('div');
+  pop.id = 'usrCtxPop';
+  pop.innerHTML = [
+    '<div class="uc-hd" id="usrCtxHd"></div>',
+    '<div id="usrCtxMenu">',
+      '<div class="uc-item uc-danger" id="usrCtxDel"></div>',
+      '<div class="uc-sep"></div>',
+      '<div class="uc-item" id="usrCtxCancel"></div>',
+    '</div>',
+    '<div id="usrCtxConfirm" style="display:none">',
+      '<div class="uc-msg" id="usrCtxMsg"></div>',
+      '<div class="uc-ft">',
+        '<button type="button" class="uc-btn" id="usrCtxNo"></button>',
+        '<button type="button" class="uc-btn uc-ok" id="usrCtxYes"></button>',
+      '</div>',
+    '</div>'
+  ].join('');
+  document.body.appendChild(pop);
+  window.__usrCtxPop = pop;
+
+  var hd = pop.querySelector('#usrCtxHd'), menu = pop.querySelector('#usrCtxMenu'),
+      cfm = pop.querySelector('#usrCtxConfirm'), del = pop.querySelector('#usrCtxDel'),
+      cancel = pop.querySelector('#usrCtxCancel'), msg = pop.querySelector('#usrCtxMsg'),
+      noBtn = pop.querySelector('#usrCtxNo'), yesBtn = pop.querySelector('#usrCtxYes');
+  var curId = null, curUser = null, state = 'menu';
+
+  function userName(){ return (curUser && (curUser.name || curUser.login)) || ''; }
+  function isProtected(){
+    return typeof isFullAccessUser === 'function' && isFullAccessUser(curUser && curUser.login);
+  }
+  function refreshText(){
+    var prot = isProtected();
+    if (state === 'menu') {
+      hd.textContent = L('usr_ctx_title') + ' · ' + userName();
+      del.textContent = prot ? L('usr_ctx_protected') : L('usr_ctx_delete');
+      cancel.textContent = L('usr_ctx_cancel');
+      del.className = 'uc-item uc-danger' + (prot ? ' uc-disabled' : '');
+      menu.style.display = ''; cfm.style.display = 'none';
+    } else {
+      hd.textContent = L('usr_ctx_del_title');
+      msg.textContent = prot ? L('usr_ctx_protected') : L('usr_ctx_msg').replace('%s', userName());
+      noBtn.textContent = L('usr_ctx_cancel');
+      yesBtn.textContent = L('usr_ctx_confirm');
+      menu.style.display = 'none'; cfm.style.display = '';
+    }
+  }
+  function showAt(x, y){
+    pop.style.display = 'block';
+    var w = pop.offsetWidth || 220, h = pop.offsetHeight || 120;
+    var left = x, top = y;
+    if (left + w > window.innerWidth - 8) left = window.innerWidth - w - 8;
+    if (top + h > window.innerHeight - 8) top = window.innerHeight - h - 8;
+    pop.style.left = Math.max(4, left) + 'px';
+    pop.style.top = Math.max(4, top) + 'px';
+  }
+  function hide(){ pop.style.display = 'none'; state = 'menu'; }
+
+  document.addEventListener('contextmenu', function(e){
+    var tr = (e.target && e.target.closest) ? e.target.closest('#usersTbody tr[data-id]') : null;
+    if (!tr) return;
+    var me = String((authUser && authUser.username) || '').trim().toLowerCase();
+    if (me !== 'tom' && me !== 'admin') return;   // 仅 tom / admin 可用
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+    curId = Number(tr.getAttribute('data-id'));
+    curUser = (usersData || []).find(function(u){ return u.id === curId; }) || {};
+    state = 'menu';
+    refreshText();
+    showAt(e.clientX || 0, e.clientY || 0);
+  }, true);
+
+  del.onclick = function(){ if (state !== 'menu' || isProtected()) return; state = 'confirm'; refreshText(); };
+  cancel.onclick = hide;
+  noBtn.onclick = hide;
+  yesBtn.onclick = function(){
+    if (state !== 'confirm' || isProtected()) { hide(); return; }
+    var id = curId;
+    fetch('/api/users/' + Number(id), { method:'DELETE', headers:(typeof authHeaders==='function'?authHeaders():{}) })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.ok) {
+          if (typeof showToast === 'function') showToast(d.message || L('users_delete_success'));
+          if (typeof loadUsers === 'function') loadUsers();
+        } else if (typeof showToast === 'function') {
+          showToast((d && d.message) || L('users_delete_failed'));
+        }
+      })
+      .catch(function(){ if (typeof showToast === 'function') showToast(L('users_delete_failed')); });
+    hide();
+  };
+  document.addEventListener('mousedown', function(e){
+    if (pop.style.display === 'none') return;
+    if (pop.contains(e.target)) return;
+    hide();
+  }, true);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') hide(); }, true);
+  window.addEventListener('resize', hide);
+  window.addEventListener('scroll', hide, true);
+  // 语言切换：只原地刷新文字，不删除/重建弹跳框、不重算坐标
+  window.addEventListener('app:langchange', function(){
+    if (pop.style.display !== 'none') refreshText();
+  });
+})();
 
 // ---------- 用户列表行重排（tom/cuong/james + 管理员专属） ----------
 function canReorderUsers(){
