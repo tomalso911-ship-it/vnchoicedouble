@@ -7482,14 +7482,47 @@ var WL_FLOW_IMG = {
       pairs.forEach(function(o){ tot.qty+=o.qty; tot.cement+=o.cement; tot.sand+=o.sand; tot.gravel+=o.gravel; usedSizes.forEach(function(s){ tot.rebar[s]+=o.rebar[s]; }); });
       return { pairs:pairs, usedSizes:usedSizes, totals:tot };
     }
-    function prod_renderMatTable(title, pairs, usedSizes, totals, groupBy){
+    /* ★PROD-B-SEC-TOGGLE-20261107：生产计划 4 个区块的「+/−」收缩按钮。
+       沿用安装模块 .inst-vis-toggle 样式（展开=−、收起=+）；状态存 localStorage，
+       重渲染 / 切语言 / 刷新后保持；只切 display，不删 DOM、不改数据、不触发服务端同步。 */
+    var PROD_B_COLLAPSE = null;
+    function prod_bCollapse(){
+      if(!PROD_B_COLLAPSE){
+        try { PROD_B_COLLAPSE = JSON.parse(localStorage.getItem('prod_b_collapse_v1')||'{}')||{}; }
+        catch(e){ PROD_B_COLLAPSE={}; }
+      }
+      return PROD_B_COLLAPSE;
+    }
+    function prod_bBtn(key){
+      var c=prod_bCollapse();
+      var tip=c[key] ? pt('btn_expand_all') : pt('btn_collapse_all');
+      return '<button type="button" id="prod-b-btn-'+key+'" class="inst-vis-toggle"'
+        + ' onclick="prod_bToggle(\''+key+'\')" title="'+prod_esc(tip)+'">'+(c[key]?'+':'−')+'</button>';
+    }
+    function prod_bSecTitle(titleKey, key){
+      return '<div class="prod-sec-title" style="border-color:#6c757d;display:flex;justify-content:space-between;align-items:center;">'
+        + pt(titleKey) + prod_bBtn(key) + '</div>';
+    }
+    function prod_bWrap(key, inner){
+      var c=prod_bCollapse();
+      return '<div id="prod-b-sec-'+key+'"'+(c[key]?' style="display:none"':'')+'>'+inner+'</div>';
+    }
+    function prod_bToggle(key){
+      var c=prod_bCollapse(); c[key]=!c[key];
+      try { localStorage.setItem('prod_b_collapse_v1', JSON.stringify(c)); } catch(e){}
+      var box=document.getElementById('prod-b-sec-'+key); if(box) box.style.display=c[key]?'none':'';
+      var btn=document.getElementById('prod-b-btn-'+key);
+      if(btn){ btn.textContent=c[key]?'+':'−'; btn.title=c[key]?pt('btn_expand_all'):pt('btn_collapse_all'); }
+    }
+    function prod_renderMatTable(title, pairs, usedSizes, totals, groupBy, collapseKey){
       /* 按原始猪舍编号/规格排序，避免切换语言时因三语名称不同导致顺序变化 */
       var _numCmp = function(a,b){ var na=parseFloat(a), nb=parseFloat(b); if(!isNaN(na) && !isNaN(nb) && na!==nb) return na-nb; return 0; };
       var sorted=pairs.slice().sort(function(a,b){
         if(groupBy==='spec'){ var c=a.spec.localeCompare(b.spec,'zh'); if(c) return c; c=_numCmp(a.ph,b.ph); return c?c:String(a.ph).localeCompare(String(b.ph),'zh'); }
         var c=_numCmp(a.ph,b.ph); if(c) return c; c=String(a.ph).localeCompare(String(b.ph),'zh'); return c?c:a.spec.localeCompare(b.spec,'zh');
       });
-      var h='<div class="prod-sec-title" style="border-color:#6c757d">'+title+'</div>';
+      var _titleHtml='<div class="prod-sec-title" style="border-color:#6c757d;display:flex;justify-content:space-between;align-items:center;">'+title+(collapseKey?prod_bBtn(collapseKey):'')+'</div>';
+      var h='';
       h+='<table class="prod-table prod-matusage"><thead><tr>';
       h+= groupBy==='spec' ? '<th>'+pt('thr_no')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_house')+'</th>' : '<th>'+pt('thr_house')+'</th><th>'+pt('th_spec')+'</th>';
       h+='<th>'+pt('th_qty_whole')+'</th>';
@@ -7534,7 +7567,7 @@ var WL_FLOW_IMG = {
       usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(totRt[s])+'</td>'; });
       h+='<td>'+fmt1Red(totals.cement)+'</td><td>'+fmt1Red(totals.sand)+prod_m3suf(totals.sand,'sand')+'</td><td>'+fmt1Red(totals.gravel)+prod_m3suf(totals.gravel,'gravel')+'</td></tr>';
       h+='</tbody></table>';
-      return h;
+      return _titleHtml + (collapseKey ? prod_bWrap(collapseKey, h) : h);
     }
     /* 按规格聚合骨料用量（供「生产骨料库存计划表」使用）：合计 数量/整场、钢筋(Tons)、水泥、黄砂、石子 */
     function prod_inventorySpecs(){
@@ -8341,8 +8374,8 @@ var WL_FLOW_IMG = {
         /* 材料/骨料明细表：按规格×栋舍、按栋舍×规格 两张互补透视表（含底部总计） */
         var mm2 = prod_slatsMaterial();
         if(mm2.pairs.length){
-          h += prod_renderMatTable(pt('sec_mat_spec'), mm2.pairs, mm2.usedSizes, mm2.totals, 'spec');
-          h += prod_renderMatTable(pt('sec_mat_house'), mm2.pairs, mm2.usedSizes, mm2.totals, 'ph');
+          h += prod_renderMatTable(pt('sec_mat_spec'), mm2.pairs, mm2.usedSizes, mm2.totals, 'spec', 'matSpec');
+          h += prod_renderMatTable(pt('sec_mat_house'), mm2.pairs, mm2.usedSizes, mm2.totals, 'ph', 'matHouse');
         }
       }
       /* 生产骨料库存计划表：结合规格用量矩阵，按 生产片数/天 + 骨料存储天数 自动推算 生产天数 与 采购量(Tons) */
@@ -8378,13 +8411,13 @@ var WL_FLOW_IMG = {
         h += '<div class="prod-empty">'+pt('empty_no_inv')+'</div>';
       }
       /* 按栋舍 × 物料 采购准备量 卡片（结合存储天数），新增独立区块，原库存计划表保留 */
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_house_card')+'</div>';
-      h += prod_renderHouseCards(inv);
+      h += prod_bSecTitle('sec_house_card','houseCard');
+      h += prod_bWrap('houseCard', prod_renderHouseCards(inv));
       /* 概念甘特图：读取「生产骨料库存计划表」每规格速率（默认300），按「优先猪舍全局优先」分段，并跳过越南公共假期（含春节前后扩展） */
       var priorityHouse = f.priorityHouse || '';
       var _prepEnd = f.prepEnd || f.planStart || ymdToDmy(prod_today());
       var _prepStartDisp = f.prepStart || dmyAddDays(_prepEnd, -45);
-      h += '<div class="prod-sec-title" style="border-color:#6c757d">'+pt('sec_gantt')+'</div>';
+      var _ganttHtmlStart = h.length;   /* ★PROD-B-SEC-TOGGLE：甘特图内容起点，末尾统一包裹成可收缩区块 */
       h += '<div class="prod-form">'
         + '<div class="prod-field"><label>'+pt('lbl_contract_signing_date')+'</label><input id="pg_contract_date" class="prod-contract-disp" value="'+prod_esc(prod_contractDateDisp())+'" readonly disabled style="background:#f0f0f0;cursor:not-allowed;"></div>'
         + prod_dateFld(pt('lbl_prep_start'),'pg_prep_start',_prepStartDisp,'prod_savePrep()')
@@ -8515,43 +8548,15 @@ var WL_FLOW_IMG = {
         });
         h += '<div style="font-size:12px;color:#666;margin-top:8px">'+pt('gantt_n1')+'<b>'+totalDays+'</b>'+pt('gantt_n2')+(priorityHouse?prod_esc(prod_phName(priorityHouse)):pt('gantt_unset'))+pt('gantt_n3')+'<strong style="color:#F9A825">'+pt('gantt_gold')+'</strong>'+pt('gantt_n4')+'<strong style="color:#2e7d32">'+pt('gantt_green')+'</strong>'+pt('gantt_n5')+'</div>';
         h += '</div></div>';
-        /* 按栋舍汇总生产计划表：分组猪舍，组内按开工日期升序，含每栋舍小计 */
-        var _byHouse = {};
-        _flat.forEach(function(s){ (_byHouse[s.house] = _byHouse[s.house] || []).push(s); });
-        var _houseSorted = mm.houseOrder.filter(function(ph){ return _byHouse[ph] && _byHouse[ph].length; });
-        /* 全局最早开工日 & 全局最晚结束日，仅这两个日期标红 */
-        var globalFirst = _flat.reduce(function(m, s){ return (!m || +s.sDate < +m) ? s.sDate : m; }, null);
-        var globalLast = _flat.reduce(function(m, s){ return (!m || +s.eDate > +m) ? s.eDate : m; }, null);
-        /* 按最早开工日期计算每个猪舍的生产次序，显示在猪舍名右侧 */
-        var _houseMinStart = {};
-        _flat.forEach(function(s){ if(!_houseMinStart[s.house] || +s.sDate < +_houseMinStart[s.house]) _houseMinStart[s.house] = s.sDate; });
-        var _houseOrder = _houseSorted.slice().sort(function(a,b){ return (+_houseMinStart[a] - +_houseMinStart[b]) || a.localeCompare(b); });
-        var prodOrder = {}; _houseOrder.forEach(function(ph, idx){ prodOrder[ph] = idx+1; });
-        h += '<div class="prod-sec-title" style="border-color:#6c757d;margin-top:18px">'+pt('sec_house_sum')+'</div>';
-        h += '<div style="overflow-x:auto"><table class="prod-table prod-houseplan" style="text-align:center"><thead><tr>'
-          + '<th>'+pt('thr_house2')+'</th><th>'+pt('th_spec')+'</th><th>'+pt('thr_qty_pcs')+'</th><th>'+pt('thr_start')+'</th><th>'+pt('thr_end')+'</th><th>'+pt('thr_prep')+'</th></tr></thead><tbody>';
-        _houseSorted.forEach(function(ph){
-          var segs = _byHouse[ph].slice().sort(function(a,b){ return +a.sDate - +b.sDate; });
-          var sub = 0;
-          var _rs = segs.length + 1; // +1 含小计行
-          segs.forEach(function(s, _idx){
-            sub += s.qty;
-            var pfx = (s.house === priorityHouse) ? '★ ' : '';
-            var redStart = (+s.sDate === +globalFirst) ? ' style="color:#d32f2f;font-weight:700"' : '';
-            var redEnd = (+s.eDate === +globalLast) ? ' style="color:#d32f2f;font-weight:700"' : '';
-            h += '<tr>';
-            if(_idx===0) h += '<td rowspan="'+_rs+'" class="merge-cell" style="border-right:2px solid #E53935;vertical-align:middle">'+pfx+prod_esc(prod_phName(s.house))+' <span style="font-size:10px;color:#666">('+pt('th_prod_order')+': '+prodOrder[s.house]+')</span></td>';
-            h += '<td>'+prod_esc(s.spec)+'</td><td>'+prod_fmtNum(s.qty)+'</td><td'+redStart+'>'+fmtFull(s.sDate)+'</td><td'+redEnd+'>'+fmtFull(s.eDate)+'</td><td style="color:#2e7d32;font-weight:600">'+fmtFull(_prepStartDate)+' ~ '+fmtFull(effStart)+'</td></tr>';
-          });
-          /* 小计行：最左列被合并单元格覆盖；黑线隔离下一组 */
-          h += '<tr style="border-bottom:2px solid #E53935;font-weight:700;background:#eef2f7"><td>'+prod_esc(prod_phName(ph))+' '+pt('subtotal')+'</td><td colspan="4" style="text-align:left">'+prod_fmtNum(sub)+' '+pt('unit_pcs')+'</td></tr>';
-        });
-        h += '</tbody></table></div>';
+        /* ★PROD-B-DEL-HOUSESUM-20261107：用户要求删除「按栋舍汇总生产计划」表格（标题/表格/相关计算整体移除） */
 
 
       } else {
         h += '<div class="prod-empty">'+pt('empty_gantt')+'</div>';
       }
+      /* ★PROD-B-SEC-TOGGLE-20261107：甘特图整块（含无数据提示）统一包进可收缩容器并补上标题/按钮 */
+      var _ganttBody = h.slice(_ganttHtmlStart);
+      h = h.slice(0, _ganttHtmlStart) + prod_bSecTitle('sec_gantt','gantt') + prod_bWrap('gantt', _ganttBody);
 
       return h;
     }
@@ -33326,6 +33331,9 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-report-table tbody tr:hover { background: #ffebee; }
 .slats-report-table tr.slats-report-total { font-weight: 700; background: #ffebee !important; }
 .slats-report-table tr.slats-report-total td { border-top: 2px solid #E53935; color: #C62828; }
+/* ★SLATS-REPORT-SOLID-YES-20261107：智能报告概述表「实心板? = YES」的整行数据红色加粗；
+   带 rowspan 的跨行分组信息列不染色，避免把同组其它行一起染红 */
+.slats-report-table tbody tr.slats-report-solid-yes td:not([rowspan]) { color: #ff0000 !important; font-weight: 700 !important; }
 .slats-report-table tbody tr:last-child td:first-child { border-radius: 0 0 0 10px; }
 .slats-report-table tbody tr:last-child td:last-child { border-radius: 0 0 10px 0; }
 /* 概述表列很多（约 21 列）：给猪舍/编号列固定较宽，其余列共享剩余空间，单元格自动换行不溢出 */
@@ -48920,7 +48928,9 @@ function openSlatsReportModal(){
     var phTranslated=_phLabel(g.pig_house);
     var gSpecial=slatsIsSpecialHouse(g.pig_house); // 四类特殊房舍：5 个字段透明(显示空白)，实际值=1
     g.rows.forEach(function(r, rIdx){
-      ovHtml+='<tr>';
+      // ★SLATS-REPORT-SOLID-YES-20261107：实心板?=YES 的整行数据红色加粗（便于阅读识别）
+      var _solidYes = String(r.solid_slat||'').trim().toUpperCase()==='YES';
+      ovHtml+='<tr'+(_solidYes?' class="slats-report-solid-yes"':'')+'>';
       if(rIdx===0){
         ovHtml+='<td rowspan="'+rs+'">'+(gIdx+1)+'</td>'+
           '<td rowspan="'+rs+'" data-i18n="'+phKey+'">'+_e(phTranslated)+'</td>'+
