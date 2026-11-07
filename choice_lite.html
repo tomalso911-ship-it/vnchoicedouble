@@ -33180,7 +33180,7 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-spec-wrap { margin-top: 8px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .slats-spec-toolbar { margin-bottom: 10px; text-align: right; flex-shrink: 0; display: flex; justify-content: flex-end; gap: 8px; }
 .slats-spec-table-scroll { overflow: auto; flex: 1 1 auto; min-height: 0; border: 1px solid #e8e8e8; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-.slats-spec-table { width: 100%; min-width: 1560px; border-collapse: separate; border-spacing: 0; font-size: 11px; background: #fff; }
+.slats-spec-table { width: 100%; min-width: 1700px; border-collapse: separate; border-spacing: 0; font-size: 10px; background: #fff; }
 .slats-spec-table th,
 .slats-spec-table td { border-right: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; padding: 2px 1px; text-align: center; vertical-align: middle; }
 .slats-spec-table th:last-child,
@@ -33192,9 +33192,10 @@ var PROD_EQUIP_FAULT_KB = {
 /* 二级表头固定在一级表头下方；z-index 必须比一级高，避免被 rowspan 单元格压住 */
 /* 加高并放开行高，避免“栋数/整场”这类两行表头被裁切（两行 11px 文本需要约 30px 内容区） */
 .slats-spec-header-sub th { background: #ff8a80; color: #fff; font-weight: 500; top: 46px; height: 34px; line-height: 1.25; padding: 5px 4px; z-index: 4; }
-  .slats-th-up{background:#fdeef0;color:#b03a4b;}
-  .slats-th-lo{background:#e3f0fb;color:#1f6fb2;}
-  .slats-spec-sub-lo input, .slats-spec-sub-lo select{background:#e3f0fb;}
+  .slats-th-up{background:#f7b6c2;color:#8f1d2c;}
+  .slats-th-lo{background:#b8d3f0;color:#174e7d;}
+  .slats-spec-sub-lo input, .slats-spec-sub-lo select{background:#e8f1fb;}
+  .slats-td-up input, .slats-td-up select{background:#fde9ed;}
   .slats-spec-disabled{opacity:.55;}
 .slats-spec-table thead tr:first-child th:first-child { border-radius: 10px 0 0 0; }
 .slats-spec-table thead tr:first-child th:last-child { border-radius: 0 10px 0 0; }
@@ -33202,7 +33203,7 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-spec-table tbody tr:hover { background: #ffebee; }
 .slats-spec-table tbody tr:last-child td:first-child { border-radius: 0 0 0 10px; }
 .slats-spec-table tbody tr:last-child td:last-child { border-radius: 0 0 10px 0; }
-.slats-spec-input { width: 100%; min-width: 42px; height: 28px; padding: 4px 2px; border: 1px solid #d0d0d0; border-radius: 0; font-size: 12px; text-align: center; box-sizing: border-box; background: #fff; transition: border-color .15s, box-shadow .15s; }
+.slats-spec-input { width: 100%; min-width: 36px; height: 24px; padding: 2px 1px; border: 1px solid #d0d0d0; border-radius: 0; font-size: 11px; text-align: center; box-sizing: border-box; background: #fff; transition: border-color .15s, box-shadow .15s; }
 .slats-spec-input:focus { border-color: #E53935; outline: none; box-shadow: inset 0 0 0 1px rgba(229,57,53,.35); }
 .slats-spec-input.slats-spec-computed { background: #f0f0f0; color: #333; cursor: default; }
 .slats-spec-input.slats-default-value { color: #D32F2F; font-weight: 600; }
@@ -49289,10 +49290,10 @@ function slatsRenderHeader(dual){
 }
 function slatsRenderColgroup(dual){
   var cg=el('slatsColgroup'); if(!cg) return;
-  var w=[46,132,92,48,55,55,55,60,48,48,48,78,60,78,78];
-  if(dual){ w=w.concat([58,58,62,50,58,62,50,58,62,50,58,62,50]); }
-  else { w=w.concat([58,58,62,50,58,62,50]); }
-  w=w.concat([86,86]);
+  var w=[44,126,80,46,52,52,52,56,46,46,46,70,58,70,70];
+  if(dual){ w=w.concat([50,50,54,44,50,54,44,50,54,44,50,54,44]); }
+  else { w=w.concat([50,50,54,44,50,54,44]); }
+  w=w.concat([76,76]);
   cg.innerHTML=w.map(function(x){ return '<col style="width:'+x+'px">'; }).join('');
 }
 function slatsApplyLowerState(tr){
@@ -49387,6 +49388,9 @@ function slatsBuildRow(dual, groupId, idx, values){
   tr.appendChild(slatsSelectCell('slats_solid_', ['YES','NO'], sv));
   tr.appendChild(slatsActionCell());
   for(var _oci=0;_oci<tr.children.length;_oci++){ tr.children[_oci].setAttribute('data-oci', _oci); }
+  if(dual){
+    for(var u=16;u<=21;u++){ var cu=tr.querySelector('td[data-oci="'+u+'"]'); if(cu && cu.className.indexOf('slats-td-up')<0) cu.className+=' slats-td-up'; }
+  }
   if(values && values.length){
     for(var ci=1;ci<values.length;ci++){
       var v=values[ci];
