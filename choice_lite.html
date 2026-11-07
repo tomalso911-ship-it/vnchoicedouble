@@ -171,6 +171,14 @@ window.__deferInit = window.__deferInit || function(fn, timeout){
   } catch (e) {}
   setTimeout(run, 1);
 };
+/* ★PERF-PRELOAD-20261107：登录后尽早后台载入本地图表库（vendor/chart.umd.min.js、echarts），
+   避免首次点开「对比分析报告 / 安装趋势 / 生产甘特」时因脚本未就绪而阻塞等待；
+   配合下方报告 DOM/图表「只渲染一次、折叠仅切换显隐」的逻辑，折叠/币种切换做到瞬间反应、稳定可复现。 */
+window.__prodPreloadCharts = function(){
+  try { if (typeof _ovLoadChartLib === 'function') _ovLoadChartLib(function(){}); } catch(e){}
+  try { if (typeof prod_ensureEcharts === 'function') { var _p = prod_ensureEcharts(); if (_p && typeof _p.catch === 'function') _p.catch(function(){}); } } catch(e){}
+};
+if (typeof window.__deferInit === 'function') window.__deferInit(window.__prodPreloadCharts, 0);
 </script>
 <script>
 // 全局错误浮层：任何 JS 报错都显示在页面顶部红线，方便定位"进不去"问题
@@ -5993,9 +6001,14 @@ var WL_FLOW_IMG = {
       .prod-report-sec-t{font-size:13px;font-weight:700;color:#E53935;border-left:4px solid #E53935;padding-left:8px;margin-bottom:8px;}
       .prod-report-tbl{width:100%;border-collapse:collapse;font-size:11px;}
       .prod-report-tbl th,.prod-report-tbl td{border:1px solid #e6e6e6;padding:4px 6px;text-align:right;white-space:nowrap;}
-      .prod-report-tbl th{background:#fafafa;color:#444;font-weight:600;text-align:center;}
+      /* ★PROD-REPORT-STYLE-20261107：表头红底白字；行斑马线 白/淡蓝；合计行保持淡红 */
+      .prod-report-tbl th{background:#E53935;color:#fff;font-weight:600;text-align:center;}
+      .prod-report-tbl tbody tr{background:#fff;}
+      .prod-report-tbl tbody tr:nth-child(even){background:#eaf2fb;}
       .prod-report-tbl td:first-child,.prod-report-tbl th:first-child{text-align:left;}
       .prod-report-tbl .prod-report-tot{background:#fff3f3;}
+      /* ★RC-DATE-CENTER-20261107：收货确认「到货日期」输入框文字居中 */
+      #pd_arr_date{text-align:center;}
       .prod-report-canvas-wrap{position:relative;height:260px;}
       .prod-report-empty{color:#888;font-size:13px;padding:10px 0;}
       /* ★PROD-REPORT-INLINE-20261107：对比分析报告不再用模态框，直接挂在「查看报告」按钮下方，配 +/− 折叠按钮 */
@@ -9625,6 +9638,7 @@ var WL_FLOW_IMG = {
     ];
     var PROD_REPORT_CUR = 'VND';
     var PROD_REPORT_OPEN = false;   /* ★PROD-REPORT-INLINE：内联报告展开状态，跨 Tab 重渲染保持 */
+    var PROD_REPORT_BUILT_FOR = null;  /* ★PERF-20261107：已为哪个项目渲染过报告 DOM/图表；切项目或数据变动时失效，避免每次开关都重算重绘 */
     var PROD_REPORT_DATA = null;
     var PROD_REPORT_CHARTS = [];
     var PROD_REPORT_LANG_TIMER = null;
@@ -9706,13 +9720,18 @@ var WL_FLOW_IMG = {
     function prodReportOpen(){
       var f=prod_get(PROD_CUR); if(!f) return;
       var panel=document.getElementById('prod_report_panel'); if(!panel) return;  /* 容器在 D 标签内 */
-      PROD_REPORT_DATA={demand:prodReportDemand(f), recv:prodReportReceived(f)};
+      var btn=document.getElementById('prod_report_toggle');
+      var body=document.getElementById('prod_report_body');
+      /* ★PERF-20261107：同一项目且已渲染过（body 非空）则只切显隐，不重算数据、不重建 DOM、不重绘图表——折叠按钮因此瞬间反应 */
+      if(!PROD_REPORT_DATA || PROD_REPORT_BUILT_FOR!==PROD_CUR || !(body && body.children.length)){
+        PROD_REPORT_DATA={demand:prodReportDemand(f), recv:prodReportReceived(f)};
+        PROD_REPORT_BUILT_FOR=PROD_CUR;
+        PROD_REPORT_CHARTS=[];
+        prodReportRenderBody();
+      }
       PROD_REPORT_OPEN=true;
       panel.style.display='';
-      var btn=document.getElementById('prod_report_toggle');
       if(btn){ btn.textContent='−'; btn.title=pt('btn_collapse_all'); }
-      PROD_REPORT_CHARTS=[];
-      prodReportRenderBody();
     }
     function prodReportSetCur(c, btn){
       PROD_REPORT_CUR=c;
@@ -48739,6 +48758,7 @@ function saveSlatsSpec(){
   window.__slatsSpecByPid = window.__slatsSpecByPid || {};
   var mid=el('wonModal')?el('wonModal').dataset.id:'';
   window.__slatsSpecByPid[mid||''] = json;
+  window.PROD_REPORT_BUILT_FOR=null; /* ★PERF-20261107：水泥板规格(材料矩阵源)变动，失效对比报告缓存，下次打开重算 */
   // 若已存在项目ID，立即写库
   if(mid){
     fetch('/api/won-projects/'+mid,{method:'PUT', credentials:'include', headers:(typeof authHeaders==='function'?authHeaders({'Content-Type':'application/json'}):{'Content-Type':'application/json'}), body:JSON.stringify({concrete_floor_spec:json})})
