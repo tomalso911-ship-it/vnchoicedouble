@@ -2067,7 +2067,8 @@ def api_comm_amt_requests():
 
     body = request.get_json(force=True, silent=True) or {}
     requester = str(body.get("requester") or "").strip().lower()
-    if requester not in COMMISSION_APPROVERS:
+    # ★FULL-ACCESS-20261107：四人最高授权可发起全部操作（含佣金金额修改）
+    if requester not in COMMISSION_APPROVERS and not _is_full_access(requester):
         conn.close()
         return jsonify({"error": "只有授权人员可以发起佣金金额修改"}), 403
 
