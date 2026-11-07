@@ -5935,7 +5935,8 @@ var WL_FLOW_IMG = {
       .inv-card .fld label{font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       .inv-card .fld input{width:56px;text-align:center;padding:2px 4px;font-size:12px;background:#fff59d !important;}
       .inv-card.inv-total{background:#eef2f7;border-color:#cdd7e3;font-weight:700;}
-      .receipt-form{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;background:#f9fafb;border:1px solid #ececec;border-radius:12px;align-items:stretch;}
+      /* ★RC-DATE-NARROW-20261107：到货日期那一栏由 1/2 收到 1/4（输入框窄 50%），省下的空间全给收货照片 */
+      .receipt-form{width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,3fr);gap:8px;padding:10px;background:#f9fafb;border:1px solid #ececec;border-radius:12px;align-items:stretch;}
       .receipt-form .prod-field{background:#fff;border:1px solid #e8eaed;border-radius:10px;padding:8px 11px;gap:6px;margin:0;}
       .receipt-form .prod-field > label{font-weight:600;color:#2c3e50;font-size:13px;}
       .receipt-form .prod-field.rc-left-top{grid-column:1;grid-row:1 / span 2;}
@@ -5983,9 +5984,7 @@ var WL_FLOW_IMG = {
       .receipt-collapse-btn:hover{background:#ffeaea;}
       .rc-list-scroll{max-height:520px;overflow-y:auto;overflow-x:hidden;padding-right:4px;}
       .prod-receipt-sec-title{position:sticky;top:0;z-index:20;background:#fff;padding-top:6px;padding-bottom:6px;}
-      /* 入库原料统计 & 需求对比 报告模态框 */
-      #prod_report_modal .modal-header{position:relative;}
-      #prod_report_modal .modal-header .prod-report-title{font-size:15px;font-weight:700;flex:1;padding-right:90px;line-height:1.4;}
+      /* 入库原料统计 & 需求对比 报告：已改为按钮下方内联面板（★PROD-REPORT-INLINE-20261107），原模态框专用样式已移除 */
       .prod-report-cur{display:inline-flex;background:#f3f6fa;border:1px solid #e0e6ee;border-radius:10px;overflow:hidden;}
       .prc-btn{padding:5px 12px;border:none;background:transparent;cursor:pointer;font-size:12px;font-weight:600;color:#5a6a7a;}
       .prc-btn.on{background:#E53935;color:#fff;}
@@ -5999,6 +5998,12 @@ var WL_FLOW_IMG = {
       .prod-report-tbl .prod-report-tot{background:#fff3f3;}
       .prod-report-canvas-wrap{position:relative;height:260px;}
       .prod-report-empty{color:#888;font-size:13px;padding:10px 0;}
+      /* ★PROD-REPORT-INLINE-20261107：对比分析报告不再用模态框，直接挂在「查看报告」按钮下方，配 +/− 折叠按钮 */
+      .prod-report-inline{margin-top:12px;}
+      .prod-report-inline-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+      .prod-report-panel{margin-top:10px;border:1px solid #e0e6ee;border-radius:10px;background:#fff;padding:12px 14px;}
+      .prod-report-panel-title{font-size:14px;font-weight:700;color:#E53935;border-left:4px solid #E53935;padding-left:8px;margin-bottom:10px;}
+      .prod-report-panel .prod-report-body{padding:0;overflow:visible;flex:none;font-size:12px;}
       /* 收货单/审批里的照片缩略图（否则原图全尺寸展示，页面被撑爆） */
       .photo-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
       .photo-list .thumb{width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;display:block;cursor:zoom-in;}
@@ -7913,7 +7918,7 @@ var WL_FLOW_IMG = {
       if(key==='A'){ body.innerHTML = prod_tabA(f); prod_syncContractDate(); prod_linkDueToCard(); prod_drawLineCompare(); }
       else if(key==='B'){ body.innerHTML = prod_tabB(f); prod_syncContractDate(); prod_applyHouseFilter(); }
       else if(key==='C'){ body.innerHTML = prod_tabC(f); prod_drawTrends(); PROD_LABOR_SORT = {col:null, dir:0}; }
-      else if(key==='D'){ body.innerHTML = prod_tabD(f); prodReceiptRenderRows(); prod_receiptApplyHouse(); prod_updateHouseFilterTip(); prod_updateHousePreview(); }
+      else if(key==='D'){ body.innerHTML = prod_tabD(f); prodReceiptRenderRows(); prod_receiptApplyHouse(); prod_updateHouseFilterTip(); prod_updateHousePreview(); if(PROD_REPORT_OPEN) prodReportOpen(); }
       else if(key==='E'){ body.innerHTML = prod_tabE(f); var _et = body.querySelector('.prod-table.pe-estats'); if(_et){ _et.addEventListener('click', prod_eStatsTableClick); } prod_drawEStats(f); prod_drawLineCompare();
         /* ★ 安装页「快速录入该舍生产数据」：渲染完自动选中线1 + 该猪舍并滚动定位 */
         if(window.__PROD_E_HOUSE_REQ){ var _erq = window.__PROD_E_HOUSE_REQ; window.__PROD_E_HOUSE_REQ = null; try{ prod_dailyApplyHouseReq(_erq.line, _erq.house); }catch(e){} } }
@@ -9563,7 +9568,17 @@ var WL_FLOW_IMG = {
         + '</div>'
         + '<div style="margin-top:6px;"><span id="pd_house_filter_tip" style="font-size:12px;color:#666;"></span></div>'
         + '<div id="pd_house_preview" style="margin-top:10px;"></div>'
-        + '<button class="prod-btn" type="button" style="margin-top:12px;display:inline-block;background:#E53935;color:#fff;border-color:#E53935;font-weight:600;" data-i18n="btn_report" onclick="prodReportOpen()">'+pt('btn_report')+'</button>';
+        /* ★PROD-REPORT-INLINE-20261107：报告直接挂在按钮下方（不再弹模态框），右侧 +/− 可折叠 */
+        + '<div class="prod-report-inline">'
+        +   '<div class="prod-report-inline-head">'
+        +     '<button class="prod-btn" type="button" style="display:inline-block;background:#E53935;color:#fff;border-color:#E53935;font-weight:600;" data-i18n="btn_report" onclick="prodReportOpen()">'+pt('btn_report')+'</button>'
+        +     '<button type="button" id="prod_report_toggle" class="inst-vis-toggle" style="margin-left:0" onclick="prodReportToggle()" title="'+prod_esc(pt('btn_expand_all'))+'">+</button>'
+        +   '</div>'
+        +   '<div id="prod_report_panel" class="prod-report-panel" style="display:none">'
+        +     '<div class="prod-report-panel-title" data-i18n="rpt_title">'+prod_esc(pt('rpt_title'))+'</div>'
+        +     '<div class="modal-body prod-report-body" id="prod_report_body"></div>'
+        +   '</div>'
+        + '</div>';
 
       /* 已提交收货单列表（最新的排最前，提交后立刻可见；过滤已删除墓碑） */
       var _delRc = (f.materials && f.materials.receiptsDeleted) || [];
@@ -9609,6 +9624,7 @@ var WL_FLOW_IMG = {
       {key:'cement', i18n:'rpt_cat_cement'}, {key:'sand', i18n:'rpt_cat_sand'}, {key:'gravel', i18n:'rpt_cat_gravel'}
     ];
     var PROD_REPORT_CUR = 'VND';
+    var PROD_REPORT_OPEN = false;   /* ★PROD-REPORT-INLINE：内联报告展开状态，跨 Tab 重渲染保持 */
     var PROD_REPORT_DATA = null;
     var PROD_REPORT_CHARTS = [];
     var PROD_REPORT_LANG_TIMER = null;
@@ -9689,21 +9705,13 @@ var WL_FLOW_IMG = {
     function prod_fmtTon(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1})+' '+pt('unit_ton'); }
     function prodReportOpen(){
       var f=prod_get(PROD_CUR); if(!f) return;
+      var panel=document.getElementById('prod_report_panel'); if(!panel) return;  /* 容器在 D 标签内 */
       PROD_REPORT_DATA={demand:prodReportDemand(f), recv:prodReportReceived(f)};
-      var ov=document.createElement('div'); ov.className='modal-overlay show'; ov.id='prod_report_modal';
-      ov.innerHTML='<div class="modal" style="width:90vw;max-width:900px;" data-mmax-btn="1">'
-        +'<div class="modal-header" style="position:relative;"><span class="prod-report-title" data-i18n="rpt_title">'+pt('rpt_title')+'</span>'
-        +'<span class="modal-actions">'
-        +'<button class="mmax-btn" type="button" onclick="toggleMaximize(this.closest(\'.modal\'))" title="最大化">&#9633;</button>'
-        +'<button class="close" type="button" onclick="prodReportClose()" title="关闭">&times;</button>'
-        +'</span></div>'
-        +'<div class="modal-body prod-report-body" id="prod_report_body"></div>'
-        +'<div class="modal-footer"><button class="btn" type="button" data-i18n="common_close" onclick="prodReportClose()">'+prod_esc(pt('common_close'))+'</button></div>'
-        +'<div class="modal-resize"></div></div>';
-      document.body.appendChild(ov);
+      PROD_REPORT_OPEN=true;
+      panel.style.display='';
+      var btn=document.getElementById('prod_report_toggle');
+      if(btn){ btn.textContent='−'; btn.title=pt('btn_collapse_all'); }
       PROD_REPORT_CHARTS=[];
-      if(typeof makeDraggable==='function') makeDraggable('#prod_report_modal', '.modal', '.modal-header');
-      if(typeof makeResizable==='function') makeResizable('#prod_report_modal', '.modal', '.modal-resize');
       prodReportRenderBody();
     }
     function prodReportSetCur(c, btn){
@@ -9712,22 +9720,30 @@ var WL_FLOW_IMG = {
       btn.classList.add('on');
       prodReportRenderBody();
     }
-    function prodReportClose(){ var m=document.getElementById('prod_report_modal'); if(m) m.remove(); }
+    function prodReportClose(){
+      PROD_REPORT_OPEN=false;
+      var panel=document.getElementById('prod_report_panel'); if(panel) panel.style.display='none';
+      var btn=document.getElementById('prod_report_toggle');
+      if(btn){ btn.textContent='+'; btn.title=pt('btn_expand_all'); }
+    }
+    function prodReportToggle(){ if(PROD_REPORT_OPEN) prodReportClose(); else prodReportOpen(); }
     function prodReportPrint(){
-      var ov=document.getElementById('prod_report_modal'); if(!ov) return;
-      /* 与 printModalById 一致：不能在 print() 之后 300ms 摘标记 ——
-         打印预览是异步快照，Edge 抓 DOM 更慢，摘早了整页会变空白。 */
+      var panel=document.getElementById('prod_report_panel'); if(!panel || panel.style.display==='none') return;
+      /* ★PROD-REPORT-INLINE：内联报告打印时复制一份到 body 直属临时节点（打印 CSS 只认 body > .print-target），
+         canvas 转 img 保住饼图/柱图位图；与 prod_printPlan 同款，打印后移除临时节点。 */
       if(typeof __clearPrintTarget==='function') __clearPrintTarget();
-      ov.classList.add('print-target');
-      if(typeof __printTargetEl!=='undefined') __printTargetEl = ov;
-      window.__printSeq = (window.__printSeq || 0) + 1;
-      if(typeof __lazyClearPrintTarget==='function' && !window.__printLazyBound){
-        window.__printLazyBound = true;
-        document.addEventListener('pointerdown', __lazyClearPrintTarget, true);
-        document.addEventListener('keydown', __lazyClearPrintTarget, true);
+      var wrap=document.createElement('div'); wrap.className='print-target prod-report-print-wrap';
+      var box=document.getElementById('prod_report_body')||panel;
+      wrap.innerHTML='<div class="prod-report-panel-title">'+prod_esc(pt('rpt_title'))+'</div>'+box.innerHTML;
+      var src=panel.querySelectorAll('canvas'), dst=wrap.querySelectorAll('canvas');
+      for(var i=0;i<src.length && i<dst.length;i++){
+        try{ var im=document.createElement('img'); im.src=src[i].toDataURL('image/png'); im.style.cssText='max-width:100%;height:auto;'; dst[i].parentNode.replaceChild(im,dst[i]); }catch(e){}
       }
+      var cw=wrap.querySelectorAll('.prod-report-canvas-wrap'); for(var k=0;k<cw.length;k++) cw[k].style.height='auto';
+      var btns=wrap.querySelectorAll('button'); for(var j=0;j<btns.length;j++) btns[j].style.display='none';
+      document.body.appendChild(wrap);
       window.print();
-      if(typeof __lazyClearPrintTarget==='function') setTimeout(__lazyClearPrintTarget, 60000);  /* 兜底 */
+      setTimeout(function(){ if(wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 300);
     }
     /* 语言切换触发的报告重渲染：防抖 320ms，把同步 burst + 300ms fallback 合并为一次 */
     function prodReportRenderBodyLang(){
@@ -17632,9 +17648,13 @@ var PROD_EQUIP_FAULT_KB = {
         }
       } catch(e){}
       try { applyRcNoteLang(); } catch(e){}
-      // 报告弹窗打开时：表格/图表/按钮文案跟随系统语言切换（防抖合并多次触发）
+      // 内联报告展开时：表格/图表/按钮文案跟随系统语言切换（防抖合并多次触发）
       try {
-        if (document.getElementById('prod_report_modal')) prodReportRenderBodyLang();
+        if (PROD_REPORT_OPEN && document.getElementById('prod_report_body')) {
+          var _rtb = document.getElementById('prod_report_toggle');
+          if(_rtb) _rtb.title = pt('btn_collapse_all');
+          prodReportRenderBodyLang();
+        }
       } catch(e){ console.warn('[lang] prod report:', e); }
       // 出库/入库操作弹窗打开时：正文/按钮/明细/标题即时跟随语言切换
       try {
