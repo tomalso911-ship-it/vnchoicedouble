@@ -131,8 +131,59 @@ CORS(app)
 # ★FULL-ACCESS-20261107（用户 2026-11-07 指定）：tom/admin/cuong/james 四人最高授权。
 # 无论 managers 表如何变动，永远 is_admin=True，且所有模块/项目恒为语义最高级。
 # 注意：必须定义在 init_db() 调用（模块加载期）之前，否则启动即 NameError 崩溃循环。
-SUPER_USERS = ("tom", "admin", "cuong", "james")
-ALWAYS_MANAGERS = SUPER_USERS
+# ★OWNER-MATRIX-20261107（用户 2026-11-07 指定）：tom 独大。
+SUPER_USERS = ("tom", "admin")            # 运行时短路（前端/后端闸门）
+ALWAYS_MANAGERS = ("tom", "admin", "cuong", "james")  # is_admin 保留，避免功能缺失
+FULL_PERMS_USERS = ("tom",)               # perms 恒归一化为全放开：只有 tom 不可降权
+PROTECTED_ACCOUNTS = ("tom", "admin")     # 不可禁用 / 不可删除（资料、密码照常可改）
+SEEDED_FULL_PERMS_USERS = ("admin", "cuong", "james")  # 初始落库全放开，之后由 tom/admin 决定
+
+
+def _is_full_perms_user(username):
+    """perms 读时归一化为全放开：只有 tom。admin/cuong/james 读存储值。"""
+    return (username or "").strip().lower() in FULL_PERMS_USERS
+
+
+# ★STD-PERMS-20261107：新增用户标准权限 = thuong 账号当前权限的固化快照
+# （14 个公共模块 + 项目 17/19；将来 thuong 被改不影响新用户；新项目默认 hide）
+_PROJ_EDIT_KEYS = ("contract", "lib", "approval", "prod_A", "prod_B", "prod_C",
+                   "prod_D", "prod_E", "prod_F", "prod_H", "inst_A", "inst_B",
+                   "inst_C", "wl_daily", "wl_mywork")
+_P17 = {k: "edit" for k in _PROJ_EDIT_KEYS}
+_P17.update({"whole": "view", "contract": "view", "lib": "view", "approval": "hide",
+             "prod_D_receipt": {"approvers": ["thuong"], "decision": "approve"}})
+_P19 = {k: "edit" for k in _PROJ_EDIT_KEYS}
+_P19.update({"whole": "view",
+             "prod_D_receipt": {"approvers": ["thuong"], "decision": "approve"}})
+NEW_USER_DEFAULT_PERMS = {
+    "USR-L1": {"approvers": [], "decision": "hide"},
+    "USR-D1": {"approvers": [], "decision": "hide"},
+    "USR-D2": {"approvers": [], "decision": "hide"},
+    "USR-D3": {"approvers": [], "decision": "hide"},
+    "common": {
+        "dashboard": "view", "won_list": "view",
+        "eq_data": "hide", "eq_dividend": "hide", "eq_holders": "hide",
+        "fin_cn": "hide", "fin_rest": "hide", "fin_vn": "hide",
+        "lib_cost": "hide", "won_btn_add": "hide", "won_btn_export": "hide",
+        "won_row_copy": "hide", "won_row_delete": "hide",
+        "won_row_edit": "hide", "won_row_view": "hide",
+    },
+    "lib_file_overrides": {},
+    "proj_default": {},
+    "projects": {"17": _P17, "19": _P19},
+}
+
+
+def _is_blank_perms(p):
+    """新建时前端会传一份「全默认」空壳；视为未设置，套标准模板。"""
+    if not isinstance(p, dict):
+        return True
+    if p.get("projects"):
+        return False
+    for v in (p.get("common") or {}).values():
+        if v not in ("hide", "view", None, ""):
+            return False
+    return True
 
 
 def _is_full_access(username):
@@ -1578,7 +1629,7 @@ def _cloud_mirror_login(conn, username, password):
         if not is_admin and (row["role"] or "") == "管理员":
             is_admin = True
         # 四人最高授权（云登录路径）★FULL-ACCESS-20261107
-        _full = _is_full_access(username)
+        _full = _is_full_perms_user(username)
         if _full:
             is_admin = True
             perms = _full_perms_for_super(conn)
@@ -1662,7 +1713,7 @@ def login():
     except Exception:
         perms = {}
     perms = _norm_user_perms(perms, conn)
-    _full = _is_full_access(_col("username"))
+    _full = _is_full_perms_user(_col("username"))
     if _full:
         perms = _full_perms_for_super(conn)
     def _ids(raw):
@@ -1741,7 +1792,7 @@ def api_me():
     except Exception:
         perms = {}
     perms = _norm_user_perms(perms, conn)
-    _full = _is_full_access(_col("username"))
+    _full = _is_full_perms_user(_col("username"))
     if _full:
         perms = _full_perms_for_super(conn)
     def _ids(raw):
@@ -8233,7 +8284,7 @@ def api_users_list():
     for u in users:
         u["perms"] = _norm_user_perms(u.get("perms", {}) or {}, conn)
         # ★FULL-ACCESS-20261107：四人读时归一化，面板/接口/导出看到全放开
-        if _is_full_access(u.get("username")):
+        if _is_full_perms_user(u.get("username")):
             u["perms"] = _full_perms_for_super(conn)
             u["is_admin"] = True
             u["status"] = "active"
@@ -8602,6 +8653,10 @@ def api_users_create():
     vis_can_see_me = data.get("vis_can_see_me") or []
     vis_he_can_see = data.get("vis_he_can_see") or []
     perms = data.get("perms") or {}
+    # ★STD-PERMS-20261107：未显式设置权限时套用 thuong 固化快照
+    if _is_blank_perms(perms):
+        import json as _json_std
+        perms = _json_std.loads(_json_std.dumps(NEW_USER_DEFAULT_PERMS))
     forgot_approvers = data.get("forgot_approvers") or ["tom"]
     if not username or not real_name:
         return jsonify({"ok": False, "message": "姓名和账号不能为空"})
@@ -8708,10 +8763,23 @@ def api_users_update(uid):
     if not row:
         conn.close()
         return jsonify({"ok": False, "message": "用户不存在"})
-    # ★FULL-ACCESS-20261107：四人账号完全锁定 —— 禁止降权 / 禁用；
-    #   perms 强制回写全放开；姓名/密码/职位等资料仍照常可改。
-    if _is_full_access(row["username"]):
+    # ★OWNER-MATRIX-20261107：tom 独大 + 顶层账号保护 + cuong/james 全部放开。
+    _tname = (row["username"] or "").strip().lower()
+    _opname = (_op or "").strip().lower()
+    _has_perms = "perms" in data
+    # 1) tom 的权限：除本人外任何人都不能改（连 admin 也不行）
+    if _tname == "tom" and _has_perms and _opname != "tom":
+        conn.close()
+        return jsonify({"ok": False, "message": "tom 的权限不可被其他账号修改"}), 403
+    # 2) cuong/james 不能改 tom / admin 的权限，但可改其他普通用户
+    if _tname in ("tom", "admin") and _has_perms and _opname in ("cuong", "james"):
+        conn.close()
+        return jsonify({"ok": False, "message": "无权修改该账号的权限"}), 403
+    # 3) tom / admin 不可被禁用或停用（资料、密码照常可改）
+    if _tname in PROTECTED_ACCOUNTS:
         status = "active"
+    # 4) 只有 tom 的 perms 恒全放开；admin/cuong/james 按存储值，改动真实生效
+    if _tname in FULL_PERMS_USERS:
         perms = _full_perms_for_super(conn)
     # WON-L1 职位联动兜底：职位从 销售/销售总监 改为其他职位时，
     # 若 WON-L1 决策仍为销售缺省的 hide，则自动改回 default（不覆盖其他决策值）。
@@ -8769,9 +8837,9 @@ def api_users_delete(uid):
         return jsonify({"ok": False, "message": "无权限：删除/停用用户未对你开放" if _gate == "deny" else "该操作需经审批流程，请在页面中提交申请"}), 403
     conn = get_db()
     _target = conn.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()
-    if _target and _is_full_access(_target["username"]):
+    if _target and (_target["username"] or "").strip().lower() in PROTECTED_ACCOUNTS:
         conn.close()
-        return jsonify({"ok": False, "message": "该账号为系统最高授权用户，不可删除"}), 403
+        return jsonify({"ok": False, "message": "该账号受保护，不可删除"}), 403
     conn.execute("DELETE FROM users WHERE id=?", (uid,))
     conn.commit()
     conn.close()

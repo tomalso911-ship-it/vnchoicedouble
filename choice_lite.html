@@ -43683,7 +43683,11 @@ function openModal(uid, copyFrom){
   window.__fullAccessEditUid = null;
   if (uid && typeof isFullAccessUser === 'function'){
     const _fu = usersData.find(function(x){ return x.id === uid; }) || {};
-    if (isFullAccessUser(_fu.login || _fu.username)) window.__fullAccessEditUid = uid;
+    const _tname = String(_fu.login || _fu.username || '').trim().toLowerCase();
+    const _opname = String((authUser && authUser.username) || '').trim().toLowerCase();
+    // ★OWNER-MATRIX-20261107：tom 可改 admin 的权限；tom 本人仍不可被降权
+    const _tomEditingAdmin = (_tname === 'admin' && _opname === 'tom');
+    if (isFullAccessUser(_tname) && !_tomEditingAdmin) window.__fullAccessEditUid = uid;
   }
   _renderUserModal(uid, copyFrom, src);
   if (curUid) {
@@ -43895,11 +43899,37 @@ const SALES_LOCKED_WON = new Set(["WON-D2","WON-D3","WON-N1","WON-C1","WON-P345"
 // 用户与权限管理三人审批组（锁死）：任一人审批即结束该流程；三人自己操作免审批（与管理员同级直达）
 const TRI_APPROVERS = ["tom", "cuong", "james"];
 // ★FULL-ACCESS-20261107：四人最高授权白名单（唯一事实源，仅这四个用户名恒全放开）
-window.__SUPER_USERS = ["tom", "admin", "cuong", "james"];
+window.__SUPER_USERS = ["tom", "admin"];   // ★OWNER-MATRIX-20261107：仅 tom/admin 恒全放开
 function isFullAccessUser(u){
   var n = String((u && (u.username || u.login)) || u || '').trim().toLowerCase();
-  return (window.__SUPER_USERS || ["tom","admin","cuong","james"]).indexOf(n) >= 0;
+  return (window.__SUPER_USERS || ["tom","admin"]).indexOf(n) >= 0;
 }
+// ★STD-PERMS-20261107：新增用户标准权限（thuong 固化快照，与 app.py 一致）
+(function(){
+  var E = ['contract','lib','approval','prod_A','prod_B','prod_C','prod_D','prod_E',
+           'prod_F','prod_H','inst_A','inst_B','inst_C','wl_daily','wl_mywork'];
+  function mk(over){
+    var o = {whole:'view', prod_D_receipt:{decision:'approve', approvers:['thuong']}};
+    E.forEach(function(k){ o[k] = 'edit'; });
+    Object.keys(over||{}).forEach(function(k){ o[k] = over[k]; });
+    return o;
+  }
+  window.__STD_PERMS = {
+    'USR-L1': {decision:'hide'}, 'USR-D1': {decision:'hide'},
+    'USR-D2': {decision:'hide'}, 'USR-D3': {decision:'hide'},
+    common: {
+      dashboard:'view', won_list:'view', eq_data:'hide', eq_dividend:'hide',
+      eq_holders:'hide', fin_cn:'hide', fin_rest:'hide', fin_vn:'hide',
+      lib_cost:'hide', won_btn_add:'hide', won_btn_export:'hide',
+      won_row_copy:'hide', won_row_delete:'hide', won_row_edit:'hide', won_row_view:'hide'
+    },
+    lib_file_overrides: {}, proj_default: {},
+    projects: {
+      '17': mk({contract:'view', lib:'view', approval:'hide'}),
+      '19': mk({})
+    }
+  };
+})();
 // 按每项 option set 取「语义最高级」，不改造级别体系
 function _fullCommonStore(){
   const out = {};
@@ -44259,6 +44289,7 @@ function _permTr(key, fallback){
 }
 
 function _commonStateFor(uid){
+  if (!uid && window.__STD_PERMS) return window.__STD_PERMS.common || {};
   const base = (uid && PERMS_STATE && PERMS_STATE[uid]) ? PERMS_STATE[uid] : {};
   const st = (base && base.common) ? base.common : {};
   return (st && typeof st === 'object') ? st : {};
@@ -44436,6 +44467,10 @@ function _renderProjRows(scopeId, store, mode){
 }
 
 function _projStateFor(uid){
+  if (!uid && window.__STD_PERMS) return {
+    tpl: window.__STD_PERMS.proj_default || {},
+    prj: window.__STD_PERMS.projects || {}
+  };
   const base = (uid && typeof PERMS_STATE !== 'undefined' && PERMS_STATE[uid]) ? PERMS_STATE[uid] : {};
   return {
     tpl: (base.proj_default && typeof base.proj_default === 'object') ? base.proj_default : {},
