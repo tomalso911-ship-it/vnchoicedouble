@@ -11314,9 +11314,10 @@ def slats_spec_export():
     ws.title = {"zh": "规格表", "en": "Spec", "vi": "Quy cách"}[lang]
 
     thin = openpyxl.styles.Side(style="thin", color="FF000000")
-    dbl = openpyxl.styles.Side(style="double", color="FF000000")
+    # ★SLATS-SOLID-BOX2-20261108：与页面一致 —— 实心板 YES 用【黄色加粗】边框（medium 黄线）
+    yes_side = openpyxl.styles.Side(style="medium", color="FFFFC400")
     box_thin = openpyxl.styles.Border(left=thin, right=thin, top=thin, bottom=thin)
-    box_dbl = openpyxl.styles.Border(left=dbl, right=dbl, top=dbl, bottom=dbl)
+    box_yes = openpyxl.styles.Border(left=yes_side, right=yes_side, top=yes_side, bottom=yes_side)
 
     for c, label in enumerate(LBL, start=1):
         cell = ws.cell(row=1, column=c, value=label)
@@ -11344,12 +11345,12 @@ def slats_spec_export():
         for c, v in enumerate(vals, start=1):
             cell = ws.cell(row=r0 + i, column=c, value=v)
             cell.border = box_thin
-            # 实心板=YES：只把「长/宽/高(mm)」三格改成双线框（第 9/10/11 列），
+            # 实心板=YES：只把「长/宽/高(mm)」三格改成黄色加粗框（第 9/10/11 列），
             # 与页面上框住的位置完全一致；房舍长宽高（第 5/6/7 列）是猪舍尺寸，不是地板尺寸。
             if yes and 9 <= c <= 11:
-                cell.border = box_dbl
+                cell.border = box_yes
         if yes:
-            ws.cell(row=r0 + i, column=len(LBL)).border = box_dbl
+            ws.cell(row=r0 + i, column=len(LBL)).border = box_yes
 
     widths = [6, 20, 12, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12, 10, 11]
     for c, w in enumerate(widths, start=1):

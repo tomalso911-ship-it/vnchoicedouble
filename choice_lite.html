@@ -5990,20 +5990,17 @@ var WL_FLOW_IMG = {
          .pe-hist .pe-vth .v2{color:#667}（3 个类）优先级更高 → 规格列第二行恒为深灰 #667，
          看起来"表头没全变白"。这里用 !important 压过一切子元素颜色规则。 */
       .pe-hist thead th, .pe-hist thead th .v1, .pe-hist thead th .v2, .pe-hist thead th *{color:#fff !important;}
-      /* ★SLATS-SOLID-BOX-20261108（用户 2026-11-08 需求）：实心板?=YES 的水泥漏缝地板规格加「Excel 双线黑框」。
-         为什么用 3px double：这些表格本身已有 1px 黑网格线，1px 黑框看不出来；
-         CSS double 至少要 3px 才画得出「两条 1px 线 + 1px 间隙」，一眼就能和普通网格分开。
-         为什么类名写两遍 .slats-solid-cell.slats-solid-cell：表格里已有
-         `.pe-hist thead th{border-color:#B71C1C !important}` 这类 (0,1,2) 选择器，
-         双写类名把优先级提到 (0,2,0)，才能稳定压过它们（否则表头框会被染成深红）。 */
-      .slats-solid-cell.slats-solid-cell{border:3px double #000 !important;}
-      /* 连续三格（长/宽/高）拼成【一个整框】：去掉它们之间的内部竖线，
-         否则三格各画一圈双线，中间会多出两条重复的线，看起来像三小块而不是一个方框。 */
+      /* ★SLATS-SOLID-BOX2-20261108（用户 2026-11-08 修正口径）：
+         要的是「紧紧贴着尺寸数值外面的文字、黄色、加粗、单个框」——
+         不要双线（double），也不要离文字很远的大框。
+         · .slats-solid-box  → 直接包住 "1,550×525×70" 这段文字（inline-block，紧贴）
+         · .slats-solid-cell → 只在「长/宽/高 被拆成三格」的地方用（规格表输入框 / 报告概述表），
+           三段拼成一个整体黄框，去掉内部竖线，看起来才是一个框。 */
+      .slats-solid-box{border:2px solid #FFC400;padding:0 3px;display:inline-block;line-height:1.2;box-sizing:border-box;border-radius:2px;}
+      .slats-solid-cell.slats-solid-cell{border:2px solid #FFC400 !important;}
       .slats-solid-cell.slats-solid-seg-mid.slats-solid-seg-mid{border-left:none !important;border-right:none !important;}
       .slats-solid-cell.slats-solid-seg-start.slats-solid-seg-start{border-right:none !important;}
       .slats-solid-cell.slats-solid-seg-end.slats-solid-seg-end{border-left:none !important;}
-      /* 非单元格里的规格文字（卡片/胶囊/按钮/说明文字）：只框住文字本身 */
-      .slats-solid-box{border:3px double #000;padding:0 3px;display:inline-block;line-height:1.25;box-sizing:border-box;}
       .pe-hist tbody tr:nth-child(odd) td{background:#fff;}
       .pe-hist tbody tr:nth-child(even) td{background:#fdeef0;}
       .pe-hist tbody td.xh-row,.pe-hist tbody td.xh-col{background:#fff6c2 !important;}
@@ -7606,9 +7603,9 @@ var WL_FLOW_IMG = {
       return _rows;
     }
     var PROD_SLATS_ROWS_CACHE = { pid:null, raw:null, rows:null };
-    /* ★SLATS-SOLID-BOX-20261108（用户 2026-11-08 需求）：
+    /* ★SLATS-SOLID-BOX2-20261108（用户 2026-11-08 修正口径）：
        「实心板? = YES」的水泥漏缝地板规格，在【全站所有表格 / 子标签 / 模态框 / 打印 / 导出】里
-       给该规格加 Excel 式「双线黑框」（3px double #000），NO 的一律不加。
+       给这段尺寸文字外面加【紧贴文字的黄框 2px solid #FFC400，单个框，不要双线】，NO 的一律不加。
        用户确认的两条判定口径：
          ① 规格表 / 智能报告这类「按行」的地方 → 只看这一行（行级 YES 才加框）；
          ② 规格当列头 / 按尺寸聚合的地方 → 只要该尺寸有任何一行 YES 就加框（尺寸级）。
@@ -7688,14 +7685,27 @@ var WL_FLOW_IMG = {
         root = root || document.body;
         if(!root || root.nodeType!==1 || !root.isConnected) return 0;
         var i, n = 0;
-        /* ① 单元格级：整个规格格子加双线框（表格、弹窗里的表都用这套） */
-        var cells = root.querySelectorAll('td,th');
-        for(i=0;i<cells.length;i++){
-          var c = cells[i];
-          if(c.classList.contains('slats-solid-cell')) continue;
-          if(c.classList.contains('slats-solid-skip')) continue;
-          if(!slatsSolidScan(c.textContent).length) continue;
-          c.classList.add('slats-solid-cell'); n++;
+        /* ① 元素级：整个单元格/标签的文字「就是一个 YES 尺寸」时（允许 ▸ 之类 1~3 字符前缀；
+           也覆盖把尺寸拆成两行 span 的表头）→ 把它的子节点整体包一层黄框，紧贴文字外面。 */
+        var els = root.querySelectorAll('td,th,b,strong');
+        for(i=0;i<els.length;i++){
+          var e0 = els[i];
+          if(!e0.firstChild) continue;
+          if(e0.querySelector('.slats-solid-box')) continue;
+          if(e0.classList.contains('slats-solid-cell')) continue;
+          var raw = String(e0.textContent||'');
+          if(!raw.trim()) continue;
+          if(raw.length > 40) continue;                 /* 长文本格（说明/汇总）不参与，防止误包 */
+          var rg = slatsSolidScan(raw);
+          if(!rg.length) continue;
+          var leading = raw.length - raw.replace(/^\s+/, '').length;
+          if(rg[0][0] - leading > 3) continue;          /* 前缀超过 3 个字符 → 该格还有别的信息 */
+          if(raw.slice(rg[0][1]).replace(/\s+/g,'').length) continue;
+          var wrap = document.createElement('span');
+          wrap.className = 'slats-solid-box';
+          while(e0.firstChild) wrap.appendChild(e0.firstChild);
+          e0.appendChild(wrap);
+          n++;
         }
         /* ② 文字级：卡片/胶囊/标签/按钮里只是整段文字含规格 → 只框住规格那几个字 */
         var hits = [], walker = document.createTreeWalker(root, 4 /* TEXT */, null, false), tn;
@@ -7707,7 +7717,7 @@ var WL_FLOW_IMG = {
           var tag = p.tagName;
           if(tag==='OPTION'||tag==='SELECT'||tag==='TEXTAREA'||tag==='SCRIPT'||tag==='STYLE'||tag==='NOSCRIPT') continue;
           if(p.classList && p.classList.contains('slats-solid-box')) continue;
-          try{ if(p.closest('td.slats-solid-cell,th.slats-solid-cell,.slats-solid-box')) continue; }catch(e){}
+          try{ if(p.closest('.slats-solid-box,td.slats-solid-cell,th.slats-solid-cell')) continue; }catch(e){}
           var rng = slatsSolidScan(v);
           if(rng.length) hits.push({ node:tn, rng:rng[0] });
         }
@@ -12523,7 +12533,7 @@ var WL_FLOW_IMG = {
         var caret = '<span class="pe-estats-caret">'+(isExp?'▾':'▸')+'</span>';
         var _gapCls = r.ok ? ' class="pe-gap-ok" title="'+prod_esc(prod_gapOkTip(r.demand, r.produced))+'"'
                            : (r.gap>0 ? ' class="pe-gap"' : '');
-        var _row = '<tr class="pe-estats-row'+(isExp?' pe-estats-expanded':'')+(r.ok?' pe-gap-ok':'')+'" data-spec="'+prod_esc(r.k)+'" data-no="'+(i+1)+'" onclick="prod_eStatsRowClick(event,this)"><td class="pe-col-no">'+(i+1)+'</td><td class="pe-vth'+slatsSolidCellCls(r.k)+'" title="'+pt('thr_house')+'：'+prod_esc(r.houseNames)+'">'+caret+vth+'</td><td>'+prod_fmtNum(r.demand)+'</td><td>'+prod_fmtNum(r.produced)+'</td><td'+_gapCls+'>'+prod_fmtNum(r.gap)+'</td><td>'+prod_esc(r.houseNames)+'</td><td>'+r.pct+'% / #'+r.rank+'</td></tr>';
+        var _row = '<tr class="pe-estats-row'+(isExp?' pe-estats-expanded':'')+(r.ok?' pe-gap-ok':'')+'" data-spec="'+prod_esc(r.k)+'" data-no="'+(i+1)+'" onclick="prod_eStatsRowClick(event,this)"><td class="pe-col-no">'+(i+1)+'</td><td class="pe-vth" title="'+pt('thr_house')+'：'+prod_esc(r.houseNames)+'">'+caret+vth+'</td><td>'+prod_fmtNum(r.demand)+'</td><td>'+prod_fmtNum(r.produced)+'</td><td'+_gapCls+'>'+prod_fmtNum(r.gap)+'</td><td>'+prod_esc(r.houseNames)+'</td><td>'+r.pct+'% / #'+r.rank+'</td></tr>';
         if(isExp && _houses.length){ _row += _houses.map(function(d,hi){ return prod_eStatsSubRowHtml(d, (i+1)+'.'+(hi+1)); }).join(''); }
         return _row;
       }).join('');
@@ -13401,8 +13411,8 @@ var WL_FLOW_IMG = {
         var tip = houses.length ? (pt('thr_house') + '：' + prod_esc(houses.join('、'))) : '';
         var sp = s.split('×');
         var sh = '<span class="v1">'+prod_esc(sp[0])+'</span>' + (sp.length>1 ? '<span class="v2">×'+prod_esc(sp[1])+'<br>×'+prod_esc(sp[2]||'')+'</span>' : '');
-        /* ★SLATS-SOLID-BOX-20261108：规格当列头的表 → 实心板 YES 只给表头加双线黑框（数据格不动） */
-        h += '<th class="pe-vth'+(specs[s]&&specs[s].solidYes?' slats-solid-cell':'')+'" title="'+tip+'">'+sh+'</th>';
+        /* ★SLATS-SOLID-BOX2-20261108：表头里的尺寸由通用补框器包一层黄框（紧贴文字），这里不再加 class */
+        h += '<th class="pe-vth" title="'+tip+'">'+sh+'</th>';
       });
       h += '<th class="pe-col-total">'+pt('thr_total_pcs')+'</th><th class="pe-col-photo">'+pt('prod_lbl_photos')+'</th><th class="pe-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
       if(!rows.length){ h += '<tr><td colspan="'+(disp.length+9)+'">—</td></tr>'; }
@@ -34246,11 +34256,11 @@ var PROD_EQUIP_FAULT_KB = {
   .print-target .slats-spec-toolbar { display:none !important; }
   .print-target .slats-spec-input,
   .print-target .slats-spec-select { border:none !important; background:transparent !important; box-shadow:none !important; }
-  /* ★SLATS-SOLID-BOX-20261108：实心板 YES 的双线黑框必须原样打印（不能被上面的 border:none 波及） */
+  /* ★SLATS-SOLID-BOX2-20261108：实心板 YES 的黄色粗框必须原样打印（不能被上面的 border:none 波及） */
   .print-target .slats-solid-cell.slats-solid-cell,
-  body > .modal-overlay.show .slats-solid-cell.slats-solid-cell{border:3px double #000 !important;}
+  body > .modal-overlay.show .slats-solid-cell.slats-solid-cell{border-color:#FFC400 !important;}
   .print-target .slats-solid-box,
-  body > .modal-overlay.show .slats-solid-box{border:3px double #000 !important;}
+  body > .modal-overlay.show .slats-solid-box{border:2px solid #FFC400 !important;}
 
   /* ===== 生产计划打印：克隆 prod-tab-body 到 body 直接子节点，隐藏按钮/输入框边框，取消横向滚动 ===== */
   .print-target.prod-print-plan { background:#fff; padding:0; color:#000; }
@@ -49910,6 +49920,9 @@ function openSlatsReportModal(){
 
   sweepI18n(modal);
   modal.classList.add('show');
+  /* ★SLATS-SOLID-BOX2-20261108：整个报告弹窗补一遍黄框——覆盖概述表、
+     水泥板规格分布表（序号/类别/数值/占比）、水泥/黄砂/石子材料表（类别列）、钢筋表。 */
+  if(typeof slatsSolidNow==='function'){ try{ slatsSolidNow(modal); }catch(e0){} }
 }
 function closeSlatsReportModal(){ el('slatsReportModal').classList.remove('show'); }
 
