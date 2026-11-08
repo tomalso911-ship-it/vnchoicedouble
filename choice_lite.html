@@ -6132,8 +6132,9 @@ var WL_FLOW_IMG = {
       /* ★PROD-RPT-SUM-20261108：标题下方的「采购与需求总览」文字段落（三语联动，常显） */
       .prod-report-sum-host{margin-top:10px;}
       .prod-report-sum{margin:0 0 12px;padding:10px 12px;background:#f7f9fc;border:1px solid #e3e9f2;border-left:3px solid #E53935;border-radius:8px;}
-      .prod-report-sum-t{font-size:12px;font-weight:700;color:#5a6a7a;margin-bottom:5px;letter-spacing:.2px;}
-      .prod-report-sum-p{font-size:13px;line-height:1.8;color:#333;word-break:break-word;}
+      /* ★PROD-RPT-SUM-RED-20261108：用户要求总览标题与正文一律红色（原来是灰标题 + 深灰正文） */
+      .prod-report-sum-t{font-size:12px;font-weight:700;color:#E53935;margin-bottom:5px;letter-spacing:.2px;}
+      .prod-report-sum-p{font-size:13px;line-height:1.8;color:#E53935;word-break:break-word;}
       .prod-report-sum-p b{color:#E53935;font-weight:700;}
       /* 收货单/审批里的照片缩略图（否则原图全尺寸展示，页面被撑爆） */
       .photo-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
@@ -18089,6 +18090,13 @@ var PROD_EQUIP_FAULT_KB = {
         var _gbtn = document.getElementById('pd_receipt_collapse_all');
         if(_gbtn) _gbtn.textContent = PROD_RECEIPTS_ALL_COLLAPSED ? pt('btn_expand_all') : pt('btn_collapse_all');
       } catch(e){}
+      /* ★PROD-RPT-SUM-LANG-20261108：D 页「采购与需求总览」段落是 JS 拼出来的字符串（无 data-i18n），
+         而 applyProductionLang 在 D 页只调本函数就 return（不重建 D 页 DOM）→ 必须在末尾显式重渲染，
+         否则先在中文下打开、再切越南语/英语时，段落会一直停在中文（用户报「缺少三语」的根因）。 */
+      try {
+        var _sumHost = document.getElementById('prod_report_sum');
+        if(_sumHost && typeof prodReportSummaryHtml === 'function') _sumHost.innerHTML = prodReportSummaryHtml();
+      } catch(e){ console.warn('[lang] prod report summary:', e); }
     }
     /* 快照/恢复 C 页编辑态，避免切换语言时表单/横幅/排序被重置 */
     function prod_captureCState(){
