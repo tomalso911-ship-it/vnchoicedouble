@@ -3244,10 +3244,13 @@ window.__finShakeReport = function (ms) {
 .bd-login { align-items:stretch; justify-content:flex-start; }
 .bd-login .bd-card-h { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .bd-lg-tools { margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+/* ★LOGIN-DATEPICK-20261108：日期框=黄色底、只可选不可编辑（无光标、不可选中文字） */
 .bd-lg-date { width:112px; height:26px; padding:0 8px; border-radius:7px; cursor:pointer;
-  background:#0a1a55; color:#dbefff; border:1px solid rgba(57,230,255,.45);
-  font-size:12px; font-family:inherit; text-align:center; }
-.bd-lg-date[readonly] { cursor:default; }
+  background:#ffd166; color:#0a1c5e; border:1px solid #e0a800;
+  font-size:12px; font-weight:700; font-family:inherit; text-align:center;
+  caret-color:transparent; -webkit-user-select:none; user-select:none; }
+.bd-lg-date:hover { background:#ffdd85; }
+.bd-lg-date[readonly] { cursor:pointer; }
 .bd-lg-btn { height:26px; padding:0 12px; border-radius:7px; cursor:pointer; font-size:12px;
   background:linear-gradient(180deg,#1a7cff,#0b53c4); color:#fff; border:1px solid rgba(120,200,255,.55); font-family:inherit; }
 .bd-lg-btn:disabled { opacity:.45; cursor:not-allowed; }
@@ -53402,7 +53405,6 @@ window.cpOpenCalendar = function(inputEl) {
   if (top + 330 > window.innerHeight) top = Math.max(8, rect.top - 334);
   popup.style.top = top + 'px';
   popup.style.left = left + 'px';
-  popup.classList.add('show');
   cpCalOpenedAt = Date.now();
   var L = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
   var lbl = L==='en' ? {today:'Today',clear:'Clear'} : L==='vi' ? {today:'Hôm nay',clear:'Xóa'} : {today:'今天',clear:'清除'};
@@ -53412,7 +53414,9 @@ window.cpOpenCalendar = function(inputEl) {
   var now = new Date();
   cpCalViewYear = cur ? cur.y : now.getFullYear();
   cpCalViewMonth = cur ? cur.m : now.getMonth();
+  /* ★LOGIN-DATEPICK-20261108：先把日历内容渲染好再显示，避免「先闪出空框再填格子」的延迟感 */
   cpRenderCal(cur);
+  popup.classList.add('show');
 };
 
 function cpCloseCalendar() {
@@ -55988,7 +55992,11 @@ function renderBoardShell() {
   +       '<div class="bd-card-h"><span class="bd-dot"></span><span id="bdLoginDailyTitle"></span>'
   +         '<span class="bd-lg-tools">'
   +           '<span class="bd-lg-note" id="bdLoginStartLbl"></span>'
-  +           '<input type="text" id="bdLoginStart" class="bd-lg-date" readonly onclick="cpOpenCalendar(this)" />'
+  // ★LOGIN-DATEPICK-20261108：pointerdown 立即弹日历（不等 click/mouseup）；只可选不可编辑
+  +           '<input type="text" id="bdLoginStart" class="bd-lg-date" readonly inputmode="none" autocomplete="off"'
+  +           ' data-lpignore="true" onpointerdown="bdLoginOpenCal(event,this)"'
+  +           ' onfocus="bdLoginOpenCal(event,this)" onkeydown="return bdLoginDateKey(event)"'
+  +           ' onpaste="return false" oncut="return false" ondrop="return false" ondragstart="return false" />'
   +           '<button type="button" class="bd-lg-btn" id="bdLoginStartBtn" onclick="bdLoginSetStart()"></button>'
   +         '</span>'
   +       '</div>'
@@ -56035,6 +56043,24 @@ function bdLgDmy(s){ var d = bdLgParse(s); return d ? (bdLgPad2(d.getDate())+'/'
 function bdLgFromDmy(s){ var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(s||'').trim()); return m ? (m[3]+'-'+m[2]+'-'+m[1]) : ''; }
 function bdLgBase(){ return (typeof crmApiBase === 'function') ? crmApiBase() : ((typeof API_BASE !== 'undefined') ? API_BASE : ''); }
 function bdLgEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+/* ★LOGIN-DATEPICK-20261108：开始记录日 —— 按下鼠标/手指的瞬间就弹日历（不等 click 的 mouseup），
+   并且只允许「选」不允许「编辑」：readonly + 拦键盘/粘贴/拖放 + 无光标。
+   pointerdown 与 focus 会先后触发，用 500ms 去重避免日历被重建两次（那才是之前“慢”的观感）。 */
+function bdLoginOpenCal(ev, el){
+  if (!el) return;
+  var now = Date.now();
+  if (el === window.__bdLoginCalT && (now - (window.__bdLoginCalAt || 0)) < 500) return;
+  window.__bdLoginCalT = el; window.__bdLoginCalAt = now;
+  try { if (ev && ev.cancelable) ev.preventDefault(); } catch(e){}   // 不聚焦、不出光标、不弹手机键盘
+  if (typeof window.cpOpenCalendar === 'function') window.cpOpenCalendar(el);
+}
+function bdLoginDateKey(e){
+  var k = (e && e.key) ? e.key : '';
+  if (k === 'Tab' || k === 'Escape') return true;                    // 只放行焦点移动/关闭
+  if (e && e.preventDefault) e.preventDefault();
+  return false;
+}
 
 function bdLoginLoad(force){
   var body = document.getElementById('bdLoginBarBody');
