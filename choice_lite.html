@@ -3237,6 +3237,46 @@ window.__finShakeReport = function (ms) {
 .bd-row3 .bd-ph-body, .bd-row3 .bd-cal-body { min-height:0; }
 .bd-sq { aspect-ratio: 1 / 1; min-height:0; overflow:hidden; }
 .bd-sq-body { display:flex; align-items:center; justify-content:center; text-align:center; }
+
+/* ============ ★LOGIN-STAT-20261108：看板底部「登录统计」两卡（各占整行） ============ */
+.bd-row1 { grid-column: 1 / -1; display:grid; grid-template-columns: 1fr; gap:14px; }
+.bd-row1 > .bd-card { grid-column: auto !important; }
+.bd-login { align-items:stretch; justify-content:flex-start; }
+.bd-login .bd-card-h { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.bd-lg-tools { margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.bd-lg-date { width:112px; height:26px; padding:0 8px; border-radius:7px; cursor:pointer;
+  background:#0a1a55; color:#dbefff; border:1px solid rgba(57,230,255,.45);
+  font-size:12px; font-family:inherit; text-align:center; }
+.bd-lg-date[readonly] { cursor:default; }
+.bd-lg-btn { height:26px; padding:0 12px; border-radius:7px; cursor:pointer; font-size:12px;
+  background:linear-gradient(180deg,#1a7cff,#0b53c4); color:#fff; border:1px solid rgba(120,200,255,.55); font-family:inherit; }
+.bd-lg-btn:disabled { opacity:.45; cursor:not-allowed; }
+.bd-lg-seg { display:inline-flex; border:1px solid rgba(57,230,255,.4); border-radius:7px; overflow:hidden; }
+.bd-lg-seg button { height:24px; padding:0 10px; font-size:12px; cursor:pointer; font-family:inherit;
+  background:transparent; color:#9fc3e0; border:0; border-right:1px solid rgba(57,230,255,.25); }
+.bd-lg-seg button:last-child { border-right:0; }
+.bd-lg-seg button.on { background:rgba(57,230,255,.22); color:#eaf7ff; font-weight:700; }
+.bd-lg-note { font-size:11px; color:#8aa7c4; }
+.bd-login-bar { height:260px; min-height:200px; width:100%; }
+.bd-login-bar-fallback { display:block; width:100%; }
+.bd-lg-bar-row { display:flex; align-items:center; gap:8px; font-size:12px; color:#cfe6f7; padding:3px 0; }
+.bd-lg-bar-row .n { width:82px; text-align:right; flex:none; color:#9fc3e0; }
+.bd-lg-bar-row .b { height:12px; border-radius:6px; background:linear-gradient(90deg,#39e6ff,#1a7cff); }
+.bd-lg-bar-row .v { width:46px; text-align:left; flex:none; color:#ffd166; font-weight:700; }
+.bd-login-matrix { max-height:430px; overflow:auto; border:1px solid rgba(57,230,255,.18); border-radius:10px; }
+.bd-lg-table { border-collapse:separate; border-spacing:0; width:100%; font-size:12px; }
+.bd-lg-table th, .bd-lg-table td { padding:4px 6px; text-align:center; white-space:nowrap;
+  border-bottom:1px solid rgba(57,230,255,.12); }
+.bd-lg-table thead th { position:sticky; top:0; z-index:2; background:#0a1c5e; color:#9fc3e0; font-weight:700; font-size:11px; }
+.bd-lg-table .bd-lg-name { position:sticky; left:0; z-index:1; background:#0a1c5e; text-align:left; min-width:132px; }
+.bd-lg-table thead .bd-lg-name { z-index:3; }
+.bd-lg-table tbody tr:hover td { background:rgba(57,230,255,.07); }
+.bd-lg-table .bd-lg-off td { color:#6b7f95; }
+.bd-lg-table .bd-lg-zero { color:#3f5570; }
+.bd-lg-table .bd-lg-sum { color:#ffd166; font-weight:700; }
+.bd-lg-pos { color:#7d93ab; font-size:11px; margin-left:6px; }
+.bd-lg-cur { background:rgba(255,209,102,.10); }
+@media (max-width: 900px){ .bd-login-bar{ height:220px; } .bd-login-matrix{ max-height:340px; } }
 .bd-fx-tile { align-items:stretch; justify-content:flex-start; }
 .bd-fx-cur { font-size:13px; color:#39e6ff; font-weight:700; text-align:center; padding:2px 0 2px; }
 /* 货币切换按钮组（RMB|USD|VND，7 个曲线卡全局联动） */
@@ -55912,6 +55952,7 @@ function loadDashboard(force) {
   boardStartClock();
   boardRenderCalendar(sec, new Date().getFullYear(), new Date().getMonth());
   boardLoadFx(sec);
+  try { bdLoginLoad(); } catch(e){ console.warn('[bdLogin] load failed', e); }   // ★LOGIN-STAT-20261108
 }
 
 // ==================== 新版看板（深蓝科技风 Grid，替代旧 livestock/价格看板） ====================
@@ -55936,8 +55977,400 @@ function renderBoardShell() {
   +     '<div class="bd-card bd-sq bd-fx-tile"><div class="bd-card-h"><span class="bd-dot"></span><span>USD-VND</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdFx2C"></canvas></div><div class="bd-fx-cur" id="bdFx2V">…</div></div>'
   +     '<div class="bd-card bd-sq bd-fx-tile"><div class="bd-card-h"><span class="bd-dot"></span><span>USD-RMB</span>'+bdCurBtns()+'</div><div class="bd-mat-chart"><canvas id="bdFx3C"></canvas></div><div class="bd-fx-cur" id="bdFx3V">…</div></div>'
   +   '</div>'
+  // ★LOGIN-STAT-20261108：登录统计两卡（各占整行，上下排列）
+  +   '<div class="bd-row1">'
+  +     '<div class="bd-card bd-login" id="bdLoginDaily">'
+  +       '<div class="bd-card-h"><span class="bd-dot"></span><span id="bdLoginDailyTitle"></span>'
+  +         '<span class="bd-lg-tools">'
+  +           '<span class="bd-lg-note" id="bdLoginStartLbl"></span>'
+  +           '<input type="text" id="bdLoginStart" class="bd-lg-date" readonly onclick="cpOpenCalendar(this)" />'
+  +           '<button type="button" class="bd-lg-btn" id="bdLoginStartBtn" onclick="bdLoginSetStart()"></button>'
+  +           '<span class="bd-lg-seg" id="bdLoginSeg">'
+  +             '<button type="button" data-r="all" class="on"></button>'
+  +             '<button type="button" data-r="d"></button>'
+  +             '<button type="button" data-r="w"></button>'
+  +             '<button type="button" data-r="m"></button>'
+  +           '</span>'
+  +         '</span>'
+  +       '</div>'
+  +       '<div class="bd-login-bar" id="bdLoginBarBody"><span class="bd-loading">…</span></div>'
+  +     '</div>'
+  +     '<div class="bd-card bd-login" id="bdLoginPeriod">'
+  +       '<div class="bd-card-h"><span class="bd-dot"></span><span id="bdLoginPerTitle"></span>'
+  +         '<span class="bd-lg-tools">'
+  +           '<span class="bd-lg-note" id="bdLoginPerYear"></span>'
+  +           '<span class="bd-lg-seg" id="bdLoginPerSeg">'
+  +             '<button type="button" data-p="w"></button>'
+  +             '<button type="button" data-p="m" class="on"></button>'
+  +             '<button type="button" data-p="q"></button>'
+  +           '</span>'
+  +         '</span>'
+  +       '</div>'
+  +       '<div class="bd-login-matrix" id="bdLoginMatrixBody"><span class="bd-loading">…</span></div>'
+  +     '</div>'
+  +   '</div>'
   + '</div>';
 }
+
+/* ==================== ★LOGIN-STAT-20261108 看板登录统计 ====================
+   记录一：7 类职位用户 × 登录次数 柱状图（横轴=人，区间可切 全量/日/周/月）
+   记录二：全员 × 周/月/季度 登录次数矩阵（本年度，横向滚动）
+   数据源：GET /api/login-stats（一次给 日粒度明细，前端做全部聚合）
+   开始记录日：服务端 app_settings 全局单例，仅 tom/admin 可改（服务端二次校验）
+   注意：不得在本模块新增 MutationObserver / setInterval（受 check_perf_idle_lock.py 第⑨条管）
+*/
+var BD_LOGIN = { data:null, ts:0, range:'all', per:'m', canEdit:false, startDraft:'', busy:false };
+
+function bdLgT(zh, en, vi){
+  var L = (typeof CUR_LANG !== 'undefined' && CUR_LANG) ? CUR_LANG : 'vi';
+  return L === 'zh' ? zh : (L === 'en' ? en : vi);
+}
+function bdLgMe(){
+  try { return (typeof authUser !== 'undefined' && authUser && authUser.username) ? String(authUser.username) : ''; } catch(e){ return ''; }
+}
+function bdLgPad2(n){ n = String(n); return n.length < 2 ? ('0' + n) : n; }
+function bdLgYmd(d){ return d.getFullYear() + '-' + bdLgPad2(d.getMonth()+1) + '-' + bdLgPad2(d.getDate()); }
+function bdLgParse(s){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||'')); return m ? new Date(+m[1], (+m[2])-1, +m[3]) : null; }
+function bdLgDmy(s){ var d = bdLgParse(s); return d ? (bdLgPad2(d.getDate())+'/'+bdLgPad2(d.getMonth()+1)+'/'+d.getFullYear()) : ''; }
+function bdLgFromDmy(s){ var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(s||'').trim()); return m ? (m[3]+'-'+m[2]+'-'+m[1]) : ''; }
+function bdLgBase(){ return (typeof crmApiBase === 'function') ? crmApiBase() : ((typeof API_BASE !== 'undefined') ? API_BASE : ''); }
+function bdLgEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+function bdLoginLoad(force){
+  var body = document.getElementById('bdLoginBarBody');
+  if (!body) return;
+  var now = Date.now();
+  if (!force && BD_LOGIN.data && (now - BD_LOGIN.ts) < 60000) { bdLoginRenderAll(); return; }
+  var me = bdLgMe();
+  fetch(bdLgBase() + '/api/login-stats?me=' + encodeURIComponent(me), {
+    credentials:'include', headers:(typeof authHeaders === 'function' ? authHeaders() : {})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d || d.ok === false) throw new Error((d && d.msg) || 'load failed');
+    BD_LOGIN.data = d; BD_LOGIN.ts = Date.now(); BD_LOGIN.canEdit = !!d.can_edit;
+    if (!BD_LOGIN.startDraft) BD_LOGIN.startDraft = d.start_date || d.today || '';
+    bdLoginRenderAll();
+  }).catch(function(){
+    var msg = '<span class="bd-loading">' + bdLgT('登录统计加载失败', 'Login stats failed', 'Tải thống kê thất bại') + '</span>';
+    var b1 = document.getElementById('bdLoginBarBody'); if (b1) b1.innerHTML = msg;
+    var b2 = document.getElementById('bdLoginMatrixBody'); if (b2) b2.innerHTML = msg;
+  });
+}
+
+function bdLoginRangeStart(range, d){
+  var start = d.start_date || d.today || '', today = d.today || '';
+  if (range === 'all') return start;
+  var s = today, dt = bdLgParse(today) || new Date();
+  if (range === 'w') {
+    var dow = (dt.getDay() + 6) % 7;   // 周一为一周起点
+    s = bdLgYmd(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - dow));
+  } else if (range === 'm') {
+    s = bdLgYmd(new Date(dt.getFullYear(), dt.getMonth(), 1));
+  }
+  return (s < start) ? start : s;
+}
+function bdLoginCounts(from, to){
+  var m = {}, list = (BD_LOGIN.data && BD_LOGIN.data.daily) || [];
+  for (var i = 0; i < list.length; i++){
+    var r = list[i];
+    if (r.d < from || r.d > to) continue;
+    m[r.u] = (m[r.u] || 0) + (r.n || 0);
+  }
+  return m;
+}
+
+function bdLoginRenderDaily(){
+  var d = BD_LOGIN.data || {}, box = document.getElementById('bdLoginBarBody'); if (!box) return;
+  var from = bdLoginRangeStart(BD_LOGIN.range, d), to = d.today || '';
+  var cnt = bdLoginCounts(from, to);
+  var users = (d.role_users || []).slice();
+  for (var i = 0; i < users.length; i++) users[i].__n = cnt[users[i].username] || 0;
+  users.sort(function(a, b){
+    return (b.__n - a.__n) || String(a.real_name || a.username).localeCompare(String(b.real_name || b.username));
+  });
+
+  var seg = document.getElementById('bdLoginSeg');
+  if (seg) {
+    var bs = seg.getElementsByTagName('button');
+    for (var k = 0; k < bs.length; k++) bs[k].className = (bs[k].getAttribute('data-r') === BD_LOGIN.range) ? 'on' : '';
+  }
+  var lbl = document.getElementById('bdLoginStartLbl');
+  if (lbl) lbl.textContent = bdLgT('开始记录日', 'Start date', 'Ngày bắt đầu');
+  var inp = document.getElementById('bdLoginStart');
+  if (inp) {
+    inp.value = bdLgDmy(BD_LOGIN.startDraft || d.start_date || '');
+    if (d.today) inp.setAttribute('data-max', bdLgDmy(d.today));
+  }
+  var btn = document.getElementById('bdLoginStartBtn');
+  if (btn) {
+    btn.textContent = bdLgT('开始记录', 'Start recording', 'Bắt đầu ghi');
+    btn.style.display = BD_LOGIN.canEdit ? '' : 'none';
+    btn.disabled = !BD_LOGIN.canEdit;
+  }
+
+  if (!users.length){
+    box.innerHTML = '<div class="bd-lg-note">' + bdLgT('当前没有这些职位的用户', 'No users with these positions', 'Không có người dùng thuộc chức vụ này') + '</div>';
+    return;
+  }
+
+  var labels = [], vals = [];
+  for (i = 0; i < users.length; i++){ labels.push(users[i].real_name || users[i].username); vals.push(users[i].__n); }
+
+  if (window.echarts) {
+    if (window.__bdLoginChart){ try { window.__bdLoginChart.dispose(); } catch(e){} window.__bdLoginChart = null; }
+    box.innerHTML = '';
+    var ch = window.__bdLoginChart = window.echarts.init(box);
+    ch.setOption({
+      animationDuration: 350,
+      grid: { left: 6, right: 14, top: 30, bottom: 6, containLabel: true },
+      tooltip: {
+        trigger: 'axis', axisPointer: { type: 'shadow' },
+        backgroundColor: 'rgba(9,36,117,.96)', borderColor: 'rgba(57,230,255,.45)',
+        textStyle: { color: '#dbefff', fontSize: 12 },
+        formatter: function(ps){
+          var p = ps && ps[0]; if (!p) return '';
+          var u = users[p.dataIndex] || {};
+          var lines = ['<b>' + bdLgEsc(u.real_name || u.username) + '</b>'
+            + (u.position ? '　<span style="color:#7d93ab">' + bdLgEsc(u.position) + '</span>' : ''),
+            bdLgT('登录次数', 'Logins', 'Số lần') + '：<b style="color:#ffd166">' + (p.value || 0) + '</b>',
+            bdLgT('区间', 'Range', 'Khoảng') + '：' + from + ' ~ ' + to];
+          if (u.last_login) lines.push(bdLgT('最后登录', 'Last login', 'Đăng nhập cuối') + '：' + String(u.last_login).slice(0,16));
+          return lines.join('<br/>');
+        }
+      },
+      xAxis: {
+        type: 'category', data: labels,
+        axisLabel: { color: '#9fc3e0', fontSize: 11, interval: 0, rotate: labels.length > 8 ? 30 : 0 },
+        axisLine: { lineStyle: { color: 'rgba(57,230,255,.35)' } },
+        axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'value', minInterval: 1,
+        axisLabel: { color: '#9fc3e0', fontSize: 11 },
+        splitLine: { lineStyle: { color: 'rgba(57,230,255,.12)' } }
+      },
+      series: [{
+        type: 'bar', data: vals, barMaxWidth: 38,
+        itemStyle: { color: '#39e6ff', borderRadius: [4,4,0,0] },
+        label: { show: true, position: 'top', color: '#ffd166', fontSize: 11 }
+      }]
+    }, true);
+    return;
+  }
+
+  // 兜底：echarts 还没加载时先用纯 DOM 条形列表，同时后台把它拉起来，到位后自动换成真图表
+  var max = Math.max.apply(null, vals.concat([1]));
+  var html = '<div class="bd-login-bar-fallback">';
+  for (i = 0; i < users.length; i++){
+    var w = Math.max(2, Math.round((vals[i] / max) * 60));
+    html += '<div class="bd-lg-bar-row"><span class="n">' + bdLgEsc(labels[i]) + '</span>'
+          + '<span class="b" style="width:' + w + '%"></span><span class="v">' + vals[i] + '</span></div>';
+  }
+  html += '</div>';
+  box.innerHTML = html;
+  bdLoginEnsureEcharts().then(function(){
+    if (window.echarts && BD_LOGIN.data) bdLoginRenderDaily();
+  });
+}
+
+/* echarts 是按需懒加载的（地图卡用 boardEnsureEcharts 拉），本卡可能先渲染、后到库。
+   这里用同一个 bdLoadScript 兜底拉取；只用 Promise，不加定时器/观察器。 */
+function bdLoginEnsureEcharts(){
+  if (window.echarts) return Promise.resolve();
+  if (window.__bdLoginEcharts) return window.__bdLoginEcharts;
+  if (typeof bdLoadScript !== 'function') return Promise.resolve();
+  window.__bdLoginEcharts = bdLoadScript('/vendor/echarts.min.js')
+    .catch(function(){ return bdLoadScript('https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js'); })
+    .catch(function(){});
+  return window.__bdLoginEcharts;
+}
+
+function bdLoginIsoWeek(dt){
+  var t = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  var day = (t.getDay() + 6) % 7;
+  t.setDate(t.getDate() - day + 3);              // 本周周四
+  var f = new Date(t.getFullYear(), 0, 4);
+  var fday = (f.getDay() + 6) % 7;
+  f.setDate(f.getDate() - fday + 3);             // 第一周的周四
+  return 1 + Math.round((t - f) / 604800000);
+}
+
+function bdLoginPeriodDefs(per, d){
+  var year = String(d.today || '').slice(0,4) || String(new Date().getFullYear());
+  var out = [], i, mn;
+  if (per === 'q'){
+    for (i = 1; i <= 4; i++) out.push({ key:'Q'+i, label:'Q'+i });
+    return out;
+  }
+  if (per === 'm'){
+    var NAMES = { zh:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+                  en:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                  vi:['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'] };
+    var L = (typeof CUR_LANG !== 'undefined' && CUR_LANG) ? CUR_LANG : 'vi';
+    var nm = NAMES[L] || NAMES.vi;
+    for (i = 1; i <= 12; i++) out.push({ key: bdLgPad2(i), label: nm[i-1] });
+    return out;
+  }
+  var today = bdLgParse(d.today) || new Date();
+  var lastWeek = bdLoginIsoWeek(today);
+  for (i = 1; i <= lastWeek; i++) out.push({ key:'W'+i, label:'W'+i });
+  return out;
+}
+
+function bdLoginPeriodKey(per, ymd){
+  var mon = Number(String(ymd).slice(5,7));
+  if (per === 'm') return String(ymd).slice(5,7);
+  if (per === 'q') return 'Q' + Math.ceil(mon / 3);
+  var dt = bdLgParse(ymd); if (!dt) return '';
+  return 'W' + bdLoginIsoWeek(dt);
+}
+
+function bdLoginRenderMatrix(){
+  var d = BD_LOGIN.data || {}, box = document.getElementById('bdLoginMatrixBody'); if (!box) return;
+  var per = BD_LOGIN.per;
+  var cols = bdLoginPeriodDefs(per, d);
+  var curKey = bdLoginPeriodKey(per, d.today || '');
+  var users = (d.all_users || []).slice();
+
+  var seg = document.getElementById('bdLoginPerSeg');
+  if (seg) {
+    var bs = seg.getElementsByTagName('button');
+    for (var k = 0; k < bs.length; k++) bs[k].className = (bs[k].getAttribute('data-p') === per) ? 'on' : '';
+  }
+  var yr = document.getElementById('bdLoginPerYear');
+  if (yr) yr.textContent = String(d.today || '').slice(0,4) + bdLgT(' 本年度', ' (this year)', ' (năm nay)');
+
+  var list = (d.daily || []), idx = {}, i, j;
+  for (i = 0; i < list.length; i++){
+    var r = list[i];
+    var key = bdLoginPeriodKey(per, r.d);
+    if (!key) continue;
+    var u = r.u;
+    if (!idx[u]) idx[u] = {};
+    idx[u][key] = (idx[u][key] || 0) + (r.n || 0);
+  }
+
+  var html = '<table class="bd-lg-table"><thead><tr><th class="bd-lg-name">'
+    + bdLgT('姓名 / 职位', 'Name / Position', 'Họ tên / Chức vụ') + '</th>';
+  for (i = 0; i < cols.length; i++){
+    html += '<th class="' + (cols[i].key === curKey ? 'bd-lg-cur' : '') + '">' + cols[i].label + '</th>';
+  }
+  html += '<th>' + bdLgT('合计', 'Total', 'Tổng') + '</th></tr></thead><tbody>';
+
+  var periodTotals = {}, grand = 0;
+  var rows = '';
+  for (i = 0; i < users.length; i++){
+    var usr = users[i], cell = idx[usr.username] || {}, sum = 0;
+    var tds = '';
+    for (j = 0; j < cols.length; j++){
+      var v = cell[cols[j].key] || 0;
+      sum += v; periodTotals[cols[j].key] = (periodTotals[cols[j].key] || 0) + v;
+      tds += '<td class="' + (v ? '' : 'bd-lg-zero') + (cols[j].key === curKey ? ' bd-lg-cur' : '') + '">' + (v || '·') + '</td>';
+    }
+    grand += sum;
+    rows += '<tr class="' + (String(usr.status) === 'active' ? '' : 'bd-lg-off') + '">'
+      + '<td class="bd-lg-name">' + bdLgEsc(usr.real_name || usr.username)
+      + (usr.position ? '<span class="bd-lg-pos">' + bdLgEsc(usr.position) + '</span>' : '')
+      + '</td>' + tds + '<td class="bd-lg-sum">' + sum + '</td></tr>';
+  }
+  html += rows + '</tbody><tfoot><tr><td class="bd-lg-name">' + bdLgT('合计', 'Total', 'Tổng') + '</td>';
+  for (j = 0; j < cols.length; j++) html += '<td class="bd-lg-sum">' + (periodTotals[cols[j].key] || 0) + '</td>';
+  html += '<td class="bd-lg-sum">' + grand + '</td></tr></tfoot></table>';
+  box.innerHTML = html;
+}
+
+function bdLoginRenderAll(){
+  var d = BD_LOGIN.data; if (!d) return;
+  var t1 = document.getElementById('bdLoginDailyTitle');
+  if (t1) t1.textContent = bdLgT('职位登录统计（柱状图）', 'Login count by role (bar)', 'Thống kê đăng nhập theo chức vụ');
+  var t2 = document.getElementById('bdLoginPerTitle');
+  if (t2) t2.textContent = bdLgT('全员登录次数（周 / 月 / 季度）', 'All users logins (week / month / quarter)', 'Số lần đăng nhập toàn bộ nhân sự');
+  var seg = document.getElementById('bdLoginSeg');
+  if (seg){
+    var b = seg.getElementsByTagName('button');
+    var labs = [bdLgT('全量','All','Tất cả'), bdLgT('日','Day','Ngày'), bdLgT('周','Week','Tuần'), bdLgT('月','Month','Tháng')];
+    for (var i = 0; i < b.length && i < labs.length; i++) b[i].textContent = labs[i];
+  }
+  var seg2 = document.getElementById('bdLoginPerSeg');
+  if (seg2){
+    var b2 = seg2.getElementsByTagName('button');
+    var labs2 = { w: bdLgT('周','Week','Tuần'), m: bdLgT('月','Month','Tháng'), q: bdLgT('季','Quarter','Quý') };
+    for (var j = 0; j < b2.length; j++){ var p = b2[j].getAttribute('data-p'); if (labs2[p]) b2[j].textContent = labs2[p]; }
+  }
+  bdLoginBind();
+  bdLoginRenderDaily();
+  bdLoginRenderMatrix();
+}
+
+function bdLoginBind(){
+  var seg = document.getElementById('bdLoginSeg');
+  if (seg && !seg.getAttribute('data-bound')){
+    seg.setAttribute('data-bound','1');
+    seg.addEventListener('click', function(e){
+      var t = e.target;
+      while (t && t !== seg && !(t.getAttribute && t.getAttribute('data-r'))) t = t.parentNode;
+      if (!t || !t.getAttribute || !t.getAttribute('data-r')) return;
+      BD_LOGIN.range = t.getAttribute('data-r');
+      bdLoginRenderDaily();
+    });
+  }
+  var seg2 = document.getElementById('bdLoginPerSeg');
+  if (seg2 && !seg2.getAttribute('data-bound')){
+    seg2.setAttribute('data-bound','1');
+    seg2.addEventListener('click', function(e){
+      var t = e.target;
+      while (t && t !== seg2 && !(t.getAttribute && t.getAttribute('data-p'))) t = t.parentNode;
+      if (!t || !t.getAttribute || !t.getAttribute('data-p')) return;
+      BD_LOGIN.per = t.getAttribute('data-p');
+      bdLoginRenderMatrix();
+    });
+  }
+}
+
+function bdLoginSetStart(){
+  if (!BD_LOGIN.canEdit || BD_LOGIN.busy) return;
+  var inp = document.getElementById('bdLoginStart');
+  var ymd = bdLgFromDmy(inp ? inp.value : '');
+  if (!ymd){ alert(bdLgT('请先选择日期', 'Pick a date first', 'Hãy chọn ngày')); return; }
+  var ok = true;
+  try {
+    ok = confirm(bdLgT('确定从 ' + bdLgDmy(ymd) + ' 开始记录登录统计？',
+                        'Start login statistics from ' + bdLgDmy(ymd) + '?',
+                        'Bắt đầu thống kê đăng nhập từ ' + bdLgDmy(ymd) + '?'));
+  } catch(e){}
+  if (!ok) return;
+  BD_LOGIN.busy = true;
+  var btn = document.getElementById('bdLoginStartBtn'); if (btn) btn.disabled = true;
+  fetch(bdLgBase() + '/api/login-stats/start', {
+    method: 'PUT', credentials: 'include',
+    headers: (typeof authHeaders === 'function' ? authHeaders() : { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ me: bdLgMe(), date: ymd })
+  }).then(function(r){ return r.json(); }).then(function(j){
+    BD_LOGIN.busy = false;
+    if (!j || j.ok === false){
+      alert((j && j.msg) || bdLgT('保存失败', 'Save failed', 'Lưu thất bại'));
+      if (btn) btn.disabled = false;
+      return;
+    }
+    BD_LOGIN.startDraft = j.start_date || ymd;
+    bdLoginLoad(true);
+  }).catch(function(){
+    BD_LOGIN.busy = false;
+    if (btn) btn.disabled = false;
+    alert(bdLgT('网络错误，请重试', 'Network error, retry', 'Lỗi mạng, thử lại'));
+  });
+}
+
+// 语言切换 / 窗口尺寸：只做重绘，不新增定时器或观察器
+try {
+  window.addEventListener('app:langchange', function(){
+    if (BD_LOGIN.data) setTimeout(function(){ bdLoginRenderAll(); }, 80);
+  });
+} catch(e){}
+try {
+  window.addEventListener('resize', function(){
+    if (window.__bdLoginChart){ try { window.__bdLoginChart.resize(); } catch(e){} }
+  });
+} catch(e){}
 
 // 总数：项目总数 = 签约(WON)+潜在(CRM)；
 // 建成/在建：在拿到项目明细后，按「安装是否完工」重新统计（安装完成率>=100%才算建成）。

@@ -1048,6 +1048,17 @@ def init_db():
         )
     """)
 
+    # ★LOGIN-STAT-20261108：全局设置表（当前只放「登录统计 · 开始记录日」）。
+    # 与 prod_kv 分开：prod_kv 是「按项目的生产数据」，这里是全站单例设置。
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            k TEXT PRIMARY KEY NOT NULL,
+            v TEXT DEFAULT '',
+            updated_by TEXT DEFAULT '',
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
+
     # 自由任命管理人员表：与职位解耦，单独维护 2-4 名管理员
     c.execute("""
         CREATE TABLE IF NOT EXISTS managers (
@@ -2263,6 +2274,119 @@ def get_login_history():
         "userMonthly": [dict(r) for r in current_month],
         "userYearly": [dict(r) for r in current_year]
     })
+
+
+# ===================== 登录统计（★LOGIN-STAT-20261108） =====================
+# 看板底部两块统计：
+#   A) 7 类职位用户的登录柱状图（横轴=人，可切 全量/日/周/月 统计区间）
+#   B) 全员 × 周/月/季度 登录次数矩阵（本年度）
+# 「开始记录日」是全局单例，存在 app_settings；只有 tom / admin 能改（服务端校验）。
+LOGIN_STAT_POSITIONS = ("生产厂长", "生产总监", "生产主管", "安装主管",
+                        "质量经理", "机械维修经理", "采购经理")
+LOGIN_STAT_EDITORS = ("tom", "admin")
+LOGIN_STAT_KEY = "login_stat_start_date"
+
+
+def _login_stat_start(conn):
+    """开始记录日：从未设置时回退到最早一条登录记录的日期（上线即有历史可看）。"""
+    val = ""
+    try:
+        row = conn.execute("SELECT v FROM app_settings WHERE k=?", (LOGIN_STAT_KEY,)).fetchone()
+        val = ((row["v"] if row else "") or "").strip()
+    except Exception:
+        val = ""
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", val):
+        return val
+    m = ""
+    try:
+        r2 = conn.execute("SELECT MIN(login_time) AS m FROM login_history").fetchone()
+        m = ((r2["m"] if r2 else "") or "").strip()
+    except Exception:
+        m = ""
+    return m[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", m) else time.strftime("%Y-%m-%d")
+
+
+@app.route("/api/login-stats", methods=["GET"])
+def api_login_stats():
+    """一次返回：开始日 / 用户清单 / 日粒度明细（前端据此做 日/周/月/季 全部聚合）。"""
+    me = (request.args.get("me") or "").strip()
+    conn = get_db()
+    urows, daily, last = [], [], {}
+    start, today = time.strftime("%Y-%m-%d"), time.strftime("%Y-%m-%d")
+    try:
+        start = _login_stat_start(conn)
+        today = time.strftime("%Y-%m-%d")
+        urows = conn.execute("""
+            SELECT username, COALESCE(real_name,'') AS real_name,
+                   COALESCE(position,'') AS position, COALESCE(status,'active') AS status
+            FROM users ORDER BY COALESCE(sort_order,0), username
+        """).fetchall()
+        for r in conn.execute("SELECT username, MAX(login_time) AS last_login FROM login_history GROUP BY username"):
+            last[r["username"]] = (r["last_login"] or "")[:19]
+        try:
+            for r in conn.execute("""
+                SELECT substr(login_time,1,10) AS d, username, COUNT(*) AS n
+                FROM login_history WHERE substr(login_time,1,10) >= ?
+                GROUP BY d, username ORDER BY d
+            """, (start,)):
+                daily.append({"d": r["d"], "u": r["username"], "n": r["n"]})
+        except Exception as e:
+            print("[LoginStat] daily agg failed: %r" % (e,))
+    finally:
+        conn.close()
+
+    all_users, role_users = [], []
+    for u in urows:
+        item = {"username": u["username"], "real_name": u["real_name"],
+                "position": u["position"], "status": u["status"],
+                "last_login": last.get(u["username"], "")}
+        all_users.append(item)
+        if u["position"] in LOGIN_STAT_POSITIONS:
+            role_users.append(item)
+    return jsonify({
+        "ok": True, "start_date": start, "today": today,
+        "can_edit": me in LOGIN_STAT_EDITORS,
+        "positions": list(LOGIN_STAT_POSITIONS),
+        "role_users": role_users, "all_users": all_users, "daily": daily,
+    })
+
+
+@app.route("/api/login-stats/start", methods=["PUT"])
+def api_login_stats_start():
+    """设置「开始记录日」：仅 tom / admin（服务端强制校验；前端隐藏按钮只是第一道）。"""
+    data = request.get_json(force=True, silent=True) or {}
+    me = (data.get("me") or data.get("requester") or "").strip()
+    if not me:
+        return jsonify({"ok": False, "msg": "未登录"}), 401
+    if me not in LOGIN_STAT_EDITORS:
+        return jsonify({"ok": False, "msg": "仅 tom / admin 可修改开始记录日"}), 403
+    date = (data.get("date") or "").strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        return jsonify({"ok": False, "msg": "日期格式必须是 YYYY-MM-DD"}), 400
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except Exception:
+        return jsonify({"ok": False, "msg": "无效日期"}), 400
+    if date > time.strftime("%Y-%m-%d"):
+        return jsonify({"ok": False, "msg": "开始记录日不能是未来日期"}), 400
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM app_settings WHERE k=?", (LOGIN_STAT_KEY,))
+        conn.execute("INSERT INTO app_settings (k, v, updated_by, updated_at) VALUES (?,?,?,?)",
+                     (LOGIN_STAT_KEY, date, me, time.strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        conn.close()
+        print("[LoginStat] save start failed: %r" % (e,))
+        return jsonify({"ok": False, "msg": "保存失败"}), 500
+    conn.close()
+    print("[LoginStat] start_date=%s by %s" % (date, me))
+    return jsonify({"ok": True, "start_date": date})
+
 
 @app.route("/api/change-password", methods=["POST"])
 def change_password():
