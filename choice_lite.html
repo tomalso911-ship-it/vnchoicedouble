@@ -5983,6 +5983,13 @@ var WL_FLOW_IMG = {
       .pe-hist thead th{position:sticky;top:0;z-index:2;}
       .pe-hist tfoot{position:sticky;bottom:0;z-index:3;background:#f3f7f3;}
       .pe-hist tfoot .pe-grand td{font-weight:700;border-top:2px solid #000;background:#f3f7f3;}
+      /* ★PE-HIST-UI-20261108：历史产出表——红色表头 + 白/淡粉斑马线 + 悬停十字高亮（淡黄） */
+      .pe-hist thead th{background:linear-gradient(180deg,#E53935,#C62828) !important;color:#fff;border-color:#B71C1C !important;}
+      .pe-hist thead th .v2{color:#ffdede;}
+      .pe-hist tbody tr:nth-child(odd) td{background:#fff;}
+      .pe-hist tbody tr:nth-child(even) td{background:#fdeef0;}
+      .pe-hist tbody td.xh-row,.pe-hist tbody td.xh-col{background:#fff6c2 !important;}
+      .pe-hist tbody td.xh-row.xh-col{background:#ffec96 !important;}
       /* 网格线：历史产出表 + 成品库存表 + 出库记录表 + 出库分析表 */
       .pe-hist th, .pe-hist td, .pe-fin th, .pe-fin td, .prod-out-records th, .prod-out-records td, .prod-out-analysis th, .prod-out-analysis td{border:1px solid #000;}
       /* 成品库存表：指定列淡蓝/淡紫背景 + 小计行 */
@@ -6122,6 +6129,12 @@ var WL_FLOW_IMG = {
       .prod-report-panel{margin-top:10px;border:1px solid #e0e6ee;border-radius:10px;background:#fff;padding:12px 14px;}
       .prod-report-panel-title{font-size:14px;font-weight:700;color:#E53935;border-left:4px solid #E53935;padding-left:8px;margin-bottom:10px;}
       .prod-report-panel .prod-report-body{padding:0;overflow:visible;flex:none;font-size:12px;}
+      /* ★PROD-RPT-SUM-20261108：标题下方的「采购与需求总览」文字段落（三语联动，常显） */
+      .prod-report-sum-host{margin-top:10px;}
+      .prod-report-sum{margin:0 0 12px;padding:10px 12px;background:#f7f9fc;border:1px solid #e3e9f2;border-left:3px solid #E53935;border-radius:8px;}
+      .prod-report-sum-t{font-size:12px;font-weight:700;color:#5a6a7a;margin-bottom:5px;letter-spacing:.2px;}
+      .prod-report-sum-p{font-size:13px;line-height:1.8;color:#333;word-break:break-word;}
+      .prod-report-sum-p b{color:#E53935;font-weight:700;}
       /* 收货单/审批里的照片缩略图（否则原图全尺寸展示，页面被撑爆） */
       .photo-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
       .photo-list .thumb{width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;display:block;cursor:zoom-in;}
@@ -6182,6 +6195,10 @@ var WL_FLOW_IMG = {
       .prod-chart-box{width:100%;height:300px;background:#fff;}
       .prod-chart-title{text-align:center;font-size:12px;font-weight:700;color:#2c3e50;margin-bottom:6px;}
       .pe-stats .pe-gap{color:#E53935;font-weight:700;}
+      /* ★PE-GAP-OK-20261108：缺口量 = 0 或为负（生产多了）→ 整行绿色加粗，表示该规格已达标 */
+      .pe-stats .pe-gap-ok{color:#1a7f37;font-weight:700;}
+      .prod-table.pe-estats tr.pe-gap-ok td{color:#1a7f37;font-weight:700;background:#eefaf0;}
+      .prod-table.pe-estats tr.pe-gap-ok:hover td{background:#e2f6e6;}
       .prod-table .pe-zero-red{color:#E53935 !important;font-weight:700;}
       .pe-over-row td{color:#E53935;font-weight:600;}
       .pe-over-cell{position:relative;}
@@ -9830,6 +9847,8 @@ var WL_FLOW_IMG = {
         +     '<div class="prod-sec-title" style="margin:0;" data-i18n="rpt_title">'+prod_esc(pt('rpt_title'))+'</div>'
         +     '<button type="button" id="prod_report_toggle" class="inst-vis-toggle" style="margin-left:auto" onclick="prodReportToggle()" title="'+prod_esc(pt('btn_expand_all'))+'">+</button>'
         +   '</div>'
+        /* ★PROD-RPT-SUM-20261108：标题正下方、折叠面板之外的总览段落——不用点「+」也能看到 */
+        +   '<div id="prod_report_sum" class="prod-report-sum-host">'+prodReportSummaryHtml()+'</div>'
         +   '<div id="prod_report_panel" class="prod-report-panel" style="display:none">'
         +     '<div class="modal-body prod-report-body" id="prod_report_body"></div>'
         +   '</div>'
@@ -9959,6 +9978,179 @@ var WL_FLOW_IMG = {
     }
     function prodReportAvgPrice(catData, cur){ if(catData && catData.tons>0) return (catData[cur]||0)/catData.tons; return 0; }
     function prod_fmtTon(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1})+' '+pt('unit_ton'); }
+
+    /* ★★PROD-RPT-SUM-20261108：报告标题下方的「采购与需求总览」文字段落（三语联动）★★
+       回答四件事：① 累计采购了哪些物料 ② 各自累计多少数量 ③ 按理论值还差多少 ④ 各物料采购间隔多少天。
+       数量与缺口直接复用下面两张表的口径（PROD_REPORT_DATA.recv / .demand.total），
+       保证「文字里说的数」和「表里显示的数」永远一致；只有「采购间隔」是这里按收货/入库日期现算的。
+       语言：走 CUR_LANG（pt / prodRptSumT），语言切换时 prodReportRenderBodyLang() 会重渲染本段。 */
+    var PROD_RPT_SUM_I18N = {
+      zh: {
+        title:'采购与需求总览',
+        head:'截至 {date}，本项目累计采购 {n} 类物料、共 {times} 次，合计 {total}：{list}。',
+        sep:'、',
+        sep2:'；',
+        gap:'按理论需求（合计 {demand}）计算，尚有缺口 {gap}：{list}。',
+        gap_item:'{name} 差 {qty}',
+        gap_none:'按理论需求（合计 {demand}）计算，各类物料均已满足。',
+        cycle:'采购间隔：{list}。',
+        cycle_item:'{name} 平均 {days} 天一次（{times} 次，{first} 至 {last}）',
+        cycle_once:'{name} 仅采购过 1 次，暂无间隔',
+        none:'本项目暂无物料采购记录，无法统计采购明细与采购间隔。'
+      },
+      en: {
+        title:'Purchasing & demand overview',
+        head:'As of {date}, this project has purchased {n} material types in {times} batches, {total} in total: {list}.',
+        sep:', ',
+        sep2:'; ',
+        gap:'Against the theoretical demand of {demand}, the remaining gap is {gap}: {list}.',
+        gap_item:'{name} short by {qty}',
+        gap_none:'Against the theoretical demand of {demand}, all material types are already sufficient.',
+        cycle:'Purchasing intervals: {list}.',
+        cycle_item:'{name} roughly every {days} days ({times} times, {first} to {last})',
+        cycle_once:'{name} purchased only once so far, no interval yet',
+        none:'No material purchase records for this project yet, so no detail or interval can be calculated.'
+      },
+      vi: {
+        title:'Tổng quan mua hàng & nhu cầu',
+        head:'Tính đến {date}, dự án đã mua {n} loại vật tư với {times} lần, tổng cộng {total}: {list}.',
+        sep:', ',
+        sep2:'; ',
+        gap:'So với nhu cầu lý thuyết ({demand}), còn thiếu {gap}: {list}.',
+        gap_item:'{name} thiếu {qty}',
+        gap_none:'So với nhu cầu lý thuyết ({demand}), các loại vật tư đều đã đủ.',
+        cycle:'Chu kỳ mua hàng: {list}.',
+        cycle_item:'{name} trung bình {days} ngày/lần ({times} lần, từ {first} đến {last})',
+        cycle_once:'{name} mới mua 1 lần, chưa có chu kỳ',
+        none:'Dự án chưa có bản ghi mua vật tư nào nên chưa tính được chi tiết và chu kỳ mua hàng.'
+      }
+    };
+    function prodRptSumT(k){
+      var lang=(typeof CUR_LANG!=='undefined'&&CUR_LANG)?CUR_LANG:'zh';
+      var d=PROD_RPT_SUM_I18N[lang]||PROD_RPT_SUM_I18N.zh;
+      var v=d?d[k]:undefined; if(v!==undefined) return v;
+      var z=PROD_RPT_SUM_I18N.zh[k]; return z!==undefined?z:k;
+    }
+    function prodRptSumFmt(tpl,map){
+      return String(tpl==null?'':tpl).replace(/\{(\w+)\}/g,function(_,k){ return (map&&map[k]!=null)?map[k]:''; });
+    }
+    /* 每类物料的「已采购量 / 理论需求 / 缺口 / 采购批次数 / 平均间隔天数」
+       次数按「单据」计（一张收货单里同一物料出现多行只算 1 次），不是按行计。 */
+    function prodRptSumStats(f, D){
+      D = D || PROD_REPORT_DATA || {};
+      var recv=D.recv||{}, dem=(D.demand&&D.demand.total)||{};
+      var del=(f&&f.materials&&f.materials.receiptsDeleted)||[];
+      var days={}, times={}, docCount=0;
+      function mark(cat, date){
+        if(!cat) return;
+        if(!times[cat]) times[cat]=0;
+        times[cat]++;
+        if(!days[cat]) days[cat]=[];
+        var ymd=date?dmyToYmd(String(date)):'';
+        if(/^\d{4}-\d{1,2}-\d{1,2}$/.test(ymd)) days[cat].push(ymd);
+      }
+      /* 一张单据里出现的物料类别去重后再计数 */
+      function markDoc(date, cats){
+        var hit=0;
+        for(var i=0;i<cats.length;i++){ if(cats[i]){ hit++; mark(cats[i], date); } }
+        if(hit) docCount++;
+      }
+      ((f&&f.materials&&f.materials.receipts)||[]).forEach(function(r){
+        if(!r || del.indexOf(r.id)>=0) return;
+        var seen={}, cats=[];
+        (r.rows||[]).forEach(function(row){
+          var cat=prodReportCatOf(row&&row.material);
+          if(!cat || seen[cat]) return;
+          seen[cat]=1; cats.push(cat);
+        });
+        markDoc(r.date, cats);
+      });
+      ((f&&f.materials&&f.materials.inbound)||[]).forEach(function(r){
+        if(!r) return;
+        var rows=r.rows||r.items||[r];
+        var seen2={}, cats2=[];
+        (rows.forEach?rows:[rows]).forEach(function(row){
+          var cat=prodReportCatOf(row&&(row.material||row.name));
+          if(!cat || seen2[cat]) return;
+          seen2[cat]=1; cats2.push(cat);
+        });
+        markDoc(r.date, cats2);
+      });
+      var list=[];
+      PROD_REPORT_CATS.forEach(function(c){
+        var tons=(recv[c.key]&&recv[c.key].tons)||0;
+        var need=(dem[c.key])||0;
+        if(tons<=0 && need<=0) return;
+        var ds=(days[c.key]||[]).filter(function(d,i,a){ return a.indexOf(d)===i; }).sort();
+        var avg=null;
+        if(ds.length>=2){
+          var t0=Date.parse(ds[0]+'T00:00:00'), t1=Date.parse(ds[ds.length-1]+'T00:00:00');
+          if(isFinite(t0) && isFinite(t1) && t1>t0) avg=Math.round((t1-t0)/86400000/(ds.length-1)*10)/10;
+        }
+        list.push({key:c.key, name:pt(c.i18n), tons:tons, need:need,
+                   gap:(need-tons)>0?(need-tons):0,
+                   times:times[c.key]||0, avg:avg, first:ds[0]||'', last:ds[ds.length-1]||''});
+      });
+      return {list:list, docCount:docCount};
+    }
+    function prodReportSummaryHtml(){
+      var f=prod_get(PROD_CUR); if(!f) return '';
+      /* 总览是常显的（不等用户点「+」），所以报告数据缓存不一定已构建，这里按需算一份；
+         但绝不写回 PROD_REPORT_DATA——那是报告面板自己的缓存，保持原逻辑不受影响。 */
+      var D=PROD_REPORT_DATA;
+      if(!D || PROD_REPORT_BUILT_FOR!==PROD_CUR){
+        D={demand:prodReportDemand(f), recv:prodReportReceived(f)};
+      }
+      var st=prodRptSumStats(f, D);
+      var list=st.list; if(!list.length) return '';
+      /* 本函数只产出纯文本，这里统一收一下空格：
+         pt('unit_ton') 在部分语言里自带前导空格，和 prod_fmtTon 拼接会出现双空格。 */
+      var ton=function(n){ return String(prod_fmtTon(n)).replace(/\s+/g,' ').trim(); };
+      var sep=prodRptSumT('sep'), sep2=prodRptSumT('sep2');
+      var bought=list.filter(function(x){ return x.tons>0; });
+      var parts=[];
+      if(bought.length){
+        var totalTons=0;
+        bought.forEach(function(x){ totalTons+=x.tons; });
+        parts.push(prodRptSumFmt(prodRptSumT('head'), {
+          date:ymdToDmy(prod_today()),
+          n:bought.length,
+          times:st.docCount,
+          total:ton(totalTons),
+          list:bought.map(function(x){ return x.name+' '+ton(x.tons); }).join(sep)
+        }));
+        var demandTons=0, gapTons=0, gapItems=[];
+        list.forEach(function(x){
+          demandTons+=x.need; gapTons+=x.gap;
+          if(x.gap>0) gapItems.push(prodRptSumFmt(prodRptSumT('gap_item'), {name:x.name, qty:ton(x.gap)}));
+        });
+        if(gapTons>0){
+          parts.push(prodRptSumFmt(prodRptSumT('gap'), {demand:ton(demandTons), gap:ton(gapTons), list:gapItems.join(sep)}));
+        } else if(demandTons>0){
+          parts.push(prodRptSumFmt(prodRptSumT('gap_none'), {demand:ton(demandTons)}));
+        }
+        var cyc=[];
+        bought.forEach(function(x){
+          if(x.avg!=null){
+            cyc.push(prodRptSumFmt(prodRptSumT('cycle_item'), {
+              name:x.name, days:x.avg, times:x.times,
+              first:ymdToDmy(x.first), last:ymdToDmy(x.last)
+            }));
+          } else {
+            cyc.push(prodRptSumFmt(prodRptSumT('cycle_once'), {name:x.name}));
+          }
+        });
+        if(cyc.length) parts.push(prodRptSumFmt(prodRptSumT('cycle'), {list:cyc.join(sep2)}));
+      } else {
+        parts.push(prodRptSumT('none'));
+      }
+      /* 中文句子自带「。」，句间不再补空格；英/越文需要空格分隔 */
+      var joiner = (typeof CUR_LANG!=='undefined' && CUR_LANG==='zh') ? '' : ' ';
+      return '<div class="prod-report-sum">'
+        + '<div class="prod-report-sum-t">'+prod_esc(prodRptSumT('title'))+'</div>'
+        + '<div class="prod-report-sum-p">'+prod_esc(parts.join(joiner))+'</div>'
+        + '</div>';
+    }
     function prodReportOpen(){
       var f=prod_get(PROD_CUR); if(!f) return;
       var panel=document.getElementById('prod_report_panel'); if(!panel) return;  /* 容器在 D 标签内 */
@@ -9996,7 +10188,10 @@ var WL_FLOW_IMG = {
       if(typeof __clearPrintTarget==='function') __clearPrintTarget();
       var wrap=document.createElement('div'); wrap.className='print-target prod-report-print-wrap';
       var box=document.getElementById('prod_report_body')||panel;
-      wrap.innerHTML='<div class="prod-report-panel-title">'+prod_esc(pt('rpt_title'))+'</div>'+box.innerHTML;
+      var _sumHost=document.getElementById('prod_report_sum');
+      wrap.innerHTML='<div class="prod-report-panel-title">'+prod_esc(pt('rpt_title'))+'</div>'
+        + (_sumHost?_sumHost.innerHTML:'')
+        + box.innerHTML;   /* ★PROD-RPT-SUM-20261108：常显总览也要进 PDF */
       var src=panel.querySelectorAll('canvas'), dst=wrap.querySelectorAll('canvas');
       for(var i=0;i<src.length && i<dst.length;i++){
         try{ var im=document.createElement('img'); im.src=src[i].toDataURL('image/png'); im.style.cssText='max-width:100%;height:auto;'; dst[i].parentNode.replaceChild(im,dst[i]); }catch(e){}
@@ -10013,6 +10208,9 @@ var WL_FLOW_IMG = {
       PROD_REPORT_LANG_TIMER = setTimeout(function(){
         PROD_REPORT_LANG_TIMER = null;
         prodReportRenderBody();
+        /* ★PROD-RPT-SUM-20261108：常显总览不在面板正文里，语言切换要单独刷新它 */
+        var host=document.getElementById('prod_report_sum');
+        if(host){ try{ host.innerHTML=prodReportSummaryHtml(); }catch(e){} }
       }, 320);
     }
     function prodReportRenderBody(){
@@ -11998,14 +12196,31 @@ var WL_FLOW_IMG = {
       }
       prod_renderTab('E');
     }
+    /* ★PE-GAP-OK-20261108：缺口量为 0 或为负（生产多了）时，悬停提示——三语。
+       含义：生产过程中有破损，为保证合格品数量，实际生产量超过了理论需求量。 */
+    var PROD_GAPOK_I18N = {
+      zh:{ over:'生产过程中有破损，为保证合格品数量，实际生产数量已超过理论需求量（多生产 {n} 片），该规格已达标。',
+           zero:'该规格生产数量已达到理论需求量，缺口为 0，已达标（生产过程中的破损由多生产的部分补足）。' },
+      en:{ over:'Breakage happens during production, so the actual produced quantity exceeds the theoretical demand by {n} pcs to keep enough good pieces — this spec has met the demand.',
+           zero:'Production has reached the theoretical demand for this spec (gap = 0) and is on target; breakage during production is covered by the extra pieces produced.' },
+      vi:{ over:'Trong quá trình sản xuất có hư hỏng nên số lượng thực tế đã vượt nhu cầu lý thuyết {n} tấm để bù hao — quy cách này đã đạt yêu cầu.',
+           zero:'Số lượng sản xuất của quy cách này đã đạt nhu cầu lý thuyết (thiếu 0 tấm), hư hỏng trong quá trình sản xuất đã được bù bằng phần sản xuất thêm.' }
+    };
+    function prod_gapOkTip(demand, produced){
+      var lang=(typeof CUR_LANG!=='undefined'&&CUR_LANG)?CUR_LANG:'zh';
+      var d=PROD_GAPOK_I18N[lang]||PROD_GAPOK_I18N.zh;
+      var over=(+produced||0)-(+demand||0);
+      return over>0 ? String(d.over).replace('{n}', prod_fmtNum(over)) : String(d.zero);
+    }
     /* 生产统计表：规格行展开/收起（直接操作 DOM，逻辑同成品库存表；排序/语言切换保持展开） */
     function prod_eStatsSubRowHtml(d, no){
-      return '<tr class="pe-estats-subrow">'
+      var ok = (d.gap<=0);
+      return '<tr class="pe-estats-subrow'+(ok?' pe-gap-ok':'')+'">'
         + '<td class="pe-col-no pe-estats-sub-idx">'+(no||'')+'</td>'
         + '<td class="pe-estats-house">'+prod_esc(d.name)+'</td>'
         + '<td>'+prod_fmtNum(d.demand)+'</td>'
         + '<td>'+prod_fmtNum(d.produced)+'</td>'
-        + '<td'+(d.gap>0?' class="pe-gap"':'')+'>'+prod_fmtNum(d.gap)+'</td>'
+        + '<td'+(ok?' class="pe-gap-ok" title="'+prod_esc(prod_gapOkTip(d.demand,d.produced))+'"':(d.gap>0?' class="pe-gap"':''))+'>'+prod_fmtNum(d.gap)+'</td>'
         + '<td></td><td></td>'
         + '</tr>';
     }
@@ -12053,13 +12268,15 @@ var WL_FLOW_IMG = {
       var rowsData = specKeys.map(function(k){
         var demand = mm.specs[k].total||0;
         var produced = (fin[k] && fin[k].produced)||0;
-        var gap = Math.max(0, demand - produced);
+        /* ★PE-GAP-OK-20261108：缺口量取「真实差值」，生产多了就是负数（原来被 Math.max 夹成 0，
+           看不出超产多少）；缺口<=0 即视为达标 → 整行绿色加粗 + 悬停说明。 */
+        var gap = demand - produced;
         var pct = totalDemand > 0 ? ((demand / totalDemand) * 100).toFixed(1) : '0.0';
         var rank = rankMap[k];
         var sp = k.split('×');
         var label = prod_esc(sp[0]||'') + ' x ' + prod_esc((sp[1]||'')+'×'+(sp[2]||''));
         var houseNames = Object.keys(mm.specs[k].houses || {}).filter(function(h){ return h && h !== '—'; }).map(prod_phName).join('、') || '—';
-        return {k:k, label:label, demand:demand, produced:produced, gap:gap, pct:pct, rank:rank, houseNames:houseNames};
+        return {k:k, label:label, demand:demand, produced:produced, gap:gap, ok:(gap<=0), pct:pct, rank:rank, houseNames:houseNames};
       });
       if(sort.col && sort.dir){
         rowsData.sort(function(a,b){
@@ -12083,12 +12300,15 @@ var WL_FLOW_IMG = {
         var _houses = housesForSpec.map(function(h){
           var hd = mm.specs[r.k].houses[h]||0;
           var hp = (hsp[h] && hsp[h][r.k]) || 0;
-          return { name:prod_phName(h), demand:hd, produced:hp, gap:Math.max(0, hd-hp) };
+          /* ★PE-GAP-OK-20261108：子行同样取真实差值（可为负），与父行口径一致 */
+          return { name:prod_phName(h), demand:hd, produced:hp, gap:(hd-hp) };
         });
         PROD_ESTATS_HOUSE[r.k] = _houses;
         var isExp = !!PROD_ESTATS_EXPAND[r.k];
         var caret = '<span class="pe-estats-caret">'+(isExp?'▾':'▸')+'</span>';
-        var _row = '<tr class="pe-estats-row'+(isExp?' pe-estats-expanded':'')+'" data-spec="'+prod_esc(r.k)+'" data-no="'+(i+1)+'" onclick="prod_eStatsRowClick(event,this)"><td class="pe-col-no">'+(i+1)+'</td><td class="pe-vth" title="'+pt('thr_house')+'：'+prod_esc(r.houseNames)+'">'+caret+vth+'</td><td>'+prod_fmtNum(r.demand)+'</td><td>'+prod_fmtNum(r.produced)+'</td><td'+(r.gap>0?' class="pe-gap"':'')+'>'+prod_fmtNum(r.gap)+'</td><td>'+prod_esc(r.houseNames)+'</td><td>'+r.pct+'% / #'+r.rank+'</td></tr>';
+        var _gapCls = r.ok ? ' class="pe-gap-ok" title="'+prod_esc(prod_gapOkTip(r.demand, r.produced))+'"'
+                           : (r.gap>0 ? ' class="pe-gap"' : '');
+        var _row = '<tr class="pe-estats-row'+(isExp?' pe-estats-expanded':'')+(r.ok?' pe-gap-ok':'')+'" data-spec="'+prod_esc(r.k)+'" data-no="'+(i+1)+'" onclick="prod_eStatsRowClick(event,this)"><td class="pe-col-no">'+(i+1)+'</td><td class="pe-vth" title="'+pt('thr_house')+'：'+prod_esc(r.houseNames)+'">'+caret+vth+'</td><td>'+prod_fmtNum(r.demand)+'</td><td>'+prod_fmtNum(r.produced)+'</td><td'+_gapCls+'>'+prod_fmtNum(r.gap)+'</td><td>'+prod_esc(r.houseNames)+'</td><td>'+r.pct+'% / #'+r.rank+'</td></tr>';
         if(isExp && _houses.length){ _row += _houses.map(function(d,hi){ return prod_eStatsSubRowHtml(d, (i+1)+'.'+(hi+1)); }).join(''); }
         return _row;
       }).join('');
@@ -12104,7 +12324,8 @@ var WL_FLOW_IMG = {
         + '</tr></thead>'
         + '<tbody>'+rowsHtml+'</tbody>' + footHtml + '</table></div>';
       h += '<div class="prod-canvas-card"><div class="prod-chart-title">'+pt('chart_bar')+'</div><div class="prod-chart-box" id="pcEBar"></div></div>';
-      h += '<div class="prod-canvas-card"><div class="prod-chart-title">'+pt('chart_weather')+'</div><div class="prod-chart-box" id="pcEWeather"></div><div id="pcEWeatherSummary" style="margin-top:8px;font-size:12px;color:#555;line-height:1.6;"></div></div>';
+      /* ★PE-E-SUM-RED-20261108：底部这行统计/进度数据改为红色加粗，便于一眼识别 */
+      h += '<div class="prod-canvas-card"><div class="prod-chart-title">'+pt('chart_weather')+'</div><div class="prod-chart-box" id="pcEWeather"></div><div id="pcEWeatherSummary" style="margin-top:8px;font-size:12px;color:#E53935;font-weight:700;line-height:1.7;"></div></div>';
       return h;
     }
     function prod_eSet(id, opt){
@@ -12911,6 +13132,34 @@ var WL_FLOW_IMG = {
       }
       f.finished = fn;
     }
+    /* ★PE-HIST-UI-20261108：历史产出表鼠标悬停「十字高亮」（整行 + 整列，淡黄）。
+       document 级委托只绑一次，表格重渲染后依然有效；每次移动只操作同类名的少量单元格。 */
+    var _PE_XH = {table:null, col:-1, row:null};
+    function prod_xhClear(){
+      var t=_PE_XH.table; if(!t) return;
+      var cells=t.querySelectorAll('td.xh-row,td.xh-col');
+      for(var i=0;i<cells.length;i++) cells[i].classList.remove('xh-row','xh-col');
+      _PE_XH.table=null; _PE_XH.col=-1; _PE_XH.row=null;
+    }
+    function prod_xhApply(td){
+      var t = (td.closest ? td.closest('table.pe-hist') : null); if(!t) return;
+      var tr = td.parentNode; if(!tr || tr.tagName!=='TR') return;
+      var idx = td.cellIndex;
+      if(_PE_XH.table===t && _PE_XH.col===idx && _PE_XH.row===tr) return;
+      prod_xhClear();
+      var tds = tr.querySelectorAll('td');
+      for(var i=0;i<tds.length;i++) tds[i].classList.add('xh-row');
+      var rows = (t.tBodies && t.tBodies[0]) ? t.tBodies[0].rows : [];
+      for(var r=0;r<rows.length;r++){ var c=rows[r].cells[idx]; if(c) c.classList.add('xh-col'); }
+      _PE_XH.table=t; _PE_XH.col=idx; _PE_XH.row=tr;
+    }
+    try{
+      document.addEventListener('mouseover', function(e){
+        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td'):null;
+        if(td) prod_xhApply(td); else prod_xhClear();
+      }, true);
+      document.addEventListener('scroll', function(){ prod_xhClear(); }, true);
+    }catch(e){}
     function prod_dailyHistoryTable(f, specs){
       /* [安全·不再静默删数据] 旧实现会把所有早于「开始生产日期」的历史产出 delete 掉并 prod_save
          推送到服务端：一旦开始生产日期(prepEnd/planStart)变动，用户已录入的产出就会被永久删除。
