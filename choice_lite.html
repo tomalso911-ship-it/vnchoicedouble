@@ -6145,6 +6145,13 @@ var WL_FLOW_IMG = {
       #prod-tab-body .pc-labor-hist tbody td.xh-row.xh-col,
       table.prod-usage tbody td.xh-row.xh-col,
       table.prod-matusage tbody td.xh-row.xh-col{background:#ffec96 !important;}
+      /* ★XH-RCPT-20261108（用户 2026-11-08 要求）：收货确认「已提交收货单」卡片里的明细表
+         → 表头深蓝底 + 白色加粗字；主体鼠标悬停十字高亮（整行 + 整列淡黄，交叉格更深）。
+         表头用 .rc-table 收窄作用域，避免影响同一模块其它 .prod-table。 */
+      .receipt-card table.rc-table thead th{background:linear-gradient(180deg,#1565C0,#0D47A1) !important;color:#fff !important;font-weight:700 !important;border-color:#08306B !important;}
+      .receipt-card table.rc-table thead th *{color:#fff !important;}
+      table.rc-table tbody td.xh-row, table.rc-table tbody td.xh-col{background:#fff6c2 !important;}
+      table.rc-table tbody td.xh-row.xh-col{background:#ffec96 !important;}
       /* 按栋舍汇总生产计划表：网格线（红色加粗分组线由内联样式保留） */
       .prod-table.prod-houseplan th, .prod-table.prod-houseplan td{border:1px solid #333;}
       /* 成品库存表：规格行可展开猪舍明细 */
@@ -12266,7 +12273,7 @@ var WL_FLOW_IMG = {
         + collapseBtn
         + '<div class="rc-top">'+ordinalBadge+'<b><span data-i18n="sec_receipt">'+pt('sec_receipt')+'</span> #'+(r.id||idx)+'</b> · <span class="rc-date">'+prod_esc(ymdToDmy(r.date||''))+'</span> '+st+reeditBtn+cardToggle+delBtn+'</div>'
         + '<div class="rc-body" id="'+cardId+'">'
-        + '<table class="prod-table"><thead><tr><th data-i18n="lbl_material">'+pt('lbl_material')+'</th><th data-i18n="lbl_spec">'+pt('lbl_spec')+'</th><th data-i18n="lbl_unit">'+pt('lbl_unit')+'</th><th data-i18n="lbl_price_vnd">'+pt('lbl_price_vnd')+'</th><th data-i18n="lbl_sub_vnd">'+pt('lbl_sub_vnd')+'</th><th data-i18n="lbl_sub_rmb">'+pt('lbl_sub_rmb')+'</th><th data-i18n="lbl_sub_usd">'+pt('lbl_sub_usd')+'</th><th data-i18n="thr_qty2">'+pt('thr_qty2')+'</th><th data-i18n="lbl_note">'+pt('lbl_note')+'</th></tr></thead><tbody>'+rowsHtml+totalRow+'</tbody></table>'
+        + '<table class="prod-table rc-table"><thead><tr><th data-i18n="lbl_material">'+pt('lbl_material')+'</th><th data-i18n="lbl_spec">'+pt('lbl_spec')+'</th><th data-i18n="lbl_unit">'+pt('lbl_unit')+'</th><th data-i18n="lbl_price_vnd">'+pt('lbl_price_vnd')+'</th><th data-i18n="lbl_sub_vnd">'+pt('lbl_sub_vnd')+'</th><th data-i18n="lbl_sub_rmb">'+pt('lbl_sub_rmb')+'</th><th data-i18n="lbl_sub_usd">'+pt('lbl_sub_usd')+'</th><th data-i18n="thr_qty2">'+pt('thr_qty2')+'</th><th data-i18n="lbl_note">'+pt('lbl_note')+'</th></tr></thead><tbody>'+rowsHtml+totalRow+'</tbody></table>'
         + (((r.floors&&r.floors.length)||(r.houses&&r.houses.length))?
           '<div class="rc-meta">'
           + ((r.floors&&r.floors.length)?'<span><span data-i18n="lbl_floor_spec">'+pt('lbl_floor_spec')+'</span>：'+prod_esc(r.floors.join('、'))+'</span>':'')
@@ -13530,7 +13537,7 @@ var WL_FLOW_IMG = {
     function prod_xhApply(td){
       /* ★PE-STATS-XH-20261108：生产统计表复用同一套十字高亮
          ★EQ-FAULT-XH-20261108：生产F页「设备配置清单」「设备故障报备」也复用同一套 */
-      var t = (td.closest ? td.closest('table.pe-hist, table.pe-estats, table.prod-equip-table, table.prod-equip-fault, table.prod-out-records, table.prod-out-analysis, table.pe-fin, table.prod-stockout, table.pc-labor-hist, table.prod-usage, table.prod-matusage') : null); if(!t) return;
+      var t = (td.closest ? td.closest('table.pe-hist, table.pe-estats, table.prod-equip-table, table.prod-equip-fault, table.prod-out-records, table.prod-out-analysis, table.pe-fin, table.prod-stockout, table.pc-labor-hist, table.prod-usage, table.prod-matusage, table.rc-table') : null); if(!t) return;
       var tr = td.parentNode; if(!tr || tr.tagName!=='TR') return;
       if(tr.classList && tr.classList.contains('prod-equip-secrow')) return;   /* 工段分隔行不参与十字高亮 */
       var idx = td.cellIndex;
@@ -13544,7 +13551,7 @@ var WL_FLOW_IMG = {
     }
     try{
       document.addEventListener('mouseover', function(e){
-        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td, table.pe-estats tbody td, table.prod-equip-table tbody td, table.prod-equip-fault tbody td, table.prod-out-records tbody td, table.prod-out-analysis tbody td, table.pe-fin tbody td, table.prod-stockout tbody td, table.pc-labor-hist tbody td, table.prod-usage tbody td, table.prod-matusage tbody td'):null;
+        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td, table.pe-estats tbody td, table.prod-equip-table tbody td, table.prod-equip-fault tbody td, table.prod-out-records tbody td, table.prod-out-analysis tbody td, table.pe-fin tbody td, table.prod-stockout tbody td, table.pc-labor-hist tbody td, table.prod-usage tbody td, table.prod-matusage tbody td, table.rc-table tbody td'):null;
         if(td) prod_xhApply(td); else prod_xhClear();
       }, true);
       document.addEventListener('scroll', function(){ prod_xhClear(); }, true);
