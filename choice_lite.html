@@ -8490,7 +8490,11 @@ var WL_FLOW_IMG = {
         ['.prod-equip-fault-scroll', 10, '430px'],
         ['.pe-line-detail-scroll', 10, '360px'],
         ['.plc-scroll', 10, '360px'],
-        ['.pc-labor-scroll', 10, '400px'],
+        /* ★IC-SCROLL-10-20261108：必须限定在生产页签内。原来写 '.pc-labor-scroll' 会
+           document.querySelector 取到【安装页签】那张同名表，把它的 maxHeight 写成固定
+           400px → 只露 4~5 条记录，且第 11 条以前就出现滚动条。安装表的高度由
+           inst_limitLaborScroll() 按「10 条记录」精确计算。 */
+        ['#prod-tab-body .pc-labor-scroll', 10, '400px'],
         ['.pe-hist-scroll', 20, '560px'],
         ['.rc-list-scroll', 10, '520px']
       ];
@@ -76331,23 +76335,49 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var dnOn = INST_LABOR_SORT.col===col && INST_LABOR_SORT.dir===-1 ? ' on' : '';
     return '<span class="pc-sort-ind"><i class="up'+upOn+'">▲</i><i class="dn'+dnOn+'">▼</i></span>';
   }
-  /* 安装「安装数量&人工明细」表：固定表头（thead sticky），
-     仅当数据行 > 10 行时出现垂直滚动条；≤10 行不限制高度、不出现滚动条。
-     高度 = 表头 + 10 行 + 小计行，保证第 11 行才触发滚动。 */
+  /* 安装「安装数量&人工明细」表：固定表头（thead sticky）+ 小计行 sticky bottom。
+     ★IC-SCROLL-10-20261108（用户 2026-11-08 指定）：必须完整显示【10 条日期记录】，
+       第 11 条开始才出现右侧垂直滚动条；≤10 条时不限高、不出现滚动条。
+     要点：一条「记录」= 一个日期块，可能占多行 <tr>（区域/猪舍/小组/安装数量被 rowspan
+       纵向合并）。所以不能按 <tr> 数量算，必须按【带日期单元格的 tr】识别块首，
+       并把前 10 个块内所有 tr 的高度累加。旧实现用 rows[0].offsetHeight × 10，
+       遇到第一条记录特别高/特别矮就会算错（实测只露 4~5 条）。 */
   function inst_limitLaborScroll(){
     var wrap = document.querySelector('#inst-tab-body .pc-labor-scroll');
     if(!wrap) return;
     var tbl = wrap.querySelector('table.pc-labor-hist');
     if(!tbl){ wrap.style.maxHeight = 'none'; return; }
     var rows = tbl.querySelectorAll('tbody tr');
-    var maxRows = 10;
-    if(!rows.length || rows.length <= maxRows){ wrap.style.maxHeight = 'none'; return; }
+    var maxRec = 10;
+    if(!rows.length){ wrap.style.maxHeight = 'none'; return; }
+    /* 记录块识别：日期单元格只出现在块首（其余行被 rowspan 合并掉） */
+    var hasDateCol = !!tbl.querySelector('tbody td.pc-col-date');
+    var totalRec = 0, i;
+    if(hasDateCol){
+      for(i=0;i<rows.length;i++){ if(rows[i].querySelector('td.pc-col-date')) totalRec++; }
+    } else {
+      totalRec = rows.length;   /* 兜底：没有日期列时按行算 */
+    }
+    if(totalRec <= maxRec){ wrap.style.maxHeight = 'none'; return; }
     var thead = tbl.querySelector('thead');
     var tfoot = tbl.querySelector('tfoot');
-    var headH = thead ? thead.offsetHeight : 0;
-    var footH = tfoot ? tfoot.offsetHeight : 0;
-    var rowH = rows[0].offsetHeight || 26;
-    wrap.style.maxHeight = (headH + maxRows * rowH + footH) + 'px';
+    var hSum = (thead ? thead.offsetHeight : 0) + (tfoot ? tfoot.offsetHeight : 0);
+    var seen = 0;
+    for(i=0;i<rows.length;i++){
+      var tr = rows[i];
+      var isStart = hasDateCol ? !!tr.querySelector('td.pc-col-date') : true;
+      if(isStart){
+        seen++;
+        if(seen > maxRec) break;   /* 第 11 条记录不纳入可见高度 */
+      }
+      hSum += (tr.offsetHeight || 26);
+    }
+    wrap.style.maxHeight = hSum + 'px';
+  }
+  /* 窗口宽度变化会让单元格换行、行高变化 → 重新按 10 条记录算一次（只绑一次） */
+  if(!window.__icLaborScrollResizeBound){
+    window.__icLaborScrollResizeBound = true;
+    window.addEventListener('resize', function(){ try{ inst_limitLaborScroll(); }catch(e){} });
   }
   /* ★IC-HIST-CROSS-20261108：安装 Tab C「安装数量&人工明细」表 —— 鼠标悬停淡粉色十字（整行+整列）高亮。
      用矩形坐标判定同行/同列：该表有 rowspan 纵向合并，cellIndex 会错位，不能用 cellIndex。
