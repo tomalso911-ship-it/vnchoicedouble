@@ -68750,11 +68750,21 @@ window.refreshMoveBtnState = function () {
   // ★WON-MOVE-OBS-GATE-20261108：整页 DOM（含两套后台常驻的 Univer 表格）一直在变动，
   //   无脑排 200ms 定时器会退化成「后台 ~3 次/秒的空转」。先做一次极廉价的判断：
   //   页面上没有移动箭头按钮（.icon-move-up）就根本不排定时器。
-  function hasMoveBtn() { return !!document.querySelector('.icon-move-up'); }
+  // 只在「签约项目」视图容器内查（整页 querySelector 在 Univer 大 DOM 上要 1~5ms）
+  function hasMoveBtn() {
+    var v = document.getElementById('view-won');
+    return !!(v ? v.querySelector('.icon-move-up') : document.querySelector('.icon-move-up'));
+  }
+  // ★MOVEOBS-COALESCE-20261108：绝不能在「每一次 body 变动」里做 document.querySelector
+  //   （Univer 每分钟上千次改动，整页查询每次 1~5ms → 会把主线程拖死）。
+  //   改为「首次变动排一个 200ms 定时器，期间的所有变动合并」，检查放在定时器里做一次。
   var mo = new MutationObserver(function () {
-    if (!hasMoveBtn()) return;
-    if (tm) clearTimeout(tm);
-    tm = setTimeout(function () { tm = null; try { window.refreshMoveBtnState(); } catch (e) {} }, 200);
+    if (tm) return;
+    tm = setTimeout(function () {
+      tm = null;
+      if (!hasMoveBtn()) return;
+      try { window.refreshMoveBtnState(); } catch (e) {}
+    }, 200);
   });
   function start() {
     if (armed) return;

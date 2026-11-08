@@ -157,7 +157,8 @@ def main():
         if p.returncode != 0:
             log("push 失败：\n" + (p.stdout or "") + (p.stderr or ""))
             raise SystemExit("GitHub 推送失败，未改动线上")
-        log("   ", (p.stderr or p.stdout or "").strip().splitlines()[-1])
+        _pout = (p.stderr or p.stdout or "").strip().splitlines()
+        log("   ", _pout[-1] if _pout else f"push rc={p.returncode}（无输出）")
 
     log("3/6 打包 + 生成 md5 清单")
     tgz, man, paths = OUT / "choice_full.tgz", OUT / "manifest.txt", OUT / "paths.txt"
@@ -217,9 +218,20 @@ def main():
     if "SERVICE=active" not in health:
         raise SystemExit("choice-pm 未处于 active")
 
-    heads = run(["git", "rev-parse", "--short", "HEAD", "origin/main"])
-    log("完成：本地/线上/GitHub 核心文件一致；HEAD/origin =",
-        " / ".join(heads.stdout.split()))
+    # ★CLEAN-TAIL-20261108：原来这里用 `git rev-parse --short HEAD origin/main` 一次性取两个 rev，
+    #   当本地没有 refs/remotes/origin/main（或尚未 fetch/push 完成）时 git 直接
+    #   "fatal: Needed a single revision" 退出 → 部署其实全成功，却在最后一行抛异常、
+    #   退出码非 0（用户看到的“收尾 cosmetic 报错”）。逐个取 + 兜底，绝不因打印失败而失败。
+    head = (run(["git", "rev-parse", "--short", "HEAD"], check=False).stdout or "").strip() or "(未知)"
+    upstream = (run(["git", "rev-parse", "--short", "origin/main"], check=False).stdout or "").strip()
+    if not upstream:
+        r2 = run(["git", "rev-parse", "--short", "@{u}"], check=False)
+        upstream = (r2.stdout or "").strip() if r2.returncode == 0 else ""
+    if not upstream:
+        upstream = "(无 origin/main 引用，推送已完成或仓库未配置 upstream)"
+    same_as_remote = (upstream == head)
+    log("完成：本地 → 线上已一致；HEAD =", head, " origin/main =", upstream,
+        "" if same_as_remote else "（本地领先，GitHub 尚未收到本次提交）")
     log("页面：https://choice-vn-crm.duckdns.org/lite")
 
 
