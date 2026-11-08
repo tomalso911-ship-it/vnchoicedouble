@@ -179,6 +179,25 @@
 #                                 历史 BUG：审批返回后收货单仍是 pending，申请人看不到按钮，
 #                                 流程无法闭环。反向测试：python _lock_reverse_test_appr.py
 #
+#   21) check_perf_idle_lock.py —— 空闲期「不空转 + 视图门控 + 后台帧泵降频」锁死区
+#                                 （PERF-IDLE-LOCK-20261108，用户 2026-11-08：
+#                                  「现在是不是点击任何按钮速度都快很多了？必须锁定这个逻辑」）：
+#                                 ① updateNavLock 观察器必须忽略 #univer_container / #equity_container
+#                                    内部 class 变动（否则每次 Univer 改 class 排一个 120ms 空转定时器）
+#                                 ② 移动箭头观察器回调里★禁止 document.querySelector
+#                                    （必须合并进 200ms 定时器；否则上千次/分 × 1~5ms 拖死主线程）
+#                                 ③ 移动箭头 800ms 重试必须退避 + 封顶（原来无上限 → 永久空转）
+#                                 ④ 财务工具栏观察器视图门控（未激活只打 __finToolbarStale）
+#                                 ⑤ 权益权限观察器视图门控（未激活只打 __eqPermsStale）
+#                                 ⑥ ★门控必须有补回通路：__onViewShown 钩子 + 700ms 兜底轮询
+#                                    （2026-11-08 事故：纯 return 让财务工具栏停在 .fin-workspace，
+#                                      宽 1322 而非 126 —— 看起来就像"工具栏坏了"）
+#                                 ⑦ Univer 帧泵降频只针对「_beginFrame + renderEvenInBackground」那个回调，
+#                                    且任一表格视图激活时必须立刻恢复 60fps
+#                                 ⑧ 两处 250ms 常驻 interval 必须视图门控
+#                                 实测收益：rAF 2151→174 /12s，回调总耗时 169→61ms
+#                                 反向测试：python _lock_reverse_test_perf_idle.py
+#
 #   后两条是【数据一致性巡检】：扫描 agi_pm.db，专门抓绕过前端（旧草稿/手工改库）写入的非法记录。
 #   它们以【警告】形式运行，不阻断提交（避免历史遗留脏数据阻塞正常推送）；
 #   但会在提交时打印，便于及时发现并修复。CI 中建议作为独立步骤做硬阻断。
@@ -206,7 +225,7 @@ fi
 
 # ===== 硬锁：静态 HTML 契约，失败即拦截 =====
 rc=0
-for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py check_clip_robust_lock.py check_undo_everystep_lock.py check_eq_geom_lock.py check_py_name_lock.py check_appr_need_edit_lock.py; do
+for f in check_modal_format.py check_print_logic.py check_fin_hi_lock.py check_fin_excel_keys_lock.py check_fin_snap_cache.py check_fin_no_trans_lock.py check_fin_formula_lock.py check_fin_cn_lock.py check_fin_cn_hide_checked_lock.py check_fin_merge_cn_blue_lock.py check_fin_keep_sheet_lock.py check_equity_lock.py check_eq_cur_notrans_lock.py check_hscroll_lock.py check_clip_robust_lock.py check_undo_everystep_lock.py check_eq_geom_lock.py check_py_name_lock.py check_appr_need_edit_lock.py check_perf_idle_lock.py; do
   if [ -f "$f" ]; then
     echo "— 契约检查（硬锁）：$f"
     if ! PYTHONIOENCODING=utf-8 "$PY" "$f"; then
