@@ -63763,12 +63763,14 @@ function submitAuth() {
       });
       var s4 = ccTpl('ccSumRAll', [f2(ccRTon), ccNum(ccRLen)]) + ' ' +
         ccTpl('ccSumSteel', [f2(area > 0 ? ccRTon * 1000 / area : 0), f1(area > 0 ? ccVol / area * 1000 : 0)]);
-      // ★CC-DIATABLE-20261104：末尾按 φ 直径小表（规格 | 总长(m) | 总重(吨)），只列实际用到的直径
+      // ★CC-DIATABLE-20261104：按 φ 直径小表（规格 | 总长(m) | 总重(吨)），只列实际用到的直径
+      // ★CC-DIA-RIGHT-20261108（用户 2026-11-08 要求）：这张「按钢筋规格汇总」从文字块【下方】移到【右侧】，
+      //   两块之间加一条垂直虚线。纯版式改动（flex + border-left:dashed），不碰任何取值/计算公式。
       var s5 = '';
       var diaList = ['6', '8', '10', '12'].filter(function(d){ return ccDia[d] && (ccDia[d].len > 0 || ccDia[d].ton > 0); });
       if(diaList.length){
-        s5 = '<div style="margin:6px 0 0;font-weight:600;">' + ccT('ccDiaTitle') + '</div>' +
-          '<table class="cc-tb" style="width:auto;min-width:340px;margin:4px 0 2px 16px;"><thead><tr>' +
+        s5 = '<div style="margin:0 0 0;font-weight:600;white-space:nowrap;">' + ccT('ccDiaTitle') + '</div>' +
+          '<table class="cc-tb" style="width:auto;min-width:340px;margin:4px 0 2px 0;"><thead><tr>' +
           '<th>' + ccT('ccDiaSpec') + '</th><th>' + ccT('ccDiaLen') + '</th><th>' + ccT('ccDiaTon') + '</th></tr></thead><tbody>';
         diaList.forEach(function(d){
           s5 += '<tr><td style="text-align:center;">φ' + d + '</td>' +
@@ -63777,7 +63779,13 @@ function submitAuth() {
         });
         s5 += '</tbody></table>';
       }
-      sumEl.innerHTML = '<div>' + s1 + '</div><div>' + s2 + '</div><div>' + s3 + '</div><div>' + s4 + '</div>' + s5;
+      var _ccLeft = '<div>' + s1 + '</div><div>' + s2 + '</div><div>' + s3 + '</div><div>' + s4 + '</div>';
+      sumEl.innerHTML = s5
+        ? ('<div style="display:flex;align-items:stretch;gap:0;">'
+            + '<div style="flex:1 1 auto;min-width:0;">' + _ccLeft + '</div>'
+            + '<div id="cc_v_dia_wrap" style="flex:0 0 auto;border-left:1px dashed #999;margin-left:22px;padding-left:22px;">' + s5 + '</div>'
+            + '</div>')
+        : _ccLeft;
     }
     if(window.__ccCrewRefresh) window.__ccCrewRefresh(); // ★CC-INSTDAYS：规格/汇率等任何重算都刷新安装天数行
     if(typeof ccPlanRefresh === 'function') ccPlanRefresh(); // ★CC-PLAN-20261108：生产/安装天数变化后同步刷新执行计划
