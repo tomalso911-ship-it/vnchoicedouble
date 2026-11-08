@@ -87,6 +87,15 @@ CASES = [
      "if (typeof cb === 'function' && _isRenderPump(cb)) {"),
     ("⑧ 去掉 finRememberCur 的视图门控（只删那一处）", tamper_fin_remember, None),
     ("⑧ 去掉 sheetLockHideDeleteMenus 的视图门控（只删那一处）", tamper_sheetlock, None),
+    ("⑨ 偷偷新增一个 body 级 MutationObserver",
+     "window.__perfIdle4 = true;",
+     "window.__perfIdle4 = true; new MutationObserver(function(){}).observe(document.body, {childList:true});"),
+    ("⑨ 偷偷新增一个无条件 setInterval",
+     "window.__perfIdle4 = true;",
+     "window.__perfIdle4 = true; setInterval(function(){ /* sneak */ }, 500);"),
+    ("⑨ 新增 documentElement 级观察器",
+     "window.__perfIdle4 = true;",
+     "window.__perfIdle4 = true; new MutationObserver(function(){}).observe(document.documentElement, {childList:true});"),
 ]
 
 

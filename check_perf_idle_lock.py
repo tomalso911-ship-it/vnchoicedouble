@@ -19,6 +19,11 @@
   ⑦ Univer 帧泵降频只许针对「源码含 _beginFrame 且含 renderEvenInBackground」的回调，
      且任一表格视图激活时必须不延迟
   ⑧ 两处 250ms 常驻 interval 必须视图门控
+  ⑨ ★基线漂移守门（用户 2026-11-08 追加要求）：
+     body 级观察器 / documentElement 级观察器 / MutationObserver 总数 / 常驻 setInterval 总数
+     全部钉死基线。后来新增（或删除）任何一处都拦提交，并在输出里列出各处行号，
+     逼开发者显式确认「是否必要、有没有 document.hidden / __viewActive 门控」
+     —— 防「以后又悄悄加一个 body 观察器或常驻轮询」绕过前 8 条（前 8 条只管已修好的那几处）。
 
 失败即 exit 1（已登记进 .githooks/pre-commit 与 .git/hooks/pre-commit）。
 反向测试：python _lock_reverse_test_perf_idle.py
@@ -130,6 +135,56 @@ _j = src.find("function sheetLockHideDeleteMenus(){")
 chk(_j > 0 and "if (!__viewActive('finance') && !__viewActive('equity')) return;"
     in src[_j:_j + 900],
     "sheetLockHideDeleteMenus：同一个函数体内必须有 finance||equity 门控")
+
+print("9) ★基线漂移守门：后来新增的 body 级观察器 / 常驻轮询必须被看见")
+# 这一组的用意：前 8 条只守「已经修好的那几处」。将来谁再往页面里加一个
+# body 级 MutationObserver 或一个无条件 setInterval，光靠前 8 条是发现不了的
+# ——用户 2026-11-08 明确要求「后期增加了别的 body 级观察器或常驻轮询，这套锁也要能发现」。
+# 做法：把当前基线钉死；数量一变就拦提交，并在输出里列出每一处的行号，
+# 逼开发者显式确认「这门控是必要的吗、加了 document.hidden / __viewActive 门控吗」。
+BASE_BODY_OBS = 10   # .observe(document.body ...)
+BASE_MUT_OBS = 20    # new MutationObserver(...)
+BASE_IV = 39         # setInterval(...)
+
+body_obs = len(re.findall(r"\.observe\(\s*document\.body", src))
+mut_obs = len(re.findall(r"new MutationObserver\s*\(", src))
+ivs = len(re.findall(r"\bsetInterval\s*\(", src))
+
+
+def baseline(name, cur, base, hint):
+    chk(cur == base, "%s：基线 %d，实际 %d%s" % (name, base, cur, "（一致）" if cur == base else " ★有变化"))
+    if cur != base:
+        print("      → %s" % hint)
+        print("      → 若确属必要：先加门控（document.hidden / __viewActive），再把 check_perf_idle_lock.py 里对应基线改成 %d" % cur)
+
+
+baseline("body 级观察器 .observe(document.body)", body_obs, BASE_BODY_OBS,
+         "新增 body 观察器会被两套常驻 Univer 的 DOM 变动持续点亮 → 记得在回调里先判视图/元素来源")
+BASE_DOCEL_OBS = 0
+baseline("documentElement 级观察器", len(re.findall(r"\.observe\(\s*document\.documentElement", src)),
+         BASE_DOCEL_OBS, "整文档级观察器极贵（每次变动都跨整棵树），一律不要新增")
+baseline("MutationObserver 实例总数", mut_obs, BASE_MUT_OBS,
+         "观察器总数变了（新增或删除），请确认没有引入新的「高频 debounce 空转」")
+baseline("常驻 setInterval 总数", ivs, BASE_IV,
+         "新增常驻轮询前请先想：能不能用事件/命令流代替？不能则必须带 document.hidden 或 __viewActive 门控")
+
+
+def _lines(pat, limit=40):
+    ls = []
+    for m in re.finditer(pat, src):
+        n = src.count("\n", 0, m.start()) + 1
+        ls.append(n)
+        if len(ls) >= limit:
+            break
+    return ls
+
+
+if body_obs != BASE_BODY_OBS:
+    print("      body observe 行号: %s" % _lines(r"\.observe\(\s*document\.body"))
+if ivs != BASE_IV:
+    print("      setInterval 行号: %s" % _lines(r"\bsetInterval\s*\("))
+if mut_obs != BASE_MUT_OBS:
+    print("      new MutationObserver 行号: %s" % _lines(r"new MutationObserver\s*\("))
 
 print("")
 if ok:
