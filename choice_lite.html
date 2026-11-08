@@ -21721,6 +21721,8 @@ var PROD_EQUIP_FAULT_KB = {
       try {
         setInterval(function(){
           if (document.hidden) return;
+          /* ★PERF-VIEWGATE-20261108：财务页不在前台时这轮没有意义（原先是每 250ms 无条件跑，4 次/秒空转） */
+          try { if (!__viewActive('finance')) return; } catch(e){}
           if (Date.now() - finLastKeyAt < 400) return;      // 正在连续按键，不去打扰
           finRememberCur(finActiveCell());
         }, 250);
@@ -26513,6 +26515,8 @@ var PROD_EQUIP_FAULT_KB = {
     function sheetLockHideDeleteMenus(){
       try {
         if (document.hidden) return;   // ★BTN-LAG：后台标签不做无谓DOM扫描
+        /* ★PERF-VIEWGATE-20261108：只在挂着 Univer 的两页（财务/股东权益）才需要扫这个菜单 */
+        try { if (!__viewActive('finance') && !__viewActive('equity')) return; } catch(_){}
         if (sheetLockIsTriAdmin()) return;
         var items = document.querySelectorAll('.univer-sheet-bar-menu .univer-sheet-bar-menu-item, .univer-sheet-bar-menu li');
         for (var i = 0; i < items.length; i++){
@@ -27749,8 +27753,15 @@ var PROD_EQUIP_FAULT_KB = {
            互相拉扯（整张表看起来一直晃）。这里合并成 180ms 一次，最坏 ~5 次/秒。 */
         finToolbarObserver = new MutationObserver(function(){
           if (finToolbarTimer) return;
+          /* ★PERF-VIEWGATE-20261108：两套 Univer 常驻，不在财务页时它的 React 也一直在改 DOM，
+             原来会 3~5 次/秒排空转定时器。视图未激活就不排，只打「待补挂」标记；
+             切回财务页时由 __onViewShown 立刻补一次，另有 700ms 兜底轮询（防漏）。 */
+          var _act = true;
+          try { _act = __viewActive('finance'); } catch(e) {}
+          if (!_act) { window.__finToolbarStale = true; return; }
           finToolbarTimer = setTimeout(function(){
             finToolbarTimer = null;
+            window.__finToolbarStale = false;
             try { fin_mountToolbar2(); } catch(e){}
           }, 180);
         });
@@ -40846,7 +40857,13 @@ function installPermObservers(){
       var eqT = null;
       var mo2 = new MutationObserver(function(){
         if (eqT) return;
-        eqT = setTimeout(function(){ eqT = null; try{ applyEqPerms(); }catch(e){} }, 200);
+        /* ★PERF-VIEWGATE-20261108：权益页不在前台时，Univer 内部仍在疯狂改 DOM，
+           没必要每 200ms 重贴一次权限。只打「待重贴」标记，切回权益页时
+           由 __onViewShown 立刻补一次，另有 700ms 兜底轮询（防漏）。 */
+        var _act = true;
+        try { _act = __viewActive('equity'); } catch(e) {}
+        if (!_act) { window.__eqPermsStale = true; return; }
+        eqT = setTimeout(function(){ eqT = null; window.__eqPermsStale = false; try{ applyEqPerms(); }catch(e){} }, 200);
       });
       mo2.observe(eqEl, { childList: true, subtree: true });
     }
@@ -68786,6 +68803,102 @@ window.refreshMoveBtnState = function () {
   }
   if (document.readyState === 'complete') preload();
   else window.addEventListener('load', preload);
+})();
+/* ============ ★PERF-IDLE4-20261108：视图钩子 + 后台帧泵降频 ============ */
+(function(){
+  if (window.__perfIdle4) return;
+  window.__perfIdle4 = true;
+
+  /* 1) switchView 钩子：视图激活时补跑「只有前台才做」的维护动作。
+        原因：对应的 MutationObserver 在后台被我们跳过了（不给空转排定时器），
+        切回来必须显式补一次，否则 toolbar 掉了/工作簿标签的隐藏没重贴。 */
+  window.__onViewShown = function(v){
+    try {
+      if (v === 'finance' && typeof window.fin_mountToolbar2 === 'function') {
+        setTimeout(function(){ try { window.fin_mountToolbar2(); } catch(e){} }, 0);
+      }
+    } catch(e){}
+    try {
+      if (v === 'equity' && typeof window.applyEqPerms === 'function') {
+        setTimeout(function(){ try { window.applyEqPerms(); } catch(e){} }, 0);
+      }
+    } catch(e){}
+  };
+  try {
+    var _sv = window.switchView;
+    if (typeof _sv === 'function' && !_sv.__perfViewHook) {
+      var _svWrapped = function(){
+        var r = _sv.apply(this, arguments);
+        try { window.__onViewShown(arguments[0]); } catch(e){}
+        return r;
+      };
+      _svWrapped.__perfViewHook = true;
+      window.switchView = _svWrapped;
+    }
+  } catch(e){}
+
+  /* 1b) 兜底轮询（700ms）：不依赖 switchView 一定是唯一入口（外部可能直接改 class 或
+         走 history 返回），只要有「待补」标记且视图已激活就补一次。开销 = 每拍两个布尔判断。 */
+  try {
+    setInterval(function(){
+      try {
+        if (window.__finToolbarStale && typeof __viewActive === 'function' && __viewActive('finance')) {
+          window.__finToolbarStale = false;
+          if (typeof window.fin_mountToolbar2 === 'function') window.fin_mountToolbar2();
+        }
+      } catch(e){}
+      try {
+        if (window.__eqPermsStale && typeof __viewActive === 'function' && __viewActive('equity')) {
+          window.__eqPermsStale = false;
+          if (typeof window.applyEqPerms === 'function') window.applyEqPerms();
+        }
+      } catch(e){}
+    }, 700);
+  } catch(e){}
+
+  /* 2) 后台帧泵降频（★RAF-PUMP-IDLE）：
+        Univer 的渲染循环用 requestAnimationFrame 自驱；容器不可见时
+        renderEvenInBackground=false，每帧进来就 return —— 但仍然 60fps/实例 空转，
+        实测 ~180 次/秒，是空闲期最大的唤醒源。
+        这里只针对「那一个」回调（源码含 _beginFrame + renderEvenInBackground），
+        在财务/权益都不在前台时把下一帧推迟 200ms（≈5fps）；
+        切回任一表格视图后下一轮就命中「激活」分支，立刻恢复 60fps。 */
+  window.__univerAnyActive = function(){
+    try {
+      if (typeof __viewActive === 'function') return !!(__viewActive('finance') || __viewActive('equity'));
+    } catch(e){}
+    try {
+      var f = document.getElementById('view-finance'), e2 = document.getElementById('view-equity');
+      return !!((f && f.classList.contains('active')) || (e2 && e2.classList.contains('active')));
+    } catch(e){ return true; }
+  };
+  try {
+    var _raf = window.requestAnimationFrame;
+    if (typeof _raf === 'function' && !window.__rafIdlePatch) {
+      window.__rafIdlePatch = true;
+      var _pumpCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
+      function _isRenderPump(fn){
+        if (!_pumpCache) return false;
+        var hit = _pumpCache.get(fn);
+        if (hit !== undefined) return hit;
+        var ok = false;
+        try {
+          var s = String(fn);
+          ok = s.indexOf('_beginFrame') >= 0 && s.indexOf('renderEvenInBackground') >= 0;
+        } catch(e){}
+        _pumpCache.set(fn, ok);
+        return ok;
+      }
+      window.requestAnimationFrame = function(cb){
+        try {
+          if (typeof cb === 'function' && _isRenderPump(cb) && !window.__univerAnyActive()) {
+            return setTimeout(function(){ try { _raf(cb); } catch(e){} }, 200);
+          }
+        } catch(e){}
+        return _raf(cb);
+      };
+    }
+  } catch(e){}
 })();
 </script>
 <script src="vendor/fx_history.js?v=20261107"></script>

@@ -554,6 +554,8 @@ function finExcelKeysBind(){
   try {
     setInterval(function(){
       if (document.hidden) return;
+      /* ★PERF-VIEWGATE-20261108：财务页不在前台时这轮没有意义（原先是每 250ms 无条件跑，4 次/秒空转） */
+      try { if (!__viewActive('finance')) return; } catch(e){}
       if (Date.now() - finLastKeyAt < 400) return;      // 正在连续按键，不去打扰
       finRememberCur(finActiveCell());
     }, 250);
