@@ -53436,16 +53436,25 @@ function cpCloseCalendar() {
   cpCalTarget = null;
 }
 
-/* 年月快捷下拉：直接跳到任意过去/未来年月（与 comm 日历统一） */
+/* 年月快捷下拉：直接跳到任意过去/未来年月（与 comm 日历统一）
+   ★CAL-FAST-20261108：原来【每次打开日历】都重建 77 个年份 option + 12 个月份 option，
+   是打开慢的最大一笔 DOM 开销。现在只在「语言变了」时重建一次，之后只改 .value。 */
 function cpCalBuildYM() {
   var ys = document.getElementById('cpYearSel'), ms = document.getElementById('cpMonthSel');
   if (!ys || !ms) return;
-  var yNow = new Date().getFullYear(), o = '';
-  for (var yy = 2000; yy <= yNow + 50; yy++) o += '<option value="' + yy + '"' + (yy === cpCalViewYear ? ' selected' : '') + '>' + yy + '</option>';
-  ys.innerHTML = o;
-  var m = '', lang = CUR_LANG || 'zh';
-  for (var mm = 0; mm < 12; mm++) m += '<option value="' + mm + '"' + (mm === cpCalViewMonth ? ' selected' : '') + '>' + cpGetMonthName(mm) + '</option>';
-  ms.innerHTML = m;
+  var lang = (typeof CUR_LANG !== 'undefined' && CUR_LANG) ? CUR_LANG : 'zh';
+  if (ys.getAttribute('data-lang') !== lang) {
+    var yNow = new Date().getFullYear(), o = '';
+    for (var yy = 2000; yy <= yNow + 50; yy++) o += '<option value="' + yy + '">' + yy + '</option>';
+    ys.innerHTML = o;
+    var m = '';
+    for (var mm = 0; mm < 12; mm++) m += '<option value="' + mm + '">' + cpGetMonthName(mm) + '</option>';
+    ms.innerHTML = m;
+    ys.setAttribute('data-lang', lang);
+    ms.setAttribute('data-lang', lang);
+  }
+  ys.value = String(cpCalViewYear);
+  ms.value = String(cpCalViewMonth);
 }
 function cpCalSetYM() {
   var ys = document.getElementById('cpYearSel'), ms = document.getElementById('cpMonthSel');
@@ -53490,11 +53499,27 @@ function cpCalPickToday() {
   cpCalViewYear = n.getFullYear(); cpCalViewMonth = n.getMonth();
   cpCalPick(n.getDate());
 }
+/* ★CAL-FAST-20261108：预热 —— 看板一渲染就先把日历内容建好（弹窗仍隐藏），
+   这样用户第一次按下日期框时只剩「定位 + 显示」，不会再有建 DOM 的等待。 */
+function cpCalPrewarm() {
+  if (window.__cpCalWarm) return;
+  if (!document.getElementById('cpCalPopup')) return;
+  var dt = new Date();
+  cpCalViewYear = dt.getFullYear();
+  cpCalViewMonth = dt.getMonth();
+  try {
+    cpRenderCal(null);
+    window.__cpCalWarm = true;
+  } catch(e) { window.__cpCalWarm = false; }
+}
+
 function cpRenderCal(selected) {
-  var weekDays = cpGetWeekDays();
+  // ★CAL-FAST-20261108：星期表头也只在语言变化时重建
   var weekContainer = document.getElementById('cpCalWeek');
-  if (weekContainer) {
-    weekContainer.innerHTML = weekDays.map(function(w){ return '<span>' + w + '</span>'; }).join('');
+  var wlang = (typeof CUR_LANG !== 'undefined' && CUR_LANG) ? CUR_LANG : 'zh';
+  if (weekContainer && weekContainer.getAttribute('data-lang') !== wlang) {
+    weekContainer.innerHTML = cpGetWeekDays().map(function(w){ return '<span>' + w + '</span>'; }).join('');
+    weekContainer.setAttribute('data-lang', wlang);
   }
   var titleEl = document.getElementById('cpCalTitle');
   if (titleEl) {
@@ -56354,6 +56379,7 @@ function bdLoginRenderAll(){
   bdLoginRenderDaily();
   bdLoginRenderMatrix();
   bdLgXHInit();
+  if (typeof cpCalPrewarm === 'function') cpCalPrewarm();   // ★CAL-FAST：提前把日历建好
 }
 
 function bdLoginBind(){
