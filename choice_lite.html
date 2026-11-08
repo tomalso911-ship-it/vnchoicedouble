@@ -1935,6 +1935,9 @@ window.__finShakeReport = function (ms) {
 
     /* ===== 日历弹出框 ===== */
     .cp-cal-popup { position:fixed;z-index:30000;width:240px;background:#fff;border:1px solid #f0c8a8;border-radius:10px;box-shadow:0 12px 30px rgba(40,30,15,.25);padding:10px 12px;font-size:12px;display:none; }
+    /* ★CAL-FIT-20261108：黑框规则给日期按钮加了 1px border，content-box 下 7 列会撑出弹窗（日期落到框外），统一 border-box + 裁剪 */
+    .cp-cal-popup, .cp-cal-popup * { box-sizing:border-box; }
+    .cp-cal-popup { overflow:hidden; }
     .cp-cal-popup.show { display:block; }
     .cp-cal-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:6px; }
     .cp-cal-head button { width:24px;height:24px;border:none;background:#FDECEA;color:#E53935;border-radius:5px;cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center; }
@@ -1945,7 +1948,7 @@ window.__finShakeReport = function (ms) {
     .cp-cal-week { display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px; }
     .cp-cal-week span { text-align:center;font-size:10px;color:#999;font-weight:700;padding:2px 0; }
     .cp-cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:2px; }
-    .cp-cal-grid button { width:100%;aspect-ratio:1/1;border:none;background:transparent;font-size:11px;color:#333;border-radius:5px;cursor:pointer;padding:0; }
+    .cp-cal-grid button { width:100%;min-width:0;aspect-ratio:1/1;border:none;background:transparent;font-size:11px;color:#333;border-radius:5px;cursor:pointer;padding:0;box-sizing:border-box; }
     .cp-cal-grid button:hover:not(.empty):not(.selected):not(.disabled) { background:#FDECEA;color:#E53935; }
     .cp-cal-grid button.empty { visibility:hidden; }
     .cp-cal-grid button.today { box-shadow:inset 0 0 0 1.5px #E53935;color:#E53935;font-weight:700; }
@@ -2197,6 +2200,9 @@ window.__finShakeReport = function (ms) {
     .cm-toast.show{opacity:1;transform:translate(-50%,-50%);}
     .cm-cal-popup{position:fixed;z-index:3000;width:248px;background:#fff;border:1px solid #e8d9c5;border-radius:12px;box-shadow:0 12px 30px rgba(40,30,15,.22);padding:10px 12px;font-size:12.5px;display:none;}
     .cm-cal-popup.show{display:block;}
+    /* ★CAL-FIT-20261108：黑框规则给日期按钮加 1px border，content-box 会撑出弹窗，统一 border-box + 裁剪 */
+    .cm-cal-popup, .cm-cal-popup *{box-sizing:border-box;}
+    .cm-cal-popup{overflow:hidden;}
     .cm-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
     .cm-cal-head button{width:26px;height:26px;border:none;background:#FBE9E7;color:#D32F2F;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
     .cm-cal-head button:hover{background:#E53935;color:#fff;}
@@ -2206,7 +2212,7 @@ window.__finShakeReport = function (ms) {
     .cm-cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px;}
     .cm-cal-week span{text-align:center;font-size:10.5px;color:#6b7088;font-weight:700;padding:3px 0;}
     .cm-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
-    .cm-cal-grid button{width:100%;aspect-ratio:1/1;border:none;background:transparent;font-size:11.5px;color:#2b2f4a;border-radius:6px;cursor:pointer;padding:0;}
+    .cm-cal-grid button{width:100%;min-width:0;aspect-ratio:1/1;border:none;background:transparent;font-size:11.5px;color:#2b2f4a;border-radius:6px;cursor:pointer;padding:0;box-sizing:border-box;}
     .cm-cal-grid button:hover:not(.cm-empty){background:#FBE9E7;color:#D32F2F;}
     .cm-cal-grid button.cm-empty{visibility:hidden;}
     .cm-cal-grid button.cm-today{box-shadow:inset 0 0 0 1.5px #E53935;color:#D32F2F;font-weight:700;}
@@ -2561,6 +2567,9 @@ window.__finShakeReport = function (ms) {
                   border-radius:10px; box-shadow:0 12px 30px rgba(40,30,15,.28); padding:10px 12px; display:none;
                   pointer-events:auto !important; }
   #commCalPopup, #commCalPopup * { pointer-events:auto !important; }
+  /* ★CAL-FIT-20261108：黑框规则给日期按钮加 1px border，content-box 下 7 列会撑出弹窗，统一 border-box + 裁剪 */
+  #commCalPopup, #commCalPopup * { box-sizing:border-box; }
+  #commCalPopup { overflow:hidden; }
   #commCalPopup .cc-head { display:flex; align-items:center; justify-content:space-between; cursor:move;
                            user-select:none; -webkit-user-select:none; padding:2px 2px 8px; }
   #commCalPopup .cc-nav { border:none; background:#FDECEA; color:#B71C1C; width:24px; height:24px;
@@ -40327,6 +40336,14 @@ function setLangDebug(lang) {
 
   // ---- 语言切换零位移适配：全页面 data-i18n 元素锁宽 + 字号缩放 ----
   try { if (typeof window.applyLangFit === 'function') window.applyLangFit(document.body); } catch (e) {}
+
+  // ---- ★CAL-KEEPOPEN-20261108：日历弹窗若正开着，原地按新语言重绘（星期/月份/今天/清除），不关闭不重定位 ----
+  try { if (typeof cpCalRelocalize === 'function') cpCalRelocalize(); } catch (e) {}
+  // ---- ★CAL-KEEPOPEN-20261108：佣金页日历（#commCalPopup）正开着 → 原地重绘，保持展开 ----
+  try {
+    var _ccp = document.getElementById('commCalPopup');
+    if (_ccp && _ccp.style.display === 'block' && typeof _ccRender === 'function') _ccRender();
+  } catch (e) {}
 }
 // 更新顶部导航栏语言按钮的高亮状态
 function updateLangSwitchUI() {
@@ -43879,6 +43896,8 @@ function openBeneficiaryEditForMain(benIdx){
       // 关键修复：翻月/切年月会重建日历内部 DOM，导致 e.target 与日历脱离父子关系，
       // 若此时仍按「点在日历外」处理会把日历误关（表现为无法翻到过去/未来月份）。
       if (e.target && e.target.isConnected === false) return;
+      // ★CAL-KEEPOPEN-20261108：点语言切换按钮不算「点外面」，日历要保持展开（切完语言原地重绘）
+      if (e.target.closest && e.target.closest('#langSwitch, #loginLangSwitch, .lang-switch, .login-lang-switch')) return;
       if (_ccPop && _ccPop.style.display === 'block' && !_ccPop.contains(e.target)) closeCommCal();
     });
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeCommCal(); });
@@ -54074,6 +54093,7 @@ document.addEventListener('keydown', function(e){
 
 // ===== 日历弹出框系统（DD-MM-YYYY） =====
 var cpCalTarget = null;
+var cpCalAnchorId = '';   /* ★CAL-KEEPOPEN-20261108：记录触发日期的输入框 id，语言切换重渲染后按 id 重新绑定，弹窗不关闭 */
 var cpCalOpenedAt = 0;
 var cpCalViewYear, cpCalViewMonth;
 
@@ -54122,6 +54142,7 @@ window.cpOpenCalendar = function(inputEl) {
     }
   } catch(e) {}
   cpCalTarget = inputEl;
+  cpCalAnchorId = (inputEl && inputEl.id) ? inputEl.id : '';
   var rect = inputEl.getBoundingClientRect();
   var popup = document.getElementById('cpCalPopup');
   // popup 为 position:fixed → 必须用视口坐标（不加 scrollY/scrollX），否则页面滚动后会错位
@@ -54133,10 +54154,7 @@ window.cpOpenCalendar = function(inputEl) {
   popup.style.top = top + 'px';
   popup.style.left = left + 'px';
   cpCalOpenedAt = Date.now();
-  var L = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
-  var lbl = L==='en' ? {today:'Today',clear:'Clear'} : L==='vi' ? {today:'Hôm nay',clear:'Xóa'} : {today:'今天',clear:'清除'};
-  var tb=document.querySelector('#cpCalPopup .cp-cal-today'); if(tb) tb.textContent=lbl.today;
-  var cb=document.getElementById('cpCalClear'); if(cb) cb.textContent=lbl.clear;
+  cpCalLabels();
   var cur = cpParseDDMMYYYY(inputEl.value);
   var now = new Date();
   cpCalViewYear = cur ? cur.y : now.getFullYear();
@@ -54150,6 +54168,40 @@ function cpCloseCalendar() {
   var popup = document.getElementById('cpCalPopup');
   if (popup) popup.classList.remove('show');
   cpCalTarget = null;
+}
+/* ★日历弹窗三语：底部按钮（今天/清除）——语言切换后必须重新套用 */
+function cpCalLabels(){
+  var L = (typeof CUR_LANG !== 'undefined' && CUR_LANG) ? CUR_LANG : 'zh';
+  var lbl = L === 'en' ? {today:'Today',clear:'Clear'} : L === 'vi' ? {today:'Hôm nay',clear:'Xóa'} : {today:'今天',clear:'清除'};
+  var tb = document.querySelector('#cpCalPopup .cp-cal-today'); if (tb) tb.textContent = lbl.today;
+  var cb = document.getElementById('cpCalClear'); if (cb) cb.textContent = lbl.clear;
+}
+/* ★CAL-KEEPOPEN-20261108：语言切换时日历必须【保持展开】并按新语言重绘，不关闭、不重新定位。
+   触发它的输入框若被重渲染替换，按记录的 id 重新绑定；只有实在找不到才收起。 */
+function cpCalRelocalize(){
+  var popup = document.getElementById('cpCalPopup');
+  if (!popup || !popup.classList.contains('show')) return;
+  var alive = cpCalTarget && (cpCalTarget.isConnected === undefined ? document.body.contains(cpCalTarget) : cpCalTarget.isConnected);
+  if (!alive) {
+    var ne = cpCalAnchorId ? document.getElementById(cpCalAnchorId) : null;
+    if (ne) { cpCalTarget = ne; alive = true; }
+  }
+  if (!alive) { cpCloseCalendar(); return; }
+  cpRenderCal(cpParseDDMMYYYY(cpCalTarget ? cpCalTarget.value : ''));
+  cpCalEnsureAlive(4);   /* 兜底：切语言后视图可能异步重建，稍后继续按 id 追认新输入框，日历不丢 */
+}
+/* ★CAL-KEEPOPEN-20261108：切语言后视图可能 100~800ms 才重渲染完，这里分几次追认锚点 */
+function cpCalEnsureAlive(n){
+  if (!(n > 0)) return;
+  setTimeout(function(){
+    var p = document.getElementById('cpCalPopup');
+    if (!p || !p.classList.contains('show')) return;
+    var alive = cpCalTarget && (cpCalTarget.isConnected === undefined ? document.body.contains(cpCalTarget) : cpCalTarget.isConnected);
+    if (alive) return;
+    var ne = cpCalAnchorId ? document.getElementById(cpCalAnchorId) : null;
+    if (ne) { cpCalTarget = ne; cpRenderCal(cpParseDDMMYYYY(cpCalTarget.value || '')); return; }
+    cpCalEnsureAlive(n - 1);
+  }, 220);
 }
 
 /* 年月快捷下拉：直接跳到任意过去/未来年月（与 comm 日历统一）
@@ -54230,6 +54282,7 @@ function cpCalPrewarm() {
 }
 
 function cpRenderCal(selected) {
+  cpCalLabels();
   // ★CAL-FAST-20261108：星期表头也只在语言变化时重建
   var weekContainer = document.getElementById('cpCalWeek');
   var wlang = (typeof CUR_LANG !== 'undefined' && CUR_LANG) ? CUR_LANG : 'zh';
@@ -54316,6 +54369,8 @@ document.addEventListener('click', function(e) {
   // 脱离父子关系；此时若按「点在日历外」处理会把日历误关，表现为无法翻到过去/未来月份。
   if (e.target && e.target.isConnected === false) return;
   if (popup.contains(e.target)) return;
+  // ★CAL-KEEPOPEN-20261108：点语言切换按钮不算「点外面」——否则切语言先把日历关掉。
+  if (e.target && e.target.closest && e.target.closest('#langSwitch, #loginLangSwitch, .lang-switch, .login-lang-switch')) return;
   // 打开后极短时间内的点击通常是 focus/click 顺序导致的“自己关掉自己”，忽略。
   if (Date.now() - cpCalOpenedAt < 120) return;
   // 点击当前输入框或其 wrapper 时不关闭（兼容 wrapper/label 等 target 不一致的情况）
@@ -65599,7 +65654,10 @@ window.cmCalSetYM = cmCalSetYM;
 window.cmCalPickToday = cmCalPickToday;
 /* 关键修复：翻月会重建 calGrid.innerHTML，使 e.target 与 calPopup 脱离父子关系；
    此时若按「点在日历外」处理会误关日历（表现为无法翻到过去/未来月份）。 */
-document.addEventListener('click',function(e){if(!calPopup||!calPopup.classList.contains('show'))return;if(e.target&&e.target.isConnected===false)return;if(calPopup.contains(e.target))return;if(calTarget&&calTarget===e.target)return;closeCalendar();});
+document.addEventListener('click',function(e){if(!calPopup||!calPopup.classList.contains('show'))return;if(e.target&&e.target.isConnected===false)return;if(calPopup.contains(e.target))return;
+  /* ★CAL-KEEPOPEN-20261108：点语言切换按钮不关日历（切完语言原地刷新文案，保持展开） */
+  if(e.target.closest&&e.target.closest('#langSwitch, #loginLangSwitch, .lang-switch, .login-lang-switch'))return;
+  if(calTarget&&calTarget===e.target)return;closeCalendar();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeCalendar();});
 
 /* ---------- 暴露命名空间 ---------- */
@@ -70284,8 +70342,15 @@ body{margin:0;background:var(--bg);color:var(--txt);
 .params-row .fld input,.params-row .fld select{width:100%;min-width:0;box-sizing:border-box;padding:4px 6px;font-size:12px;text-align:center}
 /* 日期选择框对齐：wrapper 不再加内边距，内部 input 与其它输入框完全同高同基线 */
 .params-row .fld .cp-date-input-wrapper{width:100%;min-width:0;box-sizing:border-box;padding:0;margin:0}
-.params-row .fld .cp-date-input-wrapper input{width:100%;min-width:0;box-sizing:border-box;padding:4px 6px;background:#fff;border:1px solid var(--bd);border-radius:6px;font:inherit;font-size:12px;text-align:center}
+.params-row .fld .cp-date-input-wrapper input{width:100%;min-width:0;box-sizing:border-box;padding:4px 6px;background:#FFF9C4;border:1px solid var(--bd);border-radius:6px;font:inherit;font-size:12px;text-align:center}
+.params-row .fld .cp-date-input-wrapper input:focus{background:#FFF59D;border-color:#E53935;outline:none}
 .params-row .btn{flex:0 0 auto;white-space:nowrap}
+/* 「日安装(片/组/天)」可编辑输入框：淡黄底 */
+.params-row .fld input#p_cap{background:#FFF9C4}
+.params-row .fld input#p_cap:focus{background:#FFF59D;border-color:#E53935;outline:none}
+/* 「按房舍/按小组」切换 + 「⚙ 显示设置」：红色底 + 白字 */
+.btn#btnViewQuick,.btn#btnDisplayCfg{background:#E53935;border-color:#E53935;color:#fff;font-weight:700}
+.btn#btnViewQuick:hover,.btn#btnDisplayCfg:hover{background:#C62828;border-color:#C62828;color:#fff}
 textarea{width:100%;min-height:78px;border:1px solid var(--bd);border-radius:6px;padding:7px 9px;
   font:11px/1.6 ui-monospace,Menlo,Consolas,monospace;resize:vertical;background:#fff}
 textarea:focus{outline:none;border-color:var(--pri)}
@@ -70331,6 +70396,9 @@ textarea:focus{outline:none;border-color:var(--pri)}
 .tbl-wrap tr.today-installing td{background:#FFF9C4}
 .tbl-wrap tr:hover td{background:#f0f7ff}
 .tbl-wrap tr.sel td{background:#e3f2fd}
+/* ★GX-CROSS-20261108：鼠标悬浮淡粉「十字」高亮（整行 + 整列 + 交叉点更深） */
+.tbl-wrap tbody td.gx-hl{background:#fde8ec}
+.tbl-wrap tbody td.gx-hlx{background:#fbd0d9}
 .tbl-wrap tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--pri)}
 .tbl-wrap tr.zrow td{background:#f7f9fb;font-weight:600;color:#37474f}
 .tbl-wrap tr.trow td{background:#fcfdfe;color:var(--txt2);font-style:italic}
@@ -70475,10 +70543,21 @@ body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !imp
 .legend{margin-top:10px;display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--txt2)}
 .legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 table.zt{width:100%;border-collapse:collapse;font-size:12px}
-table.zt th{background:#f4f6f8;color:#455a64;font-weight:600;text-align:left;padding:6px 9px;border-bottom:1px solid var(--bd)}
+/* 分区汇总表头：红色底 + 白色加粗 + 居中 */
+table.zt th{background:#E53935;color:#fff;font-weight:700;text-align:center;padding:6px 9px;border-bottom:1px solid var(--bd)}
 table.zt td{padding:6px 9px;border-bottom:1px solid var(--bd2)}
 table.zt td.n{text-align:center;font-variant-numeric:tabular-nums}
 table.zt tr:hover td{background:#f7fbff}
+/* 表体白 / 淡蓝 斑马纹（底色打在 tr 上，不压掉十字高亮与输入框底色） */
+table.zt tbody tr:nth-child(even){background:#eaf3fc}
+/* 表内输入框：淡黄底 + 居中 */
+table.zt input{background:#FFF9C4;text-align:center}
+table.zt input:focus{background:#FFF59D;outline:none;border-color:#E53935}
+/* 表内日历输入框：按内容宽度居中，不撑满单元格 */
+table.zt td .cp-date-input-wrapper{width:auto;min-width:0;justify-content:center}
+/* 鼠标停留表体的淡粉「十字」高亮（行 + 列），由 ztCrossBind() 加类 */
+table.zt tbody td.zt-hl{background:#fde8ec}
+table.zt tbody td.zt-hl-cross{background:#fbd0d9}
 @media (max-width:1000px){
   .layout{height:auto;flex-direction:column}
   .tbl-wrap{width:100% !important;max-height:260px;border-right:0;border-bottom:1px solid var(--bd)}
@@ -70492,6 +70571,9 @@ table.zt tr:hover td{background:#f7fbff}
   .cp-date-input-wrapper input:focus { outline:none; border-color:#E53935; }
   .cp-date-input-wrapper input:disabled { background:#f0f0f0; cursor:not-allowed; opacity:0.6; }
   .cp-cal-popup { position:fixed;z-index:30000;width:240px;background:#fff;border:1px solid #f0c8a8;border-radius:10px;box-shadow:0 12px 30px rgba(40,30,15,.25);padding:10px 12px;font-size:12px;display:none; }
+  /* ★CAL-FIT-20261108：黑框规则给日期按钮加了 1px border，content-box 下 7 列会撑出弹窗（日期落到框外），统一 border-box + 裁剪 */
+  .cp-cal-popup, .cp-cal-popup * { box-sizing:border-box; }
+  .cp-cal-popup { overflow:hidden; }
   .cp-cal-popup.show { display:block; }
   .cp-cal-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:6px; }
   .cp-cal-head button { width:24px;height:24px;border:none;background:#FDECEA;color:#E53935;border-radius:5px;cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center; }
@@ -70502,7 +70584,7 @@ table.zt tr:hover td{background:#f7fbff}
   .cp-cal-week { display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px; }
   .cp-cal-week span { text-align:center;font-size:10px;color:#999;font-weight:700;padding:2px 0; }
   .cp-cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:2px; }
-  .cp-cal-grid button { width:100%;aspect-ratio:1/1;border:none;background:transparent;font-size:11px;color:#333;border-radius:5px;cursor:pointer;padding:0; }
+  .cp-cal-grid button { width:100%;min-width:0;aspect-ratio:1/1;border:none;background:transparent;font-size:11px;color:#333;border-radius:5px;cursor:pointer;padding:0;box-sizing:border-box; }
   .cp-cal-grid button:hover:not(.empty):not(.selected):not(.disabled) { background:#FDECEA;color:#E53935; }
   .cp-cal-grid button.empty { visibility:hidden; }
   .cp-cal-grid button.today { box-shadow:inset 0 0 0 1.5px #E53935;color:#E53935;font-weight:700; }
@@ -71582,6 +71664,53 @@ function igShowBarTip(e, el){
 /* =========================================================================
  * 8. 左侧表
  * ======================================================================= */
+/* ★GX-CROSS-20261108：甘特明细表鼠标悬浮淡粉「十字」高亮（整行 + 整列 + 交叉点）。
+   事件委托绑在 #tblWrap 上（renderTable 只替换 innerHTML，监听器不受影响，只绑一次）；
+   列号按 colSpan 累加计算，保证「区汇总 / 完工」这类合并单元格行也能对齐同一列。 */
+var GX_CELLS=[], GX_TD=null;
+function gxClear(){
+  for(var i=0;i<GX_CELLS.length;i++){
+    var c=GX_CELLS[i];
+    if(c&&c.classList){ c.classList.remove('gx-hl'); c.classList.remove('gx-hlx'); }
+  }
+  GX_CELLS=[]; GX_TD=null;
+}
+function gxCellCol(td){
+  var cells=td.parentNode.cells, col=0;
+  for(var i=0;i<cells.length;i++){
+    if(cells[i]===td) return col;
+    col += (cells[i].colSpan||1);
+  }
+  return col;
+}
+function gxBind(){
+  var w=document.getElementById('tblWrap');
+  if(!w||w.__gxBound) return;
+  w.__gxBound=true;
+  w.addEventListener('mouseover',function(e){
+    var el=e.target, td=null;
+    while(el&&el!==w){ if(el.tagName==='TD'){ td=el; break; } el=el.parentNode; }
+    if(!td||td===GX_TD) return;
+    var tr=td.parentNode, body=tr&&tr.parentNode;
+    if(!tr||tr.tagName!=='TR'||!body||body.tagName!=='TBODY'){ gxClear(); return; }
+    var rows=body.rows, ri=-1, r, c;
+    for(r=0;r<rows.length;r++){ if(rows[r]===tr){ ri=r; break; } }
+    if(ri<0){ gxClear(); return; }
+    var ci=gxCellCol(td);
+    gxClear(); GX_TD=td;
+    for(r=0;r<rows.length;r++){
+      var cells=rows[r].cells, col=0;
+      for(c=0;c<cells.length;c++){
+        var cell=cells[c], span=cell.colSpan||1;
+        var hitRow=(r===ri), hitCol=(ci>=col&&ci<col+span);
+        if(hitRow&&hitCol){ cell.classList.add('gx-hl'); cell.classList.add('gx-hlx'); GX_CELLS.push(cell); }
+        else if(hitRow||hitCol){ cell.classList.add('gx-hl'); GX_CELLS.push(cell); }
+        col += span;
+      }
+    }
+  });
+  w.addEventListener('mouseleave',gxClear);
+}
 function renderTable(){
   var box=document.getElementById('tblWrap'), h='';
   var cols=visibleCols();
@@ -71626,6 +71755,7 @@ function renderTable(){
   h+='</tbody></table>';
   box.innerHTML=h;
   syncTableWidth();
+  gxBind();   /* ★GX-CROSS-20261108 十字高亮（只绑一次，innerHTML 重建后依旧生效） */
 }
 /* 可见列（至少保留一列，否则表格无法渲染） */
 function visibleCols(){
@@ -71856,7 +71986,7 @@ function renderZoneTbl(){
   var h='<thead><tr><th>'+it('g_zt_zone')+'</th><th>'+it('g_zt_team')+'</th><th class="n">'+it('g_zt_count')+'</th><th class="n">'+it('g_zt_panels')+'</th>'
     +'<th class="n">'+it('g_zt_done')+'</th><th class="n">'+it('g_zt_start')+'</th><th class="n">'+it('g_zt_end')+'</th><th class="n">'+it('g_zt_days')+'</th>'
     +'<th class="n">'+it('g_zt_ideal')+'</th><th class="n">'+it('g_zt_util')+'</th></tr></thead><tbody>';
-  zones.forEach(function(z){
+  zones.forEach(function(z,zi){
     var hs=houses.filter(function(x){ return x.zone===z.name; });
     var n=Math.max(1,z.teams|0), tp=sum(hs,'panels'), td=sum(hs,'done');
     var work=0; hs.forEach(function(x){ work+=x.days; });
@@ -71865,18 +71995,55 @@ function renderZoneTbl(){
     var realW=hs.length?workDaysBetween(z.start,z.end):0;
     var util=realW?Math.round(work/(realW*n)*100):0;
     h+='<tr><td><b>'+esc(z.name)+'</b></td>'
-      +'<td><input type="number" min="1" max="12" value="'+n+'" style="width:56px;border:1px solid var(--bd);border-radius:4px;padding:2px 5px"'
+      +'<td class="n"><input type="number" min="1" max="12" value="'+n+'" style="width:56px;margin:0 auto;display:block;text-align:center;border:1px solid var(--bd);border-radius:4px;padding:2px 5px"'
       +' onchange="setTeams(\''+esc(z.key)+'\',this.value)"></td>'
       +'<td class="n">'+fmtNum(hs.length)+'</td><td class="n">'+fmtNum(tp)+'</td><td class="n">'+fmtNum(td)+'</td>'
-      +'<td class="n"><input value="'+esc(z.userStart?dmy(z.userStart):dmy(z.start))+'" placeholder="'+it('g_ph_follow')+'"'
-      +' style="width:84px;border:1px solid var(--bd);border-radius:4px;padding:2px 5px"'
-      +' onchange="setZoneStart(\''+esc(z.key)+'\',this.value)" title="'+it('g_zone_start_tip')+'"></td>'
+      +'<td class="n"><div class="cp-date-input-wrapper" onclick="event.stopPropagation()">'
+      +'<input type="text" id="ztDate_'+zi+'" readonly value="'+esc(z.userStart?dmy(z.userStart):dmy(z.start))+'" placeholder="'+it('g_ph_follow')+'"'
+      +' style="width:96px;border:1px solid var(--bd);border-radius:4px;padding:2px 5px;cursor:pointer"'
+      +' onfocus="cpOpenCalendar(this)" oninput="setZoneStart(\''+esc(z.key)+'\',this.value)" title="'+it('g_zone_start_tip')+'"></div></td>'
       +'<td class="n">'+dmy(z.end)+'</td>'
       +'<td class="n"><b>'+fmtNum(real)+'</b></td><td class="n">'+fmtNum(ideal)+'</td>'
       +'<td class="n"><span style="color:'+(util>=85?'#2e7d32':(util>=65?'#f57c00':'#c62828'))+'"><b>'+util+'%</b></span></td></tr>';
   });
   h+='</tbody>';
   t.innerHTML=h;
+  ztCrossBind();
+}
+/* ===== 分区汇总表：鼠标停留表体 → 淡粉「十字」高亮（整行 + 整列） ===== */
+var ZT_CROSS_CELLS=[], ZT_CROSS_TD=null;
+function ztCrossClear(){
+  for(var i=0;i<ZT_CROSS_CELLS.length;i++){
+    var c=ZT_CROSS_CELLS[i];
+    if(c&&c.classList){ c.classList.remove('zt-hl'); c.classList.remove('zt-hl-cross'); }
+  }
+  ZT_CROSS_CELLS=[]; ZT_CROSS_TD=null;
+}
+function ztCrossBind(){
+  var t=document.getElementById('zoneTbl');
+  if(!t||t.__ztCrossBound) return;
+  t.__ztCrossBound=true;
+  t.addEventListener('mouseover',function(e){
+    var el=e.target, td=null;
+    while(el&&el!==t){ if(el.tagName==='TD'){ td=el; break; } el=el.parentNode; }
+    if(!td||td===ZT_CROSS_TD) return;
+    var tr=td.parentNode, body=t.tBodies&&t.tBodies[0];
+    if(!body||!tr||tr.tagName!=='TR'){ ztCrossClear(); return; }
+    var rows=body.rows, ri=-1, r, c;
+    for(r=0;r<rows.length;r++){ if(rows[r]===tr){ ri=r; break; } }
+    if(ri<0){ ztCrossClear(); return; }
+    var ci=td.cellIndex;
+    ztCrossClear(); ZT_CROSS_TD=td;
+    for(r=0;r<rows.length;r++){
+      var cells=rows[r].cells;
+      for(c=0;c<cells.length;c++){
+        var cell=cells[c];
+        if(r===ri&&c===ci){ cell.classList.add('zt-hl'); cell.classList.add('zt-hl-cross'); ZT_CROSS_CELLS.push(cell); }
+        else if(r===ri||c===ci){ cell.classList.add('zt-hl'); ZT_CROSS_CELLS.push(cell); }
+      }
+    }
+  });
+  t.addEventListener('mouseleave',ztCrossClear);
 }
 function setZoneStart(zname,v){
   var z=zoneOf(zname); if(!z) return;
@@ -72471,7 +72638,7 @@ function rebuild(){ loadHouses(); if(typeof ganttResetManualAnchors==='function'
 window.addEventListener('resize',function(){ clearTimeout(window.__rt); window.__rt=setTimeout(function(){ renderChart(); renderTable(); syncTableWidth(); },150); });
 
 /* ============================ 日历弹出框（DD-MM-YYYY，标准设计，iframe 内自包含） ============================ */
-var cpCalTarget=null, cpCalOpenedAt=0, cpCalViewYear, cpCalViewMonth;
+var cpCalTarget=null, cpCalAnchorId='', cpCalOpenedAt=0, cpCalViewYear, cpCalViewMonth;
 function cpPad(n){ return n<10?'0'+n:''+n; }
 function cpFmtDDMMYYYY(y,m,d){ return cpPad(d)+'/'+cpPad(m+1)+'/'+y; }
 function cpParseDDMMYYYY(s){ if(!s) return null; var m=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/); return m?{y:+m[3],m:+m[2]-1,d:+m[1]}:null; }
@@ -72480,6 +72647,7 @@ function cpGetMonthName(m){ var lang=curLang(); var months = lang==='en' ? ['Jan
 function cpOpenCalendar(inputEl){
   if(inputEl && inputEl.disabled) return;
   cpCalTarget=inputEl;
+  cpCalAnchorId=(inputEl&&inputEl.id)?inputEl.id:'';   /* ★CAL-KEEPOPEN-20261108 */
   var rect=inputEl.getBoundingClientRect();
   var popup=document.getElementById('cpCalPopup');
   var top=rect.bottom+4, left=rect.left;
@@ -72488,9 +72656,7 @@ function cpOpenCalendar(inputEl){
   popup.style.top=top+'px'; popup.style.left=left+'px';
   popup.classList.add('show');
   cpCalOpenedAt=Date.now();
-  var L=curLang(); var lbl=L==='en'?{today:'Today',clear:'Clear'}:L==='vi'?{today:'Hôm nay',clear:'Xóa'}:{today:'今天',clear:'清除'};
-  var tb=document.querySelector('.cp-cal-today'); if(tb) tb.textContent=lbl.today;
-  var cb=document.getElementById('cpCalClear'); if(cb) cb.textContent=lbl.clear;
+  cpCalLabels();
   var cur=cpParseDDMMYYYY(inputEl.value);
   var now=new Date();
   cpCalViewYear=cur?cur.y:now.getFullYear();
@@ -72498,6 +72664,38 @@ function cpOpenCalendar(inputEl){
   cpRenderCal(cur);
 }
 function cpCloseCalendar(){ var popup=document.getElementById('cpCalPopup'); if(popup) popup.classList.remove('show'); cpCalTarget=null; }
+/* ★日历弹窗三语：底部按钮文案（今天/清除）——语言切换后必须重新套用 */
+function cpCalLabels(){
+  var L=curLang(), lbl=(L==='en')?{today:'Today',clear:'Clear'}:(L==='vi')?{today:'Hôm nay',clear:'Xóa'}:{today:'今天',clear:'清除'};
+  var tb=document.querySelector('.cp-cal-today'); if(tb) tb.textContent=lbl.today;
+  var cb=document.getElementById('cpCalClear'); if(cb) cb.textContent=lbl.clear;
+}
+/* ★CAL-KEEPOPEN-20261108：语言切换时日历必须【保持展开】并按新语言重绘，不关闭、不重新定位。
+   触发它的输入框若被 renderAll() 重渲染替换，按记录的 id 重新绑定（分区汇总表 id=ztDate_<i>）。 */
+function cpCalRelocalize(){
+  var popup=document.getElementById('cpCalPopup');
+  if(!popup||!popup.classList.contains('show')) return;
+  var alive = cpCalTarget && (cpCalTarget.isConnected===undefined?document.body.contains(cpCalTarget):cpCalTarget.isConnected);
+  if(!alive){
+    var ne = cpCalAnchorId ? document.getElementById(cpCalAnchorId) : null;
+    if(ne){ cpCalTarget=ne; alive=true; }
+  }
+  if(!alive){ cpCloseCalendar(); return; }
+  cpRenderCal(cpParseDDMMYYYY(cpCalTarget?cpCalTarget.value:''));
+  cpCalEnsureAlive(4);
+}
+function cpCalEnsureAlive(n){
+  if(!(n>0)) return;
+  setTimeout(function(){
+    var p=document.getElementById('cpCalPopup');
+    if(!p||!p.classList.contains('show')) return;
+    var alive = cpCalTarget && (cpCalTarget.isConnected===undefined?document.body.contains(cpCalTarget):cpCalTarget.isConnected);
+    if(alive) return;
+    var ne = cpCalAnchorId ? document.getElementById(cpCalAnchorId) : null;
+    if(ne){ cpCalTarget=ne; cpRenderCal(cpParseDDMMYYYY(cpCalTarget.value||'')); return; }
+    cpCalEnsureAlive(n-1);
+  }, 220);
+}
 function cpCalBuildYM(){
   var ys=document.getElementById('cpYearSel'), ms=document.getElementById('cpMonthSel'); if(!ys||!ms) return;
   var yNow=new Date().getFullYear(), o='';
@@ -72514,6 +72712,7 @@ function cpCalPick(d){
 }
 function cpCalPickToday(){ var n=new Date(); cpCalViewYear=n.getFullYear(); cpCalViewMonth=n.getMonth(); cpCalPick(n.getDate()); }
 function cpRenderCal(selected){
+  cpCalLabels();
   var weekContainer=document.getElementById('cpCalWeek'); if(weekContainer) weekContainer.innerHTML=cpGetWeekDays().map(function(w){return '<span>'+w+'</span>';}).join('');
   var titleEl=document.getElementById('cpCalTitle'); if(titleEl) titleEl.textContent=cpCalViewYear+'-'+cpPad(cpCalViewMonth+1);
   cpCalBuildYM();
@@ -72561,7 +72760,7 @@ try{
 /* 锁死：每次加载都强制按内容重算列宽并自适应右分隔线，绝不信任 localStorage 里可能污染的旧宽度 */
 colFitAll(); fitTblW(); initSplitter();
 window.addEventListener('resize', function(){ fitTblW(); });
-window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); };
+window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent && window.parent!==window) window.parent.CUR_LANG=lang; }catch(e){} document.title=it('g_title'); localize(); renderAll(); cpCalRelocalize(); };
 </script>
 </body>
   </template>
