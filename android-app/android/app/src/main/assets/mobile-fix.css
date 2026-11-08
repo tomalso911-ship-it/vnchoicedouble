@@ -1,0 +1,136 @@
+/* ===== CHOICE SLATS 手机版修复 v4（仅 APK 注入，不改网页源码） ===== */
+
+/* ---------- 1. 表格：恢复「桌面级」自然列宽 + 容器可横滑 ---------- */
+/* 说明：带 colgroup 的、被硬锁的表格由 JS 打上 .mfix-keep，此处的 :not() 会跳过它们 */
+html body table:not(.mfix-keep) {
+  table-layout: auto !important;
+  width: auto !important;
+  min-width: 100% !important;
+}
+html body table:not(.mfix-keep) th,
+html body table:not(.mfix-keep) td {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+html body table:not(.mfix-keep) td button,
+html body table:not(.mfix-keep) td a,
+html body table:not(.mfix-keep) td .btn { white-space: nowrap !important; }
+
+/* 原本被强制 overflow-x:hidden 的宽表容器，恢复横向滑动 */
+html body .won-scroll-container,
+html body .appr-table-wrap,
+html body .users-table-wrap {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* 按钮/页签行：换行显示，避免右侧按钮被裁掉 */
+html body .fin-tabs, html body .fin-toolbar { flex-wrap: wrap !important; overflow: visible !important; }
+
+/* ---------- 2. 顶栏：字号不再被压到 8px、标签不再被撑宽 ---------- */
+html body #topbar .tb-label {
+  min-width: 0 !important;
+  width: auto !important;
+  font-size: inherit !important;
+}
+html body #topbar .tb-item { font-size: 12px !important; }
+
+/* 横屏：顶栏一行（与电脑版同款） */
+@media (orientation: landscape) and (max-height: 640px) {
+  html body #topbar {
+    height: 44px !important; min-height: 44px !important;
+    flex-wrap: nowrap !important; padding: 0 8px !important;
+    gap: 8px !important; align-items: center !important;
+  }
+  html body #topbar .tb-logo { display: none !important; }
+  html body #topbar .tb-menu {
+    display: flex !important; flex: 1 1 auto !important;
+    width: auto !important; min-width: 0 !important;
+    overflow-x: auto !important; overflow-y: hidden !important;
+    align-items: center !important; gap: 4px !important; padding: 0 !important;
+  }
+  html body #topbar .tb-menu::-webkit-scrollbar { height: 0; }
+  html body #topbar .tb-item {
+    flex: 0 0 auto !important; width: auto !important; height: 30px !important;
+    min-height: 0 !important; white-space: nowrap !important;
+    font-size: 12px !important; font-weight: 600 !important;
+    padding: 4px 8px !important; line-height: 1.1 !important;
+    display: inline-flex !important; align-items: center !important; justify-content: center !important;
+  }
+  html body #topbar .tb-label { display: inline-block !important; white-space: nowrap !important; }
+  html body #topbar .tb-item.active { padding: 4px 10px !important; margin: 0 !important; border-radius: 16px !important; }
+  html body #topbar .tb-right {
+    flex: 0 0 auto !important; width: auto !important;
+    flex-wrap: nowrap !important; gap: 4px !important;
+  }
+  html body .app-body { margin-top: 48px !important; }
+}
+
+/* 竖屏：导航 5 列 × N 行 + 右侧控件单独一行（不重叠、不被裁） */
+@media (orientation: portrait) and (max-width: 900px) {
+  html body #topbar {
+    height: auto !important; min-height: 0 !important;
+    flex-wrap: wrap !important; align-items: center !important;
+    padding: 4px 6px !important; gap: 4px !important;
+  }
+  html body #topbar .tb-logo { display: none !important; }
+  html body #topbar .tb-menu {
+    display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    flex: 1 1 100% !important; width: 100% !important; min-width: 0 !important;
+    gap: 4px !important; overflow: visible !important; padding: 0 !important;
+  }
+  html body #topbar .tb-item {
+    width: 100% !important; min-width: 0 !important; height: 28px !important;
+    flex: none !important; white-space: nowrap !important;
+    overflow: hidden !important; text-overflow: ellipsis !important;
+    font-size: 11px !important; font-weight: 600 !important;
+    padding: 2px !important; line-height: 1.1 !important;
+    display: inline-flex !important; align-items: center !important; justify-content: center !important;
+  }
+  html body #topbar .tb-item.active { padding: 2px !important; margin: 0 !important; border-radius: 14px !important; }
+  html body #topbar .tb-label {
+    display: block !important; min-width: 0 !important;
+    white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+  }
+  html body #topbar .tb-right {
+    flex: 1 1 100% !important; width: 100% !important;
+    justify-content: flex-end !important; flex-wrap: nowrap !important; gap: 6px !important;
+  }
+}
+
+/* ---------- 2.5 图标 / 按钮 / 徽标不被 flex 挤扁（emoji、svg、操作图标） ---------- */
+html body button,
+html body a.btn,
+html body .btn,
+html body .prod-op,
+html body .inst-photo-count,
+html body .mfix-topbar button { flex-shrink: 0 !important; }
+html body img,
+html body svg { flex-shrink: 0 !important; }
+html body .mfix-scroll td button,
+html body .mfix-scroll td a { flex: 0 0 auto !important; }
+
+/* ---------- 3. 通用：被裁掉的横向内容改成可横滑 ---------- */
+html body .mfix-scroll {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  max-width: 100% !important;
+}
+html body .mfix-scroll::-webkit-scrollbar { height: 6px; }
+html body .mfix-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .28); border-radius: 3px; }
+
+/* ---------- 4. 宽表容器露出细横滑条，提示「这里还能往右滑」 ---------- */
+html body .mfix-scroll::-webkit-scrollbar,
+html body div:has(> table)::-webkit-scrollbar,
+html body div:has(> div > table)::-webkit-scrollbar { height: 8px; }
+html body .mfix-scroll::-webkit-scrollbar-thumb,
+html body div:has(> table)::-webkit-scrollbar-thumb,
+html body div:has(> div > table)::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, .3);
+  border-radius: 4px;
+}
+html body .mfix-scroll::-webkit-scrollbar-track,
+html body div:has(> table)::-webkit-scrollbar-track { background: rgba(0, 0, 0, .06); }
