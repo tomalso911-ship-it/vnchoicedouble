@@ -56055,6 +56055,15 @@ function bdLgFromDmy(s){ var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(s||''
 function bdLgBase(){ return (typeof crmApiBase === 'function') ? crmApiBase() : ((typeof API_BASE !== 'undefined') ? API_BASE : ''); }
 function bdLgEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
+/* ★LOGIN-HIDE-ADMIN-20261108（用户要求）：登录统计两张表都不显示 admin 的记录，
+   行和列合计也一并按「可见用户」重新汇总，保证合计 = 可见行之和，不会对不上。 */
+var BD_LG_HIDE_USERS = ['admin'];
+function bdLgUserHidden(u){
+  var n = String((u && u.username) || '').toLowerCase();
+  for (var i = 0; i < BD_LG_HIDE_USERS.length; i++) if (n === BD_LG_HIDE_USERS[i]) return true;
+  return false;
+}
+
 /* ★LOGIN-DATEPICK-20261108：开始记录日 —— 按下鼠标/手指的瞬间就弹日历（不等 click 的 mouseup），
    并且只允许「选」不允许「编辑」：readonly + 拦键盘/粘贴/拖放 + 无光标。
    pointerdown 与 focus 会先后触发，用 500ms 去重避免日历被重建两次（那才是之前“慢”的观感）。 */
@@ -56144,7 +56153,7 @@ function bdLoginRenderDaily(){
   var rk = bdLoginRangeSet(d);
   var cT = bdLoginCounts(rk.today, to), cW = bdLoginCounts(rk.week, to);
   var cM = bdLoginCounts(rk.month, to), cA = bdLoginCounts(rk.all, to);
-  var users = (d.role_users || []).slice();
+  var users = (d.role_users || []).filter(function(u){ return !bdLgUserHidden(u); });
   for (var i = 0; i < users.length; i++){
     var un = users[i].username;
     users[i].__t = cT[un] || 0; users[i].__w = cW[un] || 0;
@@ -56244,7 +56253,7 @@ function bdLoginRenderMatrix(){
   var per = BD_LOGIN.per;
   var cols = bdLoginPeriodDefs(per, d);
   var curKey = bdLoginPeriodKey(per, d.today || '');
-  var users = (d.all_users || []).slice();
+  var users = (d.all_users || []).filter(function(u){ return !bdLgUserHidden(u); });
 
   var seg = document.getElementById('bdLoginPerSeg');
   if (seg) {
