@@ -56088,8 +56088,14 @@ function bdLoginCounts(from, to){
   }
   return m;
 }
-function bdLgCell(v, extra){
-  return '<td class="' + (v ? '' : 'bd-lg-zero') + (extra ? (' ' + extra) : '') + '">' + (v || '·') + '</td>';
+/* ★LOGIN-TABLE-20261108c：数值统一千位分隔（1056 → 1,056）；0 默认显示 '·'，合计列用 '0' */
+function bdLgNum(v, zero){
+  v = Number(v) || 0;
+  if (!v) return zero || '·';
+  return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function bdLgCell(v, extra, zero){
+  return '<td class="' + (v ? '' : 'bd-lg-zero') + (extra ? (' ' + extra) : '') + '">' + bdLgNum(v, zero) + '</td>';
 }
 
 function bdLoginRenderDaily(){
@@ -56147,8 +56153,8 @@ function bdLoginRenderDaily(){
       + '</tr>';
   }
   html += '</tbody><tfoot><tr><td class="bd-lg-name">' + bdLgT('合计', 'Total', 'Tổng') + '</td>'
-    + bdLgCell(tot[0], 'bd-lg-sum') + bdLgCell(tot[1], 'bd-lg-sum')
-    + bdLgCell(tot[2], 'bd-lg-sum') + bdLgCell(tot[3], 'bd-lg-sum')
+    + bdLgCell(tot[0], 'bd-lg-sum', '0') + bdLgCell(tot[1], 'bd-lg-sum', '0')
+    + bdLgCell(tot[2], 'bd-lg-sum', '0') + bdLgCell(tot[3], 'bd-lg-sum', '0')
     + '<td class="bd-lg-last">' + bdLgEsc(rk.all) + ' ~ ' + bdLgEsc(to) + '</td></tr></tfoot></table>';
   box.innerHTML = html;
 }
@@ -56233,16 +56239,16 @@ function bdLoginRenderMatrix(){
     for (j = 0; j < cols.length; j++){
       var v = cell[cols[j].key] || 0;
       sum += v; periodTotals[cols[j].key] = (periodTotals[cols[j].key] || 0) + v;
-      tds += '<td class="' + (v ? '' : 'bd-lg-zero') + (cols[j].key === curKey ? ' bd-lg-cur' : '') + '">' + (v || '·') + '</td>';
+      tds += '<td class="' + (v ? '' : 'bd-lg-zero') + (cols[j].key === curKey ? ' bd-lg-cur' : '') + '">' + bdLgNum(v) + '</td>';
     }
     grand += sum;
     rows += '<tr class="' + (String(usr.status) === 'active' ? '' : 'bd-lg-off') + '">'
       + '<td class="bd-lg-name" title="' + bdLgEsc(bdLgNameTitle(usr)) + '">' + bdLgEsc(bdLgName(usr))
-      + '</td>' + tds + '<td class="bd-lg-sum">' + sum + '</td></tr>';
+      + '</td>' + tds + '<td class="bd-lg-sum">' + bdLgNum(sum, '0') + '</td></tr>';
   }
   html += rows + '</tbody><tfoot><tr><td class="bd-lg-name">' + bdLgT('合计', 'Total', 'Tổng') + '</td>';
-  for (j = 0; j < cols.length; j++) html += '<td class="bd-lg-sum">' + (periodTotals[cols[j].key] || 0) + '</td>';
-  html += '<td class="bd-lg-sum">' + grand + '</td></tr></tfoot></table>';
+  for (j = 0; j < cols.length; j++) html += '<td class="bd-lg-sum">' + bdLgNum(periodTotals[cols[j].key] || 0, '0') + '</td>';
+  html += '<td class="bd-lg-sum">' + bdLgNum(grand, '0') + '</td></tr></tfoot></table>';
   box.innerHTML = html;
 }
 
