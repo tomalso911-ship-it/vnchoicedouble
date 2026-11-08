@@ -6292,6 +6292,14 @@ var WL_FLOW_IMG = {
       /* ★PE-STATS-XH-20261108：生产统计表也加悬停十字高亮（淡黄） */
       .prod-table.pe-estats tbody td.xh-row,.prod-table.pe-estats tbody td.xh-col{background:#fff6c2 !important;}
       .prod-table.pe-estats tbody td.xh-row.xh-col{background:#ffec96 !important;}
+      /* ★XH-4TAB-20261108（用户 2026-11-08 要求）：出库记录表 / 出库记录分析 / 地板需求 v.s 实际产量明细 / 生产库存及出库明细
+         四张表复用同一套十字高亮（整行 + 整列，淡黄；交叉格更深一档） */
+      table.prod-out-records tbody td.xh-row, table.prod-out-records tbody td.xh-col,
+      table.prod-out-analysis tbody td.xh-row, table.prod-out-analysis tbody td.xh-col,
+      table.pe-fin tbody td.xh-row, table.pe-fin tbody td.xh-col,
+      table.prod-stockout tbody td.xh-row, table.prod-stockout tbody td.xh-col{background:#fff6c2 !important;}
+      table.prod-out-records tbody td.xh-row.xh-col, table.prod-out-analysis tbody td.xh-row.xh-col,
+      table.pe-fin tbody td.xh-row.xh-col, table.prod-stockout tbody td.xh-row.xh-col{background:#ffec96 !important;}
       .prod-table .pe-zero-red{color:#E53935 !important;font-weight:700;}
       .pe-over-row td{color:#E53935;font-weight:600;}
       .pe-over-cell{position:relative;}
@@ -13467,7 +13475,7 @@ var WL_FLOW_IMG = {
     function prod_xhApply(td){
       /* ★PE-STATS-XH-20261108：生产统计表复用同一套十字高亮
          ★EQ-FAULT-XH-20261108：生产F页「设备配置清单」「设备故障报备」也复用同一套 */
-      var t = (td.closest ? td.closest('table.pe-hist, table.pe-estats, table.prod-equip-table, table.prod-equip-fault') : null); if(!t) return;
+      var t = (td.closest ? td.closest('table.pe-hist, table.pe-estats, table.prod-equip-table, table.prod-equip-fault, table.prod-out-records, table.prod-out-analysis, table.pe-fin, table.prod-stockout') : null); if(!t) return;
       var tr = td.parentNode; if(!tr || tr.tagName!=='TR') return;
       if(tr.classList && tr.classList.contains('prod-equip-secrow')) return;   /* 工段分隔行不参与十字高亮 */
       var idx = td.cellIndex;
@@ -13481,7 +13489,7 @@ var WL_FLOW_IMG = {
     }
     try{
       document.addEventListener('mouseover', function(e){
-        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td, table.pe-estats tbody td, table.prod-equip-table tbody td, table.prod-equip-fault tbody td'):null;
+        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td, table.pe-estats tbody td, table.prod-equip-table tbody td, table.prod-equip-fault tbody td, table.prod-out-records tbody td, table.prod-out-analysis tbody td, table.pe-fin tbody td, table.prod-stockout tbody td'):null;
         if(td) prod_xhApply(td); else prod_xhClear();
       }, true);
       document.addEventListener('scroll', function(){ prod_xhClear(); }, true);
