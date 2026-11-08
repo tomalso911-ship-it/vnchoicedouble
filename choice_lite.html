@@ -5718,6 +5718,14 @@ var WL_FLOW_IMG = {
       /* 出库记录表 */
       .prod-out-records{table-layout:fixed;width:100%;border-collapse:separate;border-spacing:0;}
       .prod-out-records th{background:#f3f6fa;border:1px solid #e6eaee;font-size:11px;padding:3px 2px;text-align:center;color:#2c3e50;white-space:nowrap;line-height:1.25;}
+      /* ★OUT-HEAD-RED-20261108（用户 2026-11-08）：出库记录表 + 表格分析 的表头改红底白字，
+         排序箭头（.sort-ind）也必须是白色，否则在红底上看不见。 */
+      .prod-out-records thead th,
+      .prod-table.prod-out-analysis thead th{background:linear-gradient(180deg,#E53935,#C62828) !important;color:#fff !important;border-color:#B71C1C !important;font-weight:700 !important;}
+      .prod-out-records thead th .sort-ind,
+      .prod-table.prod-out-analysis thead th .sort-ind{color:#fff !important;opacity:.9;}
+      /* 送往区域列：区域号颜色跟安装规划卡片一致（颜色由 JS 内联写入，这里只保证不被 td 颜色覆盖） */
+      .prod-out-zone .prod-out-zone-txt{font-weight:700;}
       .prod-out-records td{border:1px solid #e6eaee;padding:3px 2px;font-size:11px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       .prod-out-records .pe-col-no{width:4%;min-width:40px;font-size:10px;padding:2px 1px;white-space:nowrap;}
       .prod-out-records th:nth-child(2),.prod-out-records td:nth-child(2),.prod-out-records .pe-col-recorder{width:5%;min-width:45px;font-size:10px;padding:2px 1px;}
@@ -14110,6 +14118,23 @@ var WL_FLOW_IMG = {
       });
       return Object.keys(zones).sort(function(a,b){ return +a - +b; });
     }
+    /* ★OUT-AREA-COLOR-20261108（用户 2026-11-08）：「送往区域」里的区域号文字颜色
+       必须与「安装规划」里归入区域的卡片颜色一致 —— 直接复用安装模块的 INST_ZONE_COLORS
+       （区域1 青、区域2 橙、区域3 红、区域4 绿、区域5 蓝、区域6 紫…），保证两边永远同色。 */
+    function prod_outZoneColor(zone){
+      var z = parseInt(zone, 10);
+      if(!z || z < 1) return '';
+      /* 兜底表与安装模块 INST_ZONE_COLORS 完全一致（12 色），保证 1~12 号区域都同色 */
+      var pal = (typeof INST_ZONE_COLORS !== 'undefined' && INST_ZONE_COLORS && INST_ZONE_COLORS.length)
+        ? INST_ZONE_COLORS
+        : ['#26a69a','#ffa726','#ef5350','#66bb6a','#1E88E5','#8E24AA','#00897B','#6D4C41','#3949AB','#D81B60','#5E35B1','#00ACC1'];
+      return pal[(z - 1) % pal.length];
+    }
+    function prod_outZoneHtml(zone, label){
+      var c = prod_outZoneColor(zone);
+      if(!c) return prod_esc(label);
+      return '<span class="prod-out-zone-txt" style="color:'+c+';font-weight:700;">'+prod_esc(label)+'</span>';
+    }
     /* 生成“送往区域”下拉选项 */
     function prod_outAreaOptions(spec, selZone){
       var zones=prod_outAreaDemand(spec);
@@ -14881,7 +14906,7 @@ var WL_FLOW_IMG = {
             + '<td>'+prod_fmtNum(r.qty)+'</td>'
             + '<td>'+prod_esc(prod_phName(r.h))+'</td>'
             + '<td>'+prod_fmtSpec(r.k)+'</td>'
-            + '<td>'+prod_esc(zoneLabel)+'</td>'
+            + '<td class="prod-out-zone">'+prod_outZoneHtml(r.zone, zoneLabel)+'</td>'
             + '<td>'+destCell+'</td>'
             + '<td>'+prod_fmtNum(r.installedQty||0)+'</td>'
             + '<td class="pe-op-act"><button class="pe-op-ibtn pe-op-edit" type="button" data-tip="编辑" onclick="prod_outEditInline('+_jsStr(r.date)+','+_jsStr(r.h)+','+_jsStr(r.k)+')">'+PROD_OP_ICON_EDIT+'</button></td>'
@@ -15031,7 +15056,7 @@ var WL_FLOW_IMG = {
             html += '<td>'+prod_fmtNum(r.qty)+'</td>'
               + '<td>'+prod_esc(prod_phName(r.h))+'</td>'
               + '<td>'+prod_fmtSpec(r.k)+'</td>'
-              + '<td>'+prod_esc(zoneLabel)+'</td>'
+              + '<td class="prod-out-zone">'+prod_outZoneHtml(r.zone, zoneLabel)+'</td>'
               + '<td>'+destCell+'</td>'
               + '</tr>';
           });
