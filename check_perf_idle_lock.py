@@ -142,8 +142,11 @@ print("9) ★基线漂移守门：后来新增的 body 级观察器 / 常驻轮�
 # ——用户 2026-11-08 明确要求「后期增加了别的 body 级观察器或常驻轮询，这套锁也要能发现」。
 # 做法：把当前基线钉死；数量一变就拦提交，并在输出里列出每一处的行号，
 # 逼开发者显式确认「这门控是必要的吗、加了 document.hidden / __viewActive 门控吗」。
-BASE_BODY_OBS = 10   # .observe(document.body ...)
-BASE_MUT_OBS = 20    # new MutationObserver(...)
+# 2026-11-08 追加 +1：SLATS-SOLID-BOX-20261108 的「实心板 YES 双线黑框」补框器
+# （slatsSolidBoxBoot）。它只在 childList 变动时把新增子树丢进 150ms 合并队列，
+# 回调首行有 document.hidden 门控 + visibilitychange 补扫，属确属必要的一处新增。
+BASE_BODY_OBS = 11   # .observe(document.body ...)
+BASE_MUT_OBS = 21    # new MutationObserver(...)
 BASE_IV = 39         # setInterval(...)
 
 body_obs = len(re.findall(r"\.observe\(\s*document\.body", src))
