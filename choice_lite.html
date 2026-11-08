@@ -5984,7 +5984,7 @@ var WL_FLOW_IMG = {
       .pe-hist tfoot{position:sticky;bottom:0;z-index:3;background:#f3f7f3;}
       .pe-hist tfoot .pe-grand td{font-weight:700;border-top:2px solid #000;background:#f3f7f3;}
       /* ★PE-HIST-UI-20261108：历史产出表——红色表头 + 白/淡粉斑马线 + 悬停十字高亮（淡黄） */
-      .pe-hist thead th{background:linear-gradient(180deg,#E53935,#C62828) !important;color:#fff;border-color:#B71C1C !important;}
+      .pe-hist thead th{background:linear-gradient(180deg,#E53935,#C62828) !important;color:#fff !important;font-weight:700;border-color:#B71C1C !important;}
       .pe-hist thead th .v2{color:#ffdede;}
       .pe-hist tbody tr:nth-child(odd) td{background:#fff;}
       .pe-hist tbody tr:nth-child(even) td{background:#fdeef0;}
@@ -6199,6 +6199,14 @@ var WL_FLOW_IMG = {
       .pe-stats .pe-gap-ok{color:#1a7f37;font-weight:700;}
       .prod-table.pe-estats tr.pe-gap-ok td{color:#1a7f37;font-weight:700;background:#eefaf0;}
       .prod-table.pe-estats tr.pe-gap-ok:hover td{background:#e2f6e6;}
+      /* ★PE-STATS-UI-20261108：生产统计表——红色表头 + 白色加粗字体；
+         排序箭头原本是红色/灰色，红底上看不见，这里一并改成白色 */
+      .prod-table.pe-estats thead th{background:linear-gradient(180deg,#E53935,#C62828) !important;color:#fff !important;font-weight:700;border-color:#B71C1C !important;}
+      .prod-table.pe-estats thead th .pe-sort-arrow{color:#fff;}
+      .prod-table.pe-estats thead th .pe-sort-arrow.idle{color:rgba(255,255,255,.6);}
+      /* ★PE-STATS-XH-20261108：生产统计表也加悬停十字高亮（淡黄） */
+      .prod-table.pe-estats tbody td.xh-row,.prod-table.pe-estats tbody td.xh-col{background:#fff6c2 !important;}
+      .prod-table.pe-estats tbody td.xh-row.xh-col{background:#ffec96 !important;}
       .prod-table .pe-zero-red{color:#E53935 !important;font-weight:700;}
       .pe-over-row td{color:#E53935;font-weight:600;}
       .pe-over-cell{position:relative;}
@@ -13142,7 +13150,8 @@ var WL_FLOW_IMG = {
       _PE_XH.table=null; _PE_XH.col=-1; _PE_XH.row=null;
     }
     function prod_xhApply(td){
-      var t = (td.closest ? td.closest('table.pe-hist') : null); if(!t) return;
+      /* ★PE-STATS-XH-20261108：生产统计表复用同一套十字高亮 */
+      var t = (td.closest ? td.closest('table.pe-hist, table.pe-estats') : null); if(!t) return;
       var tr = td.parentNode; if(!tr || tr.tagName!=='TR') return;
       var idx = td.cellIndex;
       if(_PE_XH.table===t && _PE_XH.col===idx && _PE_XH.row===tr) return;
@@ -13155,7 +13164,7 @@ var WL_FLOW_IMG = {
     }
     try{
       document.addEventListener('mouseover', function(e){
-        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td'):null;
+        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td, table.pe-estats tbody td'):null;
         if(td) prod_xhApply(td); else prod_xhClear();
       }, true);
       document.addEventListener('scroll', function(){ prod_xhClear(); }, true);
