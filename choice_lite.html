@@ -62205,6 +62205,23 @@ function submitAuth() {
     priceNoVat:  { zh:'未税卖价', en:'Price excl. VAT', vi:'Giá chưa VAT' },
     priceVat:    { zh:'含税卖价', en:'Price incl. VAT', vi:'Giá gồm VAT' },
     perM2:       { zh:'折合每㎡单价（含税）', en:'Price per ㎡ (incl. VAT)', vi:'Đơn giá mỗi ㎡ (gồm VAT)' },
+    // ★CC-PLAN-20261108（用户 2026-11-08 要求）：报价计算下方「项目签约&执行计划」三语
+    planTitle:      { zh:'项目签约&执行计划', en:'Contract signing & execution plan', vi:'Ký hợp đồng & kế hoạch thực hiện' },
+    planSign:       { zh:'合同签约日期', en:'Contract signing date', vi:'Ngày ký hợp đồng' },
+    planFactory:    { zh:'工厂承建&试运行结束日期', en:'Factory construction & trial-run end date', vi:'Ngày kết thúc xây dựng & chạy thử nhà máy' },
+    planFactoryHint:{ zh:'（默认 = 合同签约日期 + 45 天，可修改）', en:'(default = signing date + 45 days, editable)', vi:'(mặc định = ngày ký + 45 ngày, có thể sửa)' },
+    planPhase:      { zh:'阶段', en:'Phase', vi:'Giai đoạn' },
+    planStart:      { zh:'开始日期', en:'Start date', vi:'Ngày bắt đầu' },
+    planDays:       { zh:'天数', en:'Days', vi:'Số ngày' },
+    planEnd:        { zh:'结束日期', en:'End date', vi:'Ngày kết thúc' },
+    planNote:       { zh:'说明', en:'Note', vi:'Ghi chú' },
+    planPhProd:     { zh:'生产', en:'Production', vi:'Sản xuất' },
+    planPhInst:     { zh:'安装', en:'Installation', vi:'Lắp đặt' },
+    planPhAccept:   { zh:'验收期', en:'Acceptance period', vi:'Thời gian nghiệm thu' },
+    planProjEnd:    { zh:'项目结束', en:'Project end', vi:'Kết thúc dự án' },
+    planTetAdd:     { zh:'跨 TET 春节，增加 20 天非生产日', en:'Overlaps TET holiday: +20 non-working days', vi:'Trùng TET: cộng 20 ngày nghỉ' },
+    planAcceptDays: { zh:'验收期固定 15 天', en:'Acceptance fixed 15 days', vi:'Nghiệm thu cố định 15 ngày' },
+    planDay:        { zh:'天', en:'days', vi:'ngày' },
     machNote:    { zh:'注：机械类为一次性投入，全额计入本单总成本。', en:'Note: machinery is a one-time investment, fully counted in total cost.', vi:'Lưu ý: máy móc là đầu tư một lần, tính toàn bộ vào tổng chi phí.' },
     laborNote:   { zh:'注：人工按「项目天数」（生产/安装分别计算）、运营费用按 ROUNDUP((生产项目天数+30)/30, 1) 个月自动乘算。', en:'Note: labor uses project days (production / installation separately); opex uses ROUNDUP((production days + 30)/30, 1) months.', vi:'Lưu ý: nhân công tính theo số ngày dự án (sản xuất / lắp đặt riêng); vận hành nhân theo ROUNDUP((số ngày sản xuất + 30)/30, 1) tháng.' },
     // ★CC-MACH-PRESET-20261105：1.1 生产机械 & 设备 / 1.2 工程车辆 / 1.3 工具 & 耗材 预设行名称（专业术语三语）
@@ -62318,7 +62335,8 @@ function submitAuth() {
     var base = ccDef();
     if(!saved || typeof saved !== 'object') return base;
     try{
-      ['demand','mach','agg','labor','opex','ind','provide'].forEach(function(k){
+      // ★CC-PLAN-20261108：'plan' 必须在此白名单里，否则服务端读回的 签约/工厂结束日期 会被丢弃
+      ['demand','mach','agg','labor','opex','ind','provide','plan'].forEach(function(k){
         if(saved[k] && typeof saved[k] === 'object') base[k] = Object.assign({}, base[k], saved[k]);
       });
       // ★CC-AGG-AUTO-20261105：旧存档单价为 0/缺失时补收货单参考价；用户已填的非 0 价格原样保留
@@ -63020,8 +63038,146 @@ function submitAuth() {
         return ((Number(sp.len) || 0) > 0 && (Number(sp.wid) || 0) > 0) ? ccBlockRow(sp, i) : '';
       }).join('') +
       '</tbody></table>';
+
+    // ★CC-PLAN-20261108（用户 2026-11-08 要求）：报价计算表【下方】新增「项目签约&执行计划」
+    //   合同签约日期 → 工厂承建&试运行结束(默认签约+45天,可改) → 生产 → 安装 → 验收15天 → 项目结束
+    //   生产/安装区间若跨 TET 春节，各自动 +20 天非生产日。
+    h += ccPlanHtml(ro);
     return h;
   }
+  /* ==================== ★CC-PLAN-20261108 项目签约&执行计划 ====================
+     数据：CC_DATA.plan = { sign:'YYYY-MM-DD', factoryEnd:'YYYY-MM-DD' }（随 ccScheduleSave 落盘 prod_kv/cost_calc_v1）
+     规则（用户指定）：工厂结束日默认 = 签约日 + 45 天；生产从工厂结束日次日开始，按「生产项目天数」；
+     安装接着生产结束日，按「安装项目天数」；跨越 TET 春节 +20 天非生产日；最后验收期固定 15 天 → 项目结束。 */
+  var CC_PLAN_TET = ['2025-01-29','2026-02-17','2027-02-06','2028-01-26','2029-02-13','2030-02-03','2031-01-23'];
+  var CC_PLAN_TET_EXTRA = 20;    // 遇 TET 增加的非生产日
+  var CC_PLAN_ACCEPT = 15;       // 验收期固定天数
+  var CC_PLAN_FACTORY_DAYS = 45; // 工厂承建&试运行默认天数
+  function ccPlanYmdOk(s){ return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
+  function ccPlanAddDays(ymd, n){
+    if(!ccPlanYmdOk(ymd)) return '';
+    var m = String(ymd).split('-');
+    var d = new Date(Date.UTC(+m[0], +m[1] - 1, +m[2]));
+    d.setUTCDate(d.getUTCDate() + (Number(n) || 0));
+    var mm = d.getUTCMonth() + 1, dd = d.getUTCDate();
+    return d.getUTCFullYear() + '-' + (mm < 10 ? '0' + mm : mm) + '-' + (dd < 10 ? '0' + dd : dd);
+  }
+  function ccPlanFmt(ymd){
+    if(!ccPlanYmdOk(ymd)) return '—';
+    var m = String(ymd).split('-');
+    return m[2] + '/' + m[1] + '/' + m[0];
+  }
+  function ccPlanHitsTet(start, end){
+    if(!ccPlanYmdOk(start) || !ccPlanYmdOk(end)) return false;
+    for(var i = 0; i < CC_PLAN_TET.length; i++){
+      if(CC_PLAN_TET[i] >= start && CC_PLAN_TET[i] <= end) return true;
+    }
+    return false;
+  }
+  function ccPlanState(){
+    if(!CC_DATA) CC_DATA = ccDef();
+    if(!CC_DATA.plan || typeof CC_DATA.plan !== 'object') CC_DATA.plan = { sign:'', factoryEnd:'' };
+    if(CC_DATA.plan.sign == null) CC_DATA.plan.sign = '';
+    if(CC_DATA.plan.factoryEnd == null) CC_DATA.plan.factoryEnd = '';
+    return CC_DATA.plan;
+  }
+  function ccPlanCalc(){
+    var p = ccPlanState(), d = (CC_DATA && CC_DATA.demand) || {};
+    var pd = Math.max(0, Number(d.prodDays) || 0);
+    var idn = Math.max(0, Number(d.instDays) || 0);
+    var fac = p.factoryEnd || '';
+    if(!fac && p.sign) fac = ccPlanAddDays(p.sign, CC_PLAN_FACTORY_DAYS);
+    var r = { prodStart:'', prodEnd:'', instStart:'', instEnd:'', accStart:'', accEnd:'', projEnd:'',
+              prodDays:pd, instDays:idn, prodExtra:0, instExtra:0 };
+    if(!fac) return r;
+    var ps = ccPlanAddDays(fac, 1);
+    var peRaw = pd > 0 ? ccPlanAddDays(ps, pd - 1) : ps;
+    var tetP = (pd > 0) && ccPlanHitsTet(ps, peRaw);
+    r.prodStart = ps;
+    r.prodExtra = tetP ? CC_PLAN_TET_EXTRA : 0;
+    r.prodEnd = tetP ? ccPlanAddDays(ps, pd - 1 + CC_PLAN_TET_EXTRA) : peRaw;
+    var is = ccPlanAddDays(r.prodEnd, 1);
+    var ieRaw = idn > 0 ? ccPlanAddDays(is, idn - 1) : is;
+    var tetI = (idn > 0) && ccPlanHitsTet(is, ieRaw);
+    r.instStart = is;
+    r.instExtra = tetI ? CC_PLAN_TET_EXTRA : 0;
+    r.instEnd = tetI ? ccPlanAddDays(is, idn - 1 + CC_PLAN_TET_EXTRA) : ieRaw;
+    r.accStart = ccPlanAddDays(r.instEnd, 1);
+    r.accEnd = ccPlanAddDays(r.accStart, CC_PLAN_ACCEPT - 1);
+    r.projEnd = r.accEnd;
+    return r;
+  }
+  function ccPlanDaysTxt(n, extra){
+    return String(n || 0) + ' ' + ccT('planDay') + (extra ? '（+' + extra + '）' : '');
+  }
+  function ccPlanRowHtml(key, label, start, daysTxt, end, note){
+    return '<tr><td style="font-weight:600;color:#1a3c6e;">' + label + '</td>'
+      + '<td style="text-align:center;" id="cc_pl_' + key + '_s">' + ccPlanFmt(start) + '</td>'
+      + '<td style="text-align:center;white-space:nowrap;" id="cc_pl_' + key + '_d">' + daysTxt + '</td>'
+      + '<td style="text-align:center;" id="cc_pl_' + key + '_e">' + ccPlanFmt(end) + '</td>'
+      + '<td style="font-size:12px;color:#555;" id="cc_pl_' + key + '_n">' + note + '</td></tr>';
+  }
+  function ccPlanHtml(ro){
+    var p = ccPlanState(), r = ccPlanCalc();
+    var dis = ro ? '' : ' disabled';
+    var inp = 'height:26px;border:1px solid #7aa7d4;border-radius:4px;padding:1px 4px;background:#eaf3fb;font-size:13px;';
+    var facVal = p.factoryEnd || (p.sign ? ccPlanAddDays(p.sign, CC_PLAN_FACTORY_DAYS) : '');
+    var tetNote = ccT('planTetAdd');
+    var h = '<div class="cc-sec">' + ccT('planTitle') + '</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:16px 22px;align-items:center;margin:6px 0 10px;font-size:13px;">'
+      + '<label style="display:flex;align-items:center;gap:6px;"><span style="font-weight:600;color:#1a3c6e;">' + ccT('planSign') + '：</span>'
+      + '<input type="date" id="cc_plan_sign" value="' + (p.sign || '') + '" autocomplete="off" onchange="ccPlanChange(\'sign\',this.value)" style="' + inp + '"' + dis + '></label>'
+      + '<label style="display:flex;align-items:center;gap:6px;"><span style="font-weight:600;color:#1a3c6e;">' + ccT('planFactory') + '：</span>'
+      + '<input type="date" id="cc_plan_factory" value="' + facVal + '" autocomplete="off" onchange="ccPlanChange(\'factory\',this.value)" style="' + inp + '"' + dis + '></label>'
+      + '<span style="font-size:12px;color:#888;">' + ccT('planFactoryHint') + '</span></div>';
+    h += '<table class="cc-sum"><thead><tr>'
+      + '<th style="width:110px;">' + ccT('planPhase') + '</th>'
+      + '<th style="width:120px;">' + ccT('planStart') + '</th>'
+      + '<th style="width:110px;">' + ccT('planDays') + '</th>'
+      + '<th style="width:120px;">' + ccT('planEnd') + '</th>'
+      + '<th>' + ccT('planNote') + '</th></tr></thead><tbody>'
+      + ccPlanRowHtml('prod', ccT('planPhProd'), r.prodStart, ccPlanDaysTxt(r.prodDays, r.prodExtra), r.prodEnd, r.prodExtra ? tetNote : '—')
+      + ccPlanRowHtml('inst', ccT('planPhInst'), r.instStart, ccPlanDaysTxt(r.instDays, r.instExtra), r.instEnd, r.instExtra ? tetNote : '—')
+      + ccPlanRowHtml('acc', ccT('planPhAccept'), r.accStart, ccPlanDaysTxt(CC_PLAN_ACCEPT, 0), r.accEnd, ccT('planAcceptDays'))
+      + '</tbody></table>';
+    h += '<div style="margin:10px 0 4px;font-size:15px;font-weight:800;color:#d32f2f;">'
+      + ccT('planProjEnd') + '：<span id="cc_plan_projend">' + ccPlanFmt(r.projEnd) + '</span></div>';
+    return h;
+  }
+  function ccPlanRefresh(){
+    var r = ccPlanCalc();
+    function set(id, v){ var e = document.getElementById(id); if(e) e.textContent = v; }
+    var tetNote = ccT('planTetAdd');
+    set('cc_pl_prod_s', ccPlanFmt(r.prodStart));
+    set('cc_pl_prod_d', ccPlanDaysTxt(r.prodDays, r.prodExtra));
+    set('cc_pl_prod_e', ccPlanFmt(r.prodEnd));
+    set('cc_pl_prod_n', r.prodExtra ? tetNote : '—');
+    set('cc_pl_inst_s', ccPlanFmt(r.instStart));
+    set('cc_pl_inst_d', ccPlanDaysTxt(r.instDays, r.instExtra));
+    set('cc_pl_inst_e', ccPlanFmt(r.instEnd));
+    set('cc_pl_inst_n', r.instExtra ? tetNote : '—');
+    set('cc_pl_acc_s', ccPlanFmt(r.accStart));
+    set('cc_pl_acc_d', ccPlanDaysTxt(CC_PLAN_ACCEPT, 0));
+    set('cc_pl_acc_e', ccPlanFmt(r.accEnd));
+    set('cc_pl_acc_n', ccT('planAcceptDays'));
+    set('cc_plan_projend', ccPlanFmt(r.projEnd));
+  }
+  function ccPlanChange(which, val){
+    var p = ccPlanState();
+    val = String(val || '');
+    if(which === 'sign'){
+      p.sign = val;
+      p.factoryEnd = val ? ccPlanAddDays(val, CC_PLAN_FACTORY_DAYS) : '';
+      var fi = document.getElementById('cc_plan_factory');
+      if(fi) fi.value = p.factoryEnd;
+    } else {
+      p.factoryEnd = val;
+    }
+    ccPlanRefresh();
+    try{ ccScheduleSave(); }catch(e){}
+  }
+  window.ccPlanChange = ccPlanChange; // 内联 onchange 需要全局
+  window.ccPlanRefresh = ccPlanRefresh;
   function ccPathSet(path, val){
     var parts = path.split('.'), o = CC_DATA;
     for(var i = 0; i < parts.length - 1; i++){ o = o[parts[i]]; }
@@ -63624,6 +63780,7 @@ function submitAuth() {
       sumEl.innerHTML = '<div>' + s1 + '</div><div>' + s2 + '</div><div>' + s3 + '</div><div>' + s4 + '</div>' + s5;
     }
     if(window.__ccCrewRefresh) window.__ccCrewRefresh(); // ★CC-INSTDAYS：规格/汇率等任何重算都刷新安装天数行
+    if(typeof ccPlanRefresh === 'function') ccPlanRefresh(); // ★CC-PLAN-20261108：生产/安装天数变化后同步刷新执行计划
   }
   function ccScheduleSave(){
     if(!ccCanEdit()) return;
