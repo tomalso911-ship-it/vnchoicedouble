@@ -62242,6 +62242,8 @@ function submitAuth() {
     cfInstHint:  { zh:'（安装款在验收后 10 个工作日内一次性到账）', en:'(installation payment received in one lump within 10 working days after acceptance)', vi:'(thanh toán lắp đặt nhận một lần trong 10 ngày làm việc sau nghiệm thu)' },
     cfWorkday:   { zh:'个工作日', en:'working days', vi:'ngày làm việc' },
     cfUnitVnd:   { zh:'单位：VND', en:'Unit: VND', vi:'Đơn vị: VND' },
+    cfUnitOnly:  { zh:'单位：', en:'Unit: ', vi:'Đơn vị: ' },
+    cfNoRate:    { zh:'汇率未就绪', en:'rate not ready', vi:'chưa có tỷ giá' },
     cfKpiContract:{ zh:'合同总额（含税）', en:'Contract value (incl. VAT)', vi:'Tổng giá trị hợp đồng (gồm VAT)' },
     cfInDep:     { zh:'定金', en:'Deposit', vi:'Đặt cọc' },
     cfInProd:    { zh:'生产款', en:'Production', vi:'Sản xuất' },
@@ -62378,8 +62380,8 @@ function submitAuth() {
       provide:{},
       // ★CC-DEPR-20261105：设备折旧块状态；years=折旧年限(年,默认2,可编辑)；periodMonths 已弃用(20261105 周期改只读，恒=运营费用发生周期)
       depr:{ years:2, periodMonths:0 },
-      // ★CC-CASH-20261108：现金流测算参数（定金日/定金比例/生产款比例/安装款比例）
-      cash:{ depositDate:'', depositPct:20, prodPct:40, instPct:40 }
+      // ★CC-CASH-20261108：现金流测算参数（定金日/定金比例/生产款比例/安装款比例/展示货币）
+      cash:{ depositDate:'', depositPct:20, prodPct:40, instPct:40, cur:'VND' }
     };
   }
   function ccMerge(saved){
@@ -62687,6 +62689,19 @@ function submitAuth() {
       '.cc-cf-note{font-size:11px;color:#777;line-height:1.6;margin:5px 0 0;}',
       '#cc_cash_dep,#cc_cash_dep_pct,#cc_cash_prod_pct,#cc_cash_inst_pct{background:#fff59d !important;}',
       '#cc_cash_dep::-webkit-datetime-edit{padding:0;text-align:left;}',
+      // ★CC-CASH-STYLE-20261108：录入内容（定金日 + 三个比例）改深黑 + 字号加一号(13→14) + 加粗
+      '#cc_cash_dep,#cc_cash_dep_pct,#cc_cash_prod_pct,#cc_cash_inst_pct{color:#000 !important;font-size:14px !important;font-weight:800 !important;}',
+      // ★CC-CASH-CUR-20261108：右侧货币分段小按钮（VND / RMB / USD）
+      '.cc-cf-hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:2px 0 4px;}',
+      '.cc-cf-unit{font-size:12px;color:#555;}',
+      '.cc-cf-unit b{color:#1a3c6e;font-size:13px;}',
+      '.cc-cf-segs{display:inline-flex;border:1px solid #1a3c6e;border-radius:14px;overflow:hidden;background:#eef3fb;}',
+      '.cc-cf-seg{border:0;border-right:1px solid #1a3c6e;background:transparent;color:#1a3c6e;font-size:12px;font-weight:800;padding:3px 12px;cursor:pointer;line-height:1.5;}',
+      '.cc-cf-seg:last-child{border-right:0;}',
+      '.cc-cf-seg:hover{background:#dbe7f8;}',
+      '.cc-cf-seg.on{background:#d32f2f;color:#fff;}',
+      // ★CC-CASH-CROSS-20261108：鼠标悬停十字高亮（淡黄）
+      '.cc-cf td.cc-cf-hl{background:#fff9c4 !important;box-shadow:inset 0 0 0 1px #f0c000;}',
       // ★CC-PLAN-DATEUI-20261108：签约/工厂两个日期框——淡黄底、等宽、文本左右对齐一致（原生日期编辑层单独对齐）
       '#cc_plan_sign,#cc_plan_factory{background:#fff59d !important;text-align:left !important;}',
       '#cc_plan_sign::-webkit-datetime-edit,#cc_plan_factory::-webkit-datetime-edit{padding:0;text-align:left;}',
@@ -63494,6 +63509,7 @@ function submitAuth() {
     if(c.depositPct === undefined || c.depositPct === null || c.depositPct === '') c.depositPct = 20;
     if(c.prodPct === undefined || c.prodPct === null || c.prodPct === '') c.prodPct = 40;
     if(c.instPct === undefined || c.instPct === null || c.instPct === '') c.instPct = 40;
+    if(c.cur !== 'RMB' && c.cur !== 'USD') c.cur = 'VND'; // ★CC-CASH-CUR：展示货币，默认 VND
     return c;
   }
   // 成本合计口径：优先用 ccRecalc 本回合计（window.__CC_SUM），首帧尚未重算时按同一口径自行推导兜底
@@ -63625,29 +63641,87 @@ function submitAuth() {
               net:T.net, peak:peak, firstPos:firstPos };
     return d;
   }
+  // ★CC-CASH-CUR-20261108（用户 2026-11-08 要求）：VND/RMB/USD 货币切换——VND 为基准，RMB/USD 按 fx 汇率换算，金额一律带货币符号
+  function ccCashCurObj(){
+    var cs = ccCashState();
+    var cur = (cs.cur === 'RMB' || cs.cur === 'USD') ? cs.cur : 'VND';
+    var f = ccFx(), rate = 1;
+    if(cur === 'RMB') rate = Number(f.rmb) || 0;
+    else if(cur === 'USD') rate = Number(f.usd) || 0;
+    var sym = cur === 'RMB' ? '¥' : (cur === 'USD' ? '$' : '₫');
+    return { cur:cur, rate:rate, sym:sym };
+  }
+  function ccCashMoney(v){
+    var c = ccCashCurObj(), n = Number(v) || 0;
+    if(c.cur !== 'VND'){
+      if(!(c.rate > 0)) return '—';
+      return c.sym + ccNum2(n / c.rate);
+    }
+    return c.sym + ccNum(Math.round(n));
+  }
+  function ccCashSetCur(cur){
+    var cs = ccCashState();
+    cs.cur = (cur === 'RMB' || cur === 'USD') ? cur : 'VND';
+    if(cs.cur !== 'VND'){ try{ ccFxFetch(); }catch(e){} } // 汇率缺失时拉一次 /api/fx-rates（回来后 ccRecalc 自动重绘）
+    ccCashRefresh();
+    try{ ccScheduleSave(); }catch(e){}
+  }
+  window.ccCashSetCur = ccCashSetCur;
+  function ccCashHdrHtml(){
+    var c = ccCashCurObj();
+    var seg = ['VND', 'RMB', 'USD'].map(function(k){
+      return '<button type="button" class="cc-cf-seg' + (k === c.cur ? ' on' : '') + '" onclick="ccCashSetCur(\'' + k + '\')">' + k + '</button>';
+    }).join('');
+    var rateTxt = '';
+    if(c.cur !== 'VND') rateTxt = c.rate > 0 ? '（1 ' + c.cur + ' = ' + ccNum2(c.rate) + ' ₫）' : '（' + ccT('cfNoRate') + '）';
+    return '<div class="cc-cf-hdr"><span class="cc-cf-unit">' + esc(ccT('cfUnitOnly')) + '<b>' + c.cur + '</b>' + rateTxt + '</span>'
+      + '<span class="cc-cf-segs">' + seg + '</span></div>';
+  }
+  // ★CC-CASH-CROSS-20261108：鼠标悬停十字高亮（当前行 + 当前列，淡黄），只在 tbody/tfoot 内联动（表头有 rowspan 不参与）
+  function ccCashBindHover(){
+    var box = document.getElementById('cc_cash_body');
+    if(!box || box.__cfHoverBound) return;
+    box.__cfHoverBound = true;
+    var clear = function(){ box.querySelectorAll('td.cc-cf-hl').forEach(function(e){ e.classList.remove('cc-cf-hl'); }); };
+    box.addEventListener('mouseover', function(e){
+      var t = e.target;
+      while(t && t !== box && t.tagName !== 'TD') t = t.parentNode;
+      if(!t || t === box || t.tagName !== 'TD') return;
+      clear();
+      var tr = t.parentNode, ci = t.cellIndex;
+      if(tr && tr.parentNode && tr.parentNode.tagName !== 'TBODY' && tr.parentNode.tagName !== 'TFOOT') return;
+      tr.querySelectorAll('td').forEach(function(c){ c.classList.add('cc-cf-hl'); });
+      box.querySelectorAll('tbody tr, tfoot tr').forEach(function(r){
+        var c = r.children[ci];
+        if(c && c.tagName === 'TD') c.classList.add('cc-cf-hl');
+      });
+    });
+    box.addEventListener('mouseleave', clear);
+  }
   function ccCashN0(v){ return ccNum(Math.round(Number(v) || 0)); }
   function ccCashN1(v){ return (Math.round((Number(v) || 0) * 10) / 10).toLocaleString('en-US', { maximumFractionDigits: 1 }); }
   function ccCashKpiHtml(d){
     if(!d || !d.ok) return '';
     var k = d.kpi, cells = [
-      [ccT('cfKpiContract'), ccCashN0(k.contract), ''],
-      [ccT('cfInDep') + ' · ' + (Number(ccCashState().depositPct) || 0) + '%', ccCashN0(k.dep), 'cc-cf-in'],
-      [ccT('cfInProd') + ' · ' + (Number(ccCashState().prodPct) || 0) + '%', ccCashN0(k.prod), 'cc-cf-in'],
-      [ccT('cfInInst') + ' · ' + (Number(ccCashState().instPct) || 0) + '%', ccCashN0(k.inst), 'cc-cf-in'],
-      [ccT('cfKpiIn'), ccCashN0(k.inSum), 'cc-cf-pos'],
-      [ccT('cfKpiOut'), ccCashN0(k.outSum), 'cc-cf-neg'],
-      [ccT('cfKpiNet'), ccCashN0(k.net), (k.net >= 0 ? 'cc-cf-pos' : 'cc-cf-neg')],
-      [ccT('cfKpiPeak'), ccCashN0(Math.abs(k.peak)), 'cc-cf-neg'],
-      [ccT('cfKpiPos'), (k.firstPos ? (k.firstPos.slice(5, 7) + '/' + k.firstPos.slice(0, 4)) : '—'), '', 1]
+      [ccT('cfKpiContract'), ccCashMoney(k.contract), ''],
+      [ccT('cfInDep') + ' · ' + (Number(ccCashState().depositPct) || 0) + '%', ccCashMoney(k.dep), 'cc-cf-in'],
+      [ccT('cfInProd') + ' · ' + (Number(ccCashState().prodPct) || 0) + '%', ccCashMoney(k.prod), 'cc-cf-in'],
+      [ccT('cfInInst') + ' · ' + (Number(ccCashState().instPct) || 0) + '%', ccCashMoney(k.inst), 'cc-cf-in'],
+      [ccT('cfKpiIn'), ccCashMoney(k.inSum), 'cc-cf-pos'],
+      [ccT('cfKpiOut'), ccCashMoney(k.outSum), 'cc-cf-neg'],
+      [ccT('cfKpiNet'), ccCashMoney(k.net), (k.net >= 0 ? 'cc-cf-pos' : 'cc-cf-neg')],
+      [ccT('cfKpiPeak'), ccCashMoney(Math.abs(k.peak)), 'cc-cf-neg'],
+      [ccT('cfKpiPos'), (k.firstPos ? (k.firstPos.slice(5, 7) + '/' + k.firstPos.slice(0, 4)) : '—'), '']
     ];
     return '<div class="cc-cf-kpi">' + cells.map(function(c){
-      return '<div class="' + c[2] + '">' + c[0] + '<b>' + (c[3] ? c[1] : '₫ ' + c[1]) + '</b></div>';
+      return '<div class="' + c[2] + '">' + c[0] + '<b>' + c[1] + '</b></div>';
     }).join('') + '</div>';
   }
   function ccCashTableHtml(d){
     if(!d || !d.ok) return '<div class="cc-note" style="padding:6px 2px;">' + ccT('cfNeedSign') + '</div>';
     var T = d.total;
-    function td(v, cls){ return '<td class="' + (cls || '') + '">' + (Math.abs(v) < 0.5 ? '—' : ccCashN0(v)) + '</td>'; }
+    // ★CC-CASH-CUR-20261108：金额格一律带货币符号（VND ₫ / RMB ¥ / USD $），零值仍显示破折号
+    function td(v, cls){ return '<td class="' + (cls || '') + '">' + (Math.abs(Number(v) || 0) < 0.5 ? '—' : ccCashMoney(v)) + '</td>'; }
     // ★CC-CASH-UI-20261108：把「当月净/累计」放在最左侧，保证不进横向滚动也能一眼看到资金缺口
     var h = '<div class="cc-cf-wrap"><table class="cc-cf"><thead>'
       + '<tr>'
@@ -63715,17 +63789,20 @@ function submitAuth() {
       + '<input type="text" id="cc_cash_inst_pct" value="' + (Number(cs.instPct) || 0) + '" inputmode="decimal" autocomplete="off" onchange="ccCashChange(\'instPct\',this.value)" style="' + pinp + '"' + dis + '> %</label>'
       + '<span style="font-size:12px;color:#888;">' + esc(ccT('cfInstHint')) + '</span></div>';
     h += '<div id="cc_cash_kpi">' + ccCashKpiHtml(ccCashCalc()) + '</div>';
-    h += '<div class="cc-note" style="margin:0 0 2px;">' + esc(ccT('cfUnitVnd')) + '</div>';
+    h += '<div id="cc_cash_hdr">' + ccCashHdrHtml() + '</div>';
     h += '<div id="cc_cash_body">' + ccCashTableHtml(ccCashCalc()) + '</div>';
     h += '<div class="cc-cf-note">' + esc(ccT('cfNote')) + '</div>';
+    setTimeout(ccCashBindHover, 0);
     return h;
   }
   function ccCashRefresh(){
     var d = ccCashCalc();
     var k = document.getElementById('cc_cash_kpi');
     if(k) k.innerHTML = ccCashKpiHtml(d);
+    var hd = document.getElementById('cc_cash_hdr');
+    if(hd) hd.innerHTML = ccCashHdrHtml();
     var b = document.getElementById('cc_cash_body');
-    if(b) b.innerHTML = ccCashTableHtml(d);
+    if(b){ b.innerHTML = ccCashTableHtml(d); ccCashBindHover(); }
   }
   function ccCashChange(which, val){
     var cs = ccCashState();
