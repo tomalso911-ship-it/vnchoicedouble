@@ -56095,7 +56095,12 @@ function bdLgUserHidden(u){
 function bdLoginOpenCal(ev, el){
   if (!el) return;
   var now = Date.now();
-  if (el === window.__bdLoginCalT && (now - (window.__bdLoginCalAt || 0)) < 500) return;
+  /* 只拦「日历已经开着时的重复触发」（pointerdown 与 focus 双发）；
+     日历已经关掉时立刻允许再开，避免选完日期后 500ms 内点不开。 */
+  if (el === window.__bdLoginCalT && (now - (window.__bdLoginCalAt || 0)) < 500){
+    var p0 = document.getElementById('cpCalPopup');
+    if (p0 && p0.classList.contains('show')) return;
+  }
   window.__bdLoginCalT = el; window.__bdLoginCalAt = now;
   try { if (ev && ev.cancelable) ev.preventDefault(); } catch(e){}   // 不聚焦、不出光标、不弹手机键盘
   if (typeof window.cpOpenCalendar === 'function') window.cpOpenCalendar(el);
