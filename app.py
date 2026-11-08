@@ -11344,8 +11344,9 @@ def slats_spec_export():
         for c, v in enumerate(vals, start=1):
             cell = ws.cell(row=r0 + i, column=c, value=v)
             cell.border = box_thin
-            # 实心板=YES：把「单元/栋 → 数量/整场」这一整段尺寸相关格子改成双线框
-            if yes and 4 <= c <= 13:
+            # 实心板=YES：只把「长/宽/高(mm)」三格改成双线框（第 9/10/11 列），
+            # 与页面上框住的位置完全一致；房舍长宽高（第 5/6/7 列）是猪舍尺寸，不是地板尺寸。
+            if yes and 9 <= c <= 11:
                 cell.border = box_dbl
         if yes:
             ws.cell(row=r0 + i, column=len(LBL)).border = box_dbl
