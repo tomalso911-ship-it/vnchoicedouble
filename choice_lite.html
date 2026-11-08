@@ -74961,6 +74961,25 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       var cur = (z!=='' && z!=null) ? String(z) : '';
       if(s.value !== cur) s.value = cur;
     });
+    /* ★INST-ZONE-COLOR-20261108（用户 2026-11-08 指定）：今日安装区域下拉框的底色
+       跟随「安装规划-可视化图」里归入区域的颜色（INST_ZONE_COLORS，12 色同源），
+       一眼就能和区域卡片对上号；未选区域时保持原来的黄色。
+       注意：只改颜色样式，上面 7 条锁死的增减/互斥/回写逻辑一行都不动。 */
+    var _ZPAL = (typeof INST_ZONE_COLORS !== 'undefined' && INST_ZONE_COLORS && INST_ZONE_COLORS.length)
+      ? INST_ZONE_COLORS
+      : ['#26a69a','#ffa726','#ef5350','#66bb6a','#1E88E5','#8E24AA','#00897B','#6D4C41','#3949AB','#D81B60','#5E35B1','#00ACC1'];
+    for(var _zi=0; _zi<selList.length; _zi++){
+      var _zs = selList[_zi];
+      var _zv = parseInt(_zs.value, 10);
+      var _zc = (_zv > 0) ? _ZPAL[(_zv - 1) % _ZPAL.length] : '';
+      if(_zc){
+        _zs.style.background = _zc; _zs.style.color = '#fff';
+        _zs.style.borderColor = '#000'; _zs.style.fontWeight = '700';
+      } else {
+        _zs.style.background = ''; _zs.style.color = '';
+        _zs.style.borderColor = ''; _zs.style.fontWeight = '';
+      }
+    }
   }
   function inst_zoneChange(i, val){
     var f = inst_get(INST_CUR); if(!f) return;
