@@ -55297,6 +55297,11 @@ function updateNavLock(force){
         if(tgt && tgt.nodeType===1){
           if(tgt.id==='tbMenu' || (tgt.closest && tgt.closest('#tbMenu'))) continue;
           if(tgt.id==='langSwitch' || (tgt.closest && tgt.closest('#langSwitch'))) continue;
+          // ★UNIVER-MO-QUIET-20261108：财务/权益两套 Univer 表格即使不在当前视图也在不停改 class，
+          //   它们内部不可能出现页面级弹窗（弹窗一律挂 document.body），直接忽略，
+          //   避免每次变动都排一个 120ms 的空转定时器（实测约 3 次/秒）。
+          if(tgt.id==='univer_container' || (tgt.closest && tgt.closest('#univer_container'))) continue;
+          if(tgt.id==='equity_container' || (tgt.closest && tgt.closest('#equity_container'))) continue;
         }
         schedule();
         return;
@@ -68741,17 +68746,25 @@ window.refreshMoveBtnState = function () {
    监听整个 body（表格在登录后才渲染、且可能被整体替换），
    表格一出现立即锁定首行↑、末行↓；之后每次重绘都会重新校正 */
 (function () {
-  var tm = null, armed = false;
+  var tm = null, armed = false, tries = 0;
+  // ★WON-MOVE-OBS-GATE-20261108：整页 DOM（含两套后台常驻的 Univer 表格）一直在变动，
+  //   无脑排 200ms 定时器会退化成「后台 ~3 次/秒的空转」。先做一次极廉价的判断：
+  //   页面上没有移动箭头按钮（.icon-move-up）就根本不排定时器。
+  function hasMoveBtn() { return !!document.querySelector('.icon-move-up'); }
   var mo = new MutationObserver(function () {
+    if (!hasMoveBtn()) return;
     if (tm) clearTimeout(tm);
-    tm = setTimeout(function () { try { window.refreshMoveBtnState(); } catch (e) {} }, 200);
+    tm = setTimeout(function () { tm = null; try { window.refreshMoveBtnState(); } catch (e) {} }, 200);
   });
   function start() {
     if (armed) return;
     mo.observe(document.body, { childList: true, subtree: true });
     try { window.refreshMoveBtnState(); } catch (e) {}
-    if (document.querySelector('.icon-move-up')) armed = true;
-    else setTimeout(start, 800);
+    if (hasMoveBtn()) { armed = true; return; }
+    // 原来是无上限的 setTimeout(start, 800)：没有移动按钮时（未登录/无该权限/别的视图）
+    // 会永远空转。改为退避 + 封顶，之后交给已挂上的 MutationObserver 兜底
+    // （按钮一出现就会触发 childList 变化 → 自动校正）。
+    if (++tries <= 6) setTimeout(start, 800 * tries);
   }
   if (document.readyState === 'complete') setTimeout(start, 300);
   else window.addEventListener('load', function () { setTimeout(start, 300); });
