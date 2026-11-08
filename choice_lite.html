@@ -62606,14 +62606,18 @@ function submitAuth() {
       '.cc-gantt-row:nth-child(even) .cc-gantt-lab,.cc-gantt-row:nth-child(even) .cc-gantt-track{background:#eaf3fb;}',
       '.cc-gantt-gl{position:absolute;top:0;bottom:0;width:0;border-left:1px solid #dde3ea;pointer-events:none;}',
       '.cc-gantt-gl.cc-gantt-year{border-left-color:#a9b4c1;}',
-      '.cc-gantt-ym{position:absolute;top:2px;font-size:10px;color:#333;white-space:nowrap;pointer-events:none;}',
+      // ★CC-GANTT-AXISFONT-20261108：月份刻度改黑色 + 加粗 + 字号加一号（10→11px）
+      '.cc-gantt-ym{position:absolute;top:1px;font-size:11px;font-weight:800;color:#000;white-space:nowrap;pointer-events:none;}',
       '.cc-gantt-bar{position:absolute;top:4px;height:16px;border-radius:3px;color:#fff;font-size:10px;font-weight:700;line-height:16px;padding:0 4px;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
       '.cc-gantt-outlbl{position:absolute;top:5px;font-size:10px;font-weight:800;color:#333;white-space:nowrap;pointer-events:none;}',
       '.cc-gantt-ms{position:absolute;top:5px;width:13px;height:13px;margin-left:-6px;transform:rotate(45deg);border:1px solid #7f1010;background:#d32f2f;}',
       '.cc-gantt-mslbl{position:absolute;top:4px;font-size:10px;font-weight:800;color:#d32f2f;white-space:nowrap;pointer-events:none;}',
       '.cc-gantt-today{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed #d32f2f;pointer-events:none;}',
       '.cc-gantt-tet{position:absolute;top:0;bottom:0;width:0;border-left:1px dotted #8e24aa;pointer-events:none;}',
-      '.cc-gantt-tetlbl{position:absolute;top:16px;font-size:9px;font-weight:800;color:#8e24aa;white-space:nowrap;pointer-events:none;}',
+      '.cc-gantt-tetlbl{position:absolute;top:15px;font-size:10px;font-weight:800;color:#000;white-space:nowrap;pointer-events:none;}',
+      // ★CC-GANTT-TETZONE-20261108：TET 休息的 20 天 = 虚线斜纹区域（叠在条尾）
+      '.cc-gantt-tetzone{position:absolute;top:4px;height:16px;box-sizing:border-box;border:1px dashed #8e24aa;border-radius:3px;background:repeating-linear-gradient(45deg,#e1bee7 0 4px,#f8f0fb 4px 8px);color:#4a148c;font-size:9px;font-weight:800;line-height:14px;padding:0 2px;white-space:nowrap;overflow:hidden;pointer-events:none;}',
+      '.cc-gantt-keyzone{background:repeating-linear-gradient(45deg,#e1bee7 0 4px,#f8f0fb 4px 8px);border:1px dashed #8e24aa;}',
       '.cc-gantt-foot{display:flex;flex-wrap:wrap;gap:6px 16px;padding:5px 8px;border-top:1px solid #000;background:#fffdf0;font-size:11px;color:#444;}',
       '.cc-gantt-key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}',
       '.cc-gantt-key i{display:inline-block;width:14px;height:9px;border-radius:2px;}',
@@ -63256,8 +63260,8 @@ function submitAuth() {
     var rows = [];
     if(ccPlanYmdOk(p.sign)) rows.push({ kind:'ms', lbl:ccT('planPhContract'), d:p.sign, color:'#d32f2f' });
     if(ccPlanYmdOk(p.sign) && ccPlanYmdOk(facEnd)) rows.push({ kind:'bar', lbl:ccT('planPhFactory'), s:p.sign, e:facEnd, color:'#7e57c2' });
-    if(ccPlanYmdOk(r.prodStart) && ccPlanYmdOk(r.prodEnd)) rows.push({ kind:'bar', lbl:ccT('planPhProd'), s:r.prodStart, e:r.prodEnd, color:'#1a56b0', days:r.prodDays + r.prodExtra });
-    if(ccPlanYmdOk(r.instStart) && ccPlanYmdOk(r.instEnd)) rows.push({ kind:'bar', lbl:ccT('planPhInst'), s:r.instStart, e:r.instEnd, color:'#00897b', days:r.instDays + r.instExtra });
+    if(ccPlanYmdOk(r.prodStart) && ccPlanYmdOk(r.prodEnd)) rows.push({ kind:'bar', lbl:ccT('planPhProd'), s:r.prodStart, e:r.prodEnd, color:'#1a56b0', days:r.prodDays + r.prodExtra, extra:r.prodExtra });
+    if(ccPlanYmdOk(r.instStart) && ccPlanYmdOk(r.instEnd)) rows.push({ kind:'bar', lbl:ccT('planPhInst'), s:r.instStart, e:r.instEnd, color:'#00897b', days:r.instDays + r.instExtra, extra:r.instExtra });
     if(ccPlanYmdOk(r.accStart) && ccPlanYmdOk(r.accEnd)) rows.push({ kind:'bar', lbl:ccT('planPhAccept'), s:r.accStart, e:r.accEnd, color:'#f9a825', days:CC_PLAN_ACCEPT });
     if(ccPlanYmdOk(r.projEnd)) rows.push({ kind:'ms', lbl:ccT('planProjEnd'), d:r.projEnd, color:'#d32f2f' });
     // 月份刻度（含跨年加粗）
@@ -63327,6 +63331,14 @@ function submitAuth() {
           cell += '<div class="cc-gantt-bar" title="' + ttl + '" style="left:' + gg.l.toFixed(3) + '%;width:' + gg.w.toFixed(3) + '%;background:' + row.color + ';">'
             + lblTxt + '</div>';
         }
+        // ★CC-GANTT-TETZONE-20261108（用户 2026-11-08 要求）：把 TET 休息的 20 天在条上画成虚线斜纹区域，便于识别
+        if(row.extra > 0){
+          var zs = ccPlanAddDays(row.e, -(row.extra - 1));
+          var zg = geo(zs, row.e);
+          cell += '<div class="cc-gantt-tetzone" title="' + ccPlanFmt(zs) + ' ~ ' + ccPlanFmt(row.e) + ' · ' + ccT('planTetAdd') + '"'
+            + ' style="left:' + zg.l.toFixed(3) + '%;width:' + zg.w.toFixed(3) + '%;">'
+            + '<span>' + ccT('planTet') + ' · ' + row.extra + ccT('planDay') + '</span></div>';
+        }
       }
       h += '<div class="cc-gantt-row"><div class="cc-gantt-lab">' + esc(row.lbl) + '</div><div class="cc-gantt-track">' + cell + '</div></div>';
     }
@@ -63338,7 +63350,10 @@ function submitAuth() {
       leg += '<span class="cc-gantt-key"><i style="background:' + rw.color + (rw.kind === 'ms' ? ';transform:rotate(45deg);border:1px solid #7f1010;' : '') + '"></i>' + esc(rw.lbl) + '</span>';
     }
     if(todayP !== null) leg += '<span class="cc-gantt-key"><i style="background:#fff;border-left:2px dashed #d32f2f;width:6px;"></i>' + esc(ccT('planToday')) + '</span>';
-    if(tets.length) leg += '<span class="cc-gantt-key"><i style="background:#fff;border-left:1px dotted #8e24aa;width:6px;"></i>' + esc(ccT('planTet')) + '</span>';
+    var hasZone = false;
+    for(var zz = 0; zz < rows.length; zz++){ if(rows[zz].extra > 0){ hasZone = true; break; } }
+    if(hasZone) leg += '<span class="cc-gantt-key"><i class="cc-gantt-keyzone"></i>' + esc(ccT('planTet')) + ' · ' + CC_PLAN_TET_EXTRA + ccT('planDay') + '</span>';
+    else if(tets.length) leg += '<span class="cc-gantt-key"><i style="background:#fff;border-left:1px dotted #8e24aa;width:6px;"></i>' + esc(ccT('planTet')) + '</span>';
     leg += '<span class="cc-gantt-key" style="margin-left:auto;color:#666;">' + ccPlanFmt(start) + ' → ' + ccPlanFmt(end) + '</span>';
     h += '<div class="cc-gantt-foot">' + leg + '</div>';
     return h;
