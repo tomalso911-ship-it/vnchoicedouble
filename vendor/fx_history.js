@@ -1,4 +1,4 @@
-// 汇率历史（月度，每月1号数据）：由真实API采集于 2026-09-16 生成，已历史化固化，
+// 汇率历史（月度，每月1号数据）：由真实API(Yahoo Finance月K线)采集于 2026-11-07 生成，已历史化固化，
 // 前端直接读取 window.FX_HISTORY，不再请求接口；新月份由懒采集追加到 localStorage
 window.FX_HISTORY = [
  {
@@ -411,8 +411,20 @@ window.FX_HISTORY = [
  },
  {
   "ym": "2026-09",
-  "rmbVnd": 3879.4,
-  "usdVnd": 25984.0,
-  "usdRmb": 6.698
+  "rmbVnd": 3871.9,
+  "usdVnd": 25959.0,
+  "usdRmb": 6.7045
+ },
+ {
+  "ym": "2026-10",
+  "rmbVnd": 3871.9,
+  "usdVnd": 25959.0,
+  "usdRmb": 6.7045
+ },
+ {
+  "ym": "2026-11",
+  "rmbVnd": 3873.1,
+  "usdVnd": 25799.0,
+  "usdRmb": 6.661
  }
 ];

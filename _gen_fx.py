@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # 从真实API（Yahoo Finance 月K线）采集 2021-01 ~ 2026-09 汇率（取每月1号/首交易日开盘价），
 # 生成 vendor/fx_history.js 固化进系统：历史数据一次生成，之后前端不再请求任何接口
-import json, datetime, urllib.request, io
+import json, datetime, urllib.request, io, sys
 
 P1 = int(datetime.datetime(2021, 1, 1).timestamp())
-P2 = int(datetime.datetime(2026, 10, 1).timestamp())
+P2 = int(datetime.datetime(2026, 12, 1).timestamp())
 
 def fetch_monthly(pair):
     url = ('https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1mo&period1=%d&period2=%d'
@@ -29,10 +29,10 @@ def fetch_monthly(pair):
 vnd = fetch_monthly('USDVND=X')
 cny = fetch_monthly('USDCNY=X')
 
-# 2021-01 ~ 2026-09 全月展开，缺失月份用上月值前向填充（真实序列的标准处理）
+# 2021-01 ~ 2026-11 全月展开，缺失月份用上月值前向填充（真实序列的标准处理）
 yms = []
 y, m = 2021, 1
-while (y, m) <= (2026, 9):
+while (y, m) <= (2026, 11):
     yms.append('%04d-%02d' % (y, m))
     m += 1
     if m > 12: m, y = 1, y + 1
@@ -51,9 +51,10 @@ for ym in yms:
     if not v or not c: continue
     recs.append({'ym': ym, 'rmbVnd': round(v / c, 1), 'usdVnd': round(v, 1), 'usdRmb': round(c, 4)})
 
-js = ('// 汇率历史（月度，每月1号数据）：由真实API采集于 2026-09-16 生成，已历史化固化，\n'
+js = ('// 汇率历史（月度，每月1号数据）：由真实API(Yahoo Finance月K线)采集于 %s 生成，已历史化固化，\n'
       '// 前端直接读取 window.FX_HISTORY，不再请求接口；新月份由懒采集追加到 localStorage\n'
-      'window.FX_HISTORY = ' + json.dumps(recs, ensure_ascii=False, indent=1) + ';\n')
+      % datetime.date.today().isoformat()
+      + 'window.FX_HISTORY = ' + json.dumps(recs, ensure_ascii=False, indent=1) + ';\n')
 io.open('vendor/fx_history.js', 'w', encoding='utf-8').write(js)
 sysline = 'months=%d first=%s last=%s' % (len(recs), json.dumps(recs[0], ensure_ascii=True), json.dumps(recs[-1], ensure_ascii=True))
 sys.stdout.write(sysline + '\n')
