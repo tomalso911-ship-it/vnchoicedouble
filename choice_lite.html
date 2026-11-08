@@ -56816,11 +56816,16 @@ function boardEnsureEcharts() {
     .then(function(){ return getJson('/vendor/vn34.geo.json', 1); })   // 34 省市边界（63 省按 2025 合并规则归组）
     .then(function(geo){
       window.echarts.registerMap('vn34', geo);
+      window.__vn34Geo = geo;                       // 原始 JSON 缓存：echarts 实例被换掉时可重注册
       window.__vn34Features = geo.features || [];
       return getJson('/vendor/vn_outline.geo.json', 1).catch(function(){ return null; });
     })
     .then(function(o){
-      if (o) { window.echarts.registerMap('vnOutline', o); window.__vnOutlineFeatures = o.features || []; }
+      if (o) {
+        window.echarts.registerMap('vnOutline', o);
+        window.__vnOutlineGeo = o;
+        window.__vnOutlineFeatures = o.features || [];
+      }
       if (!window.echarts
           || !(window.__vn34Features || []).length
           || !(window.__vnOutlineFeatures || []).length) throw new Error('map data not ready');
@@ -56874,6 +56879,18 @@ function boardRenderMapEcharts(body, agg) {
   var outline0 = window.__vnOutlineFeatures || [];
   if (!feats0.length || !outline0.length) throw new Error('map data not ready');
   if (!body || !body.clientWidth || !body.clientHeight) throw new Error('map body not visible');
+
+  /* ★BD-MAP-READY-20261108：页面上不止一处会加载图表库（vendor/chart.umd.min.js 等），
+     一旦 window.echarts 被替换成新实例，之前 registerMap 注册的边界就丢了
+     → geo 画不出来（省份不上色/只剩一层轮廓）。这里按缓存对象补注册一次。 */
+  try {
+    if (window.echarts.getMap && !window.echarts.getMap('vn34') && window.__vn34Geo)
+      window.echarts.registerMap('vn34', window.__vn34Geo);
+    if (window.echarts.getMap && !window.echarts.getMap('vnOutline') && window.__vnOutlineGeo)
+      window.echarts.registerMap('vnOutline', window.__vnOutlineGeo);
+    if (window.echarts.getMap && !window.echarts.getMap('vn34')) throw new Error('vn34 map lost');
+    if (window.echarts.getMap && !window.echarts.getMap('vnOutline')) throw new Error('vnOutline map lost');
+  } catch(e){ throw e; }
 
   body.innerHTML = '<div style="width:100%;height:100%;min-height:320px;"></div>';
   var el = body.firstChild;
