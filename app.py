@@ -11276,6 +11276,95 @@ def fin_eq_sheet_titles():
                     "order": [d["vi"] for d in EQ_SHEET_DEFS]})
 
 
+# ============================================================
+# ★SLATS-SOLID-BOX-20261108：水泥漏缝地板规格表「导出 xlsx」
+#   用户 2026-11-08 需求：实心板?=YES 的规格，在导出的 xlsx 里也要有框。
+#   Excel 无法给「文字外面」画框，只能给单元格设原生边框 → YES 行的
+#   长/宽/高/数量等尺寸相关单元格用 double（双线）边框，NO 行保持普通细线。
+#   前端把当前表格序列化后的 rows 传上来（不在服务器二次读库，避免与页面不同步）。
+# ============================================================
+@app.route("/api/slats-spec-export", methods=["POST"])
+def slats_spec_export():
+    data = request.get_json(force=False, silent=True) or {}
+    rows = data.get("rows") or []
+    lang = (data.get("lang") or "zh").lower()
+    if lang not in ("zh", "en", "vi"):
+        lang = "zh"
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "rows must be a list"}), 400
+
+    LBL = {
+        "zh": ["序号", "猪舍", "房舍编号", "单元/栋", "长(mm)", "宽(mm)", "高(mm)",
+               "栋数/整场", "长(mm)", "宽(mm)", "高(mm)", "数量/单元", "数量/整场",
+               "钢网层数", "实心板?"],
+        "en": ["No.", "Pig house", "House code", "Units/bldg", "L(mm)", "W(mm)", "H(mm)",
+               "Bldgs/site", "L(mm)", "W(mm)", "H(mm)", "Qty/unit", "Qty/whole",
+               "Mesh layers", "Solid slat?"],
+        "vi": ["STT", "Chuồng", "Mã chuồng", "Đơn vị/tòa", "Dài(mm)", "Rộng(mm)", "Cao(mm)",
+               "Số tòa/trảng", "Dài(mm)", "Rộng(mm)", "Cao(mm)", "SL/đơn vị", "SL/toàn trảng",
+               "Số lớp lưới", "Tấm đặc?"],
+    }[lang]
+
+    KEYS = ["pig_house", "house_code", "unit_per_building", "len_per_unit", "wid_per_unit",
+            "hgt_per_unit", "building_count", "floor_len", "floor_wid", "floor_hgt",
+            "qty_unit", "qty_whole", "mesh_layers", "solid_slat"]
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = {"zh": "规格表", "en": "Spec", "vi": "Quy cách"}[lang]
+
+    thin = openpyxl.styles.Side(style="thin", color="FF000000")
+    dbl = openpyxl.styles.Side(style="double", color="FF000000")
+    box_thin = openpyxl.styles.Border(left=thin, right=thin, top=thin, bottom=thin)
+    box_dbl = openpyxl.styles.Border(left=dbl, right=dbl, top=dbl, bottom=dbl)
+
+    for c, label in enumerate(LBL, start=1):
+        cell = ws.cell(row=1, column=c, value=label)
+        cell.font = openpyxl.styles.Font(bold=True, color="FFFFFFFF")
+        cell.fill = openpyxl.styles.PatternFill("solid", fgColor="FFE53935")
+        cell.alignment = openpyxl.styles.Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = box_thin
+
+    def _num(v):
+        try:
+            s = re.sub(r"[^0-9.\-]", "", str(v if v is not None else ""))
+            if s in ("", "-", "."):
+                return None
+            f = float(s)
+            return int(f) if f == int(f) else f
+        except Exception:
+            return v
+
+    r0 = 2
+    for i, row in enumerate(rows):
+        row = row if isinstance(row, dict) else {}
+        yes = str(row.get("solid_slat") or "").strip().upper() == "YES"
+        # solid_slat 是 YES/NO 文本，不能走数字清洗（否则空）
+        vals = [i + 1] + [(row.get(k) if k == "solid_slat" else _num(row.get(k))) for k in KEYS]
+        for c, v in enumerate(vals, start=1):
+            cell = ws.cell(row=r0 + i, column=c, value=v)
+            cell.border = box_thin
+            # 实心板=YES：把「单元/栋 → 数量/整场」这一整段尺寸相关格子改成双线框
+            if yes and 4 <= c <= 13:
+                cell.border = box_dbl
+        if yes:
+            ws.cell(row=r0 + i, column=len(LBL)).border = box_dbl
+
+    widths = [6, 20, 12, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12, 10, 11]
+    for c, w in enumerate(widths, start=1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width = w
+    ws.freeze_panes = "A2"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = "slats_spec_%s.xlsx" % time.strftime("%Y%m%d_%H%M%S")
+    resp = Response(buf.read(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    resp.headers["Content-Disposition"] = "attachment; filename=%s" % fname
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 if __name__ == "__main__":
     import logging
     import socket

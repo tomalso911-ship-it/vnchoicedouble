@@ -5990,6 +5990,20 @@ var WL_FLOW_IMG = {
          .pe-hist .pe-vth .v2{color:#667}（3 个类）优先级更高 → 规格列第二行恒为深灰 #667，
          看起来"表头没全变白"。这里用 !important 压过一切子元素颜色规则。 */
       .pe-hist thead th, .pe-hist thead th .v1, .pe-hist thead th .v2, .pe-hist thead th *{color:#fff !important;}
+      /* ★SLATS-SOLID-BOX-20261108（用户 2026-11-08 需求）：实心板?=YES 的水泥漏缝地板规格加「Excel 双线黑框」。
+         为什么用 3px double：这些表格本身已有 1px 黑网格线，1px 黑框看不出来；
+         CSS double 至少要 3px 才画得出「两条 1px 线 + 1px 间隙」，一眼就能和普通网格分开。
+         为什么类名写两遍 .slats-solid-cell.slats-solid-cell：表格里已有
+         `.pe-hist thead th{border-color:#B71C1C !important}` 这类 (0,1,2) 选择器，
+         双写类名把优先级提到 (0,2,0)，才能稳定压过它们（否则表头框会被染成深红）。 */
+      .slats-solid-cell.slats-solid-cell{border:3px double #000 !important;}
+      /* 连续三格（长/宽/高）拼成【一个整框】：去掉它们之间的内部竖线，
+         否则三格各画一圈双线，中间会多出两条重复的线，看起来像三小块而不是一个方框。 */
+      .slats-solid-cell.slats-solid-seg-mid.slats-solid-seg-mid{border-left:none !important;border-right:none !important;}
+      .slats-solid-cell.slats-solid-seg-start.slats-solid-seg-start{border-right:none !important;}
+      .slats-solid-cell.slats-solid-seg-end.slats-solid-seg-end{border-left:none !important;}
+      /* 非单元格里的规格文字（卡片/胶囊/按钮/说明文字）：只框住文字本身 */
+      .slats-solid-box{border:3px double #000;padding:0 3px;display:inline-block;line-height:1.25;box-sizing:border-box;}
       .pe-hist tbody tr:nth-child(odd) td{background:#fff;}
       .pe-hist tbody tr:nth-child(even) td{background:#fdeef0;}
       .pe-hist tbody td.xh-row,.pe-hist tbody td.xh-col{background:#fff6c2 !important;}
@@ -7592,6 +7606,186 @@ var WL_FLOW_IMG = {
       return _rows;
     }
     var PROD_SLATS_ROWS_CACHE = { pid:null, raw:null, rows:null };
+    /* ★SLATS-SOLID-BOX-20261108（用户 2026-11-08 需求）：
+       「实心板? = YES」的水泥漏缝地板规格，在【全站所有表格 / 子标签 / 模态框 / 打印 / 导出】里
+       给该规格加 Excel 式「双线黑框」（3px double #000），NO 的一律不加。
+       用户确认的两条判定口径：
+         ① 规格表 / 智能报告这类「按行」的地方 → 只看这一行（行级 YES 才加框）；
+         ② 规格当列头 / 按尺寸聚合的地方 → 只要该尺寸有任何一行 YES 就加框（尺寸级）。
+       数据源与系统智能报告同源：签约项目 concrete_floor_spec 每行的 solid_slat 字段。 */
+    function slatsRowSolidYes(r){
+      if(!r) return false;
+      var v = (r.solid_slat!=null) ? r.solid_slat : r.solidSlat;
+      return String(v==null?'':v).trim().toUpperCase() === 'YES';
+    }
+    /* 尺寸键数值归一化：'1,550 × 525×70' / '1550x525x70' → '1550×525×70'
+       （千分位逗号、全角逗号、空白、x/X/* 全部抹平，数值四舍五入到 3 位小数） */
+    function slatsSizeKeyNumeric(s){
+      /* ★只能按乘号切分：「1,550×525×70」里的逗号是千分位，绝不能当分隔符，
+         否则会被切成 1 / 550 / 525 / 70，得到 '1×550×525×70' 这种假键，
+         导致 '1,550×525×70' 与 '1550×525×70' 认不成同一个尺寸。 */
+      var parts = String(s==null?'':s).split(/[×xX*]+/)
+        .map(function(t){ return String(t).replace(/[,\s，]/g,''); })
+        .filter(function(x){ return x!==''; });
+      if(parts.length < 2) return '';
+      var out = [];
+      for(var i=0;i<parts.length;i++){
+        var v = parseFloat(String(parts[i]).replace(/[^0-9.\-]/g,''));
+        out.push(isNaN(v) ? parts[i] : String(Math.round(v*1000)/1000));
+      }
+      return out.join('×');
+    }
+    function slatsRowSizeKey(r){
+      if(!r) return '';
+      var L = r.floor_len!=null?r.floor_len:r.L,
+          W = r.floor_wid!=null?r.floor_wid:r.W,
+          H = r.floor_hgt!=null?r.floor_hgt:r.H;
+      if(L==null && W==null && H==null) return '';
+      return slatsSizeKeyNumeric((L==null?'?':L)+'×'+(W==null?'?':W)+'×'+(H==null?'?':H));
+    }
+    var SLATS_SOLID_MAP_CACHE = { rows:null, map:null };
+    /* 尺寸级 YES 集合：{ '1550×525×70':1, ... }（任一行 YES 即收录），按 rows 引用做缓存 */
+    function slatsSizeSolidMap(){
+      var rows = (typeof prod_slatsRows==='function') ? prod_slatsRows() : [];
+      if(SLATS_SOLID_MAP_CACHE.rows === rows && SLATS_SOLID_MAP_CACHE.map) return SLATS_SOLID_MAP_CACHE.map;
+      var map = {};
+      (rows||[]).forEach(function(r){
+        if(!slatsRowSolidYes(r)) return;
+        var k = slatsRowSizeKey(r);
+        if(k && k.indexOf('?')<0) map[k] = 1;
+      });
+      SLATS_SOLID_MAP_CACHE = { rows:rows, map:map };
+      return map;
+    }
+    function slatsSizeSolidYes(s){
+      var k = slatsSizeKeyNumeric(s);
+      if(!k) return false;
+      return !!slatsSizeSolidMap()[k];
+    }
+    function slatsSolidMapEmpty(){ for(var k in slatsSizeSolidMap()){ if(k) return false; } return true; }
+    /* 渲染时直接拼接的 class（' slats-solid-cell' 或 ''），供已知的规格单元格使用 */
+    function slatsSolidCellCls(s){ return slatsSizeSolidYes(s) ? ' slats-solid-cell' : ''; }
+    /* ── 通用打框器：扫描 DOM，把「YES 尺寸」出现的格子/文字加上双线黑框 ──
+       为什么要一个通用扫描器：规格文本散落在 A~H 子标签、安装 A~C、审批中心、各种弹窗、
+       智能报告、打印克隆体里，逐个渲染函数改容易漏；这里统一在「渲染后」补齐，
+       任何新增的表格/弹窗也自动覆盖。只加 class，不改数据、不改文字。 */
+    var SLATS_SIZE_RE = /(\d[\d.,]*)\s*[×xX]\s*(\d[\d.,]*)\s*[×xX]\s*(\d[\d.,]*)/g;
+    function slatsSolidScan(txt){
+      var t = String(txt==null?'':txt), out = [];
+      if(t.indexOf('×')<0 && t.indexOf('x')<0 && t.indexOf('X')<0) return out;
+      var m, map = slatsSizeSolidMap();
+      SLATS_SIZE_RE.lastIndex = 0;
+      while((m = SLATS_SIZE_RE.exec(t))){
+        var k = slatsSizeKeyNumeric(m[1]+'×'+m[2]+'×'+m[3]);
+        if(k && map[k]) out.push([m.index, m.index + m[0].length]);
+      }
+      SLATS_SIZE_RE.lastIndex = 0;
+      return out;
+    }
+    function slatsSolidSweep(root){
+      try{
+        if(slatsSolidMapEmpty()) return 0;
+        root = root || document.body;
+        if(!root || root.nodeType!==1 || !root.isConnected) return 0;
+        var i, n = 0;
+        /* ① 单元格级：整个规格格子加双线框（表格、弹窗里的表都用这套） */
+        var cells = root.querySelectorAll('td,th');
+        for(i=0;i<cells.length;i++){
+          var c = cells[i];
+          if(c.classList.contains('slats-solid-cell')) continue;
+          if(c.classList.contains('slats-solid-skip')) continue;
+          if(!slatsSolidScan(c.textContent).length) continue;
+          c.classList.add('slats-solid-cell'); n++;
+        }
+        /* ② 文字级：卡片/胶囊/标签/按钮里只是整段文字含规格 → 只框住规格那几个字 */
+        var hits = [], walker = document.createTreeWalker(root, 4 /* TEXT */, null, false), tn;
+        while((tn = walker.nextNode())){
+          var v = tn.nodeValue;
+          if(!v || (v.indexOf('×')<0 && v.indexOf('x')<0 && v.indexOf('X')<0)) continue;
+          var p = tn.parentNode;
+          if(!p || p.nodeType!==1) continue;
+          var tag = p.tagName;
+          if(tag==='OPTION'||tag==='SELECT'||tag==='TEXTAREA'||tag==='SCRIPT'||tag==='STYLE'||tag==='NOSCRIPT') continue;
+          if(p.classList && p.classList.contains('slats-solid-box')) continue;
+          try{ if(p.closest('td.slats-solid-cell,th.slats-solid-cell,.slats-solid-box')) continue; }catch(e){}
+          var rng = slatsSolidScan(v);
+          if(rng.length) hits.push({ node:tn, rng:rng[0] });
+        }
+        for(i=0;i<hits.length;i++){
+          var node = hits[i].node, s = hits[i].rng[0], e2 = hits[i].rng[1], txt = node.nodeValue;
+          if(!node.parentNode) continue;
+          var span = document.createElement('span');
+          span.className = 'slats-solid-box';
+          span.textContent = txt.slice(s, e2);
+          var frag = document.createDocumentFragment();
+          if(s > 0) frag.appendChild(document.createTextNode(txt.slice(0, s)));
+          frag.appendChild(span);
+          if(e2 < txt.length) frag.appendChild(document.createTextNode(txt.slice(e2)));
+          node.parentNode.replaceChild(frag, node);
+          n++;
+        }
+        return n;
+      }catch(err){ return 0; }
+    }
+    var SLATS_SOLID_ROOTS = [], SLATS_SOLID_TIMER = null;
+    /* 渲染后补框：MutationObserver 只负责「记下新增子树」，真正扫描合并到 150ms 后一次做完，
+       避免一次渲染（如切语言重排整页）触发几十次全量扫描。类名变化不会触发 childList，不会死循环。 */
+    function slatsSolidFlush(){
+      SLATS_SOLID_TIMER = null;
+      var roots = SLATS_SOLID_ROOTS.splice(0, SLATS_SOLID_ROOTS.length);
+      if(!roots.length) return;
+      /* 去掉「被别的待扫节点包含」的根，避免重复扫描 */
+      var keep = [];
+      roots.forEach(function(r){
+        if(!r || !r.isConnected) return;
+        if(r.nodeType === 3){ if(r.parentNode) slatsSolidSweep(r.parentNode); return; }
+        if(r.nodeType !== 1) return;
+        keep.push(r);
+      });
+      keep.forEach(function(r){
+        var dup = false;
+        for(var i=0;i<keep.length;i++){ if(keep[i]!==r && keep[i].contains(r)){ dup = true; break; } }
+        if(!dup) slatsSolidSweep(r);
+      });
+    }
+    function slatsSolidSchedule(root){
+      if(root && root.nodeType===1 && root.classList && root.classList.contains('slats-solid-box')) return;
+      if(root) SLATS_SOLID_ROOTS.push(root);
+      if(SLATS_SOLID_TIMER) return;
+      SLATS_SOLID_TIMER = setTimeout(slatsSolidFlush, 150);
+    }
+    function slatsSolidBoxBoot(){
+      if(window.__slatsSolidBoxBound) return;
+      window.__slatsSolidBoxBound = true;
+      try{
+        var mo = new MutationObserver(function(muts){
+          /* PERF 门控：标签页在后台时不扫描；切回前台补扫一次（保证不漏框） */
+          if(document.hidden){
+            if(!window.__slatsSolidVisBound){
+              window.__slatsSolidVisBound = true;
+              document.addEventListener('visibilitychange', function(){
+                if(!document.hidden) slatsSolidSchedule(document.body);
+              });
+            }
+            return;
+          }
+          for(var i=0;i<muts.length;i++){
+            var an = muts[i].addedNodes;
+            if(!an || !an.length) continue;
+            for(var j=0;j<an.length;j++){
+              var nd = an[j];
+              if(nd.nodeType===1 || nd.nodeType===3) slatsSolidSchedule(nd);
+            }
+          }
+        });
+        mo.observe(document.body, { childList:true, subtree:true });
+      }catch(e){}
+      slatsSolidSchedule(document.body);
+    }
+    /* 立即补框（不等 150ms 合并）：主表格渲染完直接调，避免肉眼看到「先无框、后加框」的闪动 */
+    function slatsSolidNow(root){ try{ return slatsSolidSweep(root || document.body); }catch(e){ return 0; } }
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', slatsSolidBoxBoot);
+    else slatsSolidBoxBoot();
     /* 猪舍编号/任意语言名称 → 当前语言名称（例如 1→公猪站/Boar stud/Trạm đực giống），无对应则原样返回
        注：I18N 在更晚的脚本块才定义，此处不能预计算映射表，必须在运行时扫描。 */
     function prod_phName(v){
@@ -7673,6 +7867,12 @@ var WL_FLOW_IMG = {
         if(!isNaN(nb)) return 1;
         return String(a).localeCompare(String(b));
       });
+      /* ★SLATS-SOLID-BOX-20261108：给每个规格标记「是否实心板」（任一 YES 即 true），
+         供「规格当列头」的表（历史产出表等）只框表头用，不必每个渲染点各自再查一遍。 */
+      try{
+        var _solidMap = slatsSizeSolidMap();
+        for(var _sk in specs){ if(specs.hasOwnProperty(_sk)){ specs[_sk].solidYes = !!_solidMap[slatsSizeKeyNumeric(_sk)]; } }
+      }catch(e){}
       var _out = { specs:specs, houseOrder:houseOrder };
       PROD_SLATS_MM_CACHE = { rows:rows, out:_out };
       return _out;
@@ -8178,6 +8378,8 @@ var WL_FLOW_IMG = {
         if(window.__PROD_H_JUMP){ var _hj = window.__PROD_H_JUMP; window.__PROD_H_JUMP = null; try{ prod_stockoutJumpHouse(_hj.h); }catch(e){} } }
       else if(key==='F'){ body.innerHTML = prod_tabF(f); prod_deferDraw(function(){ if(PROD_ACTIVE_TAB==='F') prod_drawEquipCharts(f); }); }
       if('ABCDEFH'.indexOf(key) >= 0) prod_setupAllScrolls();
+      /* ★SLATS-SOLID-BOX-20261108：标签内容刚重建 → 立刻补齐「实心板 YES 双线黑框」，不等 150ms 合并 */
+      try{ slatsSolidNow(body); }catch(e){}
       prod_updateTabBadges();
       if(key==='H' && PROD_OUT_EDIT){
         setTimeout(function(){ try{ prod_outInitEditWeather(); prod_outFocusEdit(); }catch(e){} }, 80);
@@ -12321,7 +12523,7 @@ var WL_FLOW_IMG = {
         var caret = '<span class="pe-estats-caret">'+(isExp?'▾':'▸')+'</span>';
         var _gapCls = r.ok ? ' class="pe-gap-ok" title="'+prod_esc(prod_gapOkTip(r.demand, r.produced))+'"'
                            : (r.gap>0 ? ' class="pe-gap"' : '');
-        var _row = '<tr class="pe-estats-row'+(isExp?' pe-estats-expanded':'')+(r.ok?' pe-gap-ok':'')+'" data-spec="'+prod_esc(r.k)+'" data-no="'+(i+1)+'" onclick="prod_eStatsRowClick(event,this)"><td class="pe-col-no">'+(i+1)+'</td><td class="pe-vth" title="'+pt('thr_house')+'：'+prod_esc(r.houseNames)+'">'+caret+vth+'</td><td>'+prod_fmtNum(r.demand)+'</td><td>'+prod_fmtNum(r.produced)+'</td><td'+_gapCls+'>'+prod_fmtNum(r.gap)+'</td><td>'+prod_esc(r.houseNames)+'</td><td>'+r.pct+'% / #'+r.rank+'</td></tr>';
+        var _row = '<tr class="pe-estats-row'+(isExp?' pe-estats-expanded':'')+(r.ok?' pe-gap-ok':'')+'" data-spec="'+prod_esc(r.k)+'" data-no="'+(i+1)+'" onclick="prod_eStatsRowClick(event,this)"><td class="pe-col-no">'+(i+1)+'</td><td class="pe-vth'+slatsSolidCellCls(r.k)+'" title="'+pt('thr_house')+'：'+prod_esc(r.houseNames)+'">'+caret+vth+'</td><td>'+prod_fmtNum(r.demand)+'</td><td>'+prod_fmtNum(r.produced)+'</td><td'+_gapCls+'>'+prod_fmtNum(r.gap)+'</td><td>'+prod_esc(r.houseNames)+'</td><td>'+r.pct+'% / #'+r.rank+'</td></tr>';
         if(isExp && _houses.length){ _row += _houses.map(function(d,hi){ return prod_eStatsSubRowHtml(d, (i+1)+'.'+(hi+1)); }).join(''); }
         return _row;
       }).join('');
@@ -13199,7 +13401,8 @@ var WL_FLOW_IMG = {
         var tip = houses.length ? (pt('thr_house') + '：' + prod_esc(houses.join('、'))) : '';
         var sp = s.split('×');
         var sh = '<span class="v1">'+prod_esc(sp[0])+'</span>' + (sp.length>1 ? '<span class="v2">×'+prod_esc(sp[1])+'<br>×'+prod_esc(sp[2]||'')+'</span>' : '');
-        h += '<th class="pe-vth" title="'+tip+'">'+sh+'</th>';
+        /* ★SLATS-SOLID-BOX-20261108：规格当列头的表 → 实心板 YES 只给表头加双线黑框（数据格不动） */
+        h += '<th class="pe-vth'+(specs[s]&&specs[s].solidYes?' slats-solid-cell':'')+'" title="'+tip+'">'+sh+'</th>';
       });
       h += '<th class="pe-col-total">'+pt('thr_total_pcs')+'</th><th class="pe-col-photo">'+pt('prod_lbl_photos')+'</th><th class="pe-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
       if(!rows.length){ h += '<tr><td colspan="'+(disp.length+9)+'">—</td></tr>'; }
@@ -14420,6 +14623,8 @@ var WL_FLOW_IMG = {
       body += '<div class="pop-actions"><button class="dv-btn dv-btn-close" type="button" onclick="prod_closeOpModal()">'+pt('op_cancel')+'</button>'
         + '<button class="dv-btn dv-btn-edit" type="button" onclick="prod_saveOp()">'+pt('op_save')+'</button></div>';
       var bodyEl=document.getElementById('prodOpBody'); if(bodyEl) bodyEl.innerHTML=body;
+      /* ★SLATS-SOLID-BOX-20261108：出库/入库弹窗重绘后补齐「实心板 YES 双线黑框」 */
+      if(bodyEl && typeof slatsSolidNow==='function'){ try{ slatsSolidNow(bodyEl); }catch(e0){} }
       if(PROD_OP_EDIT_IDX!==null) prod_opFocusQty();
       document.getElementById('pop_title_icon').innerHTML = isOut?PROD_OP_ICON_OUT:PROD_OP_ICON_IN;
       var titleHtml='<span class="pop-title-main">'+prod_esc(map.label)+'</span><span style="margin-left:6px;">'+pt(opI18n)+'</span>';
@@ -33739,6 +33944,8 @@ var PROD_EQUIP_FAULT_KB = {
       <div class="slats-spec-wrap">
         <div class="slats-spec-toolbar">
           <button type="button" class="btn btn-outline btn-sm" onclick="printModalById('slatsSpecModal')" data-i18n="btn_print">打印</button>
+          <!-- ★SLATS-SOLID-BOX-20261108：导出 xlsx（实心板 YES 的规格在 Excel 里也带双线框） -->
+          <button type="button" class="btn btn-outline btn-sm" onclick="exportSlatsSpecXlsx()" data-i18n="slats_btn_export">导出 xlsx</button>
           <button type="button" class="btn btn-primary btn-sm" onclick="addSlatsSpecRow()">
             <span data-i18n="slats_table_add">+ 新增行</span>
           </button>
@@ -34039,6 +34246,11 @@ var PROD_EQUIP_FAULT_KB = {
   .print-target .slats-spec-toolbar { display:none !important; }
   .print-target .slats-spec-input,
   .print-target .slats-spec-select { border:none !important; background:transparent !important; box-shadow:none !important; }
+  /* ★SLATS-SOLID-BOX-20261108：实心板 YES 的双线黑框必须原样打印（不能被上面的 border:none 波及） */
+  .print-target .slats-solid-cell.slats-solid-cell,
+  body > .modal-overlay.show .slats-solid-cell.slats-solid-cell{border:3px double #000 !important;}
+  .print-target .slats-solid-box,
+  body > .modal-overlay.show .slats-solid-box{border:3px double #000 !important;}
 
   /* ===== 生产计划打印：克隆 prod-tab-body 到 body 直接子节点，隐藏按钮/输入框边框，取消横向滚动 ===== */
   .print-target.prod-print-plan { background:#fff; padding:0; color:#000; }
@@ -35087,7 +35299,7 @@ var I18N = {
     slats_table_usage_title:"漏缝地板用量", slats_table_qty_unit:"数量\n/单元", slats_table_qty_whole:"数量\n/整场", slats_table_sqm_unit:"平米\n/单元", slats_table_sqm_whole:"平米\n/整场",
     slats_table_rebar_title:"钢筋网片\n配置信息", slats_table_mesh_layers:"钢网\n层数",
     slats_table_bar_len:"条/\n长度方向", slats_table_rebar_size_len:"钢筋尺寸/\n长度方向", slats_table_bar_wid:"条/\n宽度方向", slats_table_rebar_size_wid:"钢筋尺寸/\n宽度方向",
-    slats_table_remark:"实心板?", slats_table_op:"操作", slats_up_layer:"上层", slats_lo_layer:"下层", slats_th_bl:"条数长", slats_th_pl:"φ长", slats_th_ml:"mm长", slats_th_bw:"条数宽", slats_th_pw:"φ宽", slats_th_mw:"mm宽", slats_table_solid:"实心板?", slats_solid_yes:"YES", slats_solid_no:"NO", slats_table_mm_len:"mm长", slats_table_mm_wid:"mm宽", slats_table_add:"+ 新增行", slats_table_total:"总计", slats_fill_required:"请完成全部必填框！",
+    slats_table_remark:"实心板?", slats_table_op:"操作", slats_up_layer:"上层", slats_lo_layer:"下层", slats_th_bl:"条数长", slats_th_pl:"φ长", slats_th_ml:"mm长", slats_th_bw:"条数宽", slats_th_pw:"φ宽", slats_th_mw:"mm宽", slats_table_solid:"实心板?", slats_solid_yes:"YES", slats_solid_no:"NO", slats_table_mm_len:"mm长", slats_table_mm_wid:"mm宽", slats_table_add:"+ 新增行", slats_btn_export:"导出 xlsx", slats_table_total:"总计", slats_fill_required:"请完成全部必填框！",
     slats_default_bar_len_tip:"默认值是6，请根据实际修改！", slats_default_bar_wid_tip:"默认值是3，请根据实际修改！",
     slats_pig_house_1:"公猪站", slats_pig_house_2:"配种舍", slats_pig_house_3:"怀孕舍", slats_pig_house_4:"分娩舍", slats_pig_house_5:"保育舍", slats_pig_house_6:"育肥舍", slats_pig_house_7:"隔离舍", slats_pig_house_8:"后备舍", slats_pig_house_9:"转猪舍", slats_pig_house_10:"断奶培育舍", slats_pig_house_11:"代售舍", slats_pig_house_12:"过道", slats_pig_house_13:"自留备用", slats_pig_house_14:"其他房舍",     slats_pig_house_15:"其他用途",
     nav_dashboard:"仪表盘", nav_won:"中标项目", nav_worklog:"工作日志", nav_install:"安装管理", nav_finance:"财务管理", nav_library:"资料库", nav_equity:"股东权益",
@@ -35907,7 +36119,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     slats_table_usage_title:"Slat\nUsage", slats_table_qty_unit:"Qty\n/Unit", slats_table_qty_whole:"Qty\n/Whole", slats_table_sqm_unit:"Sqm\n/Unit", slats_table_sqm_whole:"Sqm\n/Whole",
     slats_table_rebar_title:"Rebar Mesh\nConfig", slats_table_mesh_layers:"Mesh\nLayers",
     slats_table_bar_len:"Bars/\nL", slats_table_rebar_size_len:"Rebar\nSize/L", slats_table_bar_wid:"Bars/\nW", slats_table_rebar_size_wid:"Rebar\nSize/W",
-    slats_table_remark:"Solid slat?", slats_table_op:"Operation", slats_up_layer:"Upper", slats_lo_layer:"Lower", slats_th_bl:"Bars-L", slats_th_pl:"φ-L", slats_th_ml:"mm-L", slats_th_bw:"Bars-W", slats_th_pw:"φ-W", slats_th_mw:"mm-W", slats_table_solid:"Solid slat?", slats_solid_yes:"YES", slats_solid_no:"NO", slats_table_mm_len:"mm L", slats_table_mm_wid:"mm W", slats_table_add:"+ Add Row", slats_table_total:"Total", slats_fill_required:"Please complete all required fields!",
+    slats_table_remark:"Solid slat?", slats_table_op:"Operation", slats_up_layer:"Upper", slats_lo_layer:"Lower", slats_th_bl:"Bars-L", slats_th_pl:"φ-L", slats_th_ml:"mm-L", slats_th_bw:"Bars-W", slats_th_pw:"φ-W", slats_th_mw:"mm-W", slats_table_solid:"Solid slat?", slats_solid_yes:"YES", slats_solid_no:"NO", slats_table_mm_len:"mm L", slats_table_mm_wid:"mm W", slats_table_add:"+ Add Row", slats_btn_export:"Export xlsx", slats_table_total:"Total", slats_fill_required:"Please complete all required fields!",
     slats_default_bar_len_tip:"Default is 6, please adjust as actual!", slats_default_bar_wid_tip:"Default is 3, please adjust as actual!",
     slats_pig_house_1:"Boar stud", slats_pig_house_2:"Mating barn", slats_pig_house_3:"Gestation barn", slats_pig_house_4:"Farrowing barn", slats_pig_house_5:"Nursery barn", slats_pig_house_6:"Finishing barn", slats_pig_house_7:"Isolation barn", slats_pig_house_8:"Gilt barn", slats_pig_house_9:"Transfer barn", slats_pig_house_10:"Weaner barn", slats_pig_house_11:"Sales barn", slats_pig_house_12:"Passage", slats_pig_house_13:"Reserved", slats_pig_house_14:"Other house",     slats_pig_house_15:"Other purposes",
     nav_dashboard:"Dashboard", nav_won:"Won Projects", nav_worklog:"Work Log", nav_install:"Installation", nav_finance:"Finance", nav_library:"Library", nav_equity:"Equity",
@@ -36730,7 +36942,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     slats_table_usage_title:"Lượng sàn\nsử dụng", slats_table_qty_unit:"SL\n/Đơn vị", slats_table_qty_whole:"SL\n/Toàn bộ", slats_table_sqm_unit:"m²\n/Đơn vị", slats_table_sqm_whole:"m²\n/Toàn bộ",
     slats_table_rebar_title:"Cấu hình\nlưới thép", slats_table_mesh_layers:"Số lớp\nlưới",
     slats_table_bar_len:"Thanh/\nChiều dài", slats_table_rebar_size_len:"Cỡ thép/\nChiều dài", slats_table_bar_wid:"Thanh/\nChiều rộng", slats_table_rebar_size_wid:"Cỡ thép/\nChiều rộng",
-    slats_table_remark:"Tấm đặc?", slats_table_op:"Thao tác", slats_up_layer:"Lớp trên", slats_lo_layer:"Lớp dưới", slats_th_bl:"Số dài", slats_th_pl:"φ dài", slats_th_ml:"mm dài", slats_th_bw:"Số rộng", slats_th_pw:"φ rộng", slats_th_mw:"mm rộng", slats_table_solid:"Tấm đặc?", slats_solid_yes:"YES", slats_solid_no:"NO", slats_table_mm_len:"mm D", slats_table_mm_wid:"mm R", slats_table_add:"+ Thêm dòng", slats_table_total:"Tổng cộng", slats_fill_required:"Vui lòng điền đầy đủ các trường bắt buộc!",
+    slats_table_remark:"Tấm đặc?", slats_table_op:"Thao tác", slats_up_layer:"Lớp trên", slats_lo_layer:"Lớp dưới", slats_th_bl:"Số dài", slats_th_pl:"φ dài", slats_th_ml:"mm dài", slats_th_bw:"Số rộng", slats_th_pw:"φ rộng", slats_th_mw:"mm rộng", slats_table_solid:"Tấm đặc?", slats_solid_yes:"YES", slats_solid_no:"NO", slats_table_mm_len:"mm D", slats_table_mm_wid:"mm R", slats_table_add:"+ Thêm dòng", slats_btn_export:"Xuất xlsx", slats_table_total:"Tổng cộng", slats_fill_required:"Vui lòng điền đầy đủ các trường bắt buộc!",
     slats_default_bar_len_tip:"Mặc định là 6, vui lòng điều chỉnh theo thực tế!", slats_default_bar_wid_tip:"Mặc định là 3, vui lòng điều chỉnh theo thực tế!",
     slats_pig_house_1:"Trạm đực giống", slats_pig_house_2:"Chuồng phối giống", slats_pig_house_3:"Chuồng mang thai", slats_pig_house_4:"Chuồng đẻ", slats_pig_house_5:"Chuồng úm", slats_pig_house_6:"Chuồng vỗ béo", slats_pig_house_7:"Chuồng cách ly", slats_pig_house_8:"Chuồng heo dự bị", slats_pig_house_9:"Chuồng chuyển heo", slats_pig_house_10:"Chuồng cai sữa", slats_pig_house_11:"Chuồng chờ bán", slats_pig_house_12:"Hành lang", slats_pig_house_13:"Dành riêng", slats_pig_house_14:"Chuồng khác",     slats_pig_house_15:"Mục đích khác",
     nav_dashboard:"Bảng điều khiển", nav_won:"Dự án trúng thầu", nav_worklog:"Nhật ký công việc", nav_install:"Quản lý lắp đặt", nav_finance:"Quản lý tài chính", nav_library:"Thư viện", nav_equity:"Quyền lợi cổ đông",
@@ -49264,6 +49476,34 @@ function slatsSpecSerialize(){
   });
   return out;
 }
+/* ★SLATS-SOLID-BOX-20261108：导出规格表 xlsx（服务端 openpyxl 生成，
+   实心板?=YES 的行把「单元/栋 → 数量/整场」这一段设置成 Excel 双线边框，
+   与页面上看到的双线黑框对应；NO 行保持普通细线）。 */
+function exportSlatsSpecXlsx(){
+  try{
+    var rows = slatsSpecSerialize();
+    if(!rows || !rows.length){ try{ showAlert(pt('empty_no_spec')); }catch(e0){ alert('No data'); } return; }
+    var lang = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
+    var _hdr = (typeof authHeaders==='function') ? authHeaders({'Content-Type':'application/json'}) : {'Content-Type':'application/json'};
+    fetch('/api/slats-spec-export', {
+      method:'POST', credentials:'include', headers:_hdr,
+      body: JSON.stringify({ rows: rows, lang: lang })
+    }).then(function(r){
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    }).then(function(blob){
+      var a = document.createElement('a');
+      var url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = 'slats_spec_' + (new Date().toISOString().slice(0,10)) + '.xlsx';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ try{ URL.revokeObjectURL(url); a.remove(); }catch(e2){} }, 800);
+    }).catch(function(err){
+      try{ showAlert((pt('alert_export_fail') || '导出失败') + '：' + err.message); }
+      catch(e3){ alert('Export failed: ' + err.message); }
+    });
+  }catch(e){ console.error('[slats-export]', e); }
+}
 function slatsSpecValidate(){
   var groups=slatsGroupInfo();
   var ok=true;
@@ -49573,9 +49813,12 @@ function openSlatsReportModal(){
       var rebKeyLen='slats_rebar_'+String(r.rebar_size_len||'').trim();
       var rebKeyWid='slats_rebar_'+String(r.rebar_size_wid||'').trim();
       var meshKey='slats_mesh_'+String(r.mesh_layers||'').trim();
-      ovHtml+='<td>'+slatsFmtNum(slatsParseNum(r.floor_len),0)+'</td>'+
-        '<td>'+slatsFmtNum(slatsParseNum(r.floor_wid),0)+'</td>'+
-        '<td>'+slatsFmtNum(slatsParseNum(r.floor_hgt),0)+'</td>'+
+      /* ★SLATS-SOLID-BOX-20261108：本行实心板=YES → 给该行「长/宽/高」三格加双线黑框
+         （行级判定，只看这一行；与上面 20261107 的整行红字互不影响） */
+      var _solidSegCls = function(seg){ return _solidYes ? (' class="slats-solid-cell slats-solid-seg-' + seg + '"') : ''; };
+      ovHtml+='<td'+_solidSegCls('start')+'>'+slatsFmtNum(slatsParseNum(r.floor_len),0)+'</td>'+
+        '<td'+_solidSegCls('mid')+'>'+slatsFmtNum(slatsParseNum(r.floor_wid),0)+'</td>'+
+        '<td'+_solidSegCls('end')+'>'+slatsFmtNum(slatsParseNum(r.floor_hgt),0)+'</td>'+
         '<td>'+slatsFmtNum(slatsParseNum(r.qty_unit),0)+'</td>'+
         '<td>'+slatsFmtNum(slatsParseNum(r.qty_whole),0)+'</td>'+
         '<td>'+slatsFmtNum(slatsParseNum(r.sqm_unit),0)+'</td>'+
@@ -49594,6 +49837,8 @@ function openSlatsReportModal(){
     '<td>'+slatsFmtNum(totalSqm,0)+'</td>'+
     '<td colspan="'+(rDual?14:8)+'"></td></tr></tbody></table>';
   el('slatsReportOverview').innerHTML=ovHtml;
+  /* ★SLATS-SOLID-BOX-20261108：智能报告概述表重绘后补齐 YES 行的双线黑框 */
+  if(typeof slatsSolidNow==='function'){ try{ slatsSolidNow(el('slatsReportOverview')); }catch(e0){} }
 
   // 文字说明
   var houseDesc=t.slats_report_house_desc||'共 {0} 种猪舍类型，累计 {1} 栋';
@@ -50401,6 +50646,25 @@ function slatsApplySolidRowStyle(tr){
     if (yes) td.classList.add('slats-solid-hl');
     else td.classList.remove('slats-solid-hl');
   }
+  /* ★SLATS-SOLID-BOX-20261108：实心板?=YES 的【这一行】，给它的「水泥漏缝地板尺寸」
+     那三格（data-oci 8/9/10 = 长/宽/高，单位 mm）加 Excel 双线黑框；
+     NO 的行必须摘掉，避免改完 YES→NO 后框还在。
+     行级判定 = 只看这一行（用户 2026-11-08 明确的口径）。
+     ★不要加 4/5/6：那是「房舍信息」的单元长宽高（米），不是地板尺寸，
+       而且它们带 rowspan，属于分组首行，加在非首行会框错位置。 */
+  var _solidBoxOci = [8, 9, 10];
+  var _solidSegCls = ['slats-solid-seg-start', 'slats-solid-seg-mid', 'slats-solid-seg-end'];
+  for (var bi = 0; bi < _solidBoxOci.length; bi++) {
+    var btd = tr.querySelector('td[data-oci="' + _solidBoxOci[bi] + '"]');
+    if (!btd) continue;
+    if (yes) {
+      btd.classList.add('slats-solid-cell');
+      btd.classList.add(_solidSegCls[bi]);   /* 三段拼一个整框，见 CSS 的 seg-* 规则 */
+    } else {
+      btd.classList.remove('slats-solid-cell');
+      for (var sj = 0; sj < _solidSegCls.length; sj++) btd.classList.remove(_solidSegCls[sj]);
+    }
+  }
 }
 function slatsApplySolidAllStyles(){
   var root = document.querySelector('.slats-spec-table');
@@ -50453,6 +50717,8 @@ function slatsRenderAll(rows){
   slatsUpdateFirstRowDelete();
   if(typeof fitSlatsSpecTable==='function'){ try{ fitSlatsSpecTable(); }catch(e0){} }
   if(typeof slatsApplySolidAllStyles==='function'){ try{ slatsApplySolidAllStyles(); }catch(e0){} }
+  /* ★SLATS-SOLID-BOX-20261108：规格表每次重绘后补齐 YES 行的双线黑框（行级判定见 slatsApplySolidRowStyle） */
+  if(typeof slatsSolidNow==='function'){ try{ slatsSolidNow(tb); }catch(e0){} }
 }
 
 function slatsBuildRow(dual, groupId, idx, values){
@@ -72849,6 +73115,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       try{ inst_limitLaborScroll(); setTimeout(inst_limitLaborScroll, 0); }catch(e){}
     }
     inst_updateTabBadges();
+    /* ★SLATS-SOLID-BOX-20261108：安装 A/B/C 内容重建后立刻补齐「实心板 YES 双线黑框」 */
+    try{ slatsSolidNow(body); }catch(e){}
   }
 
   /* ---------- 子标签 A：安装计划总览 ---------- */
