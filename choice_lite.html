@@ -5930,6 +5930,27 @@ var WL_FLOW_IMG = {
       .pc-labor-hist .pc-wx-cell{font-size:13px;line-height:1.2;text-align:center;vertical-align:middle;}
       .pc-labor-hist th.pc-sortable{cursor:pointer;user-select:none;}
       .pc-labor-hist th.pc-sortable:hover{background:#eef3ee;}
+      /* ★IC-FORM-YELLOW-20261108（用户 2026-11-08 指定，勿改）：
+         安装「安装小组及人工」顶部表单 —— ①输入框内文字左右居中；②日期(#ic_date)/春节(#ic_holiday) 淡黄底；
+         ③填表人(#ic_recorder)/安装日期(#ic_install_start) 背景色保持不变（只读灰）。 */
+      .inst-labor-form .prod-field input,
+      .inst-labor-form .prod-field select,
+      .inst-labor-form .inst-zone-select{text-align:center;text-align-last:center;}
+      .inst-labor-form .prod-field input#ic_date,
+      .inst-labor-form .prod-field select#ic_holiday,
+      .inst-labor-form .prod-field input#ic_holiday{background:#fff59d !important;}
+      .inst-labor-form .prod-field input#ic_recorder,
+      .inst-labor-form .prod-field input#ic_install_start{background:#f0f0f0 !important;}
+      /* ★IC-HIST-HEAD-20261108：安装 Tab C「安装数量&人工明细」表头 = 红底 + 白字加粗
+         （必须用 #inst-tab-body 前缀压过 .pc-col-yellow/.pc-col-blue/.pc-col-photo 的分组底色，且不影响生产 Tab C 同名表） */
+      #inst-tab-body .pc-labor-hist thead th{background:#E53935 !important;color:#fff !important;font-weight:700 !important;}
+      #inst-tab-body .pc-labor-hist thead th.pc-sortable:hover{background:#C62828 !important;}
+      #inst-tab-body .pc-labor-hist thead th .pc-sort-ind .up,
+      #inst-tab-body .pc-labor-hist thead th .pc-sort-ind .dn{color:rgba(255,255,255,.55);}
+      #inst-tab-body .pc-labor-hist thead th .pc-sort-ind .up.on,
+      #inst-tab-body .pc-labor-hist thead th .pc-sort-ind .dn.on{color:#FFD54F;}
+      /* ★IC-HIST-CROSS-20261108：主体区鼠标悬停 → 淡粉色十字（整行 + 整列）高亮 */
+      #inst-tab-body .pc-labor-hist tbody td.ic-xh{background:#fce4ec !important;}
       .inst-del-pop{position:fixed;z-index:9999;background:#fff;border:1px solid #ffcdd2;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);min-width:200px;padding:0;font-size:12px;overflow:hidden;}
       .inst-del-pop-hd{padding:8px 12px;background:#E53935;color:#fff;font-weight:700;font-size:12px;}
       .inst-del-pop-bd{padding:12px;color:#333;line-height:1.4;}
@@ -76309,6 +76330,37 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var rowH = rows[0].offsetHeight || 26;
     wrap.style.maxHeight = (headH + maxRows * rowH + footH) + 'px';
   }
+  /* ★IC-HIST-CROSS-20261108：安装 Tab C「安装数量&人工明细」表 —— 鼠标悬停淡粉色十字（整行+整列）高亮。
+     用矩形坐标判定同行/同列：该表有 rowspan 纵向合并，cellIndex 会错位，不能用 cellIndex。
+     只挂一个 document 级 mouseover（非 MutationObserver、非常驻 setInterval，不影响 PERF-IDLE 基线）。
+     ★锁定：不得改为 MutationObserver / 轮询实现，否则会破坏 check_perf_idle_lock.py 的基线守门。 */
+  (function(){
+    if(window.__icCrossBound) return; window.__icCrossBound = true;
+    var curTd = null, marked = [];
+    function clearCross(){
+      for(var i=0;i<marked.length;i++){ marked[i].classList.remove('ic-xh'); }
+      marked = []; curTd = null;
+    }
+    document.addEventListener('mouseover', function(e){
+      var t = e.target;
+      var td = (t && t.closest) ? t.closest('td') : null;
+      if(!td){ clearCross(); return; }
+      if(td === curTd) return;
+      var tbl = td.closest('table.pc-labor-hist');
+      if(!tbl || !tbl.closest('#inst-tab-body')){ clearCross(); return; }
+      clearCross();
+      var r = td.getBoundingClientRect();
+      var cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+      var cells = tbl.querySelectorAll('tbody td');
+      for(var i=0;i<cells.length;i++){
+        var c = cells[i], b = c.getBoundingClientRect();
+        if((b.top <= cy && b.bottom >= cy) || (b.left <= cx && b.right >= cx)){
+          c.classList.add('ic-xh'); marked.push(c);
+        }
+      }
+      curTd = td;
+    }, true);
+  })();
   function inst_tabC(f){
     var inst = f.installation || {}; inst.workers = inst.workers || {};
     var d = prod_dmy(prod_val('ic_date')||INST_TABC_SELDATE||ymdToDmy(prod_today()));
