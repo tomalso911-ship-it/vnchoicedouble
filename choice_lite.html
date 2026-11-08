@@ -3268,7 +3268,11 @@ window.__finShakeReport = function (ms) {
 .bd-lg-table { border-collapse:separate; border-spacing:0; width:max-content; min-width:100%; font-size:12px; }
 .bd-lg-table2 { width:100%; }
 /* ★LOGIN-TABLE-20261108d：网格线改黄色，且补上竖向网格线（列之间） */
+/* ★LOGIN-CELLCOLOR-20261108（用户报「只看得到合计，看不到单元格数值」的根因）：
+   数据格原先没有指定颜色，继承到页面默认的深色文字，在深蓝卡片上几乎看不见（只剩一个小点）。
+   这里给所有数据格显式亮色；表头/零值/停用行/合计列各自的规则特异性更高，仍按原样生效。 */
 .bd-lg-table th, .bd-lg-table td { padding:4px 6px; text-align:center; white-space:nowrap;
+  color:#eaf4ff;
   border-right:1px solid rgba(255,209,102,.28);
   border-bottom:1px solid rgba(255,209,102,.28); }
 .bd-lg-table tr > *:last-child { border-right:0; }
@@ -3284,6 +3288,13 @@ window.__finShakeReport = function (ms) {
 /* ★LOGIN-TABLE-20261108b：姓名列统一白色加粗（含停用行 / 合计行 / 表头），必须放在 .bd-lg-off 之后才压得住 */
 .bd-lg-table .bd-lg-name, .bd-lg-table .bd-lg-off .bd-lg-name { color:#fff; font-weight:700; }
 .bd-lg-cur { background:rgba(255,209,102,.10); }
+/* ★LOGIN-XHAIR-20261108：鼠标悬停粉色十字高亮（整行 + 整列 + 交叉点），两张矩阵表同一套 */
+.bd-lg-table .bd-lg-xh { background:rgba(255,107,157,.14) !important; }
+.bd-lg-table .bd-lg-xhx { background:rgba(255,107,157,.32) !important; }
+.bd-lg-table td.bd-lg-name.bd-lg-xh,
+.bd-lg-table td.bd-lg-name.bd-lg-xhx,
+.bd-lg-table th.bd-lg-name.bd-lg-xh,
+.bd-lg-table th.bd-lg-name.bd-lg-xhx { background:#43275e !important; }
 @media (max-width: 900px){ .bd-login-matrix{ max-height:320px; } }
 .bd-fx-tile { align-items:stretch; justify-content:flex-start; }
 .bd-fx-cur { font-size:13px; color:#39e6ff; font-weight:700; text-align:center; padding:2px 0 2px; }
@@ -56281,6 +56292,43 @@ function bdLoginRenderMatrix(){
   box.innerHTML = html;
 }
 
+/* ★LOGIN-XHAIR-20261108：两张矩阵表统一「粉色十字高亮」——悬停某格 → 该行 + 该列 + 交叉点变色。
+   事件用容器级委托（容器不被 innerHTML 替换），不新增 MutationObserver / setInterval。 */
+function bdLgXHClear(box){
+  if (!box) return;
+  var cells = box.querySelectorAll('.bd-lg-xh,.bd-lg-xhx');
+  for (var i = 0; i < cells.length; i++) cells[i].classList.remove('bd-lg-xh', 'bd-lg-xhx');
+}
+function bdLgXHApply(box, td){
+  var tr = td.parentNode;
+  var table = (tr && tr.parentNode) ? tr.parentNode.parentNode : null;
+  if (!table || !table.rows) return;
+  var ci = td.cellIndex, ri = tr.rowIndex;
+  bdLgXHClear(box);
+  for (var r = 0; r < table.rows.length; r++){
+    var cells = table.rows[r].cells;
+    for (var c = 0; c < cells.length; c++){
+      if (c === ci) cells[c].classList.add(r === ri ? 'bd-lg-xhx' : 'bd-lg-xh');
+      else if (r === ri) cells[c].classList.add('bd-lg-xh');
+    }
+  }
+}
+function bdLgXHInit(){
+  var ids = ['bdLoginBarBody', 'bdLoginMatrixBody'];
+  for (var i = 0; i < ids.length; i++){
+    (function(box){
+      if (!box || box.getAttribute('data-xhair')) return;
+      box.setAttribute('data-xhair', '1');
+      box.addEventListener('mouseover', function(e){
+        var t = e.target, td = null;
+        while (t && t !== box){ if (t.nodeType === 1 && t.tagName === 'TD'){ td = t; break; } t = t.parentNode; }
+        if (td) bdLgXHApply(box, td);
+      });
+      box.addEventListener('mouseleave', function(){ bdLgXHClear(box); });
+    })(document.getElementById(ids[i]));
+  }
+}
+
 function bdLoginRenderAll(){
   var d = BD_LOGIN.data; if (!d) return;
   var t1 = document.getElementById('bdLoginDailyTitle');
@@ -56296,6 +56344,7 @@ function bdLoginRenderAll(){
   bdLoginBind();
   bdLoginRenderDaily();
   bdLoginRenderMatrix();
+  bdLgXHInit();
 }
 
 function bdLoginBind(){
