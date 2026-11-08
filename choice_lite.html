@@ -62222,6 +62222,13 @@ function submitAuth() {
     planTetAdd:     { zh:'跨 TET 春节，增加 20 天非生产日', en:'Overlaps TET holiday: +20 non-working days', vi:'Trùng TET: cộng 20 ngày nghỉ' },
     planAcceptDays: { zh:'验收期固定 15 天', en:'Acceptance fixed 15 days', vi:'Nghiệm thu cố định 15 ngày' },
     planDay:        { zh:'天', en:'days', vi:'ngày' },
+    // ★CC-GANTT-20261108（用户 2026-11-08 要求）：阶段表下方甘特图三语
+    planGanttTitle: { zh:'执行甘特图（合同签订 → 项目结束）', en:'Execution Gantt (signing → project end)', vi:'Gantt thực hiện (ký HĐ → kết thúc dự án)' },
+    planPhContract: { zh:'合同签订', en:'Contract signing', vi:'Ký hợp đồng' },
+    planPhFactory:  { zh:'工厂承建&试运行', en:'Factory build & trial run', vi:'Xây dựng & chạy thử nhà máy' },
+    planToday:      { zh:'今天', en:'Today', vi:'Hôm nay' },
+    planTet:        { zh:'春节', en:'TET', vi:'TET' },
+    planGanttNeedSign:{ zh:'填写「合同签约日期」后自动生成甘特图。', en:'Enter the contract signing date to generate the Gantt chart.', vi:'Nhập ngày ký hợp đồng để tạo biểu đồ Gantt.' },
     machNote:    { zh:'注：机械类为一次性投入，全额计入本单总成本。', en:'Note: machinery is a one-time investment, fully counted in total cost.', vi:'Lưu ý: máy móc là đầu tư một lần, tính toàn bộ vào tổng chi phí.' },
     laborNote:   { zh:'注：人工按「项目天数」（生产/安装分别计算）、运营费用按 ROUNDUP((生产项目天数+30)/30, 1) 个月自动乘算。', en:'Note: labor uses project days (production / installation separately); opex uses ROUNDUP((production days + 30)/30, 1) months.', vi:'Lưu ý: nhân công tính theo số ngày dự án (sản xuất / lắp đặt riêng); vận hành nhân theo ROUNDUP((số ngày sản xuất + 30)/30, 1) tháng.' },
     // ★CC-MACH-PRESET-20261105：1.1 生产机械 & 设备 / 1.2 工程车辆 / 1.3 工具 & 耗材 预设行名称（专业术语三语）
@@ -62588,6 +62595,32 @@ function submitAuth() {
       '.cc-tb:not(.cc-tb-spec) th.cc-prov-th,.cc-tb:not(.cc-tb-spec) td.cc-prov{min-width:0;width:46px;font-size:10px;padding:2px 1px;}',
       '.cc-tb:not(.cc-tb-spec) .cc-prov-sym{width:18px;height:18px;line-height:16px;font-size:13px;}',
       '}',
+      // ★CC-GANTT-20261108：阶段表下方甘特图（纯 CSS，无第三方库；只做版式呈现）
+      '.cc-gantt{margin-top:6px;border:1px solid #000;background:#fff;font-size:12px;overflow:hidden;font-variant-numeric:tabular-nums;}',
+      '.cc-gantt-head,.cc-gantt-row{display:flex;align-items:stretch;width:100%;}',
+      '.cc-gantt-lab{flex:0 0 150px;width:150px;box-sizing:border-box;padding:3px 6px;border-right:1px solid #000;display:flex;align-items:center;font-weight:600;color:#1a3c6e;line-height:1.25;overflow-wrap:anywhere;}',
+      '.cc-gantt-row .cc-gantt-lab,.cc-gantt-row .cc-gantt-track{border-bottom:1px solid #e3e8ef;}',
+      '.cc-gantt-head .cc-gantt-lab{background:#ffff00;justify-content:center;font-size:11px;border-bottom:1px solid #000;}',
+      '.cc-gantt-head .cc-gantt-track{background:#ffff00;height:30px;border-bottom:1px solid #000;}',
+      '.cc-gantt-track{position:relative;flex:1 1 auto;min-width:0;height:24px;}',
+      '.cc-gantt-row:nth-child(even) .cc-gantt-lab,.cc-gantt-row:nth-child(even) .cc-gantt-track{background:#eaf3fb;}',
+      '.cc-gantt-gl{position:absolute;top:0;bottom:0;width:0;border-left:1px solid #dde3ea;pointer-events:none;}',
+      '.cc-gantt-gl.cc-gantt-year{border-left-color:#a9b4c1;}',
+      '.cc-gantt-ym{position:absolute;top:2px;font-size:10px;color:#333;white-space:nowrap;pointer-events:none;}',
+      '.cc-gantt-bar{position:absolute;top:4px;height:16px;border-radius:3px;color:#fff;font-size:10px;font-weight:700;line-height:16px;padding:0 4px;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.cc-gantt-outlbl{position:absolute;top:5px;font-size:10px;font-weight:800;color:#333;white-space:nowrap;pointer-events:none;}',
+      '.cc-gantt-ms{position:absolute;top:5px;width:13px;height:13px;margin-left:-6px;transform:rotate(45deg);border:1px solid #7f1010;background:#d32f2f;}',
+      '.cc-gantt-mslbl{position:absolute;top:4px;font-size:10px;font-weight:800;color:#d32f2f;white-space:nowrap;pointer-events:none;}',
+      '.cc-gantt-today{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed #d32f2f;pointer-events:none;}',
+      '.cc-gantt-tet{position:absolute;top:0;bottom:0;width:0;border-left:1px dotted #8e24aa;pointer-events:none;}',
+      '.cc-gantt-tetlbl{position:absolute;top:16px;font-size:9px;font-weight:800;color:#8e24aa;white-space:nowrap;pointer-events:none;}',
+      '.cc-gantt-foot{display:flex;flex-wrap:wrap;gap:6px 16px;padding:5px 8px;border-top:1px solid #000;background:#fffdf0;font-size:11px;color:#444;}',
+      '.cc-gantt-key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}',
+      '.cc-gantt-key i{display:inline-block;width:14px;height:9px;border-radius:2px;}',
+      // ★CC-PLAN-DATEUI-20261108：签约/工厂两个日期框——淡黄底、等宽、文本左右对齐一致（原生日期编辑层单独对齐）
+      '#cc_plan_sign,#cc_plan_factory{background:#fff59d !important;text-align:left !important;}',
+      '#cc_plan_sign::-webkit-datetime-edit,#cc_plan_factory::-webkit-datetime-edit{padding:0;text-align:left;}',
+      '#cc_plan_sign::-webkit-calendar-picker-indicator,#cc_plan_factory::-webkit-calendar-picker-indicator{margin-left:auto;cursor:pointer;}',
     ].join('');
     document.head.appendChild(s);
   }
@@ -63120,7 +63153,8 @@ function submitAuth() {
   function ccPlanHtml(ro){
     var p = ccPlanState(), r = ccPlanCalc();
     var dis = ro ? '' : ' disabled';
-    var inp = 'height:26px;border:1px solid #7aa7d4;border-radius:4px;padding:1px 4px;background:#eaf3fb;font-size:13px;';
+    // ★CC-PLAN-DATEUI-20261108（用户 2026-11-08 要求）：两个日期框等宽 + 文本左对齐 + 淡黄底（与页面其它输入框统一）
+    var inp = 'height:26px;width:150px;box-sizing:border-box;border:1px solid #7aa7d4;border-radius:4px;padding:1px 6px;background:#fff59d;font-size:13px;text-align:left;';
     var facVal = p.factoryEnd || (p.sign ? ccPlanAddDays(p.sign, CC_PLAN_FACTORY_DAYS) : '');
     var tetNote = ccT('planTetAdd');
     var h = '<div class="cc-sec">' + ccT('planTitle') + '</div>';
@@ -63142,6 +63176,8 @@ function submitAuth() {
       + '</tbody></table>';
     h += '<div style="margin:10px 0 4px;font-size:15px;font-weight:800;color:#d32f2f;">'
       + ccT('planProjEnd') + '：<span id="cc_plan_projend">' + ccPlanFmt(r.projEnd) + '</span></div>';
+    // ★CC-GANTT-20261108（用户 2026-11-08 要求）：阶段表下方新增甘特图，从合同签订到项目结束
+    h += ccPlanGanttHtml();
     return h;
   }
   function ccPlanRefresh(){
@@ -63161,6 +63197,9 @@ function submitAuth() {
     set('cc_pl_acc_e', ccPlanFmt(r.accEnd));
     set('cc_pl_acc_n', ccT('planAcceptDays'));
     set('cc_plan_projend', ccPlanFmt(r.projEnd));
+    // ★CC-GANTT-20261108：日期/天数变化后同步重绘甘特图（不动任何计算）
+    var g = document.getElementById('cc_plan_gantt');
+    if(g){ g.innerHTML = ccPlanGanttInner(); setTimeout(ccPlanGanttFit, 0); }
   }
   function ccPlanChange(which, val){
     var p = ccPlanState();
@@ -63178,6 +63217,164 @@ function submitAuth() {
   }
   window.ccPlanChange = ccPlanChange; // 内联 onchange 需要全局
   window.ccPlanRefresh = ccPlanRefresh;
+  /* ==================== ★CC-GANTT-20261108 执行甘特图 ====================
+     用户 2026-11-08 要求：在「项目签约&执行计划」阶段表【下方】增加甘特图，
+     覆盖 合同签订 → 工厂承建&试运行 → 生产 → 安装 → 验收期 → 项目结束。
+     实现：纯 HTML/CSS 绝对定位条（不引入第三方库），数据全部来自 ccPlanCalc()，
+     只做版式呈现，不参与任何成本/工期计算，也不写盘。 */
+  function ccPlanDaysBetween(a, b){
+    if(!ccPlanYmdOk(a) || !ccPlanYmdOk(b)) return 0;
+    var pa = String(a).split('-'), pb = String(b).split('-');
+    var ua = Date.UTC(+pa[0], +pa[1] - 1, +pa[2]), ub = Date.UTC(+pb[0], +pb[1] - 1, +pb[2]);
+    return Math.round((ub - ua) / 86400000);
+  }
+  function ccPlanTodayYmd(){
+    var d = new Date(), m = d.getMonth() + 1, dd = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (dd < 10 ? '0' + dd : dd);
+  }
+  function ccPlanGanttInner(){
+    var p = ccPlanState(), r = ccPlanCalc();
+    var facEnd = p.factoryEnd || (p.sign ? ccPlanAddDays(p.sign, CC_PLAN_FACTORY_DAYS) : '');
+    if(!ccPlanYmdOk(p.sign) && !ccPlanYmdOk(facEnd) && !ccPlanYmdOk(r.prodStart)){
+      return '<div class="cc-note" style="padding:8px 10px;">' + ccT('planGanttNeedSign') + '</div>';
+    }
+    var start = ccPlanYmdOk(p.sign) ? p.sign : (ccPlanYmdOk(facEnd) ? facEnd : r.prodStart);
+    var end = ccPlanYmdOk(r.projEnd) ? r.projEnd : (ccPlanYmdOk(facEnd) ? facEnd : start);
+    if(ccPlanDaysBetween(start, end) < 0) end = start;
+    var total = ccPlanDaysBetween(start, end) + 1;
+    if(total <= 0) total = 1;
+    function posPct(d){ var n = ccPlanDaysBetween(start, d); if(n < 0) n = 0; return n / total * 100; }
+    function geo(a, b){
+      var l = posPct(a), w = (ccPlanDaysBetween(a, b) + 1) / total * 100;
+      if(!(w > 0)) w = 100 / total;
+      if(l > 100) l = 100;
+      if(l + w > 100) w = 100 - l;
+      if(w < 0) w = 0;
+      return { l:l, w:w };
+    }
+    // 事项行（与阶段表一一对应 + 两个里程碑）
+    var rows = [];
+    if(ccPlanYmdOk(p.sign)) rows.push({ kind:'ms', lbl:ccT('planPhContract'), d:p.sign, color:'#d32f2f' });
+    if(ccPlanYmdOk(p.sign) && ccPlanYmdOk(facEnd)) rows.push({ kind:'bar', lbl:ccT('planPhFactory'), s:p.sign, e:facEnd, color:'#7e57c2' });
+    if(ccPlanYmdOk(r.prodStart) && ccPlanYmdOk(r.prodEnd)) rows.push({ kind:'bar', lbl:ccT('planPhProd'), s:r.prodStart, e:r.prodEnd, color:'#1a56b0', days:r.prodDays + r.prodExtra });
+    if(ccPlanYmdOk(r.instStart) && ccPlanYmdOk(r.instEnd)) rows.push({ kind:'bar', lbl:ccT('planPhInst'), s:r.instStart, e:r.instEnd, color:'#00897b', days:r.instDays + r.instExtra });
+    if(ccPlanYmdOk(r.accStart) && ccPlanYmdOk(r.accEnd)) rows.push({ kind:'bar', lbl:ccT('planPhAccept'), s:r.accStart, e:r.accEnd, color:'#f9a825', days:CC_PLAN_ACCEPT });
+    if(ccPlanYmdOk(r.projEnd)) rows.push({ kind:'ms', lbl:ccT('planProjEnd'), d:r.projEnd, color:'#d32f2f' });
+    // 月份刻度（含跨年加粗）
+    var ticks = [], sy = +start.split('-')[0], sm = +start.split('-')[1], ey = +end.split('-')[0], em = +end.split('-')[1];
+    for(var y = sy, m = sm; (y < ey) || (y === ey && m <= em); ){
+      var ym = y + '-' + (m < 10 ? '0' + m : m) + '-01';
+      var pp = posPct(ym);
+      if(pp >= 0) ticks.push({ p:pp, txt:(m < 10 ? '0' + m : m) + '/' + y, jan:(m === 1) });
+      m++; if(m > 12){ m = 1; y++; }
+    }
+    // 春节节点
+    var tets = [];
+    for(var ti = 0; ti < CC_PLAN_TET.length; ti++){
+      var td = CC_PLAN_TET[ti];
+      if(td >= start && td <= end) tets.push(posPct(td));
+    }
+    // 今天
+    var today = ccPlanTodayYmd(), todayP = null;
+    if(today >= start && today <= end) todayP = posPct(today);
+
+    function gridHtml(){
+      var s = '';
+      for(var i = 0; i < ticks.length; i++){
+        if(ticks[i].p <= 0.15) continue;
+        s += '<i class="cc-gantt-gl' + (ticks[i].jan ? ' cc-gantt-year' : '') + '" style="left:' + ticks[i].p.toFixed(3) + '%"></i>';
+      }
+      for(var j = 0; j < tets.length; j++) s += '<i class="cc-gantt-tet" style="left:' + tets[j].toFixed(3) + '%"></i>';
+      if(todayP !== null) s += '<i class="cc-gantt-today" style="left:' + todayP.toFixed(3) + '%"></i>';
+      return s;
+    }
+    var h = '', head = '', lastLbl = -999;
+    for(var t = 0; t < ticks.length; t++){
+      if(ticks[t].p - lastLbl >= 5.5){
+        head += '<span class="cc-gantt-ym" style="left:' + ticks[t].p.toFixed(3) + '%">' + ticks[t].txt + '</span>';
+        lastLbl = ticks[t].p;
+      }
+    }
+    for(var tq = 0; tq < tets.length; tq++){
+      head += '<span class="cc-gantt-tetlbl" style="left:' + tets[tq].toFixed(3) + '%">' + ccT('planTet') + '</span>';
+    }
+    h += '<div class="cc-gantt-head"><div class="cc-gantt-lab"></div><div class="cc-gantt-track">' + gridHtml() + head + '</div></div>';
+    for(var k = 0; k < rows.length; k++){
+      var row = rows[k], cell = gridHtml();
+      if(row.kind === 'ms'){
+        var mp = posPct(row.d);
+        // 菱形边界保护：贴左/贴右时内缩，避免被容器裁掉
+        var msMargin = (mp < 1) ? 'margin-left:0;' : (mp > 99 ? 'margin-left:-13px;' : '');
+        // 日期文字放在菱形空间更大的一侧，避免压住菱形或被右边界截断
+        var msLblPos = (mp > 82)
+          ? 'right:calc(' + (100 - mp).toFixed(3) + '% + 16px);'
+          : 'left:calc(' + mp.toFixed(3) + '% + 16px);';
+        cell += '<i class="cc-gantt-ms" style="left:' + mp.toFixed(3) + '%;background:' + row.color + ';' + msMargin + '"></i>'
+          + '<span class="cc-gantt-mslbl" style="' + msLblPos + '">' + ccPlanFmt(row.d) + '</span>';
+      } else {
+        var gg = geo(row.s, row.e);
+        var dtxt = ((row.days != null) ? row.days : (ccPlanDaysBetween(row.s, row.e) + 1)) + ccT('planDay');
+        var lblTxt = esc(row.lbl) + ' · ' + dtxt;
+        var ttl = ccPlanFmt(row.s) + ' ~ ' + ccPlanFmt(row.e);
+        if(gg.w < 8){
+          // 窄条：文字移到条外侧，避免「验收…」被截断
+          var outPos = (gg.l + gg.w > 88)
+            ? 'right:calc(' + (100 - gg.l).toFixed(3) + '% + 4px);'
+            : 'left:calc(' + (gg.l + gg.w).toFixed(3) + '% + 4px);';
+          cell += '<div class="cc-gantt-bar" title="' + ttl + '" style="left:' + gg.l.toFixed(3) + '%;width:' + gg.w.toFixed(3) + '%;background:' + row.color + ';"></div>'
+            + '<span class="cc-gantt-outlbl" style="' + outPos + '">' + lblTxt + '</span>';
+        } else {
+          cell += '<div class="cc-gantt-bar" title="' + ttl + '" style="left:' + gg.l.toFixed(3) + '%;width:' + gg.w.toFixed(3) + '%;background:' + row.color + ';">'
+            + lblTxt + '</div>';
+        }
+      }
+      h += '<div class="cc-gantt-row"><div class="cc-gantt-lab">' + esc(row.lbl) + '</div><div class="cc-gantt-track">' + cell + '</div></div>';
+    }
+    // 图例
+    var leg = '', seen = {};
+    for(var q = 0; q < rows.length; q++){
+      var rw = rows[q], key = rw.color + '|' + rw.lbl;
+      if(seen[key]) continue; seen[key] = 1;
+      leg += '<span class="cc-gantt-key"><i style="background:' + rw.color + (rw.kind === 'ms' ? ';transform:rotate(45deg);border:1px solid #7f1010;' : '') + '"></i>' + esc(rw.lbl) + '</span>';
+    }
+    if(todayP !== null) leg += '<span class="cc-gantt-key"><i style="background:#fff;border-left:2px dashed #d32f2f;width:6px;"></i>' + esc(ccT('planToday')) + '</span>';
+    if(tets.length) leg += '<span class="cc-gantt-key"><i style="background:#fff;border-left:1px dotted #8e24aa;width:6px;"></i>' + esc(ccT('planTet')) + '</span>';
+    leg += '<span class="cc-gantt-key" style="margin-left:auto;color:#666;">' + ccPlanFmt(start) + ' → ' + ccPlanFmt(end) + '</span>';
+    h += '<div class="cc-gantt-foot">' + leg + '</div>';
+    return h;
+  }
+  function ccPlanGanttHtml(){
+    setTimeout(ccPlanGanttFit, 0); // 插入 DOM 后做一次月份刻度防重叠
+    return '<div class="cc-sub" style="margin-top:14px;">' + esc(ccT('planGanttTitle')) + '</div>'
+      + '<div class="cc-gantt" id="cc_plan_gantt">' + ccPlanGanttInner() + '</div>';
+  }
+  // 月份刻度防重叠：按真实像素宽度隐藏挤在一起的刻度（与地图标签同一思路）
+  function ccPlanGanttFit(){
+    var box = document.getElementById('cc_plan_gantt');
+    if(!box || !box.getBoundingClientRect().width) return;
+    var head = box.querySelector('.cc-gantt-head .cc-gantt-track');
+    if(!head) return;
+    var hw = head.getBoundingClientRect();
+    if(!hw.width) return;
+    var labs = head.querySelectorAll('.cc-gantt-ym');
+    var lastRight = -1e9;
+    for(var i = 0; i < labs.length; i++){
+      var el = labs[i];
+      el.style.display = '';
+      var r = el.getBoundingClientRect();
+      if(r.left - 3 < lastRight || r.right > hw.right - 1){ el.style.display = 'none'; continue; }
+      lastRight = r.right;
+    }
+  }
+  window.ccPlanGanttInner = ccPlanGanttInner;
+  window.ccPlanGanttFit = ccPlanGanttFit;
+  if(!window.__ccGanttFitBound){
+    window.__ccGanttFitBound = true;
+    window.addEventListener('resize', function(){
+      clearTimeout(window.__ccGanttFitT);
+      window.__ccGanttFitT = setTimeout(ccPlanGanttFit, 200);
+    });
+  }
   function ccPathSet(path, val){
     var parts = path.split('.'), o = CC_DATA;
     for(var i = 0; i < parts.length - 1; i++){ o = o[parts[i]]; }
