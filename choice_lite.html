@@ -5439,6 +5439,9 @@ var WL_FLOW_IMG = {
       .prod-eq-summary-wrap{margin:10px 0 14px;}
       .prod-eq-summary-head{font-size:13px;font-weight:700;color:#263238;margin:14px 0 6px;}
       .prod-eq-summary{background:#fff8f3;border:1px solid #f6d9c6;border-left:4px solid #E53935;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.7;color:#37474f;}
+      /* ★EQ-SUMMARY-RED-20261108（用户 2026-11-08）：「故障统计摘要」标题与正文文字全部红色加粗 */
+      .prod-eq-summary-head{color:#E53935 !important;font-weight:700 !important;}
+      .prod-eq-summary{color:#E53935 !important;font-weight:700 !important;}
       .prod-tab-body{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;}
       .prod-form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px;}
       /* 工厂概况等需要所有字段强制在同一行的场景：禁止换行，横向滚动 */
@@ -6288,6 +6291,19 @@ var WL_FLOW_IMG = {
       .prod-equip-fault .eq-line-3{color:#2e7d32;font-weight:600;}
       .prod-equip-fault .eq-line-4{color:#1565c0;font-weight:600;}
       .prod-equip-fault tbody tr.prod-equip-fault-editing > td{background:#ffeb3b !important;box-shadow:inset 0 0 0 2px #f59e0b;transition:background .25s;}
+      /* ★EQ-FAULT-XH-20261108（用户 2026-11-08）：
+         ① 设备故障报备表头 → 红底 + 白色加粗文字；
+         ② 设备配置清单 / 设备故障报备 主体 → 鼠标悬停「十字高亮」（整行 + 整列，淡黄），
+            与生产E页历史产出表同一套观感。正在编辑的那一行保持原来的黄底（.prod-equip-fault-editing），
+            所以高亮规则要排除它，避免互相盖掉。 */
+      .prod-equip-fault thead th{background:linear-gradient(180deg,#E53935,#C62828) !important;color:#fff !important;border-color:#B71C1C !important;font-weight:700 !important;}
+      .prod-equip-fault thead th .sort-ind{color:#fff !important;opacity:.9;}
+      .prod-table.prod-equip-table tbody td.xh-row,
+      .prod-table.prod-equip-table tbody td.xh-col,
+      .prod-equip-fault tbody tr:not(.prod-equip-fault-editing) td.xh-row,
+      .prod-equip-fault tbody tr:not(.prod-equip-fault-editing) td.xh-col{background:#fff6c2 !important;}
+      .prod-table.prod-equip-table tbody td.xh-row.xh-col,
+      .prod-equip-fault tbody tr:not(.prod-equip-fault-editing) td.xh-row.xh-col{background:#ffec96 !important;}
       .prod-equip-fault .prod-equip-wx{font-size:10px;white-space:nowrap;}
       .prod-equip-fault .prod-wx-none{color:#bbb;}
       .prod-eq-note-btn{font-size:10px;padding:2px 4px;border:1px solid #2196F3;border-radius:4px;background:#fff;color:#2196F3;cursor:pointer;width:100%;box-sizing:border-box;white-space:normal;line-height:1.2;}
@@ -13387,9 +13403,11 @@ var WL_FLOW_IMG = {
       _PE_XH.table=null; _PE_XH.col=-1; _PE_XH.row=null;
     }
     function prod_xhApply(td){
-      /* ★PE-STATS-XH-20261108：生产统计表复用同一套十字高亮 */
-      var t = (td.closest ? td.closest('table.pe-hist, table.pe-estats') : null); if(!t) return;
+      /* ★PE-STATS-XH-20261108：生产统计表复用同一套十字高亮
+         ★EQ-FAULT-XH-20261108：生产F页「设备配置清单」「设备故障报备」也复用同一套 */
+      var t = (td.closest ? td.closest('table.pe-hist, table.pe-estats, table.prod-equip-table, table.prod-equip-fault') : null); if(!t) return;
       var tr = td.parentNode; if(!tr || tr.tagName!=='TR') return;
+      if(tr.classList && tr.classList.contains('prod-equip-secrow')) return;   /* 工段分隔行不参与十字高亮 */
       var idx = td.cellIndex;
       if(_PE_XH.table===t && _PE_XH.col===idx && _PE_XH.row===tr) return;
       prod_xhClear();
@@ -13401,7 +13419,7 @@ var WL_FLOW_IMG = {
     }
     try{
       document.addEventListener('mouseover', function(e){
-        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td, table.pe-estats tbody td'):null;
+        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td, table.pe-estats tbody td, table.prod-equip-table tbody td, table.prod-equip-fault tbody td'):null;
         if(td) prod_xhApply(td); else prod_xhClear();
       }, true);
       document.addEventListener('scroll', function(){ prod_xhClear(); }, true);
