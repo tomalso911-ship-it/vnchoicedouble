@@ -56786,29 +56786,48 @@ function bdLoadScript(src) {
     document.head.appendChild(s);
   });
 }
+/* ★BD-MAP-READY-20261108（用户报「刷新后仍偶发画出怪地图」的根治）：
+   旧实现把 __vn34Ready 在「34 省边界到手」时就置真，白色外轮廓还没到就允许渲染；
+   而标签外置布局完全依赖外轮廓（borderXatY），外轮廓为空时所有标签会挤到中线，
+   同时省界层按 regions 上色也可能因数据未定型而不上色 → 就是那张"怪地图"。
+   现在：就绪 = echarts + vn34 + vnOutline 三者齐备；共用一个 Promise，失败清缓存可重试。 */
 function boardEnsureEcharts() {
   if (window.echarts && window.__vn34Ready) return Promise.resolve();
-  var seq = window.echarts ? Promise.resolve()
-    : bdLoadScript('/vendor/echarts.min.js')
-        .catch(function(){ return bdLoadScript('https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js'); });
-  return seq.then(function() {
-    if (window.echarts && window.__vn34Ready) return;
-    // 34 省市边界（由 63 省真实边界按 2025 合并规则归组生成）
-    return fetch('/vendor/vn34.geo.json', { credentials:'include' })
-      .then(function(r){ return r.json(); })
-      .then(function(geo){
-        window.echarts.registerMap('vn34', geo);
-        window.__vn34Features = geo.features || [];
-        window.__vn34Ready = true;
-        // 全国+岛屿白色外轮廓（可选层，失败不影响主图）
-        return fetch('/vendor/vn_outline.geo.json', { credentials:'include' })
-          .then(function(r){ return r.json(); })
-          .then(function(o){ window.echarts.registerMap('vnOutline', o); window.__vnOutlineFeatures = o.features || []; })
-          .catch(function(){});
+  if (window.__bdMapReadyP) return window.__bdMapReadyP;
+
+  function loadLib() {
+    if (window.echarts) return Promise.resolve();
+    return bdLoadScript('/vendor/echarts.min.js')
+      .catch(function(){ return bdLoadScript('https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js'); });
+  }
+  function getJson(url, retry) {
+    return fetch(url, { credentials:'include', cache:'no-store' }).then(function(r){
+      if (!r.ok) throw new Error('http ' + r.status + ' ' + url);
+      return r.json();
+    }).catch(function(e){
+      if (retry > 0) return new Promise(function(res, rej){
+        setTimeout(function(){ getJson(url, retry - 1).then(res, rej); }, 500);
       });
-  }).then(function() {
-    if (!(window.echarts && window.__vn34Ready)) throw new Error('vn34 map not ready');
-  });
+      throw e;
+    });
+  }
+
+  window.__bdMapReadyP = loadLib()
+    .then(function(){ return getJson('/vendor/vn34.geo.json', 1); })   // 34 省市边界（63 省按 2025 合并规则归组）
+    .then(function(geo){
+      window.echarts.registerMap('vn34', geo);
+      window.__vn34Features = geo.features || [];
+      return getJson('/vendor/vn_outline.geo.json', 1).catch(function(){ return null; });
+    })
+    .then(function(o){
+      if (o) { window.echarts.registerMap('vnOutline', o); window.__vnOutlineFeatures = o.features || []; }
+      if (!window.echarts
+          || !(window.__vn34Features || []).length
+          || !(window.__vnOutlineFeatures || []).length) throw new Error('map data not ready');
+      window.__vn34Ready = true;
+    })
+    .catch(function(e){ window.__bdMapReadyP = null; throw e; });   // 失败清缓存：下次还能重试
+  return window.__bdMapReadyP;
 }
 // 把 GeoJSON 区域名（无音调英文/旧省名）解析成 34 省标准省对象
 function bdResolveRegion(name) {
@@ -56849,6 +56868,13 @@ function bdNearestBorder(cp, feats) {
   return [best.x, best.y];
 }
 function boardRenderMapEcharts(body, agg) {
+  // ★BD-MAP-READY-20261108：半就绪（缺外轮廓/缺省界）绝不画，宁可抛错让外层重试，
+  //   否则会得到「标签挤在中间、省份不上色」的怪图。
+  var feats0 = window.__vn34Features || [];
+  var outline0 = window.__vnOutlineFeatures || [];
+  if (!feats0.length || !outline0.length) throw new Error('map data not ready');
+  if (!body || !body.clientWidth || !body.clientHeight) throw new Error('map body not visible');
+
   body.innerHTML = '<div style="width:100%;height:100%;min-height:320px;"></div>';
   var el = body.firstChild;
   var chart = window.__bdMapChart;
@@ -56856,7 +56882,7 @@ function boardRenderMapEcharts(body, agg) {
   chart = window.__bdMapChart = window.echarts.init(el);
 
   // 用 34 省边界自带的 cp（与地图同一坐标空间）定位项目点
-  var feats = window.__vn34Features || [];
+  var feats = feats0;
   var cpMap = {};
   feats.forEach(function(f){ if (f.properties) cpMap[f.properties.name] = f.properties.cp; });
 
@@ -56889,7 +56915,7 @@ function boardRenderMapEcharts(body, agg) {
   var boundingCoords = [[bounds.minLng - lngPad, bounds.maxLat + 1], [bounds.maxLng + lngPad, bounds.minLat - 1]];
   var cx = (bounds.minLng + bounds.maxLng) / 2;
   var cy = (bounds.minLat + bounds.maxLat) / 2;
-  var outlineFeats = window.__vnOutlineFeatures || [];
+  var outlineFeats = outline0;
 
   // 投影坐标单位下：D = 白线→虚拟框 间距(≈11px)；T = 内陆阈值(≈7px)；radialOut = 内陆省额外外推
   var D = 900, T = 180, radialOut = 80;
@@ -57132,49 +57158,109 @@ function boardRenderMapEcharts(body, agg) {
     });
   }
 }
-function boardRenderMap(body, agg) {
-  if (window.echarts && window.__vn34Ready) {
-    try { boardRenderMapEcharts(body, agg); return; } catch(e) {}
+/* ★BD-MAP-READY-20261108：地图只有一个「完全就绪」入口，且同一时刻只允许最后一次请求生效。
+   - 半就绪（缺外轮廓/缺省界）绝不画 → 抛错后重试 3 次（350ms/700ms/1050ms）
+   - 面板已被重渲染（body 脱离文档）就放弃，避免把图打到废弃节点上
+   - 三次都失败才走静态 SVG 兜底（不再用已经失效的 window.VN_* / vnProject 旧数据） */
+function bdMapAlive(body){
+  return !!(body && body.isConnected && document.getElementById('bdMapBody') === body);
+}
+function boardRenderMap(body, agg, _try) {
+  _try = _try || 0;
+  window.__bdMapSeq = (window.__bdMapSeq || 0) + 1;
+  var seq = window.__bdMapSeq;
+  function again(delay){
+    if (_try >= 3) { boardRenderMapSvg(body, agg); return; }
+    setTimeout(function(){ boardRenderMap(body, agg, _try + 1); }, delay);
   }
   boardEnsureEcharts().then(function() {
-    if (!document.getElementById('bdMapBody')) return;   // 面板已被重渲染则放弃
-    try { boardRenderMapEcharts(body, agg); } catch(e) { boardRenderMapSvg(body, agg); }
-  }).catch(function() { boardRenderMapSvg(body, agg); });
-}
-function boardRenderMapSvg(body, agg) {
-  var W=1000, H=620, max=0;
-  for (var k in agg) if (agg[k]>max) max=agg[k];
-  var svg='<svg viewBox="0 0 '+W+' '+H+'" class="bd-map-svg" preserveAspectRatio="xMidYMid meet">';
-  svg+='<defs><radialGradient id="bdGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#39e6ff" stop-opacity="0.95"/><stop offset="100%" stop-color="#39e6ff" stop-opacity="0"/></radialGradient></defs>';
-  svg+='<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#2e343b"/>';
-  // 越南白色国界轮廓（近似） + 重点城市标注
-  var pts = (window.VN_OUTLINE || []).map(function(pt){ var q = window.vnProject(pt[1], pt[0]); return q.x.toFixed(1)+','+q.y.toFixed(1); });
-  if (pts.length) svg += '<polygon points="'+pts.join(' ')+'" fill="rgba(232,239,242,0.05)" stroke="#e8ecef" stroke-width="2" stroke-linejoin="round" opacity="0.9"/>';
-  (window.VN_CITIES || []).forEach(function(c){
-    var q = window.vnProject(c.lat, c.lng);
-    svg += '<circle cx="'+q.x+'" cy="'+q.y+'" r="2.5" fill="#ffffff"/>';
-    svg += '<text x="'+(q.x+7).toFixed(1)+'" y="'+(q.y+4).toFixed(1)+'" fill="#aab4c0" font-size="12">'+bdName3(c)+'</text>';
-    svg += '<circle cx="'+q.x+'" cy="'+q.y+'" r="14" fill="transparent" style="cursor:pointer"><title>'+escBd(bdName3(c))+'</title></circle>';
+    if (seq !== window.__bdMapSeq) return;      // 已有更新的渲染请求，放弃本次
+    if (!bdMapAlive(body)) return;              // 面板已被重渲染
+    try { boardRenderMapEcharts(body, agg); }
+    catch(e){ console.warn('[bdMap] render retry', _try, String(e && e.message || e)); again(350); }
+  }).catch(function(e) {
+    if (seq !== window.__bdMapSeq) return;
+    if (!bdMapAlive(body)) return;
+    console.warn('[bdMap] not ready', _try, String(e && e.message || e));
+    again(600);
   });
-  var provList = boardProvinceList();
-  (provList.length ? provList : (window.VN_PROVINCES||[])).forEach(function(pr, i){
-    var pt = window.vnProject(pr.lat, pr.lng);
-    var n = agg[pr.vi]||0;
-    // 透明热区：鼠标扫过任意省份都显示三语名称（有项目则附带项目数）
-    svg += '<circle cx="'+pt.x+'" cy="'+pt.y+'" r="16" fill="transparent" style="cursor:pointer"><title>'+escBd(bdName3(pr))+(n ? (' · '+n) : '')+'</title></circle>';
-    if (n>0) {
-      var r = 10 + (max ? (n/max)*24 : 0);
-      var delay = (i*0.35).toFixed(2);
-      svg+='<circle class="bd-glow" cx="'+pt.x+'" cy="'+pt.y+'" r="'+r.toFixed(1)+'" style="animation-delay:'+delay+'s"><title>'+escBd(bdName3(pr))+' · '+n+'</title></circle>';
-      svg+='<circle cx="'+pt.x+'" cy="'+pt.y+'" r="3" fill="#d9f6ff"/>';
-      var anchor = pt.x>W-170?'end':'start';
-      var lx = pt.x + (pt.x>W-170 ? -(r+6) : (r+6));
-      svg+='<text x="'+lx.toFixed(1)+'" y="'+(pt.y-(r+5)).toFixed(1)+'" fill="#eceff2" font-size="13" text-anchor="'+anchor+'">'+bdName3(pr)+' '+n+'</text>';
-    } else {
-      svg+='<circle cx="'+pt.x+'" cy="'+pt.y+'" r="2.5" fill="#5a626c"/>';
+}
+/* ★BD-MAP-READY-20261108：旧兜底依赖 window.VN_OUTLINE / VN_CITIES / VN_PROVINCES /
+   window.vnProject / boardProvinceList —— 这些全局量在当前版本里【全部不存在】，
+   一进函数就在 boardProvinceList() 抛 ReferenceError，等于兜底从来没生效过。
+   现改为直接拿已下载的 vn34 geoJSON（预投影平面坐标）画静态 SVG，永远画得出来。 */
+function boardRenderMapSvg(body, agg) {
+  if (!body) return;
+  var feats = window.__vn34Features || [];
+  var T = function(zh, en, vi){ return bdLgT(zh, en, vi); };
+  if (!feats.length) {
+    body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:280px;color:#8aa7c4;font-size:12px;">'
+      + T('地图数据加载失败，请刷新页面', 'Map data failed to load, please refresh', 'Tải bản đồ thất bại, vui lòng tải lại')
+      + '</div>';
+    return;
+  }
+  var W = 1000, H = 620, PAD = 26, k = 1, ox = 0, oy = 0;
+  var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  function eachRing(fn){
+    feats.forEach(function(f){
+      var g = f.geometry; if (!g) return;
+      var polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : []);
+      polys.forEach(function(poly){ (poly || []).forEach(function(ring){ if (ring && ring.length) fn(ring); }); });
+    });
+  }
+  eachRing(function(ring){
+    for (var i = 0; i < ring.length; i++){
+      var pt = ring[i];
+      if (pt[0] < minX) minX = pt[0]; if (pt[0] > maxX) maxX = pt[0];
+      if (pt[1] < minY) minY = pt[1]; if (pt[1] > maxY) maxY = pt[1];
     }
   });
-  svg+='</svg>';
+  if (!isFinite(minX) || !isFinite(minY)) { body.innerHTML = ''; return; }
+  k = Math.min((W - PAD*2) / Math.max(1, maxX - minX), (H - PAD*2) / Math.max(1, maxY - minY));
+  ox = (W - (maxX - minX) * k) / 2;
+  oy = (H - (maxY - minY) * k) / 2;
+  function px(x){ return ox + (x - minX) * k; }
+  function py(y){ return oy + (maxY - y) * k; }
+
+  var max = 0; for (var kk in agg) if (agg[kk] > max) max = agg[kk];
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="bd-map-svg" preserveAspectRatio="xMidYMid meet"'
+          + ' style="width:100%;height:100%;display:block">';
+  svg += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#2e343b"/>';
+  feats.forEach(function(f){
+    var nm = (f.properties && f.properties.name) || '';
+    var pr = (typeof vnProvinceByKey === 'function') ? vnProvinceByKey(nm) : null;
+    var cnt = pr ? (agg[pr.vi] || 0) : 0;
+    var g = f.geometry; if (!g) return;
+    var polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : []);
+    var d = '';
+    polys.forEach(function(poly){
+      (poly || []).forEach(function(ring){
+        if (!ring || !ring.length) return;
+        d += 'M' + ring.map(function(pt){ return px(pt[0]).toFixed(1) + ' ' + py(pt[1]).toFixed(1); }).join('L') + 'Z';
+      });
+    });
+    if (!d) return;
+    svg += '<path d="' + d + '" fill="' + (cnt ? '#3d6b86' : '#39424e') + '" stroke="#8fa3b5" stroke-width="0.7" stroke-linejoin="round">'
+         + '<title>' + (pr ? escBd(bdName3(pr)) : escBd(nm)) + (cnt ? ' · ' + cnt : '') + '</title></path>';
+  });
+  var cpByName = {};
+  feats.forEach(function(f){ if (f.properties) cpByName[f.properties.name] = f.properties.cp; });
+  Object.keys(agg || {}).forEach(function(vi){
+    var pr = (typeof vnProvinceByKey === 'function') ? vnProvinceByKey(vi) : null;
+    if (!pr || !(agg[vi] > 0)) return;
+    var cp = cpByName[pr.vi];
+    if (!cp) return;
+    var x = px(cp[0]), y = py(cp[1]);
+    var r = 9 + (max ? (agg[vi] / max) * 16 : 0);
+    svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r.toFixed(1) + '"'
+         + ' fill="rgba(57,230,255,.30)" stroke="#39e6ff" stroke-width="1.2"><title>'
+         + escBd(bdName3(pr)) + ' · ' + agg[vi] + '</title></circle>';
+    var right = x < W - 180;
+    svg += '<text x="' + (right ? (x + r + 5) : (x - r - 5)).toFixed(1) + '" y="' + (y + 4).toFixed(1)
+         + '" fill="#eaf7ff" font-size="11" font-weight="bold" text-anchor="' + (right ? 'start' : 'end') + '">'
+         + escBd(bdName3(pr)) + ' ' + agg[vi] + '</text>';
+  });
+  svg += '</svg>';
   body.innerHTML = svg;
 }
 
