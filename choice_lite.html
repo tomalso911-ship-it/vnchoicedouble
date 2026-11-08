@@ -62229,6 +62229,48 @@ function submitAuth() {
     planToday:      { zh:'今天', en:'Today', vi:'Hôm nay' },
     planTet:        { zh:'春节', en:'TET', vi:'TET' },
     planGanttNeedSign:{ zh:'填写「合同签约日期」后自动生成甘特图。', en:'Enter the contract signing date to generate the Gantt chart.', vi:'Nhập ngày ký hợp đồng để tạo biểu đồ Gantt.' },
+    // ★CC-CASH-20261108（用户 2026-11-08 要求）：现金流测算（月度回款/支出/资金缺口）三语
+    cfTitle:     { zh:'现金流测算', en:'Cash flow projection', vi:'Dự báo dòng tiền' },
+    cfSub:       { zh:'月度回款与支出规划（定金 / 生产款 / 安装款 → 建厂 / 原材料 / 人工 / 运营 / 间接）', en:'Monthly receipts & payments (deposit / production / installation → plant / materials / labor / opex / indirect)', vi:'Kế hoạch thu chi theo tháng (đặt cọc / sản xuất / lắp đặt → nhà máy / nguyên liệu / nhân công / vận hành / gián tiếp)' },
+    cfSign:      { zh:'合同签订日期', en:'Contract signing date', vi:'Ngày ký hợp đồng' },
+    cfSignMap:   { zh:'（同上，此处仅映射「项目签约&执行计划」的日期）', en:'(same as above, mirrored from the signing & execution plan)', vi:'(như trên, lấy theo kế hoạch ký & thực hiện)' },
+    cfDepDate:   { zh:'预计定金支付日期', en:'Expected deposit payment date', vi:'Ngày dự kiến thanh toán đặt cọc' },
+    cfDepHint:   { zh:'（默认 = 签约日 + 10 个工作日，可修改）', en:'(default = signing date + 10 working days, editable)', vi:'(mặc định = ngày ký + 10 ngày làm việc, có thể sửa)' },
+    cfDepPct:    { zh:'定金支付比例', en:'Deposit ratio', vi:'Tỷ lệ đặt cọc' },
+    cfProdPct:   { zh:'生产量价格支付比例', en:'Production value payment ratio', vi:'Tỷ lệ thanh toán giá trị sản xuất' },
+    cfInstPct:   { zh:'安装量价格支付比例', en:'Installation value payment ratio', vi:'Tỷ lệ thanh toán giá trị lắp đặt' },
+    cfInstHint:  { zh:'（安装款在验收后 10 个工作日内一次性到账）', en:'(installation payment received in one lump within 10 working days after acceptance)', vi:'(thanh toán lắp đặt nhận một lần trong 10 ngày làm việc sau nghiệm thu)' },
+    cfWorkday:   { zh:'个工作日', en:'working days', vi:'ngày làm việc' },
+    cfUnitVnd:   { zh:'单位：VND', en:'Unit: VND', vi:'Đơn vị: VND' },
+    cfKpiContract:{ zh:'合同总额（含税）', en:'Contract value (incl. VAT)', vi:'Tổng giá trị hợp đồng (gồm VAT)' },
+    cfInDep:     { zh:'定金', en:'Deposit', vi:'Đặt cọc' },
+    cfInProd:    { zh:'生产款', en:'Production', vi:'Sản xuất' },
+    cfInInst:    { zh:'安装款', en:'Installation', vi:'Lắp đặt' },
+    cfKpiIn:     { zh:'回款合计', en:'Total receipts', vi:'Tổng thu' },
+    cfKpiOut:    { zh:'现金支出合计', en:'Total payments', vi:'Tổng chi' },
+    cfKpiNet:    { zh:'项目净现金流', en:'Net cash flow', vi:'Dòng tiền ròng' },
+    cfKpiPeak:   { zh:'最大资金需求（垫资峰值）', en:'Peak funding requirement', vi:'Nhu cầu vốn đỉnh (ứng trước)' },
+    cfKpiPos:    { zh:'累计现金流转正月份', en:'Cumulative break-even month', vi:'Tháng dòng tiền lũy kế dương' },
+    cfMonth:     { zh:'月份', en:'Month', vi:'Tháng' },
+    cfQty:       { zh:'生产进度', en:'Production progress', vi:'Tiến độ sản xuất' },
+    cfPcs:       { zh:'片数', en:'Pcs', vi:'Tấm' },
+    cfM2:        { zh:'㎡', en:'㎡', vi:'㎡' },
+    cfProdVal:   { zh:'生产产值', en:'Production value', vi:'Giá trị sản xuất' },
+    cfInflow:    { zh:'回款（收入）', en:'Receipts (income)', vi:'Thu tiền' },
+    cfOutflow:   { zh:'支出（成本 / 费用）', en:'Payments (cost / expense)', vi:'Chi tiền (chi phí)' },
+    cfCapex:     { zh:'建厂投入', en:'Plant investment', vi:'Đầu tư nhà máy' },
+    cfMat:       { zh:'原材料', en:'Materials', vi:'Nguyên liệu' },
+    cfLabor:     { zh:'人工', en:'Labor', vi:'Nhân công' },
+    cfOpex:      { zh:'运营费用', en:'Operating cost', vi:'Chi phí vận hành' },
+    cfInd:       { zh:'间接费用', en:'Indirect cost', vi:'Chi phí gián tiếp' },
+    cfMgmt:      { zh:'管理费', en:'Overhead', vi:'Phí quản lý' },
+    cfInSum:     { zh:'回款合计', en:'Receipt total', vi:'Tổng thu' },
+    cfOutSum:    { zh:'支出合计', en:'Payment total', vi:'Tổng chi' },
+    cfNetRow:    { zh:'当月净现金流', en:'Net cash flow', vi:'Dòng tiền ròng tháng' },
+    cfCumRow:    { zh:'累计现金流', en:'Cumulative cash', vi:'Dòng tiền lũy kế' },
+    cfTotalRow:  { zh:'合计', en:'Total', vi:'Tổng' },
+    cfNote:      { zh:'测算口径：定金按比例在定金日入账；生产款 = 当月生产片数×合同单价×比例，当月入账；安装款 = 各月安装片数×合同单价×比例累计，验收后第 10 个工作日一次性入账。建厂投入（机械/车辆/工具全额）按签约日→工厂承建结束日均摊；原材料按生产进度分摊；人工按各月生产/安装天数计；运营费用取「费用/月×发生周期」；间接费用计入签约月。工作日口径 = 周一至周五且剔除 TET 春节当日。', en:'Basis: deposit booked on the deposit date; production payment = month pieces × contract unit price × ratio, same month; installation payment = Σ(month pieces × unit price × ratio), received in one lump on the 10th working day after acceptance. Plant investment (full machinery/vehicle/tool cost) spread from signing to factory completion; materials follow production progress; labor by production/installation days per month; operating cost = monthly fee × period; indirect cost booked in the signing month. Working day = Mon–Fri excluding the TET date.', vi:'Cơ sở: đặt cọc ghi nhận đúng ngày; thanh toán sản xuất = số tấm trong tháng × đơn giá hợp đồng × tỷ lệ, ghi nhận trong tháng; thanh toán lắp đặt = Σ(số tấm lắp đặt × đơn giá × tỷ lệ), nhận một lần vào ngày làm việc thứ 10 sau nghiệm thu. Đầu tư nhà máy (toàn bộ máy móc/xe/dụng cụ) phân bổ từ ngày ký đến ngày hoàn thành nhà máy; nguyên liệu theo tiến độ sản xuất; nhân công theo số ngày sản xuất/lắp đặt từng tháng; chi phí vận hành = phí/tháng × kỳ; chi phí gián tiếp ghi nhận tháng ký. Ngày làm việc = thứ 2–thứ 6, trừ ngày TET.' },
+    cfNeedSign:  { zh:'填写「合同签约日期」后自动生成月度现金流测算。', en:'Enter the contract signing date to generate the monthly cash flow projection.', vi:'Nhập ngày ký hợp đồng để tạo dự báo dòng tiền theo tháng.' },
     machNote:    { zh:'注：机械类为一次性投入，全额计入本单总成本。', en:'Note: machinery is a one-time investment, fully counted in total cost.', vi:'Lưu ý: máy móc là đầu tư một lần, tính toàn bộ vào tổng chi phí.' },
     laborNote:   { zh:'注：人工按「项目天数」（生产/安装分别计算）、运营费用按 ROUNDUP((生产项目天数+30)/30, 1) 个月自动乘算。', en:'Note: labor uses project days (production / installation separately); opex uses ROUNDUP((production days + 30)/30, 1) months.', vi:'Lưu ý: nhân công tính theo số ngày dự án (sản xuất / lắp đặt riêng); vận hành nhân theo ROUNDUP((số ngày sản xuất + 30)/30, 1) tháng.' },
     // ★CC-MACH-PRESET-20261105：1.1 生产机械 & 设备 / 1.2 工程车辆 / 1.3 工具 & 耗材 预设行名称（专业术语三语）
@@ -62335,7 +62377,9 @@ function submitAuth() {
       // ★CC-PROVIDE-20261105：行路径 → Choice VN 是否提供；空对象=全部默认 √（兼容旧存档）
       provide:{},
       // ★CC-DEPR-20261105：设备折旧块状态；years=折旧年限(年,默认2,可编辑)；periodMonths 已弃用(20261105 周期改只读，恒=运营费用发生周期)
-      depr:{ years:2, periodMonths:0 }
+      depr:{ years:2, periodMonths:0 },
+      // ★CC-CASH-20261108：现金流测算参数（定金日/定金比例/生产款比例/安装款比例）
+      cash:{ depositDate:'', depositPct:20, prodPct:40, instPct:40 }
     };
   }
   function ccMerge(saved){
@@ -62343,7 +62387,8 @@ function submitAuth() {
     if(!saved || typeof saved !== 'object') return base;
     try{
       // ★CC-PLAN-20261108：'plan' 必须在此白名单里，否则服务端读回的 签约/工厂结束日期 会被丢弃
-      ['demand','mach','agg','labor','opex','ind','provide','plan'].forEach(function(k){
+      // ★CC-CASH-20261108：'cash' 同理（定金日/比例），否则重载后回落到默认值
+      ['demand','mach','agg','labor','opex','ind','provide','plan','cash'].forEach(function(k){
         if(saved[k] && typeof saved[k] === 'object') base[k] = Object.assign({}, base[k], saved[k]);
       });
       // ★CC-AGG-AUTO-20261105：旧存档单价为 0/缺失时补收货单参考价；用户已填的非 0 价格原样保留
@@ -62621,6 +62666,27 @@ function submitAuth() {
       '.cc-gantt-foot{display:flex;flex-wrap:wrap;gap:6px 16px;padding:5px 8px;border-top:1px solid #000;background:#fffdf0;font-size:11px;color:#444;}',
       '.cc-gantt-key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}',
       '.cc-gantt-key i{display:inline-block;width:14px;height:9px;border-radius:2px;}',
+      // ★CC-CASH-20261108：现金流测算表（17 列，横向滚动；金额右对齐等宽数字）
+      '.cc-cf-wrap{overflow-x:auto;border:1px solid #000;background:#fff;}',
+      '.cc-cf{width:100%;min-width:1340px;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums;}',
+      '.cc-cf th{background:#ffff00;border:1px solid #000;padding:3px 4px;font-weight:700;text-align:center;white-space:nowrap;font-size:11px;}',
+      '.cc-cf td{border:1px solid #c9ced6;padding:2px 5px;white-space:nowrap;text-align:right;}',
+      '.cc-cf tbody tr:nth-child(even) td{background:#eaf3fb;}',
+      '.cc-cf td.cc-cf-m{text-align:center;font-weight:700;color:#1a3c6e;}',
+      '.cc-cf tfoot td{background:#f2f4f7;font-weight:800;border-top:2px solid #d32f2f;}',
+      '.cc-cf .cc-cf-in{color:#1565c0;}',
+      '.cc-cf .cc-cf-out{color:#b26a00;}',
+      '.cc-cf .cc-cf-neg{color:#d32f2f;font-weight:800;}',
+      '.cc-cf .cc-cf-pos{color:#2e7d32;font-weight:800;}',
+      '.cc-cf-kpi{display:flex;flex-wrap:wrap;gap:8px 10px;margin:8px 0 4px;}',
+      '.cc-cf-kpi div{flex:0 1 auto;min-width:148px;border:1px solid #c9ced6;border-radius:5px;padding:4px 8px;background:#fbfdff;font-size:11px;color:#555;}',
+      '.cc-cf-kpi b{display:block;font-size:14px;font-weight:800;color:#1a3c6e;margin-top:2px;}',
+      '.cc-cf-kpi .cc-cf-in b{color:#1565c0;}',
+      '.cc-cf-kpi .cc-cf-neg b{color:#d32f2f;}',
+      '.cc-cf-kpi .cc-cf-pos b{color:#2e7d32;}',
+      '.cc-cf-note{font-size:11px;color:#777;line-height:1.6;margin:5px 0 0;}',
+      '#cc_cash_dep,#cc_cash_dep_pct,#cc_cash_prod_pct,#cc_cash_inst_pct{background:#fff59d !important;}',
+      '#cc_cash_dep::-webkit-datetime-edit{padding:0;text-align:left;}',
       // ★CC-PLAN-DATEUI-20261108：签约/工厂两个日期框——淡黄底、等宽、文本左右对齐一致（原生日期编辑层单独对齐）
       '#cc_plan_sign,#cc_plan_factory{background:#fff59d !important;text-align:left !important;}',
       '#cc_plan_sign::-webkit-datetime-edit,#cc_plan_factory::-webkit-datetime-edit{padding:0;text-align:left;}',
@@ -63182,6 +63248,8 @@ function submitAuth() {
       + ccT('planProjEnd') + '：<span id="cc_plan_projend">' + ccPlanFmt(r.projEnd) + '</span></div>';
     // ★CC-GANTT-20261108（用户 2026-11-08 要求）：阶段表下方新增甘特图，从合同签订到项目结束
     h += ccPlanGanttHtml();
+    // ★CC-CASH-20261108（用户 2026-11-08 要求）：甘特图下方新增「现金流测算」
+    h += ccCashHtml(ro);
     return h;
   }
   function ccPlanRefresh(){
@@ -63204,6 +63272,8 @@ function submitAuth() {
     // ★CC-GANTT-20261108：日期/天数变化后同步重绘甘特图（不动任何计算）
     var g = document.getElementById('cc_plan_gantt');
     if(g){ g.innerHTML = ccPlanGanttInner(); setTimeout(ccPlanGanttFit, 0); }
+    // ★CC-CASH-20261108：成本/天数变化后同步刷新现金流测算（只重算显示，不改任何数据）
+    if(typeof ccCashRefresh === 'function') ccCashRefresh();
   }
   function ccPlanChange(which, val){
     var p = ccPlanState();
@@ -63383,6 +63453,293 @@ function submitAuth() {
   }
   window.ccPlanGanttInner = ccPlanGanttInner;
   window.ccPlanGanttFit = ccPlanGanttFit;
+  /* ==================== ★CC-CASH-20261108 现金流测算 ====================
+     用户 2026-11-08 要求：甘特图下方增加「现金流测算」（三语小标题 + 越详细越好）。
+     · 合同签订日期只做映射（来源 =「项目签约&执行计划」的签约日期）
+     · 定金日默认 = 签约日 + 10 个工作日（可改，带日历选择器）；定金比例默认 20%（可改）
+     · 生产款 = 该月生产片数×合同单价×比例（默认 40%，支持两位小数，可改），当月入账
+     · 安装款 = 各月安装片数×合同单价×比例累计，验收后第 10 个工作日一次性入账
+     · 支出侧：建厂投入(机械/车辆/工具全额) + 原材料 + 人工 + 运营费用 + 间接费用 + 管理费
+     纯测算，不改动任何成本数据；参数存 CC_DATA.cash（随 ccScheduleSave 落盘 prod_kv/cost_calc_v1）。 */
+  function ccAddWorkDays(ymd, n){
+    if(!ccPlanYmdOk(ymd)) return '';
+    var d = String(ymd), added = 0, guard = 0;
+    while(added < (Number(n) || 0) && guard++ < 400){
+      d = ccPlanAddDays(d, 1);
+      if(!ccPlanYmdOk(d)) break;
+      var dt = new Date(d + 'T00:00:00Z'), dow = dt.getUTCDay();
+      if(dow === 0 || dow === 6) continue;           // 周六/周日
+      if(CC_PLAN_TET.indexOf(d) >= 0) continue;      // TET 春节当日
+      added++;
+    }
+    return d;
+  }
+  function ccMonthKey(ymd){ return ccPlanYmdOk(ymd) ? String(ymd).slice(0, 7) : ''; }
+  function ccMonthRange(aM, bM){
+    var out = [];
+    if(!aM || !bM) return out;
+    var y = +aM.slice(0, 4), m = +aM.slice(5, 7), ey = +bM.slice(0, 4), em = +bM.slice(5, 7);
+    while((y < ey) || (y === ey && m <= em)){
+      out.push(y + '-' + (m < 10 ? '0' + m : m));
+      m++; if(m > 12){ m = 1; y++; }
+      if(out.length > 240) break;
+    }
+    return out;
+  }
+  function ccCashState(){
+    if(!CC_DATA) CC_DATA = ccDef();
+    if(!CC_DATA.cash || typeof CC_DATA.cash !== 'object') CC_DATA.cash = { depositDate:'', depositPct:20, prodPct:40, instPct:40 };
+    var c = CC_DATA.cash;
+    if(c.depositDate == null) c.depositDate = '';
+    if(c.depositPct === undefined || c.depositPct === null || c.depositPct === '') c.depositPct = 20;
+    if(c.prodPct === undefined || c.prodPct === null || c.prodPct === '') c.prodPct = 40;
+    if(c.instPct === undefined || c.instPct === null || c.instPct === '') c.instPct = 40;
+    return c;
+  }
+  // 成本合计口径：优先用 ccRecalc 本回合计（window.__CC_SUM），首帧尚未重算时按同一口径自行推导兜底
+  function ccCashSum(){
+    var S = window.__CC_SUM;
+    if(S && typeof S === 'object' && S.blocks !== undefined) return S;
+    var d = CC_DATA || ccDef();
+    var blocks = 0, area = 0;
+    (d.demand.specs || []).forEach(function(sp){
+      var q = Number(sp.qty) || 0, l = Number(sp.len) || 0, w = Number(sp.wid) || 0;
+      blocks += q;
+      area += (l > 0 && w > 0) ? (l * w * q / 1e6) : ((Number(sp.larea) || 0) * q);
+    });
+    var mach = 0, agg = 0, labor = 0, opex = 0, opexMonthly = 0, ind = 0;
+    ['mech','veh','tools'].forEach(function(g){ (d.mach[g] || []).forEach(function(it, i){
+      if(!ccProv('mach.' + g + '.' + i)) return; mach += (Number(it.qty) || 0) * (Number(it.price) || 0); }); });
+    Object.keys(d.agg).forEach(function(k){
+      if(!ccProv('agg.' + k)) return; agg += (Number(d.agg[k].qty) || 0) * (Number(d.agg[k].price) || 0); });
+    ['mgmt','work','inst'].forEach(function(g){ (d.labor[g] || []).forEach(function(l, i){
+      if(!ccProv('labor.' + g + '.' + i)) return; labor += (Number(l.qty) || 0) * (Number(l.sal) || 0) * ccLaborDays(g); }); });
+    Object.keys(d.opex).forEach(function(k){ if(!ccProv('opex.' + k)) return; opexMonthly += Number(d.opex[k]) || 0; });
+    opex = opexMonthly * ccOpexPeriod();
+    Object.keys(d.ind).forEach(function(k){ if(k !== 'office' && ccProv('ind.' + k)) ind += Number(d.ind[k]) || 0; });
+    var deprTotal = (mach / Math.max(0.0001, Number((d.depr || {}).years) || 2) / 12) * ccOpexPeriod();
+    var baseCost = deprTotal + agg + labor + opex + ind;
+    var mgmtAmt = baseCost * (Number(d.mgmtPct) || 0) / 100;
+    var total = baseCost + mgmtAmt;
+    var mF = 1 - (Number(d.margin) || 0) / 100;
+    var pNoVat = mF > 0 ? total / mF : 0;
+    var pVat = pNoVat + pNoVat * (Number(d.vat) || 0) / 100;
+    return { blocks:blocks, area:area, pVat:pVat, pNoVat:pNoVat, mach:mach, agg:agg, labor:labor, opex:opex,
+             opexMonthly:opexMonthly, ind:ind, mgmtAmt:mgmtAmt, total:total };
+  }
+  function ccCashCalc(){
+    var p = ccPlanState(), r = ccPlanCalc(), cs = ccCashState(), S = ccCashSum();
+    var d = { ok:false, months:[], M:[], kpi:{}, dates:{} };
+    if(!ccPlanYmdOk(p.sign)) return d;
+    var sign = p.sign;
+    var facEnd = ccPlanYmdOk(p.factoryEnd) ? p.factoryEnd : ccPlanAddDays(sign, CC_PLAN_FACTORY_DAYS);
+    if(facEnd < sign) facEnd = sign;
+    var dep = ccPlanYmdOk(cs.depositDate) ? cs.depositDate : ccAddWorkDays(sign, 10);
+    var payInst = ccPlanYmdOk(r.accEnd) ? ccAddWorkDays(r.accEnd, 10) : '';
+    d.dates = { sign:sign, facEnd:facEnd, dep:dep, payInst:payInst };
+    var blocks = Number(S.blocks) || 0, area = Number(S.area) || 0, pVat = Number(S.pVat) || 0;
+    var unit = blocks > 0 ? pVat / blocks : 0; // 合同单价（含税）/片
+    // 作业窗口：剔除尾部追加的 TET 非生产日
+    var prodEndW = (r.prodExtra > 0) ? ccPlanAddDays(r.prodEnd, -r.prodExtra) : r.prodEnd;
+    var instEndW = (r.instExtra > 0) ? ccPlanAddDays(r.instEnd, -r.instExtra) : r.instEnd;
+    var ends = [sign, facEnd, dep, payInst, r.projEnd].filter(ccPlanYmdOk).sort();
+    var months = ccMonthRange(ccMonthKey(sign), ccMonthKey(ends[ends.length - 1]));
+    var idx = {};
+    months.forEach(function(m, i){ idx[m] = i; });
+    var M = months.map(function(m){ return { ym:m, pcs:0, area:0, prodVal:0, inDep:0, inProd:0, inInst:0, inSum:0,
+                                             capex:0, mat:0, labor:0, opex:0, ind:0, mgmt:0, outSum:0, net:0, cum:0 }; });
+    function at(ymd){ var k = ccMonthKey(ymd); return (k && idx[k] != null) ? idx[k] : -1; }
+    function eachDay(a, b, fn){
+      if(!ccPlanYmdOk(a) || !ccPlanYmdOk(b) || b < a) return;
+      var n = ccPlanDaysBetween(a, b) + 1;
+      for(var i = 0; i < n; i++){ var k = at(ccPlanAddDays(a, i)); if(k >= 0) fn(M[k], n); }
+    }
+    // 生产进度（片数/㎡）按生产作业窗口均摊
+    eachDay(r.prodStart, prodEndW, function(m, n){ m.pcs += blocks / n; m.area += area / n; });
+    // 生产款：当月产值 × 比例，当月入账
+    M.forEach(function(m){ m.prodVal = m.pcs * unit; m.inProd = m.prodVal * (Number(cs.prodPct) || 0) / 100; });
+    // 安装量按安装作业窗口均摊 → 折成金额，验收后 10 个工作日一次性到账
+    var instVal = 0;
+    (function(){
+      var a = r.instStart, b = instEndW;
+      if(!ccPlanYmdOk(a) || !ccPlanYmdOk(b) || b < a) return;
+      var n = ccPlanDaysBetween(a, b) + 1;
+      for(var i = 0; i < n; i++){
+        var k = at(ccPlanAddDays(a, i));
+        if(k < 0) continue;
+        instVal += (blocks / n) * unit * (Number(cs.instPct) || 0) / 100;
+      }
+      var k2 = at(payInst);
+      if(k2 >= 0) M[k2].inInst += instVal;
+    })();
+    // 定金
+    var depAmt = pVat * (Number(cs.depositPct) || 0) / 100;
+    (function(){ var k = at(dep); if(k >= 0) M[k].inDep += depAmt; })();
+    // 支出：建厂投入（全额）在 签约日→工厂结束日 间均摊
+    eachDay(sign, facEnd, function(m, n){ m.capex += (Number(S.mach) || 0) / n; });
+    // 原材料随生产进度均摊
+    eachDay(r.prodStart, prodEndW, function(m, n){ m.mat += (Number(S.agg) || 0) / n; });
+    // 人工：生产/安装日分别按天计
+    (function(){
+      var dp = 0, di = 0;
+      ['mgmt','work'].forEach(function(g){ (CC_DATA.labor[g] || []).forEach(function(l, i){
+        if(!ccProv('labor.' + g + '.' + i)) return; dp += (Number(l.qty) || 0) * (Number(l.sal) || 0); }); });
+      (CC_DATA.labor.inst || []).forEach(function(l, i){
+        if(!ccProv('labor.inst.' + i)) return; di += (Number(l.qty) || 0) * (Number(l.sal) || 0); });
+      // 每天一份日薪：生产窗口按生产日薪、安装窗口按安装日薪
+      var i;
+      if(ccPlanYmdOk(r.prodStart) && ccPlanYmdOk(prodEndW) && prodEndW >= r.prodStart){
+        var n2 = ccPlanDaysBetween(r.prodStart, prodEndW) + 1;
+        for(i = 0; i < n2; i++){ var kp = at(ccPlanAddDays(r.prodStart, i)); if(kp >= 0) M[kp].labor += dp; }
+      }
+      if(ccPlanYmdOk(r.instStart) && ccPlanYmdOk(instEndW) && instEndW >= r.instStart){
+        var n3 = ccPlanDaysBetween(r.instStart, instEndW) + 1;
+        for(i = 0; i < n3; i++){ var ki = at(ccPlanAddDays(r.instStart, i)); if(ki >= 0) M[ki].labor += di; }
+      }
+    })();
+    // 运营费用（已= 费用/月×发生周期）在生产窗口内均摊
+    eachDay(r.prodStart, prodEndW, function(m, n){ m.opex += (Number(S.opex) || 0) / n; });
+    // 间接费用计入签约月
+    (function(){ var k = at(sign); if(k >= 0) M[k].ind += (Number(S.ind) || 0); })();
+    // 管理费按当月其它支出占比分摊
+    var otherOut = 0;
+    M.forEach(function(m){ otherOut += m.capex + m.mat + m.labor + m.opex + m.ind; });
+    if((Number(S.mgmtAmt) || 0) > 0 && otherOut > 0){
+      M.forEach(function(m){ m.mgmt = (Number(S.mgmtAmt) || 0) * (m.capex + m.mat + m.labor + m.opex + m.ind) / otherOut; });
+    }
+    // 合计与累计
+    var T = { inDep:0, inProd:0, inInst:0, inSum:0, capex:0, mat:0, labor:0, opex:0, ind:0, mgmt:0, outSum:0, net:0, pcs:0, area:0, prodVal:0 };
+    var cum = 0, peak = 0, firstPos = '';
+    M.forEach(function(m){
+      m.inSum = m.inDep + m.inProd + m.inInst;
+      m.outSum = m.capex + m.mat + m.labor + m.opex + m.ind + m.mgmt;
+      m.net = m.inSum - m.outSum;
+      cum += m.net; m.cum = cum;
+      if(cum < peak) peak = cum;
+      if(!firstPos && m.inSum > 0 && cum > 0) firstPos = m.ym;
+      Object.keys(T).forEach(function(k){ if(k !== 'net') T[k] += (m[k] || 0); });
+    });
+    T.net = T.inSum - T.outSum;
+    d.ok = true; d.M = M; d.months = months; d.total = T;
+    d.kpi = { contract:pVat, dep:depAmt, prod:T.inProd, inst:instVal, inSum:T.inSum, outSum:T.outSum,
+              net:T.net, peak:peak, firstPos:firstPos };
+    return d;
+  }
+  function ccCashN0(v){ return ccNum(Math.round(Number(v) || 0)); }
+  function ccCashN1(v){ return (Math.round((Number(v) || 0) * 10) / 10).toLocaleString('en-US', { maximumFractionDigits: 1 }); }
+  function ccCashKpiHtml(d){
+    if(!d || !d.ok) return '';
+    var k = d.kpi, cells = [
+      [ccT('cfKpiContract'), ccCashN0(k.contract), ''],
+      [ccT('cfInDep') + ' · ' + (Number(ccCashState().depositPct) || 0) + '%', ccCashN0(k.dep), 'cc-cf-in'],
+      [ccT('cfInProd') + ' · ' + (Number(ccCashState().prodPct) || 0) + '%', ccCashN0(k.prod), 'cc-cf-in'],
+      [ccT('cfInInst') + ' · ' + (Number(ccCashState().instPct) || 0) + '%', ccCashN0(k.inst), 'cc-cf-in'],
+      [ccT('cfKpiIn'), ccCashN0(k.inSum), 'cc-cf-pos'],
+      [ccT('cfKpiOut'), ccCashN0(k.outSum), 'cc-cf-neg'],
+      [ccT('cfKpiNet'), ccCashN0(k.net), (k.net >= 0 ? 'cc-cf-pos' : 'cc-cf-neg')],
+      [ccT('cfKpiPeak'), ccCashN0(Math.abs(k.peak)), 'cc-cf-neg'],
+      [ccT('cfKpiPos'), (k.firstPos ? (k.firstPos.slice(5, 7) + '/' + k.firstPos.slice(0, 4)) : '—'), '', 1]
+    ];
+    return '<div class="cc-cf-kpi">' + cells.map(function(c){
+      return '<div class="' + c[2] + '">' + c[0] + '<b>' + (c[3] ? c[1] : '₫ ' + c[1]) + '</b></div>';
+    }).join('') + '</div>';
+  }
+  function ccCashTableHtml(d){
+    if(!d || !d.ok) return '<div class="cc-note" style="padding:6px 2px;">' + ccT('cfNeedSign') + '</div>';
+    var T = d.total;
+    function td(v, cls){ return '<td class="' + (cls || '') + '">' + (Math.abs(v) < 0.5 ? '—' : ccCashN0(v)) + '</td>'; }
+    // ★CC-CASH-UI-20261108：把「当月净/累计」放在最左侧，保证不进横向滚动也能一眼看到资金缺口
+    var h = '<div class="cc-cf-wrap"><table class="cc-cf"><thead>'
+      + '<tr>'
+      + '<th rowspan="2">' + ccT('cfMonth') + '</th>'
+      + '<th rowspan="2">' + ccT('cfNetRow') + '</th>'
+      + '<th rowspan="2">' + ccT('cfCumRow') + '</th>'
+      + '<th colspan="2">' + ccT('cfQty') + '</th>'
+      + '<th rowspan="2">' + ccT('cfProdVal') + '</th>'
+      + '<th colspan="4">' + ccT('cfInflow') + '</th>'
+      + '<th colspan="7">' + ccT('cfOutflow') + '</th>'
+      + '</tr><tr>'
+      + '<th>' + ccT('cfPcs') + '</th><th>' + ccT('cfM2') + '</th>'
+      + '<th>' + ccT('cfInDep') + '</th><th>' + ccT('cfInProd') + '</th><th>' + ccT('cfInInst') + '</th><th>' + ccT('cfInSum') + '</th>'
+      + '<th>' + ccT('cfCapex') + '</th><th>' + ccT('cfMat') + '</th><th>' + ccT('cfLabor') + '</th>'
+      + '<th>' + ccT('cfOpex') + '</th><th>' + ccT('cfInd') + '</th><th>' + ccT('cfMgmt') + '</th><th>' + ccT('cfOutSum') + '</th>'
+      + '</tr></thead><tbody>';
+    d.M.forEach(function(m){
+      var ymTxt = m.ym.slice(5, 7) + '/' + m.ym.slice(0, 4);
+      h += '<tr>'
+        + '<td class="cc-cf-m">' + ymTxt + '</td>'
+        + td(m.net, m.net >= 0 ? 'cc-cf-pos' : 'cc-cf-neg')
+        + td(m.cum, m.cum >= 0 ? 'cc-cf-pos' : 'cc-cf-neg')
+        + '<td>' + (m.pcs > 0.5 ? ccCashN0(m.pcs) : '—') + '</td>'
+        + '<td>' + (m.area > 0.05 ? ccCashN1(m.area) : '—') + '</td>'
+        + td(m.prodVal)
+        + td(m.inDep, 'cc-cf-in') + td(m.inProd, 'cc-cf-in') + td(m.inInst, 'cc-cf-in') + td(m.inSum, 'cc-cf-in')
+        + td(m.capex, 'cc-cf-out') + td(m.mat, 'cc-cf-out') + td(m.labor, 'cc-cf-out')
+        + td(m.opex, 'cc-cf-out') + td(m.ind, 'cc-cf-out') + td(m.mgmt, 'cc-cf-out') + td(m.outSum, 'cc-cf-out')
+        + '</tr>';
+    });
+    h += '</tbody><tfoot><tr>'
+      + '<td class="cc-cf-m">' + ccT('cfTotalRow') + '</td>'
+      + td(T.net, T.net >= 0 ? 'cc-cf-pos' : 'cc-cf-neg')
+      + td(0)
+      + '<td>' + ccCashN0(T.pcs) + '</td><td>' + ccCashN1(T.area) + '</td>'
+      + td(T.prodVal)
+      + td(T.inDep) + td(T.inProd) + td(T.inInst) + td(T.inSum)
+      + td(T.capex) + td(T.mat) + td(T.labor) + td(T.opex) + td(T.ind) + td(T.mgmt) + td(T.outSum)
+      + '</tr></tfoot></table></div>';
+    return h;
+  }
+  function ccCashHtml(ro){
+    var cs = ccCashState(), p = ccPlanState();
+    var dis = ro ? ' disabled' : '';
+    var hinp = 'height:26px;width:150px;box-sizing:border-box;border:1px solid #7aa7d4;border-radius:4px;padding:1px 6px;background:#fff59d;font-size:13px;text-align:left;';
+    var pinp = 'height:26px;width:78px;box-sizing:border-box;border:1px solid #7aa7d4;border-radius:4px;padding:1px 6px;background:#fff59d;font-size:13px;text-align:right;';
+    var depVal = cs.depositDate || (ccPlanYmdOk(p.sign) ? ccAddWorkDays(p.sign, 10) : '');
+    var lbl = 'font-weight:600;color:#1a3c6e;';
+    var h = '<div class="cc-sub" style="margin-top:16px;">' + esc(ccT('cfTitle')) + '</div>'
+      + '<div class="cc-note" style="margin:2px 0 8px;">' + esc(ccT('cfSub')) + '</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;font-size:13px;margin:0 0 8px;">'
+      + '<span><span style="' + lbl + '">' + ccT('cfSign') + '：</span><b style="color:#d32f2f;">' + (ccPlanYmdOk(p.sign) ? ccPlanFmt(p.sign) : '—') + '</b>'
+      + '<span style="font-size:12px;color:#888;">' + esc(ccT('cfSignMap')) + '</span></span>'
+      + '</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;font-size:13px;margin:0 0 8px;">'
+      + '<label style="display:flex;align-items:center;gap:6px;"><span style="' + lbl + '">' + ccT('cfDepDate') + '：</span>'
+      + '<input type="date" id="cc_cash_dep" value="' + (depVal || '') + '" autocomplete="off" onchange="ccCashChange(\'dep\',this.value)" style="' + hinp + '"' + dis + '></label>'
+      + '<span style="font-size:12px;color:#888;">' + esc(ccT('cfDepHint')) + '</span></div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;font-size:13px;margin:0 0 10px;">'
+      + '<label style="display:flex;align-items:center;gap:6px;"><span style="' + lbl + '">' + ccT('cfDepPct') + '：</span>'
+      + '<input type="text" id="cc_cash_dep_pct" value="' + (Number(cs.depositPct) || 0) + '" inputmode="decimal" autocomplete="off" onchange="ccCashChange(\'depPct\',this.value)" style="' + pinp + '"' + dis + '> %</label>'
+      + '<label style="display:flex;align-items:center;gap:6px;"><span style="' + lbl + '">' + ccT('cfProdPct') + '：</span>'
+      + '<input type="text" id="cc_cash_prod_pct" value="' + (Number(cs.prodPct) || 0) + '" inputmode="decimal" autocomplete="off" onchange="ccCashChange(\'prodPct\',this.value)" style="' + pinp + '"' + dis + '> %</label>'
+      + '<label style="display:flex;align-items:center;gap:6px;"><span style="' + lbl + '">' + ccT('cfInstPct') + '：</span>'
+      + '<input type="text" id="cc_cash_inst_pct" value="' + (Number(cs.instPct) || 0) + '" inputmode="decimal" autocomplete="off" onchange="ccCashChange(\'instPct\',this.value)" style="' + pinp + '"' + dis + '> %</label>'
+      + '<span style="font-size:12px;color:#888;">' + esc(ccT('cfInstHint')) + '</span></div>';
+    h += '<div id="cc_cash_kpi">' + ccCashKpiHtml(ccCashCalc()) + '</div>';
+    h += '<div class="cc-note" style="margin:0 0 2px;">' + esc(ccT('cfUnitVnd')) + '</div>';
+    h += '<div id="cc_cash_body">' + ccCashTableHtml(ccCashCalc()) + '</div>';
+    h += '<div class="cc-cf-note">' + esc(ccT('cfNote')) + '</div>';
+    return h;
+  }
+  function ccCashRefresh(){
+    var d = ccCashCalc();
+    var k = document.getElementById('cc_cash_kpi');
+    if(k) k.innerHTML = ccCashKpiHtml(d);
+    var b = document.getElementById('cc_cash_body');
+    if(b) b.innerHTML = ccCashTableHtml(d);
+  }
+  function ccCashChange(which, val){
+    var cs = ccCashState();
+    var num = function(v){ var n = parseFloat(String(v).replace(/[^\d.\-]/g, '')); return isFinite(n) ? Math.round(n * 100) / 100 : 0; };
+    if(which === 'dep') cs.depositDate = String(val || '');
+    else if(which === 'depPct') cs.depositPct = num(val);
+    else if(which === 'prodPct') cs.prodPct = num(val);
+    else if(which === 'instPct') cs.instPct = num(val);
+    ccCashRefresh();
+    try{ ccScheduleSave(); }catch(e){}
+  }
+  window.ccCashChange = ccCashChange;
+  window.ccCashRefresh = ccCashRefresh;
+  window.ccCashCalc = ccCashCalc;
   if(!window.__ccGanttFitBound){
     window.__ccGanttFitBound = true;
     window.addEventListener('resize', function(){
@@ -63729,6 +64086,10 @@ function submitAuth() {
     var profit = pNoVat - total;
     var vatAmt = pNoVat * vat / 100; // ★CC-VATROW-20261106：增值税额 = 未税卖价 × 增值税税率
     var pVat = pNoVat + vatAmt;
+    // ★CC-CASH-20261108：把本回合计缓存给「现金流测算」用，避免两处重复推导造成口径漂移
+    window.__CC_SUM = { blocks:blocks, area:area, pVat:pVat, pNoVat:pNoVat, mach:mach, agg:agg, labor:labor,
+                        opex:opex, opexMonthly:(typeof opexFee === 'number' ? opexFee : 0), ind:ind,
+                        mgmtAmt:mgmtAmt, total:total, prodD:prodD, instD:instD };
     // ★CC-SUMTRI2-20261106：汇总表价格三色（含总成本/含税卖价强调行）——¥蓝/$红/₫绿，仅行标签保持红色粗体
     var set = function(id, v, unit){ var el = document.getElementById(id); if(!el) return; el.textContent = '₫ ' + ccNum(v) + (unit || ''); el.style.color = '#2e7d32'; }; // ★CC-SUMHEAD：仅金额用，带货币符号
     var setPlain = function(id, v){ var el = document.getElementById(id); if(el) el.textContent = ccNum(v); }; // ★CC-NOCUR-20261104：块数/面积等非金额，不带货币符号
