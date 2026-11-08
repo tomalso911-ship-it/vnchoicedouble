@@ -6652,7 +6652,44 @@ var WL_FLOW_IMG = {
     }
     function prod_val(id){ var e = prod_el(id); return e ? e.value : ''; }
     function prod_esc(s){ s = String(s==null?'':s); return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-    function prod_fmtNum(n){ return Math.round(Number(n)||0).toLocaleString('en-US'); }
+    /* ★PERF-FMTNUM-20261108：原实现走 toLocaleString('en-US')，V8 里每次约 1~2µs，
+       生产/安装/库存页一次渲染要调几千次（实测 Tab H 27ms、inst_openProject 81ms）。
+       改为纯字符串分组，输出与 en-US 完全一致（1,234,567 / -1,234 / 0）。 */
+    var PROD_FMT_CACHE = {}, PROD_FMT_CACHE_N = 0;
+    function prod_fmtNum(n){
+      var v = Math.round(Number(n)||0);
+      if(!isFinite(v)) return '0';
+      /* ★缓存键必须是「带符号」的原始值：曾经用取绝对值后的 v 当键，
+         导致 prod_fmtNum(-1) 先把 PROD_FMT_CACHE[1] 写成 '-1'，
+         之后 prod_fmtNum(1) 命中缓存返回 '-1'（正数变负数）。
+         这里用 Math.round 后的原值做键，负数与正数各自独立。 */
+      /* -0 必须走缓存之前判断：JS 里 -0 与 0 的属性键都是 "0"，
+         若先查缓存会被 0 的结果命中而返回 '0'。 */
+      if(v === 0 && 1 / v < 0) return '-0';          /* 与 toLocaleString(Math.round(-0.5)) 一致 */
+      var ck = v;
+      var hit = PROD_FMT_CACHE[ck];
+      if(hit !== undefined) return hit;
+      var out;
+      {
+        var neg = v < 0; var a = neg ? -v : v;
+        var s = String(a);
+        if(s.indexOf('e') >= 0 || s.indexOf('E') >= 0){
+          out = v.toLocaleString('en-US');           /* 1e21 及以上：回退原生，避免科学计数法 */
+        } else if(s.length <= 3){
+          out = (neg ? '-' : '') + s;
+        } else {
+          var r = '', c = 0;
+          for(var i = s.length - 1; i >= 0; i--){
+            r = s.charAt(i) + r;
+            if(++c % 3 === 0 && i > 0) r = ',' + r;
+          }
+          out = (neg ? '-' : '') + r;
+        }
+      }
+      if(PROD_FMT_CACHE_N > 6000){ PROD_FMT_CACHE = {}; PROD_FMT_CACHE_N = 0; }
+      PROD_FMT_CACHE[ck] = out; PROD_FMT_CACHE_N++;
+      return out;
+    }
     function prod_fmtNumRed(n){ var v=Number(n)||0; var s=prod_fmtNum(n); return v>0?'<span style="color:#E53935;font-weight:600">'+s+'</span>':s; }
     function prod_pad(n){ return n<10?'0'+n:''+n; }
     function prod_today(){ var t=new Date(); return t.getFullYear()+'-'+prod_pad(t.getMonth()+1)+'-'+prod_pad(t.getDate()); }
@@ -6781,11 +6818,21 @@ var WL_FLOW_IMG = {
       pop.querySelector('.ppc-ok').onclick = function(){ cleanup(); onOk && onOk(); };
       pop.querySelector('.ppc-cancel').onclick = cleanup;
     }
+    /* ★PERF-GET-20261108：prod_get 原实现每次调用都 localStorage.getItem + JSON.parse +
+       全量 prod_normalizeDates（后者内部还会跑 prod_houseSpecProduced）。
+       实测一次切页签会被调几十次，单次最贵 ~100ms（Tab H 98ms）。
+       这里按「原始 JSON 字符串 + PROD_MEM 引用」双重校验做缓存：
+         · 字符串变了（任何一次 prod_save 写盘）→ 自动失效；
+         · PROD_MEM[id] 被替换（prod_open 拉到服务器版本）→ 自动失效。
+       返回对象与 PROD_MEM 是同一份（原本 memMoreComplete=false 时也写回 PROD_MEM），语义不变。 */
+    var PROD_GET_CACHE = {};
     function prod_get(id){
       var def = { id:id, profile:{}, plan:[], workers:{}, materials:{items:[],inbound:[],outbound:[],receipts:[]}, production:{}, finished:{}, equipment:{list:[],faults:[]}, delivery:[] };
       try {
         var s = localStorage.getItem(PROD_LS+id);
         if(s){
+          var _gc = PROD_GET_CACHE[id];
+          if(_gc && _gc.raw === s && _gc.mem === PROD_MEM[id] && _gc.obj) return _gc.obj;
           var f=JSON.parse(s);
           if(f && (f.id==null || f.id==='')) f.id = id;   /* ★ 补齐 id：否则后续保存会写到 prod_factory_undefined，刷新即"丢数据" */
           var mem = PROD_MEM[id];
@@ -6799,12 +6846,20 @@ var WL_FLOW_IMG = {
             var mInst = (mem.installation && mem.installation.workers) ? Object.keys(mem.installation.workers).length : 0;
             var fAt = +(f.__savedAt||0), mAt = +(mem.__savedAt||0);
             var memMoreComplete = (mHo > fHo + 1) || (mInst > fInst + 1) || ((mHo>=fHo && mInst>=fInst) && mAt > fAt);
-            if(memMoreComplete) return prod_normalizeDates(mem);
+            if(memMoreComplete){
+              var _rm = prod_normalizeDates(mem);
+              PROD_GET_CACHE[id] = { raw:s, mem:PROD_MEM[id], obj:_rm };
+              return _rm;
+            }
             PROD_MEM[id] = f;
-            return prod_normalizeDates(f);
+            var _rf = prod_normalizeDates(f);
+            PROD_GET_CACHE[id] = { raw:s, mem:PROD_MEM[id], obj:_rf };
+            return _rf;
           }
           PROD_MEM[id] = f;
-          return prod_normalizeDates(f);
+          var _rf2 = prod_normalizeDates(f);
+          PROD_GET_CACHE[id] = { raw:s, mem:PROD_MEM[id], obj:_rf2 };
+          return _rf2;
         }
       } catch(e){}
       if(PROD_MEM[id]) return PROD_MEM[id];              /* ★ 本地存储不可用时的内存兜底 */
@@ -7495,8 +7550,17 @@ var WL_FLOW_IMG = {
         }catch(e){}
       }
       if(raw && typeof raw !== 'string'){ try { raw = JSON.stringify(raw); } catch(e){ raw=''; } }
-      try { var a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch(e){ return []; }
+      /* ★PERF-SLATS-20261108：规格 JSON 每次调用都重新 parse（实测 inst_openProject 里本函数 92ms）。
+         按「pid + 原始 JSON 字符串」缓存解析结果；规格一旦编辑/保存，字符串即变 → 自动失效。 */
+      var _pk = String(pid||'');
+      var _sc = PROD_SLATS_ROWS_CACHE;
+      if(_sc.rows && _sc.pid === _pk && _sc.raw === raw) return _sc.rows;
+      var _rows;
+      try { var a = JSON.parse(raw); _rows = Array.isArray(a) ? a : []; } catch(e){ _rows = []; }
+      PROD_SLATS_ROWS_CACHE = { pid:_pk, raw:raw, rows:_rows };
+      return _rows;
     }
+    var PROD_SLATS_ROWS_CACHE = { pid:null, raw:null, rows:null };
     /* 猪舍编号/任意语言名称 → 当前语言名称（例如 1→公猪站/Boar stud/Trạm đực giống），无对应则原样返回
        注：I18N 在更晚的脚本块才定义，此处不能预计算映射表，必须在运行时扫描。 */
     function prod_phName(v){
@@ -7539,6 +7603,9 @@ var WL_FLOW_IMG = {
     /* 聚合成 规格×栋舍 矩阵：key=长×宽×高，汇总各猪舍数量与总需求 */
     function prod_slatsMatrix(){
       var rows = prod_slatsRows(); var specs = {}; var houseOrder = [];
+      /* ★PERF-MATRIX-20261108：rows 已按 (pid+JSON) 缓存，引用稳定 → 矩阵按 rows 引用做一级缓存。
+         规格数据一变 rows 就是新数组，缓存自动失效。 */
+      if(PROD_SLATS_MM_CACHE.rows === rows && PROD_SLATS_MM_CACHE.out) return PROD_SLATS_MM_CACHE.out;
       var _lastPh = '—'; // 合并行兜底：JSON 按猪舍连续分组，空猪舍行继承上一非空猪舍
       rows.forEach(function(r){
         var L = r.floor_len!=null?r.floor_len:r.L, W = r.floor_wid!=null?r.floor_wid:r.W, H = r.floor_hgt!=null?r.floor_hgt:r.H;
@@ -7575,8 +7642,11 @@ var WL_FLOW_IMG = {
         if(!isNaN(nb)) return 1;
         return String(a).localeCompare(String(b));
       });
-      return { specs:specs, houseOrder:houseOrder };
+      var _out = { specs:specs, houseOrder:houseOrder };
+      PROD_SLATS_MM_CACHE = { rows:rows, out:_out };
+      return _out;
     }
+    var PROD_SLATS_MM_CACHE = { rows:null, out:null };
     /* 材料/骨料用量矩阵：按 (规格×栋舍) 聚合，复算 数量/整场、钢筋(分φ6/φ8/φ10/φ12)、水泥/黄砂/石子。
        公式与智能报告 openSlatsReportModal 完全一致，供「生产计划」页生成两张互补明细表 */
     function prod_slatsMaterial(){
@@ -8059,67 +8129,104 @@ var WL_FLOW_IMG = {
       var tabs = prod_el('prod-tabs').children;
       for(var j=0;j<tabs.length;j++){ tabs[j].classList.toggle('active', tabs[j].getAttribute('data-key')===key); }
       var body = prod_el('prod-tab-body'); var f = prod_get(PROD_CUR);
-      if(key==='A'){ body.innerHTML = prod_tabA(f); prod_syncContractDate(); prod_linkDueToCard(); prod_drawLineCompare(); }
+      /* ★PERF-CHART-DEFER-20261108：图表（ECharts/Chart.js）绘制原本串在点击处理函数里，
+         每个图都是几百次 measureText + canvas 光栅化（实测 Tab F 208ms、D 141ms、C 98ms），
+         用户点完页签要等图表画完才看到表格。
+         现在把「画图」推到下一个任务（setTimeout 0），表格先上屏、图表补一帧。
+         各绘图函数内部本来就有 PROD_ACTIVE_TAB 守卫，切走后迟到的回调会自行 return，不会画错标签。 */
+      if(key==='A'){ body.innerHTML = prod_tabA(f); prod_syncContractDate(); prod_linkDueToCard(); prod_deferDraw(prod_drawLineCompare); }
       else if(key==='B'){ body.innerHTML = prod_tabB(f); prod_syncContractDate(); prod_applyHouseFilter(); }
-      else if(key==='C'){ body.innerHTML = prod_tabC(f); prod_drawTrends(); PROD_LABOR_SORT = {col:null, dir:0}; }
+      else if(key==='C'){ body.innerHTML = prod_tabC(f); prod_deferDraw(prod_drawTrends); PROD_LABOR_SORT = {col:null, dir:0}; }
       else if(key==='D'){ body.innerHTML = prod_tabD(f); prodReceiptRenderRows(); prod_receiptApplyHouse(); prod_updateHouseFilterTip(); prod_updateHousePreview(); if(PROD_REPORT_OPEN) prodReportOpen(); }
-      else if(key==='E'){ body.innerHTML = prod_tabE(f); var _et = body.querySelector('.prod-table.pe-estats'); if(_et){ _et.addEventListener('click', prod_eStatsTableClick); } prod_drawEStats(f); prod_drawLineCompare();
+      else if(key==='E'){ body.innerHTML = prod_tabE(f); var _et = body.querySelector('.prod-table.pe-estats'); if(_et){ _et.addEventListener('click', prod_eStatsTableClick); }
+        prod_deferDraw(function(){ prod_drawEStats(f); prod_drawLineCompare(); });
         /* ★ 安装页「快速录入该舍生产数据」：渲染完自动选中线1 + 该猪舍并滚动定位 */
         if(window.__PROD_E_HOUSE_REQ){ var _erq = window.__PROD_E_HOUSE_REQ; window.__PROD_E_HOUSE_REQ = null; try{ prod_dailyApplyHouseReq(_erq.line, _erq.house); }catch(e){} } }
-      else if(key==='H'){ body.innerHTML = prod_tabH(f); var _ft = body.querySelector('.prod-table.pe-fin'); if(_ft){ _ft.addEventListener('click', prod_finTableClick); } prod_finApplyJumps(); prod_drawOutboundChart(f);
+      else if(key==='H'){ body.innerHTML = prod_tabH(f); var _ft = body.querySelector('.prod-table.pe-fin'); if(_ft){ _ft.addEventListener('click', prod_finTableClick); } prod_finApplyJumps(); prod_deferDraw(function(){ prod_drawOutboundChart(f); });
         /* ★ 安装页「快速录入出库数据」：定位并高亮该猪舍在库存/出库明细里的行 */
         if(window.__PROD_H_JUMP){ var _hj = window.__PROD_H_JUMP; window.__PROD_H_JUMP = null; try{ prod_stockoutJumpHouse(_hj.h); }catch(e){} } }
-      else if(key==='F'){ body.innerHTML = prod_tabF(f); prod_drawEquipCharts(f); }
+      else if(key==='F'){ body.innerHTML = prod_tabF(f); prod_deferDraw(function(){ if(PROD_ACTIVE_TAB==='F') prod_drawEquipCharts(f); }); }
       if('ABCDEFH'.indexOf(key) >= 0) prod_setupAllScrolls();
       prod_updateTabBadges();
       if(key==='H' && PROD_OUT_EDIT){
         setTimeout(function(){ try{ prod_outInitEditWeather(); prod_outFocusEdit(); }catch(e){} }, 80);
       }
     }
-    /* 各标签页中固定高度滚动的表格：≤10 行撑开、>10 行按原限制高度滚动 */
-    function prod_setupAllScrolls(){
-      prod_limitTableRows('.prod-out-records-scroll', 10);
-      prod_limitTableRows('.prod-analysis-scroll', 10);
-      prod_limitTableRows('.prod-stockout-scroll', 10, '420px');
-      prod_limitTableRows('.prod-equip-scroll', 10, 'calc(100vh - 240px)');
-      prod_limitTableRows('.prod-equip-fault-scroll', 10, '430px');
-      prod_limitTableRows('.pe-line-detail-scroll', 10, '360px');
-      prod_limitTableRows('.plc-scroll', 10, '360px');
-      prod_limitTableRows('.pc-labor-scroll', 10, '400px');
-      prod_limitTableRows('.pe-hist-scroll', 20, '560px');
-      prod_limitTableRows('.rc-list-scroll', 10, '520px');
+    /* ★PERF-CHART-DEFER-20261108：把绘图推到「表格已经上屏」之后执行。
+       ★不能用裸 setTimeout(0)：那仍会在下一帧之前跑，重的 canvas 绘制会把首帧一起推后
+         （实测 Tab D 表格首帧被图表拖到 337ms）。这里先让出一帧（rAF）再排一个 0ms 任务，
+         保证表格先真正画到屏幕上，图表紧随其后补上。
+       只影响观感顺序，不改任何绘制逻辑与数据；各绘图函数内部的 PROD_ACTIVE_TAB 守卫
+       仍然负责「切走了就不要画」。 */
+    function prod_deferDraw(fn){
+      if(typeof fn !== 'function') return;
+      var run = function(){ try{ fn(); }catch(e){ try{ console.error('[chart-defer]', e); }catch(e2){} } };
+      try {
+        requestAnimationFrame(function(){ setTimeout(run, 0); });
+      } catch(e) {
+        setTimeout(run, 0);
+      }
     }
-    function prod_limitTableRows(selector, maxRows, limitHeight){
-      var el = document.querySelector(selector);
-      if(!el) return;
+    /* 各标签页中固定高度滚动的表格：≤10 行撑开、>10 行按原限制高度滚动
+       ★PERF-SCROLL-20261108：原实现是「写一个表格 → 下一个表格再读 offsetHeight」交替进行，
+         每次写完样式都会让上一次的布局失效，10 个表格串联就强制整页重排约 10 次
+         （Tab H 实测本组 218ms，占整个页签切换的最大单项）。
+         现在改成两阶段：先把所有需要的高度全部测完（只读），再统一写 style。公式与阈值完全不变。 */
+    function prod_setupAllScrolls(){
+      var jobs = [
+        ['.prod-out-records-scroll', 10, ''],
+        ['.prod-analysis-scroll', 10, ''],
+        ['.prod-stockout-scroll', 10, '420px'],
+        ['.prod-equip-scroll', 10, 'calc(100vh - 240px)'],
+        ['.prod-equip-fault-scroll', 10, '430px'],
+        ['.pe-line-detail-scroll', 10, '360px'],
+        ['.plc-scroll', 10, '360px'],
+        ['.pc-labor-scroll', 10, '400px'],
+        ['.pe-hist-scroll', 20, '560px'],
+        ['.rc-list-scroll', 10, '520px']
+      ];
+      var plans = [];
+      for(var i=0;i<jobs.length;i++){
+        var el = document.querySelector(jobs[i][0]);
+        if(!el) continue;
+        var mh = prod_measureTableRows(el, jobs[i][1] || 10, jobs[i][2]);
+        if(mh != null) plans.push([el, mh]);
+      }
+      for(var k=0;k<plans.length;k++){ plans[k][0].style.maxHeight = plans[k][1]; }
+    }
+    /* 只测量、不写样式（供上面的两阶段批量处理使用）；返回值与旧实现的 style.maxHeight 完全一致 */
+    function prod_measureTableRows(el, maxRows, limitHeight){
+      if(!el) return null;
       maxRows = maxRows || 10;
       var groupCells = el.querySelectorAll('tbody td.pe-group-cell[rowspan]');
       var isGroup = groupCells.length > 0;
       var rows = isGroup ? groupCells : el.querySelectorAll('tbody tr:not(.pe-subtotal-row)');
-      if(!rows.length) return;
-      if(rows.length <= maxRows){
-        el.style.maxHeight = 'none';
-      } else if(limitHeight){
-        el.style.maxHeight = limitHeight;
-      } else {
-        var headerTr = el.querySelector('thead tr');
-        var headerH = headerTr ? (headerTr.offsetHeight || 28) : 28;
-        var subTr = el.querySelector('tbody tr.pe-subtotal-row');
-        var subH = subTr ? (subTr.offsetHeight || 28) : 0;
-        if(isGroup){
-          var allTr = el.querySelectorAll('tbody tr:not(.pe-subtotal-row)');
-          var sumH = 0, g = 0;
-          for(var i=0;i<allTr.length;i++){
-            if(allTr[i].querySelector('td.pe-group-cell[rowspan]')) g++;
-            if(g > maxRows) break;
-            sumH += allTr[i].offsetHeight || 28;
-          }
-          el.style.maxHeight = (headerH + sumH + subH) + 'px';
-        } else {
-          var h = rows[0].offsetHeight || 28;
-          el.style.maxHeight = (headerH + maxRows * h + subH) + 'px';
+      if(!rows.length) return null;
+      if(rows.length <= maxRows) return 'none';
+      if(limitHeight) return limitHeight;
+      var headerTr = el.querySelector('thead tr');
+      var headerH = headerTr ? (headerTr.offsetHeight || 28) : 28;
+      var subTr = el.querySelector('tbody tr.pe-subtotal-row');
+      var subH = subTr ? (subTr.offsetHeight || 28) : 0;
+      if(isGroup){
+        var allTr = el.querySelectorAll('tbody tr:not(.pe-subtotal-row)');
+        var sumH = 0, g = 0;
+        for(var i=0;i<allTr.length;i++){
+          if(allTr[i].querySelector('td.pe-group-cell[rowspan]')) g++;
+          if(g > maxRows) break;
+          sumH += allTr[i].offsetHeight || 28;
         }
+        return (headerH + sumH + subH) + 'px';
       }
+      var h = rows[0].offsetHeight || 28;
+      return (headerH + maxRows * h + subH) + 'px';
+    }
+    /* 保留原单点入口（其它位置可能直接调用），行为与旧版一致 */
+    function prod_limitTableRows(selector, maxRows, limitHeight){
+      var el = document.querySelector(selector);
+      if(!el) return;
+      var mh = prod_measureTableRows(el, maxRows || 10, limitHeight);
+      if(mh != null) el.style.maxHeight = mh;
     }
     /* 项目交期（ymd）与“已到交期→停止计算”判定：今天到达或超过交期即停止 */
     function prod_cDueYmd(){
@@ -8378,6 +8485,10 @@ var WL_FLOW_IMG = {
     function prod_drawLineCompare(){
       var f = prod_get(PROD_CUR); if(!f) return;
       var _body = prod_el('plcBody'); if(_body && _body.style.display === 'none') return;  /* 折叠态不初始化图表 */
+      /* ★PERF-CHART-DEFER-20261108：Tab A 的 DOM 里并不存在 plcChart 容器（该图只在 E 页渲染），
+         原实现在 A 页也会走一遍 ensureEcharts，然后在 echarts.init(null) 处抛错并被 Promise 静默吞掉。
+         这里先判容器，没有就直接返回，省一次无用的引擎等待 + 一条静默异常。 */
+      if(!prod_el('plcChart')) return;
       prod_ensureEcharts().then(function(){
         if(PROD_ACTIVE_TAB!=='A' && PROD_ACTIVE_TAB!=='E') return;
         if(!PROD_ECHARTS_RESIZED){ PROD_ECHARTS_RESIZED = true; window.addEventListener('resize', function(){ for(var id in PROD_ECHARTS){ if(PROD_ECHARTS[id]) PROD_ECHARTS[id].resize(); } }); }
@@ -72241,7 +72352,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     f.installation = f.installation || {plan:{},workers:{},daily:{}};
     return f;
   }
-  function inst_save(f){ if(typeof prod_save==='function'){ try{ prod_save(f); }catch(e){} } try{ if(typeof inst_refreshGanttLive==='function') inst_refreshGanttLive(f); }catch(e){} }
+  function inst_save(f){ try{ inst_installedIdxReset(); }catch(e){} if(typeof prod_save==='function'){ try{ prod_save(f); }catch(e){} } try{ if(typeof inst_refreshGanttLive==='function') inst_refreshGanttLive(f); }catch(e){} }
   function inst_proj(){ return (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==INST_CUR; }) : null; }
   function inst_provKey(){
     var p = inst_proj(); return p ? (p.province||p.region||'') : '';
@@ -72410,6 +72521,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   }
   function inst_renderTab(key){
     INST_ACTIVE_TAB = key;
+    /* ★PERF-INST-IDX-20261108：每次渲染重建一次「已安装数量」索引（见 inst_bldgSpecInstalledRec） */
+    try{ inst_installedIdxReset(); }catch(e){}
     var tabs = inst_el('inst-tabs');
     if(tabs){ var ch = tabs.children; for(var j=0;j<ch.length;j++){ ch[j].classList.toggle('active', ch[j].getAttribute('data-key')===key); } }
     var body = inst_el('inst-tab-body');
@@ -72929,27 +73042,50 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
      只按规格键取值，★ 不按「已发货」封顶 —— 已录入的安装量必须如实显示。
      （历史 bug：显示时用 min(已发货, 已安装) 封顶，未按栋登记发货时显示 0，
        造成「明明录入了安装，规格行却全是 0」，而顶部合计又不为 0，前后矛盾。） */
-  function inst_bldgSpecInstalledRec(f, code, idx, sp){
-    var want = String(code) + '#' + String(idx);
-    var wantNorm = inst_specKeyNorm(sp);
-    var n = 0;
+  /* ★PERF-INST-IDX-20261108：本函数被「猪舍 × 栋 × 规格」三层循环反复调用，
+     原实现每次都要把 installation.workers 的全部日期 × 区域 × 小组扫一遍
+     （实测 inst_openProject 里单独占 75ms，加上内层回调约 120ms）。
+     改为「每次渲染只建一次索引、之后 O(1) 查询」。
+     索引严格保留原判定（k === sp || 归一化后相等），所以同一猪舍栋下
+     既存 '1,550×525×70' 又存 '1550×525×70' 时仍然按原逻辑各自累加，数值不变。 */
+  var INST_INSTAL_IDX = null, INST_INSTAL_IDX_F = null;
+  function inst_installedIdxReset(){ INST_INSTAL_IDX = null; INST_INSTAL_IDX_F = null; }
+  function inst_installedIdxBuild(f){
+    var idx = {};
     var workers = (f && f.installation && f.installation.workers) || {};
     for(var dk in workers){
       if(!workers.hasOwnProperty(dk)) continue;
       var ztw = (workers[dk] && workers[dk].zoneTeamWorkers) || {};
       for(var zn in ztw){
         if(!ztw.hasOwnProperty(zn)) continue;
-        (ztw[zn] || []).forEach(function(t){
-          if(!t || !t.house) return;
+        var teams = ztw[zn] || [];
+        for(var ti0=0; ti0<teams.length; ti0++){
+          var t = teams[ti0];
+          if(!t || !t.house) continue;
           var hp = String(t.house).split('#');
-          if(((hp[0]||'') + '#' + (hp[1]||'1')) !== want) return;
+          var hkey = (hp[0]||'') + '#' + (hp[1]||'1');
           var ti = (t.todayInstall && typeof t.todayInstall==='object') ? t.todayInstall : {};
+          var bucket = idx[hkey] || (idx[hkey] = []);
           for(var k in ti){
             if(!ti.hasOwnProperty(k)) continue;
-            if(k === sp || inst_specKeyNorm(k) === wantNorm) n += (+ti[k]||0);
+            bucket.push({ k:k, n:inst_specKeyNorm(k), q:(+ti[k]||0) });
           }
-        });
+        }
       }
+    }
+    INST_INSTAL_IDX = idx; INST_INSTAL_IDX_F = f;
+    return idx;
+  }
+  function inst_bldgSpecInstalledRec(f, code, idx, sp){
+    var want = String(code) + '#' + String(idx);
+    var wantNorm = inst_specKeyNorm(sp);
+    var map = (INST_INSTAL_IDX && INST_INSTAL_IDX_F === f) ? INST_INSTAL_IDX : inst_installedIdxBuild(f);
+    var arr = map[want];
+    if(!arr || !arr.length) return 0;
+    var n = 0;
+    for(var i=0;i<arr.length;i++){
+      var e = arr[i];
+      if(e.k === sp || e.n === wantNorm) n += e.q;
     }
     return n;
   }
