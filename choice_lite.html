@@ -6119,6 +6119,32 @@ var WL_FLOW_IMG = {
       .prod-table.prod-usage th, .prod-table.prod-usage td{border:1px solid #333;}
       /* 按规格/栋舍 的材料用量表：网格线（红色加粗分组线由内联样式保留） */
       .prod-table.prod-matusage th, .prod-table.prod-matusage td{border:1px solid #333;}
+      /* ★XH-PROD3-20261108（用户 2026-11-08 要求）：
+         ① 生产 C 页「人工-天气明细表」(pc-labor-hist) + B 页「项目用量分解」(prod-usage)
+            + B 页「按规格 × 栋舍的材料用量」(prod-matusage) 三张表 → 表头统一红底 + 白色加粗字；
+         ② 三张表主体 → 鼠标悬停「十字高亮」（整行 + 整列，淡黄；交叉格更深一档），
+            复用 prod_xhApply 的 xh-row / xh-col，与生产 E/H 页、设备 F 页同一套观感。
+         注：pc-labor-hist 在安装管理 C 页也有一份（#inst-tab-body），那边已有自己的红表头与淡粉十字，
+             所以这里一律用 #prod-tab-body 收窄作用域，避免把安装页的观感改掉。 */
+      #prod-tab-body .pc-labor-hist thead th,
+      table.prod-table.prod-usage thead th,
+      table.prod-table.prod-matusage thead th{background:linear-gradient(180deg,#E53935,#C62828) !important;color:#fff !important;font-weight:700 !important;border-color:#B71C1C !important;}
+      #prod-tab-body .pc-labor-hist thead th *,
+      table.prod-table.prod-usage thead th *,
+      table.prod-table.prod-matusage thead th *{color:#fff !important;}
+      #prod-tab-body .pc-labor-hist thead th.pc-sortable:hover,
+      table.prod-table.prod-usage thead th:hover,
+      table.prod-table.prod-matusage thead th:hover{background:#C62828 !important;}
+      #prod-tab-body .pc-labor-hist thead th .pc-sort-ind .up,
+      #prod-tab-body .pc-labor-hist thead th .pc-sort-ind .dn{color:rgba(255,255,255,.55) !important;}
+      #prod-tab-body .pc-labor-hist thead th .pc-sort-ind .up.on,
+      #prod-tab-body .pc-labor-hist thead th .pc-sort-ind .dn.on{color:#FFD54F !important;}
+      #prod-tab-body .pc-labor-hist tbody td.xh-row, #prod-tab-body .pc-labor-hist tbody td.xh-col,
+      table.prod-usage tbody td.xh-row, table.prod-usage tbody td.xh-col,
+      table.prod-matusage tbody td.xh-row, table.prod-matusage tbody td.xh-col{background:#fff6c2 !important;}
+      #prod-tab-body .pc-labor-hist tbody td.xh-row.xh-col,
+      table.prod-usage tbody td.xh-row.xh-col,
+      table.prod-matusage tbody td.xh-row.xh-col{background:#ffec96 !important;}
       /* 按栋舍汇总生产计划表：网格线（红色加粗分组线由内联样式保留） */
       .prod-table.prod-houseplan th, .prod-table.prod-houseplan td{border:1px solid #333;}
       /* 成品库存表：规格行可展开猪舍明细 */
@@ -13504,7 +13530,7 @@ var WL_FLOW_IMG = {
     function prod_xhApply(td){
       /* ★PE-STATS-XH-20261108：生产统计表复用同一套十字高亮
          ★EQ-FAULT-XH-20261108：生产F页「设备配置清单」「设备故障报备」也复用同一套 */
-      var t = (td.closest ? td.closest('table.pe-hist, table.pe-estats, table.prod-equip-table, table.prod-equip-fault, table.prod-out-records, table.prod-out-analysis, table.pe-fin, table.prod-stockout') : null); if(!t) return;
+      var t = (td.closest ? td.closest('table.pe-hist, table.pe-estats, table.prod-equip-table, table.prod-equip-fault, table.prod-out-records, table.prod-out-analysis, table.pe-fin, table.prod-stockout, table.pc-labor-hist, table.prod-usage, table.prod-matusage') : null); if(!t) return;
       var tr = td.parentNode; if(!tr || tr.tagName!=='TR') return;
       if(tr.classList && tr.classList.contains('prod-equip-secrow')) return;   /* 工段分隔行不参与十字高亮 */
       var idx = td.cellIndex;
@@ -13518,7 +13544,7 @@ var WL_FLOW_IMG = {
     }
     try{
       document.addEventListener('mouseover', function(e){
-        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td, table.pe-estats tbody td, table.prod-equip-table tbody td, table.prod-equip-fault tbody td, table.prod-out-records tbody td, table.prod-out-analysis tbody td, table.pe-fin tbody td, table.prod-stockout tbody td'):null;
+        var td=(e.target&&e.target.closest)?e.target.closest('table.pe-hist tbody td, table.pe-estats tbody td, table.prod-equip-table tbody td, table.prod-equip-fault tbody td, table.prod-out-records tbody td, table.prod-out-analysis tbody td, table.pe-fin tbody td, table.prod-stockout tbody td, table.pc-labor-hist tbody td, table.prod-usage tbody td, table.prod-matusage tbody td'):null;
         if(td) prod_xhApply(td); else prod_xhClear();
       }, true);
       document.addEventListener('scroll', function(){ prod_xhClear(); }, true);
