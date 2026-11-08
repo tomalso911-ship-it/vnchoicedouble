@@ -75,19 +75,21 @@ def main() -> int:
     need(html, "specs[_sk].solidYes = !!_solidMap[slatsSizeKeyNumeric(_sk)];",
          "④ prod_slatsMatrix 必须在规格上挂 solidYes")
 
-    # ⑤ 样式：3px double #000（表格已有 1px 黑网格，1px 框看不见）
-    need(html, ".slats-solid-cell.slats-solid-cell{border:3px double #000 !important;}",
-         "⑤ 单元格双线框样式被删/被改细")
-    need(html, ".slats-solid-box{border:3px double #000;",
-         "⑤ 文字双线框样式被删/被改细")
+    # ⑤ 样式：黄色 2px 单线框（用户 2026-11-08 修正：紧贴文字、黄色、加粗，不要双线）
+    need(html, ".slats-solid-cell.slats-solid-cell{border:2px solid #FFC400 !important;}",
+         "⑤ 拆分三格的黄框样式被删/被改色")
+    need(html, ".slats-solid-box{border:2px solid #FFC400;",
+         "⑤ 文字黄框样式被删/被改色")
     need(html, "@media print",
          "⑤ 打印样式缺失")
-    need(html, "body > .modal-overlay.show .slats-solid-cell.slats-solid-cell{border:3px double #000 !important;}",
-         "⑤ 打印时双线框必须保留")
+    need(html, "body > .modal-overlay.show .slats-solid-box{border:2px solid #FFC400 !important;}",
+         "⑤ 打印时黄框必须保留")
+    deny(html, "3px double #000",
+         "⑤ 又用回黑色双线框（用户明确不要双线）")
 
-    # ⑥ 规格当列头的表：只框表头，数据格不框
-    need(html, "specs[s]&&specs[s].solidYes?' slats-solid-cell':''",
-         "⑥ 历史产出表表头没有按 solidYes 加框（列表只框表头）")
+    # ⑥ 规格当列头的表：表头由通用补框器包黄框（元素级），渲染里不再加 cell class
+    need(html, "var els = root.querySelectorAll('td,th,b,strong');",
+         "⑥ 通用补框器的元素级包框逻辑被删（表头/带 ▸ 的规格会漏框）")
 
     # ⑦ 规格编辑弹窗：行级，只框 8/9/10（长/宽/高 mm），不能框 4/5/6（房舍尺寸，带 rowspan）
     need(html, "var _solidBoxOci = [8, 9, 10];",
@@ -113,28 +115,29 @@ def main() -> int:
         ("slatsSolidNow(body);", "⑨ prod_renderTab 渲染后补框被删"),
         ("if(bodyEl && typeof slatsSolidNow==='function')", "⑨ 出库/入库弹窗补框被删"),
         ("slatsSolidNow(tb);", "⑨ 规格表重绘后补框被删"),
-        ("slatsSolidNow(el('slatsReportOverview'));", "⑨ 智能报告补框被删"),
+        ("slatsSolidNow(el('slatsReportOverview'));", "⑨ 智能报告概述表补框被删"),
+        ("slatsSolidNow(modal);", "⑨ 智能报告整个弹窗（规格分布/材料分布）补框被删"),
     ):
         need(html, anchor, label)
     if html.count("slatsSolidNow(") < 6:
         problems.append("⑨ slatsSolidNow 调用点少于 6 处（覆盖不全）")
 
-    # ⑩ 导出 xlsx：前端按钮 + 三语 key + 后端 double 边框
+    # ⑩ 导出 xlsx：前端按钮 + 三语 key + 后端黄色加粗边框
     need(html, "function exportSlatsSpecXlsx(){", "⑩ 导出函数被删")
     need(html, "onclick=\"exportSlatsSpecXlsx()\"", "⑩ 导出按钮被删")
     if html.count("slats_btn_export") < 4:
         problems.append("⑩ slats_btn_export 三语 key 不足（应有 按钮+zh/en/vi 共 4 处）")
     need(app, '@app.route("/api/slats-spec-export", methods=["POST"])',
          "⑩ 后端导出路由被删")
-    need(app, 'style="double"', "⑩ 后端必须用 double 边框")
-    need(app, "box_dbl", "⑩ 后端双线边框对象被删")
+    need(app, 'color="FFFFC400"', "⑩ 后端必须用黄色边框（#FFC400）")
+    need(app, "box_yes", "⑩ 后端黄色粗边框对象被删")
 
     if problems:
         print("[slats-solid-box-lock] ✗ 失败 %d 项：" % len(problems))
         for p in problems:
             print("   -", p)
         return 1
-    print("[slats-solid-box-lock] ✓ OK · 实心板 YES 双线黑框契约完整")
+    print("[slats-solid-box-lock] ✓ OK · 实心板 YES 黄色加粗框契约完整")
     return 0
 
 
