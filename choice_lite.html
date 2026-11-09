@@ -7741,6 +7741,17 @@ var WL_FLOW_IMG = {
     /* 读取签约项目里的水泥漏缝地板规格（concrete_floor_spec，与系统智能报告同源） */
     function prod_slatsRows(){
       var pid = PROD_CUR;
+      /* ★SLATS-SOLID-MAP-20261109（用户 2026-11-09：智能报告三个表实心板黄框全部消失）：
+         在「签约项目 / 智能报告 / 规格弹窗」等非生产视图里 PROD_CUR 是 null，
+         原逻辑会取不到规格 → 实心板尺寸集合为空 → slatsSolidSweep 直接 return 0，所有黄框消失。
+         这里补一层 pid 兜底（生产视图 PROD_CUR 有值时行为完全不变）。 */
+      if(pid===null || pid===undefined || pid===''){
+        try{
+          var _wm0 = document.getElementById('wonModal');
+          if(_wm0 && _wm0.dataset && _wm0.dataset.id) pid = _wm0.dataset.id;
+          if((pid===null||pid===undefined||pid==='') && window.__slatsSpecPid) pid = window.__slatsSpecPid;
+        }catch(e){}
+      }
       var raw = '';
       // 1) 优先从全局 WON 数据读取
       var p = (typeof globalWonData!=='undefined' && globalWonData) ? globalWonData.find(function(x){ return x.id==pid; }) : null;
@@ -7810,14 +7821,21 @@ var WL_FLOW_IMG = {
     /* 尺寸级 YES 集合：{ '1550×525×70':1, ... }（任一行 YES 即收录），按 rows 引用做缓存 */
     function slatsSizeSolidMap(){
       var rows = (typeof prod_slatsRows==='function') ? prod_slatsRows() : [];
-      if(SLATS_SOLID_MAP_CACHE.rows === rows && SLATS_SOLID_MAP_CACHE.map) return SLATS_SOLID_MAP_CACHE.map;
+      /* ★SLATS-SOLID-MAP-20261109：智能报告/规格弹窗会把自己手上的规格行登记到
+         window.__slatsSolidExtraRows，即使生产模块没打开（prod_slatsRows 为空）也能算出黄框集合 */
+      var extra = (window.__slatsSolidExtraRows && window.__slatsSolidExtraRows.length) ? window.__slatsSolidExtraRows : null;
+      if(SLATS_SOLID_MAP_CACHE.rows === rows && SLATS_SOLID_MAP_CACHE.extra === extra && SLATS_SOLID_MAP_CACHE.map) return SLATS_SOLID_MAP_CACHE.map;
       var map = {};
-      (rows||[]).forEach(function(r){
-        if(!slatsRowSolidYes(r)) return;
-        var k = slatsRowSizeKey(r);
-        if(k && k.indexOf('?')<0) map[k] = 1;
-      });
-      SLATS_SOLID_MAP_CACHE = { rows:rows, map:map };
+      var addRows = function(list){
+        (list||[]).forEach(function(r){
+          if(!slatsRowSolidYes(r)) return;
+          var k = slatsRowSizeKey(r);
+          if(k && k.indexOf('?')<0) map[k] = 1;
+        });
+      };
+      addRows(rows);
+      if(extra) addRows(extra);
+      SLATS_SOLID_MAP_CACHE = { rows:rows, extra:extra, map:map };
       return map;
     }
     function slatsSizeSolidYes(s){
@@ -49815,6 +49833,10 @@ function openSlatsReportModal(){
   try{ rows=JSON.parse(raw); if(!Array.isArray(rows)) rows=[]; }catch(e){ rows=[]; }
   rows=rows.filter(function(r){ return r && String(r.pig_house||'').trim()!==''; });
   rows=slatsSanitizeSpecRows(rows);
+  /* ★SLATS-SOLID-MAP-20261109：把本报告的规格行登记给实心板黄框判定器，
+     保证「水泥板规格分布表 / 水泥黄砂石子材料表」里 YES 尺寸一定有黄框
+     （此前它依赖生产模块的 PROD_CUR，在签约视图里为空 → 黄框全部消失） */
+  try{ window.__slatsSolidExtraRows = rows; if(_pid) window.__slatsSpecPid = _pid; }catch(e){};
   var rDual = rows.some(function(r){ return Number(r.mesh_layers)===2; });
   var _rebarSub = rDual ? (
     '<th data-i18n="slats_table_mesh_layers">'+_e(t.slats_table_mesh_layers)+'</th>'+
