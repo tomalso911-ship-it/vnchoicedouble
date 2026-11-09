@@ -11009,11 +11009,14 @@ var WL_FLOW_IMG = {
       var sel = el('pd_photo_select'); if(sel){
         if(!arr.length){ sel.innerHTML = ''; }
         else {
+          /* ★PHOTO-DEL-20261109（收货照片）：× 移出 <a>，避免点击被链接吃掉 */
           sel.innerHTML = arr.map(function(p,i){
-            return '<a href="/uploads/'+prod_esc(p)+'" class="photo-thumb-item" title="'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;">'
+            return '<div class="photo-thumb-wrap">'
+              + '<a href="/uploads/'+prod_esc(p)+'" class="photo-thumb-item" title="'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;">'
               + '<img src="/uploads/'+prod_esc(p)+'">'
-              + '<button type="button" class="photo-thumb-del" data-i18n-title="btn_remove_photo" onclick="event.preventDefault();event.stopPropagation();prodReceiptPhotoRemove('+i+')" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
-              + '</a>';
+              + '</a>'
+              + '<button type="button" class="photo-thumb-del" data-i18n-title="btn_remove_photo" onclick="event.preventDefault();event.stopPropagation();prodReceiptPhotoRemove('+i+');return false;" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
+              + '</div>';
           }).join('')
           + '<button type="button" class="photo-thumb-add" data-i18n-title="btn_add_photo" onclick="prodReceiptPhotoAdd()" title="'+prod_esc(pt('btn_add_photo'))+'">+</button>';
         }
@@ -11033,7 +11036,9 @@ var WL_FLOW_IMG = {
     function prodReceiptPhotoRemove(idx){
       var box = el('pd_photos'); if(!box) return;
       var arr=[]; try{ arr=JSON.parse(box.value||'[]'); }catch(e){}
-      if(idx>=0 && idx<arr.length){ arr.splice(idx,1); box.value=JSON.stringify(arr); }
+      /* ★PHOTO-DEL-20261109：无效下标直接返回，不再触发重绘（避免旧状态把照片刷回来） */
+      if(idx<0 || idx>=arr.length) return;
+      arr.splice(idx,1); box.value=JSON.stringify(arr);
       prod_renderReceiptPhotos();
     }
 
@@ -11086,11 +11091,14 @@ var WL_FLOW_IMG = {
       var sel = el('pe_photo_select'); if(sel){
         if(!arr.length){ sel.innerHTML = ''; }
         else {
+          /* ★PHOTO-DEL-20261109（生产照片）：× 移出 <a>，避免点击被链接吃掉 */
           sel.innerHTML = arr.map(function(p,i){
-            return '<a href="/uploads/'+prod_esc(p)+'" class="photo-thumb-item" title="'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;">'
+            return '<div class="photo-thumb-wrap">'
+              + '<a href="/uploads/'+prod_esc(p)+'" class="photo-thumb-item" title="'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;">'
               + '<img src="/uploads/'+prod_esc(p)+'">'
-              + '<button type="button" class="photo-thumb-del" data-i18n-title="btn_remove_photo" onclick="event.preventDefault();event.stopPropagation();prodProdPhotoRemove('+i+')" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
-              + '</a>';
+              + '</a>'
+              + '<button type="button" class="photo-thumb-del" data-i18n-title="btn_remove_photo" onclick="event.preventDefault();event.stopPropagation();prodProdPhotoRemove('+i+');return false;" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
+              + '</div>';
           }).join('');
         }
       }
@@ -11105,19 +11113,29 @@ var WL_FLOW_IMG = {
       document.body.appendChild(ov);
     }
     function prodProdPhotoRemove(idx){
-      var f = prod_get(PROD_CUR); if(!f) return;
+      /* ★PHOTO-DEL-20261109：先把界面/隐藏域改掉，再管服务器 KV。
+         旧版第一行 prod_get(PROD_CUR) 一旦取不到项目就整体 return，
+         表现为「点 × 完全没反应」。 */
       var box = el('pe_photos'); if(!box) return;
       var arr=[]; try{ arr=JSON.parse(box.value||'[]'); }catch(e){}
       if(idx<0 || idx>=arr.length) return;
       var fname = arr[idx];
       arr.splice(idx,1); box.value=JSON.stringify(arr);
-      var d = prod_photoDateKey(prod_val('pe_date')||ymdToDmy(prod_today()));
-      f.__prodPhotos_kv = prod_normPhotoKv(f.__prodPhotos_kv || {});
-      var kvArr = f.__prodPhotos_kv[d] || [];
-      for(var i=0;i<kvArr.length;i++){ if(kvArr[i]===fname){ kvArr.splice(i,1); break; } }
-      if(!kvArr.length) delete f.__prodPhotos_kv[d];
-      fetch('/api/inst-zone-photos/'+encodeURIComponent(fname)+'?me='+encodeURIComponent((typeof prod_loginUser==='function'?prod_loginUser():'')), { method:'DELETE' }).catch(function(){});
-      prod_saveProdPhotosToKv(f);
+      var f = null; try{ f = prod_get(PROD_CUR); }catch(e0){}
+      if(f){
+        var d = prod_photoDateKey(prod_val('pe_date')||ymdToDmy(prod_today()));
+        f.__prodPhotos_kv = prod_normPhotoKv(f.__prodPhotos_kv || {});
+        /* 同一日期可能以 dmy / ymd 两种键存在，全部清掉，避免重绘时照片复活 */
+        var forms = [d, (typeof ymdToDmy==='function'?ymdToDmy(d):''), (typeof dmyToYmd==='function'?dmyToYmd(d):'')];
+        forms.forEach(function(k){
+          if(!k) return;
+          var a = f.__prodPhotos_kv[k];
+          if(Array.isArray(a)) f.__prodPhotos_kv[k] = a.filter(function(x){ return x !== fname; });
+        });
+        if(!Array.isArray(f.__prodPhotos_kv[d])) f.__prodPhotos_kv[d] = [];
+        fetch('/api/inst-zone-photos/'+encodeURIComponent(fname)+'?me='+encodeURIComponent((typeof prod_loginUser==='function'?prod_loginUser():'')), { method:'DELETE' }).catch(function(){});
+        prod_saveProdPhotosToKv(f);
+      }
       prod_renderProdPhotos();
       try{ prod_updateHistoryPhotoCounts(); }catch(_){}
     }
