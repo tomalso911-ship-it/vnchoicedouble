@@ -62404,9 +62404,10 @@ function submitAuth() {
     planTetAdd:     { zh:'跨 TET 春节，增加 20 天非生产日', en:'Overlaps TET holiday: +20 non-working days', vi:'Trùng TET: cộng 20 ngày nghỉ' },
     planAcceptDays: { zh:'验收期固定 15 天', en:'Acceptance fixed 15 days', vi:'Nghiệm thu cố định 15 ngày' },
     planDay:        { zh:'天', en:'days', vi:'ngày' },
-    // ★CC-PLAN-INSTDATE-20261109（用户 2026-11-09）：「预计安装日期」输入框 + 日历选择器（默认生产结束后 4 周，可改）
+    // ★CC-PLAN-INSTDATE-20261109（用户 2026-11-09）：「预计安装日期」输入框 + 日历选择器
+    //   ★2026-11-09 用户更正：默认 = 生产开始日的第一天 + 4 周（不是生产结束日 + 4 周）
     planInstDate:     { zh:'预计安装日期', en:'Estimated installation date', vi:'Ngày dự kiến lắp đặt' },
-    planInstDateHint: { zh:'（默认 = 生产结束后 4 周，可用日历调整；甘特图与现金流安装用工同步跟随）', en:'(default = 4 weeks after production ends, editable; Gantt & cash-flow installation labor follow it)', vi:'(mặc định = 4 tuần sau khi kết thúc sản xuất, có thể sửa; Gantt & nhân công lắp đặt trong dòng tiền đi theo)' },
+    planInstDateHint: { zh:'（默认 = 生产开始日第一天 + 4 周，可用日历调整；甘特图与现金流安装用工同步跟随）', en:'(default = 4 weeks after the first production day, editable; Gantt & cash-flow installation labor follow it)', vi:'(mặc định = 4 tuần kể từ ngày sản xuất đầu tiên, có thể sửa; Gantt & nhân công lắp đặt trong dòng tiền đi theo)' },
     planInstNote:     { zh:'安装起始日 = 预计安装日期', en:'Installation starts on the estimated installation date', vi:'Bắt đầu lắp đặt theo ngày dự kiến lắp đặt' },
     // ★CC-GANTT-20261108（用户 2026-11-08 要求）：阶段表下方甘特图三语
     planGanttTitle: { zh:'执行甘特图（合同签订 → 项目结束）', en:'Execution Gantt (signing → project end)', vi:'Gantt thực hiện (ký HĐ → kết thúc dự án)' },
@@ -62573,7 +62574,7 @@ function submitAuth() {
       depr:{ years:2, periodMonths:0 },
       // ★CC-CASH-20261108：现金流测算参数（定金日/定金比例/生产款比例/安装款比例/展示货币）
       cash:{ depositDate:'', depositPct:20, prodPct:40, instPct:40, cur:'VND' },
-      // ★CC-PLAN-INSTDATE-20261109：签约日 / 工厂承建结束日 / 预计安装日期（'' = 未手选，自动取生产结束后 4 周）
+      // ★CC-PLAN-INSTDATE-20261109：签约日 / 工厂承建结束日 / 预计安装日期（'' = 未手选，自动取生产开始日第一天 + 4 周）
       plan:{ sign:'', factoryEnd:'', instDate:'' }
     };
   }
@@ -63380,13 +63381,13 @@ function submitAuth() {
      数据：CC_DATA.plan = { sign:'YYYY-MM-DD', factoryEnd:'YYYY-MM-DD', instDate:'YYYY-MM-DD' }（随 ccScheduleSave 落盘 prod_kv/cost_calc_v1）
      规则（用户指定）：工厂结束日默认 = 签约日 + 45 天；生产从工厂结束日次日开始，按「生产项目天数」；
      ★CC-PLAN-INSTDATE-20261109（用户 2026-11-09）：安装不再固定接在生产结束次日，改为跟随「预计安装日期」
-       （instDate 手选值优先；未手选时默认 = 生产结束日 + 4 周），甘特图与现金流安装用工窗口自动跟随 r.instStart；
+       （instDate 手选值优先；未手选时默认 = 生产开始日第一天 + 4 周，2026-11-09 用户更正口径），甘特图与现金流安装用工窗口自动跟随 r.instStart；
      跨越 TET 春节 +20 天非生产日；最后验收期固定 15 天 → 项目结束。 */
   var CC_PLAN_TET = ['2025-01-29','2026-02-17','2027-02-06','2028-01-26','2029-02-13','2030-02-03','2031-01-23'];
   var CC_PLAN_TET_EXTRA = 20;    // 遇 TET 增加的非生产日
   var CC_PLAN_ACCEPT = 15;       // 验收期固定天数
   var CC_PLAN_FACTORY_DAYS = 45; // 工厂承建&试运行默认天数
-  var CC_PLAN_INST_WEEKS = 4;    // ★CC-PLAN-INSTDATE：生产结束后 4 周开始安装
+  var CC_PLAN_INST_WEEKS = 4;    // ★CC-PLAN-INSTDATE：生产开始日第一天 + 4 周开始安装
   var CC_PLAN_INST_OFFSET = CC_PLAN_INST_WEEKS * 7; // 默认偏移 28 天
   function ccPlanYmdOk(s){ return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
   function ccPlanAddDays(ymd, n){
@@ -63414,12 +63415,13 @@ function submitAuth() {
     if(!CC_DATA.plan || typeof CC_DATA.plan !== 'object') CC_DATA.plan = { sign:'', factoryEnd:'', instDate:'' };
     if(CC_DATA.plan.sign == null) CC_DATA.plan.sign = '';
     if(CC_DATA.plan.factoryEnd == null) CC_DATA.plan.factoryEnd = '';
-    // ★CC-PLAN-INSTDATE：'' = 从未手选 → 自动按默认值（生产结束后 4 周）；一旦手选就一直生效
+    // ★CC-PLAN-INSTDATE：'' = 从未手选 → 自动按默认值（生产开始日第一天 + 4 周）；一旦手选就一直生效
     if(CC_DATA.plan.instDate == null) CC_DATA.plan.instDate = '';
     return CC_DATA.plan;
   }
-  function ccPlanInstDefault(prodEnd){
-    return ccPlanYmdOk(prodEnd) ? ccPlanAddDays(prodEnd, CC_PLAN_INST_OFFSET) : '';
+  // ★CC-PLAN-INSTDATE-20261109（用户更正）：基准日 = 生产开始日第一天（r.prodStart），不是生产结束日
+  function ccPlanInstDefault(prodStart){
+    return ccPlanYmdOk(prodStart) ? ccPlanAddDays(prodStart, CC_PLAN_INST_OFFSET) : '';
   }
   function ccPlanCalc(){
     var p = ccPlanState(), d = (CC_DATA && CC_DATA.demand) || {};
@@ -63437,10 +63439,10 @@ function submitAuth() {
     r.prodStart = ps;
     r.prodExtra = tetP ? CC_PLAN_TET_EXTRA : 0;
     r.prodEnd = tetP ? ccPlanAddDays(ps, pd - 1 + CC_PLAN_TET_EXTRA) : peRaw;
-    // ★CC-PLAN-INSTDATE-20261109：安装起始日 = 预计安装日期（手选优先，未手选 = 生产结束日 + 4 周）
-    r.instDefault = ccPlanInstDefault(r.prodEnd);
+    // ★CC-PLAN-INSTDATE-20261109：安装起始日 = 预计安装日期（手选优先，未手选 = 生产开始日第一天 + 4 周）
+    r.instDefault = ccPlanInstDefault(r.prodStart);
     r.instAuto = !ccPlanYmdOk(p.instDate);
-    r.instDate = r.instAuto ? (r.instDefault || ccPlanAddDays(r.prodEnd, 1)) : p.instDate;
+    r.instDate = r.instAuto ? (r.instDefault || ccPlanAddDays(r.prodStart, 1)) : p.instDate;
     var is = r.instDate;
     var ieRaw = idn > 0 ? ccPlanAddDays(is, idn - 1) : is;
     var tetI = (idn > 0) && ccPlanHitsTet(is, ieRaw);
@@ -63468,7 +63470,7 @@ function submitAuth() {
     // ★CC-PLAN-DATEUI-20261108（用户 2026-11-08 要求）：两个日期框等宽 + 文本左对齐 + 淡黄底（与页面其它输入框统一）
     var inp = 'height:26px;width:150px;box-sizing:border-box;border:1px solid #7aa7d4;border-radius:4px;padding:1px 6px;background:#fff59d;font-size:13px;text-align:left;';
     var facVal = p.factoryEnd || (p.sign ? ccPlanAddDays(p.sign, CC_PLAN_FACTORY_DAYS) : '');
-    // ★CC-PLAN-INSTDATE：输入框显示「手选值」或「默认值（生产结束后 4 周）」，日期控件用原生 type=date 日历选择器
+    // ★CC-PLAN-INSTDATE：输入框显示「手选值」或「默认值（生产开始日第一天 + 4 周）」，日期控件用原生 type=date 日历选择器
     var instVal = ccPlanYmdOk(p.instDate) ? p.instDate : (r.instDefault || '');
     var tetNote = ccT('planTetAdd');
     var h = '<div class="cc-sec">' + ccT('planTitle') + '</div>';
@@ -63516,7 +63518,7 @@ function submitAuth() {
     set('cc_pl_acc_e', ccPlanFmt(r.accEnd));
     set('cc_pl_acc_n', ccT('planAcceptDays'));
     set('cc_plan_projend', ccPlanFmt(r.projEnd));
-    // ★CC-PLAN-INSTDATE：未手选时，预计安装日期输入框随生产结束日自动跟随「+4 周」默认值；手选值永不被覆盖
+    // ★CC-PLAN-INSTDATE：未手选时，预计安装日期输入框随生产开始日自动跟随「+4 周」默认值；手选值永不被覆盖
     var instInp = document.getElementById('cc_plan_inst');
     if(instInp && r.instAuto) instInp.value = r.instDefault || '';
     // ★CC-GANTT-20261108：日期/天数变化后同步重绘甘特图（不动任何计算）
@@ -63534,7 +63536,7 @@ function submitAuth() {
       var fi = document.getElementById('cc_plan_factory');
       if(fi) fi.value = p.factoryEnd;
     } else if(which === 'instDate'){
-      // ★CC-PLAN-INSTDATE：合法日期 = 用户手选且一直生效；清空 = 恢复默认（生产结束后 4 周）
+      // ★CC-PLAN-INSTDATE：合法日期 = 用户手选且一直生效；清空 = 恢复默认（生产开始日第一天 + 4 周）
       p.instDate = ccPlanYmdOk(val) ? val : '';
       if(!ccPlanYmdOk(val)){
         var rr = ccPlanCalc();
