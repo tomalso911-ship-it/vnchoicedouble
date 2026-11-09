@@ -62381,6 +62381,12 @@ function submitAuth() {
     priceNoVat:  { zh:'未税卖价', en:'Price excl. VAT', vi:'Giá chưa VAT' },
     priceVat:    { zh:'含税卖价', en:'Price incl. VAT', vi:'Giá gồm VAT' },
     perM2:       { zh:'折合每㎡单价（含税）', en:'Price per ㎡ (incl. VAT)', vi:'Đơn giá mỗi ㎡ (gồm VAT)' },
+    // ★CC-MGMT-BASE-20261109（用户 2026-11-09）：报价计算新增「骨料成本 / 其他成本 / 管理费计算基数」三行（全程三语）
+    //   骨料由客户自供 → 系统未作价（不进总成本），但后台仍按骨料表 数量×单价 估价，只加入管理费计算基数。
+    aggCost:     { zh:'骨料成本（客户自供 · 后台估价，仅作管理费基数）', en:'Aggregate cost (owner-supplied · backend estimate, overhead base only)', vi:'Chi phí cốt liệu (chủ đầu tư cung cấp · ước tính nội bộ, chỉ làm cơ sở phí quản lý)' },
+    otherCost:   { zh:'其他成本（原计算基数：折旧 + 骨料 + 人工 + 运营 + 间接）', en:'Other costs (original base: depreciation + aggregates + labor + opex + indirect)', vi:'Chi phí khác (cơ sở cũ: khấu hao + cốt liệu + nhân công + vận hành + gián tiếp)' },
+    mgmtBase:    { zh:'管理费计算基数（骨料成本 + 其他成本）', en:'Overhead base (aggregate cost + other costs)', vi:'Cơ sở tính phí quản lý (chi phí cốt liệu + chi phí khác)' },
+    mgmtBaseTip: { zh:'以上述合计为基数，乘以输入的比例，得出 #5 管理费用；骨料成本不计入总成本。', en:'#5 Management overhead = the above total × the entered ratio; aggregate cost is NOT added to total cost.', vi:'Phí quản lý #5 = tổng trên × tỷ lệ đã nhập; chi phí cốt liệu KHÔNG được cộng vào tổng chi phí.' },
     // ★CC-PLAN-20261108（用户 2026-11-08 要求）：报价计算下方「项目签约&执行计划」三语
     planTitle:      { zh:'项目签约&执行计划', en:'Contract signing & execution plan', vi:'Ký hợp đồng & kế hoạch thực hiện' },
     planSign:       { zh:'合同签约日期', en:'Contract signing date', vi:'Ngày ký hợp đồng' },
@@ -62398,6 +62404,10 @@ function submitAuth() {
     planTetAdd:     { zh:'跨 TET 春节，增加 20 天非生产日', en:'Overlaps TET holiday: +20 non-working days', vi:'Trùng TET: cộng 20 ngày nghỉ' },
     planAcceptDays: { zh:'验收期固定 15 天', en:'Acceptance fixed 15 days', vi:'Nghiệm thu cố định 15 ngày' },
     planDay:        { zh:'天', en:'days', vi:'ngày' },
+    // ★CC-PLAN-INSTDATE-20261109（用户 2026-11-09）：「预计安装日期」输入框 + 日历选择器（默认生产结束后 4 周，可改）
+    planInstDate:     { zh:'预计安装日期', en:'Estimated installation date', vi:'Ngày dự kiến lắp đặt' },
+    planInstDateHint: { zh:'（默认 = 生产结束后 4 周，可用日历调整；甘特图与现金流安装用工同步跟随）', en:'(default = 4 weeks after production ends, editable; Gantt & cash-flow installation labor follow it)', vi:'(mặc định = 4 tuần sau khi kết thúc sản xuất, có thể sửa; Gantt & nhân công lắp đặt trong dòng tiền đi theo)' },
+    planInstNote:     { zh:'安装起始日 = 预计安装日期', en:'Installation starts on the estimated installation date', vi:'Bắt đầu lắp đặt theo ngày dự kiến lắp đặt' },
     // ★CC-GANTT-20261108（用户 2026-11-08 要求）：阶段表下方甘特图三语
     planGanttTitle: { zh:'执行甘特图（合同签订 → 项目结束）', en:'Execution Gantt (signing → project end)', vi:'Gantt thực hiện (ký HĐ → kết thúc dự án)' },
     planPhContract: { zh:'合同签订', en:'Contract signing', vi:'Ký hợp đồng' },
@@ -62449,6 +62459,11 @@ function submitAuth() {
     cfTotalRow:  { zh:'合计', en:'Total', vi:'Tổng' },
     cfNote:      { zh:'测算口径：定金按比例在定金日入账；生产款 = 当月生产片数×合同单价×比例，当月入账；安装款 = 各月安装片数×合同单价×比例累计，验收后第 10 个工作日一次性入账。建厂投入（机械/车辆/工具全额）按签约日→工厂承建结束日均摊；原材料按生产进度分摊；人工按各月生产/安装天数计；运营费用取「费用/月×发生周期」；间接费用计入签约月。工作日口径 = 周一至周五且剔除 TET 春节当日。', en:'Basis: deposit booked on the deposit date; production payment = month pieces × contract unit price × ratio, same month; installation payment = Σ(month pieces × unit price × ratio), received in one lump on the 10th working day after acceptance. Plant investment (full machinery/vehicle/tool cost) spread from signing to factory completion; materials follow production progress; labor by production/installation days per month; operating cost = monthly fee × period; indirect cost booked in the signing month. Working day = Mon–Fri excluding the TET date.', vi:'Cơ sở: đặt cọc ghi nhận đúng ngày; thanh toán sản xuất = số tấm trong tháng × đơn giá hợp đồng × tỷ lệ, ghi nhận trong tháng; thanh toán lắp đặt = Σ(số tấm lắp đặt × đơn giá × tỷ lệ), nhận một lần vào ngày làm việc thứ 10 sau nghiệm thu. Đầu tư nhà máy (toàn bộ máy móc/xe/dụng cụ) phân bổ từ ngày ký đến ngày hoàn thành nhà máy; nguyên liệu theo tiến độ sản xuất; nhân công theo số ngày sản xuất/lắp đặt từng tháng; chi phí vận hành = phí/tháng × kỳ; chi phí gián tiếp ghi nhận tháng ký. Ngày làm việc = thứ 2–thứ 6, trừ ngày TET.' },
     cfNeedSign:  { zh:'填写「合同签约日期」后自动生成月度现金流测算。', en:'Enter the contract signing date to generate the monthly cash flow projection.', vi:'Nhập ngày ký hợp đồng để tạo dự báo dòng tiền theo tháng.' },
+    // ★CC-CASH-INSTDATE-20261109（用户 2026-11-09）：现金流显式展示预计安装日期与安装用工窗口（跟随计划联动）
+    cfInstDate:    { zh:'预计安装日期（映射「项目签约&执行计划」）', en:'Estimated installation date (mirrored from the plan)', vi:'Ngày dự kiến lắp đặt (lấy theo kế hoạch)' },
+    cfInstLabor:   { zh:'安装用工窗口', en:'Installation labor window', vi:'Khung thời gian nhân công lắp đặt' },
+    cfInstLaborTip:{ zh:'现金流中的安装用工天数、安装款与验收日期均随预计安装日期联动。', en:'Installation labor days, installation payment and acceptance in the cash flow all follow the estimated installation date.', vi:'Số ngày nhân công lắp đặt, thanh toán lắp đặt và ngày nghiệm thu trong dòng tiền đều đi theo ngày dự kiến lắp đặt.' },
+    cfInstLaborNone:{ zh:'（填写签约日期后显示）', en:'(shown after the signing date is entered)', vi:'(hiện sau khi nhập ngày ký hợp đồng)' },
     machNote:    { zh:'注：机械类为一次性投入，全额计入本单总成本。', en:'Note: machinery is a one-time investment, fully counted in total cost.', vi:'Lưu ý: máy móc là đầu tư một lần, tính toàn bộ vào tổng chi phí.' },
     laborNote:   { zh:'注：人工按「项目天数」（生产/安装分别计算）、运营费用按 ROUNDUP((生产项目天数+30)/30, 1) 个月自动乘算。', en:'Note: labor uses project days (production / installation separately); opex uses ROUNDUP((production days + 30)/30, 1) months.', vi:'Lưu ý: nhân công tính theo số ngày dự án (sản xuất / lắp đặt riêng); vận hành nhân theo ROUNDUP((số ngày sản xuất + 30)/30, 1) tháng.' },
     // ★CC-MACH-PRESET-20261105：1.1 生产机械 & 设备 / 1.2 工程车辆 / 1.3 工具 & 耗材 预设行名称（专业术语三语）
@@ -62557,7 +62572,9 @@ function submitAuth() {
       // ★CC-DEPR-20261105：设备折旧块状态；years=折旧年限(年,默认2,可编辑)；periodMonths 已弃用(20261105 周期改只读，恒=运营费用发生周期)
       depr:{ years:2, periodMonths:0 },
       // ★CC-CASH-20261108：现金流测算参数（定金日/定金比例/生产款比例/安装款比例/展示货币）
-      cash:{ depositDate:'', depositPct:20, prodPct:40, instPct:40, cur:'VND' }
+      cash:{ depositDate:'', depositPct:20, prodPct:40, instPct:40, cur:'VND' },
+      // ★CC-PLAN-INSTDATE-20261109：签约日 / 工厂承建结束日 / 预计安装日期（'' = 未手选，自动取生产结束后 4 周）
+      plan:{ sign:'', factoryEnd:'', instDate:'' }
     };
   }
   function ccMerge(saved){
@@ -62678,6 +62695,21 @@ function submitAuth() {
     if(!m || !Object.prototype.hasOwnProperty.call(m, path)) return 1;
     var v = m[path];
     return (v === 0 || v === false || v === '0' || v === 'no') ? 0 : 1;
+  }
+  // ★CC-AGG-BASE-20261109（用户 2026-11-09）：客户自供骨料的【后台估价】
+  //   「Choice VN 提供吗」为 × 的骨料行系统未作价（不进 baseCost），但用户要求后台仍按 数量×单价 算出价格，
+  //   作为「骨料成本」加入【管理费计算基数】；已作价（√）的行不再计入，避免与 baseCost 里的 agg 重复。
+  //   ★只影响管理费的取数基数，绝不加入总成本/未税卖价/含税卖价，也不单独写盘。
+  function ccAggSelfCost(){
+    var d = (typeof CC_DATA !== 'undefined' && CC_DATA) ? CC_DATA : null;
+    if(!d || !d.agg) return 0;
+    var s = 0;
+    Object.keys(d.agg).forEach(function(k){
+      if(ccProv('agg.' + k)) return;
+      var a = d.agg[k] || {};
+      s += (Number(a.qty) || 0) * (Number(a.price) || 0);
+    });
+    return s;
   }
   function ccProvTh(){ // Choice VN 固定不翻译，只翻译「提供吗？」
     return '<th rowspan="2" class="cc-prov-th" style="width:78px;">Choice VN ' + ccT('provideQ') + '</th>';
@@ -63320,6 +63352,11 @@ function submitAuth() {
       ccSumRow(ccT('aggTotal'), 'cc_v_agg') +
       ccSumRow(ccT('laborTotal'), 'cc_v_labor') +
       ccSumRow(ccT('indTotal'), 'cc_v_ind') +
+      // ★CC-MGMT-BASE-20261109（用户 2026-11-09）：骨料成本 / 其他成本 / 管理费计算基数（三币三色：¥蓝 $红 ₫绿）
+      ccSumRow(ccT('aggCost'), 'cc_v_agg_cost') +
+      ccSumRow(ccT('otherCost'), 'cc_v_other_cost') +
+      ccSumRow(ccT('mgmtBase'), 'cc_v_mgmt_base') +
+      '<tr><td colspan="4" style="font-size:12px;color:#555;background:#f7fbff;padding:4px 8px;line-height:1.7;">' + ccT('mgmtBaseTip') + '</td></tr>' +
       ccSumRow(ccT('mgmtFee') + '：<input class="cc-in" id="cc_mgmt_pct" value="' + (Number(CC_DATA.mgmtPct) || 0).toFixed(2) + '%" inputmode="decimal" autocomplete="off" style="width:80px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;">', 'cc_v_mgmt') +
       ccSumRow(ccT('sumDepr'), 'cc_v_depr') + // ★CC-DEPR-20261105：#6 项目期间设备折旧计入总成本
       ccSumRow(ccT('totalCost'), 'cc_v_total', 'cc-big') +
@@ -63340,13 +63377,17 @@ function submitAuth() {
     return h;
   }
   /* ==================== ★CC-PLAN-20261108 项目签约&执行计划 ====================
-     数据：CC_DATA.plan = { sign:'YYYY-MM-DD', factoryEnd:'YYYY-MM-DD' }（随 ccScheduleSave 落盘 prod_kv/cost_calc_v1）
+     数据：CC_DATA.plan = { sign:'YYYY-MM-DD', factoryEnd:'YYYY-MM-DD', instDate:'YYYY-MM-DD' }（随 ccScheduleSave 落盘 prod_kv/cost_calc_v1）
      规则（用户指定）：工厂结束日默认 = 签约日 + 45 天；生产从工厂结束日次日开始，按「生产项目天数」；
-     安装接着生产结束日，按「安装项目天数」；跨越 TET 春节 +20 天非生产日；最后验收期固定 15 天 → 项目结束。 */
+     ★CC-PLAN-INSTDATE-20261109（用户 2026-11-09）：安装不再固定接在生产结束次日，改为跟随「预计安装日期」
+       （instDate 手选值优先；未手选时默认 = 生产结束日 + 4 周），甘特图与现金流安装用工窗口自动跟随 r.instStart；
+     跨越 TET 春节 +20 天非生产日；最后验收期固定 15 天 → 项目结束。 */
   var CC_PLAN_TET = ['2025-01-29','2026-02-17','2027-02-06','2028-01-26','2029-02-13','2030-02-03','2031-01-23'];
   var CC_PLAN_TET_EXTRA = 20;    // 遇 TET 增加的非生产日
   var CC_PLAN_ACCEPT = 15;       // 验收期固定天数
   var CC_PLAN_FACTORY_DAYS = 45; // 工厂承建&试运行默认天数
+  var CC_PLAN_INST_WEEKS = 4;    // ★CC-PLAN-INSTDATE：生产结束后 4 周开始安装
+  var CC_PLAN_INST_OFFSET = CC_PLAN_INST_WEEKS * 7; // 默认偏移 28 天
   function ccPlanYmdOk(s){ return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
   function ccPlanAddDays(ymd, n){
     if(!ccPlanYmdOk(ymd)) return '';
@@ -63370,10 +63411,15 @@ function submitAuth() {
   }
   function ccPlanState(){
     if(!CC_DATA) CC_DATA = ccDef();
-    if(!CC_DATA.plan || typeof CC_DATA.plan !== 'object') CC_DATA.plan = { sign:'', factoryEnd:'' };
+    if(!CC_DATA.plan || typeof CC_DATA.plan !== 'object') CC_DATA.plan = { sign:'', factoryEnd:'', instDate:'' };
     if(CC_DATA.plan.sign == null) CC_DATA.plan.sign = '';
     if(CC_DATA.plan.factoryEnd == null) CC_DATA.plan.factoryEnd = '';
+    // ★CC-PLAN-INSTDATE：'' = 从未手选 → 自动按默认值（生产结束后 4 周）；一旦手选就一直生效
+    if(CC_DATA.plan.instDate == null) CC_DATA.plan.instDate = '';
     return CC_DATA.plan;
+  }
+  function ccPlanInstDefault(prodEnd){
+    return ccPlanYmdOk(prodEnd) ? ccPlanAddDays(prodEnd, CC_PLAN_INST_OFFSET) : '';
   }
   function ccPlanCalc(){
     var p = ccPlanState(), d = (CC_DATA && CC_DATA.demand) || {};
@@ -63382,6 +63428,7 @@ function submitAuth() {
     var fac = p.factoryEnd || '';
     if(!fac && p.sign) fac = ccPlanAddDays(p.sign, CC_PLAN_FACTORY_DAYS);
     var r = { prodStart:'', prodEnd:'', instStart:'', instEnd:'', accStart:'', accEnd:'', projEnd:'',
+              instDate:'', instDefault:'', instAuto:true,
               prodDays:pd, instDays:idn, prodExtra:0, instExtra:0 };
     if(!fac) return r;
     var ps = ccPlanAddDays(fac, 1);
@@ -63390,7 +63437,11 @@ function submitAuth() {
     r.prodStart = ps;
     r.prodExtra = tetP ? CC_PLAN_TET_EXTRA : 0;
     r.prodEnd = tetP ? ccPlanAddDays(ps, pd - 1 + CC_PLAN_TET_EXTRA) : peRaw;
-    var is = ccPlanAddDays(r.prodEnd, 1);
+    // ★CC-PLAN-INSTDATE-20261109：安装起始日 = 预计安装日期（手选优先，未手选 = 生产结束日 + 4 周）
+    r.instDefault = ccPlanInstDefault(r.prodEnd);
+    r.instAuto = !ccPlanYmdOk(p.instDate);
+    r.instDate = r.instAuto ? (r.instDefault || ccPlanAddDays(r.prodEnd, 1)) : p.instDate;
+    var is = r.instDate;
     var ieRaw = idn > 0 ? ccPlanAddDays(is, idn - 1) : is;
     var tetI = (idn > 0) && ccPlanHitsTet(is, ieRaw);
     r.instStart = is;
@@ -63417,14 +63468,19 @@ function submitAuth() {
     // ★CC-PLAN-DATEUI-20261108（用户 2026-11-08 要求）：两个日期框等宽 + 文本左对齐 + 淡黄底（与页面其它输入框统一）
     var inp = 'height:26px;width:150px;box-sizing:border-box;border:1px solid #7aa7d4;border-radius:4px;padding:1px 6px;background:#fff59d;font-size:13px;text-align:left;';
     var facVal = p.factoryEnd || (p.sign ? ccPlanAddDays(p.sign, CC_PLAN_FACTORY_DAYS) : '');
+    // ★CC-PLAN-INSTDATE：输入框显示「手选值」或「默认值（生产结束后 4 周）」，日期控件用原生 type=date 日历选择器
+    var instVal = ccPlanYmdOk(p.instDate) ? p.instDate : (r.instDefault || '');
     var tetNote = ccT('planTetAdd');
     var h = '<div class="cc-sec">' + ccT('planTitle') + '</div>';
-    h += '<div style="display:flex;flex-wrap:wrap;gap:16px 22px;align-items:center;margin:6px 0 10px;font-size:13px;">'
+    h += '<div style="display:flex;flex-wrap:wrap;gap:16px 22px;align-items:center;margin:6px 0 4px;font-size:13px;">'
       + '<label style="display:flex;align-items:center;gap:6px;"><span style="font-weight:600;color:#1a3c6e;">' + ccT('planSign') + '：</span>'
       + '<input type="date" id="cc_plan_sign" value="' + (p.sign || '') + '" autocomplete="off" onchange="ccPlanChange(\'sign\',this.value)" style="' + inp + '"' + dis + '></label>'
       + '<label style="display:flex;align-items:center;gap:6px;"><span style="font-weight:600;color:#1a3c6e;">' + ccT('planFactory') + '：</span>'
       + '<input type="date" id="cc_plan_factory" value="' + facVal + '" autocomplete="off" onchange="ccPlanChange(\'factory\',this.value)" style="' + inp + '"' + dis + '></label>'
-      + '<span style="font-size:12px;color:#888;">' + ccT('planFactoryHint') + '</span></div>';
+      + '<label style="display:flex;align-items:center;gap:6px;"><span style="font-weight:600;color:#1a3c6e;">' + ccT('planInstDate') + '：</span>'
+      + '<input type="date" id="cc_plan_inst" value="' + instVal + '" autocomplete="off" onchange="ccPlanChange(\'instDate\',this.value)" style="' + inp + '"' + dis + '></label></div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:2px 22px;align-items:center;margin:0 0 10px;font-size:12px;color:#888;">'
+      + '<span>' + ccT('planFactoryHint') + '</span><span>' + ccT('planInstDateHint') + '</span></div>';
     h += '<table class="cc-sum"><thead><tr>'
       + '<th style="width:110px;">' + ccT('planPhase') + '</th>'
       + '<th style="width:120px;">' + ccT('planStart') + '</th>'
@@ -63460,6 +63516,9 @@ function submitAuth() {
     set('cc_pl_acc_e', ccPlanFmt(r.accEnd));
     set('cc_pl_acc_n', ccT('planAcceptDays'));
     set('cc_plan_projend', ccPlanFmt(r.projEnd));
+    // ★CC-PLAN-INSTDATE：未手选时，预计安装日期输入框随生产结束日自动跟随「+4 周」默认值；手选值永不被覆盖
+    var instInp = document.getElementById('cc_plan_inst');
+    if(instInp && r.instAuto) instInp.value = r.instDefault || '';
     // ★CC-GANTT-20261108：日期/天数变化后同步重绘甘特图（不动任何计算）
     var g = document.getElementById('cc_plan_gantt');
     if(g){ g.innerHTML = ccPlanGanttInner(); setTimeout(ccPlanGanttFit, 0); }
@@ -63474,6 +63533,14 @@ function submitAuth() {
       p.factoryEnd = val ? ccPlanAddDays(val, CC_PLAN_FACTORY_DAYS) : '';
       var fi = document.getElementById('cc_plan_factory');
       if(fi) fi.value = p.factoryEnd;
+    } else if(which === 'instDate'){
+      // ★CC-PLAN-INSTDATE：合法日期 = 用户手选且一直生效；清空 = 恢复默认（生产结束后 4 周）
+      p.instDate = ccPlanYmdOk(val) ? val : '';
+      if(!ccPlanYmdOk(val)){
+        var rr = ccPlanCalc();
+        var iel = document.getElementById('cc_plan_inst');
+        if(iel) iel.value = rr.instDefault || '';
+      }
     } else {
       p.factoryEnd = val;
     }
@@ -63563,6 +63630,9 @@ function submitAuth() {
     for(var tq = 0; tq < tets.length; tq++){
       head += '<span class="cc-gantt-tetlbl" style="left:' + tets[tq].toFixed(3) + '%">' + ccT('planTet') + '</span>';
     }
+    // ★CC-PLAN-INSTDATE-20261109：甘特图「安装」条起点 = 预计安装日期（ccPlanCalc().instStart），在此显式标注
+    h += '<div class="cc-note" style="margin:0 0 6px;font-size:12px;color:#1a3c6e;">'
+      + ccT('planInstNote') + '：<b>' + ccPlanFmt(r.instStart) + '</b></div>';
     h += '<div class="cc-gantt-head"><div class="cc-gantt-lab"></div><div class="cc-gantt-track">' + gridHtml() + head + '</div></div>';
     for(var k = 0; k < rows.length; k++){
       var row = rows[k], cell = gridHtml();
@@ -63711,13 +63781,16 @@ function submitAuth() {
     Object.keys(d.ind).forEach(function(k){ if(k !== 'office' && ccProv('ind.' + k)) ind += Number(d.ind[k]) || 0; });
     var deprTotal = (mach / Math.max(0.0001, Number((d.depr || {}).years) || 2) / 12) * ccOpexPeriod();
     var baseCost = deprTotal + agg + labor + opex + ind;
-    var mgmtAmt = baseCost * (Number(d.mgmtPct) || 0) / 100;
+    // ★CC-MGMT-BASE-20261109：首帧兜底口径必须与 ccRecalc 完全一致（骨料成本只进管理费基数）
+    var aggSelf = ccAggSelfCost(), mgmtBase = baseCost + aggSelf;
+    var mgmtAmt = mgmtBase * (Number(d.mgmtPct) || 0) / 100;
     var total = baseCost + mgmtAmt;
     var mF = 1 - (Number(d.margin) || 0) / 100;
     var pNoVat = mF > 0 ? total / mF : 0;
     var pVat = pNoVat + pNoVat * (Number(d.vat) || 0) / 100;
     return { blocks:blocks, area:area, pVat:pVat, pNoVat:pNoVat, mach:mach, agg:agg, labor:labor, opex:opex,
-             opexMonthly:opexMonthly, ind:ind, mgmtAmt:mgmtAmt, total:total };
+             opexMonthly:opexMonthly, ind:ind, aggSelf:aggSelf, otherCost:baseCost, mgmtBase:mgmtBase,
+             mgmtAmt:mgmtAmt, total:total };
   }
   function ccCashCalc(){
     var p = ccPlanState(), r = ccPlanCalc(), cs = ccCashState(), S = ccCashSum();
@@ -63939,6 +64012,20 @@ function submitAuth() {
       + '</tr></tfoot></table></div>';
     return h;
   }
+  // ★CC-CASH-INSTDATE-20261109（用户 2026-11-09）：现金流显式显示预计安装日期与安装用工窗口
+  //   安装人工（ccCashCalc 中按 r.instStart → instEndW 逐日累加）、安装款、验收日全部取自 ccPlanCalc，
+  //   因此改「预计安装日期」后现金流安装部分自动跟随；此处只做版式呈现，不参与计算、不写盘。
+  function ccCashPlanHtml(){
+    var r = ccPlanCalc();
+    var instEndW = (r.instExtra > 0) ? ccPlanAddDays(r.instEnd, -r.instExtra) : r.instEnd;
+    if(!ccPlanYmdOk(r.instStart)) return '<div class="cc-note">' + ccT('cfInstLaborNone') + '</div>';
+    var days = (ccPlanYmdOk(instEndW) && instEndW >= r.instStart) ? (ccPlanDaysBetween(r.instStart, instEndW) + 1) : 0;
+    return '<div style="font-size:12px;color:#1a3c6e;line-height:1.9;">'
+      + ccT('cfInstDate') + '：<b style="color:#d32f2f;">' + ccPlanFmt(r.instStart) + '</b>'
+      + ' · ' + ccT('cfInstLabor') + '：<b>' + ccPlanFmt(r.instStart) + ' → ' + ccPlanFmt(instEndW)
+      + '（' + days + ' ' + ccT('planDay') + '）</b><br>'
+      + '<span style="color:#888;">' + ccT('cfInstLaborTip') + '</span></div>';
+  }
   function ccCashHtml(ro){
     var cs = ccCashState(), p = ccPlanState();
     var dis = ro ? ' disabled' : '';
@@ -63952,6 +64039,7 @@ function submitAuth() {
       + '<span><span style="' + lbl + '">' + ccT('cfSign') + '：</span><b style="color:#d32f2f;">' + (ccPlanYmdOk(p.sign) ? ccPlanFmt(p.sign) : '—') + '</b>'
       + '<span style="font-size:12px;color:#888;">' + esc(ccT('cfSignMap')) + '</span></span>'
       + '</div>';
+    h += '<div id="cc_cash_plan" style="margin:0 0 8px;padding:4px 8px;background:#f7fbff;border-left:3px solid #1a56b0;">' + ccCashPlanHtml() + '</div>';
     h += '<div style="display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;font-size:13px;margin:0 0 8px;">'
       + '<label style="display:flex;align-items:center;gap:6px;"><span style="' + lbl + '">' + ccT('cfDepDate') + '：</span>'
       + '<input type="date" id="cc_cash_dep" value="' + (depVal || '') + '" autocomplete="off" onchange="ccCashChange(\'dep\',this.value)" style="' + hinp + '"' + dis + '></label>'
@@ -63973,6 +64061,9 @@ function submitAuth() {
   }
   function ccCashRefresh(){
     var d = ccCashCalc();
+    // ★CC-CASH-INSTDATE：预计安装日期/安装用工窗口随计划联动刷新
+    var pl = document.getElementById('cc_cash_plan');
+    if(pl) pl.innerHTML = ccCashPlanHtml();
     var k = document.getElementById('cc_cash_kpi');
     if(k) k.innerHTML = ccCashKpiHtml(d);
     var hd = document.getElementById('cc_cash_hdr');
@@ -64330,8 +64421,11 @@ function submitAuth() {
     var mgmtPct = Number(CC_DATA.mgmtPct) || 0;
     // ★CC-DEPR-ACC-20261106：会计口径——设备按「项目期间折旧额」计入项目成本（不按采购全款），故不再单独 +deprTotal（折旧已含在设备成本中）
     var baseCost = deprTotal + agg + labor + opex + ind;
-    var mgmtAmt = baseCost * mgmtPct / 100;   // ★CC-MGMT2：#5 管理费用 = 前四项 × 百分比
-    var total = baseCost + mgmtAmt;
+    // ★CC-MGMT-BASE-20261109（用户 2026-11-09）：管理费基数 = 其他成本(baseCost) + 后台估价的未作价骨料成本
+    var aggSelf = ccAggSelfCost();
+    var mgmtBase = baseCost + aggSelf;
+    var mgmtAmt = mgmtBase * mgmtPct / 100;   // ★CC-MGMT-BASE：#5 管理费用 = 新基数 × 输入比例
+    var total = baseCost + mgmtAmt;            // ★骨料客户自供，绝不加入总成本/报价
     var margin = Number(CC_DATA.margin) || 0, vat = Number(CC_DATA.vat) || 0;
     // ★CC-MARKUP-20261106：加价口径——未税卖价 = 总成本/(1-利润率)，利润 = 未税卖价 - 总成本
     var mF = 1 - margin / 100;
@@ -64342,6 +64436,7 @@ function submitAuth() {
     // ★CC-CASH-20261108：把本回合计缓存给「现金流测算」用，避免两处重复推导造成口径漂移
     window.__CC_SUM = { blocks:blocks, area:area, pVat:pVat, pNoVat:pNoVat, mach:mach, agg:agg, labor:labor,
                         opex:opex, opexMonthly:(typeof opexFee === 'number' ? opexFee : 0), ind:ind,
+                        aggSelf:aggSelf, otherCost:baseCost, mgmtBase:mgmtBase,
                         mgmtAmt:mgmtAmt, total:total, prodD:prodD, instD:instD };
     // ★CC-SUMTRI2-20261106：汇总表价格三色（含总成本/含税卖价强调行）——¥蓝/$红/₫绿，仅行标签保持红色粗体
     var set = function(id, v, unit){ var el = document.getElementById(id); if(!el) return; el.textContent = '₫ ' + ccNum(v) + (unit || ''); el.style.color = '#2e7d32'; }; // ★CC-SUMHEAD：仅金额用，带货币符号
@@ -64532,13 +64627,17 @@ function submitAuth() {
       if(perInp){ perInp.value = (Math.round(deprPer * 10) / 10).toFixed(1); }
     })();
     set('cc_v_mach', deprTotal); set('cc_v_agg', agg); set('cc_v_labor', labor + opex); set('cc_v_ind', ind); // ★CC-DEPR-ACC-20261106：#1 机械类合计 = 项目期间折旧价值（会计口径，不填设备采购全额）
-    set('cc_v_mgmt', mgmtAmt); // ★CC-MGMT2：#5 右侧数值 = 管理费金额(前四项×百分比)
+    // ★CC-MGMT-BASE-20261109：新增三行的 VND 列（绿色），RMB/USD 列由下方 sumVals 按汇率三色填充
+    set('cc_v_agg_cost', aggSelf); set('cc_v_other_cost', baseCost); set('cc_v_mgmt_base', mgmtBase);
+    set('cc_v_mgmt', mgmtAmt); // ★CC-MGMT-BASE：#5 右侧数值 = 管理费计算基数 × 输入比例
     set('cc_v_depr', deprTotal); // ★CC-DEPR-20261105：#6 项目期间设备折旧
     set('cc_v_total', total); set('cc_v_profit', profit); set('cc_v_vat', vatAmt); set('cc_v_pnovat', pNoVat); set('cc_v_pvat', pVat);
     set('cc_v_m2', area > 0 ? pVat / area : 0, ccT('unitM2')); // ★CC-PERBLOCK：每㎡价带 /㎡
     // ★CC-SUMHEAD-20261104：汇总表 RMB/USD 列按汇率自动换算
     var sumVals = {
       cc_v_mach: deprTotal, cc_v_agg: agg, cc_v_labor: labor + opex, cc_v_ind: ind,
+      // ★CC-MGMT-BASE-20261109：骨料成本 / 其他成本 / 管理费计算基数的 RMB(蓝)、USD(红) 三色换算
+      cc_v_agg_cost: aggSelf, cc_v_other_cost: baseCost, cc_v_mgmt_base: mgmtBase,
       cc_v_mgmt: mgmtAmt, cc_v_depr: deprTotal, cc_v_total: total, cc_v_profit: profit,
       cc_v_pnovat: pNoVat, cc_v_vat: vatAmt, cc_v_pvat: pVat, cc_v_m2: (area > 0 ? pVat / area : 0)
     };
