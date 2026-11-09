@@ -18824,10 +18824,11 @@ var PROD_EQUIP_FAULT_KB = {
       /* 信息框内「录入：<规格>」条目按钮 */
       .inst-bldg-tip-spec-btn{display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:3px 6px;font-size:11px;line-height:1.3;border:1px solid rgba(255,255,255,.55);border-radius:4px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer;text-align:left;white-space:normal;}
       .inst-bldg-tip-spec-btn:hover{background:rgba(255,255,255,.22);}
-      .inst-bldg-tip-title{font-weight:700;font-size:13px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.25);}
+      .inst-bldg-tip-title{font-weight:700;font-size:13px;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #fff;}
       .inst-bldg-tip-body{display:flex;flex-wrap:wrap;gap:16px;}
       .inst-bldg-tip-col{flex:1 1 auto;min-width:110px;}
-      .inst-bldg-tip-col+.inst-bldg-tip-col{border-left:1px solid rgba(255,255,255,.2);padding-left:16px;}
+      /* ★TIP-SEP-20261109：列分隔线改为白色加粗（2px 纯白），与深蓝底色对比更强 */
+      .inst-bldg-tip-col+.inst-bldg-tip-col{border-left:2px solid #fff;padding-left:16px;}
       .inst-bldg-tip-h{font-weight:700;margin-bottom:6px;color:#ffd54f;}
       .prod-out-dest{cursor:pointer;border-bottom:1px dashed rgba(30,58,95,.5);}
       .out-edit-dest-wrap{position:relative;display:inline-block;width:100%;box-sizing:border-box;}
@@ -18865,6 +18866,20 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-bldg-tip .inst-bldg-tip-hl .inst-bldg-tip-k,
       .inst-bldg-tip .inst-bldg-tip-hl .inst-bldg-tip-v,
       .inst-bldg-tip .inst-bldg-tip-hl .inst-bldg-tip-s{color:#0d1b52 !important;font-weight:700;}
+      /* ★TIP-PULSE-20261109：悬停信息框「整个项目发货 / 整个项目安装」两列，
+         每个尺寸的「录入：<规格>」入口各自套一个呼吸框（发货=红、安装=黄），
+         缓慢变亮 → 变暗 → 再变亮，无限循环（只动边框与发光，不影响点击） */
+      .inst-bldg-tip-spec-box{display:block;box-sizing:border-box;margin:6px 0 0;padding:3px;border:2px solid #ff2d2d;border-radius:7px;animation:instTipPulseRed 2.4s ease-in-out infinite;}
+      .inst-bldg-tip-spec-box .inst-bldg-tip-spec-btn{margin-top:0;}
+      .inst-bldg-tip-spec-box.yellow{border-color:#ffd54f;animation-name:instTipPulseYellow;}
+      @keyframes instTipPulseRed{
+        0%,100%{border-color:rgba(255,45,45,.4);box-shadow:0 0 1px rgba(255,45,45,.2),inset 0 0 0 rgba(255,45,45,0);}
+        50%{border-color:#ff2d2d;box-shadow:0 0 12px 2px rgba(255,45,45,.9),inset 0 0 8px rgba(255,45,45,.28);}
+      }
+      @keyframes instTipPulseYellow{
+        0%,100%{border-color:rgba(255,213,79,.4);box-shadow:0 0 1px rgba(255,213,79,.2),inset 0 0 0 rgba(255,213,79,0);}
+        50%{border-color:#ffd54f;box-shadow:0 0 12px 2px rgba(255,213,79,.9),inset 0 0 8px rgba(255,213,79,.28);}
+      }
       /* 天气卡片黑色边框（无数据分支与正常分支都覆盖） */
       .prod-wx-card{border:1px solid #000 !important;}
       .inst-bldg:hover{border-color:#E53935 !important;}
@@ -74949,8 +74964,13 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var specBtnsShip = '', specBtnsInstall = '';
     tipSpecs.forEach(function(s){
       var _lbl = prod_esc(it('inst_lbl_rec_prefix'))+prod_esc(s);
-      specBtnsShip += '<button type="button" class="inst-bldg-tip-spec-btn"'+_hl(s)+' onclick="inst_quickOutboundHouse(\''+_codeQ+'\',\''+_idxQ+'\',\''+_jq(s)+'\')">'+_lbl+'</button>';
-      specBtnsInstall += '<button type="button" class="inst-bldg-tip-spec-btn"'+_hl(s)+' onclick="inst_quickInstallEntry(\''+_codeQ+'\',\''+_idxQ+'\',\''+_jq(s)+'\')">'+_lbl+'</button>';
+      /* ★TIP-PULSE-20261109：整个项目发货 = 红色呼吸框；整个项目安装 = 黄色呼吸框（每个尺寸一个） */
+      specBtnsShip += '<div class="inst-bldg-tip-spec-box">'
+        + '<button type="button" class="inst-bldg-tip-spec-btn"'+_hl(s)+' onclick="inst_quickOutboundHouse(\''+_codeQ+'\',\''+_idxQ+'\',\''+_jq(s)+'\')">'+_lbl+'</button>'
+        + '</div>';
+      specBtnsInstall += '<div class="inst-bldg-tip-spec-box yellow">'
+        + '<button type="button" class="inst-bldg-tip-spec-btn"'+_hl(s)+' onclick="inst_quickInstallEntry(\''+_codeQ+'\',\''+_idxQ+'\',\''+_jq(s)+'\')">'+_lbl+'</button>'
+        + '</div>';
     });
     var projProdRows = '<div class="inst-bldg-tip-h">'+prod_esc(it('inst_tip_proj_prod'))+'</div>'
       + tipRow(it('inst_bldg_need'), projDemand)
