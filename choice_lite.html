@@ -6323,6 +6323,8 @@ var WL_FLOW_IMG = {
       .vis-hide{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;white-space:nowrap;}
       .photo-err{display:none;color:#e74c3c;font-size:11px;font-weight:500;}
       .photo-select-box{margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill, minmax(70px, 1fr));gap:6px;max-height:220px;overflow-y:auto;}
+      /* ★PHOTO-DEL-20261109：缩略图外层容器（删除按钮的定位基准，且不再嵌在 <a> 里） */
+      .photo-thumb-wrap{position:relative;display:block;}
       .photo-thumb-item{position:relative;display:block;padding-top:100%;border-radius:6px;overflow:hidden;border:1px solid #e0e0e0;background:#f7f7f7;}
       .photo-thumb-item img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
       .photo-thumb-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,.5);color:#fff;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
@@ -76271,11 +76273,15 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var sel = document.getElementById('ic_zphoto_select_'+zoneNum); if(sel){
       if(!arr.length){ sel.innerHTML = ''; }
       else {
+        /* ★PHOTO-DEL-20261109：删除按钮改为 <a> 的兄弟节点（外面套 .photo-thumb-wrap），
+           避免按钮点在 <a> 内部时被链接的默认跳转/事件冒泡吃掉，导致「点 × 没反应」 */
         sel.innerHTML = arr.map(function(p,i){
-          return '<a href="/uploads/'+prod_esc(p)+'" class="photo-thumb-item" title="'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;">'
+          return '<div class="photo-thumb-wrap">'
+            + '<a href="/uploads/'+prod_esc(p)+'" class="photo-thumb-item" title="'+prod_esc(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;">'
             + '<img src="/uploads/'+prod_esc(p)+'">'
-            + '<button type="button" class="photo-thumb-del" onclick="event.preventDefault();event.stopPropagation();inst_zonePhotoRemove(\''+zoneNum+'\','+i+')" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
-            + '</a>';
+            + '</a>'
+            + '<button type="button" class="photo-thumb-del" onclick="event.preventDefault();event.stopPropagation();inst_zonePhotoRemove(\''+zoneNum+'\','+i+');return false;" title="'+prod_esc(pt('btn_remove_photo'))+'">×</button>'
+            + '</div>';
         }).join('')
         + '<button type="button" class="photo-thumb-add" onclick="inst_zonePhotoAdd(\''+zoneNum+'\')" title="'+prod_esc(pt('btn_add_photo'))+'">+</button>';
       }
@@ -76293,23 +76299,33 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     fetch('/api/inst-zone-photos/'+encodeURIComponent(fname)+'?me='+encodeURIComponent((typeof prod_loginUser==='function'?prod_loginUser():'')), { method:'DELETE' }).catch(function(){});
     var f = inst_get(INST_CUR); if(f){
       var d = inst_photoDateKey(prod_val('ic_date')||ymdToDmy(prod_today()));
-      /* 从 KV 缓存删除 */
-      var kv = f.__zonePhotos_kv || {};
-      var kvArr = ((kv[d] || {})[String(zoneNum)]) || [];
-      if(Array.isArray(kvArr)){
-        for(var i=0;i<kvArr.length;i++){ if(kvArr[i]===fname){ kvArr.splice(i,1); break; } }
-      }
+      var zoneK = String(zoneNum);
+      /* ★PHOTO-DEL-20261109：一次删干净 —— 同一日期可能存在 dmy / ymd 两种键，
+         旧版只删 kv[d]，一旦真实数据挂在另一种键上，重新渲染（inst_zoneCardsReRenderPhotos）
+         就会把照片又拉回来，表现为「点了 × 删不掉」。这里遍历所有键形式全删。 */
+      var kv = f.__zonePhotos_kv || (f.__zonePhotos_kv = {});
+      var forms = [d, (typeof ymdToDmy==='function'?ymdToDmy(d):''), (typeof dmyToYmd==='function'?dmyToYmd(d):'')];
+      forms.forEach(function(k){
+        if(!k || !kv[k] || !kv[k][zoneK] || !Array.isArray(kv[k][zoneK])) return;
+        kv[k][zoneK] = kv[k][zoneK].filter(function(x){ return x !== fname; });
+      });
+      /* 主键一定要存在（可以是空数组），用空数组遮住下面的「旧工厂 JSON」回退分支 */
+      kv[d] = kv[d] || {};
+      kv[d][zoneK] = arr.slice();
+      /* 旧工厂 JSON 里所有日期键一起清理 */
+      try{
+        var W = (f.installation && f.installation.workers) || {};
+        Object.keys(W).forEach(function(kk){
+          var zp = (W[kk] && W[kk].zonePhotos) ? W[kk].zonePhotos[zoneK] : null;
+          if(Array.isArray(zp)) W[kk].zonePhotos[zoneK] = zp.filter(function(x){ return x !== fname; });
+        });
+      }catch(_){}
       inst_saveZonePhotosToKv(f);
-      /* 兼容旧工厂 JSON */
-      var w = (f.installation && f.installation.workers && f.installation.workers[d]) || {};
-      var zp = (w.zonePhotos || {})[String(zoneNum)] || [];
-      if(Array.isArray(zp)){
-        for(var j=0;j<zp.length;j++){ if(zp[j]===fname){ zp.splice(j,1); break; } }
-      }
       if(typeof prod_save==='function') prod_save(f);
     }
     inst_zonePhotoRender(zoneNum);
     try{ inst_tabCUpdatePhotoCounts(); }catch(_){}
+    try{ inst_zoneCardsReRenderPhotos(); }catch(_){}
   }
   function inst_zonePhotoOnFile(input, zoneNum){
     var errEl = document.getElementById('ic_zphoto_err_'+zoneNum);
