@@ -50517,6 +50517,26 @@ var _slatsBarLabelsPlugin = {
     var unit = opt.unit || '', sum = opt.total || 0;
     var ctx = chart.ctx;
     var meta = chart.getDatasetMeta(0);
+    /* ★SLATS-CHART-SOLID-BOX-20261109：横向条形图左侧「规格」是 canvas 画的，
+       通用 DOM 补框器扫不到 → 这里对 实心板=YES 的尺寸标签补一个黄色 2px 外框，
+       与表格里的 #FFC400 黄框口径完全一致（打印/导出 PDF 时同样带框）。 */
+    try{
+      var ys = chart.scales && chart.scales.y;
+      if(ys && typeof slatsSizeSolidYes === 'function'){
+        meta.data.forEach(function(bar, i){
+          var lbl = String((chart.data.labels && chart.data.labels[i]) || '');
+          if(!lbl || !slatsSizeSolidYes(lbl)) return;
+          ctx.save();
+          ctx.font = '11px sans-serif';
+          var tw = ctx.measureText(lbl).width;
+          var xr = ys.right - 6;
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#FFC400';
+          ctx.strokeRect(xr - tw - 4, bar.y - 9, tw + 8, 18);
+          ctx.restore();
+        });
+      }
+    }catch(e){}
     ctx.save();
     ctx.font = '600 11px sans-serif';
     ctx.fillStyle = '#333';
