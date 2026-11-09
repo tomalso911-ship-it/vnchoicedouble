@@ -34213,7 +34213,7 @@ var PROD_EQUIP_FAULT_KB = {
                 <th colspan="3" data-i18n="slats_table_size_title">水泥漏缝地板尺寸(单位：毫米)</th>
                 <th colspan="4" data-i18n="slats_table_usage_title">漏缝地板用量</th>
                 <th id="slatsRebarMainTh" colspan="7" data-i18n="slats_table_rebar_title">钢筋网片配置信息</th>
-                <th rowspan="2" data-i18n="slats_table_remark">备注</th>
+                <th rowspan="2" class="slats-th-solid" data-i18n="slats_table_remark">实心板?</th>
                 <th rowspan="2" data-i18n="slats_table_op">操作</th>
               </tr>
               <tr class="slats-spec-header-sub" id="slatsRebarSub"></tr>
@@ -34312,7 +34312,7 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-spec-wrap { margin-top: 8px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .slats-spec-toolbar { margin-bottom: 10px; text-align: right; flex-shrink: 0; display: flex; justify-content: flex-end; gap: 8px; }
 .slats-spec-table-scroll { overflow: auto; flex: 1 1 auto; min-height: 0; border: 1px solid #e8e8e8; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-.slats-spec-table { width: 100%; min-width: 828px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 9px; background: #fff; }
+.slats-spec-table { width: 100%; min-width: 870px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 9px; background: #fff; }
 .slats-spec-table th,
 .slats-spec-table td { border-right: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; padding: 2px 1px; text-align: center; vertical-align: middle; }
 .slats-spec-table th:last-child,
@@ -34359,6 +34359,12 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-spec-btn-merge { color: #FF9800; }
 .slats-spec-btn-merge:hover { background: #fff3e0; border-color: #FF9800; }
 .slats-spec-select { appearance:none; -webkit-appearance:none; -moz-appearance:none; padding:2px 0; cursor:pointer; text-align:center; text-align-last:center; }
+/* ★SLATS-SOLID-COL-20261109（用户 2026-11-09）：操作列左侧「实心板?」三语表头单行完整显示、
+   YES/NO 下拉醒目；黄色左边界把这一列与前面的钢筋列分开。选 YES 的整行红字仍由 slats-solid-hl 负责。 */
+.slats-spec-table thead th.slats-th-solid { white-space:nowrap; font-size:9px; font-weight:700; letter-spacing:.2px; padding:4px 2px; }
+.slats-spec-table thead th.slats-th-solid,
+.slats-spec-table tbody td.slats-td-solid { border-left:2px solid #FFC400; }
+.slats-spec-table tbody td.slats-td-solid select[data-prefix="slats_solid_"] { font-weight:700; background:#fff8e1; }
 .slats-spec-remark { text-align:left; }
 /* 猪舍后缀 + 按钮与浮层 */
 .slats-ph-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:100%;width:100%;}
@@ -50655,6 +50661,7 @@ function slatsPigHouseLabel(v){
 }
 function slatsSelectCell(prefix, arr, selected){
   var td=document.createElement('td');
+  if(prefix==='slats_solid_') td.className='slats-td-solid';
   var sel=document.createElement('select');
   sel.className='slats-spec-input slats-spec-select';
   sel.setAttribute('data-prefix', prefix);
@@ -50886,9 +50893,14 @@ function slatsRenderColgroup(dual){
   var w=[26,108,40,22,32,32,30,28,32,32,32,36,38,36,40,28];
   if(dual){ w=w.concat([20,22,28,20,22,28,20,22,28,20,22,28]); }
   else { w=w.concat([20,22,28,20,22,28]); }
-  w=w.concat([36,60]);
+  /* ★SLATS-SOLID-COL-20261109（用户 2026-11-09）：操作列左侧「实心板?」原 36px 太窄，
+     三语表头被压成「slat?」、YES/NO 下拉几乎看不见 → 加宽到 78px；
+     列数(单层24/双层30)、data-oci、serialize、YES 红字逻辑全部不动。
+     data-minw 按实际列宽求和，fitSlatsSpecTable 才能正确等比缩放。 */
+  w=w.concat([78,60]);
   cg.innerHTML=w.map(function(x){ return '<col style="width:'+x+'px">'; }).join('');
-  var tbl=document.querySelector('.slats-spec-table'); if(tbl){ tbl.style.minWidth=(dual?968:828)+'px'; tbl.setAttribute('data-minw', dual?968:828); }
+  var minW=w.reduce(function(a,b){ return a+b; },0);
+  var tbl=document.querySelector('.slats-spec-table'); if(tbl){ tbl.style.minWidth=minW+'px'; tbl.setAttribute('data-minw', minW); }
 }
 function slatsApplyLowerState(tr){
   if(!slatsIsDualRow(tr)) return;
