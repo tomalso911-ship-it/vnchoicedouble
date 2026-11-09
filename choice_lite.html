@@ -62164,6 +62164,9 @@ function submitAuth() {
      查看=只读，编辑=可修改（自动保存），三人组/超管恒可编辑。 */
   var CC_KEY = 'cost_calc_v1';
   var CC_DATA = null, CC_LOADED = false, CC_DIRTY = false, CC_SAVE_T = null;
+  // ★CC-MGMT-FOLD-20261109（用户 2026-11-09）：骨料成本/其他成本/管理费计算基数三行默认折叠；
+  //   状态只存会话内存（切语言/重算后保持），不写盘、不改动任何成本数据。
+  var CC_MGMT_OPEN = false;
   var CC_LANG = {
     title:       { zh:'成本核算', en:'Cost Accounting', vi:'Kế toán chi phí' },
     readonlyTip: { zh:'只读模式（需「资料-成本核算=编辑」权限才能修改）', en:'Read-only (needs Cost Accounting = edit permission)', vi:'Chỉ đọc (cần quyền "Kế toán chi phí = Sửa")' },
@@ -62387,6 +62390,9 @@ function submitAuth() {
     otherCost:   { zh:'其他成本（原计算基数：折旧 + 骨料 + 人工 + 运营 + 间接）', en:'Other costs (original base: depreciation + aggregates + labor + opex + indirect)', vi:'Chi phí khác (cơ sở cũ: khấu hao + cốt liệu + nhân công + vận hành + gián tiếp)' },
     mgmtBase:    { zh:'管理费计算基数（骨料成本 + 其他成本）', en:'Overhead base (aggregate cost + other costs)', vi:'Cơ sở tính phí quản lý (chi phí cốt liệu + chi phí khác)' },
     mgmtBaseTip: { zh:'以上述合计为基数，乘以输入的比例，得出 #5 管理费用；骨料成本不计入总成本。', en:'#5 Management overhead = the above total × the entered ratio; aggregate cost is NOT added to total cost.', vi:'Phí quản lý #5 = tổng trên × tỷ lệ đã nhập; chi phí cốt liệu KHÔNG được cộng vào tổng chi phí.' },
+    // ★CC-MGMT-FOLD-20261109：管理费基数折叠按钮三语
+    mgmtBaseShow: { zh:'查看管理费用基数', en:'View overhead base', vi:'Xem cơ sở phí quản lý' },
+    mgmtBaseHide: { zh:'收起管理费用基数', en:'Hide overhead base', vi:'Ẩn cơ sở phí quản lý' },
     // ★CC-PLAN-20261108（用户 2026-11-08 要求）：报价计算下方「项目签约&执行计划」三语
     planTitle:      { zh:'项目签约&执行计划', en:'Contract signing & execution plan', vi:'Ký hợp đồng & kế hoạch thực hiện' },
     planSign:       { zh:'合同签约日期', en:'Contract signing date', vi:'Ngày ký hợp đồng' },
@@ -62760,6 +62766,18 @@ function submitAuth() {
       '.cc-sum .cc-val{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;}',
       '.cc-sum tr.cc-big td{font-size:16px;font-weight:800;border-top:2px solid #d32f2f;}',
       '.cc-sum tr.cc-big td.cc-lbl{color:#d32f2f;}', // ★CC-SUMTRI2-20261106：强调行数值改三色(¥蓝/$红/₫绿)，仅标签保持红色
+      // ★CC-MGMT-FOLD-20261109（用户 2026-11-09）：三行默认折叠，表格加 .cc-mgmt-open 才展开
+      '.cc-sum .cc-mgmt-base-row{display:none;}',
+      '.cc-sum.cc-mgmt-open .cc-mgmt-base-row{display:table-row;}',
+      // ★CC-MGMT-FOLD-RED-20261109（用户 2026-11-09）：展开时给整个区块一个【红色大外框】，区域一眼可辨
+      //   只画外框四条边（上/下/左/右 3px #d32f2f），内部仍是淡红细线，不逐格画红框。
+      '.cc-sum.cc-mgmt-open .cc-mgmt-base-row td{border-bottom:1px solid #f3c9c9;}',
+      '.cc-sum.cc-mgmt-open .cc-mgmt-base-row td:first-child{border-left:3px solid #d32f2f;}',
+      '.cc-sum.cc-mgmt-open .cc-mgmt-base-row td:last-child{border-right:3px solid #d32f2f;}',
+      '.cc-sum.cc-mgmt-open .cc-mgmt-base-top td{border-top:3px solid #d32f2f;}',
+      '.cc-sum.cc-mgmt-open .cc-mgmt-base-bottom td{border-bottom:3px solid #d32f2f;}',
+      '.cc-mgmt-base-btn{margin-left:10px;padding:2px 9px;font-size:12px;border:1px solid #7aa7d4;border-radius:4px;background:#eaf3fb;color:#1a3c6e;cursor:pointer;white-space:nowrap;vertical-align:middle;}',
+      '.cc-mgmt-base-btn:hover{background:#d6e8f8;}',
       '.cc-note{font-size:12px;color:#888;margin-top:4px;}',
       '.cc-pct{width:70px !important;text-align:right;}',
       '.cc-tb-spec tbody tr:nth-child(even) td{background:#eaf3fb;}',
@@ -63161,6 +63179,25 @@ function submitAuth() {
             '<td class="cc-val" id="' + id + '">0</td>'
           : '<td colspan="3"></td>') + '</tr>';
   }
+  // ★CC-MGMT-FOLD-20261109（用户 2026-11-09）：「查看管理费用基数」按钮 → 展开三行，再点收起
+  //   只切 DOM 显示，绝不改 CC_DATA / 不重算 / 不写盘；展开状态存 CC_MGMT_OPEN，切语言重建后保持。
+  function ccMgmtBaseBtnHtml(){
+    return '<button type="button" class="cc-mgmt-base-btn" id="cc_mgmt_base_btn"'
+      + ' aria-expanded="' + (CC_MGMT_OPEN ? 'true' : 'false') + '"'
+      + ' onclick="ccToggleMgmtBase();return false;">'
+      + (CC_MGMT_OPEN ? '▴ ' : '▾ ') + ccT(CC_MGMT_OPEN ? 'mgmtBaseHide' : 'mgmtBaseShow') + '</button>';
+  }
+  function ccToggleMgmtBase(){
+    CC_MGMT_OPEN = !CC_MGMT_OPEN;
+    var t = document.getElementById('cc_sum_table');
+    if(t) t.classList.toggle('cc-mgmt-open', CC_MGMT_OPEN);
+    var b = document.getElementById('cc_mgmt_base_btn');
+    if(b){
+      b.textContent = (CC_MGMT_OPEN ? '▴ ' : '▾ ') + ccT(CC_MGMT_OPEN ? 'mgmtBaseHide' : 'mgmtBaseShow');
+      b.setAttribute('aria-expanded', CC_MGMT_OPEN ? 'true' : 'false');
+    }
+  }
+  window.ccToggleMgmtBase = ccToggleMgmtBase;
   // ★CC-PERBLOCK-20261104：每个规格一行「规格 L×W×H 每块」，三币单价 = 每㎡含税价 × 单块面积
   function ccBlockRow(sp, i){
     var dim = [sp.len, sp.wid, sp.hei].map(function(x){ return ccNum(x); }).join('×');
@@ -63346,19 +63383,20 @@ function submitAuth() {
 
     // 报价计算
     var roAttr = ro ? '' : ' disabled';
-    h += '<div class="cc-sec">' + ccT('calc') + '</div><table class="cc-sum"><thead>' +
+    h += '<div class="cc-sec">' + ccT('calc') + '</div><table class="cc-sum' + (CC_MGMT_OPEN ? ' cc-mgmt-open' : '') + '" id="cc_sum_table"><thead>' +
       '<tr><th rowspan="2">' + ccT('name') + '</th><th colspan="3">' + ccT('costLabel') + '</th></tr>' +
       '<tr><th>' + ccT('curRmb') + '</th><th>' + ccT('curUsd') + '</th><th>' + ccT('curVnd') + '</th></tr></thead><tbody>' +
       ccSumRow(ccT('machTotal'), 'cc_v_mach') +
       ccSumRow(ccT('aggTotal'), 'cc_v_agg') +
       ccSumRow(ccT('laborTotal'), 'cc_v_labor') +
       ccSumRow(ccT('indTotal'), 'cc_v_ind') +
-      // ★CC-MGMT-BASE-20261109（用户 2026-11-09）：骨料成本 / 其他成本 / 管理费计算基数（三币三色：¥蓝 $红 ₫绿）
-      ccSumRow(ccT('aggCost'), 'cc_v_agg_cost') +
-      ccSumRow(ccT('otherCost'), 'cc_v_other_cost') +
-      ccSumRow(ccT('mgmtBase'), 'cc_v_mgmt_base') +
-      '<tr><td colspan="4" style="font-size:12px;color:#555;background:#f7fbff;padding:4px 8px;line-height:1.7;">' + ccT('mgmtBaseTip') + '</td></tr>' +
-      ccSumRow(ccT('mgmtFee') + '：<input class="cc-in" id="cc_mgmt_pct" value="' + (Number(CC_DATA.mgmtPct) || 0).toFixed(2) + '%" inputmode="decimal" autocomplete="off" style="width:80px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;">', 'cc_v_mgmt') +
+      // ★CC-MGMT-BASE-20261109：骨料成本 / 其他成本 / 管理费计算基数（三币三色：¥蓝 $红 ₫绿）
+      // ★CC-MGMT-FOLD-20261109（用户 2026-11-09）：这四行默认折叠，由「#5 管理费用」行右侧按钮展开
+      ccSumRow(ccT('aggCost'), 'cc_v_agg_cost', 'cc-mgmt-base-row cc-mgmt-base-top') +
+      ccSumRow(ccT('otherCost'), 'cc_v_other_cost', 'cc-mgmt-base-row') +
+      ccSumRow(ccT('mgmtBase'), 'cc_v_mgmt_base', 'cc-mgmt-base-row') +
+      '<tr class="cc-mgmt-base-row cc-mgmt-base-bottom"><td colspan="4" style="font-size:12px;color:#555;background:#f7fbff;padding:4px 8px;line-height:1.7;">' + ccT('mgmtBaseTip') + '</td></tr>' +
+      ccSumRow(ccT('mgmtFee') + '：<input class="cc-in" id="cc_mgmt_pct" value="' + (Number(CC_DATA.mgmtPct) || 0).toFixed(2) + '%" inputmode="decimal" autocomplete="off" style="width:80px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;">' + ccMgmtBaseBtnHtml(), 'cc_v_mgmt') +
       ccSumRow(ccT('sumDepr'), 'cc_v_depr') + // ★CC-DEPR-20261105：#6 项目期间设备折旧计入总成本
       ccSumRow(ccT('totalCost'), 'cc_v_total', 'cc-big') +
       ccSumRow(ccT('margin') + '：<input class="cc-in cc-pct" id="cc_margin" value="' + (Number(CC_DATA.margin) || 0) + '" inputmode="decimal"' + roAttr + '> %', 'cc_v_profit') +
