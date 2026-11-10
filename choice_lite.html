@@ -12832,9 +12832,9 @@ var WL_FLOW_IMG = {
         var el = prod_el('pe_date'); if(el) el.value = dd;
       }
       PROD_PE_DRAFT = prod_dailyDraftFor(dd);
-      /* [锁死] 切到新日期：若该日期已有保存数据则默认只读，否则进入编辑模式。
-         不得改为无条件进入编辑，也不得把已保存日期强行置为编辑。 */
-      PROD_PE_EDIT_MODE = !PROD_PE_DRAFT._saved;
+      /* ★PE-ALWAYS-EDIT-20261110：切日期同样保持编辑态（否则切到有数据的日期就又变成无胶囊的只读表）。
+         用户 2026-11-10 要求恢复旧交互：随时都能看到全部猪舍胶囊并直接录入。 */
+      PROD_PE_EDIT_MODE = true;
       prod_renderTab('E');
     }
     /* 自动补抓 E 页当前日期（过去日期）缺失的天气，无需点按钮 */
@@ -12919,9 +12919,12 @@ var WL_FLOW_IMG = {
       var todayDmy = ymdToDmy(todayYmd);
       if(!PROD_PE_DRAFT || PROD_PE_DRAFT._cur !== PROD_CUR){ PROD_PE_DRAFT = prod_dailyDraftFor(todayDmy); }
       if(PROD_PE_DRAFT.date === todayDmy && (!PROD_PE_DRAFT.weatherAm || !PROD_PE_DRAFT.weatherPm)){ prodTryCaptureWeather(); }
-      /* [锁死] 已保存的日期默认只读；无数据日期必须处于编辑模式。用户点“编辑”后保持编辑直到保存或切日期。
-         不得移除或反转此分支。 */
-      if(!PROD_PE_DRAFT._saved) PROD_PE_EDIT_MODE = true;
+      /* ★PE-ALWAYS-EDIT-20261110（用户 2026-11-10 明确要求：恢复「一进每日生产就有全部猪舍胶囊」的旧样子）：
+         旧逻辑是「已保存的日期默认只读、只有没数据的日期才进编辑」，导致当天已经录过产量时
+         一打开 E 页就是只读表格 —— 看不到任何猪舍胶囊，用户会认为功能被删掉了。
+         现在：进入 E 页一律是编辑态（直接渲染带全部猪舍胶囊的 prod_dailyLineCard，
+         点胶囊 → 展开该猪舍的水泥板规格数量框 → 录入）。想只看不想改时，双击卡片空白处即可收起为只读。 */
+      PROD_PE_EDIT_MODE = true;
       /* 绑定一次：编辑模式下点击卡片空白处自动收起（见 prod_dailyMaybeCollapseEdit 锁死说明） */
       if(!window.__peCollapseBound){ document.addEventListener('dblclick', prod_dailyMaybeCollapseEdit); window.__peCollapseBound = true; }
       var N = prod_lineCount();
@@ -14018,8 +14021,11 @@ var WL_FLOW_IMG = {
       prod_recomputeFinished(f);
       prod_save(f);
       PROD_PE_DRAFT = prod_dailyDraftFor(d);
-      /* [锁死] 保存后必须回到只读模式 */
-      PROD_PE_EDIT_MODE = false;  /* 保存后回到只读模式 */
+      /* ★PE-ALWAYS-EDIT-20261110（用户 2026-11-10 要求恢复旧样子）：
+         原来保存后强制回只读 → 猪舍胶囊又消失，用户以为功能坏了。
+         现在保存后【保持编辑态】，胶囊一直在，可继续录入其它猪舍/规格；
+         需要纯浏览时双击卡片空白处即可收起为只读（prod_dailyExitEditMode）。 */
+      PROD_PE_EDIT_MODE = true;
       prod_renderTab('E');
       prod_toast(pt('toast_prod_saved'));
     }
