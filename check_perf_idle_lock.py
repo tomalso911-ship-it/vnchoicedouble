@@ -147,7 +147,10 @@ print("9) ★基线漂移守门：后来新增的 body 级观察器 / 常驻轮�
 # 回调首行有 document.hidden 门控 + visibilitychange 补扫，属确属必要的一处新增。
 BASE_BODY_OBS = 11   # .observe(document.body ...)
 BASE_MUT_OBS = 21    # new MutationObserver(...)
-BASE_IV = 39         # setInterval(...)
+# 2026-11-10 追加 +1：WX-LIVE-SYNC-20261110「天气全员即时同步」的 15 秒轮询。
+# 它带 document.hidden + window.currentView==='worklog' 双重门控（setInterval 回调首行判 hidden，
+# wxLiveTick 再判视图），后台/其它视图一律不发请求；已按第⑨条显式确认必要性并登记基线。
+BASE_IV = 40         # setInterval(...)
 
 body_obs = len(re.findall(r"\.observe\(\s*document\.body", src))
 mut_obs = len(re.findall(r"new MutationObserver\s*\(", src))

@@ -4757,7 +4757,9 @@ window.__finShakeReport = function (ms) {
       var backBtn = document.querySelector('#wl-detail .wl-back'); if(backBtn) backBtn.textContent = wl_i18n('wl_back');
       document.getElementById('wl-detail-title').textContent = wl_name(p);
       wl_renderTabs(WL_ACTIVE_TAB || 'daily');
-      if (typeof prodWxAutoFixAll === 'function') { try { prodWxAutoFixAll(); } catch(e){} }
+      /* ★WX-LIVE-SYNC-20261110：打开项目立刻拉服务端天气；force 跳过 3 分钟节流立即补缺 */
+      try{ wxLiveBoot(); wxLivePull(WL_CUR.id, true); }catch(e){}
+      if (typeof prodWxAutoFixAll === 'function') { try { prodWxAutoFixAll(true); } catch(e){} }
     }
     function wl_back(){
       WL_CUR = null;
@@ -4866,6 +4868,90 @@ window.__finShakeReport = function (ms) {
       return it;
     }
     function wl_factory(){ return (WL_CUR && typeof prod_get==='function') ? prod_get(WL_CUR.id) : null; }
+    /* ★WX-LIVE-SYNC-20261110（用户 2026-11-10：天气必须每个人立即同步）
+       根因：天气由各浏览器各自抓 Open-Meteo，wl_factory() 只读本地 localStorage/PROD_MEM 副本，
+       wl_open 从不向服务端取数 → 每个人看到的都是自己那份旧副本，且补缺被 3 分钟节流。
+       方案：打开/切回日报页 + visibilitychange/focus + 15 秒轮询，从服务端只取天气字段合并进本地；
+       仅当值变化才替换 #wl_wx_live 内容（不整页重绘，绝不打断正在录入的日报）。
+       ★只写 weatherAm/weatherPm，绝不动 __savedAt 或任何业务字段：
+         不触发 prod_pushToServer 的防回退闸，也不改变天气 09/14 点时间锁。 */
+    var WX_LIVE_MS = 15000, WX_LIVE_BOOTED = false, WX_LIVE_BUSY = false, WX_LIVE_LAST_AT = 0;
+    var WX_LIVE_SIG = {};
+    function wxLiveKey(v){ return v ? (typeof v === 'object' ? JSON.stringify(v) : String(v)) : ''; }
+    function wxLiveLocal(pid){
+      try{ if(typeof PROD_MEM !== 'undefined' && PROD_MEM[pid]) return PROD_MEM[pid]; }catch(e){}
+      try{ var s = localStorage.getItem(PROD_LS+pid); if(s) return JSON.parse(s); }catch(e){}
+      /* ★服务端已有天气但本地从没存过该项目工厂数据时，用 prod_get() 的默认副本做基底；
+         否则 wxLiveMerge 返回 null，天气永远同步不过来（线上探针 2026-11-10 实测）。
+         只写 weatherAm/weatherPm，不调 prod_save，不会触发空壳保护或防回退闸。 */
+      try{ if(typeof prod_get === 'function'){ var d = prod_get(pid); if(d) return d; } }catch(e){}
+      return null;
+    }
+    /* 服务端天气 → 本地副本：只覆盖服务端有值的槽；本地有而服务端没有的一律保留 */
+    function wxLiveMerge(pid, srv){
+      var f = wxLiveLocal(pid); if(!f) return null;
+      var changed = false;
+      ['workers','production'].forEach(function(k){
+        var s = (srv && srv[k]) || {};
+        if(!Object.keys(s).length) return;
+        var l = f[k] || (f[k] = {});
+        Object.keys(s).forEach(function(d){
+          var so = s[d]; if(!so || typeof so !== 'object') return;
+          var lo = l[d] || (l[d] = {});
+          ['weatherAm','weatherPm'].forEach(function(wk){
+            if(!so[wk]) return;
+            if(wxLiveKey(lo[wk]) !== wxLiveKey(so[wk])){ lo[wk] = so[wk]; changed = true; }
+          });
+        });
+      });
+      if(!changed) return f;
+      try{
+        if(typeof PROD_MEM !== 'undefined') PROD_MEM[pid] = f;
+        localStorage.setItem(PROD_LS+pid, JSON.stringify(f));
+      }catch(e){}
+      return f;
+    }
+    /* 只更新天气卡片 DOM；签名相同则不动，避免无谓重绘 */
+    function wxLivePaint(f){
+      if(window.currentView !== 'worklog' || !WL_CUR || !WL_CUR_DATE) return;
+      var box = document.getElementById('wl_wx_live'); if(!box) return;
+      var w = f && f.workers && f.workers[WL_CUR_DATE];
+      var rec = f && f.production && f.production[WL_CUR_DATE];
+      var am = w && w.weatherAm, pm = w && w.weatherPm;
+      if(!am && rec && rec.weatherAm) am = rec.weatherAm;
+      if(!pm && rec && rec.weatherPm) pm = rec.weatherPm;
+      var sig = WL_CUR_DATE + '=' + wxLiveKey(am) + '|' + wxLiveKey(pm);
+      if(WX_LIVE_SIG[WL_CUR.id] === sig) return;
+      WX_LIVE_SIG[WL_CUR.id] = sig;
+      box.innerHTML = wl_wxCardMerged(am, pm);
+    }
+    function wxLivePull(pid, force){
+      if(!pid || WX_LIVE_BUSY) return;
+      if(!force && Date.now() - WX_LIVE_LAST_AT < 1500) return;
+      var me = (typeof authUser !== 'undefined' && authUser && authUser.username) ? authUser.username : '';
+      if(!me) return;
+      WX_LIVE_LAST_AT = Date.now(); WX_LIVE_BUSY = true;
+      fetch('/api/prod-factory/'+encodeURIComponent(pid)+'?me='+encodeURIComponent(me)+'&_='+Date.now(), {cache:'no-store'})
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(d){
+          WX_LIVE_BUSY = false;
+          var srv = d && d.ok && d.data; if(!srv) return;
+          var f = wxLiveMerge(pid, srv); if(f) wxLivePaint(f);
+        })
+        .catch(function(){ WX_LIVE_BUSY = false; });
+    }
+    function wxLiveTick(){
+      /* ★PERF-IDLE-LOCK-20261108 第⑨条：常驻轮询必须 document.hidden + 视图门控，后台一律不唤醒 */
+      if(document.hidden || window.currentView !== 'worklog' || !WL_CUR) return;
+      wxLivePull(WL_CUR.id);
+    }
+    function wxLiveBoot(){
+      if(WX_LIVE_BOOTED) return; WX_LIVE_BOOTED = true;
+      /* 新增的这 1 个常驻 interval 已在 check_perf_idle_lock.py 基线登记（39→40，WX-LIVE-SYNC-20261110） */
+      setInterval(function(){ if(document.hidden) return; wxLiveTick(); }, WX_LIVE_MS);
+      document.addEventListener('visibilitychange', function(){ if(!document.hidden) wxLiveTick(); });
+      window.addEventListener('focus', function(){ if(!document.hidden) wxLiveTick(); });
+    }
     function wl_reportDates(f){
       var set={};
       if(f){
@@ -5036,7 +5122,7 @@ window.__finShakeReport = function (ms) {
       var weekday = String(wl_i18n('wl_weekdays','周日,周一,周二,周三,周四,周五,周六').split(',')[dt.getDay()]||'');
       h += '<div class="wl-report-top-row">'
         + '<div class="wl-report-left-col">'
-        + wl_wxCardMerged(wxAm, wxPm)
+        + '<div id="wl_wx_live">' + wl_wxCardMerged(wxAm, wxPm) + '</div>'
         + '<div class="wl-rep-nav-group">'
         + '<button type="button" class="wl-rep-nav" onclick="wl_repStep(-1)" title="'+wl_i18n('wl_prev')+'">‹</button>'
         + '<div class="wl-rep-date">'+dmyToYmd(date)+' · '+weekday+'</div>'
@@ -5111,7 +5197,11 @@ window.__finShakeReport = function (ms) {
         Array.prototype.forEach.call(box.querySelectorAll('.wl-tab'), function(t){ t.classList.toggle('active', t.getAttribute('data-key') === key); });
       }
       var body = document.getElementById('wl-tab-body'); if(!body) return;
-      if(key==='daily') wl_renderDaily();
+      if(key==='daily'){
+        wl_renderDaily();
+        /* ★WX-LIVE-SYNC-20261110：切回日报页立刻与服务端对齐天气（1.5s 内重复调用自动去重） */
+        try{ wxLiveBoot(); if(WL_CUR) wxLivePull(WL_CUR.id); }catch(e){}
+      }
       else wl_renderMywork();
     }
 var WL_FLOW_IMG = {
@@ -10188,7 +10278,8 @@ var WL_FLOW_IMG = {
         try{ if(typeof inst_backfillWeather==='function') inst_backfillWeather(); }catch(_){}
       }
       var targets = list.filter(function(id){ return String(id)!==String(PROD_CUR); });
-      if(!PROD_WX_ALL_TIMER && !force) PROD_WX_ALL_TIMER = setInterval(function(){ prodWxAutoFixAll(); }, 600000);
+      /* ★WX-LIVE-SYNC-20261110：force（打开工作日志）也要确保 10 分钟补缺定时器存在 */
+      if(!PROD_WX_ALL_TIMER) PROD_WX_ALL_TIMER = setInterval(function(){ prodWxAutoFixAll(); }, 600000);
       if(!targets.length) return;
       PROD_WX_ALL_AT = Date.now(); PROD_WX_ALL_RUNNING = true;
       var pending = targets.length, fixedProjects = 0, fixedRows = 0;
