@@ -11941,8 +11941,74 @@ var WL_FLOW_IMG = {
       var txt = pt('mark_receipt_draft_saved') || '已保存 {t}';
       tip.textContent = txt.replace('{t}', prod_dmy(new Date(savedAt).getFullYear()+'-'+prod_pad(d.getMonth()+1)+'-'+prod_pad(d.getDate()))+' '+hh+':'+mi);
     }
+    /* ===== ★RC-AUTOCLEAR-20261110（用户 2026-11-10 需求）=====
+       场景：这一单已经「提交收货单」，并且采购经理已确认（procApprApplyInbound 把 status 改成 confirmed、
+       同时整单过账写进 materials.inbound，也就是用户说的「系统检查到移交了」）。
+       此时再点右上角「保存」= 收尾：把上一单残留在表单里的明细行 / 照片引用 / 数量单价清空，
+       到货日期回到今天、猪舍与水泥板规格取消勾选，准备下一单。
+       ★ 只清「表单 + 草稿」，绝不删除服务器上的照片文件与已提交的收货单（收货单卡片还要显示这些照片）。 */
+    function prodRcConfirmedReceipt(){
+      try{
+        var f = prod_get(PROD_CUR); if(!f) return null;
+        var rs = (f.materials && f.materials.receipts) || [];
+        for(var i = rs.length - 1; i >= 0; i--){
+          var r = rs[i]; if(!r) continue;
+          if(r.status === 'confirmed') return r;   /* 已确认 = 已移交/已过账 */
+          if(r.status === 'pending') return null;  /* 还在等审批，不能清空 */
+        }
+      }catch(e){}
+      return null;
+    }
+    function prodRcNormNum(v){
+      var n = parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));
+      return isNaN(n) ? 0 : n;
+    }
+    /* 表单里的内容是否就是那张已确认收货单的内容（或表单本来就是空的）——
+       是才允许清空；用户已经动手录下一单（行数/材料/规格/数量/单价变了）就绝不清。 */
+    function prodRcDraftIsSubmitted(rec){
+      try{
+        var cur = prodRcRows || [];
+        var filled = cur.filter(function(r){ return r && (r.material || r.spec || prodRcNormNum(r.qty) || prodRcNormNum(r.priceVnd)); });
+        if(!filled.length) return true;
+        var sub = rec.rows || [];
+        if(sub.length !== cur.length) return false;
+        for(var i=0;i<cur.length;i++){
+          var a = cur[i] || {}, b = sub[i] || {};
+          if(String(a.material||'') !== String(b.material||'')) return false;
+          if(String(a.spec||'') !== String(b.spec||'')) return false;
+          if(String(a.unit||'') !== String(b.unit||'')) return false;
+          if(Math.abs(prodRcNormNum(a.qty) - prodRcNormNum(b.qty)) > 0.0001) return false;
+          if(Math.abs(prodRcNormNum(a.priceVnd) - prodRcNormNum(b.priceVnd)) > 0.0001) return false;
+        }
+        return true;
+      }catch(e){ return false; }
+    }
+    function prodRcResetForNextWork(){
+      try{ prodRcClearDraft(); }catch(e){}
+      try{ localStorage.removeItem(prodRcDraftKey()); }catch(e){}
+      prodRcRows = [];
+      try{ if(typeof prodRcRowsByPid !== 'undefined' && PROD_CUR) delete prodRcRowsByPid[PROD_CUR]; }catch(e){}
+      /* 只清表单里的照片引用，服务器照片文件与已确认的收货单保持不动 */
+      try{ var pb = el('pd_photos'); if(pb) pb.value = '[]'; if(typeof prod_renderReceiptPhotos === 'function') prod_renderReceiptPhotos(); }catch(e){}
+      try{ var de = el('pd_arr_date'); if(de) de.value = ymdToDmy(prod_today()); }catch(e){}
+      try{ document.querySelectorAll('.pd_house').forEach(function(c){ c.checked = false; }); PROD_SELECTED_HOUSES = []; }catch(e){}
+      try{ document.querySelectorAll('.pd_floor').forEach(function(c){ if(!c.disabled) c.checked = false; }); }catch(e){}
+      try{ prod_updateHouseFilterTip(); prod_updateHousePreview(); }catch(e){}
+      try{ prodReceiptRenderRows(); prodReceiptRenderFoot(); }catch(e){}
+      try{ if(typeof prod_receiptRefreshSpecProgress === 'function') prod_receiptRefreshSpecProgress(); }catch(e){}
+      try{ prodRcDraftTip(0); }catch(e){}
+      var _msg = { zh:'上一张收货单已确认移交，已清空内容，可以开始下一单',
+                   en:'Previous receipt confirmed & transferred. Form cleared — ready for the next receipt.',
+                   vi:'Phiếu nhập trước đã được xác nhận và chuyển giao. Đã xóa nội dung — sẵn sàng cho phiếu tiếp theo.' };
+      prod_toast(_msg[(typeof CUR_LANG !== 'undefined' && CUR_LANG) || 'zh'] || _msg.zh);
+    }
     function prodRcDraftSave(){
       if(!PROD_CUR){ prod_toast(pt('toast_name_req')||'请先选择项目'); return; }
+      /* ★RC-AUTOCLEAR-20261110：已提交且已确认移交 → 「保存」即收尾清空，不再保留上一单内容 */
+      try{
+        var _mv = prodRcConfirmedReceipt();
+        if(_mv && prodRcDraftIsSubmitted(_mv)){ prodRcResetForNextWork(); return; }
+      }catch(e){}
       var d = prodRcDraftSnapshot();
       try{ localStorage.setItem(prodRcDraftKey(), JSON.stringify(d)); }catch(e){}
       var me = prodRcCurUser();
