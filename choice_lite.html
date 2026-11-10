@@ -76102,6 +76102,25 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     /* ★ 规格 ↔「录入：<规格>」按钮 双向高亮：
        给元素打上 data-tipspec，并挂悬停回调；同规格的所有块/按钮会一起高亮 */
     var _hl = function(s){ return ' data-tipspec="'+prod_esc(s)+'" onmouseenter="inst_bldgTipHoverSpec(\''+_jq(s)+'\')" onmouseleave="inst_bldgTipHoverSpec(\'\')"'; };
+    /* ★SOLID-TIP-20261110：猪舍概览浮窗里的「规格：<尺寸>」也要按【这一条规格键】标实心板黄框（.pe-solid）。
+       判定只认精确键（含零宽标识的实心板键）；矩阵里查不到就一律不框，绝不退回“按尺寸”判断
+       —— 否则同尺寸的非实心板会被一起框上，就是之前反馈的那个问题。 */
+    var _tipSolid = function(sp){
+      try{
+        var mm = (typeof prod_slatsMatrix === 'function') ? prod_slatsMatrix() : null;
+        if(mm && mm.specs){
+          if(mm.specs[sp]) return !!mm.specs[sp].solid;
+          var _k2 = String(sp) + '\u200b';
+          if(mm.specs[_k2]) return !!mm.specs[_k2].solid;
+          return false;
+        }
+      }catch(e){}
+      try{ return (typeof prod_specIsSolid === 'function') ? !!prod_specIsSolid(sp) : false; }catch(e){ return false; }
+    };
+    var _specTxtHtml = function(sp){
+      var _t = prod_esc((typeof prod_specLabel === 'function') ? prod_specLabel(sp) : sp);
+      return _tipSolid(sp) ? '<span class="pe-solid">'+_t+'</span>' : _t;
+    };
     var leftRows = '<div class="inst-bldg-tip-h">'+prod_esc(it('inst_tip_house_install'))+'</div>'
       + tipRow(it('inst_bldg_need'), totalNeed)
       + tipRow(it('inst_lbl_installed'), installQty)
@@ -76115,7 +76134,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
             if(rNeed <= 0 && rec <= 0) return;
             var shown = rNeed > 0 ? Math.min(rNeed, rec) : rec;
             out += '<div class="inst-bldg-tip-spec"'+_hl(s.spec)+'>'
-              + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+prod_esc(s.spec)+'</div>'
+              + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+_specTxtHtml(s.spec)+'</div>'
               + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_need')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(rNeed)+'</span></div>'
               + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_lbl_installed')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(shown)+'</span></div>'
               + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_lbl_uninstalled')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(Math.max(0, rNeed - shown))+'</span></div>'
@@ -76134,7 +76153,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         var isCurrent = currentSpec && String(s.spec)===String(currentSpec);
         var warnClass = isCurrent ? ' warn' : '';
         rightRows += '<div class="inst-bldg-tip-spec'+warnClass+'"'+_hl(s.spec)+'>'
-          + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+prod_esc(s.spec)+'</div>'
+          + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+_specTxtHtml(s.spec)+'</div>'
           + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_need')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(s.need)+'</span></div>'
           + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_shipped')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(s.shipped)+'</span></div>'
           + gap
@@ -76172,7 +76191,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
             var isCurrent=currentSpec && inst_specKeyNorm(currentSpec)===n;
             var warnClass=isCurrent?' warn':'';
             out += '<div class="inst-bldg-tip-spec'+warnClass+'"'+_hl(s.spec)+'>'
-              + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+prod_esc(s.spec)+'</div>'
+              + '<div class="inst-bldg-tip-s">'+it('inst_lbl_spec')+'：'+_specTxtHtml(s.spec)+'</div>'
               + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_produced_short')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(st.produced)+'</span></div>'
               + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_bldg_shipped')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(st.shipped)+'</span></div>'
               + '<div class="inst-bldg-tip-row"><span class="inst-bldg-tip-k">'+it('inst_lbl_remaining')+'</span><span class="inst-bldg-tip-v">'+prod_fmtNum(remain)+'</span></div>'
