@@ -6872,7 +6872,7 @@ var WL_FLOW_IMG = {
       },
       en: {
         prod_tab_A:'Factory Overview & Quick View', prod_tab_B:'Production Plan', prod_tab_C:'Daily: Labor/Weather', prod_tab_D:'Raw Material Stock', prod_tab_E:'Daily Production', prod_tab_H:'Inbound & Outbound', prod_tab_F:'Equipment & Failures',
-        prod_overview:'Factory Overview', lbl_contract_date:'Contract Signing Date', lbl_contract_signing_date:'Contract Signing Date', lbl_project_due:'Ngày bàn giao dự án', lbl_start_prod_date:'Production Start Date', lbl_addr:'Site Address', lbl_line:'Production Line', opt_line_1:'1 line', opt_line_2:'2 lines', opt_line_3:'3 lines', opt_line_4:'4 lines', lbl_shift:'Shift', opt_shift_1:'1 shift/day', opt_shift_2:'2 shifts/day', btn_save:'Save', prod_line_cmp_title:'Production Line Comparison Analysis', prod_line_chart_title:'Production Line Comparison Chart', prod_line_table_title:'Production Line Comparison Table', prod_line_seq:'#', prod_line_date:'Date', prod_line_prefix:'Line ', prod_line_empty:'No production records yet.',
+        prod_overview:'Factory Overview', lbl_contract_date:'Contract Signing Date', lbl_contract_signing_date:'Contract Signing Date', lbl_project_due:'Project Due Date', lbl_start_prod_date:'Production Start Date', lbl_addr:'Site Address', lbl_line:'Production Line', opt_line_1:'1 line', opt_line_2:'2 lines', opt_line_3:'3 lines', opt_line_4:'4 lines', lbl_shift:'Shift', opt_shift_1:'1 shift/day', opt_shift_2:'2 shifts/day', btn_save:'Save', prod_line_cmp_title:'Production Line Comparison Analysis', prod_line_chart_title:'Production Line Comparison Chart', prod_line_table_title:'Production Line Comparison Table', prod_line_seq:'#', prod_line_date:'Date', prod_line_prefix:'Line ', prod_line_empty:'No production records yet.',
         sec_usage:'Project Usage Breakdown (Spec × House, from signed project spec sheet)', empty_no_spec:'This project has not entered concrete slatted floor specs. Please go back to "Signed Projects", open the project, click "Edit" and fill in "Concrete Slatted Floor Specs".', empty_no_spec_sel:'Select specs above to enter qty', tip_spec_over:'This spec for the selected house is already overproduced and cannot be selected',
         th_spec:'Spec (L×W×H mm)', thr_house:'House', th_total:'Total Demand', th_shared:'Sharing', share_excl:' exclusive', share_cross_pre:'shared by ', share_cross_suf:'',
         sec_mat_spec:'Material Usage by Spec × House', sec_mat_house:'Material Usage by House × Spec', th_qty_whole:'Qty / Whole Site', th_rebar:'Rebar', th_cement:'Cement/Tons', th_sand:'Sand/Tons', th_gravel:'Gravel/Tons', thr_total:'Grand Total',
@@ -7857,13 +7857,41 @@ var WL_FLOW_IMG = {
         .catch(function(){ prod_toast('回滚失败（网络错误）'); });
     }
     function prod_fld(label,id,val,cls){ return '<div class="prod-field'+(cls?' '+cls:'')+'"><label>'+label+'</label><input id="'+id+'" value="'+prod_esc(val)+'"></div>'; }
-    function prod_numFld(label,id,val){ return '<div class="prod-field"><label>'+label+'</label><input id="'+id+'" inputmode="numeric" pattern="[0-9]*" value="'+prod_esc(val)+'" onfocus="this.select(); if(this.value===\'0\'){this.value=\'\';this.dataset.wasZero=\'1\'}" onblur="var v=this.value.replace(/[^0-9]/g,\'\'); if(v===\'\'){if(this.dataset.wasZero){this.value=\'0\';delete this.dataset.wasZero}}else{this.value=String(parseInt(v,10)||0); delete this.dataset.wasZero}"></div>'; }
+    /* ★NUM1-20261110：人员数量允许小数点后 1 位（如 0.5 人 = 半天人工）。
+       prod_num1Input 边打字边清洗（保留结尾的「1.」以便继续输入小数位）；
+       prod_fmt1 失焦/汇总时统一成最多 1 位小数，整数不带 .0。 */
+    function prod_num1Input(v){
+      var s = String(v==null?'':v).replace(/[^0-9.]/g,'');
+      var p = s.split('.');
+      if(p.length > 1) s = p[0] + '.' + p[1].slice(0,1);
+      if(s.charAt(0)==='.') s = '0' + s;
+      return s;
+    }
+    /* 只在「确实不合法」时才回写，避免每敲一个字都重设 .value 导致光标跳动、输入被吞 */
+    function prod_num1Guard(el){
+      if(!el) return;
+      var s = prod_num1Input(el.value);
+      if(s !== el.value) el.value = s;
+    }
+    function prod_fmt1(n){
+      var v = Math.round((Number(n)||0)*10)/10;
+      if(!isFinite(v)) return '0';
+      return String(v);
+    }
+    /* 带千位分隔的 1 位小数（表格/小计用；输入框里不用，避免逗号影响再次输入） */
+    function prod_fmt1G(n){
+      var s = prod_fmt1(n), p = s.split('.');
+      p[0] = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return p.join('.');
+    }
+    function prod_numFld(label,id,val){ return '<div class="prod-field"><label>'+label+'</label><input id="'+id+'" inputmode="decimal" value="'+prod_esc(val)+'" onfocus="this.select(); if(this.value===\'0\'){this.value=\'\';this.dataset.wasZero=\'1\'}" oninput="prod_num1Guard(this)" onblur="var v=prod_num1Input(this.value).replace(/\\.$/,\'\'); if(v===\'\'){if(this.dataset.wasZero){this.value=\'0\';delete this.dataset.wasZero}}else{this.value=prod_fmt1(parseFloat(v)||0); delete this.dataset.wasZero}"></div>'; }
     /* 取角色预填值：当天已保存 → 用保存值；否则用默认模板（可编辑，保存后即固化） */
     function prod_workerDefault(role, w){
       if(w && w[role]!=null && w[role]!=='') return mathNum(w[role]);
       return PROD_WORKER_DEFAULTS.hasOwnProperty(role) ? PROD_WORKER_DEFAULTS[role] : 0;
     }
-    function mathNum(v){ var n=parseInt(String(v).replace(/[^0-9]/g,''),10); return isNaN(n)?0:n; }
+    /* ★NUM1-20261110：parseInt 会把 0.5 变成 5（去掉小数点后 "05"），改用 parseFloat 保留 1 位小数 */
+    function mathNum(v){ var n=parseFloat(String(v==null?'':v).replace(/[^0-9.]/g,'')); return isNaN(n)?0:n; }
     /* 春节下拉：选「是」→ 字体红色，选「否」→ 默认颜色（pc_holiday / ic_holiday 共用） */
     function prod_holidayColor(sel){
       if(!sel) return;
@@ -9665,16 +9693,16 @@ var WL_FLOW_IMG = {
           + '<td class="pc-col-holiday" data-sort-val="'+((ww.holiday==='yes')?'yes':'no')+'">'+((ww.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'</td>'
           + '<td class="pc-col-period">'+prod_esc(prod_dayHalfText(ww.period))+'</td>'
           + '<td class="pc-col-rec">'+recDisp+'</td>';
-        PROD_WORKERS.forEach(function(k){ var v = isDefaultRecord ? (PROD_WORKER_DEFAULTS[k[0]]||0) : prod_workerDefault(k[0], ww); sum += v; subTot[k[0]] += v; h += '<td class="pc-col-role'+(v===0?' pc-zero':'')+'">'+v+'</td>'; });
+        PROD_WORKERS.forEach(function(k){ var v = isDefaultRecord ? (PROD_WORKER_DEFAULTS[k[0]]||0) : prod_workerDefault(k[0], ww); sum += v; subTot[k[0]] += v; h += '<td class="pc-col-role'+(v===0?' pc-zero':'')+'">'+prod_fmt1G(v)+'</td>'; });
         subTotTotal += sum;
-        h += '<td class="pc-col-total'+(sum===0?' pc-zero':'')+'"><b>'+sum+'</b></td>'
+        h += '<td class="pc-col-total'+(sum===0?' pc-zero':'')+'"><b>'+prod_fmt1G(sum)+'</b></td>'
           + '<td class="pc-col-act"><button class="prod-op" aria-label="'+pt('op_edit')+'" onclick="prod_editRow(\''+dd+'\')">✏️</button>'
           + '<button class="prod-op" onclick="prod_copyRow(\''+dd+'\')">📋</button>' + '<button class="prod-op" aria-label="'+pt('op_del')+'" onclick="prod_delWorkers(\''+dd+'\')">🗑️</button></td></tr>';
       });
       h += '</tbody><tfoot class="pc-labor-tfoot"><tr>'
         + '<td class="pc-col-no"></td><td class="pc-col-date"><b>'+pt('subtotal')+'</b></td><td class="pc-col-wx"></td><td class="pc-col-wx"></td><td class="pc-col-holiday"></td><td class="pc-col-period"></td><td class="pc-col-rec"></td>';
-      PROD_WORKERS.forEach(function(k){ var st = subTot[k[0]]; h += '<td class="pc-col-role'+(st===0?' pc-zero':'')+'"><b>'+st.toLocaleString()+'</b></td>'; });
-      h += '<td class="pc-col-total'+(subTotTotal===0?' pc-zero':'')+'"><b>'+subTotTotal.toLocaleString()+'</b></td><td class="pc-col-act"></td></tr></tfoot></table></div>';
+      PROD_WORKERS.forEach(function(k){ var st = subTot[k[0]]; h += '<td class="pc-col-role'+(st===0?' pc-zero':'')+'"><b>'+prod_fmt1G(st)+'</b></td>'; });
+      h += '<td class="pc-col-total'+(subTotTotal===0?' pc-zero':'')+'"><b>'+prod_fmt1G(subTotTotal)+'</b></td><td class="pc-col-act"></td></tr></tfoot></table></div>';
       h += prod_renderTrends(f);
       setTimeout(prodAutoBackfillWeather, 0);
       return h;
@@ -77314,7 +77342,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       });
       h += '<div class="inst-zone-team-block'+(ti%2===1?' inst-zone-team-block-alt':'')+'">';
       h += '<div class="inst-zone-team-title"><span>'+it('inst_lbl_team_record').replace('{0}', zoneNum).replace('{1}', ti+1)+'</span>'
-        + '<span class="inst-zone-team-total">'+it('inst_lbl_team_total')+'：<b>'+teamTotal+'</b>'+it('inst_unit_person')+'</span></div>';
+        + '<span class="inst-zone-team-total">'+it('inst_lbl_team_total')+'：<b>'+prod_fmt1(teamTotal)+'</b>'+it('inst_unit_person')+'</span></div>';
       h += '<div class="inst-zone-team-roles">';
       /* 猪舍下拉：value 用稳定的语言无关 key（原始编号），显示文字做翻译；
          兼容旧数据：已保存值是旧语言翻译名时也能回显。
@@ -77343,7 +77371,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       INST_ROLES.forEach(function(rk){
         if(rk[0]==='reporter' || rk[0]==='leader') return;
         var val = holidayYes ? 0 : inst_teamVal(teamObj, rk[0]);
-        h += '<div class="inst-zone-team-role"><label>'+it(rk[1])+'</label><input id="ic_zt_'+zoneNum+'_'+ti+'_'+rk[0]+'" inputmode="numeric" value="'+prod_esc(val)+'"></div>';
+        /* ★NUM1-20261110：人员数量允许 1 位小数（0.5 人 = 半天） */
+        h += '<div class="inst-zone-team-role"><label>'+it(rk[1])+'</label><input id="ic_zt_'+zoneNum+'_'+ti+'_'+rk[0]+'" inputmode="decimal" value="'+prod_esc(val)+'" oninput="prod_num1Guard(this)" onblur="this.value=prod_fmt1(parseFloat(prod_num1Input(this.value))||0)"></div>';
       });
       /* ===== 区域N-小组M-安装数量记录（只读映射 + 今日安装录入） ===== */
       var teamInstallHtml = '';
@@ -77510,10 +77539,10 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var totalPeople = 0;
     INST_ROLES.forEach(function(rk){
       if(rk[0]==='reporter' || rk[0]==='leader') return;
-      roleParts.push(it(rk[1]) + it('inst_ana_colon') + totalRoles[rk[0]] + it('inst_lbl_zone_summary_role_unit'));
+      roleParts.push(it(rk[1]) + it('inst_ana_colon') + prod_fmt1(totalRoles[rk[0]]) + it('inst_lbl_zone_summary_role_unit'));
       totalPeople += totalRoles[rk[0]];
     });
-    roleParts.push(it('inst_lbl_zone_summary_all').replace('{0}', totalPeople));
+    roleParts.push(it('inst_lbl_zone_summary_all').replace('{0}', prod_fmt1(totalPeople)));
     h += '<div class="inst-zone-summary"><b>' + it('inst_lbl_zone_summary_prefix').replace('{0}', zoneNum).replace('{1}', zoneTeams) + '</b>'
       + it('inst_lbl_zone_summary_total') + roleParts.join(it('inst_lbl_zone_summary_sep')) + '</div>';
     h += '</div>';
@@ -77573,14 +77602,14 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         if(rk[0]==='reporter' || rk[0]==='leader') return;
         var val = holidayYes ? 0 : inst_teamVal(teamObj, rk[0]);
         teamTotal += val;
-        if(val > 0) roleParts.push(it(rk[1])+it('inst_ana_colon')+val);
+        if(val > 0) roleParts.push(it(rk[1])+it('inst_ana_colon')+prod_fmt1(val));
       });
       var todayMap = teamObj.todayInstall || {};
       var todayTotal = 0;
       var specParts = [];
       for(var sp in todayMap){ if(todayMap.hasOwnProperty(sp)){ var v = +todayMap[sp]||0; todayTotal += v; if(v>0) specParts.push(prod_esc(sp)+'：'+prod_fmtNum(v)); } }
       h += '<div class="inst-zone-team-readonly'+(ti%2===1?' inst-zone-team-readonly-alt':'')+'">';
-      h += '<div class="inst-zone-team-ro-title">'+it('inst_lbl_team_record').replace('{0}', zoneNum).replace('{1}', ti+1)+' · '+it('inst_lbl_house')+'：'+houseName+' · '+it('inst_lbl_total_man')+'：'+teamTotal+'</div>';
+      h += '<div class="inst-zone-team-ro-title">'+it('inst_lbl_team_record').replace('{0}', zoneNum).replace('{1}', ti+1)+' · '+it('inst_lbl_house')+'：'+houseName+' · '+it('inst_lbl_total_man')+'：'+prod_fmt1(teamTotal)+'</div>';
       if(roleParts.length) h += '<div class="inst-zone-team-ro-roles">'+roleParts.join('、')+'</div>';
       if(specParts.length) h += '<div class="inst-zone-team-ro-install">'+it('inst_lbl_today_install')+'：'+prod_fmtNum(todayTotal)+' '+it('inst_lbl_today_install_unit')+' ('+specParts.join('、')+')</div>';
       h += '</div>';
@@ -77598,7 +77627,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     var totalPeople = 0;
     INST_ROLES.forEach(function(rk){
       if(rk[0]==='reporter' || rk[0]==='leader') return;
-      roleParts.push(it(rk[1]) + it('inst_ana_colon') + totalRoles[rk[0]] + it('inst_lbl_zone_summary_role_unit'));
+      roleParts.push(it(rk[1]) + it('inst_ana_colon') + prod_fmt1(totalRoles[rk[0]]) + it('inst_lbl_zone_summary_role_unit'));
       totalPeople += totalRoles[rk[0]];
     });
     h += '<div class="inst-zone-summary"><b>' + it('inst_lbl_zone_summary_prefix').replace('{0}', zoneNum).replace('{1}', zoneTeams) + '</b>'
@@ -77786,7 +77815,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         if(!tobj) return;
         INST_ROLES.forEach(function(rk){
           if(rk[0]==='reporter' || rk[0]==='leader') return;
-          totalRoles[rk[0]] += (tobj[rk[0]]|0) || 0;
+          /* ★NUM1-20261110：(x|0) 会把 0.5 截成 0，改用数值累加 */
+          totalRoles[rk[0]] += (+tobj[rk[0]] || 0);
         });
       });
     });
@@ -77795,7 +77825,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     INST_ROLES.forEach(function(rk){
       if(rk[0]==='reporter' || rk[0]==='leader') return;
       var cnt = totalRoles[rk[0]] || 0;
-      roleParts.push(it(rk[1]) + it('inst_ana_colon') + cnt + it('inst_summary_role_unit'));
+      roleParts.push(it(rk[1]) + it('inst_ana_colon') + prod_fmt1(cnt) + it('inst_summary_role_unit'));
       totalPeople += cnt;
     });
     var zoneNames = zones.map(function(zn){ return inst_zoneName(+zn); });
@@ -77808,7 +77838,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       .replace('{4}', it('inst_summary_house_unit'))
       .replace('{5}', houseNames.length ? houseNames.join(sep) : it('inst_summary_none'))
       .replace('{6}', roleParts.join(sep))
-      .replace('{7}', totalPeople);
+      .replace('{7}', prod_fmt1(totalPeople));
     /* ===== ① 各区完成栋数 ② 今日理论安装猪舍 ③ 今日实际安装猪舍(含理论起止) ④ 实际 vs 理论 偏差 ===== */
     var dYmd = (typeof dmyToYmd==='function') ? dmyToYmd(d) : '';
     var planMap = inst_anaPlanMap(houses);
@@ -78656,7 +78686,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         var tobj = {};
         INST_ROLES.forEach(function(rk){
           if(rk[0]==='reporter' || rk[0]==='leader') return;
-          var rv = parseInt((prod_val('ic_zt_'+zn+'_'+ti+'_'+rk[0])||'0').replace(/[^0-9]/g,'')||'0',10)||0;
+          /* ★NUM1-20261110：人员数量按 1 位小数解析（0.5 = 半天），不再 parseInt 截断 */
+          var rv = Math.round((parseFloat(String(prod_val('ic_zt_'+zn+'_'+ti+'_'+rk[0])||'0').replace(/[^0-9.]/g,''))||0)*10)/10;
           tobj[rk[0]] = (w.holiday==='yes') ? 0 : rv;
         });
         tobj.house = prod_val('ic_zt_'+zn+'_'+ti+'_house') || '';
