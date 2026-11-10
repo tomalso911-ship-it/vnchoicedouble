@@ -9236,8 +9236,21 @@ var WL_FLOW_IMG = {
       PROD_DUE_EDITING = true;
       prod_renderTab('A');
     }
-    /* 水泥漏缝地板详细配置：查看（全员）/ 编辑（受用户与授权 WON-D2 控制，仅授权可见） */
+    /* 水泥漏缝地板详细配置：查看（全员）/ 编辑（WON-D2 或 该项目生产模块授予「编辑」） */
     function prod_canEditSlats(){
+      /* ★PERM-EDIT-GRANT-20261110（用户要求：「编辑（可修改）」必须真正可改）：
+         面板「按项目授权」里把该项目的生产模块设成编辑 = 允许维护水泥板规格
+         （规格是生产的基础数据）。旧逻辑只认公共模块 WON-D2，
+         于是出现「按项目给了编辑，点规格仍提示无权限编辑」。 */
+      try {
+        var _pid = (typeof _curPid === 'function') ? _curPid(typeof PROD_CUR !== 'undefined' ? PROD_CUR : null) : null;
+        if (_pid && typeof permLvProj === 'function'){
+          var _ks = ['prod_A','prod_B','prod_C','prod_D','prod_E','prod_F','prod_H'];
+          for (var _i=0;_i<_ks.length;_i++){
+            if (permLvProj(_pid, _ks[_i]) === 'edit') return true;
+          }
+        }
+      } catch(e){}
       try { if (typeof permVisible === 'function') return permVisible('WON-D2'); } catch(e){}
       return true;
     }
@@ -41911,11 +41924,41 @@ function _permInfo(bid){
   var key = 'user_block_' + String(bid).replace(/-/g,'_') + '_info';
   return (T().empty && T().empty[key]) ? T().empty[key] : '';
 }
+// ★PERM-EDIT-GRANT-20261110（根因修复）：
+//   某区块在权限面板里【显式设置】的级别（新公共模块键桥 → 旧区块顶层/blocks）。
+//   返回 null = 面板从未配置过（此时才允许回落到历史规则）。
+function _permExplicitLv(bid){
+  try{
+    if (typeof _wonBridgeLv === 'function'){
+      var _b = _wonBridgeLv(bid);
+      if (_b !== null){
+        var _n = permLvNorm4(_b);
+        if (_n !== null) return _n;
+      }
+    }
+  }catch(e){}
+  try{
+    var _l = permLvNorm4(curRawDecision(bid));
+    if (_l !== null) return _l;
+  }catch(e){}
+  return null;
+}
 // 行级写权限判断：数据范围授权仅授予"查看"权；写（编辑/删除/转移）仅限行归属者本人，管理员豁免。
 // p 为行数据对象（含 owner_user_id / salesperson）。未登录（老模式）兜底放行。
-function canWriteRow(p){
+// ★PERM-EDIT-GRANT-20261110（用户明确要求：面板选「编辑（可修改）」= 这个人必须真的能改）：
+//   第 2 参传该行所属区块（'WON-D2' / 'CRM-D2' …）。只要面板里这一项显式是 edit，
+//   就与后端 _owns_row(…, op) 完全同口径放行全部行；显式 hide 一律拒绝；
+//   只有【从未配置】时才回落到「行归属者本人」的老规则（不影响存量的数据范围只读语义）。
+function canWriteRow(p, bid){
   if (typeof authUser === 'undefined' || !authUser) return true;
   if (_isSuperUser()) return true;
+  if (bid){
+    try{
+      var _lvW = _permExplicitLv(bid);
+      if (_lvW === 'edit') return true;
+      if (_lvW === 'hide') return false;
+    }catch(e){}
+  }
   var me = (authUser.username || '').trim().toLowerCase();
   if (!me) return true;
   var owner = String(p.owner_user_id || '').trim().toLowerCase();
@@ -41979,7 +42022,23 @@ function permLvProj(pid, key){
 function _projWholeVisible(pid){
   try{
     if (typeof permLvProj !== 'function') return true;
-    return permLvProj(pid, 'whole') !== 'hide';
+    var _lvW = permLvProj(pid, 'whole');
+    if (_lvW !== 'hide') return true;
+    // ★PERM-EDIT-GRANT-20261110（用户要求：授权设为「编辑（可修改）」必须真正进得去）：
+    //   「整个项目」默认就是 hide（PROJ-HIDE-DEF）。管理员只在项目内把某个模块（如
+    //   A 工厂概况 / C 人员 / 生产计划…）设成「查看 / 编辑」，却忘了单独把「整个项目」
+    //   改成「显示」→ 旧逻辑直接判定该项目不可见，用户连进都进不去，表现为
+    //   「选了编辑仍提示无权进入」。这里补一条：整体是 hide 但项目下【任一模块】
+    //   被显式授予 view / edit / approve → 视为可进入（内部各模块仍按各自级别工作）。
+    //   仅当整项目所有模块都隐藏/未配置时，项目才真正不可见。
+    var _p = _myPermsObj();
+    var _ov = (_p.projects || {})[String(pid)] || {};
+    for (var _k in _ov){
+      if (_k === 'whole') continue;
+      var _l = permLvNorm4(_ov[_k]);
+      if (_l === 'view' || _l === 'edit' || _l === 'approve') return true;
+    }
+    return false;
   }catch(e){ return true; }
 }
 window._projWholeVisible = _projWholeVisible;
@@ -46464,14 +46523,27 @@ function collectProjects(){
   const out = {};
   document.querySelectorAll('#projList .pproj').forEach(function(pEl){
     const pid = pEl.getAttribute('data-pid');
-    // ★BTN-LAG2-20261107：未展开的项目明细没有渲染，直接沿用内存原值。
-    // 否则保存会把这些项目已配好的权限当成"未设置"清空 —— 数据事故，绝不能发生。
-    if (!pEl.querySelector('.pperm-row')){
-      const prior = _PROJ_PRIOR[pid];
-      if (prior && Object.keys(prior).length) out[pid] = prior;
+    // ★PERM-EDIT-GRANT-20261110（数据事故修复）：
+    //   项目标题行本身就是一个 .pperm-row（data-key="whole"），所以旧判断
+    //   `if (!pEl.querySelector('.pperm-row'))` 恒为 false —— 项目【没展开】时
+    //   body 里一个模块行都没有，却仍然走"逐行收集"，结果 obj 只剩 {whole:…}，
+    //   保存后该项目原有的 prod_A..F / inst_A..C 等授权被整批删掉（用户看到
+    //   「我设了编辑，结果全没了 / 仍然进不去」）。这里改为：先灌入内存原值，
+    //   再按"明细是否真的渲染过"决定要不要覆盖。
+    const prior = _PROJ_PRIOR[pid];
+    const obj = {};
+    if (prior && typeof prior === 'object'){
+      Object.keys(prior).forEach(function(k){ obj[k] = prior[k]; });
+    }
+    const bodyEl = pEl.querySelector('.pproj-body');
+    const expanded = !!(bodyEl && bodyEl.getAttribute('data-filled'));
+    if (!expanded){
+      // 明细未展开：只有标题行的「整个项目」可能被改过，其它模块一律沿用原值
+      const wsel = pEl.querySelector('summary .pperm-row[data-key="whole"] select.pperm-sel');
+      if (wsel) obj['whole'] = wsel.value;
+      if (Object.keys(obj).length) out[pid] = obj;
       return;
     }
-    const obj = {};
     pEl.querySelectorAll('.pperm-row').forEach(function(row){
       const k = row.getAttribute('data-key');
       const sel = row.querySelector('select.pperm-sel');
@@ -49738,7 +49810,7 @@ function openDetailView(id, field, labelKey) {
   
   var editBtn = el('dvBtnEdit');
   // 数据范围授权仅只读：非本人(且非管理员)的明细不可编辑
-  var rowWritable = (typeof canWriteRow==='function') ? canWriteRow(p) : true;
+  var rowWritable = (typeof canWriteRow==='function') ? canWriteRow(p, 'WON-D2') : true;
   editBtn.style.display = rowWritable ? '' : 'none';
   editBtn.textContent = '✏️ ' + (t.detail_edit || '编辑');
   var _dvClose = el('dvBtnClose'); if (_dvClose) _dvClose.textContent = t.detail_close || '关闭';
@@ -50052,7 +50124,7 @@ function openWonModal(id) {
     if (!permGuard('WON-D2')) return;
     // 行级写权限：数据范围授权仅只读，非本人(且非管理员)禁止编辑
     var _p = (typeof globalWonData!=='undefined') ? (globalWonData.find(function(x){return x.id==id;})||null) : null;
-    if (_p && typeof canWriteRow==='function' && !canWriteRow(_p)) { showToast(T().empty.err_readonly || '只读授权：他人数据仅可查看，不能修改或删除'); return; }
+    if (_p && typeof canWriteRow==='function' && !canWriteRow(_p, 'WON-D2')) { showToast(T().empty.err_readonly || '只读授权：他人数据仅可查看，不能修改或删除'); return; }
   }
   var t=T();
   el('wonModal').dataset.id=id||''; 
@@ -52443,7 +52515,7 @@ function openCrmModal(id) {
     if (!permGuard('CRM-D2')) return;
     // 行级写权限：数据范围授权仅只读，非本人(且非管理员)禁止编辑
     var _p = (typeof globalCrmData!=='undefined') ? (globalCrmData.find(function(x){return x.id==id;})||null) : null;
-    if (_p && typeof canWriteRow==='function' && !canWriteRow(_p)) { showToast(T().empty.err_readonly || '只读授权：他人数据仅可查看，不能修改或删除'); return; }
+    if (_p && typeof canWriteRow==='function' && !canWriteRow(_p, 'CRM-D2')) { showToast(T().empty.err_readonly || '只读授权：他人数据仅可查看，不能修改或删除'); return; }
   }
   var t = T();
   id = id || '';
