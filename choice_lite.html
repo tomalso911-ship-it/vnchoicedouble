@@ -8061,6 +8061,7 @@ var WL_FLOW_IMG = {
           if(!e0.firstChild) continue;
           if(e0.querySelector('.slats-solid-box')) continue;
           if(e0.classList.contains('slats-solid-cell')) continue;
+          try{ if(e0.closest && e0.closest('[data-solid-managed],.pe-solid')) continue; }catch(e){}
           var raw = String(e0.textContent||'');
           if(!raw.trim()) continue;
           if(raw.length > 40) continue;                 /* 长文本格（说明/汇总）不参与，防止误包 */
@@ -8085,7 +8086,9 @@ var WL_FLOW_IMG = {
           var tag = p.tagName;
           if(tag==='OPTION'||tag==='SELECT'||tag==='TEXTAREA'||tag==='SCRIPT'||tag==='STYLE'||tag==='NOSCRIPT') continue;
           if(p.classList && p.classList.contains('slats-solid-box')) continue;
-          try{ if(p.closest('.slats-solid-box,td.slats-solid-cell,th.slats-solid-cell')) continue; }catch(e){}
+          /* ★SOLID-KEY-20261110：已经是「按键级」判断过实心板的位置（data-solid-managed / .pe-solid）
+             一律跳过 —— 否则同尺寸的实心板与非实心板会被旧的「按尺寸」规则一起框上黄框（BUG）。 */
+          try{ if(p.closest('.slats-solid-box,td.slats-solid-cell,th.slats-solid-cell,[data-solid-managed],.pe-solid')) continue; }catch(e){}
           var rng = slatsSolidScan(v);
           if(rng.length) hits.push({ node:tn, rng:rng[0] });
         }
@@ -13600,7 +13603,7 @@ var WL_FLOW_IMG = {
           selHouses.forEach(function(hh){ var q = +detail[hh]||0; if(q>0) rows.push(prod_esc(prod_phName(hh))+'：'+prod_fmtNum(q)); });
           if(!rows.length) rows.push('—');
           /* ★SOLID-KEY-20261110：只读表里实心板规格名同样加黄色外框，不写文字 */
-          h += '<tr><td class="pe-ro-spec"><span'+(prod_specIsSolid(s)?' class="pe-solid"':'')+'>'+prod_esc(prod_specLabel(s))+'</span></td><td class="pe-ro-detail">'+rows.join('<br>')+'</td><td class="pe-ro-subtotal">'+prod_fmtNum(line.qty[s]||0)+'</td></tr>';
+          h += '<tr><td class="pe-ro-spec"><span data-solid-managed="1"'+((prod_specIsSolid(s))?' class="pe-solid"':'')+'>'+prod_esc(prod_specLabel(s))+'</span></td><td class="pe-ro-detail">'+rows.join('<br>')+'</td><td class="pe-ro-subtotal">'+prod_fmtNum(line.qty[s]||0)+'</td></tr>';
         });
         h += '</tbody></table>';
       }
@@ -13856,10 +13859,11 @@ var WL_FLOW_IMG = {
         var _solidCls = prod_specIsSolid(s) ? ' pe-solid' : '';
         var _label = prod_specLabel(s);
         var title = _label+'&#10;'+pt('chip_real')+'：'+prod_fmtNum(realProd)+'/'+prod_fmtNum(houseQty)+'&#10;'+pt('chip_spec_all')+'：'+prod_fmtNum(allProd)+'/'+prod_fmtNum(total);
-        var inner = '<span class="pe-chip-name'+_solidCls+'">'+prod_esc(_label)+'</span>'
+        var inner = '<span class="pe-chip-name'+_solidCls+'" data-solid-managed="1">'+prod_esc(_label)+'</span>'
           + '<span class="pe-chip-bar"><i style="width:'+pct+'%"></i></span>'
           + '<span class="pe-chip-num"><b>'+prod_fmtNum(realProd)+'</b>/'+prod_fmtNum(houseQty)+'</span>';
-        return '<span class="pe-chip pe-spec'+on+_solidCls+'" title="'+title+'" data-line="'+n+'" data-spec="'+prod_esc(s)+'" onclick="prod_dailySpecToggle(this,'+n+')">'+inner+'</span>';
+        /* 外层胶囊不再套黄框（只在尺寸文字上框），并标记 data-solid-managed 阻止旧扫描器重复加框 */
+        return '<span class="pe-chip pe-spec'+on+'" data-solid-managed="1" title="'+title+'" data-line="'+n+'" data-spec="'+prod_esc(s)+'" onclick="prod_dailySpecToggle(this,'+n+')">'+inner+'</span>';
       }).join('');
     }
     function prod_dailyHouseStatHtml(demand, produced){
@@ -13929,7 +13933,7 @@ var WL_FLOW_IMG = {
             .replace('{1}', '')
             .replace('{2}', prod_fmtNum(singleProduced))
             .replace('{3}', singleLastSpan);
-          var topHtml = '<div class="pe-specrow-left"><span class="pe-specname'+_specCls+'">'+prod_esc(_specTxt)+'</span><span class="pe-specrow-stat">'+singleStatText+'</span></div>';
+          var topHtml = '<div class="pe-specrow-left"><span class="pe-specname'+_specCls+'" data-solid-managed="1">'+prod_esc(_specTxt)+'</span><span class="pe-specrow-stat">'+singleStatText+'</span></div>';
           var v = (detail[h]!=null) ? detail[h] : ((line.qty[s]!=null)?line.qty[s]:0);
           var inputHtml = '<input class="pe-q" type="text" inputmode="numeric" pattern="[0-9,]*" autocomplete="off" data-line="'+n+'" data-spec="'+prod_esc(s)+'" data-house="'+prod_esc(h)+'" value="'+prod_fmtNum(v)+'" oninput="prod_dailyQtyInput(this)">';
           return '<div class="pe-specrow">'+topHtml+inputHtml+'</div>';
@@ -13945,7 +13949,7 @@ var WL_FLOW_IMG = {
         var subtotalStat = prod_dailySubtotalStatHtml(totalDemandH, totalProducedH);
         var inputHtml = '<div class="pe-qty-group">'+houseInputs
           + '<div class="pe-qty-row pe-qty-subtotal"><div class="pe-qty-row-left">'+subtotalStat+'</div><div class="pe-qty-row-right"><span class="pe-qty-label">'+prod_esc(pt('subtotal'))+'</span><b>'+prod_fmtNum(line.qty[s]||0)+'</b></div></div></div>';
-        var topHtml = '<div class="pe-specrow-left"><span class="pe-specname'+_specCls+'">'+prod_esc(_specTxt)+'</span></div>';
+        var topHtml = '<div class="pe-specrow-left"><span class="pe-specname'+_specCls+'" data-solid-managed="1">'+prod_esc(_specTxt)+'</span></div>';
         return '<div class="pe-specrow pe-specrow-multi"><div class="pe-specrow-top">'+topHtml+'</div><div class="pe-specrow-body">'+inputHtml+'</div></div>';
       }).join('');
     }
@@ -14377,7 +14381,7 @@ var WL_FLOW_IMG = {
         var caret = '<span class="pe-fin-caret">'+(isExp?'▾':'▸')+'</span>';
         h += '<tr class="pe-fin-row'+(isExp?' pe-fin-expanded':'')+'" data-idx="'+idx+'" data-spec="'+prod_esc(s)+'" onclick="prod_finClick(event,this)">'
           + '<td class="pe-col-no">'+(idx+1)+'</td>'
-          + '<td>'+caret+(prod_specIsSolid(s)?'<span class="pe-solid">'+prod_esc(prod_specLabel(s))+'</span>':prod_esc(prod_specLabel(s)))+'</td>'
+          + '<td>'+caret+'<span data-solid-managed="1"'+(prod_specIsSolid(s)?' class="pe-solid"':'')+'>'+prod_esc(prod_specLabel(s))+'</span></td>'
           + '<td style="text-align:center">'+prod_fmtNum(sd)+'</td>'
           + '<td class="pe-col-blue" style="text-align:center"'+zc(p)+'>'+prod_fmtNum(p)+'</td>'
           + '<td class="pe-col-blue" style="text-align:center"'+zc(need)+'>'+prod_fmtNum(need)+'</td>'
@@ -14417,7 +14421,8 @@ var WL_FLOW_IMG = {
       function fmtSpec(k){
         var sp = prod_specLabel(k).split('×');
         var _inner = prod_esc(sp[0]||'') + ' × ' + prod_esc((sp[1]||'')+'×'+(sp[2]||''));
-        return prod_specIsSolid(k) ? '<span class="pe-solid">'+_inner+'</span>' : _inner;
+        /* 无论实心板与否都标记 data-solid-managed，避免旧扫描器按尺寸把非实心板也框上 */
+        return '<span data-solid-managed="1"'+(prod_specIsSolid(k)?' class="pe-solid"':'')+'>'+_inner+'</span>';
       }
       function produced(h,k){ return (hsp[h] && hsp[h][k]) || 0; }
       var byHouse = [];
