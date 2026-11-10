@@ -8061,7 +8061,14 @@ var WL_FLOW_IMG = {
           if(!e0.firstChild) continue;
           if(e0.querySelector('.slats-solid-box')) continue;
           if(e0.classList.contains('slats-solid-cell')) continue;
-          try{ if(e0.closest && e0.closest('[data-solid-managed],.pe-solid,.pe-specchips,.pe-specrows,.pe-ro-table')) continue; }catch(e){}
+          /* ★SOLID-ONCE-20261110（用户 2026-11-10 反馈）：
+             渲染层已经按「行级」判定过实心板的位置（data-solid-managed / .pe-solid）一律跳过。
+             否则会出现两种错：
+               ① 实心板格子被套两层黄框 —— 内层 .pe-solid（渲染层）+ 外层 .slats-solid-box（本扫描器包在 td 上）；
+               ② 非实心的同尺寸行被按尺寸误框 —— 该行明明是 NO，但同尺寸别处有 YES → 被框。
+             判定必须只认「这一行/这个键」，不能按尺寸。 */
+          if(e0.querySelector('[data-solid-managed],.pe-solid,.slats-solid-box')) continue;
+          try{ if(e0.closest && e0.closest('[data-solid-managed],.pe-solid,.inst-bldg-tip,.pe-specchips,.pe-specrows,.pe-ro-table')) continue; }catch(e){}
           var raw = String(e0.textContent||'');
           if(!raw.trim()) continue;
           if(raw.length > 40) continue;                 /* 长文本格（说明/汇总）不参与，防止误包 */
@@ -8088,7 +8095,9 @@ var WL_FLOW_IMG = {
           if(p.classList && p.classList.contains('slats-solid-box')) continue;
           /* ★SOLID-KEY-20261110：已经是「按键级」判断过实心板的位置（data-solid-managed / .pe-solid）
              一律跳过 —— 否则同尺寸的实心板与非实心板会被旧的「按尺寸」规则一起框上黄框（BUG）。 */
-          try{ if(p.closest('.slats-solid-box,td.slats-solid-cell,th.slats-solid-cell,[data-solid-managed],.pe-solid,.pe-specchips,.pe-specrows,.pe-ro-table')) continue; }catch(e){}
+          /* ★SOLID-ONCE-20261110：猪舍概览浮窗（.inst-bldg-tip）整块不参与按尺寸包框 ——
+             那里的规格只是文字信息，同尺寸别处有 YES 就会把非实心板的规格也框上黄框（用户反馈的第二个问题）。 */
+          try{ if(p.closest('.slats-solid-box,td.slats-solid-cell,th.slats-solid-cell,[data-solid-managed],.pe-solid,.inst-bldg-tip,.pe-specchips,.pe-specrows,.pe-ro-table')) continue; }catch(e){}
           var rng = slatsSolidScan(v);
           if(rng.length) hits.push({ node:tn, rng:rng[0] });
         }
@@ -10442,9 +10451,22 @@ var WL_FLOW_IMG = {
          只要该项目最新一张收货单已经被采购经理确认（status='confirmed' = 已移交/已过账入库），
          上一单的草稿就自动作废 —— 不清内存行、不回填本地草稿，进来就是干净的一单。
          根因：旧逻辑只看「本地有没有草稿」，不管这一单是否已经收尾，所以刷新/重登又会把内容填回来。 */
-      var _rcMoved = null;
-      try{ _rcMoved = (typeof prodRcConfirmedReceipt === 'function') ? prodRcConfirmedReceipt() : null; }catch(e){}
-      if(_rcMoved){
+      var _rcSub = null;
+      try{ _rcSub = (typeof prodRcSubmittedReceipt === 'function') ? prodRcSubmittedReceipt() : null; }catch(e){}
+      var _rcPurge = false;
+      if(_rcSub){
+        if(_rcSub.status === 'confirmed'){ _rcPurge = true; }   /* 已确认移交 → 无条件收尾 */
+        else {
+          /* ★RC-AUTOCLEAR-20261110c：待审批(pending) 也算「已提交、工作已完成」。
+             但只有当本地草稿内容就是这张已提交的单时才作废 —— 用户已经改过/新录的内容必须保留。 */
+          try{
+            var _d0 = prodRcDraftLocal();
+            if(!_d0 || !_d0.rows || !_d0.rows.length) _rcPurge = true;
+            else if(typeof prodRcRowsLikeReceipt === 'function' && prodRcRowsLikeReceipt(prodRcDraftRows(_d0), _rcSub)) _rcPurge = true;
+          }catch(e){}
+        }
+      }
+      if(_rcPurge){
         try{ prodRcClearDraft(); }catch(e){}
         try{ localStorage.removeItem(prodRcDraftKey()); }catch(e){}
         prodRcRows = [];
@@ -10490,8 +10512,10 @@ var WL_FLOW_IMG = {
       h += '<div style="margin:6px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
         + '<button class="prod-btn" type="button" data-i18n="btn_add_line" onclick="prodReceiptAddRow()">'+pt('btn_add_line')+'</button>'
         + '<span id="pd_draft_tip" style="font-size:12px;color:#2b7a3e;"></span>'
+        /* ★RC-AUTOCLEAR-20261110c：手动兜底 —— 一键清空上一单残留（明细+照片引用+日期归今天），随时可用 */
+        + '<button class="prod-btn" type="button" onclick="prodRcClearAllNow()" title="'+({zh:'清空收货明细与照片，准备下一单',en:'Clear lines and photos, start a new receipt',vi:'Xóa dòng hàng và ảnh, bắt đầu phiếu mới'})[(typeof CUR_LANG!=='undefined'&&CUR_LANG)||'zh']+'">'+({zh:'清空',en:'Clear',vi:'Xóa'})[(typeof CUR_LANG!=='undefined'&&CUR_LANG)||'zh']+'</button>'
         + '<button class="prod-btn" type="button" data-i18n="btn_save_receipt_draft" onclick="prodRcDraftSave()" style="margin-left:auto">'+pt('btn_save_receipt_draft')+'</button>'
-        + '<span id="pd_build_tag" title="收货明细版本标记：看不到这行字说明浏览器还在跑旧页面" style="font-size:10px;color:#aaa;letter-spacing:.5px">RC-20261110b-autoclear</span>'
+        + '<span id="pd_build_tag" title="收货明细版本标记：看不到这行字说明浏览器还在跑旧页面" style="font-size:10px;color:#aaa;letter-spacing:.5px">RC-20261110c-autoclear</span>'
         + '</div>';
       h += '<div id="pd_rows" class="rc-lines"></div><div id="pd_foot" class="rc-foot-bar"></div>';
 
@@ -11972,18 +11996,27 @@ var WL_FLOW_IMG = {
       }catch(e){}
       return null;
     }
-    function prodRcNormNum(v){
-      var n = parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));
-      return isNaN(n) ? 0 : n;
-    }
-    /* 表单里的内容是否就是那张已确认收货单的内容（或表单本来就是空的）——
-       是才允许清空；用户已经动手录下一单（行数/材料/规格/数量/单价变了）就绝不清。 */
-    function prodRcDraftIsSubmitted(rec){
+    /* ★RC-AUTOCLEAR-20261110c：只要这一单【已经提交过】（pending 待审批 或 confirmed 已确认），
+       就说明「工作已完成并移交」，草稿不该再把内容填回来。
+       退回（returned / need_edit）不算 —— 那是要重新填的。 */
+    function prodRcSubmittedReceipt(){
       try{
-        var cur = prodRcRows || [];
+        var f = prod_get(PROD_CUR); if(!f) return null;
+        var rs = (f.materials && f.materials.receipts) || [];
+        for(var i = rs.length - 1; i >= 0; i--){
+          var r = rs[i]; if(!r) continue;
+          if(r.status === 'returned' || r.status === 'need_edit') return null;
+          return r;                                  /* 最新一张已提交（pending / confirmed / 无状态） */
+        }
+      }catch(e){}
+      return null;
+    }
+    /* 一组明细行是否与某张收货单的内容一致（材料/规格/单位/数量/单价逐行比对） */
+    function prodRcRowsLikeReceipt(rows, rec){
+      try{
+        var cur = rows || [], sub = (rec && rec.rows) || [];
         var filled = cur.filter(function(r){ return r && (r.material || r.spec || prodRcNormNum(r.qty) || prodRcNormNum(r.priceVnd)); });
         if(!filled.length) return true;
-        var sub = rec.rows || [];
         if(sub.length !== cur.length) return false;
         for(var i=0;i<cur.length;i++){
           var a = cur[i] || {}, b = sub[i] || {};
@@ -11995,6 +12028,15 @@ var WL_FLOW_IMG = {
         }
         return true;
       }catch(e){ return false; }
+    }
+    function prodRcNormNum(v){
+      var n = parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));
+      return isNaN(n) ? 0 : n;
+    }
+    /* 表单里的内容是否就是那张已确认收货单的内容（或表单本来就是空的）——
+       是才允许清空；用户已经动手录下一单（行数/材料/规格/数量/单价变了）就绝不清。 */
+    function prodRcDraftIsSubmitted(rec){
+      return prodRcRowsLikeReceipt(prodRcRows || [], rec);
     }
     function prodRcResetForNextWork(){
       try{ prodRcClearDraft(); }catch(e){}
@@ -12010,16 +12052,48 @@ var WL_FLOW_IMG = {
       try{ prodReceiptRenderRows(); prodReceiptRenderFoot(); }catch(e){}
       try{ if(typeof prod_receiptRefreshSpecProgress === 'function') prod_receiptRefreshSpecProgress(); }catch(e){}
       try{ prodRcDraftTip(0); }catch(e){}
-      var _msg = { zh:'上一张收货单已确认移交，已清空内容，可以开始下一单',
-                   en:'Previous receipt confirmed & transferred. Form cleared — ready for the next receipt.',
-                   vi:'Phiếu nhập trước đã được xác nhận và chuyển giao. Đã xóa nội dung — sẵn sàng cho phiếu tiếp theo.' };
+      var _msg = { zh:'已清空上一单的明细与照片，可以开始下一单',
+                   en:'Previous receipt cleared — ready for the next one.',
+                   vi:'Đã xóa nội dung phiếu trước — sẵn sàng cho phiếu tiếp theo.' };
       prod_toast(_msg[(typeof CUR_LANG !== 'undefined' && CUR_LANG) || 'zh'] || _msg.zh);
+    }
+    /* ★RC-AUTOCLEAR-20261110c：手动兜底「清空」按钮 —— 一键清掉上一单残留（明细行 + 照片引用 + 日期归今天）。
+       自动收尾逻辑失效、或用户想主动重填时随时可用；不删服务器照片文件，不动已提交/已确认的收货单。 */
+    function prodRcClearAllNow(){
+      if(!PROD_CUR){ prod_toast(pt('toast_name_req')||'请先选择项目'); return; }
+      var _L = (typeof CUR_LANG !== 'undefined' && CUR_LANG) || 'zh';
+      var hasRows = false;
+      try{
+        hasRows = (prodRcRows || []).some(function(r){
+          return r && (r.material || r.spec || prodRcNormNum(r.qty) || prodRcNormNum(r.priceVnd) || (r.note && String(r.note).trim()));
+        });
+      }catch(e){}
+      var hasPhotos = false;
+      try{
+        var _pbx = el('pd_photos');
+        if(_pbx){ var _pxa = JSON.parse(_pbx.value || '[]'); hasPhotos = !!(_pxa && _pxa.length); }
+      }catch(e){}
+      var hasHouses = false;
+      try{ if(document.querySelectorAll('.pd_house:checked').length) hasHouses = true; }catch(e){}
+      try{ if(PROD_SELECTED_HOUSES && PROD_SELECTED_HOUSES.length) hasHouses = true; }catch(e){}
+      var hasFloors = false;
+      try{ if(document.querySelectorAll('.pd_floor:checked').length) hasFloors = true; }catch(e){}
+      if(!hasRows && !hasPhotos && !hasHouses && !hasFloors){
+        prod_toast({zh:'当前没有需要清空的内容', en:'Nothing to clear.', vi:'Không có nội dung để xóa.'}[_L] || '当前没有需要清空的内容');
+        return;
+      }
+      var _ask = { zh:'确定清空当前收货单的明细与照片引用吗？\n（照片文件与已提交的收货单不会被删除）',
+                   en:'Clear all lines and photo references of this receipt?\n(Photo files and submitted receipts are not deleted.)',
+                   vi:'Xóa toàn bộ dòng hàng và ảnh tham chiếu của phiếu này?\n(Tệp ảnh và phiếu đã gửi không bị xóa.)' };
+      try{ if(typeof window.confirm === 'function' && !window.confirm(_ask[_L] || _ask.zh)) return; }catch(e){}
+      prodRcResetForNextWork();
     }
     function prodRcDraftSave(){
       if(!PROD_CUR){ prod_toast(pt('toast_name_req')||'请先选择项目'); return; }
-      /* ★RC-AUTOCLEAR-20261110：已提交且已确认移交 → 「保存」即收尾清空，不再保留上一单内容 */
+      /* ★RC-AUTOCLEAR-20261110c：这一单已经提交过（pending 待审批 / confirmed 已确认）且表单内容就是它
+         → 「保存」即收尾清空，不再保留上一单内容，准备下一单 */
       try{
-        var _mv = prodRcConfirmedReceipt();
+        var _mv = prodRcSubmittedReceipt();
         if(_mv && prodRcDraftIsSubmitted(_mv)){ prodRcResetForNextWork(); return; }
       }catch(e){}
       var d = prodRcDraftSnapshot();
@@ -12068,8 +12142,14 @@ var WL_FLOW_IMG = {
     }
     /* D 页渲染后的统一回填入口：本地草稿已回填过行 → 只补 DOM；否则内存为空时向服务端要一次 */
     function prodRcRestoreDraftPost(){
-      /* ★RC-AUTOCLEAR-20261110：上一单已确认移交 → 服务端草稿也不要拉回来 */
-      try{ if(typeof prodRcConfirmedReceipt === 'function' && prodRcConfirmedReceipt()){ PROD_RC_DRAFT_RESTORED = null; return; } }catch(e){}
+      /* ★RC-AUTOCLEAR-20261110c：上一单已提交（pending/confirmed）且内容就是它 → 服务端草稿也不要拉回来 */
+      try{
+        var _rs2 = (typeof prodRcSubmittedReceipt === 'function') ? prodRcSubmittedReceipt() : null;
+        if(_rs2 && (_rs2.status === 'confirmed' ||
+           (typeof prodRcRowsLikeReceipt === 'function' && prodRcRowsLikeReceipt(prodRcRows || [], _rs2)))){
+          PROD_RC_DRAFT_RESTORED = null; return;
+        }
+      }catch(e){}
       var d = PROD_RC_DRAFT_RESTORED;
       if(d){ PROD_RC_DRAFT_RESTORED = null; prodRcDraftApplyDom(d); return; }
       /* 切语言/局部重渲染会重建 #pd_draft_tip，这里用本地草稿的时间戳把提示补回来 */
