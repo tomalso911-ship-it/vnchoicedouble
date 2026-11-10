@@ -5638,7 +5638,8 @@ var WL_FLOW_IMG = {
       .pc-labor-form{flex:2 1 520px;min-width:0;display:flex;flex-direction:column;}
       .pc-weather-side{flex:1 1 300px;min-width:300px;display:flex;flex-direction:column;}
       .pc-weather-cards{display:flex;gap:14px;flex-wrap:wrap;flex:1;}
-      .pc-common-grid{display:grid;grid-template-columns:130px repeat(3, minmax(0, 1fr));gap:10px;width:100%;}
+      /* ★DAYHALF-20261110：多了一列「一天/半天」→ 4 列变 5 列 */
+      .pc-common-grid{display:grid;grid-template-columns:130px repeat(4, minmax(0, 1fr));gap:10px;width:100%;}
       .pc-common-grid .prod-field{min-width:0;}
       @media (max-width:860px){ .pc-lw-row{flex-direction:column;} .pc-weather-side,.pc-labor-form{flex:1 1 auto;width:100%;min-width:0;} .pc-common-grid{grid-template-columns:repeat(2, minmax(0, 1fr));} }
       .prod-role-grid{display:grid;grid-template-columns:repeat(5, minmax(0, 1fr));gap:10px;width:100%;}
@@ -6013,6 +6014,9 @@ var WL_FLOW_IMG = {
       .pc-labor-hist .pc-col-date{width:76px;white-space:nowrap;word-break:normal;}
       .pc-labor-hist .pc-col-zone{width:36px;white-space:nowrap;word-break:normal;text-align:center;vertical-align:middle;}
       .pc-labor-hist .pc-col-holiday{width:42px;}
+      /* ★DAYHALF-20261110：「一天/半天」列较窄，表头拆两行；单元格文字居中 */
+      .pc-labor-hist .pc-col-period{width:44px;white-space:normal;word-break:normal;line-height:1.15;text-align:center;vertical-align:middle;}
+      .pc-labor-hist th.pc-col-period{white-space:normal;line-height:1.15;}
       .pc-labor-hist .pc-col-rec{width:44px;}
       .pc-labor-hist .pc-col-role{width:50px;}
       .pc-labor-hist .pc-col-total{width:46px;}
@@ -6947,6 +6951,22 @@ var WL_FLOW_IMG = {
       PROD_I18N.zh.mark_receipt_draft_saved='已保存 {t}';
       PROD_I18N.en.mark_receipt_draft_saved='Saved {t}';
       PROD_I18N.vi.mark_receipt_draft_saved='Đã lưu {t}';
+      /* ★DAYHALF-20261110：生产 C 页「一天/半天」（一天 / 上午 / 下午），表头分两行显示 */
+      PROD_I18N.zh.lbl_period='一天/半天';
+      PROD_I18N.en.lbl_period='Day / Half-day';
+      PROD_I18N.vi.lbl_period='Cả ngày / Nửa ngày';
+      PROD_I18N.zh.th_period='一天/<br>半天';
+      PROD_I18N.en.th_period='Day/<br>Half';
+      PROD_I18N.vi.th_period='Cả ngày/<br>Nửa ngày';
+      PROD_I18N.zh.opt_period_full='一天';
+      PROD_I18N.en.opt_period_full='Full day';
+      PROD_I18N.vi.opt_period_full='Cả ngày';
+      PROD_I18N.zh.opt_period_am='上午';
+      PROD_I18N.en.opt_period_am='Morning';
+      PROD_I18N.vi.opt_period_am='Buổi sáng';
+      PROD_I18N.zh.opt_period_pm='下午';
+      PROD_I18N.en.opt_period_pm='Afternoon';
+      PROD_I18N.vi.opt_period_pm='Buổi chiều';
     }
     function pt(k){
       var lang = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
@@ -7840,6 +7860,16 @@ var WL_FLOW_IMG = {
       var cls = 'prod-field' + (extraClass ? ' '+extraClass : '');
       var labAttr = i18nKey ? ' data-i18n="'+i18nKey+'"' : '';
       return '<div class="'+cls+'"><label'+labAttr+'>'+label+'</label><div class="cp-date-input-wrapper" onclick="event.stopPropagation()"><input type="text" id="'+id+'" placeholder="DD/MM/YYYY" readonly onfocus="window.cpOpenCalendar(this)"'+oi+dm+dmin+' style="width:100%;cursor:pointer;" value="'+prod_esc(disp)+'"></div></div>';
+    }
+    /* ★DAYHALF-20261110：一天/半天（full=一天 / am=上午 / pm=下午），三语下拉与显示文案 */
+    function prod_dayHalfOptions(val){
+      var k = (val==='am'||val==='pm') ? val : 'full';
+      return [['full','opt_period_full'],['am','opt_period_am'],['pm','opt_period_pm']].map(function(o){
+        return '<option value="'+o[0]+'"'+(k===o[0]?' selected':'')+'>'+pt(o[1])+'</option>';
+      }).join('');
+    }
+    function prod_dayHalfText(val){
+      return pt(val==='am' ? 'opt_period_am' : (val==='pm' ? 'opt_period_pm' : 'opt_period_full'));
     }
     /* 读取签约项目里的水泥漏缝地板规格（concrete_floor_spec，与系统智能报告同源） */
     function prod_slatsRows(){
@@ -9573,7 +9603,9 @@ var WL_FLOW_IMG = {
 +   '<option value="yes"'+((w.holiday==='yes')?' selected':'')+'>'+pt('opt_yes')+'</option>'
 + '</select></div>'
 + '<div class="prod-field"><label>'+pt('lbl_recorder')+'</label><input id="pc_recorder" value="'+prod_esc(rec)+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
-        +           prod_numFld(pt('prod_role_manager'),'pc_manager',prod_workerDefault('manager', w))+'</div>'
+        +           prod_numFld(pt('prod_role_manager'),'pc_manager',prod_workerDefault('manager', w))
+        /* ★DAYHALF-20261110：一天/半天 下拉（一天/上午/下午），放在本行最右侧 */
+        +           '<div class="prod-field"><label>'+pt('lbl_period')+'</label><select id="pc_period">'+prod_dayHalfOptions(w.period)+'</select></div></div>'
         +         '<div class="prod-role-grid">';
       PROD_WORKERS.slice(1).forEach(function(wk){ h += prod_numFld(pt('prod_role_'+wk[0]),'pc_'+wk[0],prod_workerDefault(wk[0], w)); });
       h += '</div></div>';
@@ -9594,6 +9626,8 @@ var WL_FLOW_IMG = {
         + '<th class="pc-col-wx pc-sortable" onclick="prod_sortLabor(this)">'+pt('wx_am')+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>'
         + '<th class="pc-col-wx pc-sortable" onclick="prod_sortLabor(this)">'+pt('wx_pm')+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>'
         + '<th class="pc-col-holiday pc-sortable" onclick="prod_sortLabor(this)">'+pt('lbl_holiday')+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>'
+        /* ★DAYHALF-20261110：新列「一天/半天」，表头拆两行（一天/ 半天）以便列宽更小 */
+        + '<th class="pc-col-period">'+pt('th_period')+'</th>'
         + '<th class="pc-col-rec pc-sortable" onclick="prod_sortLabor(this)">'+pt('thr_recorder')+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>';
       PROD_WORKERS.forEach(function(wk){ h += '<th class="pc-col-role pc-sortable" onclick="prod_sortLabor(this)">'+pt('prod_role_'+wk[0])+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>'; });
       h += '<th class="pc-col-total pc-sortable" onclick="prod_sortLabor(this)">'+pt('thr_total2')+'<span class="pc-sort-ind"><i class="up">▲</i><i class="dn">▼</i></span></th>'
@@ -9610,6 +9644,7 @@ var WL_FLOW_IMG = {
           + '<td class="pc-col-wx pc-wx-cell">'+prod_wxCompact((ww.weatherAm&&ww.weatherAm.v===2)?ww.weatherAm:null)+'</td>'
           + '<td class="pc-col-wx pc-wx-cell">'+prod_wxCompact((ww.weatherPm&&ww.weatherPm.v===2)?ww.weatherPm:null)+'</td>'
           + '<td class="pc-col-holiday" data-sort-val="'+((ww.holiday==='yes')?'yes':'no')+'">'+((ww.holiday==='yes')?pt('opt_yes'):pt('opt_no'))+'</td>'
+          + '<td class="pc-col-period">'+prod_esc(prod_dayHalfText(ww.period))+'</td>'
           + '<td class="pc-col-rec">'+recDisp+'</td>';
         PROD_WORKERS.forEach(function(k){ var v = isDefaultRecord ? (PROD_WORKER_DEFAULTS[k[0]]||0) : prod_workerDefault(k[0], ww); sum += v; subTot[k[0]] += v; h += '<td class="pc-col-role'+(v===0?' pc-zero':'')+'">'+v+'</td>'; });
         subTotTotal += sum;
@@ -9618,7 +9653,7 @@ var WL_FLOW_IMG = {
           + '<button class="prod-op" onclick="prod_copyRow(\''+dd+'\')">📋</button>' + '<button class="prod-op" aria-label="'+pt('op_del')+'" onclick="prod_delWorkers(\''+dd+'\')">🗑️</button></td></tr>';
       });
       h += '</tbody><tfoot class="pc-labor-tfoot"><tr>'
-        + '<td class="pc-col-no"></td><td class="pc-col-date"><b>'+pt('subtotal')+'</b></td><td class="pc-col-wx"></td><td class="pc-col-wx"></td><td class="pc-col-holiday"></td><td class="pc-col-rec"></td>';
+        + '<td class="pc-col-no"></td><td class="pc-col-date"><b>'+pt('subtotal')+'</b></td><td class="pc-col-wx"></td><td class="pc-col-wx"></td><td class="pc-col-holiday"></td><td class="pc-col-period"></td><td class="pc-col-rec"></td>';
       PROD_WORKERS.forEach(function(k){ var st = subTot[k[0]]; h += '<td class="pc-col-role'+(st===0?' pc-zero':'')+'"><b>'+st.toLocaleString()+'</b></td>'; });
       h += '<td class="pc-col-total'+(subTotTotal===0?' pc-zero':'')+'"><b>'+subTotTotal.toLocaleString()+'</b></td><td class="pc-col-act"></td></tr></tfoot></table></div>';
       h += prod_renderTrends(f);
@@ -9870,6 +9905,10 @@ var WL_FLOW_IMG = {
       PROD_WORKERS.forEach(function(k){ w[k[0]] = +prod_val('pc_'+k[0])||0; });
       w.recorder = prod_loginUser();
       w.holiday = prod_val('pc_holiday') || 'no';
+      /* ★DAYHALF-20261110：一天/半天（full/am/pm）。下拉不存在时保留原值，绝不清空 */
+      var _pdVal = prod_val('pc_period');
+      if(_pdVal) w.period = (_pdVal==='am'||_pdVal==='pm') ? _pdVal : 'full';
+      else if(!w.period) w.period = 'full';
       f.workers[d] = w; prod_save(f); prod_renderTab('C');
       prodTryCaptureWeather(); // 保存后立刻尝试抓取当天天气
       var eb = prod_el('pcEditBanner'); if(eb) eb.style.display = 'none';
@@ -9945,6 +9984,10 @@ var WL_FLOW_IMG = {
       });
       clone.recorder = prod_loginUser();
       clone.holiday = (srcHoliday==='yes') ? 'yes' : 'no';
+      /* ★DAYHALF-20261110：复制时一并带上「一天/半天」（表单优先，其次源日期） */
+      var _pdSel = prod_el('pc_period');
+      clone.period = _pdSel ? (_pdSel.value==='am'||_pdSel.value==='pm' ? _pdSel.value : 'full')
+                            : ((f.workers[dd].period==='am'||f.workers[dd].period==='pm') ? f.workers[dd].period : 'full');
       f.workers[tk] = clone; prod_save(f); prod_renderTab('C');
       prod_toast(pt('toast_copied') + ' → ' + tk);
     }
@@ -9956,6 +9999,8 @@ var WL_FLOW_IMG = {
       PROD_WORKERS.forEach(function(k){ var e = prod_el('pc_'+k[0]); if(e) e.value = prod_workerDefault(k[0], w); });
       var recEl = prod_el('pc_recorder'); if(recEl) recEl.value = prod_loginUser();
       var he = prod_el('pc_holiday'); if(he){ he.value = (w.holiday==='yes' ? 'yes' : 'no'); prod_holidayColor(he); }
+      /* ★DAYHALF-20261110：把该日的「一天/半天」回填到下拉 */
+      var pe = prod_el('pc_period'); if(pe) pe.value = (w.period==='am'||w.period==='pm') ? w.period : 'full';
       prod_updateWeatherCards();
       var eb = prod_el('pcEditBanner');
       if(eb){ eb.textContent = pt('editing_label') + '：' + d; eb.style.display = 'block'; eb.scrollIntoView({behavior:'smooth', block:'start'}); }
@@ -74714,6 +74759,32 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
   INST_I18N.zh.inst_dblclick_hint='提示：双击空白处可收起录入框';
   INST_I18N.en.inst_dblclick_hint='Tip: double-click blank area to collapse the entry form';
   INST_I18N.vi.inst_dblclick_hint='Mẹo: nhấn đúp vùng trống để thu gọn ô nhập';
+  /* ★DAYHALF-20261110：安装 C 页「一天/半天」（一天 / 上午 / 下午），表头分两行显示 */
+  INST_I18N.zh.inst_lbl_period='一天/半天';
+  INST_I18N.en.inst_lbl_period='Day / Half-day';
+  INST_I18N.vi.inst_lbl_period='Cả ngày / Nửa ngày';
+  INST_I18N.zh.inst_th_period='一天/<br>半天';
+  INST_I18N.en.inst_th_period='Day/<br>Half';
+  INST_I18N.vi.inst_th_period='Cả ngày/<br>Nửa ngày';
+  INST_I18N.zh.inst_opt_period_full='一天';
+  INST_I18N.en.inst_opt_period_full='Full day';
+  INST_I18N.vi.inst_opt_period_full='Cả ngày';
+  INST_I18N.zh.inst_opt_period_am='上午';
+  INST_I18N.en.inst_opt_period_am='Morning';
+  INST_I18N.vi.inst_opt_period_am='Buổi sáng';
+  INST_I18N.zh.inst_opt_period_pm='下午';
+  INST_I18N.en.inst_opt_period_pm='Afternoon';
+  INST_I18N.vi.inst_opt_period_pm='Buổi chiều';
+  /* 一天/半天 选项与显示文案（it 版本，安装模块专用） */
+  function inst_dayHalfOptions(val){
+    var k = (val==='am'||val==='pm') ? val : 'full';
+    return [['full','inst_opt_period_full'],['am','inst_opt_period_am'],['pm','inst_opt_period_pm']].map(function(o){
+      return '<option value="'+o[0]+'"'+(k===o[0]?' selected':'')+'>'+it(o[1])+'</option>';
+    }).join('');
+  }
+  function inst_dayHalfText(val){
+    return it(val==='am' ? 'inst_opt_period_am' : (val==='pm' ? 'inst_opt_period_pm' : 'inst_opt_period_full'));
+  }
 
   function it(k){
     var lang = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
@@ -77998,6 +78069,12 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         : '<div class="prod-field"><label>'+it('inst_lbl_holiday')+'</label><input id="ic_holiday" value="'+prod_esc((w.holiday||(latest?latest.holiday:''))==='yes'?pt('opt_yes'):pt('opt_no'))+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>')
       + '<div class="prod-field"><label>'+it('inst_lbl_recorder')+'</label><input id="ic_recorder" value="'+prod_esc(rec)+'" readonly style="background:#f0f0f0;cursor:not-allowed;"></div>'
       + '<div class="prod-field inst-zone-field"><label>'+it('inst_lbl_today_zones')+'</label>'+(INST_TAB_C_EDIT_MODE?'<div class="inst-zone-selects" id="ic_zones_wrap"></div>':'<input id="ic_zones_readonly" value="'+prod_esc((w.zones||[]).filter(function(z){return z!==''&&z!=null;}).map(function(z){return it('inst_gantt_zone_name').replace('{0}', z);}).join('、')||'—')+'" readonly style="background:#f0f0f0;cursor:not-allowed;">')+'</div>'
+      /* ★DAYHALF-20261110：一天/半天 下拉（一天/上午/下午），放在本行最右侧 */
+      + '<div class="prod-field inst-period-field"><label>'+it('inst_lbl_period')+'</label>'
+      +   (INST_TAB_C_EDIT_MODE
+            ? '<select id="ic_period">'+inst_dayHalfOptions(w.period)+'</select>'
+            : '<input id="ic_period" value="'+prod_esc(inst_dayHalfText(w.period))+'" readonly style="background:#f0f0f0;cursor:not-allowed;">')
+      + '</div>'
       + '</div>';
     h += '<div id="ic_zone_cards" class="inst-zone-cards"></div>';
     /* 分区标题带项目名：XXXX项目-安装数量&人工明细 */
@@ -78005,7 +78082,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       + prod_esc(ui_projTitle((function(){ var p=inst_proj(); return p ? (p.client||p.customer||p.name||'') : ''; })(), it('inst_sec_labor_detail')))
       + '</div>';
     h += '<div class="prod-table-scroll pc-labor-scroll"><table class="prod-table pc-labor-hist"><thead><tr>'
-      + '<th class="pc-col-no">'+pt('thr_no')+'</th><th class="pc-col-date">'+it('inst_lbl_date')+'</th><th>'+pt('wx_am')+'</th><th>'+pt('wx_pm')+'</th><th>'+it('inst_lbl_holiday')+'</th><th>'+it('inst_lbl_recorder')+'</th>'
+      + '<th class="pc-col-no">'+pt('thr_no')+'</th><th class="pc-col-date">'+it('inst_lbl_date')+'</th><th>'+pt('wx_am')+'</th><th>'+pt('wx_pm')+'</th><th>'+it('inst_lbl_holiday')+'</th>'
+      /* ★DAYHALF-20261110：新列「一天/半天」，表头拆两行以便列宽更小 */
+      + '<th class="pc-col-period">'+it('inst_th_period')+'</th><th>'+it('inst_lbl_recorder')+'</th>'
       + '<th class="pc-col-zone pc-col-yellow pc-sortable" onclick="inst_sortLabor(\'zone\')">'+it('inst_lbl_zone_short')+inst_sortInd('zone')+'</th><th class="pc-col-yellow pc-sortable" onclick="inst_sortLabor(\'house\')">'+it('inst_lbl_house')+inst_sortInd('house')+'</th><th class="pc-col-yellow">'+it('inst_lbl_team')+'</th><th class="pc-col-yellow">'+it('inst_lbl_install_qty')+'</th><th class="pc-col-dsub pc-col-yellow">'+it('inst_lbl_day_subtotal')+'</th>';
     INST_ROLES.forEach(function(rk){ if(rk[0]==='reporter' || rk[0]==='leader') return; h += '<th class="pc-col-blue">'+it(rk[1])+'</th>'; });
     h += '<th class="pc-col-blue">'+it('inst_lbl_total_man')+'</th><th class="pc-col-photo">'+it('inst_lbl_photos_count')+'</th><th class="pc-col-act">'+pt('op_actions')+'</th></tr></thead><tbody>';
@@ -78128,6 +78207,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       var wxAm = (typeof prod_wxCompact==='function') ? prod_wxCompact((ww.weatherAm&&ww.weatherAm.v===2)?ww.weatherAm:null) : '—';
       var wxPm = (typeof prod_wxCompact==='function') ? prod_wxCompact((ww.weatherPm&&ww.weatherPm.v===2)?ww.weatherPm:null) : '—';
       var holidayTxt = (ww.holiday==='yes') ? pt('opt_yes') : pt('opt_no');
+      var periodTxt = (typeof inst_dayHalfText==='function') ? inst_dayHalfText(ww.period) : '';
       var recorderTxt = prod_esc(ww.recorder||'');
       var vals = [], keys = [];
       /* 累加本日小计到总计（避免按子行重复累加，按日期汇一次） */
@@ -78141,6 +78221,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
         rv.push(wxAm);                        rk2.push('am|'+wxAm);
         rv.push(wxPm);                        rk2.push('pm|'+wxPm);
         rv.push(holidayTxt);                  rk2.push('hol|'+holidayTxt);
+        rv.push(prod_esc(periodTxt));         rk2.push('per|'+periodTxt);
         rv.push(recorderTxt);                 rk2.push('rec|'+recorderTxt);
         rv.push(prod_esc(s.zone));            rk2.push('zone|'+s.zone);
         var _hDone = !!(s.houseKey && houseDoneMap[s.houseKey]);
@@ -78162,6 +78243,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       }
       sub.forEach(function(s, si){
         var parts = ['<tr data-orig-idx="'+idx+'">'];
+        /* ★DAYHALF-20261110：中间插入「一天/半天」列后所有列号 +1，这里用常量避免再数错 */
+        var C_PERIOD=5, C_ZONE=7, C_DSUB=11, C_ROLE0=12;
         for(var c=0;c<ncol;c++){
           var p = plans[c][si];
           if(p && p.emit){
@@ -78169,13 +78252,14 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
             if(c===0) clsArr.push('pc-col-no');
             if(c===1) clsArr.push('pc-col-date');
             if(c===2 || c===3) clsArr.push('pc-wx-cell');
-            if(c===6) clsArr.push('pc-col-zone');
-            if(c===10) clsArr.push('pc-col-dsub');
+            if(c===C_PERIOD) clsArr.push('pc-col-period');
+            if(c===C_ZONE) clsArr.push('pc-col-zone');
+            if(c===C_DSUB) clsArr.push('pc-col-dsub');
             if(c===ncol-1) clsArr.push('pc-col-act');
-            if(c===11+instRoleN+1) clsArr.push('pc-col-photo');         /* 照片列 */
-            if(c>=6 && c<=10) clsArr.push('pc-col-yellow');           /* 区域/猪舍/小组/安装数量/日安装小计 */
-            if(c>=11 && c<=11+instRoleN) clsArr.push('pc-col-blue');  /* 各角色列 + 总人力 */
-            if(c>=11 && c<11+instRoleN && vals[si][c]==='0') clsArr.push('pc-zero');
+            if(c===C_ROLE0+instRoleN+1) clsArr.push('pc-col-photo');         /* 照片列 */
+            if(c>=C_ZONE && c<=C_DSUB) clsArr.push('pc-col-yellow');          /* 区域/猪舍/小组/安装数量/日安装小计 */
+            if(c>=C_ROLE0 && c<=C_ROLE0+instRoleN) clsArr.push('pc-col-blue');/* 各角色列 + 总人力 */
+            if(c>=C_ROLE0 && c<C_ROLE0+instRoleN && vals[si][c]==='0') clsArr.push('pc-zero');
             var cls = clsArr.length ? ' class="'+clsArr.join(' ')+'"' : '';
             parts.push((p.rowspan>1 ? '<td rowspan="'+p.rowspan+'"' : '<td') + cls + '>' + vals[si][c] + '</td>');
           }
@@ -78190,7 +78274,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     h += '<tfoot class="pc-labor-subtotal"><tr>'
       + '<td class="pc-col-no"></td>'
       + '<td class="pc-col-date"><b>'+(pt('subtotal')||'小计')+'</b></td>'
-      + '<td></td><td></td><td></td><td></td>' /* 上午天气、下午天气、春节、记录人 */
+      + '<td></td><td></td><td></td><td></td><td></td>' /* 上午天气、下午天气、春节、一天/半天、记录人 */
       + '<td class="pc-col-yellow"></td><td class="pc-col-yellow"></td><td class="pc-col-yellow"></td><td class="pc-col-yellow"></td>' /* 区域、猪舍、小组、安装数量 */
       + '<td class="pc-col-dsub pc-col-yellow"><b>'+prod_fmtNum(grandInstall)+'</b></td>';
     INST_ROLES.forEach(function(rk){
@@ -78496,6 +78580,10 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     if(w._deleted){ delete w._deleted; delete w.__deletedAt; }
     w.holiday = prod_val('ic_holiday');
     w.recorder = prod_val('ic_recorder') || (typeof prod_loginUser==='function'?prod_loginUser():'');
+    /* ★DAYHALF-20261110：一天/半天（full/am/pm）。下拉不存在/为空时保留原值，绝不清空 */
+    var _icPd = prod_val('ic_period');
+    if(_icPd) w.period = (_icPd==='am'||_icPd==='pm') ? _icPd : 'full';
+    else if(!w.period) w.period = 'full';
     var zones = inst_workerZones(w);
     var zoneTeams = w.zoneTeams || {};
     var zoneTeamWorkers = w.zoneTeamWorkers || {};
