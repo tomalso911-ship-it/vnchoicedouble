@@ -13517,6 +13517,39 @@ var WL_FLOW_IMG = {
       h += '</div>';
       return h;
     }
+    /* ★PE-RO-CHIPS-20261110（用户要求恢复原样）：
+       只读态点「猪舍胶囊」→ 进入编辑模式并选中该猪舍 → 展开它的水泥板规格数量录入框。
+       以前一进每日生产就直接是编辑态（胶囊全在），现在只读态也把全部猪舍做成胶囊，
+       点一下就回到「选中猪舍 → 展开该猪舍水泥板信息 → 录入生产数据」的原有手感。 */
+    function prod_dailyReadOnlyHouseTap(el, n){
+      var hh = el ? String(el.getAttribute('data-house') || '') : '';
+      try{
+        PROD_PE_EDIT_MODE = true;
+        if(!PROD_PE_DRAFT) return;
+        if(!PROD_PE_DRAFT.lines) PROD_PE_DRAFT.lines = {};
+        var line = PROD_PE_DRAFT.lines[n];
+        if(!line){ line = PROD_PE_DRAFT.lines[n] = { houses:[], qty:{}, qtyDetail:{} }; }
+        if(!line.houses) line.houses = [];
+        if(!line.qty) line.qty = {};
+        if(!line.qtyDetail) line.qtyDetail = {};
+        if(hh && line.houses.indexOf(hh) < 0){
+          line.houses.push(hh);
+          /* 与 prod_dailyHouseToggle 一致：新加入的猪舍给已选规格补 0 明细，避免输入框缺失 */
+          for(var s in line.qty){
+            if(line.qty[s] == null) continue;
+            var d = prod_dailyEnsureQtyDetail(line, s);
+            if(d && d[hh] == null) d[hh] = 0;
+          }
+        }
+        prod_renderTab('E');
+        setTimeout(function(){
+          var rows = document.getElementById('pe_specrows_' + n);
+          if(rows && rows.scrollIntoView){ try{ rows.scrollIntoView({ behavior:'smooth', block:'center' }); }catch(e){} }
+          var inp = document.querySelector('#pe_specrows_' + n + ' input');
+          if(inp && inp.focus){ try{ inp.focus(); }catch(e){} }
+        }, 60);
+      }catch(e){ console.warn('[PE-RO-CHIPS]', e); }
+    }
     /* [锁死] 只读卡片：只展示所选猪舍 + 规格/各猪舍产量/小计表格，不得出现可编辑输入框。 */
     function prod_dailyLineReadOnlyCard(n, specs, houses){
       var line = PROD_PE_DRAFT.lines[n] || {houses:[],qty:{}};
@@ -13524,7 +13557,20 @@ var WL_FLOW_IMG = {
       h += '<div class="pe-card-head"><div class="pe-card-title pe-line-title">'+pt('prod_line_n').replace('{n}',n)+'</div>'
          + '<div class="pe-line-total">'+prod_dailyLineTotalHtml(line, specs)+'</div></div>';
       var selHouses = (line.houses||[]);
-      h += '<div class="pe-ro-block"><span class="pe-ro-label">'+pt('lbl_houses')+'：</span>'+(selHouses.length ? selHouses.map(function(hh){ return prod_esc(prod_phName(hh)); }).join('、') : '—')+'</div>';
+      /* ★PE-RO-CHIPS-20261110（用户要求：恢复「一进每日生产就能看到全部猪舍的胶囊按钮」）：
+         只读卡原来把猪舍压成一行纯文字（分娩舍、公猪站、怀孕舍、育肥舍），看起来像功能被删掉了。
+         现在这里渲染【全部猪舍胶囊】（已选中的高亮 on），点任意胶囊 = 进入编辑模式 + 选中该猪舍
+         → 展开该猪舍的水泥板规格数量录入框（见 prod_dailyReadOnlyHouseTap）。
+         只读卡本身仍然不出现任何输入框（PROD-E-READONLY 锁定规则不变）。 */
+      var _allHouses = (houses && houses.length) ? houses : selHouses;
+      h += '<div class="pe-ro-block"><span class="pe-ro-label">'+pt('lbl_houses')+'：</span><span class="pe-chips pe-ro-chips">'
+         + (_allHouses.length
+              ? _allHouses.map(function(hh){
+                  var _on = selHouses.indexOf(hh) >= 0 ? ' on' : '';
+                  return '<span class="pe-chip'+_on+'" data-line="'+n+'" data-house="'+prod_esc(hh)+'" title="'+prod_esc(pt('op_edit'))+'" onclick="prod_dailyReadOnlyHouseTap(this,'+n+')">'+prod_esc(prod_phName(hh))+'</span>';
+                }).join('')
+              : '—')
+         + '</span></div>';
       var keys = Object.keys(line.qty||{});
       h += '<div class="pe-ro-block">';
       if(!keys.length){
@@ -42248,7 +42294,19 @@ function _applyTabGroupPerms(tabBoxSel, bodySel, tabSel, pid, keyFn){
   var actK = null;
   try{ var a2 = document.querySelector(tabBoxSel + ' ' + tabSel + '.active'); actK = a2 ? a2.getAttribute('data-key') : null; }catch(e){}
   var lv = actK ? permLvProj(pid, keyFn(actK)) : 'view';
-  if (lv !== 'edit') _applyRO(body);
+  /* ★PE-RO-CHIPS-20261110：每日生产(E) 自带「只读/编辑」双模式（PROD_PE_EDIT_MODE）。
+     用户已经显式进入编辑态（点编辑按钮 / 点猪舍胶囊）时，通用只读层不得再把输入框、
+     数量框和「保存当日生产」按钮禁用 —— 否则会出现「编辑按钮能点开、界面也切到编辑，
+     但一个字都填不了」的假死。C/D/H/F 等其它标签仍完全按权限只读。 */
+  var _peSelfMode = false;
+  try{
+    var _peFlag = (typeof PROD_PE_EDIT_MODE !== 'undefined') && !!PROD_PE_EDIT_MODE;
+    /* 兜底：PROD_PE_EDIT_MODE 若被包在生产模块闭包里，全局直接看不到 →
+       用 DOM 事实判断（编辑态才会有规格数量输入框，只读卡永远没有输入框） */
+    var _peDomEdit = !!body.querySelector('.pe-specrows input, .pe-specrow input');
+    _peSelfMode = (tabBoxSel === '#prod-tabs') && String(actK) === 'E' && (_peFlag || _peDomEdit);
+  }catch(e){}
+  if (lv !== 'edit' && !_peSelfMode) _applyRO(body);
   return lv;
 }
 // ★PERM-PID-FIX-20261019：PROD_CUR / INST_CUR 存的是 **项目 id 数字**（不是对象！），
