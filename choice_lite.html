@@ -10438,9 +10438,22 @@ var WL_FLOW_IMG = {
     /* D 原料与库存（自采；收货后提交采购经理审批） */
     function prod_tabD(f){
       prodRcRows = (PROD_CUR && prodRcRowsByPid[PROD_CUR]) ? prodRcRowsByPid[PROD_CUR].slice() : [];
+      /* ★RC-AUTOCLEAR-20261110（用户 2026-11-10：一打开又看到上一单的内容）：
+         只要该项目最新一张收货单已经被采购经理确认（status='confirmed' = 已移交/已过账入库），
+         上一单的草稿就自动作废 —— 不清内存行、不回填本地草稿，进来就是干净的一单。
+         根因：旧逻辑只看「本地有没有草稿」，不管这一单是否已经收尾，所以刷新/重登又会把内容填回来。 */
+      var _rcMoved = null;
+      try{ _rcMoved = (typeof prodRcConfirmedReceipt === 'function') ? prodRcConfirmedReceipt() : null; }catch(e){}
+      if(_rcMoved){
+        try{ prodRcClearDraft(); }catch(e){}
+        try{ localStorage.removeItem(prodRcDraftKey()); }catch(e){}
+        prodRcRows = [];
+        try{ if(PROD_CUR) delete prodRcRowsByPid[PROD_CUR]; }catch(e){}
+        try{ var _pb0 = el('pd_photos'); if(_pb0) _pb0.value = '[]'; }catch(e){}
+      }
       /* ★RC-DRAFT-20261110：本会话内存里没有明细时，用上次点「保存」存下的草稿回填（刷新/重新登录不丢输入） */
       PROD_RC_DRAFT_RESTORED = null;
-      if(!prodRcRows.length){
+      if(!prodRcRows.length && !_rcMoved){
         var _rcDft = prodRcDraftLocal();
         if(_rcDft && _rcDft.rows && _rcDft.rows.length){
           prodRcRows = prodRcDraftRows(_rcDft);
@@ -12055,6 +12068,8 @@ var WL_FLOW_IMG = {
     }
     /* D 页渲染后的统一回填入口：本地草稿已回填过行 → 只补 DOM；否则内存为空时向服务端要一次 */
     function prodRcRestoreDraftPost(){
+      /* ★RC-AUTOCLEAR-20261110：上一单已确认移交 → 服务端草稿也不要拉回来 */
+      try{ if(typeof prodRcConfirmedReceipt === 'function' && prodRcConfirmedReceipt()){ PROD_RC_DRAFT_RESTORED = null; return; } }catch(e){}
       var d = PROD_RC_DRAFT_RESTORED;
       if(d){ PROD_RC_DRAFT_RESTORED = null; prodRcDraftApplyDom(d); return; }
       /* 切语言/局部重渲染会重建 #pd_draft_tip，这里用本地草稿的时间戳把提示补回来 */
