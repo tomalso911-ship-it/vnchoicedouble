@@ -33841,6 +33841,17 @@ var PROD_EQUIP_FAULT_KB = {
   .perm-row select.dec-default { background:#fff9c4; }
   .perm-row select.dec-hide     { background:#ffcdd2; }
   .perm-row select.dec-allow    { background:#c8e6c9; }
+  /* ★PERM-HSCROLL-20261110（用户 2026-11-10 确认）：权限「公共模块」面板彻底禁止横向滚动条。
+     根因：.modal-body 是 overflow:auto（两轴都 auto）+ select 只设 min-width:150px 会随
+     三语文字/浏览器字体缩放自己撑宽 → 整行顶到容器边缘溢出 1~2px → Windows 经典横向滚动条
+     钉在弹窗右下角（总出现）。这里锁死宽度并用 max-width/overflow-x:hidden 兜底。 */
+  #commonPerm { max-width:100%; overflow-x:hidden; }
+  #commonPerm .cperm-group,
+  #commonPerm .cperm-rows { max-width:100%; overflow-x:hidden; }
+  #commonPerm .cperm-row { min-width:0; max-width:100%; overflow:hidden; }
+  #commonPerm .cperm-name { min-width:0; overflow:hidden; overflow-wrap:anywhere; }
+  #commonPerm .cperm-sel { min-width:0; width:172px; flex:0 0 172px; box-sizing:border-box; }
+  .modal-body.perm-nohscroll { overflow-x:hidden !important; overflow-y:auto !important; }
   /* 用户与权限管理审批卡片（前后对比/新增/删除） */
   .usr-diff-box { background:#fff; border:1px solid #f0e2d4; border-radius:8px; padding:10px 12px; }
   .usr-diff-head { font-weight:700; color:#2c3e50; margin-bottom:8px; font-size:13px; }
@@ -45815,7 +45826,7 @@ function buildCommonPerm(uid){
       const rowBg = (ri % 2 === 1) ? c.bg : '#ffffff';
       return `<div class="cperm-row" data-key="${it.k}" style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-bottom:1px solid ${c.bar}22;background:${rowBg};">
         <span class="cperm-name" style="flex:1;min-width:0;font-size:13px;">${nameLbl}</span>
-        <select class="cperm-sel" style="min-width:150px;padding:3px 6px;background:${_permSelColor(cur)};"${_faEdit()?' disabled':''}>${opts}</select>
+        <select class="cperm-sel" style="min-width:0;width:172px;flex:0 0 172px;box-sizing:border-box;padding:3px 6px;background:${_permSelColor(cur)};"${_faEdit()?' disabled':''}>${opts}</select>
       </div>`;
     }).join('');
     return `<div class="cperm-group" style="margin-bottom:10px;">
@@ -45823,6 +45834,11 @@ function buildCommonPerm(uid){
       <div class="cperm-rows" style="border:1px solid ${c.bar}33;border-top:none;border-radius:0 0 4px 4px;overflow:hidden;">${rows}</div>
     </div>`;
   }).join('');
+  // ★PERM-HSCROLL-20261110：禁止权限弹窗内容区横向滚动（消除右下角常驻横向滚动条）
+  try {
+    const _mb = wrap.closest ? wrap.closest('.modal-body') : null;
+    if (_mb) _mb.classList.add('perm-nohscroll');
+  } catch(_e){}
   // 下拉选值变化 → 立即同步级别底色（隐藏红 / 查看黄 / 编辑绿）
   wrap.querySelectorAll('select.cperm-sel').forEach(function(sel){
     const sync = function(){ sel.style.background = _permSelColor(sel.value); };
