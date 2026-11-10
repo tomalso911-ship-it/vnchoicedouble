@@ -76168,7 +76168,9 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     if(!tipSpecs.length){ specs.forEach(function(x){ if(x && x.spec!=null && tipSpecs.indexOf(x.spec)<0) tipSpecs.push(x.spec); }); }
     var specBtnsShip = '', specBtnsInstall = '';
     tipSpecs.forEach(function(s){
-      var _lbl = prod_esc(it('inst_lbl_rec_prefix'))+prod_esc(s);
+      /* ★SOLID-TIP-20261110b（用户 2026-11-10）：实心板规格的「录入：<尺寸>」按钮里，
+         尺寸文字同样要套黄色实心板外框；非实心板不加。判定走 _specTxtHtml（只认精确规格键）。 */
+      var _lbl = prod_esc(it('inst_lbl_rec_prefix'))+_specTxtHtml(s);
       /* ★TIP-PULSE-20261109：整个项目发货 = 红色呼吸框；整个项目安装 = 黄色呼吸框（每个尺寸一个） */
       specBtnsShip += '<div class="inst-bldg-tip-spec-box">'
         + '<button type="button" class="inst-bldg-tip-spec-btn"'+_hl(s)+' onclick="inst_quickOutboundHouse(\''+_codeQ+'\',\''+_idxQ+'\',\''+_jq(s)+'\')">'+_lbl+'</button>'
