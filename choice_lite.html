@@ -6934,6 +6934,19 @@ var WL_FLOW_IMG = {
       PROD_I18N.zh.pe_dblclick_hint='提示：双击空白处可收起录入框';
       PROD_I18N.en.pe_dblclick_hint='Tip: double-click blank area to collapse the entry form';
       PROD_I18N.vi.pe_dblclick_hint='Mẹo: nhấn đúp vùng trống để thu gọn ô nhập';
+      /* ★RC-DRAFT-20261110：收货明细「保存」按钮（三语） */
+      PROD_I18N.zh.btn_save_receipt_draft='保存';
+      PROD_I18N.en.btn_save_receipt_draft='Save';
+      PROD_I18N.vi.btn_save_receipt_draft='Lưu';
+      PROD_I18N.zh.toast_receipt_draft_saved='收货明细已保存，刷新或重新登录后仍可继续填写';
+      PROD_I18N.en.toast_receipt_draft_saved='Receipt lines saved — they will still be here after refresh or login again';
+      PROD_I18N.vi.toast_receipt_draft_saved='Đã lưu chi tiết nhận hàng — vẫn còn sau khi tải lại hoặc đăng nhập lại';
+      PROD_I18N.zh.toast_receipt_draft_restored='已恢复上次保存的收货明细';
+      PROD_I18N.en.toast_receipt_draft_restored='Restored the receipt lines you saved last time';
+      PROD_I18N.vi.toast_receipt_draft_restored='Đã khôi phục chi tiết nhận hàng đã lưu lần trước';
+      PROD_I18N.zh.mark_receipt_draft_saved='已保存 {t}';
+      PROD_I18N.en.mark_receipt_draft_saved='Saved {t}';
+      PROD_I18N.vi.mark_receipt_draft_saved='Đã lưu {t}';
     }
     function pt(k){
       var lang = (typeof CUR_LANG!=='undefined' && CUR_LANG) ? CUR_LANG : 'zh';
@@ -8652,7 +8665,7 @@ var WL_FLOW_IMG = {
       if(key==='A'){ body.innerHTML = prod_tabA(f); prod_syncContractDate(); prod_linkDueToCard(); prod_deferDraw(prod_drawLineCompare); }
       else if(key==='B'){ body.innerHTML = prod_tabB(f); prod_syncContractDate(); prod_applyHouseFilter(); }
       else if(key==='C'){ body.innerHTML = prod_tabC(f); prod_deferDraw(prod_drawTrends); PROD_LABOR_SORT = {col:null, dir:0}; }
-      else if(key==='D'){ body.innerHTML = prod_tabD(f); prodReceiptRenderRows(); prod_receiptApplyHouse(); prod_updateHouseFilterTip(); prod_updateHousePreview(); if(PROD_REPORT_OPEN) prodReportOpen(); }
+      else if(key==='D'){ body.innerHTML = prod_tabD(f); prodReceiptRenderRows(); prod_receiptApplyHouse(); prodRcRestoreDraftPost(); prod_updateHouseFilterTip(); prod_updateHousePreview(); if(PROD_REPORT_OPEN) prodReportOpen(); }
       else if(key==='E'){ body.innerHTML = prod_tabE(f); var _et = body.querySelector('.prod-table.pe-estats'); if(_et){ _et.addEventListener('click', prod_eStatsTableClick); }
         prod_deferDraw(function(){ prod_drawEStats(f); prod_drawLineCompare(); });
         /* ★ 安装页「快速录入该舍生产数据」：渲染完自动选中线1 + 该猪舍并滚动定位 */
@@ -10303,6 +10316,16 @@ var WL_FLOW_IMG = {
     /* D 原料与库存（自采；收货后提交采购经理审批） */
     function prod_tabD(f){
       prodRcRows = (PROD_CUR && prodRcRowsByPid[PROD_CUR]) ? prodRcRowsByPid[PROD_CUR].slice() : [];
+      /* ★RC-DRAFT-20261110：本会话内存里没有明细时，用上次点「保存」存下的草稿回填（刷新/重新登录不丢输入） */
+      PROD_RC_DRAFT_RESTORED = null;
+      if(!prodRcRows.length){
+        var _rcDft = prodRcDraftLocal();
+        if(_rcDft && _rcDft.rows && _rcDft.rows.length){
+          prodRcRows = prodRcDraftRows(_rcDft);
+          PROD_RC_DRAFT_RESTORED = _rcDft;
+          if(PROD_CUR) prodRcRowsByPid[PROD_CUR] = prodRcRows.slice();
+        }
+      }
       if(!prodRcRows.length){ prodRcRows.push({material:'', spec:'', unit:'', priceVnd:'', qty:'', note:'', noteTr:{zh:'',en:'',vi:''}}); prodRcRowsByPid[PROD_CUR]=prodRcRows.slice(); }
       var h = '<div class="prod-sec-title" data-i18n="sec_raw">'+pt('sec_raw')+'</div>';
 
@@ -10327,7 +10350,13 @@ var WL_FLOW_IMG = {
 
       /* 明细表格 */
       h += '<div class="prod-sec-title" style="border-color:#2b7a3e;margin-top:10px" data-i18n="sec_receipt_lines">'+pt('sec_receipt_lines')+'</div>';
-      h += '<div style="margin:6px 0 4px"><button class="prod-btn" type="button" data-i18n="btn_add_line" onclick="prodReceiptAddRow()">'+pt('btn_add_line')+'</button></div>';
+      /* ★RC-DRAFT-20261110：右侧「保存」按钮 —— 把当前明细/到货日期/猪舍/照片存成草稿
+         （localStorage + 服务端 prod-kv），刷新、关浏览器或换设备重新登录后自动回填，输入内容不丢 */
+      h += '<div style="margin:6px 0 4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        + '<button class="prod-btn" type="button" data-i18n="btn_add_line" onclick="prodReceiptAddRow()">'+pt('btn_add_line')+'</button>'
+        + '<span id="pd_draft_tip" style="font-size:12px;color:#2b7a3e;"></span>'
+        + '<button class="prod-btn" type="button" data-i18n="btn_save_receipt_draft" onclick="prodRcDraftSave()" style="margin-left:auto">'+pt('btn_save_receipt_draft')+'</button>'
+        + '</div>';
       h += '<div id="pd_rows" class="rc-lines"></div><div id="pd_foot" class="rc-foot-bar"></div>';
 
       h += '<div style="margin-top:8px"><button class="prod-btn" data-i18n="btn_submit_receipt" onclick="prod_submitReceipt()">'+pt('btn_submit_receipt')+'</button>'
@@ -11401,6 +11430,32 @@ var WL_FLOW_IMG = {
       var sym = cur==='VND' ? '₫' : (cur==='RMB' ? '¥' : '$');
       return sym + Math.round(Math.abs(n)).toLocaleString('en-US');
     }
+    /* ★RC-DECIMAL-20261110：收货明细的「数量」「单价(VND)」允许输入小数点，
+       小数位数完全按用户自己输入的位数保留（不截断、不四舍五入）。
+       解析规则：只保留数字与第一个小数点；「.5」自动补成「0.5」；多余的小数点丢弃。 */
+    function prodRcSanitizeNum(v){
+      var s = String(v==null?'':v).replace(/[^0-9.]/g,'');
+      var i = s.indexOf('.');
+      if(i >= 0) s = s.slice(0,i+1) + s.slice(i+1).replace(/\./g,'');
+      if(s.charAt(0)==='.') s = '0'+s;
+      return s;
+    }
+    /* 带千位分隔符，但保留用户输入的小数位（12.5 → 12.5；1234.5 → 1,234.5；12. → 12.） */
+    function prodRcFmtDec(v){
+      var s = prodRcSanitizeNum(v);
+      if(!s) return '';
+      var p = s.split('.');
+      var ip = (p[0]||'').replace(/^0+(?=\d)/,'');
+      if(!ip) ip = '0';
+      var gp = ip.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return (p.length>1) ? (gp + '.' + p[1]) : gp;
+    }
+    /* 金额格式化（保留小数位）：与 prodFormatMoney 的唯一区别是不做 Math.round */
+    function prodFormatMoneyDec(num, cur){
+      var s = prodRcFmtDec(num);
+      var sym = cur==='VND' ? '₫' : (cur==='RMB' ? '¥' : '$');
+      return sym + (s || '0');
+    }
     /* 材料/单位/规格 的三语对照表（key 为中文规范值，value 跟随 CUR_LANG 切换） */
     var PROD_RC_MATS_TR = {
       'HP钢筋φ6':{en:'HP Rebar φ6',vi:'Thép HP φ6'}, 'VY钢筋φ6':{en:'VY Rebar φ6',vi:'Thép VY φ6'}, 'HP钢筋φ8':{en:'HP Rebar φ8',vi:'Thép HP φ8'}, 'VY钢筋φ8':{en:'VY Rebar φ8',vi:'Thép VY φ8'},
@@ -11579,8 +11634,8 @@ var WL_FLOW_IMG = {
         + '<div class="rc-col rc-col-spec">'+L('lbl_spec')+'<div class="rc-spec-row"><select id="pd_spec_'+idx+'" onchange="prodRcSpecChange('+idx+',this)">'+spOpts+'</select>'
           + '<button type="button" class="mini-pen" data-i18n-title="lbl_edit_spec" title="'+prod_esc(pt('lbl_edit_spec'))+'" onclick="prodRcEditSpecsTri('+idx+',this)">✎</button></div></div>'
         + '<div class="rc-col rc-col-unit">'+L('lbl_unit')+'<select onchange="prodRcSet('+idx+',\'unit\',this.value)">'+unOpts+'</select></div>'
-        + '<div class="rc-col rc-col-qty">'+L('thr_qty2')+'<input class="rc-num" value="'+prod_esc(row.qty?prod_fmtNum(row.qty):'')+'" oninput="prodRcSet('+idx+',\'qty\',this.value)" onfocus="prodRcQtyFocus(this)" onblur="prodRcQtyBlur(this,'+idx+')"></div>'
-        + '<div class="rc-col rc-col-pv">'+L('lbl_price_vnd')+'<input class="rc-num'+(priceIsDef?' prod-def-input':'')+'" value="'+prod_esc(row.priceVnd? prodFormatMoney(row.priceVnd,'VND'):'')+'" oninput="prodRcSet('+idx+',\'priceVnd\',this.value)" onfocus="prodRcPriceFocus(this)" onblur="prodRcPriceBlur(this,'+idx+')"></div>'
+        + '<div class="rc-col rc-col-qty">'+L('thr_qty2')+'<input class="rc-num" inputmode="decimal" value="'+prod_esc(row.qty?prodRcFmtDec(row.qty):'')+'" oninput="prodRcSet('+idx+',\'qty\',this.value)" onfocus="prodRcQtyFocus(this)" onblur="prodRcQtyBlur(this,'+idx+')"></div>'
+        + '<div class="rc-col rc-col-pv">'+L('lbl_price_vnd')+'<input class="rc-num'+(priceIsDef?' prod-def-input':'')+'" inputmode="decimal" value="'+prod_esc(row.priceVnd? prodFormatMoneyDec(row.priceVnd,'VND'):'')+'" oninput="prodRcSet('+idx+',\'priceVnd\',this.value)" onfocus="prodRcPriceFocus(this)" onblur="prodRcPriceBlur(this,'+idx+')"></div>'
         + '<div class="rc-col rc-col-pr">'+L('lbl_price_rmb')+'<input id="pd_pr_'+idx+'" class="rc-num" value="'+prod_esc(r.rmb? prodFormatMoney(pv/r.rmb,'RMB'):'')+'" readonly></div>'
         + '<div class="rc-col rc-col-pu">'+L('lbl_price_usd')+'<input id="pd_pu_'+idx+'" class="rc-num" value="'+prod_esc(r.usd? prodFormatMoney(pv/r.usd,'USD'):'')+'" readonly></div>'
         + '<div class="rc-col rc-col-sv">'+L('lbl_sub_vnd')+'<input id="pd_sv_'+idx+'" class="rc-num" value="'+prod_esc(subV? prodFormatMoney(subV,'VND'):'')+'" readonly></div>'
@@ -11605,7 +11660,7 @@ var WL_FLOW_IMG = {
     }
     function prodRcSet(idx,key,val){
       if(!prodRcRows[idx]) return;
-      if(key==='priceVnd' || key==='qty') val = String(val||'').replace(/[^0-9]/g,'');
+      if(key==='priceVnd' || key==='qty') val = prodRcSanitizeNum(val);   /* ★RC-DECIMAL-20261110：允许小数点，位数按用户输入保留 */
       prodRcRows[idx][key]=val;
       if(key==='priceVnd'||key==='qty'){ prodRcComputeRow(idx); prodReceiptRenderFoot(); }
       else if(key==='unit'){
@@ -11656,17 +11711,134 @@ var WL_FLOW_IMG = {
       prodReceiptRenderRows(); prodRcRowsByPid[PROD_CUR]=prodRcRows.slice();
     }
     function prodRcEdit(idx){ var card=document.querySelector('#pd_rows .rc-line-card[data-idx="'+idx+'"]'); if(card){ card.classList.add('rc-edit-hl'); card.scrollIntoView({block:'center'}); var inp=card.querySelector('select'); if(inp) inp.focus(); } }
-    function prodRcPriceFocus(inp){ inp.value = String(inp.value||'').replace(/[^0-9]/g,''); }
+    /* ★RC-DECIMAL-20261110：数量/单价的聚焦与失焦不再清掉小数点，只做「数字 + 单个小数点」清洗 */
+    function prodRcTrimDot(s){ return String(s||'').replace(/\.$/,''); }
+    function prodRcPriceFocus(inp){ inp.value = prodRcSanitizeNum(inp.value); }
     function prodRcPriceBlur(inp, idx){
-      var raw = String(inp.value||'').replace(/[^0-9]/g,'');
+      var raw = prodRcTrimDot(prodRcSanitizeNum(inp.value));
       prodRcSet(idx,'priceVnd',raw);
-      inp.value = raw ? prodFormatMoney(raw,'VND') : '';
+      inp.value = raw ? prodFormatMoneyDec(raw,'VND') : '';
     }
-    function prodRcQtyFocus(inp){ inp.value = String(inp.value||'').replace(/[^0-9]/g,''); }
+    function prodRcQtyFocus(inp){ inp.value = prodRcSanitizeNum(inp.value); }
     function prodRcQtyBlur(inp, idx){
-      var raw = String(inp.value||'').replace(/[^0-9]/g,'');
+      var raw = prodRcTrimDot(prodRcSanitizeNum(inp.value));
       prodRcSet(idx,'qty',raw);
-      inp.value = raw ? prod_fmtNum(raw) : '';
+      inp.value = raw ? prodRcFmtDec(raw) : '';
+    }
+    /* ===== ★RC-DRAFT-20261110：收货明细草稿（「保存」按钮）=====
+       需求（用户 2026-11-10）：明细里填的数量/单价/规格等，点「保存」后刷新页面或重新登录仍要在。
+       做法：把当前明细行 + 到货日期 + 已选猪舍 + 照片清单存成草稿，
+             本地 localStorage（即时、离线可用）＋ 服务端 /api/prod-kv（跨设备/换浏览器）双写；key 按项目区分。
+       回填时机：① 进入 D 页且本次会话内存里没有明细 → 先用本地草稿；② 本地没有 → 再向服务端要一次。 */
+    var PROD_RC_DRAFT_RESTORED = null;
+    function prodRcDraftKey(pid){ return 'prod_receipt_draft_' + (pid || (typeof PROD_CUR!=='undefined' && PROD_CUR ? PROD_CUR : '')); }
+    function prodRcDraftRows(d){
+      var rows = (d && d.rows) ? d.rows : [];
+      return rows.map(function(rw){
+        var note = rw.note || '';
+        return {material:rw.material||'', spec:rw.spec||'', unit:rw.unit||'',
+                priceVnd:String(rw.priceVnd==null?'':rw.priceVnd), qty:String(rw.qty==null?'':rw.qty),
+                note:note, noteTr:rw.noteTr||{zh:note, en:note, vi:note}};
+      });
+    }
+    function prodRcDraftLocal(){
+      try{ var v = localStorage.getItem(prodRcDraftKey()); return v ? JSON.parse(v) : null; }catch(e){ return null; }
+    }
+    function prodRcDraftSnapshot(){
+      var houses = [].slice.call(document.querySelectorAll('.pd_house:checked')).map(function(c){ return c.value; });
+      var floors = [].slice.call(document.querySelectorAll('.pd_floor:checked')).map(function(c){ return c.value; });
+      var de = el('pd_arr_date');
+      var photos = []; try{ photos = JSON.parse((el('pd_photos')||{}).value || '[]') || []; }catch(e){}
+      return { savedAt: Date.now(), by: prodRcCurUser(),
+               dateRaw: de ? de.value : '', houses: houses, floors: floors, photos: photos,
+               rows: prodRcRows.map(function(r){
+                 return {material:r.material||'', spec:r.spec||'', unit:r.unit||'',
+                         priceVnd:String(r.priceVnd==null?'':r.priceVnd), qty:String(r.qty==null?'':r.qty),
+                         note:r.note||'', noteTr:r.noteTr||{zh:'',en:'',vi:''}};
+               }) };
+    }
+    function prodRcDraftTip(savedAt){
+      var tip = el('pd_draft_tip'); if(!tip) return;
+      if(!savedAt){ tip.textContent = ''; return; }
+      var d = new Date(savedAt);
+      var hh = prod_pad(d.getHours()), mi = prod_pad(d.getMinutes());
+      var txt = pt('mark_receipt_draft_saved') || '已保存 {t}';
+      tip.textContent = txt.replace('{t}', prod_dmy(new Date(savedAt).getFullYear()+'-'+prod_pad(d.getMonth()+1)+'-'+prod_pad(d.getDate()))+' '+hh+':'+mi);
+    }
+    function prodRcDraftSave(){
+      if(!PROD_CUR){ prod_toast(pt('toast_name_req')||'请先选择项目'); return; }
+      var d = prodRcDraftSnapshot();
+      try{ localStorage.setItem(prodRcDraftKey(), JSON.stringify(d)); }catch(e){}
+      var me = prodRcCurUser();
+      if(me){
+        try{ fetch('/api/prod-kv/'+encodeURIComponent(prodRcDraftKey()), { method:'PUT', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ requester:me, data:d }) }).catch(function(){}); }catch(e){}
+      }
+      prodRcDraftTip(d.savedAt);
+      prod_toast(pt('toast_receipt_draft_saved')||'收货明细已保存');
+    }
+    function prodRcClearDraft(){
+      try{ localStorage.removeItem(prodRcDraftKey()); }catch(e){}
+      var me = prodRcCurUser();
+      if(me){
+        try{ fetch('/api/prod-kv/'+encodeURIComponent(prodRcDraftKey()), { method:'PUT', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ requester:me, data:{ savedAt:0, rows:[] } }) }).catch(function(){}); }catch(e){}
+      }
+      prodRcDraftTip(0);
+    }
+    /* 回填 DOM 部分（日期/猪舍/地板规格/照片）——必须在 D 页 innerHTML 渲染完之后调用 */
+    function prodRcDraftApplyDom(d){
+      if(!d) return;
+      try{ var de = el('pd_arr_date'); if(de && d.dateRaw) de.value = d.dateRaw; }catch(e){}
+      try{
+        if(d.houses && d.houses.length){
+          var hset = {}; d.houses.forEach(function(x){ hset[String(x)] = 1; });
+          PROD_SELECTED_HOUSES = d.houses.slice();
+          [].slice.call(document.querySelectorAll('.pd_house')).forEach(function(c){ c.checked = !!hset[String(c.value)]; });
+        }
+        prod_receiptApplyHouse();
+        if(d.floors && d.floors.length){
+          var fset = {}; d.floors.forEach(function(x){ fset[String(x)] = 1; });
+          [].slice.call(document.querySelectorAll('.pd_floor')).forEach(function(c){ if(!c.disabled) c.checked = !!fset[String(c.value)]; });
+        }
+        prod_receiptRefreshSpecProgress();
+      }catch(e){}
+      try{
+        if(d.photos && d.photos.length){
+          var pb = el('pd_photos'); if(pb) pb.value = JSON.stringify(d.photos);
+          if(typeof prod_renderReceiptPhotos === 'function') prod_renderReceiptPhotos();
+        }
+      }catch(e){}
+      prodRcDraftTip(d.savedAt);
+    }
+    /* D 页渲染后的统一回填入口：本地草稿已回填过行 → 只补 DOM；否则内存为空时向服务端要一次 */
+    function prodRcRestoreDraftPost(){
+      var d = PROD_RC_DRAFT_RESTORED;
+      if(d){ PROD_RC_DRAFT_RESTORED = null; prodRcDraftApplyDom(d); return; }
+      /* 切语言/局部重渲染会重建 #pd_draft_tip，这里用本地草稿的时间戳把提示补回来 */
+      var _ld = prodRcDraftLocal(); if(_ld && _ld.savedAt) prodRcDraftTip(_ld.savedAt);
+      var blank = !prodRcRows.some(function(r){ return r && (r.material || r.spec || r.qty || r.priceVnd || (r.note && String(r.note).trim())); });
+      if(!blank) return;
+      var me = prodRcCurUser(); if(!me || !PROD_CUR) return;
+      try{
+        fetch('/api/prod-kv/'+encodeURIComponent(prodRcDraftKey())+'?me='+encodeURIComponent(me))
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            var sd = (j && j.ok) ? j.data : null;
+            if(!sd || !sd.rows || !sd.rows.length) return;
+            var local = prodRcDraftLocal();
+            if(local && (local.savedAt||0) >= (sd.savedAt||0)) return;          /* 本地更新，不覆盖 */
+            var stillBlank = !prodRcRows.some(function(r){ return r && (r.material || r.qty || r.priceVnd); });
+            if(!stillBlank) return;                                             /* 用户已经开始填，别打断 */
+            prodRcRows = prodRcDraftRows(sd);
+            if(PROD_CUR) prodRcRowsByPid[PROD_CUR] = prodRcRows.slice();
+            try{ localStorage.setItem(prodRcDraftKey(), JSON.stringify(sd)); }catch(e){}
+            prodReceiptRenderRows();
+            prodRcDraftApplyDom(sd);
+            prod_updateHouseFilterTip(); prod_updateHousePreview();
+            prod_toast(pt('toast_receipt_draft_restored')||'已恢复上次保存的收货明细');
+          }).catch(function(){});
+      }catch(e){}
     }
     /* ===== 收货明细备注三语编辑 ===== */
     var _rcNoteIdx = null;
@@ -12268,6 +12440,8 @@ var WL_FLOW_IMG = {
       var saved = prod_save(f);
       // 保存后立即清空表单并重渲染，让提交的收货单（含照片）马上出现在「已提交收货单」列表
       prodRcRows=[]; if(PROD_CUR) delete prodRcRowsByPid[PROD_CUR];
+      /* ★RC-DRAFT-20261110：单据已提交 → 草稿作废，否则下次进 D 页又会把已提交的内容回填出来 */
+      try{ prodRcClearDraft(); }catch(e){}
       prod_renderTab('D');
       _finish();
       // 审批人 = 采购经理 + tom/cuong/james 三人组（三人任一点击即结束该申请，效率同等）
