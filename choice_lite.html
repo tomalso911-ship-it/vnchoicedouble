@@ -10356,6 +10356,7 @@ var WL_FLOW_IMG = {
         + '<button class="prod-btn" type="button" data-i18n="btn_add_line" onclick="prodReceiptAddRow()">'+pt('btn_add_line')+'</button>'
         + '<span id="pd_draft_tip" style="font-size:12px;color:#2b7a3e;"></span>'
         + '<button class="prod-btn" type="button" data-i18n="btn_save_receipt_draft" onclick="prodRcDraftSave()" style="margin-left:auto">'+pt('btn_save_receipt_draft')+'</button>'
+        + '<span id="pd_build_tag" title="收货明细版本标记：看不到这行字说明浏览器还在跑旧页面" style="font-size:10px;color:#aaa;letter-spacing:.5px">RC-20261110</span>'
         + '</div>';
       h += '<div id="pd_rows" class="rc-lines"></div><div id="pd_foot" class="rc-foot-bar"></div>';
 
@@ -11432,12 +11433,39 @@ var WL_FLOW_IMG = {
     }
     /* ★RC-DECIMAL-20261110：收货明细的「数量」「单价(VND)」允许输入小数点，
        小数位数完全按用户自己输入的位数保留（不截断、不四舍五入）。
-       解析规则：只保留数字与第一个小数点；「.5」自动补成「0.5」；多余的小数点丢弃。 */
+
+       ★RC-COMMA-20261110（越南同事习惯用逗号当小数点，如 2,5 = 2.5）：
+       现在 '.' 和 ',' 都可以当小数点，规则如下（既要不吞掉小数点，也不能把千位符当小数）：
+         ① 同时出现 '.' 和 ',' → 最后出现的那个当小数点，其余全部当千位分隔符
+            （例：₫1,250,000.5 → 1250000.5；1.250.000,5 → 1250000.5）
+         ② 只有一种符号且出现多次 → 全部是千位分隔符（例：1,250,000 / 1.250.000 → 1250000）
+         ③ 只有一种符号且只出现一次：
+            - 后面正好 3 位、前面不是单独一个 0 → 当千位分隔符（例：1,250 → 1250；这也是
+              输入框失焦后显示 "1,250" 再点回来时必须还原成 1250 的原因）
+            - 其它情况 → 当小数点（例：2,5 → 2.5；0,125 → 0.125；1.500 → 1500 属第③-1 条）
+         ④ 「.5」「,5」自动补前导 0。 */
     function prodRcSanitizeNum(v){
-      var s = String(v==null?'':v).replace(/[^0-9.]/g,'');
-      var i = s.indexOf('.');
-      if(i >= 0) s = s.slice(0,i+1) + s.slice(i+1).replace(/\./g,'');
-      if(s.charAt(0)==='.') s = '0'+s;
+      var s = String(v==null?'':v).replace(/[^0-9.,]/g,'');
+      if(!s) return '';
+      var hasDot = s.indexOf('.') >= 0, hasComma = s.indexOf(',') >= 0;
+      if(hasDot && hasComma){
+        var last = Math.max(s.lastIndexOf('.'), s.lastIndexOf(','));
+        s = s.slice(0,last).replace(/[.,]/g,'') + '.' + s.slice(last+1).replace(/[.,]/g,'');
+      } else if(hasDot || hasComma){
+        var ch = hasDot ? '.' : ',';
+        var parts = s.split(ch);
+        if(parts.length > 2){
+          s = parts.join('');                                   /* 多次出现 = 千位分隔符 */
+        } else {
+          var ip = parts[0] || '', dp = parts[1] || '';
+          if(dp.length === 3 && ip !== '' && ip !== '0'){
+            s = ip + dp;                                        /* 1,250 → 1250（千位） */
+          } else {
+            s = ip + '.' + dp;                                  /* 2,5 → 2.5（小数） */
+          }
+        }
+      }
+      if(s.charAt(0)==='.') s = '0' + s;
       return s;
     }
     /* 带千位分隔符，但保留用户输入的小数位（12.5 → 12.5；1234.5 → 1,234.5；12. → 12.） */
