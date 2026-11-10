@@ -325,6 +325,62 @@ def _full_perms_for_super(conn):
         "lib_file_overrides": {},
     }
 
+# ★PERM-CONTRACT-20261110：取消「超级用户读时全放开」前的一次性写回迁移。
+#   线上实测 tom 的存储 perms 仍是旧扁平结构（35 个顶层旧区块，没有 common/blocks），
+#   若直接删掉 _full_perms_for_super 的读时覆盖，tom 会瞬间失去全部新版权限。
+#   因此把完整结构真正写进数据库，之后所有账号一律「面板选什么就是什么」。
+#   ★懒迁移（首个 /api/users、/api/login、/api/me 请求时执行）：此时 SYS_COMMON_DEFAULTS
+#     等常量已全部定义，避免 init_db() 提前调用导致 NameError；prod_kv 标记保证只跑一次。
+_PERM_NO_FULL_KEY = "sys_perm_no_full_override_20261110_v1"
+_PERM_NO_FULL_DONE = False
+
+
+def _migrate_no_full_override(conn):
+    global _PERM_NO_FULL_DONE
+    if _PERM_NO_FULL_DONE:
+        return
+    try:
+        if conn.execute("SELECT 1 FROM prod_kv WHERE k=?", (_PERM_NO_FULL_KEY,)).fetchone():
+            _PERM_NO_FULL_DONE = True
+            return
+        full = _full_perms_for_super(conn)
+        new_keys = ("common", "proj_default", "projects", "lib_file_overrides")
+        n = 0
+        for uname in SUPER_USERS:
+            row = conn.execute("SELECT id, perms FROM users WHERE lower(username)=?", (uname,)).fetchone()
+            if not row:
+                continue
+            try:
+                old = json.loads(row["perms"]) if row["perms"] else {}
+            except Exception:
+                old = {}
+            if not isinstance(old, dict):
+                old = {}
+            if any(k in old for k in new_keys) and isinstance(old.get("blocks"), dict):
+                continue                       # 已是新版结构，保持原样
+            merged = json.loads(json.dumps(full))
+            # 保留旧扁平区块（含 PROD-RECEIPT 等特别授权），生成值优先
+            for k, v in old.items():
+                if k not in new_keys and k != "blocks" and isinstance(v, dict):
+                    merged["blocks"].setdefault(k, v)
+            conn.execute("UPDATE users SET perms=? WHERE id=?",
+                         (json.dumps(merged, ensure_ascii=False), row["id"]))
+            n += 1
+        conn.execute("INSERT OR REPLACE INTO prod_kv (k, data, updated_by, updated_at) "
+                     "VALUES (?, ?, 'system', datetime('now','localtime'))",
+                     (_PERM_NO_FULL_KEY, json.dumps({"users": n})))
+        conn.commit()
+        for uname in SUPER_USERS:
+            try:
+                bump_perm_version(uname)   # 已在线的浏览器 6 秒内自动拉到新 perms
+            except Exception:
+                pass
+        _PERM_NO_FULL_DONE = True
+        print("[PERM-CONTRACT] 超级用户旧扁平权限已写回完整结构: %d 个账号" % n)
+    except Exception as _e:
+        print("[PERM-CONTRACT] 写回失败（不阻断请求）: %s" % _e)
+
+
 # ===================== 权限变更实时推送（轻量级版本号机制）=====================
 # 每个用户的权限/角色/状态发生变更时，bump 其版本号。
 # 前端轮询 /api/perm-version?username= 检测版本变化，变化时立即刷新本地会话缓存，
@@ -1743,11 +1799,10 @@ def _cloud_mirror_login(conn, username, password):
             pass
         if not is_admin and (row["role"] or "") == "管理员":
             is_admin = True
-        # 四人最高授权（云登录路径）★FULL-ACCESS-20261107
+        # ★PERM-CONTRACT-20261110：不再用运行时生成的全放开 perms 覆盖存储值
         _full = _is_full_perms_user(username)
         if _full:
             is_admin = True
-            perms = _full_perms_for_super(conn)
         def _ids(raw):
             try:
                 v = json.loads(raw or "[]")
@@ -1781,6 +1836,7 @@ def login():
     if not username or not password:
         return jsonify({"ok": False, "error": "请输入用户名和密码"})
     conn = get_db()
+    _migrate_no_full_override(conn)
     row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
     if not row:
         # 本机 users 表没有该账号 → 尝试【云端用户目录镜像】离线登录（桌面版）。
@@ -1828,9 +1884,8 @@ def login():
     except Exception:
         perms = {}
     perms = _norm_user_perms(perms, conn)
+    # ★PERM-CONTRACT-20261110：取消读时全放开覆盖，登录/会话拿到的就是库里真实授权
     _full = _is_full_perms_user(_col("username"))
-    if _full:
-        perms = _full_perms_for_super(conn)
     def _ids(raw):
         try:
             v = json.loads(raw or "[]")
@@ -1890,6 +1945,7 @@ def api_me():
     if not username:
         return jsonify({"ok": False, "error": "missing username"})
     conn = get_db()
+    _migrate_no_full_override(conn)
     row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
     if not row:
         conn.close()
@@ -1907,9 +1963,8 @@ def api_me():
     except Exception:
         perms = {}
     perms = _norm_user_perms(perms, conn)
+    # ★PERM-CONTRACT-20261110：取消读时全放开覆盖，登录/会话拿到的就是库里真实授权
     _full = _is_full_perms_user(_col("username"))
-    if _full:
-        perms = _full_perms_for_super(conn)
     def _ids(raw):
         try:
             v = json.loads(raw or "[]")
@@ -2791,17 +2846,15 @@ def _owns_row(table, pid, username, op=None):
         if _is_manager(conn, username):
             return True
         if table == "won_projects" and op in ("edit", "delete"):
-            if _is_super(conn, username):
+            # ★PERM-CONTRACT-20261110：取消超户恒放行与销售/销售总监职位硬编码，
+            #   一律按 common 实际级别（含 allow→edit 别名归一）判定。
+            st = load_perms(conn, username)
+            lv = (st.get("common") or {}).get("won_row_edit" if op == "edit" else "won_row_delete")
+            lv = _PERM_ALIAS.get(str(lv or "").strip().lower())
+            if lv == "edit":
                 return True
-            u = conn.execute("SELECT position FROM users WHERE username=?", (username,)).fetchone()
-            pos = (u["position"] or "").strip() if u else ""
-            if pos not in ("销售", "销售总监"):
-                st = load_perms(conn, username)
-                lv = (st.get("common") or {}).get("won_row_edit" if op == "edit" else "won_row_delete")
-                if lv == "edit":
-                    return True
-                if lv == "hide":
-                    return False
+            if lv == "hide":
+                return False
         row = conn.execute(f"SELECT owner_user_id, salesperson FROM {table} WHERE id=?", (pid,)).fetchone()
         if not row:
             return False
@@ -8509,6 +8562,7 @@ def api_approval_delete(rid):
 @app.route("/api/users", methods=["GET"])
 def api_users_list():
     conn = get_db()
+    _migrate_no_full_override(conn)
     managers = set(_manager_usernames(conn))
     rows = conn.execute(
         "SELECT * FROM users ORDER BY sort_order ASC, id ASC"
@@ -8516,9 +8570,9 @@ def api_users_list():
     users = [_row_to_user(r, managers) for r in rows]
     for u in users:
         u["perms"] = _norm_user_perms(u.get("perms", {}) or {}, conn)
-        # ★FULL-ACCESS-20261107：四人读时归一化，面板/接口/导出看到全放开
+        # ★PERM-CONTRACT-20261110：取消读时全放开覆盖 —— 面板显示的就是库里真实值；
+        #   仅保留管理员标识/状态保护（不是权限值覆盖）。
         if _is_full_perms_user(u.get("username")):
-            u["perms"] = _full_perms_for_super(conn)
             u["is_admin"] = True
             u["status"] = "active"
     conn.close()
@@ -8688,8 +8742,7 @@ def common_level(conn, username, key):
         return ("hide", [])
     default_level = SYS_COMMON_DEFAULTS.get(key, "view")
     opts = COMMON_OPTION_SETS.get(key, ("hide", "view", "edit"))
-    if _is_super(conn, username):
-        return ("edit", []) if "edit" in opts else ("view", [])
+    # ★PERM-CONTRACT-20261110：取消超户恒全放开，一律按库里存储值
     st = load_perms(conn, username)
     lv, appr = _level_of(st["common"].get(key), default_level)
     return (lv if lv in opts else default_level, appr)
@@ -8701,13 +8754,15 @@ def proj_level(conn, username, project_id, key):
     未单独授权的项目模块对非超级用户一律隐藏。→ (hide|view|edit|approve, approvers)"""
     if not username:
         return ("hide", [])
-    if _is_super(conn, username):
-        return ("edit", [])
+    # ★PERM-CONTRACT-20261110：取消超户恒全放开；并补 proj_default 模板回退
+    #   （与前端 permLvProj 完全同口径，避免前后端判成两个不同级别）
     st = load_perms(conn, username)
     val = None
     ov = st["projects"].get(str(project_id))
     if isinstance(ov, dict) and key in ov:
         val = ov[key]
+    if val is None:
+        val = (st.get("proj_default") or {}).get(key)
     return _level_of(val, "hide")
 
 
@@ -8719,8 +8774,7 @@ def lib_file_level(conn, username, file_row):
         row = dict(file_row)
     except Exception:
         return ("hide", [])
-    if _is_super(conn, username):
-        return ("edit", [])
+    # ★PERM-CONTRACT-20261110：取消超户恒全放开，一律按库里存储值
     # ★LIB-SALES-CONTRACT-20261019：合同占位（is_contract=1）以及「销售合同」文件夹下的文件都走 contract 项
     _nm = str(row.get("original_name") or "").replace("\\", "/")
     _is_contract_ctx = bool(row.get("is_contract")) or _nm == SALES_CONTRACT_DIR or _nm.startswith(SALES_CONTRACT_DIR + "/")
@@ -8756,13 +8810,18 @@ def can_edit(conn, username, key=None, project_id=None, file_row=None):
 
 
 def _user_perm_dec(conn, username, bid):
-    """读取用户 perms 中某区块的决策；未配置返回 ''。"""
+    """读取用户 perms 中某区块的决策；兼容顶层旧键与 perms.blocks，并归一旧别名。
+    ★PERM-CONTRACT-20261110：旧区块已统一存进 blocks，此前只读顶层 → 授权恒判 deny。"""
     try:
         r = conn.execute("SELECT perms FROM users WHERE username=?", (username,)).fetchone()
         if not r or not r["perms"]:
             return ""
         p = json.loads(r["perms"])
-        return ((p.get(bid) or {}).get("decision") or "")
+        b = p.get(bid)
+        if not (isinstance(b, dict) and b.get("decision") is not None):
+            b = (p.get("blocks") or {}).get(bid)
+        d = str((b or {}).get("decision") or "").strip().lower()
+        return _PERM_ALIAS.get(d, d)
     except Exception:
         return ""
 
@@ -8778,7 +8837,8 @@ def _usr_op_gate(conn, op, bid):
             return "direct"
     except Exception:
         pass
-    if _user_perm_dec(conn, op, bid) == "allow":
+    # ★PERM-CONTRACT-20261110：面板已把 allow 映射为 edit，两者都认
+    if _user_perm_dec(conn, op, bid) in ("allow", "edit"):
         return "allow"
     return "deny"
 
@@ -8880,8 +8940,8 @@ def api_users_create():
     import json as _json
     conn = get_db()
     perms = _norm_user_perms(perms, conn)
-    perms = _force_sales_locked_perms(perms, position)
-    perms = _force_observer_perms(perms, position)
+    # ★PERM-CONTRACT-20261110：取消销售/观察者职位的保存时强制覆盖
+    #   （面板选什么就存什么，不再静默改回 hide / 套用固定模板）
     conn = get_db()
     exists = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
     if exists:
@@ -8971,8 +9031,8 @@ def api_users_update(uid):
     import json as _json
     conn = get_db()
     perms = _norm_user_perms(perms, conn)
-    perms = _force_sales_locked_perms(perms, position)
-    perms = _force_observer_perms(perms, position)
+    # ★PERM-CONTRACT-20261110：取消销售/观察者职位的保存时强制覆盖
+    #   （面板选什么就存什么，不再静默改回 hide / 套用固定模板）
     row = conn.execute("SELECT id, username, position, perms FROM users WHERE id=?", (uid,)).fetchone()
     if not row:
         conn.close()
@@ -8992,20 +9052,8 @@ def api_users_update(uid):
     # 3) tom / admin 不可被禁用或停用（资料、密码照常可改）
     if _tname in PROTECTED_ACCOUNTS:
         status = "active"
-    # 4) 只有 tom 的 perms 恒全放开；admin/cuong/james 按存储值，改动真实生效
-    if _tname in FULL_PERMS_USERS:
-        perms = _full_perms_for_super(conn)
-    # WON-L1 职位联动兜底：职位从 销售/销售总监 改为其他职位时，
-    # 若 WON-L1 决策仍为销售缺省的 hide，则自动改回 default（不覆盖其他决策值）。
-    try:
-        _old_pos = (row["position"] or "").strip()
-        _new_pos = (position or "").strip()
-        if _old_pos in ("销售", "销售总监") and _new_pos not in ("销售", "销售总监"):
-            blk = perms.get("WON-L1") if isinstance(perms, dict) else None
-            if isinstance(blk, dict) and blk.get("decision") == "hide":
-                blk["decision"] = "default"
-    except Exception:
-        pass
+    # ★PERM-CONTRACT-20261110：取消「保存时把 tom 的 perms 强制替换为全放开」，
+    #   以及销售职位 WON-L1 联动 —— 面板选什么就存什么，不再有任何静默覆盖。
     # 不能把离职代理指向自己
     if delegate_to:
         tgt = conn.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()

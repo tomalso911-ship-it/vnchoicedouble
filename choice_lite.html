@@ -41249,7 +41249,7 @@ function deleteUser(id) {
   const _triPass = TRI.map(function(s){ return String(s).toLowerCase(); }).indexOf(_meName)>=0;
   const _admPass = _isSuperUser();
   if (isFullAccessUser(u.login)) { showAlert('该账号为系统最高授权用户，不可删除'); return; }
-  const _needApprove = (!(_triPass||_admPass)) && curRawDecision('USR-D3')==='allow';
+  const _needApprove = (!(_triPass||_admPass)) && permLvNorm4(curRawDecision('USR-D3'))==='edit';
   if (!(_triPass||_admPass||_needApprove)) { showAlert(t.usr_perm_no_right || '无权限：该项未对你开放'); return; }
   showCrmOrangeConfirm(
     function(t){ return t.users_delete || '删除用户'; },
@@ -41335,8 +41335,12 @@ function loadUsers(){
         VIS_ME[u.id] = parseIds(vu.vis_can_see_me);
         const perms = (vu.perms && typeof vu.perms === 'object') ? vu.perms : {};
         PERMS_STATE[u.id] = perms;
-        Object.keys(perms).forEach(function(bid){
-          const p = perms[bid] || {};
+        // ★PERM-CONTRACT-20261110：旧区块已统一存进 perms.blocks，
+        //   审批人也要一并从 blocks 里读，否则保存后审批人列表被清空。
+        const _blocks = (perms.blocks && typeof perms.blocks === 'object') ? perms.blocks : {};
+        const _allBlockKeys = Object.keys(perms).concat(Object.keys(_blocks));
+        _allBlockKeys.forEach(function(bid){
+          const p = _blocks[bid] || perms[bid] || {};
           if (Array.isArray(p.approvers) && p.approvers.length){
             APPROVERS[u.id + ":" + bid] = _normApproverList(p.approvers);
           }
@@ -41400,19 +41404,46 @@ function normDecision(raw){
   if (_DEC_SETS.def.has(raw)) return 'def';
   return 'def'; // 未知值按"保留默认"兜底
 }
+// ★PERM-CONTRACT-20261110（根因修复）：全站唯一值域 = hide / view / edit / approve。
+//   旧词（company / allow / write / 中文标签）一律归一；default/def 返回 null 交回旧规则处理。
+var _PERM_LV4 = { hide:1, view:1, edit:1, approve:1 };
+function permLvNorm4(v){
+  if (v && typeof v === 'object') v = v.decision || v.level;
+  if (v === undefined || v === null || v === '') return null;
+  var s = String(v).trim().toLowerCase();
+  var m = { hidden:'hide', '隐藏':'hide', '查看':'view', '编辑':'edit', write:'edit',
+            allow:'edit', company:'view', '特别授权看全公司':'view', '允许编辑':'edit',
+            '发起审批':'approve' };
+  s = m[s] || s;
+  return _PERM_LV4[s] ? s : null;
+}
+// ★统一旧区块读取口：同时兼容新旧两种存储结构（顶层 bid / perms.blocks[bid]）。
+//   后端 _split_perms() 把旧扁平键收进 blocks，此前 curRawDecision 只读顶层 → 全部读空。
+function permBlockObj(bid){
+  try {
+    var p = (authUser && authUser.perms) ? authUser.perms : {};
+    if (typeof p === 'string') p = JSON.parse(p || '{}');
+    var b = p[bid];
+    if (b && typeof b === 'object' && b.decision !== undefined) return b;
+    if (p.blocks && p.blocks[bid] && typeof p.blocks[bid] === 'object'
+        && p.blocks[bid].decision !== undefined) return p.blocks[bid];
+  } catch(e){}
+  return null;
+}
 // 当前登录用户对该区块的决策（原始值，可能为空=未配置）
 function curRawDecision(bid){
   try {
+    var _b = (typeof permBlockObj === 'function') ? permBlockObj(bid) : null;
+    if (_b) return _b.decision || '';
     var perms = (authUser && authUser.perms) ? authUser.perms : {};
     if (typeof perms === 'string') perms = JSON.parse(perms || '{}');
     var d = perms[bid] && perms[bid].decision;
     return d || '';
   } catch(e){ return ''; }
 }
-// "保留默认"下的可见性：A 类默认显示；C 类默认隐藏；S 类仅管理员可见
-// 管理员在"保留默认"下始终可见所有区块，避免测试时入口/图表被误隐藏
+// "保留默认"下的可见性：A/B 类默认显示；C/S 类默认隐藏（所有账号一视同仁）
+// ★PERM-CONTRACT-20261110：取消「管理员在保留默认下恒可见所有区块」的超户豁免
 function defaultVisible(bid){
-  if (_isSuperUser()) return true;
   var meta = PERM_META[bid]; if (!meta) return true;
   var cat = meta.cat;
   if (cat === 'A') return true;
@@ -41432,15 +41463,13 @@ function _isSalesPos(u){
 //   行内按钮（编辑/删除/复制/报告）与新建/导出的显隐历史上挂在 WON-D2/D3/C1/D4/N1/E1，
 //   新版公共模块表（2.2~2.7）设了值就必须以新键为准，否则"设了编辑按钮也不出现"。
 //   返回 null = 新键未配置 → 完全沿用旧区块逻辑（向后兼容，不改变存量用户行为）。
-//   销售/销售总监的 5 项锁死优先级最高（即使新键给了 edit 也不放行）。
+//   ★PERM-CONTRACT-20261110：取消销售职位硬锁与超级用户短路 —— 面板选什么就是什么。
 function _wonBridgeLv(bid){
   var map = { 'WON-D2':'won_row_edit', 'WON-D3':'won_row_delete', 'WON-C1':'won_row_copy',
               'WON-D4':'won_row_view',  'WON-N1':'won_btn_add',   'WON-E1':'won_btn_export' };
   var k = map[bid];
   if (!k) return null;
   if (typeof authUser === 'undefined' || !authUser) return null;
-  if (_isSalesPos(authUser) && typeof SALES_LOCKED_WON !== 'undefined' && SALES_LOCKED_WON.has(bid)) return 'hide';
-  if (typeof _isSuperUser === 'function' && _isSuperUser()) return 'edit';
   var perms = authUser.perms || {};
   if (typeof perms === 'string'){ try { perms = JSON.parse(perms || '{}'); } catch(e){ perms = {}; } }
   var c = perms.common || {};
@@ -41448,22 +41477,23 @@ function _wonBridgeLv(bid){
   return (v === undefined) ? null : v;
 }
 function permVisible(bid){
-  // tom/cuong/james 三人组：用户与权限管理四个区块全部直接可见（与管理员同级直通）
-  if (_isSuperUser() && (bid==='USR-L1'||bid==='USR-D1'||bid==='USR-D2'||bid==='USR-D3')) return true;
-  // 用户与权限管理 D1/D2/D3：'allow' 决策=按钮可见（可直接操作，提交后走三人审批报告）
-  if ((bid==='USR-D1'||bid==='USR-D2'||bid==='USR-D3') && curRawDecision(bid)==='allow') return true;
-  var raw = curRawDecision(bid);
-  var dec = normDecision(raw);
-  // 销售/销售总监：5 个 WON 权限无条件锁死隐藏（优先级最高，即使历史数据存了其他决策也不放行）
-  if(_isSalesPos(authUser) && typeof SALES_LOCKED_WON!=='undefined' && SALES_LOCKED_WON.has(bid)) dec = 'hide';
-  if(!raw && bid==='WON-L1' && _isSalesPos(authUser)) dec = 'hide';  // WON-L1 职位缺省规则
-  if(!raw && bid==='WON-P345' && _isSalesPos(authUser)) dec = 'hide';  // WON-P345 职位缺省规则（P3-P4-P5列）
-  // ★PERM-V2-BRIDGE-20261019：新版公共模块键已配置 → 以新键为准（hide=不显示，edit=显示）
+  // ★PERM-CONTRACT-20261110：不再有任何「职位/账号白名单」静默覆盖，
+  //   一律按【实际存储的级别】判定；四值归一后 hide=隐藏，其余=可见。
+  // 1) 新版公共模块键已配置 → 以新键为准
   var _bl = _wonBridgeLv(bid);
-  if (_bl !== null) return (_bl === 'edit');
+  if (_bl !== null){
+    var _blv = permLvNorm4(_bl);
+    if (_blv !== null) return (_blv !== 'hide');
+  }
+  var raw = curRawDecision(bid);
+  // 2) 旧区块（顶层或 blocks）里的新版四值 → 直接用归一结果，allow/company 一并认
+  var _lv4 = permLvNorm4(raw);
+  if (_lv4 !== null) return (_lv4 !== 'hide');
+  // 3) 旧版 default/company/all 等历史值 → 保留原 normDecision 语义
+  var dec = normDecision(raw);
   if (dec === 'hide') return false;
-  if (dec === 'all') return true;             // 特别授权：即使默认隐藏也显示
-  if (dec === 'approve') return true;         // 发起审批：入口可见，操作受拦截
+  if (dec === 'all') return true;
+  if (dec === 'approve') return true;
   return defaultVisible(bid);                 // 保留默认 / 未配置
 }
 // 显示/隐藏某个 DOM 元素（按 id 或元素）
@@ -41513,7 +41543,8 @@ function permGuard(bid, actionName){
   //   edit=A 类放行、B 类仍走单次审批入口；非 edit=拦截并提示。
   var _bl = _wonBridgeLv(bid);
   if (_bl !== null){
-    if (_bl !== 'edit'){
+    // ★PERM-CONTRACT-20261110：经四值归一，view=只读（拦截写操作），edit=放行
+    if (permLvNorm4(_bl) !== 'edit'){
       showToast((_permName(bid)) + ' ' + (T().empty.user_perm_hidden||'No permission: this module is hidden'));
       return false;
     }
@@ -41576,37 +41607,34 @@ function _myPermsObj(){
   }catch(e){ return {}; }
 }
 function permLvCommon(key){
-  if (_isSuperUser()) return 'edit';
+  // ★PERM-CONTRACT-20261110：取消 _isSuperUser 短路（面板选什么就是什么），
+  //   统一经 permLvNorm4 归一，allow/company/write 等旧值不再被当成「非 edit」而误锁只读。
   var c = _myPermsObj().common || {};
-  var v = c[key];
-  return (v === undefined) ? (SYS_COMMON_DEF[key] || 'view') : v;
+  return permLvNorm4(c[key]) || (SYS_COMMON_DEF[key] || 'view');
 }
 function permLvProj(pid, key){
-  if (_isSuperUser()) return 'edit';
   var p = _myPermsObj();
   var ov = (p.projects || {})[String(pid)];
   if (ov && ov[key] !== undefined){
-    var v1 = ov[key];
-    if (typeof v1 === 'object') return v1.decision || 'hide';
-    return v1;
+    var _l1 = permLvNorm4(ov[key]);
+    if (_l1 !== null) return _l1;
   }
   // ★PERM-TPL-ALL-20261110：单项目未显式设置 → 回退服务端下发的全局模板
   //   （与 app.py 的 proj_default 同口径，保证旧项目/新项目、面板/运行时完全一致）。
   var tpl = p.proj_default || {};
   if (tpl[key] !== undefined){
-    var v2 = tpl[key];
-    if (typeof v2 === 'object') return v2.decision || 'hide';
-    return v2;
+    var _l2 = permLvNorm4(tpl[key]);
+    if (_l2 !== null) return _l2;
   }
   // ★PROJ-HIDE-DEF-20261019（用户要求）：模板也没有 → 未单独授权的项目模块一律「隐藏」
   return 'hide';
 }
 // ★PERM-V2-WHOLE-20261019（用户要求）：「整个项目：隐藏/查看」（按项目授权第一项，默认隐藏）。
 //   隐藏 → 该用户在签约列表 / 工作日志 / 生产 / 安装 里完全看不到这个项目（卡片与行都不过滤不出来）；
-//   查看 → 能进项目，内部各模块再按各自授权（未授权=隐藏）工作。超级用户恒可见。
+//   查看 → 能进项目，内部各模块再按各自授权（未授权=隐藏）工作。
+//   ★PERM-CONTRACT-20261110：取消超户恒可见，一律按 whole 实际级别。
 function _projWholeVisible(pid){
   try{
-    if (typeof _isSuperUser === 'function' && _isSuperUser()) return true;
     if (typeof permLvProj !== 'function') return true;
     return permLvProj(pid, 'whole') !== 'hide';
   }catch(e){ return true; }
@@ -41616,7 +41644,7 @@ window._projWholeVisible = _projWholeVisible;
 //   导航入口可见性 = 任一项目把 approval 设成「查看 / 编辑」；全部隐藏或未配置 → 隐藏。
 function _anyProjApproval(){
   try{
-    if (typeof _isSuperUser === 'function' && _isSuperUser()) return true;
+    // ★PERM-CONTRACT-20261110：取消超户恒放行，一律按各项目 approval 实际级别
     var pr = (_myPermsObj().projects || {});
     for (var pid in pr){
       var o = pr[pid];
@@ -41905,35 +41933,33 @@ function _myCommonLevel(key, defVal){
     var perms = (authUser && authUser.perms) ? authUser.perms : {};
     if (typeof perms === 'string') perms = JSON.parse(perms || '{}');
     var c = perms ? perms.common : null;
-    if (c && c[key] !== undefined) return c[key];
+    if (c && c[key] !== undefined){
+      var _n = permLvNorm4(c[key]);
+      return (_n !== null) ? _n : defVal;
+    }
   }catch(e){}
   return defVal;
 }
 function viewAllowed(name){
   if (typeof authUser === 'undefined' || !authUser) return false;
-  // ★PERM-V2-20261018：新版公共模块权限参与导航显隐（超级用户无视；未配置沿用旧行为）
-  if (!_isSuperUser()){
-    if (name === 'dashboard' && _myCommonLevel('dashboard', 'view') === 'hide') return false;
-    if (name === 'won'       && _myCommonLevel('won_list',  'view') === 'hide') return false;
-    if (name === 'finance'   && _myCommonLevel('fin_vn','view')   === 'hide'
-                             && _myCommonLevel('fin_cn','view')   === 'hide'
-                             && _myCommonLevel('fin_rest','view') === 'hide') return false;
-    if (name === 'approvals' && !_anyProjApproval()) return false;
-    // ★EQ-VIEW-GATE-20261106（根因修复）：股东权益三项（总投资三合一/股东结构/分红记录）全「隐藏」
-    //   → 整页不可见、导航入口消失（之前 viewAllowed 漏了 equity，永远返回 true，导航按钮被 applyAllPermVisibility 强行显示）。
-    if (name === 'equity'    && _myCommonLevel('eq_data','view')     === 'hide'
-                             && _myCommonLevel('eq_holders','view')  === 'hide'
-                             && _myCommonLevel('eq_dividend','view') === 'hide') return false;
-  }
+  // ★PERM-CONTRACT-20261110：取消 _isSuperUser 包裹 —— 所有账号（含 tom/admin/cuong/james）
+  //   一律按面板实际存储的级别判定，不再有「超户无视设置」的静默覆盖。
+  if (name === 'dashboard' && _myCommonLevel('dashboard', 'view') === 'hide') return false;
+  if (name === 'won'       && _myCommonLevel('won_list',  'view') === 'hide') return false;
+  if (name === 'finance'   && _myCommonLevel('fin_vn','view')   === 'hide'
+                           && _myCommonLevel('fin_cn','view')   === 'hide'
+                           && _myCommonLevel('fin_rest','view') === 'hide') return false;
+  if (name === 'approvals' && !_anyProjApproval()) return false;
+  if (name === 'equity'    && _myCommonLevel('eq_data','view')     === 'hide'
+                           && _myCommonLevel('eq_holders','view')  === 'hide'
+                           && _myCommonLevel('eq_dividend','view') === 'hide') return false;
   // 空领航标签：始终显示，不依赖看板区块权限
   if (name === 'dashboard') {
     return true;
   }
-  if (name === 'users') return _isSuperUser() || permVisible('USR-L1');
+  if (name === 'users') return permVisible('USR-L1');
   if (name === 'approvals') {
-    // 观察者角色：审批组在权限界面整组不渲染（OBSERVER_EXCLUDED_GIDS），领航标签也不显示审批按钮
-    if (typeof _isObserverPos === 'function' && _isObserverPos(authUser)) return false;
-    // ★PERM-V2-APP-PROJ-20261019：审批按项目授权，任一项目授权可见即显示入口（默认隐藏）
+    // ★PERM-CONTRACT-20261110：取消观察者角色硬锁，一律按项目授权判定
     return _anyProjApproval();
   }
   if (name === 'commission') return _isSuperUser();
@@ -44669,9 +44695,8 @@ function applyAllPermVisibility(){
     var view = item.getAttribute('data-view');
     if (view) item.style.display = viewAllowed(view) ? 'inline-block' : 'none';
   });
-  // 用户与权限管理：管理员始终可见该入口；非管理员按 USR-L1 决策
-  var isAdmin = _isSuperUser();
-  var usrVisible = isAdmin || permVisible('USR-L1');
+  // ★PERM-CONTRACT-20261110：取消「管理员始终可见」硬放行，一律按 USR-L1 的实际存储级别
+  var usrVisible = permVisible('USR-L1');
   var usersTab = document.querySelector('.tb-item[data-view="users"]');
   if (usersTab) usersTab.style.display = usrVisible ? 'inline-block' : 'none';
   // 审批视图页签
@@ -45125,15 +45150,8 @@ function openModal(uid, copyFrom){
       _mk.addEventListener(ev, function(e){ if (e && e.isTrusted) window.__userModalDirty = true; }, true);
     });
   }
+  // ★PERM-CONTRACT-20261110：不再因「被编辑账号是超级用户」而锁死面板（__fullAccessEditUid 恒空）。
   window.__fullAccessEditUid = null;
-  if (uid && typeof isFullAccessUser === 'function'){
-    const _fu = usersData.find(function(x){ return x.id === uid; }) || {};
-    const _tname = String(_fu.login || _fu.username || '').trim().toLowerCase();
-    const _opname = String((authUser && authUser.username) || '').trim().toLowerCase();
-    // ★OWNER-MATRIX-20261107：tom 可改 admin 的权限；tom 本人仍不可被降权
-    const _tomEditingAdmin = (_tname === 'admin' && _opname === 'tom');
-    if (isFullAccessUser(_tname) && !_tomEditingAdmin) window.__fullAccessEditUid = uid;
-  }
   _renderUserModal(uid, copyFrom, src);
   if (curUid) {
     try {
@@ -45393,7 +45411,9 @@ function _fullProjStore(){
   }); }); } catch(e){}
   return out;
 }
-function _faEdit(){ return !!window.__fullAccessEditUid; }
+// ★PERM-CONTRACT-20261110：取消「全放开账号面板强制显示最高级 + 禁用下拉」的静默覆盖，
+//   所有账号一律可编辑、一律回显真实存储值（面板选什么就是什么）。
+function _faEdit(){ return false; }
 // 观察者固定权限模板（整体锁死不可修改，含审批人）：审批组/用户与权限管理组与观察者无关 → 全部禁止
 const OBSERVER_PERM_FIXED = {
   "DB-S1":"default","DB-P1":"default","DB-B1":"default","DB-C1":"default","US-LH1":"default","US-LH2":"default",
@@ -45456,7 +45476,7 @@ function buildPermGroups(uid){
   // 当前编辑用户的职位（新建用户时实时读职位下拉）
   const _posInput = document.getElementById("f-position");
   const _editPos = uid ? ((usersData.find(function(x){ return x.id === uid; })||{}).position) : (_posInput ? _posInput.value : "");
-  const _observerLock = _isObserverPos({position:_editPos});   // 观察者：审批/用户组不渲染 + 未配置区块按模板预设（可修改，非锁死）
+  // ★PERM-CONTRACT-20261110：取消观察者整组不渲染 / 模板预设的职位硬锁
   // A 类：默认保留，无审批，审批人禁用；B 类：单次生效，操作前单独审批，审批人始终启用；C 类：持续生效审批，选「发起审批」时启用审批人
   // 下拉用稳定内部值(v)做 value/比较键，显示文字随语言切换，避免跨语言错位
   const ALL_DEC = [
@@ -45505,25 +45525,23 @@ function buildPermGroups(uid){
   }
   // gid(区块中文) → 三语 key 后缀
   const GID_KEY = { "看板":"dashboard", "价格走势":"marketdata", "CRM 潜在项目":"crm", "Won 签约项目":"won", "Lost 失败项目":"lost", "审批":"approve", "用户与权限管理":"usradmin" };
-  // 观察者：审批组、用户与权限管理组与其无关 → 权限界面不渲染这两组（全部禁止）
-  const _permGroupsSrc = _observerLock ? PERMS.filter(function(g){ return !OBSERVER_EXCLUDED_GIDS.has(g.gid); }) : PERMS;
+  // ★PERM-CONTRACT-20261110：取消观察者整组不渲染的硬锁，所有组一律显示
+  const _permGroupsSrc = PERMS;
   wrap.innerHTML=_permGroupsSrc.map(g=>{
     const gidKey = GID_KEY[g.gid] || null;
     const gidText = (gidKey && t['perm_group_'+gidKey]) ? t['perm_group_'+gidKey] : g.gid;
     const rows=g.rows.map(r=>{
       const cat = r[2];
-      const blockPerm = userPerms[r[0]] || {};
+      // ★PERM-CONTRACT-20261110：旧区块统一存 perms.blocks，兼容顶层旧键
+      const blockPerm = (userPerms.blocks && userPerms.blocks[r[0]]) || userPerms[r[0]] || {};
       const key=uid? uid+":"+r[0] : null;
       const selApprovers = key? (APPROVERS[key]||[]) : [];
       // decision 统一用稳定内部键(default/hide/company/approve)；历史中文值做兼容映射
       const LEGACY_MAP = {'保留默认':'default','隐藏该项':'hide','特别授权看全公司':'company','发起审批':'approve'};
-      // WON-L1 / WON-P345 缺省规则：销售/销售总监默认「隐藏该项」，其他角色默认「保留默认」（显式保存过的优先）
-      const _pu = uid ? usersData.find(function(x){ return x.id === uid; }) : null;
-      // 销售/销售总监：5 个 WON 权限锁死（UI 下拉禁用 + 值强制「隐藏该项」）
-      const _salesLock = !!( _isSalesPos({position:_editPos}) && SALES_LOCKED_WON.has(r[0]));
-      const _wonL1Def = ((r[0]==='WON-L1' || r[0]==='WON-P345') && !blockPerm.decision && _isSalesPos(_pu)) ? 'hide' : 'default';
-      // 观察者预设：未配置过的区块按固定模板给初始值（管理员可自由修改保存，非锁死）
-      const _obsDef = (_observerLock && !blockPerm.decision && OBSERVER_PERM_FIXED[r[0]] !== undefined) ? OBSERVER_PERM_FIXED[r[0]] : null;
+      // ★PERM-CONTRACT-20261110：取消销售/销售总监 5 项 WON 锁死、缺省隐藏、观察者预设
+      const _salesLock = false;
+      const _wonL1Def = 'default';
+      const _obsDef = null;
       let decision = blockPerm.decision || _obsDef || _wonL1Def;
       if(LEGACY_MAP[decision]) decision = LEGACY_MAP[decision];
       // 非 CRM/WON/LOST 非 L1 区块禁止"发起审批"；若历史数据存了此值，兜底回退为"default"
@@ -45533,7 +45551,10 @@ function buildPermGroups(uid){
       // 用户与权限管理组：选项已精简——USR-L1 无「保留默认」（未配置/保留默认 → 隐藏，C 类默认即不显示）；
       // USR-D1/D2/D3 仅 hide/allow 两值，历史 default/company 残留一律归 hide
       if(r[0]==='USR-L1' && decision==='default') decision='hide';
-      if(r[0]==='USR-D1'||r[0]==='USR-D2'||r[0]==='USR-D3'){ if(decision!=='allow') decision='hide'; }
+      // ★PERM-CONTRACT-20261110：allow 与 edit 等价（四值归一），其余一律 hide
+      if(r[0]==='USR-D1'||r[0]==='USR-D2'||r[0]==='USR-D3'){
+        decision = (permLvNorm4(decision)==='edit') ? 'allow' : 'hide';
+      }
       // 锁死层最后生效：销售/销售总监的 5 个 WON 权限一律「隐藏该项」（观察者不锁死，按预设可改）
       if(_salesLock) decision = 'hide';
       const infoKey = 'user_block_' + r[0].replace(/-/g,'_') + '_info';
@@ -45700,11 +45721,13 @@ var COMMON_PERM_DEFS = [
       {k:'eq_holders',  n:'股东结构', o:['hide','view','edit'], d:'hide'},
       {k:'eq_dividend', n:'分红记录', o:['hide','view','edit'], d:'hide'}
   ]},
+  // ★PERM-CONTRACT-20261110：company/allow 统一映射为全站四值 view/edit；
+  //   labelKey 保留原有三语 key（显示用户列表 / 允许编辑 …），文案一字不改。
   { mod:'用户与授权', rows:[
-      {k:'usr_l1', block:'USR-L1', n:'用户列表',          o:['hide','company'], d:'hide', labels:{company:'显示用户列表'}},
-      {k:'usr_d1', block:'USR-D1', n:'编辑用户权限（弹窗）', o:['hide','allow'],   d:'hide', labels:{allow:'允许编辑'}},
-      {k:'usr_d2', block:'USR-D2', n:'新增用户',          o:['hide','allow'],   d:'hide', labels:{allow:'允许新增'}},
-      {k:'usr_d3', block:'USR-D3', n:'删除/停用用户',      o:['hide','allow'],   d:'hide', labels:{allow:'允许删除/停用'}}
+      {k:'usr_l1', block:'USR-L1', n:'用户列表',          o:['hide','view'], d:'hide', labelKey:'perm_c_usr_l1_company', labels:{view:'显示用户列表'}},
+      {k:'usr_d1', block:'USR-D1', n:'编辑用户权限（弹窗）', o:['hide','edit'], d:'hide', labelKey:'perm_c_usr_d1_allow', labels:{edit:'允许编辑'}},
+      {k:'usr_d2', block:'USR-D2', n:'新增用户',          o:['hide','edit'], d:'hide', labelKey:'perm_c_usr_d2_allow', labels:{edit:'允许新增'}},
+      {k:'usr_d3', block:'USR-D3', n:'删除/停用用户',      o:['hide','edit'], d:'hide', labelKey:'perm_c_usr_d3_allow', labels:{edit:'允许删除/停用'}}
   ]}
 ];
 var COMMON_LEVEL_LABEL = { hide:'隐藏', view:'查看（只读）', edit:'编辑（可修改）' };
@@ -45749,27 +45772,20 @@ function buildCommonPerm(uid){
   const wrap = document.getElementById('commonPerm');
   if(!wrap) return;
   const st = _commonStateFor(uid);
-  // ★PERM-V2-20261018：USR-* 的值仍存在旧 flat 区块里（perms['USR-L1'].decision），
-  //   渲染时从区块读取；保存时再映射回去（见 saveModal 的 USR_KEY_MAP）。
+  // ★PERM-CONTRACT-20261110：USR-* 旧区块现在统一存在 perms.blocks 里，
+  //   同时兼容顶层旧键；company/allow 经 permLvNorm4 映射成 view/edit 后回显。
+  //   取消「全放开账号强制显示最高级」「观察者整组不渲染」两处静默覆盖。
   const userBlocks = (uid && typeof PERMS_STATE !== 'undefined' && PERMS_STATE[uid]) ? PERMS_STATE[uid] : {};
-  const _posInput = document.getElementById('f-position');
-  const _editPos = uid
-    ? ((typeof usersData !== 'undefined') ? ((usersData.find(function(x){ return x.id === uid; }) || {}).position || '') : '')
-    : (_posInput ? _posInput.value : '');
-  // 观察者与「用户与授权」组无关 → 不渲染该组（与旧版权限表行为一致）
-  const _observerLock = (typeof _isObserverPos === 'function') ? _isObserverPos({ position: _editPos }) : false;
+  const legacyBlocks = (userBlocks.blocks && typeof userBlocks.blocks === 'object') ? userBlocks.blocks : {};
   const levelOf = function(it){
-    if (_faEdit()) return it.o[it.o.length-1];
     let v;
     if (it.block) {
-      v = (userBlocks[it.block] || {}).decision;
+      const _b = legacyBlocks[it.block] || userBlocks[it.block];
+      v = _b;
     } else {
       v = st[it.k];
     }
-    // ★PERM-V2-FIX-20261019：值可能是字符串（'hide'）或对象（{decision:'hide'}），
-    //   必须统一取 decision 后再比对选项，否则存了「隐藏」却回显成系统默认「查看」。
-    let d = (v && typeof v === 'object') ? (v.decision || v.level) : v;
-    if (typeof d === 'string') d = d.trim();
+    const d = permLvNorm4(v);
     if (d && it.o.indexOf(d) >= 0) return d;
     return it.d;                       // 未配置 → 系统默认
   };
@@ -45782,7 +45798,6 @@ function buildCommonPerm(uid){
   // ★颜色：每组一个色系（标题色条 + 行底斑马纹），下拉按级别变色（隐藏红/查看黄/编辑绿）
   let gi = 0;
   wrap.innerHTML = COMMON_PERM_DEFS.map(function(g){
-    if (_observerLock && g.mod === '用户与授权') return '';
     gi++;
     const c = PERM_GROUP_COLORS[(gi - 1) % PERM_GROUP_COLORS.length];
     const gLabel = gi + ' ' + _permTr(COMMON_MOD_KEY[g.mod], g.mod);
@@ -45792,7 +45807,7 @@ function buildCommonPerm(uid){
       const cur = levelOf(it);
       const opts = it.o.map(function(o){
         const lbl = (it.labels && it.labels[o])
-          ? _permTr('perm_c_' + it.k + '_' + o, it.labels[o])
+          ? _permTr(it.labelKey || ('perm_c_' + it.k + '_' + o), it.labels[o])
           : _permTr('perm_lv_' + o, COMMON_LEVEL_LABEL[o] || o);
         return `<option value="${o}"${o===cur?' selected':''}>${lbl}</option>`;
       }).join('');
@@ -45864,11 +45879,13 @@ var PROJ_PERM_DEFS = [
 var _LV_FALLBACK = { hide:'隐藏', view:'查看（只读）', edit:'编辑（可修改）', approve:'发起审批', inherit:'跟随模板' };
 
 function _projLevelOf(store, it){
+  // ★PERM-CONTRACT-20261110：先经全站四值归一，allow/company/对象 decision 不再被白名单吞成 hide；
+  //   prod_D_receipt 的 approvers 原样保留。
   let v = store[it.k];
-  if (typeof v === 'string') v = { decision: v };
-  if (v && v.decision && it.o.indexOf(v.decision) >= 0) return v;
-  // ★PROJ-HIDE-DEF-20261019（用户要求）：按项目授权未单独设置 = 默认「隐藏」；
-  //   全局模板已整体删除，不再作为回退来源。
+  const appr = (v && typeof v === 'object' && Array.isArray(v.approvers)) ? v.approvers : [];
+  const d = permLvNorm4(v);
+  if (d && it.o.indexOf(d) >= 0) return { decision: d, approvers: appr };
+  // ★PROJ-HIDE-DEF-20261019（用户要求）：未单独设置 / 值非法 = 默认「隐藏」
   return { decision: 'hide', approvers: [] };
 }
 
@@ -46174,10 +46191,19 @@ async function saveModal(){
   const blockPerms={};
   const _srcUid = (window.__curVisUid !== undefined && window.__curVisUid !== null) ? window.__curVisUid : curUid;
   const _prevBlocks = (_srcUid && typeof PERMS_STATE !== 'undefined' && PERMS_STATE[_srcUid]) ? PERMS_STATE[_srcUid] : {};
+  // ★PERM-CONTRACT-20261110：旧区块统一存 perms.blocks。此前只遍历顶层 →
+  //   blocks 里的 WON/CRM/LOST/APP/USR 区块保存时被整批清空（"改了就没"的根因之一）。
+  const _legacy = (_prevBlocks.blocks && typeof _prevBlocks.blocks === 'object') ? _prevBlocks.blocks : {};
+  Object.keys(_legacy).forEach(function(bid){
+    const p = _legacy[bid];
+    if (p && typeof p === 'object' && p.decision !== undefined){
+      blockPerms[bid] = { decision:p.decision, approvers:(p.approvers||[]).slice() };
+    }
+  });
   Object.keys(_prevBlocks).forEach(function(bid){
-    if (bid==='common' || bid==='proj_default' || bid==='projects' || bid==='lib_file_overrides') return;
+    if (bid==='common' || bid==='proj_default' || bid==='projects' || bid==='lib_file_overrides' || bid==='blocks') return;
     const p=_prevBlocks[bid];
-    if (p && typeof p==='object' && p.decision!==undefined){
+    if (p && typeof p==='object' && p.decision!==undefined && !blockPerms[bid]){
       blockPerms[bid]={ decision:p.decision, approvers:(p.approvers||[]).slice() };
     }
   });
@@ -46185,19 +46211,20 @@ async function saveModal(){
   const USR_KEY_MAP = { usr_l1:'USR-L1', usr_d1:'USR-D1', usr_d2:'USR-D2', usr_d3:'USR-D3' };
   Object.keys(USR_KEY_MAP).forEach(function(ck){
     if (_commonCollected[ck] !== undefined){
+      // ★值域统一：usr_* 面板现在选 view/edit，写回旧区块也用四值，
+      //   前端 permVisible / 后端 _user_perm_dec 均已同步支持四值。
       blockPerms[USR_KEY_MAP[ck]] = { decision:_commonCollected[ck], approvers:[] };
       delete _commonCollected[ck];
     }
   });
   // ★防"变回默认"兜底：新版表是异步渲染的（项目列表要 fetch），若保存时还没渲染完，
   //   collect* 会返回空对象 —— 直接写库就等于把已配好的权限清空、全部退回默认值。
-  //   因此：本次采集为空 且 内存里原本有值 → 沿用原值，绝不用空覆盖。
   const _keep = function(collected, prevKey){
     if (collected && Object.keys(collected).length) return collected;
     return (_prevBlocks[prevKey] && typeof _prevBlocks[prevKey] === 'object') ? _prevBlocks[prevKey] : (collected || {});
   };
   const perms = {};
-  Object.keys(blockPerms).forEach(function(k){ perms[k]=blockPerms[k]; });
+  perms.blocks = blockPerms;      // ★旧区块唯一存放处，与后端 _split_perms 同口径
   perms.common = _keep(_commonCollected, 'common');
   perms.proj_default = _keep((typeof collectProjDefault==='function') ? collectProjDefault() : {}, 'proj_default');
   perms.projects = _keep((typeof collectProjects==='function') ? collectProjects() : {}, 'projects');
@@ -46240,24 +46267,31 @@ async function saveModal(){
   const _admPass = _isSuperUser();
   if (!_triPass && !_admPass) {
     const _decBid = curUid ? 'USR-D1' : 'USR-D2';
-    if (curRawDecision(_decBid) !== 'allow') { showAlert(t.usr_perm_no_right || '无权限：该项未对你开放'); return; }
+    // ★PERM-CONTRACT-20261110：值域统一后允许 edit（兼容旧 allow），不再只认字符串 'allow'
+    if (permLvNorm4(curRawDecision(_decBid)) !== 'edit') { showAlert(t.usr_perm_no_right || '无权限：该项未对你开放'); return; }
     let _pl;
     if (curUid) {
       const _orig = usersData.find(function(x){ return x.id === curUid; }) || {};
       let _before = {};
       try { _before = (typeof _orig.perms==='string')? JSON.parse(_orig.perms||'{}') : (_orig.perms||{}); } catch(e){ _before={}; }
       const _changes = [];
-      Object.keys(perms).forEach(function(bid){
-        const _o = (_before[bid]||{}).decision || 'default';
-        const _n = (perms[bid]||{}).decision || 'default';
-        const _oa = ((_before[bid]||{}).approvers||[]).join(',');
-        const _na = ((perms[bid]||{}).approvers||[]).join(',');
+      // ★PERM-CONTRACT-20261110：旧区块已收进 blocks，diff 必须按 blocks 逐键比较，
+      //   否则「改了旧区块」会被误判成「没有权限变更」而无法提交审批。
+      const _beforeBlocks = (_before.blocks && typeof _before.blocks === 'object') ? _before.blocks : _before;
+      const _newBlocks = (perms.blocks && typeof perms.blocks === 'object') ? perms.blocks : {};
+      const _skipKeys = {common:1, proj_default:1, projects:1, lib_file_overrides:1, blocks:1};
+      const _seenB = {};
+      Object.keys(_beforeBlocks).concat(Object.keys(_newBlocks)).forEach(function(bid){
+        if (_seenB[bid] || _skipKeys[bid]) return; _seenB[bid] = 1;
+        const _o = (_beforeBlocks[bid]||{}).decision || 'default';
+        const _n = (_newBlocks[bid]||{}).decision || 'default';
+        const _oa = ((_beforeBlocks[bid]||{}).approvers||[]).join(',');
+        const _na = ((_newBlocks[bid]||{}).approvers||[]).join(',');
         if (_o!==_n || _oa!==_na) _changes.push({bid:bid, before:_o, after:_n});
       });
-      // ★PERM-V2-20261018（阶段 2）：新版权限区（common / proj_default / projects / 文件覆盖）
-      //   数据结构不是 {decision,approvers}，上面的比对检不出来 —— 必须单独整段比对，
-      //   否则被授权人（USR-D1）只改新版权限时会被误判成「没有权限变更」而无法提交审批。
-      ['common','proj_default','projects','lib_file_overrides'].forEach(function(sk){
+      // ★PERM-V2-20261018（阶段 2）：新版权限区（common / proj_default / projects / 文件覆盖 / 旧区块）
+      //   数据结构不是 {decision,approvers}，上面的比对检不出来 —— 必须单独整段比对。
+      ['common','proj_default','projects','lib_file_overrides','blocks'].forEach(function(sk){
         const _o = JSON.stringify(_before[sk] || {});
         const _n = JSON.stringify(perms[sk] || {});
         if (_o !== _n) _changes.push({bid:sk, before:_o, after:_n});
@@ -48414,9 +48448,10 @@ function buildWonColGroup(){
 // ===== WON-P345：签约项目 P3/P4/P5 列（50~80列）按权限隐藏 =====
 var WON_P345_COLS = (function(){ var a=[]; for(var c=53;c<=83;c++) a.push(c); return a; })();
 function wonP345Hidden(){
+  // ★PERM-CONTRACT-20261110：取消销售/观察者的职位缺省隐藏，一律按实际存储的级别
   var raw = curRawDecision('WON-P345');
-  if(!raw && typeof _isSalesPos==='function' && _isSalesPos(authUser)) return true;  // 职位缺省：销售/销售总监
-  if(!raw && typeof _isObserverPos==='function' && _isObserverPos(authUser)) return true;  // 职位缺省：观察者（预设隐藏，管理员改配置后按配置）
+  var lv = permLvNorm4(raw);
+  if (lv !== null) return (lv === 'hide');
   return normDecision(raw) === 'hide';
 }
 // ===== 货币列显隐开关（CRM/WON/LOST 三表共享；仅影响显示，数据/计算/导出完全不受影响） =====
@@ -60906,11 +60941,20 @@ var _lastPermVersion = null;
 
 // 重新拉取会话并刷新前端缓存（authUser、角色、用户名展示、当前视图）
 function reloadSession(silent){
-  // M10 安全加固：优先用 token 调 /api/session（后端核验身份），无 token 时回退 /api/me
-  var url = VAULT_TOKEN ? (API_BASE + '/api/session') : (API_BASE + '/api/me');
-  var opts = VAULT_TOKEN ? { method: 'GET', headers: { 'Authorization': 'Bearer ' + VAULT_TOKEN } } : { credentials: 'include' };
-  return fetch(url, opts)
-    .then(function(r){ return r.json(); })
+  // ★PERM-CONTRACT-20261110（根因修复）：/api/session 后端根本不存在（线上实测 404），
+  //   原实现带 VAULT_TOKEN 时永远拿不到新 perms，且整条链无 catch → 权限版本变化也不生效。
+  //   统一优先 /api/me（返回库里最新 perms），失败再兜 /api/session，并全程带 catch。
+  var _un = (authUser && authUser.username) || '';
+  var _viaMe = function(){
+    return fetch(API_BASE + '/api/me?username=' + encodeURIComponent(_un), { credentials:'include' })
+      .then(function(r){ return r.json(); });
+  };
+  var _viaSession = function(){
+    return fetch(API_BASE + '/api/session', { method:'GET', headers:{ 'Authorization':'Bearer ' + VAULT_TOKEN } })
+      .then(function(r){ return r.ok ? r.json() : null; });
+  };
+  return _viaMe()
+    .catch(function(){ return VAULT_TOKEN ? _viaSession().catch(function(){ return null; }) : null; })
     .then(function(data){
       if(data && data.user){
         authUser = data.user;
@@ -60945,7 +60989,8 @@ function reloadSession(silent){
         }
         return authUser;
       }
-    });
+    })
+    .catch(function(){ return null; });
 }
 
 // 启动权限版本轮询：服务端版本号变化时，立即刷新本地会话（被改权限用户实时更新）
