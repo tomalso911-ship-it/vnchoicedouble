@@ -41590,7 +41590,15 @@ function permLvProj(pid, key){
     if (typeof v1 === 'object') return v1.decision || 'hide';
     return v1;
   }
-  // ★PROJ-HIDE-DEF-20261019（用户要求）：全局模板已删除，未单独授权的项目模块一律「隐藏」
+  // ★PERM-TPL-ALL-20261110：单项目未显式设置 → 回退服务端下发的全局模板
+  //   （与 app.py 的 proj_default 同口径，保证旧项目/新项目、面板/运行时完全一致）。
+  var tpl = p.proj_default || {};
+  if (tpl[key] !== undefined){
+    var v2 = tpl[key];
+    if (typeof v2 === 'object') return v2.decision || 'hide';
+    return v2;
+  }
+  // ★PROJ-HIDE-DEF-20261019（用户要求）：模板也没有 → 未单独授权的项目模块一律「隐藏」
   return 'hide';
 }
 // ★PERM-V2-WHOLE-20261019（用户要求）：「整个项目：隐藏/查看」（按项目授权第一项，默认隐藏）。
@@ -45341,16 +45349,23 @@ function isFullAccessUser(u){
   var n = String((u && (u.username || u.login)) || u || '').trim().toLowerCase();
   return (window.__SUPER_USERS || ["tom","admin"]).indexOf(n) >= 0;
 }
-// ★STD-PERMS-20261107：新增用户标准权限（thuong 固化快照，与 app.py 一致）
+// ★PERM-TPL-ALL-20261110（用户 2026-11-10 三轮澄清后确认：唯一模板，禁止再分叉）
+//   模板 = thuong 账号「001」项目的按项目授权【原样】 + 审批中心 approval=编辑；
+//   与 app.py 的 PERM_TPL_PROJ 逐键一致（全站只此一份，不再写死项目 17/19）。
+//   所有普通用户 × 所有项目（旧项目 / 新建项目）一律同值；common 公用模块原样沿用。
+window.__PERM_TPL_PROJ = {
+  whole:'view', wl_daily:'edit', wl_mywork:'edit',
+  prod_A:'edit', prod_B:'edit', prod_C:'edit', prod_D:'edit',
+  prod_D_receipt:{decision:'approve', approvers:['thuong']},
+  prod_E:'edit', prod_H:'edit', prod_F:'edit',
+  inst_A:'edit', inst_B:'edit', inst_C:'edit',
+  lib:'view', contract:'view', approval:'edit'
+};
+function permTplClone(){
+  return JSON.parse(JSON.stringify(window.__PERM_TPL_PROJ || {}));
+}
+// ★STD-PERMS-20261107：新增用户标准权限（common 固化快照；projects 由模板逐项目渲染）
 (function(){
-  var E = ['contract','lib','approval','prod_A','prod_B','prod_C','prod_D','prod_E',
-           'prod_F','prod_H','inst_A','inst_B','inst_C','wl_daily','wl_mywork'];
-  function mk(over){
-    var o = {whole:'view', prod_D_receipt:{decision:'approve', approvers:['thuong']}};
-    E.forEach(function(k){ o[k] = 'edit'; });
-    Object.keys(over||{}).forEach(function(k){ o[k] = over[k]; });
-    return o;
-  }
   window.__STD_PERMS = {
     'USR-L1': {decision:'hide'}, 'USR-D1': {decision:'hide'},
     'USR-D2': {decision:'hide'}, 'USR-D3': {decision:'hide'},
@@ -45360,11 +45375,9 @@ function isFullAccessUser(u){
       lib_cost:'hide', won_btn_add:'hide', won_btn_export:'hide',
       won_row_copy:'hide', won_row_delete:'hide', won_row_edit:'hide', won_row_view:'hide'
     },
-    lib_file_overrides: {}, proj_default: {},
-    projects: {
-      '17': mk({contract:'view', lib:'view', approval:'hide'}),
-      '19': mk({})
-    }
+    lib_file_overrides: {},
+    proj_default: permTplClone(),
+    projects: {}      // ★不再写死 17/19；新用户面板按 proj_default 给每个项目渲染模板值
   };
 })();
 // 按每项 option set 取「语义最高级」，不改造级别体系
@@ -45993,7 +46006,9 @@ async function buildProjPerm(uid){
   if (_myToken !== _PROJ_RENDER_TOKEN) return;   // 已有更新的渲染，放弃本次
 
   const projHtml = list.map(function(p, _pi){
-    const store = _faEdit() ? _fullProjStore() : (st.prj[String(p.id)] || {});
+    // ★PERM-TPL-ALL-20261110：全局模板打底、单项目显式值覆盖（q10：面板值与服务端口径一致）。
+    //   新用户 st.prj 为空 → 每个项目都显示模板值，不再一片「隐藏」。
+    const store = _faEdit() ? _fullProjStore() : Object.assign({}, st.tpl || {}, st.prj[String(p.id)] || {});
     // ★BTN-LAG2：明细行只生成 HTML 字符串，展开时才插入 DOM（首屏不再建 221 个 select）
     _PROJ_HTML[String(p.id)] = _renderProjRows(String(p.id), store, 'proj');
     _PROJ_PRIOR[String(p.id)] = store;

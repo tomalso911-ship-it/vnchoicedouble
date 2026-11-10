@@ -144,17 +144,44 @@ def _is_full_perms_user(username):
     return (username or "").strip().lower() in FULL_PERMS_USERS
 
 
-# ★STD-PERMS-20261107：新增用户标准权限 = thuong 账号当前权限的固化快照
-# （14 个公共模块 + 项目 17/19；将来 thuong 被改不影响新用户；新项目默认 hide）
-_PROJ_EDIT_KEYS = ("contract", "lib", "approval", "prod_A", "prod_B", "prod_C",
-                   "prod_D", "prod_E", "prod_F", "prod_H", "inst_A", "inst_B",
-                   "inst_C", "wl_daily", "wl_mywork")
-_P17 = {k: "edit" for k in _PROJ_EDIT_KEYS}
-_P17.update({"whole": "view", "contract": "view", "lib": "view", "approval": "hide",
-             "prod_D_receipt": {"approvers": ["thuong"], "decision": "approve"}})
-_P19 = {k: "edit" for k in _PROJ_EDIT_KEYS}
-_P19.update({"whole": "view",
-             "prod_D_receipt": {"approvers": ["thuong"], "decision": "approve"}})
+# ★PERM-TPL-ALL-20261110（用户 2026-11-10 三轮澄清后确认：唯一模板，不得再分叉）
+#   模板 = thuong 账号「001」项目的按项目授权【原样】（线上 /api/users 实测快照），
+#   外加 q12「所有人 approval = 编辑」。
+#   作用范围：所有普通用户 × 所有项目（旧项目 / 新建项目 / 以后建的项目）一律同值；
+#   common（公用模块）原样沿用，绝不改；tom/admin/cuong/james 只跳过一次性回填。
+#   ★必须定义在下方 init_db() 调用之前，否则服务启动即 NameError。
+#   ★前端 choice_lite.html 的 window.__PERM_TPL_PROJ 与此处逐键一致。
+PERM_TPL_EXCLUDE_USERS = ("tom", "admin", "cuong", "james")
+PERM_TPL_MIGRATION_KEY = "sys_perm_tpl_all_20261110_v1"
+PERM_TPL_PROJ = {
+    "whole": "view",
+    "wl_daily": "edit", "wl_mywork": "edit",
+    "prod_A": "edit", "prod_B": "edit", "prod_C": "edit", "prod_D": "edit",
+    "prod_D_receipt": {"decision": "approve", "approvers": ["thuong"]},
+    "prod_E": "edit", "prod_H": "edit", "prod_F": "edit",
+    "inst_A": "edit", "inst_B": "edit", "inst_C": "edit",
+    "lib": "view", "contract": "view",
+    "approval": "edit",
+}
+
+
+def _perm_tpl_clone():
+    """深拷贝模板（绝不把同一个 dict 对象塞给多个用户/项目）。"""
+    return json.loads(json.dumps(PERM_TPL_PROJ))
+
+
+def _perm_tpl_projects(conn):
+    """当前全部签约项目 → 每个项目一份模板。"""
+    out = {}
+    try:
+        for r in conn.execute("SELECT id FROM won_projects").fetchall():
+            out[str(r["id"])] = _perm_tpl_clone()
+    except Exception:
+        pass
+    return out
+
+
+# 新增用户的【公共模块】：★用户明确要求「公用模块的授权不变，继续沿用」——保持 20261107 快照原样。
 NEW_USER_DEFAULT_PERMS = {
     "USR-L1": {"approvers": [], "decision": "hide"},
     "USR-D1": {"approvers": [], "decision": "hide"},
@@ -169,9 +196,16 @@ NEW_USER_DEFAULT_PERMS = {
         "won_row_edit": "hide", "won_row_view": "hide",
     },
     "lib_file_overrides": {},
-    "proj_default": {},
-    "projects": {"17": _P17, "19": _P19},
+    "proj_default": _perm_tpl_clone(),
+    "projects": {},      # ★由 _new_user_default_perms(conn) 按当前全部项目动态灌满
 }
+
+
+def _new_user_default_perms(conn):
+    """新用户标准权限：common 沿用固化快照；projects / proj_default 一律用唯一模板。"""
+    perms = json.loads(json.dumps(NEW_USER_DEFAULT_PERMS))
+    perms["projects"] = _perm_tpl_projects(conn)
+    return perms
 
 
 def _is_blank_perms(p):
@@ -184,6 +218,72 @@ def _is_blank_perms(p):
         if v not in ("hide", "view", None, ""):
             return False
     return True
+
+
+def _perm_tpl_ensure_user(perms, conn):
+    """新用户落库前兜底：projects 全量覆盖为「所有项目各一份模板」；
+    common / 旧区块 / lib_file_overrides 原样沿用（q6：只换 projects）。
+    前端授权面板可能未加载完（projects 空）或仍是旧缓存（只 17/19），此处统一收口。"""
+    if not isinstance(perms, dict) or _is_blank_perms(perms):
+        return _new_user_default_perms(conn)
+    perms["projects"] = _perm_tpl_projects(conn)
+    perms["proj_default"] = _perm_tpl_clone()
+    return perms
+
+
+def _migrate_perm_tpl_all(c):
+    """★PERM-TPL-ALL-20261110 一次性启动迁移（q3：全部覆盖回填 / q8：服务端启动迁移）。
+    把【所有普通用户】的 projects 全量覆盖为「每个现存项目一份模板」，proj_default 同步；
+    common / blocks / lib_file_overrides 完全不动；prod_kv 打标记，服务重启绝不重复执行。
+    q7/q9：tom/admin/cuong/james 只跳过这一次回填（新建项目自动套用仍覆盖所有人）。"""
+    import json as _json
+    try:
+        if c.execute("SELECT 1 FROM prod_kv WHERE k=?", (PERM_TPL_MIGRATION_KEY,)).fetchone():
+            return
+        pids = [str(r[0]) for r in c.execute("SELECT id FROM won_projects").fetchall()]
+        rows = c.execute("SELECT id, username, perms FROM users").fetchall()
+        n = 0
+        for r in rows:
+            uname = (r["username"] or "").strip().lower()
+            if uname in PERM_TPL_EXCLUDE_USERS:
+                continue
+            try:
+                raw = _json.loads(r["perms"]) if r["perms"] else {}
+            except Exception:
+                raw = {}
+            if not isinstance(raw, dict):
+                raw = {}
+            new_keys = ("common", "proj_default", "projects", "lib_file_overrides")
+            has_new = any(k in raw for k in new_keys)
+            blocks = raw.get("blocks") if isinstance(raw.get("blocks"), dict) else {}
+            if not has_new:
+                blocks = dict(raw)          # 旧扁平结构整体归 blocks
+            else:
+                for k, v in raw.items():
+                    if k not in new_keys and k != "blocks" and isinstance(v, dict):
+                        blocks.setdefault(k, v)
+            out = {
+                "blocks": blocks,
+                "common": raw.get("common") if isinstance(raw.get("common"), dict) else {},
+                "proj_default": _perm_tpl_clone(),
+                "projects": {pid: _perm_tpl_clone() for pid in pids},
+                "lib_file_overrides": raw.get("lib_file_overrides") if isinstance(raw.get("lib_file_overrides"), dict) else {},
+            }
+            c.execute("UPDATE users SET perms=? WHERE id=?",
+                      (_json.dumps(out, ensure_ascii=False), r["id"]))
+            try:
+                bump_perm_version(uname)
+            except Exception:
+                pass
+            n += 1
+        c.execute("INSERT OR REPLACE INTO prod_kv (k, data, updated_by, updated_at) "
+                  "VALUES (?, ?, 'system', datetime('now','localtime'))",
+                  (PERM_TPL_MIGRATION_KEY,
+                   _json.dumps({"users": n, "projects": len(pids)})))
+        print("[PERM-TPL] 一次性回填完成：%d 个用户 × %d 个项目" % (n, len(pids)))
+    except Exception as _e:
+        # 绝不因迁移失败阻断服务启动；标记未写入 → 下次启动自动重试
+        print("[PERM-TPL] 一次性回填失败（不阻断启动）: %s" % _e)
 
 
 def _is_full_access(username):
@@ -1127,6 +1227,10 @@ def init_db():
 
     # 迁移：把旧权限数据里存的审批人数字 ID 全部转换为用户名
     _migrate_approver_ids_to_usernames(c)
+
+    # ★PERM-TPL-ALL-20261110：一次性把全部普通用户的所有项目授权覆盖为 thuong「001」模板
+    #   （prod_kv 标记，只跑一次；init_db 末尾的 conn.commit() 负责落盘）
+    _migrate_perm_tpl_all(c)
 
     # ===================== 资料库文件索引表 =====================
     c.execute("""
@@ -2935,7 +3039,7 @@ def create_project():
     cur = conn.execute(sql, vals)
     new_id = cur.lastrowid
     conn.execute("UPDATE won_projects SET updated_at=datetime('now','localtime') WHERE id=?", (new_id,))
-    # ★PROJ-TPL-THUONG-20261106：新项目自动给 thuong 套用按项目授权标准（只补缺不覆盖）
+    # ★PERM-TPL-ALL-20261110：新项目自动给【所有用户】写入与 thuong「001」一致的授权（全量覆盖）
     try:
         _apply_new_project_perm_template(conn, new_id)
     except Exception as _e:
@@ -8263,6 +8367,11 @@ def api_approval_resolve(rid):
                             fa = pl.get("forgot_approvers") or ["tom"]
                             if isinstance(fa, list) and "tom" not in fa:
                                 fa.insert(0, "tom")
+                            # ★PERM-TPL-ALL-20261110：审批建号与直达建号走同一模板，
+                            #   防止前端面板未渲染完把新用户写成「没有任何项目」。
+                            _newperms = json.dumps(
+                                _perm_tpl_ensure_user(pl.get("perms") or {}, conn2),
+                                ensure_ascii=False)
                             conn2.execute("""INSERT INTO users
                                (username, password, real_name, role, position, status,
                                 vis_can_see_me, vis_he_can_see, perms, forgot_approvers, created_at)
@@ -8270,7 +8379,7 @@ def api_approval_resolve(rid):
                                 _uname, DEFAULT_INIT_PASSWORD, pl.get("name") or _uname,
                                 "user", pl.get("position") or "", "active",
                                 json.dumps(pl.get("vis_can_see_me") or []), json.dumps(pl.get("vis_he_can_see") or []),
-                                json.dumps(pl.get("perms") or {}, ensure_ascii=False),
+                                _newperms,
                                 json.dumps(fa[:3], ensure_ascii=False), time.strftime("%Y-%m-%d %H:%M:%S")))
                             if pl.get("delegate_to"):
                                 conn2.execute("UPDATE users SET delegate_to=? WHERE lower(username)=lower(?)",
@@ -8519,54 +8628,32 @@ def load_perms(conn, username):
     return _split_perms(raw)
 
 
-# ★PROJ-TPL-THUONG-20261106（用户要求）：thuong 使用独立项目、按项目授权。
-#   以后所有【新建项目】自动按此标准给 thuong 写入按项目授权（= DABACO 003 项目同款）：
-#   整个项目=显示；工作日志(每日记录报告/我的工作)=编辑；生产管理 A~H 全编辑；
-#   D区「提交收货单审核」=发起审批(审批人 thuong)；安装管理 A/B/C=编辑。
-#   只补缺、绝不覆盖该用户已有的显式设置。
-PROJ_PERM_TEMPLATE_USERS = ("thuong",)
-PROJ_PERM_TEMPLATE = {
-    "whole": "view",
-    "wl_daily": "edit", "wl_mywork": "edit",
-    "prod_A": "edit", "prod_B": "edit", "prod_C": "edit", "prod_D": "edit",
-    "prod_D_receipt": {"decision": "approve", "approvers": ["thuong"]},
-    "prod_E": "edit", "prod_H": "edit", "prod_F": "edit",
-    "inst_A": "edit", "inst_B": "edit", "inst_C": "edit",
-    # ★PROJ-TPL-LIB-20261106（用户要求）：4 资料库/合同 —— 独立项目资料、合同文档 = 查看（只读）
-    "lib": "view", "contract": "view",
-}
+# ★PERM-TPL-ALL-20261110（q11：新建项目也自动套用，和旧项目口径永远一致）
+#   模板常量只有文件顶部 PERM_TPL_PROJ 一份，此处不再另立第二份模板。
+#   q9：tom/admin/cuong/james 只跳过一次性回填；新建项目时【所有用户】一视同仁。
 
 
 def _apply_new_project_perm_template(conn, pid):
-    """新建项目时，把 PROJ_PERM_TEMPLATE 自动写入模板用户（thuong）的按项目授权。
-    已有该项目显式授权（whole 已设置）则整体跳过，绝不覆盖。"""
-    for _u in PROJ_PERM_TEMPLATE_USERS:
-        uname = (_u or "").strip().lower()
-        if not uname:
-            continue
-        row = conn.execute("SELECT id, perms FROM users WHERE lower(username)=?", (uname,)).fetchone()
-        if not row:
-            continue
+    """新建项目：给每个用户写入与 thuong「001」完全一致的按项目授权。
+    全量覆盖该 pid（不再「只补缺」），并把 proj_default 同步为模板兜底。"""
+    for row in conn.execute("SELECT id, username, perms FROM users").fetchall():
+        uname = (row["username"] or "").strip().lower()
         try:
             raw = json.loads(row["perms"]) if row["perms"] else {}
         except Exception:
             raw = {}
+        if not isinstance(raw, dict):
+            raw = {}
         st = _split_perms(raw)
-        projs = st["projects"]
-        entry = projs.get(str(pid))
-        if isinstance(entry, dict) and entry.get("whole"):
-            continue
-        entry = dict(entry) if isinstance(entry, dict) else {}
-        for k, v in PROJ_PERM_TEMPLATE.items():
-            if k not in entry:
-                entry[k] = v
-        projs[str(pid)] = entry
-        raw2 = dict(raw)
-        raw2["blocks"] = st["blocks"]
-        raw2["common"] = st["common"]
-        raw2["proj_default"] = st["proj_default"]
-        raw2["projects"] = projs
-        raw2["lib_file_overrides"] = st["lib_file_overrides"]
+        st["projects"][str(pid)] = _perm_tpl_clone()
+        st["proj_default"] = _perm_tpl_clone()
+        raw2 = {
+            "blocks": st["blocks"],
+            "common": st["common"],
+            "proj_default": st["proj_default"],
+            "projects": st["projects"],
+            "lib_file_overrides": st["lib_file_overrides"],
+        }
         conn.execute("UPDATE users SET perms=? WHERE id=?",
                      (json.dumps(raw2, ensure_ascii=False), row["id"]))
         try:
@@ -8777,10 +8864,13 @@ def api_users_create():
     vis_can_see_me = data.get("vis_can_see_me") or []
     vis_he_can_see = data.get("vis_he_can_see") or []
     perms = data.get("perms") or {}
-    # ★STD-PERMS-20261107：未显式设置权限时套用 thuong 固化快照
-    if _is_blank_perms(perms):
-        import json as _json_std
-        perms = _json_std.loads(_json_std.dumps(NEW_USER_DEFAULT_PERMS))
+    # ★PERM-TPL-ALL-20261110：所有新用户 projects = 当前全部项目各一份唯一模板；
+    #   common / 旧区块原样沿用（用户明确「公用模块不变」）。面板未加载完也有服务端兜底。
+    _tpl_conn = get_db()
+    try:
+        perms = _perm_tpl_ensure_user(perms, _tpl_conn)
+    finally:
+        _tpl_conn.close()
     forgot_approvers = data.get("forgot_approvers") or ["tom"]
     if not username or not real_name:
         return jsonify({"ok": False, "message": "姓名和账号不能为空"})
