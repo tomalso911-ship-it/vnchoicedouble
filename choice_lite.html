@@ -15631,7 +15631,18 @@ var WL_FLOW_IMG = {
           var wxFallback = prod_weatherForDate(ymdToDmy(d));
           if(!_amOk) wxFallback.am = null;
           if(!_pmOk) wxFallback.pm = null;
-          rows.push({ date:d, qty:(e.qty||0), h:h, k:k, destHouse:(e.destHouse||h), destBuildings:(e.destBuildings||[]), zone:(e.zone||''), wx:{am:wxStored.am||wxFallback.am, pm:wxStored.pm||wxFallback.pm}, recorder:(e.recorder||'') });
+          /* ★OUT-MULTI-20261110（用户 2026-11-10）：同一天同一规格可以有多条出库记录
+             （分别发往不同猪舍#栋），统一存在 outDaily[日期].lines[] 里，表格必须按 lines 逐条显示。
+             旧数据没有 lines 时按“单条”处理，保证兼容。 */
+          var _lines = (e && e.lines && e.lines.length) ? e.lines
+            : [{ seq:1, qty:((e&&e.qty)||0), dest:((e&&e.destBuildings&&e.destBuildings[0])||''), zone:((e&&e.zone)||'') }];
+          _lines.forEach(function(L, _li){
+            rows.push({ date:d, lineIdx:_li, isLine:true,
+              qty:(+((L&&L.qty)||0)||0), h:h, k:k, destHouse:((e&&e.destHouse)||h),
+              destBuildings:(L && L.dest) ? [String(L.dest)] : (((e&&e.destBuildings))||[]),
+              zone:(((L&&L.zone)||(e&&e.zone))||''),
+              wx:{am:wxStored.am||wxFallback.am, pm:wxStored.pm||wxFallback.pm}, recorder:((e&&e.recorder)||'') });
+          });
         }
         /* 兼容旧数据：曾只填过 rec.out 总数、未生成 outDaily 的记录，合成一行显示，避免下方两张表空白 */
         if(!Object.keys(outDaily).length && (+rec.out||0) > 0){
@@ -15737,9 +15748,11 @@ var WL_FLOW_IMG = {
         html+=rows.map(function(r,i){
           var dest=(r.destBuildings&&r.destBuildings.length) ? prod_phName(r.destHouse)+'#'+r.destBuildings.join(', #') : prod_phName(r.destHouse);
           var zoneLabel = r.zone ? pt('out_area_label').replace('{0}', r.zone) : pt('out_area_empty');
+          /* ★OUT-MULTI-20261110：同一天同一规格可能有多条（lines），编辑态必须再按 lineIdx 精确匹配 */
           var editing = PROD_OUT_EDIT && (
             PROD_OUT_EDIT.isNew ? !!r.isNew :
-            (!r.isNew && PROD_OUT_EDIT.date===r.date && PROD_OUT_EDIT.h===r.h && PROD_OUT_EDIT.k===r.k)
+            (!r.isNew && PROD_OUT_EDIT.date===r.date && PROD_OUT_EDIT.h===r.h && PROD_OUT_EDIT.k===r.k
+              && (PROD_OUT_EDIT.lineIdx==null || PROD_OUT_EDIT.lineIdx===r.lineIdx))
           );
           if(editing){
             var curDestVal = (r.destHouse && r.destBuildings&&r.destBuildings.length) ? (r.destHouse+'#'+r.destBuildings[0]) : '';
@@ -15769,7 +15782,7 @@ var WL_FLOW_IMG = {
               + '</td>';
           }
           var destCell = prod_outDestCellHtml(r.destHouse, r.destBuildings, r.k);
-          return '<tr class="prod-trace-row" onclick="prod_traceStockout(event,'+_jsStr(r.h)+','+_jsStr(r.k)+')" oncontextmenu="return prod_outRightDelete(event,'+_jsStr(r.date)+','+_jsStr(r.h)+','+_jsStr(r.k)+')">'
+          return '<tr class="prod-trace-row" data-line-idx="'+(r.lineIdx||0)+'" onclick="prod_traceStockout(event,'+_jsStr(r.h)+','+_jsStr(r.k)+')" oncontextmenu="return prod_outRightDelete(event,'+_jsStr(r.date)+','+_jsStr(r.h)+','+_jsStr(r.k)+','+(r.lineIdx||0)+')">'
             + '<td class="pe-col-no">'+_displayNo(i)+'</td>'
             + '<td class="pe-col-recorder">'+prod_esc(r.recorder||'')+'</td>'
             + '<td>'+prod_esc(ymdToDmy(r.date))+'</td>'
@@ -15781,7 +15794,7 @@ var WL_FLOW_IMG = {
             + '<td class="prod-out-zone">'+prod_outZoneHtml(r.zone, zoneLabel)+'</td>'
             + '<td>'+destCell+'</td>'
             + '<td>'+prod_fmtNum(r.installedQty||0)+'</td>'
-            + '<td class="pe-op-act"><button class="pe-op-ibtn pe-op-edit" type="button" data-tip="编辑" onclick="prod_outEditInline('+_jsStr(r.date)+','+_jsStr(r.h)+','+_jsStr(r.k)+')">'+PROD_OP_ICON_EDIT+'</button></td>'
+            + '<td class="pe-op-act"><button class="pe-op-ibtn pe-op-edit" type="button" data-tip="编辑" onclick="prod_outEditInline('+_jsStr(r.date)+','+_jsStr(r.h)+','+_jsStr(r.k)+','+(r.lineIdx||0)+')">'+PROD_OP_ICON_EDIT+'</button></td>'
           ;
         }).join('');
         /* 小计行 */
@@ -15873,7 +15886,15 @@ var WL_FLOW_IMG = {
           var e = outDaily[d];
           var wxStored = { am:(e.weatherAm||null), pm:(e.weatherPm||null) };
           var wxFallback = prod_weatherForDate(ymdToDmy(d));
-          rows.push({ date:d, qty:(e.qty||0), h:h, k:k, zone:(e.zone||''), destHouse:(e.destHouse||h), destBuildings:(e.destBuildings||[]), wx:{am:wxStored.am||wxFallback.am, pm:wxStored.pm||wxFallback.pm}, recorder:(e.recorder||'') });
+          /* ★OUT-MULTI-20261110：与出库记录表一致 —— 一条 outDaily 里可能有多条 lines（不同猪舍#栋），逐条成行 */
+          var _alines = (e && e.lines && e.lines.length) ? e.lines
+            : [{ seq:1, qty:((e&&e.qty)||0), dest:((e&&e.destBuildings&&e.destBuildings[0])||''), zone:((e&&e.zone)||'') }];
+          _alines.forEach(function(L){
+            rows.push({ date:d, qty:(+((L&&L.qty)||0)||0), h:h, k:k, zone:(((L&&L.zone)||(e&&e.zone))||''),
+              destHouse:((e&&e.destHouse)||h),
+              destBuildings:(L && L.dest) ? [String(L.dest)] : (((e&&e.destBuildings))||[]),
+              wx:{am:wxStored.am||wxFallback.am, pm:wxStored.pm||wxFallback.pm}, recorder:((e&&e.recorder)||'') });
+          });
         }
         /* 兼容旧数据：曾只填过 rec.out 总数、未生成 outDaily 的记录，合成一行显示，避免下方两张表空白 */
         if(!Object.keys(outDaily).length && (+rec.out||0) > 0){
@@ -16032,8 +16053,9 @@ var WL_FLOW_IMG = {
       if(!el) return;
       prod_outRowEnsureWeather(el.value, idx);
     }
-    function prod_outEditInline(date,h,k){
-      PROD_OUT_EDIT={date:date,h:h,k:k};
+    function prod_outEditInline(date,h,k,lineIdx){
+      /* ★OUT-MULTI-20261110：同一天同一规格可能有多条记录（lines），必须带上 lineIdx 才知道编辑哪一条 */
+      PROD_OUT_EDIT={date:date,h:h,k:k,lineIdx:(lineIdx==null?0:(parseInt(lineIdx,10)||0))};
       if(PROD_ACTIVE_TAB==='H') prod_renderTab('H');
       setTimeout(function(){ prod_outInitEditWeather(); prod_outFocusEdit(); }, 80);
     }
@@ -16140,8 +16162,23 @@ var WL_FLOW_IMG = {
       if(startYmd && newDateYmd && newDateYmd<startYmd){ try{ prod_toast(pt('toast_before_start')); }catch(e){} if(dateEl){ dateEl.value=ymdToDmy(startYmd); dateEl.focus(); } return; }
       var idx=prod_outFindIdx(h,k);
       var produced=(idx>=0)?(PROD_HO_MAP[idx].produced||0):0;
-      /* 汇总口径：该猪舍×规格在所有日期的出库之和，但要排除掉本行旧日期，以及目标日期上已有的旧条目（因为会被覆盖） */
-      var sumOthers=0; if(rec.outDaily){ for(var d in rec.outDaily){ if(!rec.outDaily.hasOwnProperty(d)) continue; if(d===date) continue; if(d===newDateYmd) continue; sumOthers+=(rec.outDaily[d].qty||0); } }
+      /* ★OUT-MULTI-20261110：同一天同一规格允许多条（lines）。这里只排除「正在编辑的那一条」，
+         同一天其它记录必须计入总量校验（旧逻辑排除整个日期，会让校验漏算）。 */
+      var _editLineIdx = (PROD_OUT_EDIT && PROD_OUT_EDIT.lineIdx!=null) ? (parseInt(PROD_OUT_EDIT.lineIdx,10)||0) : null;
+      var sumOthers=0;
+      if(rec.outDaily){
+        for(var d in rec.outDaily){ if(!rec.outDaily.hasOwnProperty(d)) continue;
+          var _se = rec.outDaily[d]; if(!_se || typeof _se!=='object') continue;
+          var _sl = (_se.lines && _se.lines.length) ? _se.lines
+            : [{ qty:(+_se.qty||0), dest:((_se.destBuildings&&_se.destBuildings[0])||''), zone:(_se.zone||'') }];
+          var _ssum = 0;
+          _sl.forEach(function(L){ _ssum += (+((L&&L.qty)||0)||0); });
+          if(!isNewEdit && _editLineIdx!=null && String(d)===String(newDateYmd) && _sl[_editLineIdx]){
+            _ssum -= (+((_sl[_editLineIdx]&&_sl[_editLineIdx].qty)||0)||0);   /* 去掉被编辑的那一条 */
+          }
+          sumOthers += _ssum;
+        }
+      }
       if(sumOthers+newQty>produced){
         try{ prod_toast(pt('toast_out_exceeds_produced')); }catch(err){ alert(pt('toast_out_exceeds_produced')); }
         var qe=document.getElementById('out_edit_qty'); if(qe){ qe.focus(); try{ qe.select(); }catch(e){} }
@@ -16149,12 +16186,42 @@ var WL_FLOW_IMG = {
       }
       /* 实际写入（确认超需求后也会走到这里；取消则留在编辑态重填） */
       function prod_outSaveInlineCore(){
-        if(rec.outDaily && rec.outDaily[date]) delete rec.outDaily[date];
         rec.outDaily=rec.outDaily||{};
-        var buildings=newDest?[newDest]:[];
+        /* ★OUT-MULTI-20261110（用户 2026-11-10 反馈：保存新记录会顶掉旧记录）：
+           同一天同一规格不再覆盖，改为在 outDaily[日期].lines[] 里【追加一条】；
+           只有「编辑已有记录」时才替换原来那一条。 */
+        function _outLinesOf(en){
+          if(!en || typeof en!=='object') return [];
+          if(en.lines && en.lines.length) return en.lines.slice();
+          return [{ seq:1, qty:(+en.qty||0), dest:((en.destBuildings&&en.destBuildings[0])||''), zone:(en.zone||'') }];
+        }
+        var tlines = _outLinesOf(rec.outDaily[newDateYmd]);
+        /* 编辑已有记录：先把原来那一条从它所在的日期条目里摘掉（日期可能被改过） */
+        if(!isNewEdit && _editLineIdx!=null && rec.outDaily[date]){
+          var _oe = rec.outDaily[date];
+          var _ol = _outLinesOf(_oe);
+          if(String(date)===String(newDateYmd)) tlines = _ol;   /* 同一天：在同一个列表里替换 */
+          _ol.splice(_editLineIdx,1);
+          if(_ol.length){
+            _oe.lines=_ol;
+            var _oq=0, _obs=[];
+            _ol.forEach(function(L){ _oq += (+((L&&L.qty)||0)||0); var _b=(L&&L.dest)?String(L.dest):''; if(_b && _obs.indexOf(_b)<0) _obs.push(_b); });
+            _oe.qty=_oq; _oe.destBuildings=_obs;
+            rec.outDaily[date]=_oe;
+          } else {
+            delete rec.outDaily[date];
+          }
+        }
+        tlines.push({ seq:tlines.length+1, qty:newQty, dest:newDest, zone:newZone });
+        var buildings=[], _tot=0;
+        tlines.forEach(function(L){
+          _tot += (+((L&&L.qty)||0)||0);
+          var _b=(L&&L.dest)?String(L.dest):'';
+          if(_b && buildings.indexOf(_b)<0) buildings.push(_b);
+        });
         /* 天气接口按 dmy 查询，必须转一下；之前传 ymd 导致查不到天气 */
         var wxSnap=prod_weatherForDate(ymdToDmy(newDateYmd));
-        rec.outDaily[newDateYmd]={ date:newDateYmd, lines:[{seq:1, qty:newQty, dest:newDest, zone:newZone}], qty:newQty, destHouse:newDestHouse||h, destBuildings:buildings, zone:newZone, recorder:oldRecorder, weatherAm:wxSnap.am, weatherPm:wxSnap.pm };
+        rec.outDaily[newDateYmd]={ date:newDateYmd, lines:tlines, qty:_tot, destHouse:newDestHouse||h, destBuildings:buildings, zone:newZone, recorder:oldRecorder, weatherAm:wxSnap.am, weatherPm:wxSnap.pm };
         rec.out=0; for(var d2 in rec.outDaily){ if(rec.outDaily.hasOwnProperty(d2)) rec.out+=(rec.outDaily[d2].qty||0); }
         rec.outDate=newDateYmd;
         f.houseOut[h+'|'+k]=rec; prod_save(f);
@@ -16243,29 +16310,42 @@ var WL_FLOW_IMG = {
     function prod_outCopy(date,h,k){
       var idx=prod_outFindIdx(h,k); if(idx>=0) prod_openOpModal(idx,'out',ymdToDmy(prod_today()),date);
     }
-    function prod_outDelete(date,h,k){
+    function prod_outDelete(date,h,k,lineIdx){
       if(!prod_canDeleteOutRecord()){ prod_toast(pt('toast_no_auth_del')); return; }
       if(!confirm(pt('confirm_delete_record'))) return;
-      prod_outDeleteExec(date,h,k);
+      prod_outDeleteExec(date,h,k,lineIdx);
     }
-    function prod_outRightDelete(e,date,h,k){
+    function prod_outRightDelete(e,date,h,k,lineIdx){
       /* 右键单击删除：仅 tom/cuong/james 可执行。其他人静默拦截（不提示，避免暴露机密） */
       if(e && e.preventDefault) e.preventDefault();
       if(!prod_canDeleteOutRecord()){ return false; }
-      prod_confirmAt(e, {msg: pt('confirm_delete_record'), msgKey:'confirm_delete_record', ok: pt('btn_ok'), okKey:'btn_ok', cancel: pt('btn_cancel'), cancelKey:'btn_cancel'}, function(){ prod_outDeleteExec(date,h,k); });
+      prod_confirmAt(e, {msg: pt('confirm_delete_record'), msgKey:'confirm_delete_record', ok: pt('btn_ok'), okKey:'btn_ok', cancel: pt('btn_cancel'), cancelKey:'btn_cancel'}, function(){ prod_outDeleteExec(date,h,k,lineIdx); });
       return false;
     }
-    function prod_outDeleteExec(date,h,k){
+    /* ★OUT-MULTI-20261110：同一天同一规格可能有多条记录（lines），删除只删指定那一条，
+       该日期只剩这一条时再整条删除，绝不动同一天其它记录。 */
+    function prod_outDeleteExec(date,h,k,lineIdx){
       var f=prod_get(PROD_CUR); if(!f) return;
       f.houseOut=f.houseOut||{};
       var rec=f.houseOut[h+'|'+k]||{out:0,ret:0};
-      if(rec.outDaily && rec.outDaily[date]){
+      var _e = (rec.outDaily && rec.outDaily[date]) ? rec.outDaily[date] : null;
+      if(!_e) return;
+      var _lines = (_e.lines && _e.lines.length) ? _e.lines.slice()
+        : [{ seq:1, qty:(+_e.qty||0), dest:((_e.destBuildings&&_e.destBuildings[0])||''), zone:(_e.zone||'') }];
+      var _li = (lineIdx==null) ? 0 : (parseInt(lineIdx,10)||0);
+      if(_lines.length<=1){
         delete rec.outDaily[date];
-        rec.out=0; for(var d in rec.outDaily){ if(rec.outDaily.hasOwnProperty(d)) rec.out+=(rec.outDaily[d].qty||0); }
-        f.houseOut[h+'|'+k]=rec; prod_save(f);
-        if(PROD_ACTIVE_TAB==='H') prod_renderTab('H');
-        prod_toast(pt('toast_op_saved'));
+      } else {
+        _lines.splice(_li,1);
+        var _q=0, _bs=[];
+        _lines.forEach(function(L){ _q += (+((L&&L.qty)||0)||0); var _b=(L&&L.dest)?String(L.dest):''; if(_b && _bs.indexOf(_b)<0) _bs.push(_b); });
+        _e.lines=_lines; _e.qty=_q; _e.destBuildings=_bs;
+        rec.outDaily[date]=_e;
       }
+      rec.out=0; for(var d in rec.outDaily){ if(rec.outDaily.hasOwnProperty(d)) rec.out+=(rec.outDaily[d].qty||0); }
+      f.houseOut[h+'|'+k]=rec; prod_save(f);
+      if(PROD_ACTIVE_TAB==='H') prod_renderTab('H');
+      prod_toast(pt('toast_op_saved'));
     }
     /* 出库记录内联编辑态快照：切换语言重渲染后恢复输入值与焦点，避免编辑框被重置 */
     function prod_captureOutEditState(){
