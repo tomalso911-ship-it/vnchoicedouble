@@ -6737,6 +6737,10 @@ var WL_FLOW_IMG = {
       .pe-specrow{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#fff;border:1px solid #000;border-radius:10px;padding:8px 14px;min-height:42px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
       .pe-specrow-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0;overflow:hidden;}
       .pe-specname{flex:0 0 auto;font-size:14px;font-weight:500;color:#333;}
+      /* ★SOLID-KEY-20261110（用户要求）：实心板只在尺寸文字外加「黄色框子」，绝不写任何文字。
+         同尺寸的实心板与非实心板是两个产品，靠这个黄框区分，产量分别录入。 */
+      .pe-solid{border:2px solid #f2c200 !important;border-radius:4px;padding:1px 5px;display:inline-block;line-height:1.25;box-decoration-break:clone;}
+      .pe-chip.on .pe-chip-name.pe-solid{border-color:#ffd54f !important;}
       .pe-specrow-stat{font-size:10px;font-weight:500;white-space:normal;line-height:1.2;text-align:left;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;}
       .pe-stat-demand{color:#E53935;}
       .pe-stat-prod{color:#1f6feb;}
@@ -8224,8 +8228,18 @@ var WL_FLOW_IMG = {
         // 支持一栋或多栋猪舍：1,2 / 1+2 / 1/2 / 1 2 等；这些会被识别为“共用”
         var houses = ph === '—' ? [] : ph.split(/[,，+\/、&\s]+/).filter(function(x){ return x.trim() !== ''; }).map(function(x){ return x.trim(); });
         if(!houses.length) houses = ['—'];
-        var key = (L||'?')+'×'+(W||'?')+'×'+(H||'?');
-        if(!specs[key]) specs[key] = { key:key, L:L, W:W, H:H, houses:{}, total:0 };
+        /* ★SOLID-KEY-20261110（用户 2026-11-10 明确要求）：
+           实心板与非实心板是【两个不同产品，只是尺寸相同】，必须分开列、分别录产量。
+           键 = 尺寸 + (实心板 ? 零宽字符 : '')。
+           · 用零宽字符 U+200B 而不是文字后缀 —— 显示出来仍是「1,550×600×70」，肉眼没有任何差异、
+             不出现任何文字；实心板只用「黄色外框」标识（CSS .pe-solid），符合用户「不要写出文字」的要求。
+           · 非实心板沿用原来的纯尺寸键 → 历史产量/出库/库存数据完全兼容，不需要迁移。
+           · 实心板是新增键 → 以前被合并进同尺寸的那部分数据仍算作非实心板，不会被算丢。 */
+        var _sizeTxt = (L||'?')+'×'+(W||'?')+'×'+(H||'?');
+        var _isSolid = false;
+        try{ _isSolid = !!slatsRowSolidYes(r); }catch(e){}
+        var key = _sizeTxt + (_isSolid ? '\u200b' : '');
+        if(!specs[key]) specs[key] = { key:key, L:L, W:W, H:H, size:_sizeTxt, solid:_isSolid, houses:{}, total:0 };
         houses.forEach(function(h){
           specs[key].houses[h] = (+specs[key].houses[h]||0) + qty;
           if(houseOrder.indexOf(h) < 0) houseOrder.push(h);
@@ -13585,7 +13599,8 @@ var WL_FLOW_IMG = {
           var rows = [];
           selHouses.forEach(function(hh){ var q = +detail[hh]||0; if(q>0) rows.push(prod_esc(prod_phName(hh))+'：'+prod_fmtNum(q)); });
           if(!rows.length) rows.push('—');
-          h += '<tr><td class="pe-ro-spec">'+prod_esc(s)+'</td><td class="pe-ro-detail">'+rows.join('<br>')+'</td><td class="pe-ro-subtotal">'+prod_fmtNum(line.qty[s]||0)+'</td></tr>';
+          /* ★SOLID-KEY-20261110：只读表里实心板规格名同样加黄色外框，不写文字 */
+          h += '<tr><td class="pe-ro-spec"><span'+(prod_specIsSolid(s)?' class="pe-solid"':'')+'>'+prod_esc(prod_specLabel(s))+'</span></td><td class="pe-ro-detail">'+rows.join('<br>')+'</td><td class="pe-ro-subtotal">'+prod_fmtNum(line.qty[s]||0)+'</td></tr>';
         });
         h += '</tbody></table>';
       }
@@ -13710,6 +13725,20 @@ var WL_FLOW_IMG = {
       });
       return map;
     }
+    /* ★SOLID-KEY-20261110：规格键 → 展示文本。
+       实心板的键末尾带一个零宽字符（仅用于区分数据），显示时必须剥掉，界面上只看到纯尺寸。 */
+    function prod_specLabel(s){
+      return String(s==null?'':s).replace(/\u200b/g,'');
+    }
+    /* ★SOLID-KEY-20261110：该规格键是否为实心板（实心板 = 尺寸外加黄色外框，不写文字） */
+    function prod_specIsSolid(s){
+      try{
+        var mm = prod_slatsMatrix();
+        if(mm.specs && mm.specs[s]) return !!mm.specs[s].solid;
+      }catch(e){}
+      try{ return !!slatsSizeSolidYes(prod_specLabel(s)); }catch(e){}
+      return false;
+    }
     function prod_lineAvailSpecs(line){
       /* ★ 必须与 prod_dailySpecHouses 同源（都基于 prod_slatsMatrix），否则「可选规格」与「实际渲染的猪舍输入框」会不一致，
          出现「取消某猪舍胶囊后其输入框仍在」的乱象。prod_houseSpecMap 会忽略合并空猪舍行，这里改走 slatsMatrix 保持一致。 */
@@ -13823,11 +13852,14 @@ var WL_FLOW_IMG = {
         (line.houses||[]).forEach(function(h){ realProd += ((houseSpecMap[h] && houseSpecMap[h][s]) || 0); });
         mm.houseOrder.forEach(function(h){ allProd += ((houseSpecMap[h] && houseSpecMap[h][s]) || 0); });
         var pct = houseQty>0 ? Math.min(100, Math.round(realProd/houseQty*100)) : 0;
-        var title = s+'&#10;'+pt('chip_real')+'：'+prod_fmtNum(realProd)+'/'+prod_fmtNum(houseQty)+'&#10;'+pt('chip_spec_all')+'：'+prod_fmtNum(allProd)+'/'+prod_fmtNum(total);
-        var inner = '<span class="pe-chip-name">'+prod_esc(s)+'</span>'
+        /* ★SOLID-KEY-20261110：实心板胶囊的尺寸文字加黄色外框（不写任何文字），与非实心板区分 */
+        var _solidCls = prod_specIsSolid(s) ? ' pe-solid' : '';
+        var _label = prod_specLabel(s);
+        var title = _label+'&#10;'+pt('chip_real')+'：'+prod_fmtNum(realProd)+'/'+prod_fmtNum(houseQty)+'&#10;'+pt('chip_spec_all')+'：'+prod_fmtNum(allProd)+'/'+prod_fmtNum(total);
+        var inner = '<span class="pe-chip-name'+_solidCls+'">'+prod_esc(_label)+'</span>'
           + '<span class="pe-chip-bar"><i style="width:'+pct+'%"></i></span>'
           + '<span class="pe-chip-num"><b>'+prod_fmtNum(realProd)+'</b>/'+prod_fmtNum(houseQty)+'</span>';
-        return '<span class="pe-chip pe-spec'+on+'" title="'+title+'" data-line="'+n+'" data-spec="'+prod_esc(s)+'" onclick="prod_dailySpecToggle(this,'+n+')">'+inner+'</span>';
+        return '<span class="pe-chip pe-spec'+on+_solidCls+'" title="'+title+'" data-line="'+n+'" data-spec="'+prod_esc(s)+'" onclick="prod_dailySpecToggle(this,'+n+')">'+inner+'</span>';
       }).join('');
     }
     function prod_dailyHouseStatHtml(demand, produced){
@@ -13862,6 +13894,10 @@ var WL_FLOW_IMG = {
       var hsp = prod_houseSpecProduced(prod_get(PROD_CUR));
       return keys.map(function(s){
         var sp = mm.specs[s] || {total:0, houses:{}};
+        /* ★SOLID-KEY-20261110：实心板规格名加黄色外框（不写任何文字），
+           与同尺寸的非实心板作为两行分别录入产量 */
+        var _specCls = prod_specIsSolid(s) ? ' pe-solid' : '';
+        var _specTxt = prod_specLabel(s);
         var houseQty = 0;
         (line.houses||[]).forEach(function(h){ houseQty += (+sp.houses[h]||0); });
         var producedQty = prod_producedForHousesSpec(prod_get(PROD_CUR), s, line.houses);
@@ -13893,7 +13929,7 @@ var WL_FLOW_IMG = {
             .replace('{1}', '')
             .replace('{2}', prod_fmtNum(singleProduced))
             .replace('{3}', singleLastSpan);
-          var topHtml = '<div class="pe-specrow-left"><span class="pe-specname">'+prod_esc(s)+'</span><span class="pe-specrow-stat">'+singleStatText+'</span></div>';
+          var topHtml = '<div class="pe-specrow-left"><span class="pe-specname'+_specCls+'">'+prod_esc(_specTxt)+'</span><span class="pe-specrow-stat">'+singleStatText+'</span></div>';
           var v = (detail[h]!=null) ? detail[h] : ((line.qty[s]!=null)?line.qty[s]:0);
           var inputHtml = '<input class="pe-q" type="text" inputmode="numeric" pattern="[0-9,]*" autocomplete="off" data-line="'+n+'" data-spec="'+prod_esc(s)+'" data-house="'+prod_esc(h)+'" value="'+prod_fmtNum(v)+'" oninput="prod_dailyQtyInput(this)">';
           return '<div class="pe-specrow">'+topHtml+inputHtml+'</div>';
@@ -13909,7 +13945,7 @@ var WL_FLOW_IMG = {
         var subtotalStat = prod_dailySubtotalStatHtml(totalDemandH, totalProducedH);
         var inputHtml = '<div class="pe-qty-group">'+houseInputs
           + '<div class="pe-qty-row pe-qty-subtotal"><div class="pe-qty-row-left">'+subtotalStat+'</div><div class="pe-qty-row-right"><span class="pe-qty-label">'+prod_esc(pt('subtotal'))+'</span><b>'+prod_fmtNum(line.qty[s]||0)+'</b></div></div></div>';
-        var topHtml = '<div class="pe-specrow-left"><span class="pe-specname">'+prod_esc(s)+'</span></div>';
+        var topHtml = '<div class="pe-specrow-left"><span class="pe-specname'+_specCls+'">'+prod_esc(_specTxt)+'</span></div>';
         return '<div class="pe-specrow pe-specrow-multi"><div class="pe-specrow-top">'+topHtml+'</div><div class="pe-specrow-body">'+inputHtml+'</div></div>';
       }).join('');
     }
@@ -14341,7 +14377,7 @@ var WL_FLOW_IMG = {
         var caret = '<span class="pe-fin-caret">'+(isExp?'▾':'▸')+'</span>';
         h += '<tr class="pe-fin-row'+(isExp?' pe-fin-expanded':'')+'" data-idx="'+idx+'" data-spec="'+prod_esc(s)+'" onclick="prod_finClick(event,this)">'
           + '<td class="pe-col-no">'+(idx+1)+'</td>'
-          + '<td>'+caret+prod_esc(s)+'</td>'
+          + '<td>'+caret+(prod_specIsSolid(s)?'<span class="pe-solid">'+prod_esc(prod_specLabel(s))+'</span>':prod_esc(prod_specLabel(s)))+'</td>'
           + '<td style="text-align:center">'+prod_fmtNum(sd)+'</td>'
           + '<td class="pe-col-blue" style="text-align:center"'+zc(p)+'>'+prod_fmtNum(p)+'</td>'
           + '<td class="pe-col-blue" style="text-align:center"'+zc(need)+'>'+prod_fmtNum(need)+'</td>'
@@ -14377,7 +14413,12 @@ var WL_FLOW_IMG = {
     function prod_stockOutSection(f){
       var mm = prod_slatsMatrix(); var hsp = prod_houseSpecProduced(f);
       var specKeys = Object.keys(mm.specs).sort(prod_specSortCmp);
-      function fmtSpec(k){ var sp = String(k).split('×'); return prod_esc(sp[0]||'') + ' × ' + prod_esc((sp[1]||'')+'×'+(sp[2]||'')); }
+      /* ★SOLID-KEY-20261110：实心板规格在库存表里同样加黄色外框（键里的零宽字符不显示文字） */
+      function fmtSpec(k){
+        var sp = prod_specLabel(k).split('×');
+        var _inner = prod_esc(sp[0]||'') + ' × ' + prod_esc((sp[1]||'')+'×'+(sp[2]||''));
+        return prod_specIsSolid(k) ? '<span class="pe-solid">'+_inner+'</span>' : _inner;
+      }
       function produced(h,k){ return (hsp[h] && hsp[h][k]) || 0; }
       var byHouse = [];
       mm.houseOrder.forEach(function(h){ if(h==='—') return; specKeys.forEach(function(k){ var dh = mm.specs[k].houses[h]; if(dh==null) return; byHouse.push({ h:h, k:k, demand:dh, produced:produced(h,k), gap:dh-produced(h,k) }); }); });
@@ -14443,7 +14484,7 @@ var WL_FLOW_IMG = {
           var rowDone = (!disabled && r.demand > 0 && out === r.demand && actualStock === 0);
           var rowCls = []; if(isLast) rowCls.push('pe-group-end'); if(rowDone) rowCls.push('pe-row-done');
           var trAttr = (rowCls.length ? ' class="'+rowCls.join(' ')+'"' : '') + ' data-h="'+prod_esc(r.h)+'" data-k="'+prod_esc(r.k)+'"';
-          PROD_HO_MAP[idx] = { key:key, h:r.h, k:r.k, produced:r.produced, demand:r.demand, label:prod_phName(r.h)+' / '+fmtSpec(r.k) };
+          PROD_HO_MAP[idx] = { key:key, h:r.h, k:r.k, produced:r.produced, demand:r.demand, label:prod_phName(r.h)+' / '+prod_specLabel(r.k) };
           var hStat = houseStat[r.h] || {total:0, done:0};
           var houseDone = (hStat.total>0 && hStat.done===hStat.total);
           var houseCell = isFirst ? '<td class="pe-col-no pe-group-end" rowspan="'+houseSize[r.h]+'">'+r.seq+'</td><td class="pe-group-end pe-house-cell'+(houseDone?' pe-house-done':'')+'"'+(houseDone?' style="color:#1E90FF;font-weight:700;text-shadow:0 0 1px rgba(0,0,0,.35)"':'')+' data-house-cell="'+prod_esc(r.h)+'" rowspan="'+houseSize[r.h]+'">'+prod_esc(prod_phName(r.h))+'</td>' : '';
