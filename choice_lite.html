@@ -15256,6 +15256,14 @@ var WL_FLOW_IMG = {
         return;
       }
       body.innerHTML=prod_outRenderAreaDist(f);
+      /* ★BLDG-FIT-20261110：弹窗里的方格子同样要等高自适应（弹窗展开/最大化后宽度会变，二次校正） */
+      try{
+        if(typeof inst_bldgFitHeights==='function'){
+          setTimeout(inst_bldgFitHeights, 0);
+          setTimeout(inst_bldgFitHeights, 150);
+          setTimeout(inst_bldgFitHeights, 400);
+        }
+      }catch(e){}
       prod_outScrollJumpIntoView();
     }
     /* 点击表格分析里的「出库后移动至猪舍」跳进来后，把被黑圈高亮的卡片滚动到可视区域 */
@@ -19589,7 +19597,10 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-ana-li .inst-ana-li{}
       .inst-ana-b em{font-style:normal;color:#E53935;font-weight:600;}
       .inst-bldg-wrap{display:flex;flex-wrap:wrap;gap:4px;}
-      .inst-bldg{width:64px;min-height:68px;padding:18px 4px 20px;background:#f4f6f2;border:1px solid #d6dcd2;border-radius:6px;font-size:11px;line-height:1.25;text-align:center;cursor:pointer;user-select:none;box-sizing:border-box;display:flex;align-items:flex-end;justify-content:center;word-break:break-word;position:relative;}
+      /* ★BLDG-FIT-20261110（用户 2026-11-10）：顶部预留 28px —— 角标(1→10) + 进度条(11→16) + 百分比(18→26) 三层，
+         房舍名从 28px 起排，语言切换/长名字换行时不会再和上面的文字压在一起。
+         高度由脚本 inst_bldgFitHeights() 统一按「最需要的那一格」设置，保证同一区所有格子等高。 */
+      .inst-bldg{width:64px;min-height:68px;padding:28px 4px 20px;background:#f4f6f2;border:1px solid #d6dcd2;border-radius:6px;font-size:11px;line-height:1.25;text-align:center;cursor:pointer;user-select:none;box-sizing:border-box;display:flex;align-items:flex-end;justify-content:center;word-break:break-word;position:relative;}
       .inst-bldg:hover{border-color:#E53935;}
       .inst-bldg-sel{outline:3px solid #E53935;outline-offset:1px;}
       .inst-bldg-sel::after{content:'✓';position:absolute;top:2px;right:3px;font-size:13px;line-height:1;font-weight:bold;}
@@ -19617,7 +19628,7 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-bldg.ins-before::before{left:-4px;}
       .inst-bldg.ins-after::before{right:-4px;}
       /* 出库记录「查看区域分布」模态框专用卡片：与截图一致，标签+百分比置顶、房舍名置底 */
-      .inst-bldg-modal{width:86px;min-height:68px;padding:24px 3px 6px;border-radius:6px;}
+      .inst-bldg-modal{width:86px;min-height:68px;padding:28px 3px 8px;border-radius:6px;}
       .inst-bldg-modal .inst-bldg-corner{font-size:8px;white-space:nowrap;}
       .inst-bldg-modal .inst-bldg-name-wrap{font-size:12px;font-weight:600;line-height:1.25;text-align:center;width:100%;}
       /* 从表格分析跳转进来时，用黑圈圈出对应房舍卡片，便于一眼识别 */
@@ -76666,8 +76677,36 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       });
       h += '</div></div>';
     }
+    /* ★BLDG-FIT-20261110（用户 2026-11-10）：渲染完立刻按内容量一次高度，同一区所有格子取最大值等高 */
+    try{ setTimeout(inst_bldgFitHeights, 0); setTimeout(inst_bldgFitHeights, 160); }catch(e){}
     return h;
   }
+  /* ★BLDG-FIT-20261110：方格子高度自适应（语言切换 / 房舍名长短 / 换行行数都会变）。
+     规则：逐个量「内容自然高度」，同一个 .inst-bldg-wrap 内取最大值，再统一写给所有格子 ——
+     这样整片格子永远等高对齐；内容最少的那格只会多留白，绝不会再压字。
+     只在容器可见（量得到高度）时才写死高度，隐藏容器（模态框未展开）保持 auto，展开后再次调用即可。 */
+  function inst_bldgFitHeights(root){
+    try{
+      var scope = root || document;
+      var wraps = scope.querySelectorAll ? scope.querySelectorAll('.inst-bldg-wrap') : [];
+      for(var w=0; w<wraps.length; w++){
+        var els = wraps[w].querySelectorAll('.inst-bldg');
+        if(!els || !els.length) continue;
+        var max = 0, i, measurable = false;
+        for(i=0;i<els.length;i++){
+          els[i].style.height = 'auto';
+          els[i].style.minHeight = '0px';
+          var hh = els[i].offsetHeight || 0;
+          if(hh > 0) measurable = true;
+          if(hh > max) max = hh;
+        }
+        if(!measurable){ for(i=0;i<els.length;i++){ els[i].style.height=''; els[i].style.minHeight=''; } continue; }
+        if(max < 68) max = 68;                 /* 与 CSS min-height 一致，短名字也不缩成小条 */
+        for(i=0;i<els.length;i++){ els[i].style.height = max + 'px'; }
+      }
+    }catch(e){}
+  }
+  try{ window.inst_bldgFitHeights = inst_bldgFitHeights; }catch(e){}
   function inst_generateLayout(){
     var f = inst_get(INST_CUR);
     if(!inst_isLayoutComplete(f)){ prod_toast(it('inst_gen_layout_incomplete')); return; }
