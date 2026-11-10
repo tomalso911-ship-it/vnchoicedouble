@@ -19650,6 +19650,8 @@ var PROD_EQUIP_FAULT_KB = {
       .inst-bldg-tip-spec.warn .inst-bldg-tip-s,
       .inst-bldg-tip-spec.warn .inst-bldg-tip-k,
       .inst-bldg-tip-spec.warn .inst-bldg-tip-v{color:#ff6b6b !important;}
+      /* ★TIP-ZERO-20261110（用户 2026-11-10）：数值为 0 时不要变红 —— 0 不是异常，保持正常白色 */
+      .inst-bldg-tip .inst-bldg-tip-v.z{color:#ffffff !important;}
       .inst-bldg-tip-s{font-weight:600;margin-bottom:3px;}
       .inst-bldg-tip-row{display:flex;justify-content:space-between;gap:8px;margin:1px 0;}
       .inst-bldg-tip-k{color:rgba(255,255,255,.75);}
@@ -76105,13 +76107,44 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     /* ★SOLID-TIP-20261110：猪舍概览浮窗里的「规格：<尺寸>」也要按【这一条规格键】标实心板黄框（.pe-solid）。
        判定只认精确键（含零宽标识的实心板键）；矩阵里查不到就一律不框，绝不退回“按尺寸”判断
        —— 否则同尺寸的非实心板会被一起框上，就是之前反馈的那个问题。 */
+    /* ★SOLID-TIP-20261110c（用户 2026-11-10 反馈“浮窗里实心板还是没框”）：
+       根因——本浮窗会被【安装模块】调用，那时 PROD_CUR 可能不是当前项目（甚至是空的），
+       prod_slatsMatrix() 拿到的是别的项目/空的规格矩阵 → 查不到这个规格键 → 一律不框。
+       修法：用浮窗自己的工厂 f 的项目 id 临时切 PROD_CUR 取矩阵（同 inst_demandMapSafe 的做法），
+       整块只取一次并缓存；仍查不到时按“显示尺寸”精确匹配唯一键，多个同尺寸键视为歧义 → 不框，
+       绝不退回“同尺寸任一 YES 就框”的旧规则。 */
+    var _tipMM = null, _tipMMDone = false;
+    var _tipMMGet = function(){
+      if(_tipMMDone) return _tipMM;
+      _tipMMDone = true;
+      try{
+        if(typeof prod_slatsMatrix !== 'function') return null;
+        var saved = (typeof PROD_CUR !== 'undefined') ? PROD_CUR : undefined;
+        var pid = (f && f.id != null) ? f.id : null;
+        if(pid != null && typeof PROD_CUR !== 'undefined' && String(saved) !== String(pid)){
+          PROD_CUR = pid;
+          try{ _tipMM = prod_slatsMatrix(); } finally { PROD_CUR = saved; }
+        } else {
+          _tipMM = prod_slatsMatrix();
+        }
+      }catch(e){ _tipMM = null; }
+      return _tipMM;
+    };
     var _tipSolid = function(sp){
       try{
-        var mm = (typeof prod_slatsMatrix === 'function') ? prod_slatsMatrix() : null;
+        var mm = _tipMMGet();
         if(mm && mm.specs){
           if(mm.specs[sp]) return !!mm.specs[sp].solid;
           var _k2 = String(sp) + '\u200b';
           if(mm.specs[_k2]) return !!mm.specs[_k2].solid;
+          /* 键写法不一致时：按“显示尺寸”找同名键，只有唯一一个才采信 */
+          var _want = (typeof prod_specLabel === 'function') ? prod_specLabel(sp) : String(sp);
+          var _hit = null, _cnt = 0;
+          for(var _k in mm.specs){ if(!mm.specs.hasOwnProperty(_k)) continue;
+            var _lbl = (typeof prod_specLabel === 'function') ? prod_specLabel(_k) : _k;
+            if(_lbl === _want){ _cnt++; _hit = _k; }
+          }
+          if(_cnt === 1) return !!mm.specs[_hit].solid;
           return false;
         }
       }catch(e){}
@@ -76213,7 +76246,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       + tipRow(it('inst_lbl_uninstalled'), Math.max(0, projDemand - projInstalled))
       + (hideBtns ? '' : '<button type="button" class="inst-bldg-tip-btn" onclick="inst_quickInstallEntry(\''+_codeQ+'\',\''+_idxQ+'\')">'+prod_esc(it('inst_btn_quick_install'))+'</button>')
       + (hideBtns ? '' : specBtnsInstall);
-    return '<div class="inst-bldg-tip-title">'+prod_esc(label)+'</div>'
+    var _tipHtml = '<div class="inst-bldg-tip-title">'+prod_esc(label)+'</div>'
       + '<div class="inst-bldg-tip-body">'
       + '<div class="inst-bldg-tip-col">'+leftRows+'</div>'
       + '<div class="inst-bldg-tip-col">'+rightRows+'</div>'
@@ -76221,6 +76254,13 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       + '<div class="inst-bldg-tip-col">'+projShipRows+'</div>'
       + '<div class="inst-bldg-tip-col">'+projInstallRows+'</div>'
       + '</div>';
+    /* ★TIP-ZERO-20261110（用户 2026-11-10）：数值为 0 时不要变红。
+       缺货块（.inst-bldg-tip-spec.warn）会把整块数值染红，0 看起来像“报警”，
+       这里给所有值为 0 的数字加 z 标记，CSS 里强制回白色。 */
+    try{
+      _tipHtml = _tipHtml.replace(/<span class="inst-bldg-tip-v">\s*0\s*<\/span>/g, '<span class="inst-bldg-tip-v z">0</span>');
+    }catch(e){}
+    return _tipHtml;
   }
   /* ★ 规格 ↔「录入：<规格>」按钮 双向高亮：悬停任一处，提示框内该规格的所有块与按钮一起高亮。
      规格字符串做归一化比较，兼容 '1,550×525×70' / '1550×525×70' 这类写法差异。 */
