@@ -122,6 +122,14 @@ def main() -> int:
     if html.count("slatsSolidNow(") < 6:
         problems.append("⑨ slatsSolidNow 调用点少于 6 处（覆盖不全）")
 
+    # ⑪ 一个格子只能有一个黄框（用户 2026-11-10 反馈：实心板出现两层黄框 + 非实心板同尺寸被误框）
+    #    · 扫到「渲染层已按行/按键判定过」的位置（data-solid-managed / .pe-solid）必须直接跳过；
+    #    · 猪舍概览浮窗 .inst-bldg-tip 整块不参与按尺寸包框。
+    need(html, "[data-solid-managed],.pe-solid,.slats-solid-box",
+         "⑪ 扫描器没有跳过已按行判定的格子（会叠出两层黄框 / 误框非实心板）")
+    need(html, ".inst-bldg-tip,.pe-specchips",
+         "⑪ 猪舍概览浮窗没有被排除在按尺寸包框之外（非实心板会冒出黄框）")
+
     # ⑩ 导出 xlsx：前端按钮 + 三语 key + 后端黄色加粗边框
     need(html, "function exportSlatsSpecXlsx(){", "⑩ 导出函数被删")
     need(html, "onclick=\"exportSlatsSpecXlsx()\"", "⑩ 导出按钮被删")
