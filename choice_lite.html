@@ -6018,6 +6018,16 @@ var WL_FLOW_IMG = {
       .pc-labor-hist .pc-col-period{width:44px;white-space:normal;word-break:normal;line-height:1.15;text-align:center;vertical-align:middle;}
       .pc-labor-hist th.pc-col-period{white-space:normal;line-height:1.15;}
       .pc-labor-hist .pc-col-rec{width:44px;}
+      /* ★CURCOLOR-20261110：三币种配色 —— RMB 蓝 / USD 红 / VND 绿（表格文字与只读输入框统一） */
+      .cur-rmb{color:#1565C0 !important;}
+      .cur-usd{color:#C62828 !important;}
+      .cur-vnd{color:#2E7D32 !important;}
+      /* 注意：必须 !important —— 后面的 .rc-col input{color:#333} / input[readonly]{color:#555} 会覆盖普通选择器 */
+      .rc-col.rc-col-pv input,.rc-col.rc-col-sv input{color:#2E7D32 !important;}
+      .rc-col.rc-col-pr input,.rc-col.rc-col-sr input{color:#1565C0 !important;}
+      .rc-col.rc-col-pu input,.rc-col.rc-col-su input{color:#C62828 !important;}
+      /* 单价是系统默认价时保留灰色提示（表示自动带出，未人工改过） */
+      .rc-col.rc-col-pv input.prod-def-input{color:#999 !important;}
       .pc-labor-hist .pc-col-role{width:50px;}
       .pc-labor-hist .pc-col-total{width:46px;}
       .pc-labor-hist .pc-col-dsub{width:64px;white-space:nowrap;text-align:center;vertical-align:middle;font-size:11px;}
@@ -11511,8 +11521,34 @@ var WL_FLOW_IMG = {
         }
       }
       if(s.charAt(0)==='.') s = '0' + s;
+      /* ★QTY2-20261110：用户要求「数量只允许小数点后面两位」，这里统一截到 2 位（单价/金额同理） */
+      var _dp = s.split('.');
+      if(_dp.length > 1 && _dp[1].length > 2) s = _dp[0] + '.' + _dp[1].slice(0,2);
       return s;
     }
+    /* ★QTY2-20261110：数量求和/显示统一两位小数，去掉 3862.02999999999997 这类浮点尾巴 */
+    function prodRound2(n){
+      var v = Number(n);
+      if(!isFinite(v)) return 0;
+      return Math.round((v + (v >= 0 ? 1 : -1) * 1e-9) * 100) / 100;
+    }
+    function prodQtyTxt(n){
+      var v = prodRound2(n);
+      if(!v) return '0';
+      var p = v.toFixed(2).split('.');
+      var ip = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      var dp = p[1].replace(/0+$/, '');
+      return dp ? (ip + '.' + dp) : ip;
+    }
+    /* ★CURCOLOR-20261110：三币种配色（便于阅读）—— RMB 蓝 / USD 红 / VND 绿 */
+    var CUR_COLOR = { RMB:'#1565C0', USD:'#C62828', VND:'#2E7D32' };
+    function curSpan(html, cur){
+      var c = CUR_COLOR[cur] || CUR_COLOR.VND;
+      return '<span class="cur-'+String(cur||'VND').toLowerCase()+'" style="color:'+c+'">'+html+'</span>';
+    }
+    /* 金额 → 带币种颜色的 span（用于表格/文本里的金额；input 的 value 里不要用） */
+    function prodMoneySpan(num, cur){ return curSpan(prod_esc(prodFormatMoney(num, cur)), cur); }
+    function prodMoneySpanDec(num, cur){ return curSpan(prod_esc(prodFormatMoneyDec(num, cur)), cur); }
     /* 带千位分隔符，但保留用户输入的小数位（12.5 → 12.5；1234.5 → 1,234.5；12. → 12.） */
     function prodRcFmtDec(v){
       var s = prodRcSanitizeNum(v);
@@ -12050,12 +12086,12 @@ var WL_FLOW_IMG = {
         var subV=pv*qv; totV+=subV; totR+= r.rmb? subV/r.rmb:0; totU+= r.usd? subV/r.usd:0;
         if(qv){ byUnit[row.unit]=(byUnit[row.unit]||0)+qv; }
       });
-      var unitTxt=Object.keys(byUnit).map(function(u){ return prodRcTr('unit', u)+'：'+(+byUnit[u].toFixed(3)); }).join('，');
+      var unitTxt=Object.keys(byUnit).map(function(u){ return prodRcTr('unit', u)+'：'+prodQtyTxt(byUnit[u]); }).join('，');
       tf.innerHTML = '<div class="rc-foot-main"><span class="rc-foot-unit">'+prod_esc(unitTxt)+'</span>'
         + '<span class="rc-foot-tot"><span data-i18n="lbl_total">'+pt('lbl_total')+'</span>： '
-        + prod_esc(prodFormatMoney(totV,'VND')) + ' / '
-        + prod_esc(prodFormatMoney(totR,'RMB')) + ' / '
-        + prod_esc(prodFormatMoney(totU,'USD')) + '</span></div>';
+        + prodMoneySpan(totV,'VND') + ' / '
+        + prodMoneySpan(totR,'RMB') + ' / '
+        + prodMoneySpan(totU,'USD') + '</span></div>';
     }
     /* 规格编辑（铅笔）：保存至 localStorage，按材料名持久化 */
     function prodRcEditSpecs(idx){
@@ -12499,7 +12535,7 @@ var WL_FLOW_IMG = {
         var pv=parseFloat(String(rw.priceVnd).replace(/[^0-9.\-]/g,''))||0;
         var qv=parseFloat(String(rw.qty).replace(/[^0-9.\-]/g,''))||0;
         var subV=pv*qv;
-        return {material:rw.material, spec:rw.spec, unit:rw.unit, priceVnd:pv, qty:qv, note:rw.note||'', noteTr:rw.noteTr||{zh:'',en:'',vi:''},
+        return {material:rw.material, spec:rw.spec, unit:rw.unit, priceVnd:pv, qty:prodRound2(qv), note:rw.note||'', noteTr:rw.noteTr||{zh:'',en:'',vi:''},
           subVnd:Math.round(subV), subRmb: r.rmb? +(subV/r.rmb).toFixed(2):0, subUsd: r.usd? +(subV/r.usd).toFixed(2):0 };
       });
       // 未勾选地板规格时不再阻断提交：若该工厂有可用规格则自动全选，保证收货单一定能提交成功
@@ -12640,10 +12676,10 @@ var WL_FLOW_IMG = {
         var subU = (+rw.subUsd||0) || (rates.usd ? +(subV / rates.usd).toFixed(2) : 0);
         totalV += subV; totalR += subR; totalU += subU; totalQ += (+rw.qty||0);
         return '<tr><td>'+prod_esc(prodRcTr('mat', rw.material))+'</td><td>'+prod_esc(prodRcSpecDisplay(rw.material, rw.spec))+'</td><td>'+prod_esc(prodRcTr('unit', rw.unit))+'</td>'
-          + '<td>'+prod_esc(prodFormatMoney(rw.priceVnd,'VND'))+'</td><td>'+prod_esc(prodFormatMoney(subV,'VND'))+'</td><td>'+prod_esc(prodFormatMoney(subR,'RMB'))+'</td><td>'+prod_esc(prodFormatMoney(subU,'USD'))+'</td>'
-          + '<td>'+prod_esc(rw.qty)+'</td><td>'+prod_esc(prodRcNoteVal(rw))+'</td></tr>';
+          + '<td>'+prodMoneySpan(rw.priceVnd,'VND')+'</td><td>'+prodMoneySpan(subV,'VND')+'</td><td>'+prodMoneySpan(subR,'RMB')+'</td><td>'+prodMoneySpan(subU,'USD')+'</td>'
+          + '<td>'+prod_esc(prodQtyTxt(rw.qty))+'</td><td>'+prod_esc(prodRcNoteVal(rw))+'</td></tr>';
       }).join('');
-      var totalRow = '<tr class="rc-total"><td colspan="4"><b data-i18n="thr_total2">'+pt('thr_total2')+'</b></td><td><b>'+prod_esc(prodFormatMoney(totalV,'VND'))+'</b></td><td><b>'+prod_esc(prodFormatMoney(totalR,'RMB'))+'</b></td><td><b>'+prod_esc(prodFormatMoney(totalU,'USD'))+'</b></td><td><b>'+prod_esc(totalQ)+'</b></td><td></td></tr>';
+      var totalRow = '<tr class="rc-total"><td colspan="4"><b data-i18n="thr_total2">'+pt('thr_total2')+'</b></td><td><b>'+prodMoneySpan(totalV,'VND')+'</b></td><td><b>'+prodMoneySpan(totalR,'RMB')+'</b></td><td><b>'+prodMoneySpan(totalU,'USD')+'</b></td><td><b>'+prod_esc(prodQtyTxt(totalQ))+'</b></td><td></td></tr>';
       var _ph=(r.photos||[]).map(function(p){return '<a href="/uploads/'+encodeURIComponent(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;"><img src="/uploads/'+encodeURIComponent(p)+'" class="thumb"></a>';}).join('');
       return '<div class="receipt-card'+(r.status==='confirmed'?' confirmed':'')+'"'+cardStyle+'>'
         + collapseBtn
@@ -18959,6 +18995,11 @@ var PROD_EQUIP_FAULT_KB = {
         }
       } catch(e){}
       try { applyRcNoteLang(); } catch(e){}
+      /* ★RC-LABEL-LANG-20261110：收货明细每行的列标签是 L() 现场拼出来的，切语言必须整行重渲染，
+         否则会出现「备注」仍显示英文 Note 等不跟随的问题（数据都在 prodRcRows 里，重渲染不丢输入） */
+      try {
+        if (document.getElementById('pd_rows') && typeof prodReceiptRenderRows === 'function') prodReceiptRenderRows();
+      } catch(e){ console.warn('[lang] rc rows:', e); }
       // 内联报告展开时：表格/图表/按钮文案跟随系统语言切换（防抖合并多次触发）
       try {
         if (PROD_REPORT_OPEN && document.getElementById('prod_report_body')) {
@@ -47336,8 +47377,8 @@ function prodApprReceiptHtml(pl){
       + '<td>'+prod_esc(prodRcTr('mat', rw.material))+'</td>'
       + '<td><input id="apr_rc_'+i+'_spec" value="'+prod_esc((typeof prodRcSpecDisplay==='function')?prodRcSpecDisplay(rw.material, rw.spec):rw.spec)+'" style="width:90px"></td>'
       + '<td>'+prod_esc(prodRcTr('unit', rw.unit))+'</td>'
-      + '<td><input id="apr_rc_'+i+'_price" value="'+prod_esc(rw.priceVnd)+'" style="width:80px" oninput="prodApprReceiptRecompute()"></td>'
-      + '<td><input id="apr_rc_'+i+'_qty" value="'+prod_esc(rw.qty)+'" style="width:70px" oninput="prodApprReceiptRecompute()"></td>'
+      + '<td><input id="apr_rc_'+i+'_price" value="'+prod_esc(rw.priceVnd)+'" style="width:80px;color:#2E7D32" oninput="prodApprReceiptRecompute()"></td>'
+      + '<td><input id="apr_rc_'+i+'_qty" value="'+prod_esc(prodQtyTxt(rw.qty))+'" style="width:70px" oninput="prodApprReceiptRecompute()"></td>'
       + '<td id="apr_rc_'+i+'_sv" style="text-align:right"></td>'
       + '<td id="apr_rc_'+i+'_sr" style="text-align:right"></td>'
       + '<td id="apr_rc_'+i+'_su" style="text-align:right"></td>'
@@ -47367,13 +47408,13 @@ function prodApprReceiptRecompute(){
     var pqEl=document.getElementById('apr_rc_'+i+'_qty'); var pq=parseFloat(String((pqEl?pqEl.value:'0')||'').replace(/[^0-9.\-]/g,''))||0;
     var subV=pv*pq; var subR=r.rmb?subV/r.rmb:0; var subU=r.usd?subV/r.usd:0;
     totV+=subV; totR+=subR; totU+=subU;
-    var sv=document.getElementById('apr_rc_'+i+'_sv'); if(sv) sv.textContent=subV?prodFormatMoney(subV,'VND'):'';
-    var sr=document.getElementById('apr_rc_'+i+'_sr'); if(sr) sr.textContent=subR?prodFormatMoney(subR,'RMB'):'';
-    var su=document.getElementById('apr_rc_'+i+'_su'); if(su) su.textContent=subU?prodFormatMoney(subU,'USD'):'';
+    var sv=document.getElementById('apr_rc_'+i+'_sv'); if(sv) sv.innerHTML=subV?prodMoneySpan(subV,'VND'):'';
+    var sr=document.getElementById('apr_rc_'+i+'_sr'); if(sr) sr.innerHTML=subR?prodMoneySpan(subR,'RMB'):'';
+    var su=document.getElementById('apr_rc_'+i+'_su'); if(su) su.innerHTML=subU?prodMoneySpan(subU,'USD'):'';
   }
-  var tv=document.getElementById('apr_rc_total_v'); if(tv) tv.textContent=prodFormatMoney(totV,'VND');
-  var tr=document.getElementById('apr_rc_total_r'); if(tr) tr.textContent=prodFormatMoney(totR,'RMB');
-  var tu=document.getElementById('apr_rc_total_u'); if(tu) tu.textContent=prodFormatMoney(totU,'USD');
+  var tv=document.getElementById('apr_rc_total_v'); if(tv) tv.innerHTML=prodMoneySpan(totV,'VND');
+  var tr=document.getElementById('apr_rc_total_r'); if(tr) tr.innerHTML=prodMoneySpan(totR,'RMB');
+  var tu=document.getElementById('apr_rc_total_u'); if(tu) tu.innerHTML=prodMoneySpan(totU,'USD');
 }
 function prodApprReceiptResolve(id, action){
   var x = APPROVAL_BY_ID[id]; if(!x) return;
