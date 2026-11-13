@@ -64849,7 +64849,9 @@ function submitAuth() {
                      bldgs:(Number(s.bldgs)>0?Number(s.bldgs):1),
                      hole:(String(s.hole||'').trim().toUpperCase()==='YES')?'YES':'NO',
                      price:Number(s.price)||0,
-                     remark:String(s.remark==null?'':s.remark) };
+                     remark:String(s.remark==null?'':s.remark),
+                     /* ★CC-OPCELL-20261113：分组号（复制/合并产生的组）必须持久化，否则刷新后分组散开 */
+                     gid:(s.gid===null||s.gid===undefined)?'':s.gid };
           });
         } else if(d0.blocks !== undefined || d0.area !== undefined){
           base.demand.specs = [{ len:0, wid:0, hei:0, qty:Number(d0.blocks)||0, layers:2, nl:0, dl:0, nw:0, dw:0, nl2:0, rL2:'', nw2:0, rW2:'', d2mod:0, larea:Number(d0.area)||0, solid:'NO' }];
@@ -65039,6 +65041,12 @@ function submitAuth() {
       /* 钢筋单元格：mm 数值 + 小号 φ 下拉并排 */
       '.ccg-cell2>span{font-size:9px;margin-right:1px;}',
       '.ccg-cell2 .ccg-sel{width:30px;font-size:8px;}',
+      /* ★CC-OPCELL-20261113：操作列三个按钮固定收在格内（flex 居中 + 15×15 紧凑按钮，图标 11px） */
+      '.ccg-tb td.ccg-op{padding:0 1px !important;overflow:hidden;}',
+      '.ccg-acts{display:flex;align-items:center;justify-content:center;gap:2px;width:100%;overflow:hidden;}',
+      '.ccg-acts .cc-icn{width:15px;height:15px;min-width:15px;padding:0;margin:0;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;}',
+      '.ccg-acts .cc-icn svg{width:11px;height:11px;}',
+      '.ccg-acts .ccg-btn-merge{background:#fff;}',
       '.ccg-idx{font-weight:700;font-size:9px;}',
       '.ccg-info{display:block;color:#1a56b0;font-size:8px;line-height:1;cursor:default;}',
       '.ccg-modal-mask{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:99999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px;}',
@@ -65493,6 +65501,7 @@ function submitAuth() {
   function ccGridRowDef(){
     var d = ccSpecDef();
     d.house = ''; d.code = ''; d.units = 1; d.bldgs = 1; d.hole = 'NO'; d.price = 0; d.remark = '';
+    d.gid = ''; // 空 = 按字段值自动成组（新增行默认独立一组）
     return d;
   }
   /* ---- 列显隐开关（8 组，与规格表一致；存 localStorage，切换后整表重建） ---- */
@@ -65555,25 +65564,56 @@ function submitAuth() {
     return [String(sp.house || ''), String(sp.code || ''), ccRowUnits(sp), ccRowBldgs(sp),
       Number(sp.len) || 0, Number(sp.wid) || 0, Number(sp.hei) || 0].join('|');
   }
+  /* ★CC-OPCELL-20261113：引入分组号 gid（与规格表 data-slats-group 同一套语义）
+     · 有 gid → 按 gid 成组（复制出来的行即使数值相同也独立成组）
+     · 无 gid（历史数据）→ 退回「按字段值连续相同」成组，视觉完全不变 */
+  function ccGridGid(sp){
+    if(sp && sp.gid !== null && sp.gid !== undefined && String(sp.gid) !== '') return 'g' + sp.gid;
+    return 'v' + ccGridGroupKey(sp);
+  }
   function ccGridGroups(specs){
     var out = [], cur = null;
     specs.forEach(function(sp, i){
-      var k = ccGridGroupKey(sp);
+      var k = ccGridGid(sp);
       if(!cur || cur.key !== k){ cur = { key:k, rows:[i] }; out.push(cur); }
       else cur.rows.push(i);
     });
     return out;
+  }
+  function ccGridGroupEnd(list, i){
+    var k = ccGridGid(list[i]), e = i;
+    while(e + 1 < list.length && ccGridGid(list[e + 1]) === k) e++;
+    return e;
+  }
+  function ccGridNewGid(){
+    var mx = 0;
+    ((CC_DATA && CC_DATA.demand && CC_DATA.demand.specs) || []).forEach(function(s){ var n = Number(s && s.gid); if(n > mx) mx = n; });
+    return mx + 1;
+  }
+  /* 把当前行所在的整组打上同一个 gid（历史无 gid 的组，第一次合并时固化下来） */
+  function ccGridPinGroup(list, i){
+    var key = ccGridGid(list[i]);
+    var s = i, e = i;
+    while(s > 0 && ccGridGid(list[s - 1]) === key) s--;
+    while(e + 1 < list.length && ccGridGid(list[e + 1]) === key) e++;
+    var cur = list[i].gid;
+    if(cur !== null && cur !== undefined && String(cur) !== '') return { s: s, e: e, gid: cur };
+    var g = ccGridNewGid();
+    for(var k = s; k <= e; k++) list[k].gid = g;
+    return { s: s, e: e, gid: g };
   }
   function ccEsc2(s){
     return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
   function ccGridIcons(i){
     var T = ccT;
-    /* ★CC-SPECGRID2-20261113：与规格表一致，操作列只有 复制/合并/删除（编辑改为格内直接输入） */
-    return ccIcnCopy(i)
-      + '<button type="button" class="cc-icn" data-act="mergerow" data-i="' + i + '" title="' + T('mergeRow') + '">'
+    /* ★CC-OPCELL-20261113：三个按钮永远收在单元格内——统一装进 .ccg-acts（flex 居中、gap 2px、15×15 紧凑钮） */
+    return '<div class="ccg-acts">'
+      + ccIcnCopy(i)
+      + '<button type="button" class="cc-icn ccg-btn-merge" data-act="mergerow" data-i="' + i + '" title="' + T('mergeRow') + '">'
         + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f9d58" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="8" rx="1.5"/><rect x="3" y="13" width="18" height="8" rx="1.5"/></svg></button>'
-      + ccIcnDel(i);
+      + ccIcnDel(i)
+      + '</div>';
   }
   /* ★CC-SPECGRID2-20261113：格内直接输入 + 整表自适应铺满（永不出现底部横向滚动条） */
   function ccRaw(v){ var n = Number(v); if(!isFinite(n)) return ''; return (Math.round(n * 100) / 100).toString(); }
@@ -67715,20 +67755,27 @@ function submitAuth() {
         CC_DATA.demand.specs.push(ccGridRowDef());
         lib_renderCostBody(); ccScheduleSave();
       } else if(act === 'copyrow' || act === 'copyspec'){
-        // ★CC-SPECGRID-20261113：复制该行并插到下一行（数据全字段深拷贝）
+        /* ★CC-OPCELL-20261113：完全对齐规格表 copySlatsSpecRow —— 复制本行全部数值，作为【新分组】插到本组之后 */
         var sps2 = CC_DATA.demand.specs;
         var si = Number(el.getAttribute('data-i'));
-        if(sps2[si]){ sps2.splice(si + 1, 0, JSON.parse(JSON.stringify(sps2[si]))); }
+        if(sps2[si]){
+          var cpRow = JSON.parse(JSON.stringify(sps2[si]));
+          cpRow.gid = ccGridNewGid();
+          sps2.splice(ccGridGroupEnd(sps2, si) + 1, 0, cpRow);
+        }
         lib_renderCostBody(); ccScheduleSave();
       } else if(act === 'mergerow'){
-        // ★CC-SPECGRID-20261113：合并 = 把该行的 猪舍/房舍编号/单元/栋数/长/宽/高 对齐上一行 → 归入同一 rowspan 组
+        /* ★CC-OPCELL-20261113：完全对齐规格表 mergeSlatsSpecRow —— 复制本行全部数值，插到本组之后并【归入同一分组】
+           （规格表里就是 groupId 不变地再插一行，合并单元格自动跨行覆盖；不是"对齐上一行"） */
         var sps3 = CC_DATA.demand.specs;
         var mi = Number(el.getAttribute('data-i'));
-        if(mi > 0 && sps3[mi - 1] && sps3[mi]){
-          var pv = sps3[mi - 1], cv = sps3[mi];
-          ['house','code','units','bldgs','len','wid','hei'].forEach(function(k){ cv[k] = pv[k]; });
-          lib_renderCostBody(); ccScheduleSave();
+        if(sps3[mi]){
+          var pin = ccGridPinGroup(sps3, mi);
+          var mgRow = JSON.parse(JSON.stringify(sps3[mi]));
+          mgRow.gid = pin.gid;
+          sps3.splice(pin.e + 1, 0, mgRow);
         }
+        lib_renderCostBody(); ccScheduleSave();
       } else if(act === 'editrow'){
         ccGridEditOpen(Number(el.getAttribute('data-i')));
       } else if(act === 'delspec'){
