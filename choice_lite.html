@@ -8509,11 +8509,15 @@ var WL_FLOW_IMG = {
         var mesh=_num(r.mesh_layers);
         var kLen=String(r.rebar_size_len||'').replace(/[^0-9.]/g,'');
         var kWid=String(r.rebar_size_wid||'').replace(/[^0-9.]/g,'');
-        if(kLen && SLATS_REBAR_WEIGHT[kLen]!==undefined){ var lm=((L-100)/1000)*_num(r.bar_len)*mesh*qty; o.rebar[kLen]+=lm; sizeMeters[kLen]+=lm; }
-        if(kWid && SLATS_REBAR_WEIGHT[kWid]!==undefined){ var wm=((W-80)/1000)*_num(r.bar_wid)*mesh*qty; o.rebar[kWid]+=wm; sizeMeters[kWid]+=wm; }
+        /* ★SLATS-BUY-COEF-20261113：钢筋长度按采购口径 ×1.1（搭接/下料损耗），吨数在下游再 ÷0.97 */
+        if(kLen && SLATS_REBAR_WEIGHT[kLen]!==undefined){ var lm=slatsBuyLen(((L-100)/1000)*_num(r.bar_len)*mesh*qty); o.rebar[kLen]+=lm; sizeMeters[kLen]+=lm; }
+        if(kWid && SLATS_REBAR_WEIGHT[kWid]!==undefined){ var wm=slatsBuyLen(((W-80)/1000)*_num(r.bar_wid)*mesh*qty); o.rebar[kWid]+=wm; sizeMeters[kWid]+=wm; }
         // 水泥/黄砂/石子：单块体积→折算标准板(1500×600×70)→耗量
         var vol=(L*W*H)/1e9, std=vol/0.063;
-        o.cement+=std*24.4*qty/1000; o.sand+=std*22.6*qty/1000; o.gravel+=std*68*qty/1000;
+        /* ★SLATS-BUY-COEF-20261113：理论吨 → 采购吨（水泥÷0.93、黄砂÷0.65、石子÷0.96） */
+        o.cement+=slatsBuyMat(std*24.4*qty/1000,'cement');
+        o.sand+=slatsBuyMat(std*22.6*qty/1000,'sand');
+        o.gravel+=slatsBuyMat(std*68*qty/1000,'gravel');
       });
       var pairs=Object.keys(map).map(function(k){ return map[k]; });
       var usedSizes=SLATS_REBAR_SIZES.filter(function(s){ return sizeMeters[s]>0; });
@@ -8576,9 +8580,9 @@ var WL_FLOW_IMG = {
       _runs.forEach(function(_run, runIdx){
         var _rs = _run.rows.length + 1; // +1 含小计行
         var _sq=0, _srebar={}, _scement=0, _ssand=0, _sgravel=0; usedSizes.forEach(function(s){ _srebar[s]=0; });
-        _run.rows.forEach(function(o){ var _rt={}; usedSizes.forEach(function(s){ _rt[s]=o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; _srebar[s]+=_rt[s]; }); _sq+=o.qty; _scement+=o.cement; _ssand+=o.sand; _sgravel+=o.gravel; });
+        _run.rows.forEach(function(o){ var _rt={}; usedSizes.forEach(function(s){ _rt[s]=slatsBuyRebarTons(o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000); _srebar[s]+=_rt[s]; }); _sq+=o.qty; _scement+=o.cement; _ssand+=o.sand; _sgravel+=o.gravel; });
         _run.rows.forEach(function(o, _idx){
-          var _rt={}; usedSizes.forEach(function(s){ _rt[s]=o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
+          var _rt={}; usedSizes.forEach(function(s){ _rt[s]=slatsBuyRebarTons(o.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000); });
           h+='<tr>';
           if(_idx===0){
             if(groupBy==='spec'){
@@ -8600,7 +8604,7 @@ var WL_FLOW_IMG = {
         usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(_srebar[s])+'</td>'; });
         h+='<td>'+fmt1Red(_scement)+'</td><td>'+fmt1Red(_ssand)+prod_m3suf(_ssand,'sand')+'</td><td>'+fmt1Red(_sgravel)+prod_m3suf(_sgravel,'gravel')+'</td></tr>';
       });
-      var totRt={}; usedSizes.forEach(function(s){ totRt[s]=totals.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000; });
+      var totRt={}; usedSizes.forEach(function(s){ totRt[s]=slatsBuyRebarTons(totals.rebar[s]*SLATS_REBAR_WEIGHT[s]/1000); });
       h+='<tr style="font-weight:700;background:#eef2f7"><td colspan="'+(groupBy==='spec'?3:2)+'">'+pt('thr_total')+'</td>';
       h+='<td>'+prod_fmtNumRed(totals.qty)+'</td>';
       usedSizes.forEach(function(s){ h+='<td>'+fmt1Red(totRt[s])+'</td>'; });
@@ -8621,7 +8625,7 @@ var WL_FLOW_IMG = {
       });
       return Object.keys(bySpec).sort(function(a,b){ return a.localeCompare(b,'zh'); }).map(function(k){
         var d = bySpec[k], rt = 0;
-        SLATS_REBAR_SIZES.forEach(function(s){ rt += (d.rebar[s]||0)*SLATS_REBAR_WEIGHT[s]/1000; });
+        SLATS_REBAR_SIZES.forEach(function(s){ rt += slatsBuyRebarTons((d.rebar[s]||0)*SLATS_REBAR_WEIGHT[s]/1000); });
         return { spec:k, qty:d.qty, rebarTons:rt, cement:d.cement, sand:d.sand, gravel:d.gravel };
       });
     }
@@ -8683,7 +8687,7 @@ var WL_FLOW_IMG = {
       Object.keys(byHouse).forEach(function(ph){
         var d = byHouse[ph], rt = 0;
         d.days = Math.ceil(d.daySum || 0);
-        SLATS_REBAR_SIZES.forEach(function(s){ rt += (d.rebarBySize[s]||0)*SLATS_REBAR_WEIGHT[s]/1000; });
+        SLATS_REBAR_SIZES.forEach(function(s){ rt += slatsBuyRebarTons((d.rebarBySize[s]||0)*SLATS_REBAR_WEIGHT[s]/1000); });
         d.rebarTons = rt;
       });
       var fmt = function(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}); };
@@ -10872,10 +10876,11 @@ var WL_FLOW_IMG = {
       var perHouse={}, total={rebar6:0,rebar8:0,rebar10:0,rebar12:0,cement:0,sand:0,gravel:0};
       Object.keys(byHouse).forEach(function(ph){
         var d=byHouse[ph];
-        var hc={rebar6:(d.rebarBySize['6']||0)*SLATS_REBAR_WEIGHT['6']/1000,
-                rebar8:(d.rebarBySize['8']||0)*SLATS_REBAR_WEIGHT['8']/1000,
-                rebar10:(d.rebarBySize['10']||0)*SLATS_REBAR_WEIGHT['10']/1000,
-                rebar12:(d.rebarBySize['12']||0)*SLATS_REBAR_WEIGHT['12']/1000,
+        /* ★SLATS-BUY-COEF-20261113：米数已含 ×1.1，这里再 ÷0.97 过磅系数 → 采购吨 */
+        var hc={rebar6:slatsBuyRebarTons((d.rebarBySize['6']||0)*SLATS_REBAR_WEIGHT['6']/1000),
+                rebar8:slatsBuyRebarTons((d.rebarBySize['8']||0)*SLATS_REBAR_WEIGHT['8']/1000),
+                rebar10:slatsBuyRebarTons((d.rebarBySize['10']||0)*SLATS_REBAR_WEIGHT['10']/1000),
+                rebar12:slatsBuyRebarTons((d.rebarBySize['12']||0)*SLATS_REBAR_WEIGHT['12']/1000),
                 cement:d.cement, sand:d.sand, gravel:d.gravel};
         perHouse[ph]=hc;
         Object.keys(hc).forEach(function(k){ total[k]=(total[k]||0)+hc[k]; });
@@ -66477,8 +66482,9 @@ function submitAuth() {
         var dL = String(sp[dF] || ''), dW = String(sp[dWF] || '');
         var wL = ccRW[dL] || 0, wW = ccRW[dW] || 0;
         var barsL = (Number(sp[nF]) || 0) * mult * q, barsW = (Number(sp[wF]) || 0) * mult * q;
-        var lenL = wL ? (sp.dl / 1000) * barsL : 0, lenW = wW ? (sp.dw / 1000) * barsW : 0;
-        var tonL = lenL * wL / 1000, tonW = lenW * wW / 1000;
+        /* ★SLATS-BUY-COEF-20261113：长度 ×1.1（搭接/下料损耗），吨数再 ÷0.97（过磅系数），与智能报告同口径 */
+        var lenL = wL ? slatsBuyLen((sp.dl / 1000) * barsL) : 0, lenW = wW ? slatsBuyLen((sp.dw / 1000) * barsW) : 0;
+        var tonL = slatsBuyRebarTons(lenL * wL / 1000), tonW = slatsBuyRebarTons(lenW * wW / 1000);
         addR(dL, sp.dl, barsL, lenL, tonL);
         addR(dW, sp.dw, barsW, lenW, tonW);
         return { ton: tonL + tonW, len: lenL + lenW, bars: (wL ? barsL : 0) + (wW ? barsW : 0) };
@@ -66500,7 +66506,10 @@ function submitAuth() {
       }
     });
     // ★CC-WASTE-20261104：生产浪费 + 运输损失 → 水泥/黄砂/石子统一上浮 5%（吨与方同步）
-    ccCem *= 1.05; ccSand *= 1.05; ccGrav *= 1.05;
+    // ★SLATS-BUY-COEF-20261113：再按采购口径折算（水泥÷0.93、黄砂÷0.65、石子÷0.96），与智能报告/生产计划一致
+    ccCem = slatsBuyMat(ccCem * 1.05, 'cement');
+    ccSand = slatsBuyMat(ccSand * 1.05, 'sand');
+    ccGrav = slatsBuyMat(ccGrav * 1.05, 'gravel');
     // ★CC-AGG-AUTO-20261105：骨料数量自动对应下方汇总（水泥/钢筋=吨，黄砂/石子=方），随规格表实时刷新、只读
     var ccAggQty = {
       sand:  Math.round(ccSand / 1.45 * 10) / 10,
