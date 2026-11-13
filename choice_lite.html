@@ -65030,6 +65030,10 @@ function submitAuth() {
       '.ccg-mmcell{padding:0 1px !important;white-space:nowrap;text-align:center;}',
       '.ccg-mmcell>span{font-size:8px;margin-right:1px;letter-spacing:-0.2px;}',
       '.ccg-sel-house{font-size:9px;text-align:center;}',
+      /* ★CC-PHPLUS-20261113：猪舍格 = 「+」圆钮在上、下拉在下（照搬规格表 .slats-ph-wrap 结构） */
+      '.ccg-tb td.ccg-house{height:auto;padding:2px 1px;overflow:visible;}',
+      '.ccg-tb td.ccg-house .slats-ph-wrap{gap:3px;height:auto;}',
+      '.ccg-tb td.ccg-house .slats-suffix-plus{width:16px;height:16px;font-size:12px;line-height:1;padding:0;}',
       /* ★CC-REBARW-20261113：φ 下拉文字缩小到 7px、宽度 36px，让 "φ10" 与箭头都完整可见 */
       '.ccg-mmcell>.ccg-sel{width:36px !important;height:16px !important;min-height:0 !important;font-size:7px !important;padding:0 0 0 1px !important;border:1px solid #cfd8e3;background:#fff;border-radius:3px;box-sizing:border-box;text-align-last:center;}',
       '.ccg-in{width:100%;border:1px solid transparent;background:transparent;font-size:9px;text-align:center;color:inherit;font-family:inherit;padding:1px 0;outline:none;box-sizing:border-box;}',
@@ -65538,7 +65542,8 @@ function submitAuth() {
       { k:'qw',   w:70,  th:T('qty'),           sub:T('th_qtyWhole'), cls:'ccg-num ccg-calc' },
       { k:'su',   w:70,  th:T('th_sqm'),        sub:T('th_sqmUnit'),  cls:'ccg-num ccg-calc', on:'sqm' },
       { k:'sw',   w:72,  th:T('th_sqm'),        sub:T('th_sqmWhole'), cls:'ccg-num ccg-calc', on:'sqm' },
-      { k:'lyr',  w:54,  th:T('layers') },
+      /* ★CC-HEADER-LOCK-20261113：钢网层数属于「钢筋网片配置信息」组，随该组一起显隐 */
+      { k:'lyr',  w:54,  th:T('layers'), on:'rebar' },
       /* ★CC-REBARW-20261113：钢筋尺寸(mm) 列加宽，保证「1,191 + φ8▾」完整显示；条数列略收窄让位 */
       { k:'bl',   w:48,  th:T('barsL'),         sub:T('unitPcs'),  cls:'ccg-num', on:'rebar' },
       { k:'ml',   w:74,  th:T('th_rebarMm'),    sub:T('th_lenDir'), cls:'ccg-num ccg-calc', on:'rebar' },
@@ -65657,6 +65662,75 @@ function submitAuth() {
     lib_renderCostBody();
   }
   window.ccGridCommit = ccGridCommit;
+  /* ★CC-PHPLUS-20261113：猪舍「+」后缀按钮（与规格表 slatsPigHouseCell 的 plus/pop 同构）
+     点 + 在按钮右侧弹出 slats-suffix-pop：输入 1~4 位后缀 → 生成「6-a」这种值并写回本行。 */
+  window.ccHousePlus = function(btn, ev){
+    if(ev && ev.stopPropagation) ev.stopPropagation();
+    var wrap = btn && btn.parentNode;
+    var sel = wrap ? wrap.querySelector('select') : null;
+    if(!sel) return;
+    var oldPop = document.getElementById('ccg_suffix_pop');
+    if(oldPop && oldPop.parentNode) oldPop.parentNode.removeChild(oldPop);
+    var T = ccT;
+    var pop = document.createElement('div');
+    pop.id = 'ccg_suffix_pop';
+    pop.className = 'slats-suffix-pop';
+    pop.innerHTML = '<div class="slats-suffix-pop-title">' + ccEsc2(T('suffixTitle')) + '</div>'
+      + '<div class="slats-suffix-pop-row"><span class="slats-suffix-dash">-</span>'
+      + '<input class="slats-suffix-input" type="text" maxlength="4" placeholder="' + ccEsc2(T('suffixPh')) + '"></div>'
+      + '<div class="slats-suffix-pop-btns">'
+      + '<button type="button" class="slats-suffix-btn" data-act="save">' + ccEsc2(T('btnSave')) + '</button>'
+      + '<button type="button" class="slats-suffix-btn" data-act="clear">' + ccEsc2(T('suffixClear')) + '</button>'
+      + '<button type="button" class="slats-suffix-btn" data-act="exit">' + ccEsc2(T('btnCancel')) + '</button>'
+      + '</div>';
+    document.body.appendChild(pop);
+    var r = btn.getBoundingClientRect();
+    pop.style.position = 'fixed';
+    pop.style.left = (r.right + 6) + 'px';
+    pop.style.top = Math.max(4, r.top - 4) + 'px';
+    pop.style.zIndex = '100000';
+    pop.style.display = 'block';
+    var inp = pop.querySelector('.slats-suffix-input');
+    setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 30);
+    inp.addEventListener('input', function(){ var v = this.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 4); if(v !== this.value) this.value = v; });
+    var close = function(){ if(pop.parentNode) pop.parentNode.removeChild(pop); };
+    pop.querySelectorAll('.slats-suffix-btn').forEach(function(b){
+      b.addEventListener('click', function(e){
+        e.stopPropagation();
+        var act = b.getAttribute('data-act');
+        if(act === 'save'){
+          var cur = String(sel.value || '');
+          var base = cur.replace(/-([a-z0-9]{1,4})$/, '') || cur;
+          if(!base){ close(); return; }
+          var sf = inp.value, nv = sf ? (base + '-' + sf) : base;
+          var ex = false;
+          for(var i = 0; i < sel.options.length; i++){ if(sel.options[i].value === nv){ ex = true; break; } }
+          if(!ex){
+            var o = document.createElement('option');
+            o.value = nv;
+            o.textContent = (typeof slatsPigHouseLabel === 'function') ? slatsPigHouseLabel(nv) : nv;
+            sel.appendChild(o);
+          }
+          sel.value = nv;
+          close();
+          ccGridInput(sel);
+          ccScheduleSave();
+          lib_renderCostBody();
+        } else if(act === 'clear'){ inp.value = ''; inp.focus(); }
+        else close();
+      });
+    });
+    if(!document._ccSuffixCloseInit){
+      document._ccSuffixCloseInit = true;
+      document.addEventListener('click', function(e){
+        var p = document.getElementById('ccg_suffix_pop');
+        if(!p) return;
+        if(p.contains(e.target)) return;
+        if(e.target.closest && e.target.closest('.slats-suffix-plus')) return;
+        if(p.parentNode) p.parentNode.removeChild(p);
+      });
+    }
+  };
   function ccGridRefreshComputed(){
     var specs = (CC_DATA.demand && CC_DATA.demand.specs) || [];
     var tq = 0, ta = 0;
@@ -65689,13 +65763,30 @@ function submitAuth() {
     if(t.style.width) t.style.width = '';
   }
   window.ccGridFit = ccGridFit;
+  /* ★CC-HEADER-LOCK-20261113：表头结构自检——列数与 colgroup 必须完全对齐（被改坏就报错，不静默错位） */
+  function ccGridHeaderLockCheck(){
+    try{
+      var dual = ccSpecDualMode();
+      var expect = 3 + 2 + (CC_ROW_COLS.dim ? 3 : 0) + 2 + (CC_ROW_COLS.sqm ? 2 : 0)
+        + (CC_ROW_COLS.rebar ? (dual ? 9 : 5) : 0)
+        + (CC_ROW_COLS.solid ? 1 : 0) + (CC_ROW_COLS.hole ? 1 : 0)
+        + (CC_ROW_COLS.price ? 1 : 0) + (CC_ROW_COLS.subtotal ? 1 : 0) + (CC_ROW_COLS.remark ? 1 : 0) + 1;
+      var actual = ccGridCols(dual).length;
+      if(expect !== actual){
+        window.__CC_HEADER_LOCK_FAILED = true;
+        console.error('[cc-header-lock] 表头列数 ' + actual + ' ≠ 期望 ' + expect + '（★CC-HEADER-LOCK-20261113 被改坏了）');
+      }
+      return expect === actual;
+    }catch(e){ return false; }
+  }
+  window.ccGridHeaderLockCheck = ccGridHeaderLockCheck;
   /* ---- 需求信息表（新） ---- */
   function ccGridHtml(){
     var T = ccT;
     var specs = (CC_DATA && CC_DATA.demand && CC_DATA.demand.specs) || [];
     var dual = ccSpecDualMode();
     var cols = ccGridCols(dual);
-    var has = function(k){ for(var i=0;i<cols.length;i++){ if(cols[i].k===k) return true; } return false; };
+    try{ if(typeof ccGridHeaderLockCheck === 'function') ccGridHeaderLockCheck(); }catch(e0){}
     /* 列开关按钮条 */
     var tg = [['dim','dimCols'],['rebar','rebarCfg'],['solid','solidSlat'],['hole','th_hole'],['sqm','th_sqm'],['price','th_price'],['subtotal','th_subtotal'],['remark','th_remark']];
     var toggleHtml = '<div class="ccg-toggles">' + tg.map(function(o){
@@ -65708,16 +65799,26 @@ function submitAuth() {
        整表恒等于容器宽度 → 永远没有底部横向滚动条；表头文字超出就换行（见 CSS） */
     var totalW = cols.reduce(function(s, c){ return s + c.w; }, 0) || 1;
     var cg = '<colgroup>' + cols.map(function(c){ return '<col style="width:' + (c.w / totalW * 100).toFixed(3) + '%">'; }).join('') + '</colgroup>';
+    /* ==================================================================================
+       ★CC-HEADER-LOCK-20261113（用户 2026-11-13 要求：完全照规格表 slats-spec-table 的两级表头，
+         并且【锁死不可改】）。结构与 slatsSpecTable 的 thead 一一对应：
+           序号(rs2) | 猪舍(rs2) | 房舍编号(rs2)
+           | 房舍信息(cs2: 单元/栋, 栋数)
+           | 水泥漏缝地板尺寸(cs3: 长, 宽, 高)
+           | 漏缝地板用量(cs4 或 cs2: 数量/单元, 数量/整场[, 平米/单元, 平米/整场])
+           | 钢筋网片配置信息(cs5 双层 cs9: 钢网层数, 条/长, 钢筋尺寸(mm), 条/宽, 钢筋尺寸(mm)[, 下层 4])
+           | 实心板?(rs2) | 带圆孔?(rs2) | 单价(rs2) | 小计(rs2) | 备注(rs2) | 操作(rs2)
+       ★ 任何"优化/重构"都不得把一级表头拆成两个单列，也不得调整下面的顺序；
+         启动时 ccGridHeaderLockCheck() 会走一遍并核对列数，被改坏会 console.error。
+       ================================================================================== */
     var th1 = '<tr>' +
       '<th rowspan="2" class="ccg-idx">' + T('th_no') + '</th>' +
       '<th rowspan="2">' + T('th_house') + '</th>' +
       '<th rowspan="2">' + T('th_houseCode') + '</th>' +
-      '<th colspan="2">' + T('th_bldgGroup') + '</th>' +
-      (CC_ROW_COLS.dim ? '<th colspan="3">' + T('specDim') + '</th>' : '') +
-      '<th colspan="2">' + T('qty') + '</th>' +
-      (CC_ROW_COLS.sqm ? '<th colspan="2">' + T('th_sqm') + '</th>' : '') +
-      '<th rowspan="2">' + T('layers') + '</th>' +
-      (CC_ROW_COLS.rebar ? '<th colspan="' + (dual ? 8 : 4) + '">' + T('rebarCfg') + '</th>' : '') +
+      '<th colspan="2">' + T('th_houseInfo') + '</th>' +
+      (CC_ROW_COLS.dim ? '<th colspan="3">' + T('specDimTitle') + '</th>' : '') +
+      '<th colspan="' + (CC_ROW_COLS.sqm ? 4 : 2) + '">' + T('th_usageTitle') + '</th>' +
+      (CC_ROW_COLS.rebar ? '<th colspan="' + (dual ? 9 : 5) + '">' + T('rebarCfg') + '</th>' : '') +
       (CC_ROW_COLS.solid ? '<th rowspan="2">' + T('solidSlat') + '</th>' : '') +
       (CC_ROW_COLS.hole ? '<th rowspan="2">' + T('th_hole') + '</th>' : '') +
       (CC_ROW_COLS.price ? '<th rowspan="2">' + T('th_price') + '</th>' : '') +
@@ -65729,7 +65830,12 @@ function submitAuth() {
       (CC_ROW_COLS.dim ? '<th>' + T('specLen') + '</th><th>' + T('specWid') + '</th><th>' + T('specHei') + '</th>' : '') +
       '<th>' + T('th_qtyUnit') + '</th><th>' + T('th_qtyWhole') + '</th>' +
       (CC_ROW_COLS.sqm ? '<th>' + T('th_sqmUnit') + '</th><th>' + T('th_sqmWhole') + '</th>' : '') +
-      (CC_ROW_COLS.rebar ? '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('barsL') + '</th><th>' + (dual ? T('upLayer') + '<br>' : '') + T('th_rebarMm') + '</th><th>' + (dual ? T('upLayer') + '<br>' : '') + T('barsW') + '</th><th>' + (dual ? T('upLayer') + '<br>' : '') + T('th_rebarMm') + '</th>' : '') +
+      (CC_ROW_COLS.rebar ?
+        '<th>' + T('layers') + '</th>' +
+        '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('barsL') + '</th>' +
+        '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('th_rebarMm') + '</th>' +
+        '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('barsW') + '</th>' +
+        '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('th_rebarMm') + '</th>' : '') +
       (dual && CC_ROW_COLS.rebar ? '<th class="ccg-lo">' + T('loLayer') + '<br>' + T('barsL') + '</th><th class="ccg-lo">' + T('loLayer') + '<br>' + T('th_rebarMm') + '</th><th class="ccg-lo">' + T('loLayer') + '<br>' + T('barsW') + '</th><th class="ccg-lo">' + T('loLayer') + '<br>' + T('th_rebarMm') + '</th>' : '') +
       '</tr>';
     /* 数据行：按组合并 8 列（序号/猪舍/编号/单元/栋数/长/宽/高） */
@@ -65748,9 +65854,18 @@ function submitAuth() {
         /* 直接输入：input/select 都挂 ccGridInput（输入即算） + ccGridCommit（离开格子保存并整页刷新） */
         var inp = function(f, val, kind, grp, w){
           var at = ' data-i="' + ri + '" data-f="' + f + '"' + (grp ? ' data-grp="' + grpIds + '"' : '');
-          if(kind === 'sel' || kind === 'house'){
-            /* ★CC-HOUSESEL-20261113：猪舍与规格表同源——用 slatsOptHtml(SLATS_PIG_HOUSE,'slats_pig_house_') 的 15 类下拉 */
-            return '<select class="ccg-in ccg-sel' + (kind === 'house' ? ' ccg-sel-house' : '') + '"' + at + ' oninput="ccGridInput(this)" onchange="ccGridCommit(this)">' + selOpts(f, val) + '</select>';
+          if(kind === 'sel'){
+            return '<select class="ccg-in ccg-sel"' + at + ' oninput="ccGridInput(this)" onchange="ccGridCommit(this)">' + selOpts(f, val) + '</select>';
+          }
+          if(kind === 'house'){
+            /* ★CC-PHPLUS-20261113：完全照规格表的猪舍单元格——div.slats-ph-wrap 里「+」圆按钮在上、下拉在下，
+               + 打开 slats-suffix-pop 后缀浮层（同名 class，样式与规格表 100% 一致） */
+            var hv = String(val == null ? '' : val).trim();
+            return '<div class="slats-ph-wrap">'
+              + '<button type="button" class="slats-suffix-plus" data-i="' + ri + '" title="' + ccEsc2(ccT('suffixTip')) + '"'
+              + (hv ? '' : ' style="display:none;"') + ' onclick="ccHousePlus(this,event)">+</button>'
+              + '<select class="ccg-in ccg-sel ccg-sel-house"' + at + ' oninput="ccGridInput(this)" onchange="ccGridCommit(this)">' + selOpts('house', val) + '</select>'
+              + '</div>';
           }
           if(kind === 'money'){
             var pv = Number(val) || 0;
@@ -65763,10 +65878,10 @@ function submitAuth() {
         };
         if(gi === 0){
           var rs = ' rowspan="' + g.rows.length + '"';
-          body += '<td class="ccg-idx"' + rs + '><span class="ccg-no">' + no + '</span>'
-                + '<span class="ccg-info" title="' + T('th_house') + ' / ' + T('specDim') + '">' + (g.rows.length > 1 ? 'ⓘ' + g.rows.length : 'ⓘ') + '</span></td>';
+          /* ★CC-IDX-20261113：序号恢复正常数字（去掉 ⓘ 角标，只显示 1、2、3…） */
+          body += '<td class="ccg-idx"' + rs + '>' + no + '</td>';
           /* 合并列必须带 data-grp：改一格要同步整组（猪舍/编号/单元/栋数/长/宽/高） */
-          body += '<td class="ccg-merge"' + rs + '>' + inp('house', sp.house, 'house', true) + '</td>';
+          body += '<td class="ccg-merge ccg-house"' + rs + '>' + inp('house', sp.house, 'house', true) + '</td>';
           body += '<td class="ccg-merge"' + rs + '>' + inp('code', sp.code, 'text', true) + '</td>';
           body += '<td class="ccg-merge"' + rs + '>' + inp('units', ccRowUnits(sp), 'num', true) + '</td>';
           body += '<td class="ccg-merge"' + rs + '>' + inp('bldgs', ccRowBldgs(sp), 'num', true) + '</td>';
@@ -65782,8 +65897,9 @@ function submitAuth() {
           body += '<td id="ccg_su_' + ri + '">' + ccNum2(ccRowSqmUnit(sp)) + '</td>';
           body += '<td class="ccg-b" id="ccg_sw_' + ri + '">' + ccNum2(ccRowSqmWhole(sp)) + '</td>';
         }
-        body += '<td>' + inp('layers', Number(sp.layers) === 2 ? 2 : 1, 'sel') + '</td>';
         if(CC_ROW_COLS.rebar){
+          /* ★CC-HEADER-LOCK-20261113：钢网层数是「钢筋网片配置信息」组的第一列（与规格表一致） */
+          body += '<td>' + inp('layers', Number(sp.layers) === 2 ? 2 : 1, 'sel') + '</td>';
           /* ★CC-REBARCELL-20261113：完全照规格表——「钢筋尺寸(mm)」格 = mm 数值 + 紧跟一个小号 φ 下拉
              （上层/下层同样都有 mm + φ，下层无数据时 mm 留空而不是只剩一个空下拉） */
           var mmCell = function(id, mmv, f, val, lo){
@@ -65825,8 +65941,8 @@ function submitAuth() {
     var footCells = '<td colspan="' + (CC_ROW_COLS.dim ? 8 : 5) + '" style="text-align:right;font-weight:700;">' + T('totalAll') + '</td>'
       + '<td></td><td class="ccg-b" id="ccg_ft_qty">' + ccNum(tQty) + '</td>'
       + (CC_ROW_COLS.sqm ? '<td></td><td class="ccg-b" id="ccg_ft_area">' + ccNum(tArea) + '</td>' : '')
-      + '<td></td>'
-      + (CC_ROW_COLS.rebar ? '<td></td><td></td><td></td><td></td>' + (dual ? '<td></td><td></td><td></td><td></td>' : '') : '')
+      /* 钢筋组含「钢网层数」一格（★CC-HEADER-LOCK-20261113） */
+      + (CC_ROW_COLS.rebar ? '<td></td><td></td><td></td><td></td><td></td>' + (dual ? '<td></td><td></td><td></td><td></td>' : '') : '')
       + (CC_ROW_COLS.solid ? '<td></td>' : '') + (CC_ROW_COLS.hole ? '<td></td>' : '')
       + (CC_ROW_COLS.price ? '<td></td>' : '') + (CC_ROW_COLS.subtotal ? '<td></td>' : '') + (CC_ROW_COLS.remark ? '<td></td>' : '')
       + '<td></td>';
@@ -65949,7 +66065,14 @@ function submitAuth() {
       dimCols:      { zh:'长宽高', en:'L×W×H', vi:'D×R×C' },
       emptySpec:    { zh:'暂无规格行，点右上角「增加行」开始', en:'No spec rows yet — click "Add row"', vi:'Chưa có dòng quy cách — bấm "Thêm dòng"' },
       btnSave:      { zh:'保存', en:'Save', vi:'Lưu' },
-      btnCancel:    { zh:'取消', en:'Cancel', vi:'Hủy' }
+      btnCancel:    { zh:'取消', en:'Cancel', vi:'Hủy' },
+      th_houseInfo: { zh:'房舍信息', en:'House info', vi:'Thông tin chuồng' },
+      specDimTitle: { zh:'水泥漏缝地板尺寸(单位：毫米)', en:'Slat size (mm)', vi:'Kích thước tấm (mm)' },
+      th_usageTitle:{ zh:'漏缝地板用量', en:'Slat usage', vi:'Lượng dùng tấm' },
+      suffixTip:    { zh:'自定义房舍后缀（如 6-a）', en:'Custom house suffix (e.g. 6-a)', vi:'Hậu tố chuồng (vd 6-a)' },
+      suffixTitle:  { zh:'房舍自定义后缀', en:'Custom house suffix', vi:'Hậu tố chuồng' },
+      suffixPh:     { zh:'1~4 位字母或数字', en:'1-4 letters/digits', vi:'1-4 ký tự' },
+      suffixClear:  { zh:'清空', en:'Clear', vi:'Xóa' }
     };
     Object.keys(add).forEach(function(k){ if(!CC_LANG[k]) CC_LANG[k] = add[k]; });
   })();
