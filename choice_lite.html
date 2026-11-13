@@ -51679,9 +51679,10 @@ function openSlatsReportModal(){
   var rebarUsedCnt=SLATS_REBAR_SIZES.filter(function(k){ return rebarLen[k]>0; }).length;
   el('slatsReportRebarDesc').textContent=rebarDesc.replace('{0}', rebarUsedCnt);
 
-  // 钢筋统计：吨位 = 总长度(米) × 每米重量(kg/m) / 1000
+  // 钢筋统计：★SLATS-BUY-COEF-20261113 采购长度 = 计算长度×1.1；吨位 = 采购长度×每米重量/1000 ÷0.97（过磅）
   var rebarStat=SLATS_REBAR_SIZES.map(function(k){
-    return { size:k, len:rebarLen[k], tons:rebarLen[k]*SLATS_REBAR_WEIGHT[k]/1000 };
+    var lenBuy=slatsBuyLen(rebarLen[k]);
+    return { size:k, len:lenBuy, lenCalc:rebarLen[k], tons:slatsBuyRebarTons(lenBuy*SLATS_REBAR_WEIGHT[k]/1000) };
   });
   var totalTons=rebarStat.reduce(function(s,o){ return s+o.tons; },0);
   var rebarWeightMap={};
@@ -51693,8 +51694,11 @@ function openSlatsReportModal(){
     var o=matMap[k];
     var vol=(o.L*o.W*o.H)/1000000000; // 单块板体积(m³)
     var std=vol/0.063;                // 折算 1500×600×70 标准板数
+    /* ★SLATS-BUY-COEF-20261113：理论吨 → 采购吨（水泥÷0.93、黄砂÷0.65、石子÷0.96） */
     return { key:o.key, L:o.L, W:o.W, H:o.H, qty:o.qty, vol:vol,
-      cement:std*24.4*o.qty/1000, sand:std*22.6*o.qty/1000, gravel:std*68*o.qty/1000 };
+      cement:slatsBuyMat(std*24.4*o.qty/1000,'cement'),
+      sand:slatsBuyMat(std*22.6*o.qty/1000,'sand'),
+      gravel:slatsBuyMat(std*68*o.qty/1000,'gravel') };
   });
   matRows.sort(function(a,b){ return (a.L-b.L)||(a.W-b.W)||(a.H-b.H); });
 
@@ -51708,7 +51712,8 @@ function openSlatsReportModal(){
   matRows.forEach(function(o){
     totalVol+=o.vol*o.qty; matCem+=o.cement; matSand+=o.sand; matGrav+=o.gravel;
   });
-  var rebarLenTotal=SLATS_REBAR_SIZES.reduce(function(s,k){ return s+rebarLen[k]; },0);
+  // ★SLATS-BUY-COEF-20261113：总长同样按采购口径汇总（每根计算长度×1.1）
+  var rebarLenTotal=rebarStat.reduce(function(s,o){ return s+o.len; },0);
   var steelPerSqm=totalSqm>0?(totalTons*1000/totalSqm):0;
   var thickCm=totalSqm>0?(totalVol/totalSqm*100):0;
   var _sfmt=function(s){ for(var i=1;i<arguments.length;i++){ s=s.replace('{'+(i-1)+'}', String(arguments[i])); } return s; };
@@ -51999,6 +52004,18 @@ function _slatsRenderDistTable(containerId, dataMap, total, unit, t){
 // 钢筋每米重量(kg/m)：φ6=0.222 φ8=0.395 φ10=0.617 φ12=0.888
 var SLATS_REBAR_SIZES=['6','8','10','12'];
 var SLATS_REBAR_WEIGHT={'6':0.222,'8':0.395,'10':0.617,'12':0.888};
+/* ★SLATS-BUY-COEF-20261113（用户 2026-11-13 定稿）：
+   智能报告「生产物料使用量」必须给【采购口径】，不再用纯理论值。全系统系数只在这里维护，
+   任何地方都禁止再写裸的 1.1 / 0.97 / 0.93 / 0.65 / 0.96 或裸长度吨数：
+   · 钢筋：计算长度 × 1.1（搭接/下料损耗）→ 按 φ 每米重量算吨 → ÷ 0.97（过磅系数）
+   · 水泥：理论吨 ÷ 0.93（公差）
+   · 石子：理论吨 ÷ 0.96（公差）
+   · 黄砂：理论吨 ÷ 0.65（现场损耗/含泥量，实测偏差最大）
+   砂/石仍按 1.45 / 1.5 吨·方 换算（见 SLATS_TPM 与材料表 _matCell），换算率不动。 */
+var SLATS_BUY_COEF={ rebarLen:1.1, rebarWeigh:0.97, cement:0.93, sand:0.65, gravel:0.96 };
+function slatsBuyLen(m){ return (Number(m)||0)*SLATS_BUY_COEF.rebarLen; }
+function slatsBuyRebarTons(t){ var c=SLATS_BUY_COEF.rebarWeigh; return c>0?((Number(t)||0)/c):0; }
+function slatsBuyMat(ton, key){ var c=SLATS_BUY_COEF[key]; return c>0?((Number(ton)||0)/c):0; }
 function _slatsRenderRebarTable(containerId, statArr, totalTons, t){
   var container=document.getElementById(containerId);
   if(!container) return;
