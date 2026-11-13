@@ -64840,7 +64840,16 @@ function submitAuth() {
                      rW2:(s.rW2===undefined||s.rW2===null)?_rW:String(s.rW2),
                      d2mod:Number(s.d2mod)||0, larea:Number(s.larea)||0,
                      /* ★CC-SOLID-20261109：迁移旧存档时必须保留实心板选择，否则重建对象会把该字段丢掉 */
-                     solid:(String(s.solid||'').trim().toUpperCase()==='YES')?'YES':'NO' };
+                     solid:(String(s.solid||'').trim().toUpperCase()==='YES')?'YES':'NO',
+                     /* ★CC-SPECGRID-20261113：规格表新增字段（猪舍/编号/单元/栋数/带圆孔/单价/备注），
+                        旧存档缺省时 units/bldgs 补 1 → 数量/整场 与旧口径完全一致，不改变任何历史数值 */
+                     house:String(s.house==null?'':s.house),
+                     code:String(s.code==null?'':s.code),
+                     units:(Number(s.units)>0?Number(s.units):1),
+                     bldgs:(Number(s.bldgs)>0?Number(s.bldgs):1),
+                     hole:(String(s.hole||'').trim().toUpperCase()==='YES')?'YES':'NO',
+                     price:Number(s.price)||0,
+                     remark:String(s.remark==null?'':s.remark) };
           });
         } else if(d0.blocks !== undefined || d0.area !== undefined){
           base.demand.specs = [{ len:0, wid:0, hei:0, qty:Number(d0.blocks)||0, layers:2, nl:0, dl:0, nw:0, dw:0, nl2:0, rL2:'', nw2:0, rW2:'', d2mod:0, larea:Number(d0.area)||0, solid:'NO' }];
@@ -64993,6 +65002,42 @@ function submitAuth() {
       '.cc-tb tfoot td#cc_v_blocks_ft{color:#d32f2f !important;font-weight:700 !important;}',
       '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
       '.cc-icn:hover{background:#f5f5f5;}',
+      /* ★CC-SPECGRID-20261113：需求信息新表（合并分组 + 列开关 + 行编辑弹窗） */
+      '.ccg-wrap{margin:6px 0 2px;}',
+      '.ccg-toggles{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;}',
+      '.ccg-tg{font-size:12px;border:1px solid #c2ccd8;background:#fff;border-radius:14px;padding:2px 10px;cursor:pointer;color:#777;line-height:1.6;}',
+      '.ccg-tg.on{background:#e8f1ff;border-color:#7aa7d4;color:#1a56b0;font-weight:700;}',
+      '.ccg-tg:hover{background:#f2f7ff;}',
+      '.ccg-scroll{width:100%;overflow-x:auto;}',
+      '.ccg-tb{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;background:#fff;}',
+      '.ccg-tb th,.ccg-tb td{border:1px solid #000;padding:3px 4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.ccg-tb th{background:#ffff00;font-weight:700;font-size:11px;line-height:1.3;white-space:normal;word-break:break-word;}',
+      '.ccg-tb td{height:26px;font-variant-numeric:tabular-nums;}',
+      '.ccg-tb tbody tr:nth-child(even) td{background:#f7fbff;}',
+      '.ccg-tb .ccg-b{font-weight:700;color:#d32f2f;}',
+      '.ccg-tb .ccg-remark{text-align:left;white-space:normal;word-break:break-word;}',
+      '.ccg-tb .ccg-op{white-space:nowrap;overflow:visible;}',
+      '.ccg-tb tr.ccg-solid-yes td{color:#ff0000 !important;font-weight:700 !important;}',
+      '.ccg-tb tr.ccg-hole-yes td{color:#7B1FA2 !important;font-weight:700 !important;background:#f6ecfa !important;}',
+      '.ccg-tb tr.ccg-solid-yes.ccg-hole-yes td{color:#7B1FA2 !important;}',
+      '.ccg-tb tfoot td{background:#fff3cd;font-weight:700;}',
+      '.ccg-tb th.ccg-lo,.ccg-tb td.ccg-lo{background:#e8f1fb;}',
+      '.ccg-tb th.ccg-lo{background:#b8d3f0;}',
+      '.ccg-idx .ccg-no{font-weight:700;}',
+      '.ccg-idx .ccg-info{color:#1a56b0;font-size:10px;margin-left:2px;cursor:default;}',
+      '.ccg-modal-mask{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:99999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 12px;}',
+      '.ccg-modal{background:#fff;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.3);width:min(880px,96vw);}',
+      '.ccg-modal-h{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#E53935,#C62828);color:#fff;font-weight:700;padding:8px 14px;border-radius:10px 10px 0 0;}',
+      '.ccg-x{background:none;border:0;color:#fff;font-size:16px;cursor:pointer;line-height:1;}',
+      '.ccg-modal-b{padding:10px 14px;max-height:70vh;overflow:auto;}',
+      '.ccg-fs{border:1px solid #dbe3ec;border-radius:8px;padding:8px 10px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;}',
+      '.ccg-fs-t{width:100%;font-weight:700;color:#1a56b0;font-size:12px;}',
+      '.ccg-f{display:flex;align-items:center;gap:6px;font-size:12px;margin:0;}',
+      '.ccg-f span{color:#555;white-space:nowrap;}',
+      '.ccg-f input,.ccg-f select{border:1px solid #b9c6d6;border-radius:4px;padding:2px 6px;font-size:12px;width:96px;}',
+      '.ccg-f-wide{width:100%;}',
+      '.ccg-f-wide input{width:100%;}',
+      '.ccg-modal-f{display:flex;gap:10px;justify-content:flex-end;padding:8px 14px 12px;}',
       '.cc-sel{text-align:center;}',
       // ★CC-ZEBRA-20261104：所有表格白色/淡蓝斑马线 + 汇总表黑色网格线
       '.cc-tb tbody tr:nth-child(odd) td,.cc-sum tbody tr:nth-child(odd) td{background:#fff;}',
@@ -65398,6 +65443,353 @@ function submitAuth() {
       '<td class="cc-val cc-fx" data-block="' + i + '" data-cur="usd">—</td>' +
       '<td class="cc-val" data-blockv="' + i + '">—</td></tr>';
   }
+  /* ==================================================================================
+     ★CC-SPECGRID-20261113（用户 2026-11-13 定稿）：
+     需求信息表整表换成「水泥漏缝地板规格」那张表（序号/猪舍/房舍编号/单元/栋数/长宽高/
+     数量·单元/数量·整场/平米·单元/平米·整场/钢网层数/钢筋网片/实心板/带圆孔/单价/小计/备注/操作）。
+     · 数据仍是 CC_DATA.demand.specs ——【成本核算独立副本】，改这里不影响智能报告/生产计划
+     · 旧数据缺字段自动补：house 猪舍 / code 房舍编号 / units 单元(默认1) / bldgs 栋数(默认1) /
+       hole 带圆孔 / price 单价 / remark 备注
+     · 口径（与规格表完全一致）：
+         数量/整场 = 数量/单元 × 单元数 × 栋数
+         平米/单元 = 长×宽/1e6 × 数量/单元
+         平米/整场 = 平米/单元 × 单元数 × 栋数
+         钢筋尺寸(mm) = 长−9 / 宽−9
+     · 合并规则同规格表 SLATS_MERGED_COLS：序号/猪舍/房舍编号/单元/栋数/长/宽/高 八列按
+       连续相同值合并 rowspan；实心板=YES 整行红字；带圆孔=YES 整行紫字。
+     · 右上角「总块数 / 总面积」= 本表 Σ数量/整场、Σ平米/整场（唯一口径）
+     ================================================================================== */
+  function ccRowUnits(sp){ var n = Number(sp && sp.units); return n > 0 ? n : 1; }
+  function ccRowBldgs(sp){ var n = Number(sp && sp.bldgs); return n > 0 ? n : 1; }
+  function ccRowQtyUnit(sp){ return Number(sp && sp.qty) || 0; }
+  function ccRowQtyWhole(sp){ return ccRowQtyUnit(sp) * ccRowUnits(sp) * ccRowBldgs(sp); }
+  function ccRowSqmUnit(sp){
+    var l = Number(sp && sp.len) || 0, w = Number(sp && sp.wid) || 0;
+    if(l > 0 && w > 0) return l * w / 1e6 * ccRowQtyUnit(sp);
+    return (Number(sp && sp.larea) || 0) * ccRowQtyUnit(sp);
+  }
+  function ccRowSqmWhole(sp){ return ccRowSqmUnit(sp) * ccRowUnits(sp) * ccRowBldgs(sp); }
+  function ccRowMmLen(sp){ var l = Number(sp && sp.len) || 0; return l > 0 ? l - 9 : 0; }
+  function ccRowMmWid(sp){ var w = Number(sp && sp.wid) || 0; return w > 0 ? w - 9 : 0; }
+  function ccRowIsSolid(sp){ return String((sp && sp.solid) || '').trim().toUpperCase() === 'YES'; }
+  function ccRowIsHole(sp){ return String((sp && sp.hole) || '').trim().toUpperCase() === 'YES'; }
+  /* 规格行默认值（含规格表新增的 7 个字段） */
+  function ccGridRowDef(){
+    var d = ccSpecDef();
+    d.house = ''; d.code = ''; d.units = 1; d.bldgs = 1; d.hole = 'NO'; d.price = 0; d.remark = '';
+    return d;
+  }
+  /* ---- 列显隐开关（8 组，与规格表一致；存 localStorage，切换后整表重建） ---- */
+  var CC_ROW_COLS_KEY = 'cc_row_cols_v1';
+  var CC_ROW_COLS_DEF = { dim:true, rebar:true, solid:true, hole:true, sqm:true, price:false, subtotal:false, remark:false };
+  var CC_ROW_COLS = (function(){
+    var o = {};
+    try{
+      var s = JSON.parse(localStorage.getItem(CC_ROW_COLS_KEY) || 'null');
+      Object.keys(CC_ROW_COLS_DEF).forEach(function(k){ o[k] = (s && s[k] !== undefined) ? !!s[k] : CC_ROW_COLS_DEF[k]; });
+    }catch(e){ Object.keys(CC_ROW_COLS_DEF).forEach(function(k){ o[k] = CC_ROW_COLS_DEF[k]; }); }
+    return o;
+  })();
+  function ccRowColsSave(){ try{ localStorage.setItem(CC_ROW_COLS_KEY, JSON.stringify(CC_ROW_COLS)); }catch(e){} }
+  function ccRowToggleCol(g){
+    if(!CC_ROW_COLS.hasOwnProperty(g)) return;
+    CC_ROW_COLS[g] = !CC_ROW_COLS[g]; ccRowColsSave();
+    lib_renderCostBody();
+  }
+  window.ccRowToggleCol = ccRowToggleCol;
+  /* ---- 表格列定义：oci -> {key, w(px), on():是否显示, th:表头文字, sub:二级表头} ---- */
+  function ccGridCols(dual){
+    var T = ccT;
+    var cols = [
+      { k:'idx',  w:34,  th:'#',                                  cls:'ccg-idx' },
+      { k:'house',w:92,  th:T('th_house'),                        cls:'ccg-merge' },
+      { k:'code', w:56,  th:T('th_houseCode'),                    cls:'ccg-merge' },
+      { k:'units',w:50,  th:T('th_units'),      sub:T('th_unitsShort'),  cls:'ccg-merge' },
+      { k:'bldgs',w:50,  th:T('th_bldgs'),                        cls:'ccg-merge' },
+      { k:'len',  w:58,  th:T('specLen'),       sub:T('unitMm'),  cls:'ccg-merge', on:'dim' },
+      { k:'wid',  w:58,  th:T('specWid'),       sub:T('unitMm'),  cls:'ccg-merge', on:'dim' },
+      { k:'hei',  w:54,  th:T('specHei'),       sub:T('unitMm'),  cls:'ccg-merge', on:'dim' },
+      { k:'qu',   w:64,  th:T('qty'),           sub:T('th_qtyUnit'),  cls:'ccg-num' },
+      { k:'qw',   w:70,  th:T('qty'),           sub:T('th_qtyWhole'), cls:'ccg-num ccg-calc' },
+      { k:'su',   w:70,  th:T('th_sqm'),        sub:T('th_sqmUnit'),  cls:'ccg-num ccg-calc', on:'sqm' },
+      { k:'sw',   w:72,  th:T('th_sqm'),        sub:T('th_sqmWhole'), cls:'ccg-num ccg-calc', on:'sqm' },
+      { k:'lyr',  w:54,  th:T('layers') },
+      { k:'bl',   w:52,  th:T('barsL'),         sub:T('unitPcs'),  cls:'ccg-num', on:'rebar' },
+      { k:'ml',   w:60,  th:T('th_rebarMm'),    sub:T('th_lenDir'), cls:'ccg-num ccg-calc', on:'rebar' },
+      { k:'bw',   w:52,  th:T('barsW'),         sub:T('unitPcs'),  cls:'ccg-num', on:'rebar' },
+      { k:'mw',   w:60,  th:T('th_rebarMm'),    sub:T('th_widDir'), cls:'ccg-num ccg-calc', on:'rebar' }
+    ];
+    if(dual){
+      cols.push({ k:'bl2', w:52, th:T('loLayer')+T('barsL'),  cls:'ccg-num ccg-lo', on:'rebar' });
+      cols.push({ k:'ml2', w:60, th:T('loLayer')+T('th_rebarMm'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
+      cols.push({ k:'bw2', w:52, th:T('loLayer')+T('barsW'),  cls:'ccg-num ccg-lo', on:'rebar' });
+      cols.push({ k:'mw2', w:60, th:T('loLayer')+T('th_rebarMm'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
+    }
+    cols.push({ k:'solid', w:56, th:T('solidSlat'), cls:'ccg-center', on:'solid' });
+    cols.push({ k:'hole',  w:56, th:T('th_hole'),   cls:'ccg-center', on:'hole' });
+    cols.push({ k:'price', w:78, th:T('th_price'),  cls:'ccg-num',    on:'price' });
+    cols.push({ k:'sub',   w:88, th:T('th_subtotal'), cls:'ccg-num ccg-calc', on:'subtotal' });
+    cols.push({ k:'remark',w:120,th:T('th_remark'), cls:'ccg-remark', on:'remark' });
+    cols.push({ k:'op',    w:96, th:T('op'),        cls:'ccg-op' });
+    return cols.filter(function(c){ return !c.on || !!CC_ROW_COLS[c.on]; });
+  }
+  /* ---- 合并分组：连续相同 groupKey 的行首行给 rowspan，其余行不出这 8 个 td ---- */
+  function ccGridGroupKey(sp){
+    return [String(sp.house || ''), String(sp.code || ''), ccRowUnits(sp), ccRowBldgs(sp),
+      Number(sp.len) || 0, Number(sp.wid) || 0, Number(sp.hei) || 0].join('|');
+  }
+  function ccGridGroups(specs){
+    var out = [], cur = null;
+    specs.forEach(function(sp, i){
+      var k = ccGridGroupKey(sp);
+      if(!cur || cur.key !== k){ cur = { key:k, rows:[i] }; out.push(cur); }
+      else cur.rows.push(i);
+    });
+    return out;
+  }
+  function ccEsc2(s){
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function ccGridIcons(i){
+    var T = ccT;
+    return '<button type="button" class="cc-icn" data-act="editrow" data-i="' + i + '" title="' + T('editRow') + '">'
+        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a56b0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>'
+      + ccIcnCopy(i)
+      + '<button type="button" class="cc-icn" data-act="mergerow" data-i="' + i + '" title="' + T('mergeRow') + '">'
+        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f9d58" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="8" rx="1.5"/><rect x="3" y="13" width="18" height="8" rx="1.5"/></svg></button>'
+      + ccIcnDel(i);
+  }
+  /* ---- 需求信息表（新） ---- */
+  function ccGridHtml(){
+    var T = ccT;
+    var specs = (CC_DATA && CC_DATA.demand && CC_DATA.demand.specs) || [];
+    var dual = ccSpecDualMode();
+    var cols = ccGridCols(dual);
+    var has = function(k){ for(var i=0;i<cols.length;i++){ if(cols[i].k===k) return true; } return false; };
+    /* 列开关按钮条 */
+    var tg = [['dim','dimCols'],['rebar','rebarCfg'],['solid','solidSlat'],['hole','th_hole'],['sqm','th_sqm'],['price','th_price'],['subtotal','th_subtotal'],['remark','th_remark']];
+    var toggleHtml = '<div class="ccg-toggles">' + tg.map(function(o){
+      var on = !!CC_ROW_COLS[o[0]];
+      return '<button type="button" class="ccg-tg' + (on ? ' on' : '') + '" onclick="ccRowToggleCol(\'' + o[0] + '\')" title="' + T('colToggle') + '">'
+        + (on ? '−' : '+') + ' ' + T(o[1]) + '</button>';
+    }).join('') + '</div>';
+    /* colgroup + 表头 */
+    var cg = '<colgroup>' + cols.map(function(c){ return '<col style="width:' + c.w + 'px">'; }).join('') + '</colgroup>';
+    var th1 = '<tr>' +
+      '<th rowspan="2" class="ccg-idx">' + T('th_no') + '</th>' +
+      '<th rowspan="2">' + T('th_house') + '</th>' +
+      '<th rowspan="2">' + T('th_houseCode') + '</th>' +
+      '<th rowspan="2">' + T('th_units') + '</th>' +
+      '<th rowspan="2">' + T('th_bldgs') + '</th>' +
+      (CC_ROW_COLS.dim ? '<th colspan="3">' + T('specDim') + '</th>' : '') +
+      '<th colspan="2">' + T('qty') + '</th>' +
+      (CC_ROW_COLS.sqm ? '<th colspan="2">' + T('th_sqm') + '</th>' : '') +
+      '<th rowspan="2">' + T('layers') + '</th>' +
+      (CC_ROW_COLS.rebar ? '<th colspan="' + (dual ? 8 : 4) + '">' + T('rebarCfg') + '</th>' : '') +
+      (CC_ROW_COLS.solid ? '<th rowspan="2">' + T('solidSlat') + '</th>' : '') +
+      (CC_ROW_COLS.hole ? '<th rowspan="2">' + T('th_hole') + '</th>' : '') +
+      (CC_ROW_COLS.price ? '<th rowspan="2">' + T('th_price') + '</th>' : '') +
+      (CC_ROW_COLS.subtotal ? '<th rowspan="2">' + T('th_subtotal') + '</th>' : '') +
+      (CC_ROW_COLS.remark ? '<th rowspan="2">' + T('th_remark') + '</th>' : '') +
+      '<th rowspan="2">' + T('op') + '</th></tr>';
+    var th2 = '<tr>' +
+      (CC_ROW_COLS.dim ? '<th>' + T('specLen') + '</th><th>' + T('specWid') + '</th><th>' + T('specHei') + '</th>' : '') +
+      '<th>' + T('th_qtyUnit') + '</th><th>' + T('th_qtyWhole') + '</th>' +
+      (CC_ROW_COLS.sqm ? '<th>' + T('th_sqmUnit') + '</th><th>' + T('th_sqmWhole') + '</th>' : '') +
+      (CC_ROW_COLS.rebar ? '<th>' + T('barsL') + '</th><th>' + T('th_rebarMm') + '</th><th>' + T('barsW') + '</th><th>' + T('th_rebarMm') + '</th>' : '') +
+      (dual && CC_ROW_COLS.rebar ? '<th class="ccg-lo">' + T('barsL') + '</th><th class="ccg-lo">' + T('th_rebarMm') + '</th><th class="ccg-lo">' + T('barsW') + '</th><th class="ccg-lo">' + T('th_rebarMm') + '</th>' : '') +
+      '</tr>';
+    /* 数据行：按组合并 8 列（序号/猪舍/编号/单元/栋数/长/宽/高） */
+    var groups = ccGridGroups(specs), body = '';
+    var no = 0;
+    groups.forEach(function(g){
+      no++;
+      g.rows.forEach(function(ri, gi){
+        var sp = specs[ri] || {};
+        var l = Number(sp.len) || 0, w = Number(sp.wid) || 0, hh = Number(sp.hei) || 0;
+        var cls = [];
+        if(ccRowIsSolid(sp)) cls.push('ccg-solid-yes');
+        if(ccRowIsHole(sp))  cls.push('ccg-hole-yes');
+        body += '<tr data-row="' + ri + '"' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') + '>';
+        if(gi === 0){
+          var rs = ' rowspan="' + g.rows.length + '"';
+          body += '<td class="ccg-idx' + '"' + rs + '><span class="ccg-no">' + no + '</span>'
+                + '<span class="ccg-info" title="' + T('th_house') + ' / ' + T('specDim') + '">ⓘ</span></td>';
+          body += '<td' + rs + '>' + ccEsc2(sp.house || '—') + '</td>';
+          body += '<td' + rs + '>' + ccEsc2(sp.code || '') + '</td>';
+          body += '<td' + rs + '>' + ccNum(ccRowUnits(sp)) + '</td>';
+          body += '<td' + rs + '>' + ccNum(ccRowBldgs(sp)) + '</td>';
+          if(CC_ROW_COLS.dim) body += '<td' + rs + '>' + (l ? ccNum(l) : '') + '</td><td' + rs + '>' + (w ? ccNum(w) : '') + '</td><td' + rs + '>' + (hh ? ccNum(hh) : '') + '</td>';
+        } else if(CC_ROW_COLS.dim === false){
+          /* 尺寸列被合并列覆盖，无需再出 td */
+        }
+        body += '<td>' + ccNum(ccRowQtyUnit(sp)) + '</td>';
+        body += '<td class="ccg-b">' + ccNum(ccRowQtyWhole(sp)) + '</td>';
+        if(CC_ROW_COLS.sqm){
+          body += '<td>' + ccNum2(ccRowSqmUnit(sp)) + '</td>';
+          body += '<td class="ccg-b">' + ccNum2(ccRowSqmWhole(sp)) + '</td>';
+        }
+        body += '<td>' + ccNum(Number(sp.layers) || 0) + '</td>';
+        if(CC_ROW_COLS.rebar){
+          body += '<td>' + ccNum(Number(sp.nl) || 0) + '</td>';
+          body += '<td>' + (ccRowMmLen(sp) ? ccNum(ccRowMmLen(sp)) : '') + '</td>';
+          body += '<td>' + ccNum(Number(sp.nw) || 0) + '</td>';
+          body += '<td>' + (ccRowMmWid(sp) ? ccNum(ccRowMmWid(sp)) : '') + '</td>';
+          if(dual){
+            var lo = Number(sp.layers) === 2;
+            body += '<td class="ccg-lo">' + (lo ? ccNum(Number(sp.nl2) || 0) : '—') + '</td>';
+            body += '<td class="ccg-lo">' + (lo && ccRowMmLen(sp) ? ccNum(ccRowMmLen(sp)) : '—') + '</td>';
+            body += '<td class="ccg-lo">' + (lo ? ccNum(Number(sp.nw2) || 0) : '—') + '</td>';
+            body += '<td class="ccg-lo">' + (lo && ccRowMmWid(sp) ? ccNum(ccRowMmWid(sp)) : '—') + '</td>';
+          }
+        }
+        if(CC_ROW_COLS.solid) body += '<td class="ccg-center">' + (ccRowIsSolid(sp) ? 'YES' : 'NO') + '</td>';
+        if(CC_ROW_COLS.hole)  body += '<td class="ccg-center">' + (ccRowIsHole(sp) ? 'YES' : 'NO') + '</td>';
+        if(CC_ROW_COLS.price) body += '<td>' + (Number(sp.price) ? ccNum(Number(sp.price)) : '') + '</td>';
+        if(CC_ROW_COLS.subtotal) body += '<td class="ccg-b">' + (Number(sp.price) ? ccNum(ccRowQtyWhole(sp) * (Number(sp.price) || 0)) : '') + '</td>';
+        if(CC_ROW_COLS.remark) body += '<td class="ccg-remark">' + ccEsc2(sp.remark || '') + '</td>';
+        body += '<td class="ccg-op">' + ccGridIcons(ri) + '</td></tr>';
+      });
+    });
+    if(!specs.length){
+      body = '<tr><td colspan="' + cols.length + '" style="text-align:center;color:#888;padding:14px;">' + T('emptySpec') + '</td></tr>';
+    }
+    var tQty = 0, tArea = 0;
+    specs.forEach(function(sp){ tQty += ccRowQtyWhole(sp); tArea += ccRowSqmWhole(sp); });
+    var foot = '<tr class="ccg-foot"><td colspan="6" style="text-align:right;font-weight:700;">' + T('totalAll') + '</td>'
+      + '<td class="ccg-b">' + ccNum(tQty) + '</td><td></td><td></td><td></td><td class="ccg-b">' + ccNum(tArea) + '</td>'
+      + '</tr>';
+    /* 表尾合计用简化行：只在关键列放数，其余留空（colspan 由列数决定，避免错位） */
+    /* 合计行：colspan 必须覆盖 序号/猪舍/编号/单元/栋数(5) + 长宽高(3)，否则整行错位 */
+    var footCells = '<td colspan="' + (CC_ROW_COLS.dim ? 8 : 5) + '" style="text-align:right;font-weight:700;">' + T('totalAll') + '</td>'
+      + '<td></td><td class="ccg-b">' + ccNum(tQty) + '</td>'
+      + (CC_ROW_COLS.sqm ? '<td></td><td class="ccg-b">' + ccNum(tArea) + '</td>' : '')
+      + '<td></td>'
+      + (CC_ROW_COLS.rebar ? '<td></td><td></td><td></td><td></td>' + (dual ? '<td></td><td></td><td></td><td></td>' : '') : '')
+      + (CC_ROW_COLS.solid ? '<td></td>' : '') + (CC_ROW_COLS.hole ? '<td></td>' : '')
+      + (CC_ROW_COLS.price ? '<td></td>' : '') + (CC_ROW_COLS.subtotal ? '<td></td>' : '') + (CC_ROW_COLS.remark ? '<td></td>' : '')
+      + '<td></td>';
+    return '<div class="ccg-wrap">' + toggleHtml
+      + '<div class="ccg-scroll"><table class="ccg-tb' + (dual ? ' ccg-dual' : '') + '">' + cg + '<thead>' + th1 + th2 + '</thead><tbody>' + body + '</tbody>'
+      + '<tfoot><tr>' + footCells + '</tr></tfoot></table></div></div>';
+  }
+  /* ---- 行编辑弹窗（与「水泥漏缝地板规格」同一套控件：输入框 / φ 下拉 / YES-NO 下拉） ---- */
+  var CC_GRID_EDIT_I = -1;
+  function ccGridEditOpen(i){
+    var specs = (CC_DATA.demand && CC_DATA.demand.specs) || [];
+    var sp = specs[i]; if(!sp) return;
+    if(!ccCanEdit()) return;
+    CC_GRID_EDIT_I = i;
+    var T = ccT, ro = '';
+    var fld = function(label, f, v, type, step){
+      return '<label class="ccg-f"><span>' + label + '</span><input id="ccg_e_' + f + '" value="' + ccEsc2(v == null ? '' : v) + '" inputmode="' + (type === 'text' ? 'text' : 'decimal') + '"' + ro + '></label>';
+    };
+    var sel = function(label, f, v, opts){
+      return '<label class="ccg-f"><span>' + label + '</span><select id="ccg_e_' + f + '">' + opts.map(function(o){
+        return '<option value="' + o[0] + '"' + (String(v) === String(o[0]) ? ' selected' : '') + '>' + o[1] + '</option>';
+      }).join('') + '</select></label>';
+    };
+    var diaOpts = [['','—'],['6','φ6'],['8','φ8'],['10','φ10'],['12','φ12']];
+    var ynOpts = [['YES','YES'],['NO','NO']];
+    var lay = Number(sp.layers) === 2 ? 2 : 1;
+    var h = '<div class="ccg-modal-mask" id="ccg_modal_mask">'
+      + '<div class="ccg-modal"><div class="ccg-modal-h">' + T('editRow') + ' #' + (i + 1) + '<button type="button" class="ccg-x" id="ccg_modal_x">✕</button></div>'
+      + '<div class="ccg-modal-b">'
+      + '<div class="ccg-fs"><div class="ccg-fs-t">' + T('th_house') + '</div>'
+      + fld(T('th_house'), 'house', sp.house || '', 'text') + fld(T('th_houseCode'), 'code', sp.code || '', 'text')
+      + fld(T('th_units'), 'units', ccRowUnits(sp)) + fld(T('th_bldgs'), 'bldgs', ccRowBldgs(sp)) + '</div>'
+      + '<div class="ccg-fs"><div class="ccg-fs-t">' + T('specDim') + ' / ' + T('qty') + '</div>'
+      + fld(T('specLen'), 'len', sp.len || '') + fld(T('specWid'), 'wid', sp.wid || '') + fld(T('specHei'), 'hei', sp.hei || '')
+      + fld(T('th_qtyUnit'), 'qty', sp.qty || '') + '</div>'
+      + '<div class="ccg-fs"><div class="ccg-fs-t">' + T('rebarCfg') + ' · ' + T('upLayer') + '</div>'
+      + sel(T('layers'), 'layers', lay, [['1','1'],['2','2']])
+      + fld(T('barsL'), 'nl', sp.nl || '') + sel(T('rDiaL'), 'rL', sp.rL || '', diaOpts)
+      + fld(T('barsW'), 'nw', sp.nw || '') + sel(T('rDiaW'), 'rW', sp.rW || '', diaOpts) + '</div>'
+      + '<div class="ccg-fs" id="ccg_fs_lo" style="' + (lay === 2 ? '' : 'display:none;') + '"><div class="ccg-fs-t">' + T('rebarCfg') + ' · ' + T('loLayer') + '</div>'
+      + fld(T('barsL'), 'nl2', sp.nl2 || '') + sel(T('rDiaL'), 'rL2', sp.rL2 || '', diaOpts)
+      + fld(T('barsW'), 'nw2', sp.nw2 || '') + sel(T('rDiaW'), 'rW2', sp.rW2 || '', diaOpts) + '</div>'
+      + '<div class="ccg-fs"><div class="ccg-fs-t">' + T('solidSlat') + ' / ' + T('th_price') + '</div>'
+      + sel(T('solidSlat'), 'solid', sp.solid || 'NO', ynOpts) + sel(T('th_hole'), 'hole', sp.hole || 'NO', ynOpts)
+      + fld(T('th_price'), 'price', sp.price || '') + '</div>'
+      + '<div class="ccg-fs"><div class="ccg-fs-t">' + T('th_remark') + '</div>'
+      + '<label class="ccg-f ccg-f-wide"><span>' + T('th_remark') + '</span><input id="ccg_e_remark" value="' + ccEsc2(sp.remark || '') + '"></label></div>'
+      + '</div>'
+      + '<div class="ccg-modal-f"><button type="button" class="cc-btn" id="ccg_modal_ok">' + T('btnSave') + '</button>'
+      + '<button type="button" class="cc-btn cc-btn-plain" id="ccg_modal_no">' + T('btnCancel') + '</button></div>'
+      + '</div></div>';
+    var old = document.getElementById('ccg_modal_mask'); if(old) old.parentNode.removeChild(old);
+    var wrap = document.createElement('div'); wrap.innerHTML = h;
+    document.body.appendChild(wrap.firstChild);
+    var mask = document.getElementById('ccg_modal_mask');
+    var close = function(){ if(mask && mask.parentNode) mask.parentNode.removeChild(mask); CC_GRID_EDIT_I = -1; };
+    var laySel = document.getElementById('ccg_e_layers');
+    if(laySel) laySel.onchange = function(){
+      var lo = document.getElementById('ccg_fs_lo'); if(lo) lo.style.display = (String(laySel.value) === '2') ? '' : 'none';
+    };
+    var xb = document.getElementById('ccg_modal_x'); if(xb) xb.onclick = close;
+    var nb = document.getElementById('ccg_modal_no'); if(nb) nb.onclick = close;
+    if(mask) mask.onclick = function(ev){ if(ev.target === mask) close(); };
+    var okb = document.getElementById('ccg_modal_ok');
+    if(okb) okb.onclick = function(){
+      var gv = function(f){ var e = document.getElementById('ccg_e_' + f); return e ? e.value : ''; };
+      var num = function(f){ return ccParseVnd(gv(f)); };
+      var target = CC_DATA.demand.specs[i]; if(!target){ close(); return; }
+      target.house = gv('house');
+      target.code = gv('code');
+      target.units = Math.max(1, Math.round(num('units') || 1));
+      target.bldgs = Math.max(1, Math.round(num('bldgs') || 1));
+      target.len = num('len'); target.wid = num('wid'); target.hei = num('hei');
+      target.qty = num('qty');
+      target.layers = (String(gv('layers')) === '2') ? 2 : 1;
+      target.nl = num('nl'); target.rL = gv('rL');
+      target.nw = num('nw'); target.rW = gv('rW');
+      target.nl2 = num('nl2'); target.rL2 = gv('rL2');
+      target.nw2 = num('nw2'); target.rW2 = gv('rW2');
+      target.d2mod = 1;
+      target.solid = (String(gv('solid')).toUpperCase() === 'YES') ? 'YES' : 'NO';
+      target.hole  = (String(gv('hole')).toUpperCase() === 'YES') ? 'YES' : 'NO';
+      target.price = num('price');
+      target.remark = gv('remark');
+      close();
+      lib_renderCostBody();
+      ccScheduleSave();
+    };
+  }
+  window.ccGridEditOpen = ccGridEditOpen;
+  /* ★CC-SPECGRID-20261113：新表所需三语文案（只补缺，绝不覆盖既有 key） */
+  (function(){
+    if(typeof CC_LANG === 'undefined' || !CC_LANG) return;
+    var add = {
+      th_no:        { zh:'序号', en:'No.', vi:'STT' },
+      th_house:     { zh:'猪舍', en:'House', vi:'Chuồng' },
+      th_houseCode: { zh:'房舍编号', en:'House code', vi:'Mã chuồng' },
+      th_units:     { zh:'单元', en:'Units', vi:'Đơn vị' },
+      th_unitsShort:{ zh:'单元/栋', en:'Units/bldg', vi:'ĐV/tòa' },
+      th_bldgs:     { zh:'栋数', en:'Bldgs', vi:'Số tòa' },
+      th_qtyUnit:   { zh:'数量/单元', en:'Qty/unit', vi:'SL/đơn vị' },
+      th_qtyWhole:  { zh:'数量/整场', en:'Qty/farm', vi:'SL/toàn bộ' },
+      th_sqm:       { zh:'平米', en:'Area', vi:'Diện tích' },
+      th_sqmUnit:   { zh:'平米/单元', en:'m²/unit', vi:'m²/đơn vị' },
+      th_sqmWhole:  { zh:'平米/整场', en:'m²/farm', vi:'m²/toàn bộ' },
+      th_rebarMm:   { zh:'钢筋尺寸(mm)', en:'Rebar size (mm)', vi:'Cỡ thép (mm)' },
+      th_lenDir:    { zh:'长方向', en:'length dir.', vi:'chiều dài' },
+      th_widDir:    { zh:'宽方向', en:'width dir.', vi:'chiều rộng' },
+      th_hole:      { zh:'带圆孔?', en:'Hole slat?', vi:'Tấm có lỗ?' },
+      th_price:     { zh:'单价', en:'Unit price', vi:'Đơn giá' },
+      th_subtotal:  { zh:'小计', en:'Subtotal', vi:'Tiểu kế' },
+      th_remark:    { zh:'备注', en:'Remark', vi:'Ghi chú' },
+      unitMm:       { zh:'mm', en:'mm', vi:'mm' },
+      unitPcs:      { zh:'条', en:'pcs', vi:'thanh' },
+      editRow:      { zh:'编辑', en:'Edit', vi:'Sửa' },
+      mergeRow:     { zh:'合并到上一组', en:'Merge into group above', vi:'Gộp vào nhóm trên' },
+      colToggle:    { zh:'勾选显示列', en:'Show/hide columns', vi:'Chọn cột hiển thị' },
+      dimCols:      { zh:'长宽高', en:'L×W×H', vi:'D×R×C' },
+      emptySpec:    { zh:'暂无规格行，点右上角「增加行」开始', en:'No spec rows yet — click "Add row"', vi:'Chưa có dòng quy cách — bấm "Thêm dòng"' },
+      btnSave:      { zh:'保存', en:'Save', vi:'Lưu' },
+      btnCancel:    { zh:'取消', en:'Cancel', vi:'Hủy' }
+    };
+    Object.keys(add).forEach(function(k){ if(!CC_LANG[k]) CC_LANG[k] = add[k]; });
+  })();
   function ccHtml(){
     ccStyle();
     var ro = ccCanEdit();
@@ -65416,64 +65808,8 @@ function submitAuth() {
       '<span style="white-space:nowrap;font-size:12px;">' + ccT('totalArea') + '：<b id="cc_v_area" style="color:#d32f2f;">0</b> ㎡</span>' +
       '<button class="cc-add" data-act="addspec" style="margin:0;">' + ccT('addRow2') + '</button>' +
       '<button class="cc-add" id="cc_print_btn" onclick="ccPrintPdf()" style="margin:0;background:#1a56b0;border-color:#1a56b0;color:#fff;">🖨 ' + ccT('printPdf') + '</button></div>'; // ★CC-PRINTPDF-20261106：右上角打印PDF（只读也可用，故不走 data-act）
-    // ★CC-DUAL-20261104：单层表原样；任一行层数=2 时整表切 13 列双层表（上层6列+下层6列+层数列）
-    var specDual = ccSpecDualMode();
-    // ★CC-DUAL-NOHSCROLL-20261104：表头压成 2 行（上/下 + 短字段），完整字段名保留在 title；18 列按百分比等分，表格永远等于容器宽度
-    var dTh = function(pre, key, sh){
-      var full = (ccT(pre) + '-' + ccT(key)).replace(/"/g, '&quot;');
-      return '<th class="cc-th2' + (pre === 'upLayer' ? ' cc-th2-up' : '') + '" title="' + full + '">' + ccT(pre) + '<br>' + ccT(sh) + '</th>';
-    };
-    var dColW = [6, 6, 6, 6, 5];
-    for(var ci = 0; ci < 12; ci++) dColW.push(4.9167);
-    /* ★CC-SOLID-20261109：3 尺寸 + 数量 + 层数 + 12 钢筋 + 实心板? + 操作 = 19 列，合计 100%（钢筋列让出 6%） */
-    dColW.push(6, 6);
-    var dCols = '<colgroup>' + dColW.map(function(w){ return '<col style="width:' + w + '%;">'; }).join('') + '</colgroup>';
-    h += '<table class="cc-tb cc-tb-spec' + (specDual ? ' cc-dual' : '') + '">' +
-      (specDual ? dCols : '') + '<thead><tr>' +
-      '<th colspan="3">' + ccT('specDim') + '</th>' +
-      '<th rowspan="2" style="width:80px;">' + ccT('qty') + '</th>' +
-      '<th colspan="' + (specDual ? 13 : 7) + '">' + ccT('rebarCfg') + '</th>' +
-      '<th rowspan="2" class="cc-th-solid" style="width:72px;">' + ccT('solidSlat') + '</th>' +
-      '<th rowspan="2" style="width:64px;">' + ccT('op') + '</th></tr>' +
-      '<tr><th style="width:90px;">' + ccT('specLen') + '</th><th style="width:90px;">' + ccT('specWid') + '</th><th style="width:90px;">' + ccT('specHei') + '</th>' +
-      '<th style="width:80px;">' + ccT('layers') + '</th>' +
-      (specDual ?
-        dTh('upLayer','barsL','dBarL') + dTh('upLayer','rDiaL','dDiaL') + dTh('upLayer','rebarL','dSizeL') +
-        dTh('upLayer','barsW','dBarW') + dTh('upLayer','rDiaW','dDiaW') + dTh('upLayer','rebarW','dSizeW') +
-        dTh('loLayer','barsL','dBarL') + dTh('loLayer','rDiaL','dDiaL') + dTh('loLayer','rebarL','dSizeL') +
-        dTh('loLayer','barsW','dBarW') + dTh('loLayer','rDiaW','dDiaW') + dTh('loLayer','rebarW','dSizeW')
-        :
-        '<th style="width:100px;">' + ccT('barsL') + '</th><th style="width:110px;">' + ccT('rDiaL') + '</th><th style="width:120px;">' + ccT('rebarL') + '</th>' +
-        '<th style="width:100px;">' + ccT('barsW') + '</th><th style="width:110px;">' + ccT('rDiaW') + '</th><th style="width:120px;">' + ccT('rebarW') + '</th>'
-      ) + '</tr></thead><tbody>';
-    specs.forEach(function(sp, i){
-      var offLower = specDual && Number(sp.layers) !== 2;
-      /* ★CC-SOLID-20261109：YES 行整行红字（纯显示层，不参与成本计算） */
-      h += '<tr' + (String(sp.solid||'').trim().toUpperCase() === 'YES' ? ' class="cc-solid-yes"' : '') + '>' +
-        ccSpecTd('len', sp, i) + ccSpecTd('wid', sp, i) + ccSpecTd('hei', sp, i) +
-        ccSpecTd('qty', sp, i) + ccSpecTd('layers', sp, i) +
-        ccSpecTd('nl', sp, i) + '<td>' + ccInSel('rL', sp.rL, i) + '</td>' +
-        '<td class="cc-subcell" data-dlen="' + i + '">0</td>' +
-        ccSpecTd('nw', sp, i) + '<td>' + ccInSel('rW', sp.rW, i) + '</td>' +
-        '<td class="cc-subcell" data-dwid="' + i + '">0</td>' +
-        (specDual ? (offLower ?
-          ccSpecOff('nl2', i) + ccSpecOff('rL2', i) + '<td class="cc-offcell">&nbsp;</td>' +
-          ccSpecOff('nw2', i) + ccSpecOff('rW2', i) + '<td class="cc-offcell">&nbsp;</td>'
-          :
-          ccSpecTd('nl2', sp, i) + '<td>' + ccInSel('rL2', sp.rL2, i) + '</td>' +
-          '<td class="cc-subcell" data-dlen="' + i + '">0</td>' +
-          ccSpecTd('nw2', sp, i) + '<td>' + ccInSel('rW2', sp.rW2, i) + '</td>' +
-          '<td class="cc-subcell" data-dwid="' + i + '">0</td>'
-        ) : '') +
-        '<td class="cc-solid-cell">' + ccInSolid(sp.solid, i) + '</td>' +
-        '<td style="text-align:center;white-space:nowrap;">' + ccIcnCopy(i) + ccIcnDel(i) + '</td>' +
-        '</tr>';
-    });
-    h += '</tbody><tfoot><tr>' +
-      '<td colspan="3" style="text-align:right;">' + ccT('totalAll') + '</td>' +
-      '<td style="text-align:right;" id="cc_v_blocks_ft">0</td>' +
-      '<td colspan="' + (specDual ? 15 : 9) + '"></td></tr></tfoot></table>' +
-      (specDual ? '<div class="cc-note">' + ccT('dualNote') + '</div>' : '');
+    // ★CC-SPECGRID-20261113：整表换成「水泥漏缝地板规格」逻辑（合并分组 + 列开关 + ✎⧉▦🗑 + 总块数/总面积同源）
+    h += ccGridHtml();
     // ★CC-SPEC-SUMMARY-20261104：需求信息表底部总概括（材料/钢筋/单方指标，按智能报告公式）
     // ★CC-FOLD-20261106：钢筋/规格汇总框可折叠
     h += '<div class="cc-fold"><div class="cc-fold-head"><button type="button" class="cc-fold-btn">−</button>' +
@@ -66001,9 +66337,9 @@ function submitAuth() {
     var d = CC_DATA || ccDef();
     var blocks = 0, area = 0;
     (d.demand.specs || []).forEach(function(sp){
-      var q = Number(sp.qty) || 0, l = Number(sp.len) || 0, w = Number(sp.wid) || 0;
-      blocks += q;
-      area += (l > 0 && w > 0) ? (l * w * q / 1e6) : ((Number(sp.larea) || 0) * q);
+      /* ★CC-SPECGRID-20261113：与需求表同源（数量/整场、平米/整场） */
+      blocks += ccRowQtyWhole(sp);
+      area += ccRowSqmWhole(sp);
     });
     var mach = 0, agg = 0, labor = 0, opex = 0, opexMonthly = 0, ind = 0;
     ['mech','veh','tools'].forEach(function(g){ (d.mach[g] || []).forEach(function(it, i){
@@ -66409,7 +66745,7 @@ function submitAuth() {
   // ★CC-WD3-20261104：安装效率计算（总块数/日产能/安装天数/4%余量/实际天数），项目天数与汇总行共用
   function ccInstCalc(){
     var d = CC_DATA && CC_DATA.demand ? CC_DATA.demand : {}, c = d.crew || {};
-    var total = 0; (d.specs || []).forEach(function(sp){ total += Number(sp && sp.qty) || 0; });
+    var total = 0; (d.specs || []).forEach(function(sp){ total += ccRowQtyWhole(sp); });
     var daily = (Number(c.groups) || 0) * (Number(c.perDay) || 0);
     var days = daily > 0 ? Math.ceil(total / daily) : 0;
     var buf = Math.ceil(days * 0.04);
@@ -66445,14 +66781,13 @@ function submitAuth() {
     var ccVol = 0, ccCem = 0, ccSand = 0, ccGrav = 0, ccRTon = 0, ccRLen = 0, ccSpecN = 0, ccRRows = [], ccDia = {};
     var ccDual = ccSpecDualMode(); // ★CC-DUAL-20261104：整表双层时汇总口径同步切换
     (CC_DATA.demand.specs || []).forEach(function(sp, i){
-      var l = Number(sp.len) || 0, w = Number(sp.wid) || 0, q = Number(sp.qty) || 0, h3 = Number(sp.hei) || 0;
+      /* ★CC-SPECGRID-20261113：数量/整场 = 数量/单元 × 单元数 × 栋数；面积同源（ccRowSqmWhole） */
+      var l = Number(sp.len) || 0, w = Number(sp.wid) || 0, q = ccRowQtyWhole(sp), h3 = Number(sp.hei) || 0;
       blocks += q;
-      area += (l > 0 && w > 0) ? (l * w * q / 1e6) : ((Number(sp.larea) || 0) * q);
+      area += ccRowSqmWhole(sp);
       // ★CC-REBAR-AUTO-20261104：钢筋尺寸(长度方向)=长−9，(宽度方向)=宽−9（mm），自动计算只读
       sp.dl = l > 0 ? l - 9 : 0;
       sp.dw = w > 0 ? w - 9 : 0;
-      host.querySelectorAll('[data-dlen="' + i + '"]').forEach(function(e){ e.textContent = ccNum(sp.dl); });
-      host.querySelectorAll('[data-dwid="' + i + '"]').forEach(function(e){ e.textContent = ccNum(sp.dw); });
       if(sp.rL) usedDia[String(sp.rL)] = 1;
       if(sp.rW) usedDia[String(sp.rW)] = 1;
       if(ccDual && (Number(sp.layers) || 0) === 2){
@@ -66692,10 +67027,11 @@ function submitAuth() {
     var CPD = Number(CC_DATA.demand.moldCpd) || 40, MPRICE = 3; // 模/天/生产线(输入框可改,默认40) / 万元每套
     var LINES = Math.max(1, parseInt(String(CC_DATA.demand.moldLines), 10) || 2); // 生产线数(输入框可改,默认2)
     var mtEl = document.getElementById('cc_mold_total'); if(mtEl) mtEl.textContent = ccNum(CPD * LINES); // ★CC-MOLDLINES-20261106：全部生产线共计脱模次数
-    var sl = (CC_DATA.demand.specs || []).filter(function(sp){ return sp.len > 0 && sp.wid > 0 && (Number(sp.qty) || 0) > 0; });
+    /* ★CC-SPECGRID-20261113：模具估算的"块数"必须用 数量/整场（含单元/栋数），否则有单元的行会少算 */
+    var sl = (CC_DATA.demand.specs || []).filter(function(sp){ return sp.len > 0 && sp.wid > 0 && ccRowQtyWhole(sp) > 0; });
     var eMa = document.getElementById('cc_mold_a'), eMc = document.getElementById('cc_mold_c');
     function ccSpecLine(m, ind, prefix){
-      var dP = Math.ceil((Number(m.sp.qty) || 0) / (m.pcs * CPD * LINES)); // 全线并行天数
+      var dP = Math.ceil(ccRowQtyWhole(m.sp) / (m.pcs * CPD * LINES)); // 全线并行天数（★CC-SPECGRID-20261113：按整场块数）
       return '<div style="margin:2px 0 2px ' + (ind ? '14px' : '0') + ';">' + (ind ? '· ' : '') + ccNum(m.sp.len) + '×' + ccNum(m.sp.wid) + '：' + (prefix || '') +
         ccT('moldPer') + ' ' + m.pcs + ' ' + ccT('moldPcs') + ' · ' + ccT('moldDaily') + ' ' + ccNum(m.pcs * CPD * LINES) + ' ' + ccT('moldPcs') +
         ' · ' + ccT('moldNeedDays') + ' ' + dP + ' ' + ccT('moldDaysUnit') + '</div>';
@@ -67252,19 +67588,30 @@ function submitAuth() {
         if(!arr.length) arr.push({ n:'', qty:1, price:0 });
         lib_renderCostBody(); ccScheduleSave();
       } else if(act === 'addspec'){
-        // ★CC-SPEC-20261104：需求信息规格行 增加行/删除
-        CC_DATA.demand.specs.push(ccSpecDef());
+        // ★CC-SPECGRID-20261113：需求信息 增加行（带 猪舍/单元/栋数 等新字段）
+        CC_DATA.demand.specs.push(ccGridRowDef());
         lib_renderCostBody(); ccScheduleSave();
-      } else if(act === 'copyspec'){
-        // ★CC-SPEC-20261104：复制该规格行并插到下一行
+      } else if(act === 'copyrow' || act === 'copyspec'){
+        // ★CC-SPECGRID-20261113：复制该行并插到下一行（数据全字段深拷贝）
         var sps2 = CC_DATA.demand.specs;
         var si = Number(el.getAttribute('data-i'));
         if(sps2[si]){ sps2.splice(si + 1, 0, JSON.parse(JSON.stringify(sps2[si]))); }
         lib_renderCostBody(); ccScheduleSave();
+      } else if(act === 'mergerow'){
+        // ★CC-SPECGRID-20261113：合并 = 把该行的 猪舍/房舍编号/单元/栋数/长/宽/高 对齐上一行 → 归入同一 rowspan 组
+        var sps3 = CC_DATA.demand.specs;
+        var mi = Number(el.getAttribute('data-i'));
+        if(mi > 0 && sps3[mi - 1] && sps3[mi]){
+          var pv = sps3[mi - 1], cv = sps3[mi];
+          ['house','code','units','bldgs','len','wid','hei'].forEach(function(k){ cv[k] = pv[k]; });
+          lib_renderCostBody(); ccScheduleSave();
+        }
+      } else if(act === 'editrow'){
+        ccGridEditOpen(Number(el.getAttribute('data-i')));
       } else if(act === 'delspec'){
         var sps = CC_DATA.demand.specs;
         sps.splice(Number(el.getAttribute('data-i')), 1);
-        if(!sps.length) sps.push(ccSpecDef());
+        if(!sps.length) sps.push(ccGridRowDef());
         lib_renderCostBody(); ccScheduleSave();
       }
     };
