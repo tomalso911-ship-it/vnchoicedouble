@@ -65012,7 +65012,8 @@ function submitAuth() {
       '.ccg-scroll{width:100%;overflow-x:hidden;}',
       '.ccg-tb{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px;background:#fff;transform-origin:top left;}',
       '.ccg-tb th,.ccg-tb td{border:1px solid #e7e7e7;padding:0 2px;text-align:center;white-space:nowrap;overflow:hidden;vertical-align:middle;height:23px;font-variant-numeric:tabular-nums;}',
-      '.ccg-tb thead th{background:linear-gradient(135deg,#E53935,#C62828);color:#fff;font-weight:700;font-size:8px;line-height:1.15;padding:2px 1px;white-space:normal;word-break:break-word;}',
+      /* ★CC-COLPCT-20261113：表头字体大一号(9px)，宽度不够就换行、始终左右居中 */
+      '.ccg-tb thead th{background:linear-gradient(135deg,#E53935,#C62828);color:#fff;font-weight:700;font-size:9px;line-height:1.25;padding:3px 1px;white-space:normal;word-break:break-word;text-align:center;vertical-align:middle;}',
       '.ccg-tb thead th.ccg-lo{background:#b8d3f0;color:#0d3b6f;}',
       '.ccg-tb tbody tr:nth-child(even) td{background:#fbfdff;}',
       '.ccg-tb .ccg-b{font-weight:700;color:#d32f2f;}',
@@ -65023,13 +65024,16 @@ function submitAuth() {
       '.ccg-tb tr.ccg-solid-yes.ccg-hole-yes td{color:#7B1FA2 !important;}',
       '.ccg-tb tfoot td{background:#fff8e1;font-weight:700;}',
       '.ccg-tb td.ccg-lo{background:#f4f9ff;}',
-      '.ccg-cell2{padding:0 1px !important;}',
+      /* ★CC-REBARCELL-20261113：钢筋尺寸(mm) 格 = 数值 + 小号 φ 下拉，横向居中并排 */
+      '.ccg-mmcell{padding:0 1px !important;white-space:nowrap;text-align:center;}',
+      '.ccg-mmcell>span{font-size:9px;margin-right:1px;}',
+      '.ccg-mmcell>.ccg-sel{width:32px !important;height:16px !important;min-height:0 !important;font-size:8px !important;padding:0 0 0 1px !important;border:1px solid #cfd8e3;background:#fff;border-radius:3px;box-sizing:border-box;}',
       '.ccg-in{width:100%;border:1px solid transparent;background:transparent;font-size:9px;text-align:center;color:inherit;font-family:inherit;padding:1px 0;outline:none;box-sizing:border-box;}',
       '.ccg-in:hover{border-color:#cfe0f5;background:#fff;}',
       '.ccg-in:focus{border-color:#1a73e8;background:#fff;}',
       '.ccg-in-num{text-align:right;}',
       '.ccg-in-txt{text-align:center;}',
-      '.ccg-sel{width:100%;max-width:100%;border-color:#dde3ea;background:#fff;text-align:center;font-size:9px;padding:0;}',
+      '.ccg-sel{width:100%;max-width:100%;border-color:#dde3ea;background:#fff;text-align:center;font-size:9px;padding:0;height:18px;line-height:1;box-sizing:border-box;}',
       /* 钢筋单元格：mm 数值 + 小号 φ 下拉并排 */
       '.ccg-cell2>span{font-size:9px;margin-right:1px;}',
       '.ccg-cell2 .ccg-sel{width:30px;font-size:8px;}',
@@ -65613,7 +65617,10 @@ function submitAuth() {
       set('ccg_sw_' + i, ccNum2(sw));
       set('ccg_ml_' + i, ccRowMmLen(sp) ? ccNum(ccRowMmLen(sp)) : '');
       set('ccg_mw_' + i, ccRowMmWid(sp) ? ccNum(ccRowMmWid(sp)) : '');
-      set('ccg_sub_' + i, Number(sp.price) ? ccNum(qw * (Number(sp.price) || 0)) : '');
+      var lo2 = Number(sp.layers) === 2;
+      set('ccg_ml2_' + i, (lo2 && ccRowMmLen(sp)) ? ccNum(ccRowMmLen(sp)) : '');
+      set('ccg_mw2_' + i, (lo2 && ccRowMmWid(sp)) ? ccNum(ccRowMmWid(sp)) : '');
+      set('ccg_sub_' + i, Number(sp.price) ? ('₫' + ccNum(qw * (Number(sp.price) || 0))) : '');
     });
     set('ccg_ft_qty', ccNum(tq));
     set('ccg_ft_area', ccNum(ta));
@@ -65624,19 +65631,10 @@ function submitAuth() {
   /* 自适应：列宽固定 → 整表按容器宽度等比 zoom，永远铺满且不出现底部横向滚动条 */
   function ccGridFit(){
     var t = document.querySelector('.ccg-tb');
-    if(!t || !t.parentNode) return;
-    var avail = t.parentNode.clientWidth - 2;
-    var minw = Number(t.getAttribute('data-minw')) || 0;
-    if(avail <= 0 || !minw){ return; }
-    var z = Math.min(1, avail / minw);
-    if(z >= 0.999){
-      /* 容器够宽：整表拉满 100%，列宽按 colgroup 比例分 */
-      t.style.zoom = ''; t.style.width = '100%';
-    } else {
-      /* 容器不够宽：表格保持最小可读宽度，再整体等比缩小 → 视觉上永远铺满且无横向滚动条 */
-      t.style.width = minw + 'px';
-      t.style.zoom = z.toFixed(3);
-    }
+    if(!t) return;
+    /* ★CC-COLPCT-20261113：列宽已改为百分比自适应，这里只清掉历史遗留的 zoom / 固定宽 */
+    if(t.style.zoom) t.style.zoom = '';
+    if(t.style.width) t.style.width = '';
   }
   window.ccGridFit = ccGridFit;
   /* ---- 需求信息表（新） ---- */
@@ -65654,7 +65652,10 @@ function submitAuth() {
         + (on ? '−' : '+') + ' ' + T(o[1]) + '</button>';
     }).join('') + '</div>';
     /* colgroup + 表头 */
-    var cg = '<colgroup>' + cols.map(function(c){ return '<col style="width:' + c.w + 'px">'; }).join('') + '</colgroup>';
+    /* ★CC-COLPCT-20261113：列宽用【百分比】分配（weight → %），列多自动变窄、列少自动变宽，
+       整表恒等于容器宽度 → 永远没有底部横向滚动条；表头文字超出就换行（见 CSS） */
+    var totalW = cols.reduce(function(s, c){ return s + c.w; }, 0) || 1;
+    var cg = '<colgroup>' + cols.map(function(c){ return '<col style="width:' + (c.w / totalW * 100).toFixed(3) + '%">'; }).join('') + '</colgroup>';
     var th1 = '<tr>' +
       '<th rowspan="2" class="ccg-idx">' + T('th_no') + '</th>' +
       '<th rowspan="2">' + T('th_house') + '</th>' +
@@ -65676,8 +65677,8 @@ function submitAuth() {
       (CC_ROW_COLS.dim ? '<th>' + T('specLen') + '</th><th>' + T('specWid') + '</th><th>' + T('specHei') + '</th>' : '') +
       '<th>' + T('th_qtyUnit') + '</th><th>' + T('th_qtyWhole') + '</th>' +
       (CC_ROW_COLS.sqm ? '<th>' + T('th_sqmUnit') + '</th><th>' + T('th_sqmWhole') + '</th>' : '') +
-      (CC_ROW_COLS.rebar ? '<th>' + T('barsL') + '</th><th>' + T('th_rebarMm') + '</th><th>' + T('barsW') + '</th><th>' + T('th_rebarMm') + '</th>' : '') +
-      (dual && CC_ROW_COLS.rebar ? '<th class="ccg-lo">' + T('barsL') + '</th><th class="ccg-lo">' + T('th_rebarMm') + '</th><th class="ccg-lo">' + T('barsW') + '</th><th class="ccg-lo">' + T('th_rebarMm') + '</th>' : '') +
+      (CC_ROW_COLS.rebar ? '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('barsL') + '</th><th>' + (dual ? T('upLayer') + '<br>' : '') + T('th_rebarMm') + '</th><th>' + (dual ? T('upLayer') + '<br>' : '') + T('barsW') + '</th><th>' + (dual ? T('upLayer') + '<br>' : '') + T('th_rebarMm') + '</th>' : '') +
+      (dual && CC_ROW_COLS.rebar ? '<th class="ccg-lo">' + T('loLayer') + '<br>' + T('barsL') + '</th><th class="ccg-lo">' + T('loLayer') + '<br>' + T('th_rebarMm') + '</th><th class="ccg-lo">' + T('loLayer') + '<br>' + T('barsW') + '</th><th class="ccg-lo">' + T('loLayer') + '<br>' + T('th_rebarMm') + '</th>' : '') +
       '</tr>';
     /* 数据行：按组合并 8 列（序号/猪舍/编号/单元/栋数/长/宽/高） */
     var groups = ccGridGroups(specs), body = '';
@@ -65697,6 +65698,10 @@ function submitAuth() {
           var at = ' data-i="' + ri + '" data-f="' + f + '"' + (grp ? ' data-grp="' + grpIds + '"' : '');
           if(kind === 'sel'){
             return '<select class="ccg-in ccg-sel"' + at + ' oninput="ccGridInput(this)" onchange="ccGridCommit(this)">' + selOpts(f, val) + '</select>';
+          }
+          if(kind === 'money'){
+            var pv = Number(val) || 0;
+            return '<input class="ccg-in ccg-in-num ccg-in-money"' + at + ' value="' + (pv ? ('₫' + ccNum(pv)) : '') + '" inputmode="decimal" oninput="ccGridInput(this)" onchange="ccGridCommit(this)">';
           }
           if(kind === 'text'){
             return '<input class="ccg-in ccg-in-txt"' + at + ' value="' + ccEsc2(val == null ? '' : val) + '" oninput="ccGridInput(this)" onchange="ccGridCommit(this)"' + (w ? ' style="width:' + w + '"' : '') + '>';
@@ -65726,21 +65731,30 @@ function submitAuth() {
         }
         body += '<td>' + inp('layers', Number(sp.layers) === 2 ? 2 : 1, 'sel') + '</td>';
         if(CC_ROW_COLS.rebar){
+          /* ★CC-REBARCELL-20261113：完全照规格表——「钢筋尺寸(mm)」格 = mm 数值 + 紧跟一个小号 φ 下拉
+             （上层/下层同样都有 mm + φ，下层无数据时 mm 留空而不是只剩一个空下拉） */
+          var mmCell = function(id, mmv, f, val, lo){
+            return '<td class="ccg-mmcell' + (lo ? ' ccg-lo' : '') + '">'
+                 + '<span id="' + id + '">' + (mmv ? ccNum(mmv) : '') + '</span>'
+                 + inp(f, val || '', 'sel') + '</td>';
+          };
           body += '<td>' + inp('nl', Number(sp.nl) || 0, 'num') + '</td>';
-          body += '<td class="ccg-cell2"><span id="ccg_ml_' + ri + '">' + (ccRowMmLen(sp) ? ccNum(ccRowMmLen(sp)) : '') + '</span>' + inp('rL', sp.rL || '', 'sel') + '</td>';
+          body += mmCell('ccg_ml_' + ri, ccRowMmLen(sp), 'rL', sp.rL, false);
           body += '<td>' + inp('nw', Number(sp.nw) || 0, 'num') + '</td>';
-          body += '<td class="ccg-cell2"><span id="ccg_mw_' + ri + '">' + (ccRowMmWid(sp) ? ccNum(ccRowMmWid(sp)) : '') + '</span>' + inp('rW', sp.rW || '', 'sel') + '</td>';
+          body += mmCell('ccg_mw_' + ri, ccRowMmWid(sp), 'rW', sp.rW, false);
           if(dual){
-            body += '<td class="ccg-lo">' + inp('nl2', Number(sp.nl2) || 0, 'num') + '</td>';
-            body += '<td class="ccg-cell2 ccg-lo">' + inp('rL2', sp.rL2 || '', 'sel') + '</td>';
-            body += '<td class="ccg-lo">' + inp('nw2', Number(sp.nw2) || 0, 'num') + '</td>';
-            body += '<td class="ccg-cell2 ccg-lo">' + inp('rW2', sp.rW2 || '', 'sel') + '</td>';
+            var isLo = Number(sp.layers) === 2;
+            body += '<td class="ccg-lo">' + inp('nl2', isLo ? (Number(sp.nl2) || 0) : 0, 'num') + '</td>';
+            body += mmCell('ccg_ml2_' + ri, isLo ? ccRowMmLen(sp) : 0, 'rL2', sp.rL2, true);
+            body += '<td class="ccg-lo">' + inp('nw2', isLo ? (Number(sp.nw2) || 0) : 0, 'num') + '</td>';
+            body += mmCell('ccg_mw2_' + ri, isLo ? ccRowMmWid(sp) : 0, 'rW2', sp.rW2, true);
           }
         }
         if(CC_ROW_COLS.solid) body += '<td>' + inp('solid', ccRowIsSolid(sp) ? 'YES' : 'NO', 'sel') + '</td>';
         if(CC_ROW_COLS.hole)  body += '<td>' + inp('hole', ccRowIsHole(sp) ? 'YES' : 'NO', 'sel') + '</td>';
-        if(CC_ROW_COLS.price) body += '<td>' + inp('price', Number(sp.price) || 0, 'num') + '</td>';
-        if(CC_ROW_COLS.subtotal) body += '<td class="ccg-b" id="ccg_sub_' + ri + '">' + (Number(sp.price) ? ccNum(ccRowQtyWhole(sp) * (Number(sp.price) || 0)) : '') + '</td>';
+        /* ★CC-MONEY-20261113：单价/小计必须带越南盾符号 + 千位符（₫11,222 / ₫448,880,000） */
+        if(CC_ROW_COLS.price) body += '<td>' + inp('price', Number(sp.price) || 0, 'money') + '</td>';
+        if(CC_ROW_COLS.subtotal) body += '<td class="ccg-b" id="ccg_sub_' + ri + '">' + (Number(sp.price) ? '₫' + ccNum(ccRowQtyWhole(sp) * (Number(sp.price) || 0)) : '') + '</td>';
         if(CC_ROW_COLS.remark) body += '<td class="ccg-remark">' + inp('remark', sp.remark, 'text') + '</td>';
         body += '<td class="ccg-op">' + ccGridIcons(ri) + '</td></tr>';
       });
@@ -65763,9 +65777,8 @@ function submitAuth() {
       + (CC_ROW_COLS.solid ? '<td></td>' : '') + (CC_ROW_COLS.hole ? '<td></td>' : '')
       + (CC_ROW_COLS.price ? '<td></td>' : '') + (CC_ROW_COLS.subtotal ? '<td></td>' : '') + (CC_ROW_COLS.remark ? '<td></td>' : '')
       + '<td></td>';
-    var totalW = cols.reduce(function(s, c){ return s + c.w; }, 0);
     return '<div class="ccg-wrap">' + toggleHtml
-      + '<div class="ccg-scroll"><table class="ccg-tb' + (dual ? ' ccg-dual' : '') + '" data-minw="' + totalW + '">' + cg
+      + '<div class="ccg-scroll"><table class="ccg-tb' + (dual ? ' ccg-dual' : '') + '">' + cg
       + '<thead>' + th1 + th2 + '</thead><tbody>' + body + '</tbody>'
       + '<tfoot><tr>' + footCells + '</tr></tfoot></table></div></div>';
   }
