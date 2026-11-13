@@ -11434,18 +11434,19 @@ def slats_spec_export():
     LBL = {
         "zh": ["序号", "猪舍", "房舍编号", "单元/栋", "长(mm)", "宽(mm)", "高(mm)",
                "栋数/整场", "长(mm)", "宽(mm)", "高(mm)", "数量/单元", "数量/整场",
-               "钢网层数", "实心板?"],
+               "钢网层数", "实心板?", "带圆孔?", "单价", "小计", "备注"],
         "en": ["No.", "Pig house", "House code", "Units/bldg", "L(mm)", "W(mm)", "H(mm)",
                "Bldgs/site", "L(mm)", "W(mm)", "H(mm)", "Qty/unit", "Qty/whole",
-               "Mesh layers", "Solid slat?"],
+               "Mesh layers", "Solid slat?", "Round hole?", "Unit price", "Subtotal", "Remark"],
         "vi": ["STT", "Chuồng", "Mã chuồng", "Đơn vị/tòa", "Dài(mm)", "Rộng(mm)", "Cao(mm)",
                "Số tòa/trảng", "Dài(mm)", "Rộng(mm)", "Cao(mm)", "SL/đơn vị", "SL/toàn trảng",
-               "Số lớp lưới", "Tấm đặc?"],
+               "Số lớp lưới", "Tấm đặc?", "Có lỗ tròn?", "Đơn giá", "Thành tiền", "Ghi chú"],
     }[lang]
 
     KEYS = ["pig_house", "house_code", "unit_per_building", "len_per_unit", "wid_per_unit",
             "hgt_per_unit", "building_count", "floor_len", "floor_wid", "floor_hgt",
-            "qty_unit", "qty_whole", "mesh_layers", "solid_slat"]
+            "qty_unit", "qty_whole", "mesh_layers", "solid_slat", "hole_slat",
+            "unit_price", "subtotal", "remark"]
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -11456,6 +11457,10 @@ def slats_spec_export():
     yes_side = openpyxl.styles.Side(style="medium", color="FFFFC400")
     box_thin = openpyxl.styles.Border(left=thin, right=thin, top=thin, bottom=thin)
     box_yes = openpyxl.styles.Border(left=yes_side, right=yes_side, top=yes_side, bottom=yes_side)
+    # ★SLATS-HOLE-20261112：带圆孔 YES 用紫色粗框 + 淡紫底
+    hole_side = openpyxl.styles.Side(style="medium", color="FF8E24AA")
+    box_hole = openpyxl.styles.Border(left=hole_side, right=hole_side, top=hole_side, bottom=hole_side)
+    hole_fill = openpyxl.styles.PatternFill("solid", fgColor="FFF3E5F5")
 
     for c, label in enumerate(LBL, start=1):
         cell = ws.cell(row=1, column=c, value=label)
@@ -11463,6 +11468,19 @@ def slats_spec_export():
         cell.fill = openpyxl.styles.PatternFill("solid", fgColor="FFE53935")
         cell.alignment = openpyxl.styles.Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = box_thin
+
+    def _remark(v, lang):
+        if isinstance(v, dict):
+            return v.get(lang) or v.get("zh") or v.get("en") or v.get("vi") or ""
+        s = str(v or "").strip()
+        if s.startswith("{"):
+            try:
+                d = json.loads(s)
+                if isinstance(d, dict):
+                    return d.get(lang) or d.get("zh") or d.get("en") or d.get("vi") or ""
+            except Exception:
+                pass
+        return s
 
     def _num(v):
         try:
@@ -11478,19 +11496,36 @@ def slats_spec_export():
     for i, row in enumerate(rows):
         row = row if isinstance(row, dict) else {}
         yes = str(row.get("solid_slat") or "").strip().upper() == "YES"
-        # solid_slat 是 YES/NO 文本，不能走数字清洗（否则空）
-        vals = [i + 1] + [(row.get(k) if k == "solid_slat" else _num(row.get(k))) for k in KEYS]
+        hole = str(row.get("hole_slat") or "").strip().upper() == "YES"
+        # solid_slat / hole_slat 是 YES/NO 文本；remark 是 {zh,en,vi} 三语对象，都不能走数字清洗
+        def _val(k):
+            if k == "remark":
+                return _remark(row.get(k), lang)
+            if k in ("solid_slat", "hole_slat"):
+                return row.get(k)
+            return _num(row.get(k))
+        vals = [i + 1] + [_val(k) for k in KEYS]
         for c, v in enumerate(vals, start=1):
             cell = ws.cell(row=r0 + i, column=c, value=v)
             cell.border = box_thin
+            # ★SLATS-PRICE-20261112：单价/小计在 Excel 里也带 ₫ 符号与千位符
+            if c >= 2 and KEYS[c - 2] in ("unit_price", "subtotal"):
+                cell.number_format = '"₫"#,##0'
             # 实心板=YES：只把「长/宽/高(mm)」三格改成黄色加粗框（第 9/10/11 列），
             # 与页面上框住的位置完全一致；房舍长宽高（第 5/6/7 列）是猪舍尺寸，不是地板尺寸。
             if yes and 9 <= c <= 11:
                 cell.border = box_yes
+        # 列位置按 KEYS 计算（新增 单价/小计/备注 后不能再假设实心板/带圆孔是最后两列）
         if yes:
-            ws.cell(row=r0 + i, column=len(LBL)).border = box_yes
+            ws.cell(row=r0 + i, column=KEYS.index("solid_slat") + 2).border = box_yes
+        if hole:
+            hc = ws.cell(row=r0 + i, column=KEYS.index("hole_slat") + 2)
+            hc.border = box_hole
+            hc.fill = hole_fill
+            for _hc in range(9, 12):
+                ws.cell(row=r0 + i, column=_hc).fill = hole_fill
 
-    widths = [6, 20, 12, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12, 10, 11]
+    widths = [6, 20, 12, 9, 9, 9, 9, 9, 9, 9, 9, 12, 12, 10, 11, 11, 14, 16, 26]
     for c, w in enumerate(widths, start=1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width = w
     ws.freeze_panes = "A2"
