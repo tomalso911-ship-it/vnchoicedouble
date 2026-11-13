@@ -65026,8 +65026,10 @@ function submitAuth() {
       '.ccg-tb td.ccg-lo{background:#f4f9ff;}',
       /* ★CC-REBARCELL-20261113：钢筋尺寸(mm) 格 = 数值 + 小号 φ 下拉，横向居中并排 */
       '.ccg-mmcell{padding:0 1px !important;white-space:nowrap;text-align:center;}',
-      '.ccg-mmcell>span{font-size:9px;margin-right:1px;}',
-      '.ccg-mmcell>.ccg-sel{width:32px !important;height:16px !important;min-height:0 !important;font-size:8px !important;padding:0 0 0 1px !important;border:1px solid #cfd8e3;background:#fff;border-radius:3px;box-sizing:border-box;}',
+      '.ccg-mmcell>span{font-size:8px;margin-right:1px;letter-spacing:-0.2px;}',
+      '.ccg-sel-house{font-size:9px;text-align:center;}',
+      /* ★CC-REBARW-20261113：φ 下拉文字缩小到 7px、宽度 36px，让 "φ10" 与箭头都完整可见 */
+      '.ccg-mmcell>.ccg-sel{width:36px !important;height:16px !important;min-height:0 !important;font-size:7px !important;padding:0 0 0 1px !important;border:1px solid #cfd8e3;background:#fff;border-radius:3px;box-sizing:border-box;text-align-last:center;}',
       '.ccg-in{width:100%;border:1px solid transparent;background:transparent;font-size:9px;text-align:center;color:inherit;font-family:inherit;padding:1px 0;outline:none;box-sizing:border-box;}',
       '.ccg-in:hover{border-color:#cfe0f5;background:#fff;}',
       '.ccg-in:focus{border-color:#1a73e8;background:#fff;}',
@@ -65528,16 +65530,17 @@ function submitAuth() {
       { k:'su',   w:70,  th:T('th_sqm'),        sub:T('th_sqmUnit'),  cls:'ccg-num ccg-calc', on:'sqm' },
       { k:'sw',   w:72,  th:T('th_sqm'),        sub:T('th_sqmWhole'), cls:'ccg-num ccg-calc', on:'sqm' },
       { k:'lyr',  w:54,  th:T('layers') },
-      { k:'bl',   w:52,  th:T('barsL'),         sub:T('unitPcs'),  cls:'ccg-num', on:'rebar' },
-      { k:'ml',   w:60,  th:T('th_rebarMm'),    sub:T('th_lenDir'), cls:'ccg-num ccg-calc', on:'rebar' },
-      { k:'bw',   w:52,  th:T('barsW'),         sub:T('unitPcs'),  cls:'ccg-num', on:'rebar' },
-      { k:'mw',   w:60,  th:T('th_rebarMm'),    sub:T('th_widDir'), cls:'ccg-num ccg-calc', on:'rebar' }
+      /* ★CC-REBARW-20261113：钢筋尺寸(mm) 列加宽，保证「1,191 + φ8▾」完整显示；条数列略收窄让位 */
+      { k:'bl',   w:48,  th:T('barsL'),         sub:T('unitPcs'),  cls:'ccg-num', on:'rebar' },
+      { k:'ml',   w:74,  th:T('th_rebarMm'),    sub:T('th_lenDir'), cls:'ccg-num ccg-calc', on:'rebar' },
+      { k:'bw',   w:48,  th:T('barsW'),         sub:T('unitPcs'),  cls:'ccg-num', on:'rebar' },
+      { k:'mw',   w:74,  th:T('th_rebarMm'),    sub:T('th_widDir'), cls:'ccg-num ccg-calc', on:'rebar' }
     ];
     if(dual){
-      cols.push({ k:'bl2', w:52, th:T('loLayer')+T('barsL'),  cls:'ccg-num ccg-lo', on:'rebar' });
-      cols.push({ k:'ml2', w:60, th:T('loLayer')+T('th_rebarMm'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
-      cols.push({ k:'bw2', w:52, th:T('loLayer')+T('barsW'),  cls:'ccg-num ccg-lo', on:'rebar' });
-      cols.push({ k:'mw2', w:60, th:T('loLayer')+T('th_rebarMm'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
+      cols.push({ k:'bl2', w:48, th:T('loLayer')+T('barsL'),  cls:'ccg-num ccg-lo', on:'rebar' });
+      cols.push({ k:'ml2', w:74, th:T('loLayer')+T('th_rebarMm'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
+      cols.push({ k:'bw2', w:48, th:T('loLayer')+T('barsW'),  cls:'ccg-num ccg-lo', on:'rebar' });
+      cols.push({ k:'mw2', w:74, th:T('loLayer')+T('th_rebarMm'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
     }
     cols.push({ k:'solid', w:56, th:T('solidSlat'), cls:'ccg-center', on:'solid' });
     cols.push({ k:'hole',  w:56, th:T('th_hole'),   cls:'ccg-center', on:'hole' });
@@ -65577,6 +65580,15 @@ function submitAuth() {
   var CC_DIA_LIST = ['', '6', '8', '10', '12'];
   function selOpts(f, val){
     var up = String(val == null ? '' : val).toUpperCase();
+    if(f === 'house'){
+      var ho = '<option value="">—</option>';
+      try{
+        if(typeof slatsOptHtml === 'function' && typeof SLATS_PIG_HOUSE !== 'undefined') ho += slatsOptHtml(SLATS_PIG_HOUSE, 'slats_pig_house_', val);
+      }catch(e){}
+      var hs = String(val == null ? '' : val).trim();
+      if(hs && !(Number(hs) >= 1 && Number(hs) <= 15)) ho += '<option value="' + ccEsc2(hs) + '" selected>' + ccEsc2(hs) + '</option>';
+      return ho;
+    }
     if(f === 'layers') return '<option value="1"' + (String(val) === '2' ? '' : ' selected') + '>1</option><option value="2"' + (String(val) === '2' ? ' selected' : '') + '>2</option>';
     if(f === 'solid' || f === 'hole') return '<option value="NO"' + (up !== 'YES' ? ' selected' : '') + '>NO</option><option value="YES"' + (up === 'YES' ? ' selected' : '') + '>YES</option>';
     return CC_DIA_LIST.map(function(d){ return '<option value="' + d + '"' + (String(val || '') === d ? ' selected' : '') + '>' + (d ? 'φ' + d : '—') + '</option>'; }).join('');
@@ -65696,8 +65708,9 @@ function submitAuth() {
         /* 直接输入：input/select 都挂 ccGridInput（输入即算） + ccGridCommit（离开格子保存并整页刷新） */
         var inp = function(f, val, kind, grp, w){
           var at = ' data-i="' + ri + '" data-f="' + f + '"' + (grp ? ' data-grp="' + grpIds + '"' : '');
-          if(kind === 'sel'){
-            return '<select class="ccg-in ccg-sel"' + at + ' oninput="ccGridInput(this)" onchange="ccGridCommit(this)">' + selOpts(f, val) + '</select>';
+          if(kind === 'sel' || kind === 'house'){
+            /* ★CC-HOUSESEL-20261113：猪舍与规格表同源——用 slatsOptHtml(SLATS_PIG_HOUSE,'slats_pig_house_') 的 15 类下拉 */
+            return '<select class="ccg-in ccg-sel' + (kind === 'house' ? ' ccg-sel-house' : '') + '"' + at + ' oninput="ccGridInput(this)" onchange="ccGridCommit(this)">' + selOpts(f, val) + '</select>';
           }
           if(kind === 'money'){
             var pv = Number(val) || 0;
@@ -65713,7 +65726,7 @@ function submitAuth() {
           body += '<td class="ccg-idx"' + rs + '><span class="ccg-no">' + no + '</span>'
                 + '<span class="ccg-info" title="' + T('th_house') + ' / ' + T('specDim') + '">' + (g.rows.length > 1 ? 'ⓘ' + g.rows.length : 'ⓘ') + '</span></td>';
           /* 合并列必须带 data-grp：改一格要同步整组（猪舍/编号/单元/栋数/长/宽/高） */
-          body += '<td class="ccg-merge"' + rs + '>' + inp('house', sp.house, 'text', true) + '</td>';
+          body += '<td class="ccg-merge"' + rs + '>' + inp('house', sp.house, 'house', true) + '</td>';
           body += '<td class="ccg-merge"' + rs + '>' + inp('code', sp.code, 'text', true) + '</td>';
           body += '<td class="ccg-merge"' + rs + '>' + inp('units', ccRowUnits(sp), 'num', true) + '</td>';
           body += '<td class="ccg-merge"' + rs + '>' + inp('bldgs', ccRowBldgs(sp), 'num', true) + '</td>';
