@@ -64589,7 +64589,7 @@ function submitAuth() {
     /* ★CC-MOLDDESIGN2-20261114：去重口径（长×宽×类型）新增文案 */
     moldMerge:     { zh:'同规格合并 {0} 批 · 总产量 {1} 块', en:'{0} rows of the same spec merged · total {1} pcs', vi:'gộp {0} dòng cùng quy cách · tổng {1} tấm' },
     moldSingleCap: { zh:'单套 {0} 块/天', en:'per set {0} pcs/day', vi:'mỗi bộ {0} tấm/ngày' },
-    moldNoCombo:   { zh:'全部规格同尺寸同类型 → 无需组合（方案B = 方案A）', en:'all specs share the same size & type → nothing to combine (Plan B = Plan A)', vi:'tất cả quy cách cùng cỡ và cùng loại → không cần ghép (B = A)' },
+    moldNoCombo:   { zh:'每种类型只有 1 个规格 → 无需组合（方案B = 方案A）', en:'only one spec per type → nothing to combine (Plan B = Plan A)', vi:'mỗi loại chỉ có 1 quy cách → không cần ghép (B = A)' },
     moldTypeSolid: { zh:'实心板', en:'solid', vi:'tấm đặc' },
     moldTypeHole:  { zh:'带圆孔', en:'round-hole', vi:'có lỗ tròn' },
     moldPar:     { zh:'线并行约', en:'lines in parallel ≈', vi:'dây song song ≈' }, // ★CC-MOLDLINES2-20261106：前面拼线数——「N 线并行约 X 天」
@@ -67677,25 +67677,24 @@ function submitAuth() {
       });
       htmlA += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkA + ' ' + ccT('moldDaysUnit') + '</div>';
       if(eMa) eMa.innerHTML = htmlA;
-      // ★CC-MOLDDESIGN-20261114：方案B——主力规格（产量最大）专用模；其余规格尝试拼一块「条带式」组合模
+      // ★CC-MOLDDESIGN3-20261114（用户 2026-11-14 三定稿）：方案B —— 【每种类型各取一个主力】专用模，
+      //   同类型其余规格再尝试拼「条带式」组合模；拼不进（每模 0 块）的退回单独开模。
       var byQty = designs.slice().sort(function(a, b){ return b.qty - a.qty; });
-      var main = byQty[0];
-      var rest = byQty.slice(1);
-      rest.forEach(function(d){
-        var lm = d.len / 1000, wm = d.wid / 1000;
-        d.rowsFit = lm > 0 ? Math.floor(3.5 / lm + 1e-9) : 0;               // 3.5m 长度方向切几条
-        d.kFit = wm > 0 ? Math.min(2, Math.floor(1.5 / wm + 1e-9)) : 0;     // 1.5m 宽度方向叠几条（最多 2）
-        d.perPlate = (d.rowsFit > 0 && d.kFit > 0) ? d.rowsFit * d.kFit : 0; // 每模出几块（0 = 排不下）
-      });
-      /* ★CC-MOLDDESIGN2-20261114：组合模按「类型」分组——实心板和带圆孔板型腔不同，不能拼同一块板 */
-      var combos = [], solos = [];
-      var seenType = {};
-      rest.forEach(function(d){
-        if(seenType[d.type]) return;
-        seenType[d.type] = 1;
-        var grp = rest.filter(function(x){ return x.type === d.type; });
-        var fit = grp.filter(function(x){ return x.perPlate >= 1; });
-        var nofit = grp.filter(function(x){ return x.perPlate < 1; });
+      var typeOrder = [];
+      byQty.forEach(function(d){ if(typeOrder.indexOf(d.type) < 0) typeOrder.push(d.type); });
+      var mains = [], combos = [], solos = [];
+      typeOrder.forEach(function(tk){
+        var grp = byQty.filter(function(d){ return d.type === tk; }); // 已按产量降序
+        mains.push(grp[0]);                                          // 该类型的主力规格
+        grp.slice(1).forEach(function(d){
+          var lm = d.len / 1000, wm = d.wid / 1000;
+          d.rowsFit = lm > 0 ? Math.floor(3.5 / lm + 1e-9) : 0;               // 3.5m 长度方向切几条
+          d.kFit = wm > 0 ? Math.min(2, Math.floor(1.5 / wm + 1e-9)) : 0;     // 1.5m 宽度方向叠几条（最多 2）
+          d.perPlate = (d.rowsFit > 0 && d.kFit > 0) ? d.rowsFit * d.kFit : 0; // 每模出几块（0 = 排不下）
+        });
+        var restG = grp.slice(1);
+        var fit = restG.filter(function(x){ return x.perPlate >= 1; });
+        var nofit = restG.filter(function(x){ return x.perPlate < 1; });
         if(fit.length){
           var pcs = 0, qty = 0;
           fit.forEach(function(x){ pcs += x.perPlate; qty += x.qty; });
@@ -67704,7 +67703,8 @@ function submitAuth() {
         }
         nofit.forEach(function(x){ solos.push(x); });
       });
-      var setsB = main.sets, mkB = main.days;
+      var setsB = 0, mkB = 0;
+      mains.forEach(function(d){ setsB += d.sets; mkB += d.days; });
       combos.forEach(function(g){ setsB += g.sets; mkB += g.days; });
       solos.forEach(function(d){ setsB += d.sets; mkB += d.days; });
       var htmlB = ccT('moldSum') + ' ' + setsB + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkB + ' ' + ccT('moldDaysUnit') +
@@ -67712,13 +67712,15 @@ function submitAuth() {
       // ★CC-MOLDDESIGN-20261114：逐副模具明细——主力=单规格整板；小规格=混拼板(条带×腔)；拼不进的单独开模
       htmlB += '<div style="font-weight:700;color:#1a56b0;margin:6px 0 2px;">📋 ' + ccT('moldDetail') + '</div>';
       var bi = 0;
-      htmlB += '<div style="margin:2px 0 2px 14px;">' + (CN[bi++] || bi) + ' ' + ccMoldSizeTxt(main) + ' ' + ccT('moldDedic') +
-        ' × ' + main.sets + ' ' + ccT('moldSets') + ' — ' + ccT('moldPlate1') +
-        ' · ' + ccMFill(ccT('moldMerge'), ccNum(main.rows), ccNum(main.qty)) +
-        ' · ' + ccT('moldPer') + ' ' + main.pcs + ' ' + ccT('moldPcs') +
-        ' · ' + ccMFill(ccT('moldSingleCap'), ccNum(main.singleCap)) +
-        ' · ' + ccT('moldNeedDays') + ' ' + main.days + ' ' + ccT('moldDaysUnit') +
-        '</div>';
+      mains.forEach(function(mn){
+        htmlB += '<div style="margin:2px 0 2px 14px;">' + (CN[bi++] || bi) + ' ' + ccMoldSizeTxt(mn) + ' ' + ccT('moldDedic') +
+          ' × ' + mn.sets + ' ' + ccT('moldSets') + ' — ' + ccT('moldPlate1') +
+          ' · ' + ccMFill(ccT('moldMerge'), ccNum(mn.rows), ccNum(mn.qty)) +
+          ' · ' + ccT('moldPer') + ' ' + mn.pcs + ' ' + ccT('moldPcs') +
+          ' · ' + ccMFill(ccT('moldSingleCap'), ccNum(mn.singleCap)) +
+          ' · ' + ccT('moldNeedDays') + ' ' + mn.days + ' ' + ccT('moldDaysUnit') +
+          '</div>';
+      });
       combos.forEach(function(g){
         htmlB += '<div style="margin:2px 0 0 14px;">' + (CN[bi++] || bi) + ' ' + ccT('moldCombo') + ' × ' + g.sets + ' ' + ccT('moldSets') + ' — <b>' + ccT('moldPlate2') + '</b>：</div>';
         g.members.forEach(function(d){
@@ -67738,7 +67740,7 @@ function submitAuth() {
           ' · ' + ccT('moldPer') + ' ' + d.pcs + ' ' + ccT('moldPcs') +
           ' · ' + ccT('moldNeedDays') + ' ' + d.days + ' ' + ccT('moldDaysUnit') + '</div>';
       });
-      if(!rest.length){
+      if(!combos.length && !solos.length){
         htmlB += '<div style="margin:6px 0 0 14px;color:#1a56b0;">· ' + ccT('moldNoCombo') + '</div>';
       }
       htmlB += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkB + ' ' + ccT('moldDaysUnit') + '</div>';
