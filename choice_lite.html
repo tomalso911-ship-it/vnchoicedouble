@@ -65965,9 +65965,12 @@ function submitAuth() {
             /* ★CC-PHPLUS-20261113：完全照规格表的猪舍单元格——div.slats-ph-wrap 里「+」圆按钮在上、下拉在下，
                + 打开 slats-suffix-pop 后缀浮层（同名 class，样式与规格表 100% 一致） */
             var hv = String(val == null ? '' : val).trim();
+            /* ★CC-PHPLUS-VIS-20261114：模态框 #slatsSpecTable 的 + 是「有值就 inline-flex、空值 none」，
+               这里原先有值时【不写 inline style】，被全局 .slats-suffix-plus{display:none} 兜底 → 永远看不见。
+               改成与模态框逐字一致的可见性规则。 */
             return '<div class="slats-ph-wrap">'
               + '<button type="button" class="slats-suffix-plus" data-i="' + ri + '" title="' + ccEsc2(ccT('suffixTip')) + '"'
-              + (hv ? '' : ' style="display:none;"') + ' onclick="ccHousePlus(this,event)">+</button>'
+              + (hv ? ' style="display:inline-flex;"' : ' style="display:none;"') + ' onclick="ccHousePlus(this,event)">+</button>'
               + '<select class="ccg-in ccg-sel ccg-sel-house"' + at + ' oninput="ccGridInput(this)" onchange="ccGridCommit(this)">' + selOpts('house', val) + '</select>'
               + '</div>';
           }
