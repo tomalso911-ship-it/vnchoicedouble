@@ -2205,6 +2205,14 @@ window.__finShakeReport = function (ms) {
     .slats-suffix-plus{ display:none !important; }
     .slats-suffix-pop{ display:none !important; }
 
+    /* ★CC-PRINTOPHIDE-20261114（用户 2026-11-14：「打印的时候，操作列不需要显示，永远不需要」）：
+       成本核算「操作」列（复制/合并/删除图标）整列不打印。
+       表头 th、表体 td、合计行 td 都带 .ccg-op，连 <col> 一起隐藏，
+       否则 table-layout:fixed 下会留一条空白列（宽度按 colgroup 百分比保留）。 */
+    .ccg-tb th.ccg-op,
+    .ccg-tb td.ccg-op,
+    .ccg-tb col.ccg-col-op{ display:none !important; }
+
     html,body{height:auto !important;overflow:visible !important;}
     @page { size: auto; margin: 8mm; }
   }
@@ -65980,7 +65988,8 @@ function submitAuth() {
     /* ★CC-COLPCT-20261113：列宽用【百分比】分配（weight → %），列多自动变窄、列少自动变宽，
        整表恒等于容器宽度 → 永远没有底部横向滚动条；表头文字超出就换行（见 CSS） */
     var totalW = cols.reduce(function(s, c){ return s + c.w; }, 0) || 1;
-    var cg = '<colgroup>' + cols.map(function(c){ return '<col style="width:' + (c.w / totalW * 100).toFixed(3) + '%">'; }).join('') + '</colgroup>';
+    /* ★CC-PRINTOPHIDE-20261114：给每列 <col> 打 class（ccg-col-<key>），打印时用来整列隐藏「操作」列 */
+    var cg = '<colgroup>' + cols.map(function(c){ return '<col class="ccg-col ccg-col-' + c.k + '" style="width:' + (c.w / totalW * 100).toFixed(3) + '%">'; }).join('') + '</colgroup>';
     /* ==================================================================================
        ★CC-HEADER-LOCK-20261113（用户 2026-11-13 要求：完全照规格表 slats-spec-table 的两级表头，
          并且【锁死不可改】）。结构与 slatsSpecTable 的 thead 一一对应：
@@ -66006,7 +66015,8 @@ function submitAuth() {
       (CC_ROW_COLS.price ? '<th rowspan="2">' + T('th_price') + '</th>' : '') +
       (CC_ROW_COLS.subtotal ? '<th rowspan="2">' + T('th_subtotal') + '</th>' : '') +
       (CC_ROW_COLS.remark ? '<th rowspan="2">' + T('th_remark') + '</th>' : '') +
-      '<th rowspan="2">' + T('op') + '</th></tr>';
+      /* ★CC-PRINTOPHIDE-20261114：操作列打 class，打印时整列隐藏（图标对打印毫无意义） */
+      '<th rowspan="2" class="ccg-op">' + T('op') + '</th></tr>';
     var th2 = '<tr>' +
       '<th>' + T('th_unitsShort') + '</th><th>' + T('th_bldgs') + '</th>' +
       (CC_ROW_COLS.dim ? '<th>' + T('specLen') + '</th><th>' + T('specWid') + '</th><th>' + T('specHei') + '</th>' : '') +
@@ -66130,7 +66140,7 @@ function submitAuth() {
       + (CC_ROW_COLS.rebar ? '<td></td><td></td><td></td><td></td><td></td>' + (dual ? '<td></td><td></td><td></td><td></td>' : '') : '')
       + (CC_ROW_COLS.solid ? '<td></td>' : '') + (CC_ROW_COLS.hole ? '<td></td>' : '')
       + (CC_ROW_COLS.price ? '<td></td>' : '') + (CC_ROW_COLS.subtotal ? '<td></td>' : '') + (CC_ROW_COLS.remark ? '<td></td>' : '')
-      + '<td></td>';
+      + '<td class="ccg-op"></td>';
     return '<div class="ccg-wrap">' + toggleHtml
       + '<div class="ccg-scroll"><table class="ccg-tb' + (dual ? ' ccg-dual' : '') + '">' + cg
       + '<thead>' + th1 + th2 + '</thead><tbody>' + body + '</tbody>'
