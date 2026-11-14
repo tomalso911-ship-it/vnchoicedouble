@@ -64586,12 +64586,12 @@ function submitAuth() {
     moldCav:     { zh:'腔', en:'cavity(ies)', vi:'hốc' },
     moldNeedDays:{ zh:'需', en:'needs', vi:'cần' },
     moldNoFit:   { zh:'组合放不下，改为单独开模', en:'does not fit the combined mold — dedicated mold instead', vi:'không vừa khuôn kết hợp — làm khuôn riêng' },
-    /* ★CC-MOLDDESIGN-20261114：去重口径新增文案 */
-    moldMerge:     { zh:'同尺寸合并 {0} 批 · 总产量 {1} 块', en:'{0} rows of same size merged · total {1} pcs', vi:'gộp {0} dòng cùng cỡ · tổng {1} tấm' },
+    /* ★CC-MOLDDESIGN2-20261114：去重口径（长×宽×类型）新增文案 */
+    moldMerge:     { zh:'同规格合并 {0} 批 · 总产量 {1} 块', en:'{0} rows of the same spec merged · total {1} pcs', vi:'gộp {0} dòng cùng quy cách · tổng {1} tấm' },
     moldSingleCap: { zh:'单套 {0} 块/天', en:'per set {0} pcs/day', vi:'mỗi bộ {0} tấm/ngày' },
-    moldExtra:     { zh:'为满足交付期限 {0} 天，加开 {1} 套', en:'add {1} set(s) to meet the {0}-day deadline', vi:'thêm {1} bộ để kịp hạn {0} ngày' },
-    moldNoCombo:   { zh:'全部规格同尺寸 → 无需组合（方案B = 方案A）', en:'all specs share one size → nothing to combine (Plan B = Plan A)', vi:'tất cả quy cách cùng một cỡ → không cần ghép (B = A)' },
-    moldDeadline:  { zh:'交付期限(天，0=不限)', en:'Delivery deadline (days, 0 = none)', vi:'Thời hạn giao (ngày, 0 = không giới hạn)' },
+    moldNoCombo:   { zh:'全部规格同尺寸同类型 → 无需组合（方案B = 方案A）', en:'all specs share the same size & type → nothing to combine (Plan B = Plan A)', vi:'tất cả quy cách cùng cỡ và cùng loại → không cần ghép (B = A)' },
+    moldTypeSolid: { zh:'实心板', en:'solid', vi:'tấm đặc' },
+    moldTypeHole:  { zh:'带圆孔', en:'round-hole', vi:'có lỗ tròn' },
     moldPar:     { zh:'线并行约', en:'lines in parallel ≈', vi:'dây song song ≈' }, // ★CC-MOLDLINES2-20261106：前面拼线数——「N 线并行约 X 天」
    moldDetail:  { zh:'模具明细（每线 1 套）', en:'Mold breakdown (1 set per line)', vi:'Chi tiết khuôn (1 bộ/mỗi dây)' }, // ★CC-MOLDDETAIL-20261106
    moldPlate1:  { zh:'单规格整板（1 副模具只出 1 种规格）', en:'single-spec plate (one spec per mold)', vi:'thẻ nguyên 1 quy cách (1 khuôn chỉ ra 1 quy cách)' }, // ★CC-MOLDDETAIL-20261106
@@ -66350,8 +66350,7 @@ function submitAuth() {
       ' <input class="cc-in" id="cc_mold_cpd" value="' + (Number(CC_DATA.demand.moldCpd) || 40) + '" inputmode="numeric" autocomplete="off" style="width:60px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"> ' + ccT('moldNote2') +
       ' <span id="cc_mold_total" style="font-weight:700;color:#d32f2f;">—</span> ' + ccT('moldNote3') + '</span>' + // ★CC-MOLDLINES-20261106：共计=每线×线数，ccRecalc 实时刷新
       '<span>' + ccT('moldLines') + '：<input class="cc-in" id="cc_mold_lines" value="' + (parseInt(String(CC_DATA.demand.moldLines), 10) || 2) + '" inputmode="numeric" autocomplete="off" style="width:44px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"></span>' + // ★CC-MOLDLINES2-20261106：线数可配置(默认2)，工期/套数/投资全部跟随
-      // ★CC-MOLDDESIGN-20261114：交付期限（0=不限）。只有「工期 > 期限」时才加开模具压缩工期
-      '<span>' + ccT('moldDeadline') + '：<input class="cc-in" id="cc_mold_deadline" value="' + (Number(CC_DATA.demand.moldDeadline) || 0) + '" inputmode="numeric" autocomplete="off" style="width:56px;text-align:center;padding:1px 4px;background:#eaf3fb;border:1px solid #7aa7d4;"></span>' +
+
       '<span style="color:#333;font-weight:600;">' + ccT('moldPick') +
       ' <select id="cc_mold_pick" style="padding:2px 8px;border:1px solid #7aa7d4;border-radius:4px;font-size:12px;background:#eaf3fb;">' +
       '<option value="A"' + (pick === 'A' ? ' selected' : '') + '>' + ccT('moldOptA') + '</option>' +
@@ -67543,42 +67542,50 @@ function submitAuth() {
     setPlain('cc_v_blocks', blocks);
     setPlain('cc_v_blocks_ft', blocks);
     setPlain('cc_v_area', area);
-    // ★CC-MOLDDESIGN-20261114（用户 2026-11-14 定稿口径）：规格 ≠ 模具 —— 规格是订单维度，模具是物理工具维度。
-    //   ① 按「长×宽」指纹去重 → N 种模具设计（4 批 1200×600 = 1 种设计，不是 4 种）
-    //   ② 每种设计：总产量 = 同尺寸所有批次块数之和；单套日产 = 每模块数 × 模/天；全线日产 = 单套日产 × 线数
-    //   ③ 套数：底线每线 1 套（=线数）；若工期 > 交付期限 → 套数 = ceil(总产量 ÷ (单套日产 × 期限))，且不小于线数
-    //   ④ 方案A 总套数 = Σ各设计套数；总工期 = Σ各设计工期（每个设计自带「线数」套，只能一轮一轮做）
-    //   ⑤ 方案B = 主力规格（产量最大）专用模 + 其余规格拼组合模；拼不进（每模 0 块）的退回单独开模；全是同尺寸时 B 退化为 A
+    // ★CC-MOLDDESIGN2-20261114（用户 2026-11-14 二次定稿口径）：规格 ≠ 模具 —— 规格是订单维度，模具是物理工具维度。
+    //   ① 指纹 = 长×宽×类型（类型 = 实心板 / 带圆孔）→ 同尺寸同类型才合并成一种模具设计
+    //   ② 每种设计：总产量 = 同规格所有批次块数之和；单套日产 = 每模块数 × 模/天；全线日产 = 单套日产 × 线数
+    //   ③ 套数 = 线数（每线 1 套）—— 【加套不压缩工期】（用户选定），只有加线才提速
+    //   ④ 工期 = 总产量 ÷ 全线日产；方案A 总套数 = Σ各设计套数，总工期 = Σ各设计工期
+    //   ⑤ 方案B = 主力规格（总产量最大）专用模 + 其余规格按类型拼组合模；拼不进（每模 0 块）的退回单独开模
     var CPD = Number(CC_DATA.demand.moldCpd) || 40, MPRICE = 3; // 模/天/生产线(输入框可改,默认40) / 万元每套
     var LINES = Math.max(1, parseInt(String(CC_DATA.demand.moldLines), 10) || 2); // 生产线数(输入框可改,默认2)
-    var DEAD = Math.max(0, Number(CC_DATA.demand.moldDeadline) || 0); // 交付期限(天)，0 = 不限
     var mtEl = document.getElementById('cc_mold_total'); if(mtEl) mtEl.textContent = ccNum(CPD * LINES); // ★CC-MOLDLINES-20261106：全部生产线共计脱模次数
     /* ★CC-SPECGRID-20261113：模具估算的"块数"必须用 数量/整场（含单元/栋数），否则有单元的行会少算 */
     var sl = (CC_DATA.demand.specs || []).filter(function(sp){ return sp.len > 0 && sp.wid > 0 && ccRowQtyWhole(sp) > 0; });
     var eMa = document.getElementById('cc_mold_a'), eMc = document.getElementById('cc_mold_c');
-    /* ★CC-MOLDDESIGN-20261114：按「长×宽」指纹去重 */
+    /* ★CC-MOLDDESIGN2-20261114：按「长×宽×类型」指纹去重 */
     var designs = [], dMap = {};
     sl.forEach(function(sp){
-      var key = (Number(sp.len) || 0) + 'x' + (Number(sp.wid) || 0);
+      var isSolid = ccRowIsSolid(sp);
+      var isHole = String(sp.hole || '').trim().toUpperCase() === 'YES';
+      var typeKey = (isSolid ? 'S' : '') + (isHole ? 'H' : '');
+      var key = (Number(sp.len) || 0) + 'x' + (Number(sp.wid) || 0) + 'x' + typeKey;
       var d = dMap[key];
-      if(!d){ d = dMap[key] = { key: key, len: Number(sp.len) || 0, wid: Number(sp.wid) || 0, qty: 0, rows: 0 }; designs.push(d); }
+      if(!d){
+        d = dMap[key] = { key: key, len: Number(sp.len) || 0, wid: Number(sp.wid) || 0,
+                          type: typeKey, solid: isSolid, hole: isHole, qty: 0, rows: 0 };
+        designs.push(d);
+      }
       d.qty += ccRowQtyWhole(sp); d.rows++;
     });
-    /* 套数/工期决策（两种方案共用） */
+    /* 规格显示：1,200×600（实心板） */
+    function ccMoldSizeTxt(d){
+      var t = d.solid ? ccT('moldTypeSolid') : (d.hole ? ccT('moldTypeHole') : '');
+      return ccNum(d.len) + '×' + ccNum(d.wid) + (t ? '（' + t + '）' : '');
+    }
+    /* 套数/工期决策（两种方案共用）：套数恒定 = 线数，加套不压缩工期 */
     function ccMoldPlan(qty, pcs){
       var single = pcs * CPD;                     // 单套日产能
-      var lineCap = single * Math.max(1, LINES);  // 全线日产能
-      var sets = LINES;                           // 底线：每线 1 套
-      if(DEAD > 0 && single > 0 && (qty / lineCap) > DEAD){
-        sets = Math.max(LINES, Math.ceil(qty / (single * DEAD))); // 需求产能 ÷ 单套产能
-      }
-      var days = (single > 0 && sets > 0) ? Math.ceil(qty / (single * sets)) : 0;
-      return { single: single, lineCap: lineCap, sets: sets, days: days, extra: sets - LINES };
+      var lineCap = single * Math.max(1, LINES);  // 全线日产能（= 套数 × 单套，套数即线数）
+      var sets = Math.max(1, LINES);              // 底线：每线 1 套
+      var days = lineCap > 0 ? Math.ceil(qty / lineCap) : 0;
+      return { single: single, lineCap: lineCap, sets: sets, days: days };
     }
     designs.forEach(function(d){
       d.pcs = ccMoldPer(d.len, d.wid, false);
       var p = ccMoldPlan(d.qty, d.pcs);
-      d.singleCap = p.single; d.sets = p.sets; d.days = p.days; d.extra = p.extra;
+      d.singleCap = p.single; d.sets = p.sets; d.days = p.days;
     });
     /* 文案占位符填充：ccMFill('同尺寸合并 {0} 批 · 总产量 {1} 块', 4, '160,000') */
     function ccMFill(s){
@@ -67660,13 +67667,12 @@ function submitAuth() {
         ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsA * MPRICE);
       htmlA += '<div style="font-weight:700;color:#1a56b0;margin:6px 0 2px;">📋 ' + ccT('moldDetail') + '</div>';
       designs.forEach(function(d, i){
-        htmlA += '<div style="margin:2px 0 2px 14px;">' + (CN[i] || (i + 1)) + ' ' + ccNum(d.len) + '×' + ccNum(d.wid) + ' ' + ccT('moldDedic') +
+        htmlA += '<div style="margin:2px 0 2px 14px;">' + (CN[i] || (i + 1)) + ' ' + ccMoldSizeTxt(d) + ' ' + ccT('moldDedic') +
           ' × ' + d.sets + ' ' + ccT('moldSets') + ' — ' + ccT('moldPlate1') +
           ' · ' + ccMFill(ccT('moldMerge'), ccNum(d.rows), ccNum(d.qty)) +
           ' · ' + ccT('moldPer') + ' ' + d.pcs + ' ' + ccT('moldPcs') +
           ' · ' + ccMFill(ccT('moldSingleCap'), ccNum(d.singleCap)) +
           ' · ' + ccT('moldNeedDays') + ' ' + d.days + ' ' + ccT('moldDaysUnit') +
-          (d.extra > 0 ? ' · <span style="color:#d32f2f;font-weight:700;">' + ccMFill(ccT('moldExtra'), ccNum(DEAD), d.extra) + '</span>' : '') +
           '</div>';
       });
       htmlA += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkA + ' ' + ccT('moldDaysUnit') + '</div>';
@@ -67681,41 +67687,52 @@ function submitAuth() {
         d.kFit = wm > 0 ? Math.min(2, Math.floor(1.5 / wm + 1e-9)) : 0;     // 1.5m 宽度方向叠几条（最多 2）
         d.perPlate = (d.rowsFit > 0 && d.kFit > 0) ? d.rowsFit * d.kFit : 0; // 每模出几块（0 = 排不下）
       });
-      var combos = rest.filter(function(d){ return d.perPlate >= 1; });
-      var solos = rest.filter(function(d){ return d.perPlate < 1; });
-      var comboPcs = 0, comboQty = 0;
-      combos.forEach(function(d){ comboPcs += d.perPlate; comboQty += d.qty; });
-      var comboP = comboPcs > 0 ? ccMoldPlan(comboQty, comboPcs) : null;
-      solos.forEach(function(d){ var p = ccMoldPlan(d.qty, d.pcs); d.sets = p.sets; d.days = p.days; d.extra = p.extra; });
-      var setsB = main.sets + (comboP ? comboP.sets : 0), mkB = main.days + (comboP ? comboP.days : 0);
+      /* ★CC-MOLDDESIGN2-20261114：组合模按「类型」分组——实心板和带圆孔板型腔不同，不能拼同一块板 */
+      var combos = [], solos = [];
+      var seenType = {};
+      rest.forEach(function(d){
+        if(seenType[d.type]) return;
+        seenType[d.type] = 1;
+        var grp = rest.filter(function(x){ return x.type === d.type; });
+        var fit = grp.filter(function(x){ return x.perPlate >= 1; });
+        var nofit = grp.filter(function(x){ return x.perPlate < 1; });
+        if(fit.length){
+          var pcs = 0, qty = 0;
+          fit.forEach(function(x){ pcs += x.perPlate; qty += x.qty; });
+          var p = ccMoldPlan(qty, pcs);
+          combos.push({ members: fit, pcs: pcs, qty: qty, single: p.single, sets: p.sets, days: p.days });
+        }
+        nofit.forEach(function(x){ solos.push(x); });
+      });
+      var setsB = main.sets, mkB = main.days;
+      combos.forEach(function(g){ setsB += g.sets; mkB += g.days; });
       solos.forEach(function(d){ setsB += d.sets; mkB += d.days; });
       var htmlB = ccT('moldSum') + ' ' + setsB + ' ' + ccT('moldSets') + ' · ' + LINES + ' ' + ccT('moldPar') + ' ' + mkB + ' ' + ccT('moldDaysUnit') +
         ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsB * MPRICE);
       // ★CC-MOLDDESIGN-20261114：逐副模具明细——主力=单规格整板；小规格=混拼板(条带×腔)；拼不进的单独开模
       htmlB += '<div style="font-weight:700;color:#1a56b0;margin:6px 0 2px;">📋 ' + ccT('moldDetail') + '</div>';
       var bi = 0;
-      htmlB += '<div style="margin:2px 0 2px 14px;">' + (CN[bi++] || bi) + ' ' + ccNum(main.len) + '×' + ccNum(main.wid) + ' ' + ccT('moldDedic') +
+      htmlB += '<div style="margin:2px 0 2px 14px;">' + (CN[bi++] || bi) + ' ' + ccMoldSizeTxt(main) + ' ' + ccT('moldDedic') +
         ' × ' + main.sets + ' ' + ccT('moldSets') + ' — ' + ccT('moldPlate1') +
         ' · ' + ccMFill(ccT('moldMerge'), ccNum(main.rows), ccNum(main.qty)) +
         ' · ' + ccT('moldPer') + ' ' + main.pcs + ' ' + ccT('moldPcs') +
         ' · ' + ccMFill(ccT('moldSingleCap'), ccNum(main.singleCap)) +
         ' · ' + ccT('moldNeedDays') + ' ' + main.days + ' ' + ccT('moldDaysUnit') +
-        (main.extra > 0 ? ' · <span style="color:#d32f2f;font-weight:700;">' + ccMFill(ccT('moldExtra'), ccNum(DEAD), main.extra) + '</span>' : '') +
         '</div>';
-      if(comboP){
-        htmlB += '<div style="margin:2px 0 0 14px;">' + (CN[bi++] || bi) + ' ' + ccT('moldCombo') + ' × ' + comboP.sets + ' ' + ccT('moldSets') + ' — <b>' + ccT('moldPlate2') + '</b>：</div>';
-        combos.forEach(function(d){
-          htmlB += '<div style="margin:2px 0 2px 28px;">· ' + ccNum(d.len) + '×' + ccNum(d.wid) +
+      combos.forEach(function(g){
+        htmlB += '<div style="margin:2px 0 0 14px;">' + (CN[bi++] || bi) + ' ' + ccT('moldCombo') + ' × ' + g.sets + ' ' + ccT('moldSets') + ' — <b>' + ccT('moldPlate2') + '</b>：</div>';
+        g.members.forEach(function(d){
+          htmlB += '<div style="margin:2px 0 2px 28px;">· ' + ccMoldSizeTxt(d) +
             '（' + d.kFit + ' ' + ccT('moldStrip') + ' × ' + d.rowsFit + ' ' + ccT('moldCav') + '）' +
             '：' + ccT('moldPer') + ' ' + d.perPlate + ' ' + ccT('moldPcs') +
             ' · ' + ccMFill(ccT('moldMerge'), ccNum(d.rows), ccNum(d.qty)) + '</div>';
         });
-        htmlB += '<div style="margin:0 0 2px 28px;color:#1a56b0;">· ' + ccT('moldPer') + ' ' + comboPcs + ' ' + ccT('moldPcs') +
-          ' · ' + ccMFill(ccT('moldSingleCap'), ccNum(comboP.single)) +
-          ' · ' + ccT('moldNeedDays') + ' ' + comboP.days + ' ' + ccT('moldDaysUnit') + '</div>';
-      }
+        htmlB += '<div style="margin:0 0 2px 28px;color:#1a56b0;">· ' + ccT('moldPer') + ' ' + g.pcs + ' ' + ccT('moldPcs') +
+          ' · ' + ccMFill(ccT('moldSingleCap'), ccNum(g.single)) +
+          ' · ' + ccT('moldNeedDays') + ' ' + g.days + ' ' + ccT('moldDaysUnit') + '</div>';
+      });
       solos.forEach(function(d){
-        htmlB += '<div style="margin:2px 0 2px 14px;">' + (CN[bi++] || bi) + ' ' + ccNum(d.len) + '×' + ccNum(d.wid) + ' ' + ccT('moldDedic') +
+        htmlB += '<div style="margin:2px 0 2px 14px;">' + (CN[bi++] || bi) + ' ' + ccMoldSizeTxt(d) + ' ' + ccT('moldDedic') +
           ' × ' + d.sets + ' ' + ccT('moldSets') + ' — ' + ccT('moldPlate1') + ' · <span style="color:#d32f2f;">' + ccT('moldNoFit') + '</span>' +
           ' · ' + ccMFill(ccT('moldMerge'), ccNum(d.rows), ccNum(d.qty)) +
           ' · ' + ccT('moldPer') + ' ' + d.pcs + ' ' + ccT('moldPcs') +
@@ -67990,18 +68007,6 @@ function submitAuth() {
       ln.addEventListener('input', function(){
         if(!CC_DATA) return;
         CC_DATA.demand.moldLines = Math.max(1, parseInt(String(this.value).replace(/[^0-9]/g, ''), 10) || 0) || 2;
-        ccRecalc(); ccScheduleSave();
-      });
-    })();
-    // ★CC-MOLDDESIGN-20261114：交付期限(天) 输入框直绑（0/空 = 不限，输入即重算套数与工期）
-    (function(){
-      var dl = document.getElementById('cc_mold_deadline');
-      if(!dl) return;
-      dl.disabled = false;
-      dl.addEventListener('focus', function(){ try{ this.select(); }catch(e){} });
-      dl.addEventListener('input', function(){
-        if(!CC_DATA) return;
-        CC_DATA.demand.moldDeadline = Math.max(0, parseInt(String(this.value).replace(/[^0-9]/g, ''), 10) || 0);
         ccRecalc(); ccScheduleSave();
       });
     })();
