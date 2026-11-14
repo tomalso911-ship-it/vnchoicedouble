@@ -2199,6 +2199,12 @@ window.__finShakeReport = function (ms) {
        现在只要是通过 printModalById 打印（body.printing-modal），非目标的弹层一律不打印。 */
     body.printing-modal > .modal-overlay.show:not(.print-target){ display:none !important; }
 
+    /* ★CC-PHPLUS-PRINT-20261114（用户 2026-11-14：+ 不许跟着打印出来）：
+       猪舍格的「+」后缀圆钮、以及任何后缀浮层，打印/导出 PDF 时一律不出现。
+       放在全局 print 块里，成本核算 PDF、规格表 PDF、报告 PDF 全走这一条。 */
+    .slats-suffix-plus{ display:none !important; }
+    .slats-suffix-pop{ display:none !important; }
+
     html,body{height:auto !important;overflow:visible !important;}
     @page { size: auto; margin: 8mm; }
   }
@@ -15470,7 +15476,11 @@ var WL_FLOW_IMG = {
       doSelect();
     }
     function prod_outDestKey(e){ if(e.key==='Escape'){ prod_outDestCloseAll(); } }
-    document.addEventListener('click', function(e){ if(!e.target.closest('.out-edit-dest-wrap')) prod_outDestCloseAll(); });
+    /* ★POPUP-KEEPOPEN-20261114：点语言按钮不算"点外面"，出库目标猪舍下拉切语言时必须留着 */
+    document.addEventListener('click', function(e){
+      if(window.__isLangUiClick && window.__isLangUiClick(e)) return;
+      if(!e.target.closest('.out-edit-dest-wrap')) prod_outDestCloseAll();
+    });
     /* 编辑行：区域切换时联动刷新目标猪舍+栋号下拉并回选第一个 */
     function prod_outAreaChanged(){
       var areaSel=document.getElementById('out_edit_area');
@@ -41508,8 +41518,28 @@ function __langGuard(snap){
   } catch(e){}
 }
 
+/* ★LANG-UI-CLICK-20261114（用户 2026-11-14：切语言时浮层/弹窗必须保持打开）：
+   语言切换本身就是一次 document click，所有"点空白处关闭浮层"的逻辑都会把它当成关闭信号
+   → 切语言的瞬间浮层自己关掉。统一在这里判定：这次点击是不是「语言切换相关」的点击。
+   ① 语言按钮 DOM 判定；② 切语言后 1200ms 保护窗（覆盖按钮冒泡 + 可能的异步重排点击）。 */
+window.__langSwitchAt = 0;
+window.__isLangUiClick = function(e){
+  try {
+    if (Date.now() - (window.__langSwitchAt || 0) < 1200) return true;
+    var t = e && (e.target || e.srcElement);
+    if (!t || !t.closest) return false;
+    if (t.closest('.lang-switch') || t.closest('#langSwitch') || t.closest('#loginLangBox') || t.closest('#dbgLangBox')) return true;
+    if (t.id && /^(dbgLang|loginLang)/.test(t.id)) return true;
+    if (t.closest('[data-lang-btn]')) return true;
+    return false;
+  } catch(err) { return false; }
+};
+
 function setLangDebug(lang) {
   if(!I18N[lang]) { console.warn('[lang] unsupported:', lang); return; }
+
+  // ★LANG-UI-CLICK-20261114：给"点外面关闭浮层"的各处逻辑一个保护窗口（见 __isLangUiClick）
+  try { window.__langSwitchAt = Date.now(); } catch(e){}
 
   // ★USR-CTX-LANG-20261107：切语言期间给「用户右键弹跳框」上保护窗口。
   // 与 initUsrCtx 的 outside-close 排除规则配套：scroll/resize/重渲染不得把弹跳框关掉。
@@ -41575,6 +41605,26 @@ function setLangDebug(lang) {
     // ★USR-CTX-LANG-20261107：用户右键删除弹跳框同样纳入「切语言保活」清单
     var _ucKeep = document.getElementById('usrCtxPop');
     if (_ucKeep && _ucKeep.style.display === 'block') __langPreserveList.push({type:'style', el:_ucKeep, display:'block'});
+
+    /* ★POPUP-KEEPOPEN-20261114（用户 2026-11-14：扫描全部代码，所有弹窗/浮层切语言都不许消失）：
+       凡是此刻可见的浮层，一律登记 display，切语言完成后由 __restoreLangPreserve() 还原。
+       覆盖：后缀浮层（成本核算 #ccg_suffix_pop / 规格表 .slats-suffix-pop）、安装删除确认、
+       猪舍信息气泡、设备/天气浮层、确认框、右键菜单、日历弹层、求和气泡等。
+       前提：这些节点不能被"点外面"的处理器 remove 掉（节点没了就无法还原）——
+       成本核算后缀浮层已改为 display:none 隐藏（见 ccHousePlus 的 close）。 */
+    var __POP_SEL = '.slats-suffix-pop, #ccg_suffix_pop, .inst-del-pop, .inst-dsub-tip, .inst-bldg-tip,'
+                  + '.prod-pop-confirm, .appr-ctx-menu, .a-menu.show, .cp-cal-popup, .cm-cal-popup,'
+                  + '.pe-wx-pop, .pt-tip, .fin-rpt-pop, .won-sum-tooltip, .prod-trend-tip, .prod-canvas-tip,'
+                  + '.inco-tooltip, .ig-tip, .usr-ctx-pop';
+    try {
+      document.querySelectorAll(__POP_SEL).forEach(function(el){
+        var d = (el.style && el.style.display) || '';
+        var shown = (d && d !== 'none') || (getComputedStyle(el).display !== 'none');
+        if (!shown) return;
+        if (el.classList && el.classList.contains('show')) __langPreserveList.push({type:'class', el:el, cls:'show'});
+        if (d && d !== 'none') __langPreserveList.push({type:'style', el:el, display:d});
+      });
+    } catch(e) {}
   } catch(e) {}
   window.__langPreserveList = __langPreserveList;
 
@@ -41853,6 +41903,8 @@ function setLangDebug(lang) {
 
   // ---- ★CAL-KEEPOPEN-20261108：日历弹窗若正开着，原地按新语言重绘（星期/月份/今天/清除），不关闭不重定位 ----
   try { if (typeof cpCalRelocalize === 'function') cpCalRelocalize(); } catch (e) {}
+  // ---- ★POPUP-KEEPOPEN-20261114：成本核算「+」后缀浮层若正开着，原地换语言文字（不关闭、不重定位）----
+  try { if (typeof window.__ccSuffixLocalize === 'function') window.__ccSuffixLocalize(); } catch (e) {}
   // ---- ★CAL-KEEPOPEN-20261108：佣金页日历（#commCalPopup）正开着 → 原地重绘，保持展开 ----
   try {
     var _ccp = document.getElementById('commCalPopup');
@@ -48236,6 +48288,8 @@ function deleteApprovalFromCtx(){
   });
 }
 document.addEventListener('click', function(e){
+  /* ★POPUP-KEEPOPEN-20261114：点语言按钮不算"点外面"，审批右键菜单切语言时必须留着 */
+  if (window.__isLangUiClick && window.__isLangUiClick(e)) return;
   var m = document.getElementById('apprCtxMenu');
   if (m && m.style.display === 'block' && !m.contains(e.target)) closeApprCtx();
 });
@@ -52528,11 +52582,16 @@ function slatsPigHouseCell(initVal){
   if(!document._slatsSuffixCloseInit){
     document._slatsSuffixCloseInit=true;
     document.addEventListener('click', function(e){
-      var p=document.querySelector('.slats-suffix-pop');
-      if(!p || p.style.display==='none') return;
-      if(p.contains(e.target)) return;
+      /* ★POPUP-KEEPOPEN-20261114：点语言切换按钮不算"点外面"——否则切语言的瞬间后缀浮层自己关掉 */
+      if(window.__isLangUiClick && window.__isLangUiClick(e)) return;
       if(e.target.closest && e.target.closest('.slats-suffix-plus')) return;
-      p.style.display='none';
+      /* 逐个关闭：原先只取 querySelector('.slats-suffix-pop') 的第一个，
+         取到的是别的（隐藏）单元格的浮层 → 真正打开的那个永远关不掉 */
+      Array.prototype.forEach.call(document.querySelectorAll('.slats-suffix-pop'), function(p){
+        if(!p || p.style.display==='none') return;
+        if(p.contains(e.target)) return;
+        p.style.display='none';
+      });
     });
     var sc=document.querySelector('.slats-spec-table-scroll');
     if(sc) sc.addEventListener('scroll', function(){ var p=document.querySelector('.slats-suffix-pop'); if(p) p.style.display='none'; });
@@ -65798,7 +65857,10 @@ function submitAuth() {
     var inp = pop.querySelector('.slats-suffix-input');
     setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 30);
     inp.addEventListener('input', function(){ var v = this.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 4); if(v !== this.value) this.value = v; });
-    var close = function(){ if(pop.parentNode) pop.parentNode.removeChild(pop); };
+    /* ★POPUP-KEEPOPEN-20261114：关闭改为 display:none 隐藏而不是 removeChild。
+       原先移除节点 → 切语言时 setLangDebug 的 __restoreLangPreserve 无从还原（元素已不在 DOM），
+       用户看到"切语言浮层就没了"。改成隐藏后，__langPreserveList 会在切语言后把 display 还原。 */
+    var close = function(){ pop.style.display = 'none'; };
     pop.querySelectorAll('.slats-suffix-btn').forEach(function(b){
       b.addEventListener('click', function(e){
         e.stopPropagation();
@@ -65829,12 +65891,27 @@ function submitAuth() {
       document._ccSuffixCloseInit = true;
       document.addEventListener('click', function(e){
         var p = document.getElementById('ccg_suffix_pop');
-        if(!p) return;
+        if(!p || p.style.display === 'none') return;
         if(p.contains(e.target)) return;
         if(e.target.closest && e.target.closest('.slats-suffix-plus')) return;
-        if(p.parentNode) p.parentNode.removeChild(p);
+        // ★LANG-UI-CLICK-20261114：点语言切换按钮不算"点外面"，浮层必须留着
+        if(window.__isLangUiClick && window.__isLangUiClick(e)) return;
+        p.style.display = 'none';
       });
     }
+  };
+  /* ★POPUP-KEEPOPEN-20261114：语言切换时把成本核算后缀浮层【原地】翻成新语言（不关闭、不重定位） */
+  window.__ccSuffixLocalize = function(){
+    var pop = document.getElementById('ccg_suffix_pop');
+    if(!pop || pop.style.display === 'none') return;
+    try {
+      var T = ccT;
+      var tEl = pop.querySelector('.slats-suffix-pop-title'); if(tEl) tEl.textContent = T('suffixTitle');
+      var iEl = pop.querySelector('.slats-suffix-input');     if(iEl) iEl.setAttribute('placeholder', T('suffixPh'));
+      var bS  = pop.querySelector('[data-act="save"]');        if(bS)  bS.textContent  = T('btnSave');
+      var bC  = pop.querySelector('[data-act="clear"]');       if(bC)  bC.textContent  = T('suffixClear');
+      var bE  = pop.querySelector('[data-act="exit"]');        if(bE)  bE.textContent  = T('suffixExit');
+    } catch(e) {}
   };
   function ccGridRefreshComputed(){
     var specs = (CC_DATA.demand && CC_DATA.demand.specs) || [];
@@ -66180,7 +66257,8 @@ function submitAuth() {
       suffixTip:    { zh:'自定义房舍后缀（如 6-a）', en:'Custom house suffix (e.g. 6-a)', vi:'Hậu tố chuồng (vd 6-a)' },
       suffixTitle:  { zh:'房舍自定义后缀', en:'Custom house suffix', vi:'Hậu tố chuồng' },
       suffixPh:     { zh:'1~4 位字母或数字', en:'1-4 letters/digits', vi:'1-4 ký tự' },
-      suffixClear:  { zh:'清空', en:'Clear', vi:'Xóa' },
+      /* ★CC-SUFFIX-CLEAR-20261114：与模态框统一为「清除」（en/vi 原本就一致） */
+      suffixClear:  { zh:'清除', en:'Clear', vi:'Xóa' },
       /* ★CC-SUFFIX-EXIT-20261114：与模态框 #slatsSpecTable 后缀浮层统一为「退出」（原为「取消」） */
       suffixExit:   { zh:'退出', en:'Exit', vi:'Thoát' }
     };
@@ -69157,6 +69235,8 @@ function submitAuth() {
 
   // 右键菜单：点击别处 / Esc 关闭
   document.addEventListener('click', function(e){
+    /* ★POPUP-KEEPOPEN-20261114：点语言切换按钮不算"点外面"，资料库右键菜单切语言时必须留着 */
+    if(window.__isLangUiClick && window.__isLangUiClick(e)) return;
     if(e.target && e.target.closest && e.target.closest('.lib-ctx')) return;
     lib_closeCtx();
   });
