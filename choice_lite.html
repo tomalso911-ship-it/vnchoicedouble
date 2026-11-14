@@ -1411,6 +1411,46 @@ window.__finShakeReport = function (ms) {
     .won-scroll-container tbody tr.fake-header-row td.rate, .won-scroll-container tbody tr.fake-header-row:hover td.rate { background:#ffd0d0 !important; color:#8a1a1a !important; }
     .won-scroll-container tbody td.rate { background:#ffd0d0; }
 
+    /* ==================================================================
+       ★WON-THEAD-ROWSPAN-20261114（用户选定方案 B：真两级合并表头）
+       签约项目表（#wonTable）两级表头已全部放进 <thead>：
+         一级 tr.won-thead    无子列的格子 rowspan="2"，分组格子 colspan="N"
+         二级 tr.won-subthead 只含 56 个分组子列（RMB / USD / VND 等）
+       规则全部以 #wonTable 前缀限定，不影响页面其它表格（生产/规格/报表…）。
+       ================================================================== */
+    /* ★实测（Chrome 153）：单元格一旦带 rowspan，Chromium 就放弃该格（乃至同级格）的
+       position:sticky —— 表头会随数据行一起滚走。因此把纵向粘性整体交给 <thead>：
+       两级表头作为"一整块"粘住，rowspan 合并区与分组区永远对齐。
+       单元格仍各自保留 sticky（固定列靠它做横向 left 钉住）；在不支持 thead sticky 的
+       浏览器里退回单元格级 top 方案（--won-th1-h），两条路都是对齐的。 */
+    #wonTable thead { position: sticky; top: 0; z-index: 20; }
+    /* 一级行：分组格结束于第一行 → 1px 分隔；rowspan 格跨到第二行底部 → 2px 收口线 */
+    #wonTable thead tr.won-thead th { border-bottom:1px solid #bbb; }
+    #wonTable thead tr.won-thead th[rowspan] { border-bottom:2px solid #999; }
+    /* 二级行：纵向钉在一级行下沿。top 用运行时实测的一级行高（--won-th1-h，
+       由 _wonSyncTheadHeight 写入）→ 不写死像素，切语言/换字号导致一级行变高时
+       也不会与一级表头重叠或露出白缝。横向 left 仍由 .col-fixed 提供。 */
+    #wonTable thead tr.won-subthead th {
+      position: sticky; top: var(--won-th1-h, 22px); z-index: 19;
+      font-size: 9px; font-weight: 700; line-height: 11px; padding: 3px 4px;
+      vertical-align: middle; white-space: nowrap; text-align: center;
+      border-top: none; border-bottom: 2px solid #999;
+      background: #f3eaff !important; color:#303133 !important;
+      pointer-events: none;
+    }
+    /* 带排序箭头的二级格才可点（其余格子让鼠标穿透，避免误触 hover 变色） */
+    #wonTable thead tr.won-subthead th.sortable-cell { pointer-events: auto !important; cursor: pointer; }
+    /* 二级行固定列兜底层级（本版 0/1 列已 rowspan 到一级行，为未来改动留口） */
+    #wonTable thead tr.won-subthead th.col-fixed,
+    #wonTable thead tr.won-subthead th.col-fixed-2 { z-index: 24; }
+    /* 二级行配色：与数据行三币种口径一致（RMB 蓝 / USD 红 / VND 绿），hover 不变色 */
+    #wonTable thead tr.won-subthead th.won-rmb,
+    #wonTable thead tr.won-subthead th.won-rmb:hover { background:#E7F0FB !important; color:#1565C0 !important; }
+    #wonTable thead tr.won-subthead th.won-usd,
+    #wonTable thead tr.won-subthead th.won-usd:hover { background:#FCEAEA !important; color:#C62828 !important; }
+    #wonTable thead tr.won-subthead th.won-vnd,
+    #wonTable thead tr.won-subthead th.won-vnd:hover { background:#E9F4E9 !important; color:#2E7D32 !important; }
+
     /* ===== Q1-Q7 一级表头（深黄色） ===== */
     .won-qhdr { background:#FFD966 !important; color:#6b4f00 !important; }
     .won-scroll-container thead th.won-qhdr { background:#FFD966 !important; color:#6b4f00 !important; }
@@ -48976,6 +49016,9 @@ function updateTheadTextOnly() {
   
   var ths = thead.querySelectorAll('th');
   ths.forEach(function(th) {
+    // ★WON-THEAD-ROWSPAN-20261114：二级表头行（RMB/USD/VND）是静态标签，三语一致，
+    //   绝不能套 headerTextMap —— 否则会被写成一级分组标题（设备金额/佣金金额…）而串位。
+    if (th.parentNode && th.parentNode.classList && th.parentNode.classList.contains('won-subthead')) return;
     var col = th.dataset.col;
     if (col !== undefined && headerTextMap[col] !== undefined) {
       var toggleBtn = th.querySelector('.won-col-toggle');
@@ -48995,6 +49038,8 @@ function updateTheadTextOnly() {
     }
     
   });
+  // ★WON-THEAD-ROWSPAN-20261114：文字变化可能改变一级行高 → 重算二级行的 sticky 偏移
+  try { _wonSyncTheadHeight(); } catch(e) {}
 }
 
 function updateRowButtons() {
@@ -49170,20 +49215,22 @@ function sortWonTable(colIndex) {
 
 // ==================== 十字高亮逻辑 ====================
 function bindCrossHighlight(){
-  var tbody=document.getElementById('wonTbody'); if(!tbody) return;
-  if(tbody.__chBound) return;   // tbody 元素不重建（只换 innerHTML），避免每次渲染叠加监听器
-  tbody.__chBound=true;
-  tbody.addEventListener('mouseover', onCrossOver);
-  tbody.addEventListener('mouseout', onCrossOut);
+  // ★WON-THEAD-ROWSPAN-20261114：二级表头已搬进 <thead>，事件必须挂在整张 table 上，
+  //   否则二级表头的求和气泡/悬停高亮全部失效（tbody 里已没有伪表头行）。
+  var table=document.getElementById('wonTable'); if(!table) return;
+  if(table.__chBound) return;   // table 元素不重建（只换 innerHTML），避免每次渲染叠加监听器
+  table.__chBound=true;
+  table.addEventListener('mouseover', onCrossOver);
+  table.addEventListener('mouseout', onCrossOut);
 }
 
 function onCrossOver(e){
-  var td = e.target.closest('td');
+  var td = e.target.closest('td,th');
   if(!td) return;
   var tr = td.closest('tr');
   if(!tr) return;
 
-  if(tr.classList.contains('fake-header-row')) {
+  if(tr.classList.contains('won-subthead') || tr.classList.contains('fake-header-row')) {
     document.querySelectorAll('#wonTbody td.row-hl,#wonTbody td.col-hl,#wonTbody td.cross-hl')
       .forEach(function(c){ c.classList.remove('row-hl','col-hl','cross-hl'); });
     return;
@@ -49205,8 +49252,10 @@ function onCrossOver(e){
 }
 
 function onCrossOut(e){
-  var td=e.target.closest('td'); if(!td) return;
-  var tr=td.closest('tr'); if(!tr || tr.classList.contains('fake-header-row')) return;
+  var td=e.target.closest('td,th'); if(!td) return;
+  var tr=td.closest('tr'); if(!tr) return;
+  if(tr.classList.contains('won-subthead') || tr.classList.contains('fake-header-row')) return;
+  if(tr.closest('thead')) return;
   var col=td.dataset.col; if(col===undefined) return;
   tr.querySelectorAll('td').forEach(function(c){ c.classList.remove('row-hl'); });
   document.querySelectorAll('#wonTbody td[data-col="' + col + '"]').forEach(function(c){
@@ -49216,19 +49265,22 @@ function onCrossOut(e){
 
 // ==================== 求和逻辑 ====================
 function bindSumOnHover(){
+  // ★WON-THEAD-ROWSPAN-20261114：求和气泡的触发格现在是 thead 内的二级 <th>，
+  //   监听改挂整张 table（tbody 里已无伪表头行）。
+  var table = document.getElementById('wonTable');
   var tbody = document.getElementById('wonTbody');
-  if(!tbody) return;
-  if(tbody.__sumBound) return;   // tbody 元素不重建（只换 innerHTML），避免每次渲染叠加监听器
-  tbody.__sumBound=true;
+  if(!table || !tbody) return;
+  if(table.__sumBound) return;   // table 元素不重建（只换 innerHTML），避免每次渲染叠加监听器
+  table.__sumBound=true;
 
   var activeTooltip = null;
 
-  tbody.addEventListener('mouseover', function(e) {
-    var td = e.target.closest('td');
+  table.addEventListener('mouseover', function(e) {
+    var td = e.target.closest('td,th');
     if(!td) return;
     
     var tr = td.closest('tr');
-    if(!tr || !tr.classList.contains('fake-header-row')) {
+    if(!tr || !(tr.classList.contains('won-subthead') || tr.classList.contains('fake-header-row'))) {
         if(activeTooltip) { activeTooltip.remove(); activeTooltip = null; }
         return;
     }
@@ -49278,8 +49330,8 @@ function bindSumOnHover(){
     tooltip.style.top = top + 'px';
   });
 
-  tbody.addEventListener('mouseout', function(e) {
-    var td = e.target.closest('td');
+  table.addEventListener('mouseout', function(e) {
+    var td = e.target.closest('td,th');
     if(!td) {
         if(activeTooltip) { activeTooltip.remove(); activeTooltip = null; }
         return;
@@ -49292,7 +49344,7 @@ function bindSumOnHover(){
 function renderWonData(list) {
   var t = T();
   var canEdit = true;
-  var fakeRow = renderFakeSubHeaderRow();
+  // ★WON-THEAD-ROWSPAN-20261114：二级表头已并入 thead，tbody 里不再有伪表头行
 
   var dataRows = list.map(function(p, idx) {
     var row = '';
@@ -49430,7 +49482,7 @@ function renderWonData(list) {
   }).join('');
 
   var noDataRow = '<tr class="won-data-row zebra-odd"><td colspan="86" style="text-align:center;padding:20px;color:#999;">' + t.noData + '</td></tr>';
-  el('wonTbody').innerHTML = fakeRow + (dataRows || noDataRow);
+  el('wonTbody').innerHTML = (dataRows || noDataRow);
 
   // 按权限隐藏"签约项目"行内按钮（查看详情由单元格点击触发，此处不拦）
   applyRowPerms('wonTbody', [
@@ -49493,10 +49545,15 @@ function renumberWonNo(tbody) {
 }
 
 // ===== 表头渲染 =====
+// ★WON-THEAD-ROWSPAN-20261114（用户选定方案 B：真两级合并表头）
+//   一级 tr.won-thead：无子列的格子 rowspan="2"，分组格子 colspan="N"
+//   二级 tr.won-subthead：只渲染"有子列"的 56 个分组列（7/8、14-43、45-50、54-56、58-63、66-68、70-75）
+//   86 列守恒：一级 49 个格子（30 个 rowspan 覆盖 30 列 + 19 个 colspan 覆盖 56 列）+ 二级 56 格 = 86
+//   ⛔ 二级行必须留在 thead 内：放 tbody 里无法与一级格做跨行合并；也不能再渲染占位格，会多列错位。
 function renderWonThead() {
   var thead=el('wonThead'); if(!thead) return;
   var t = T();
-  var html = '<tr>' +
+  var html = '<tr class="won-thead">' +
     '<th class="won-basic hdr col-fixed col-never-hide" style="width:40px;min-width:40px;max-width:40px;">No.</th>' +
     '<th class="won-basic hdr col-fixed-2 col-never-hide" style="width:90px;min-width:90px;max-width:90px;">' + t.contract_no + ' <span class="sort-indicator" data-col="1" onclick="sortWonTable(1)">↕</span></th>' +
     '<th class="won-basic hdr">' + t.customer_name + ' <span class="sort-indicator" data-col="2" onclick="sortWonTable(2)">↕</span></th>' +
@@ -49547,12 +49604,45 @@ function renderWonThead() {
     '<th class="won-doc hdr">' + t.salesperson + ' <span class="sort-indicator" data-col="84" onclick="sortWonTable(84)">↕</span></th>' +
     '<th class="won-action won-action-yellow hdr">' + t.action + '</th>' +
   '</tr>';
+  // ★WON-THEAD-ROWSPAN-20261114：凡是【没有 colspan】的一级表头格 → rowspan="2"，
+  //   让它与下面的二级行纵向合并成一个大表头格（Excel 观感）。
+  html = html.replace(/<th (?![^>]*\bcolspan=)/g, '<th rowspan="2" ');
+  // 二级表头行（同属 thead，与一级 rowspan/colspan 互补）
+  html += renderFakeSubHeaderRow();
   thead.innerHTML = html;
   assignColDataAttrs();
   buildWonColGroup();
   injectWonToggleBtns();
   // thead 重建（首次加载/语言切换）后立即按单一事实源恢复列可见性与组头 colspan
   if (typeof syncWonColVisibility === 'function') syncWonColVisibility();
+  // 实测一级表头行高 → 二级行 sticky 的 top 用它（视图隐藏时内部会 200ms 后补测一次）
+  _wonSyncTheadHeight();
+}
+
+// ★WON-THEAD-ROWSPAN-20261114：把【实测】一级表头行高写进 CSS 变量 --won-th1-h。
+//   二级表头 sticky 的 top 用它定位（不写死像素）→ 切语言/换字号导致一级行变高时，
+//   二级表头依然严丝合缝贴在一级表头下沿，既不重叠也不露白缝。
+function _wonSyncTheadHeight() {
+  var tbl = document.getElementById('wonTable');
+  var th  = document.getElementById('wonThead');
+  if (!tbl || !th) return;
+  var r1 = th.querySelector('tr.won-thead');
+  if (!r1) return;
+  var h = Math.round(r1.getBoundingClientRect().height);
+  if (!h) {
+    if (!window.__wonTh1Retry) {
+      window.__wonTh1Retry = true;
+      setTimeout(function(){ window.__wonTh1Retry = false; try { _wonSyncTheadHeight(); } catch(e){} }, 200);
+    }
+    return;
+  }
+  if (tbl.getAttribute('data-th1-h') === String(h)) return;
+  tbl.setAttribute('data-th1-h', String(h));
+  tbl.style.setProperty('--won-th1-h', h + 'px');
+}
+if (!window.__wonTh1ResizeBound) {
+  window.__wonTh1ResizeBound = true;
+  window.addEventListener('resize', function(){ try { _wonSyncTheadHeight(); } catch(e){} });
 }
 
 function renderFakeSubHeaderRow() {
@@ -49625,31 +49715,39 @@ function renderFakeSubHeaderRow() {
      数据与列索引保持不变，避免 86 列全表错位。 */
   var hiddenCols = new Set([11, 78, 79, 80]);
 
+  // ★WON-THEAD-ROWSPAN-20261114：只渲染【有子列】的分组列（56 个），且全部改为 <th>；
+  //   其余 30 列的一级表头格已 rowspan="2" 跨行覆盖，这里绝不能再输出占位格
+  //   （多一格就多一列 → 表头与数据整表错位）。
+  //   hiddenCols 里的 11/78/79/80 都不是分组列，二级行无需再判；分组列的隐藏统一由
+  //   syncWonColVisibility 施加 col-hidden（一级组头 / 二级子格 / 数据格 三者同步）。
+  //   catOf() 仅在旧版"34 个占位列"分支用过，保留声明不影响本行渲染。
   var html = '';
   for (var c = 0; c < 86; c++) {
-    if (cells[c]) {
-      var style = cells[c].style || '';
-      var hideCls = hiddenCols.has(c) ? ' col-hidden' : '';
-      html += '<td class="' + cells[c].cls + hideCls + '" data-col="' + c + '" style="' + style + '">' + cells[c].text + '</td>';
-    } else {
-      var cls = catOf(c);
-      if (c===85) {
-        cls = 'won-action won-action-yellow hdr';
-      } else if (!cls) {
-        cls = 'won-basic hdr';
-      } else {
-        cls = cls + ' hdr';
-      }
-      if (hiddenCols.has(c)) cls += ' col-hidden';
-      html += '<td class="' + cls + '" data-col="' + c + '">&nbsp;</td>';
-    }
+    if (!cells[c]) continue;
+    if (!_wonHasSubCell(c)) continue;
+    var style = cells[c].style || '';
+    html += '<th class="' + cells[c].cls + '" data-col="' + c + '"' +
+            (style ? ' style="' + style + '"' : '') + '>' + cells[c].text + '</th>';
   }
-  return '<tr class="fake-header-row" data-row="fake-subheader">' + html + '</tr>';
+  return '<tr class="won-subthead">' + html + '</tr>';
+}
+
+// ★WON-THEAD-ROWSPAN-20261114：某列是否存在二级子表头格（= 一级表头是否为分组格 colspan>1）。
+//   与 WON_CUR_TRIPLE_STARTS（P1 十组 + P2/P3/P4 八组的三连起始）同源，外加汇率组 7/8。
+function _wonHasSubCell(c) {
+  if (c === 7 || c === 8) return true;
+  var S = (typeof WON_CUR_TRIPLE_STARTS !== 'undefined') ? WON_CUR_TRIPLE_STARTS
+          : [14,17,20,23,26,29,32,35,38,41,45,48,54,58,61,66,70,73];
+  for (var i = 0; i < S.length; i++) {
+    if (c >= S[i] && c < S[i] + 3) return true;
+  }
+  return false;
 }
 
 function assignColDataAttrs(){
   var thead=document.getElementById('wonThead'); if(!thead) return;
-  var row1=thead.querySelector('tr'); if(!row1) return;
+  // ★WON-THEAD-ROWSPAN-20261114：只对一级行按 colspan 累加列号（二级行自带 data-col）
+  var row1=thead.querySelector('tr.won-thead') || thead.querySelector('tr'); if(!row1) return;
   var ci=0;
   Array.from(row1.cells).forEach(function(cell){
     var cs=parseInt(cell.colSpan||'1',10)||1;
@@ -49822,7 +49920,10 @@ function syncWonColVisibility(){
                     : (!!hidden[cc] || (_sel ? curHiddenForSel(cc,'won',_sel) : false));
   }
   // 单列可见性：一次性取全部 td/col，避免 86 次 querySelectorAll 重复遍历大表格
-  var cells = tbl.querySelectorAll('td[data-col], col[data-col]');
+  // ★WON-THEAD-ROWSPAN-20261114：二级表头格现在是 thead 内的 <th>，必须一并纳入，
+  //   否则数据格隐藏了、二级表头还留着 → 表头比数据多列，整表错位。
+  //   一级表头格不在此列（由下方"组头单一事实源"按 colspan 收缩处理）。
+  var cells = tbl.querySelectorAll('td[data-col], col[data-col], thead tr.won-subthead th[data-col]');
   for (var i=0, len=cells.length; i<len; i++){
     var el=cells[i];
     var c=parseInt(el.getAttribute('data-col'),10);
@@ -49841,7 +49942,9 @@ function syncWonColVisibility(){
       if (WON_NEVER_HIDE_COLS.has(c)) { vis++; return; }
       if (!colHidden[c]) vis++;
     });
-    var th=tbl.querySelector('thead th[data-col="'+first+'"]');
+    // ★WON-THEAD-ROWSPAN-20261114：必须显式限定一级行 —— 两级表头共用 data-col，
+    //   不加限定 querySelector 可能撞上二级子表头格。
+    var th=tbl.querySelector('thead tr.won-thead > th[data-col="'+first+'"]');
     if(th){
       if(vis===0) th.classList.add('col-hidden');
       else { th.classList.remove('col-hidden'); th.colSpan=vis; th.classList.toggle('hdr-shrink', vis < g.c.length); }
@@ -49943,14 +50046,15 @@ function updateWonCollapsedBar(){
 
 function injectWonToggleBtns(){
   var table=document.getElementById('wonTable'); if(!table) return;
+  // ★WON-THEAD-ROWSPAN-20261114：折叠按钮只挂一级表头格（限定 tr.won-thead）
   WON_NEVER_HIDE_COLS.forEach(function(c){
-    table.querySelectorAll('thead th[data-col="' + c + '"]').forEach(function(th){
+    table.querySelectorAll('thead tr.won-thead > th[data-col="' + c + '"]').forEach(function(th){
       var old=th.querySelector('.won-col-toggle'); if(old) old.remove();
     });
   });
   WON_GROUPS.forEach(function(g){
     var c=g.c[0]; if(WON_NEVER_HIDE_COLS.has(c)) return;
-    var th=table.querySelector('thead th[data-col="' + c + '"]');
+    var th=table.querySelector('thead tr.won-thead > th[data-col="' + c + '"]');
     if(!th || th.querySelector('.won-col-toggle')) return;
     var btn=document.createElement('span');
     btn.className='won-col-toggle'; btn.innerText='[-]';

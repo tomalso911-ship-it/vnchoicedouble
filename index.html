@@ -502,9 +502,13 @@ function _ovLoadChartLib(cb){
        锁定 px 行高后：表头恒 22px、数据行行高恒定，切语言只重绘被改动的文字。
        ★ 2026-10-30 追加：二级假表头已按用户要求【取消纵向粘性】（见下方 fake-header-row
        规则），彻底移除 top:22px 这个"固定偏移 + 表头高度波动 = 露白"的组合。
+       ★ 2026-11-14 补充（CRM-THEAD-ROWSPAN-20261114）：CRM 表的二级表头已并进 <thead>
+       做真两级合并（一级格 rowspan="2"），它必须跟着一级行一起粘住，因此改用
+       【运行时实测的一级行高】--crm-th1-h 作 top（见 _crmSyncTheadHeight），
+       不再有"写死偏移"的问题。上面的 2026-10-30 规则现在只作用于签约项目/失败项目两张表。
        ⛔ 不得改回 normal / 1.x / em（会重现白闪）；
        ⛔ 若改动 thead 的 padding/font-size，必须同步重算：height = line-height + 8 + 1，
-          并同步二级假表头的 top 偏移。
+          并同步二级假表头的 top 偏移（CRM 表由 _crmSyncTheadHeight 自动跟随）。
        ================================================================== */
     .won-scroll-container tbody tr.fake-header-row td { line-height:11px; }
     /* 注：表头单元格【不要】单独加 will-change/translateZ —— 与滚动容器那一层会打架，
@@ -580,6 +584,45 @@ function _ovLoadChartLib(cb){
     .won-scroll-container tbody tr.fake-header-row:hover td.won-rmb { background:#fde8e8 !important; color:#c0392b !important; }
     .won-scroll-container tbody tr.fake-header-row:hover td.won-usd { background:#e8edf8 !important; color:#2c5fa8 !important; }
     .won-scroll-container tbody tr.fake-header-row:hover td.won-vnd { background:#f8f4e0 !important; color:#b8860b !important; }
+
+    /* ==================================================================
+       ★ CRM-THEAD-ROWSPAN-20261114（用户选定方案 B：真两级合并表头）
+       CRM 表（#crmTable）的两级表头已全部放进 <thead>：
+         一级 <tr class="won-thead">   无子列的格子 rowspan="2"，分组格子 colspan="N"
+         二级 <tr class="won-subthead"> 只含分组的子列（26 列）
+       ⛔ 下面这些规则全部以 #crmTable 前缀限定 —— 签约项目/失败项目两张表
+          仍是 tbody 伪表头行，继续使用上面的 .fake-header-row 规则，互不影响。
+       ================================================================== */
+    /* 一级行：分组格结束于第一行 → 1px 分隔；rowspan 格跨到第二行底部 → 2px 收口线 */
+    #crmTable thead tr.won-thead th { border-bottom:1px solid #bbb; }
+    #crmTable thead tr.won-thead th[rowspan] { border-bottom:2px solid #999; }
+    /* 二级行：纵向钉在一级行下沿。top 用运行时实测的一级行高（--crm-th1-h，
+       由 _crmSyncTheadHeight 写入）→ 不再写死 22px，切语言/换字号导致一级行
+       变高时也不会与一级表头重叠或露出白缝。横向 left 由 .col-fixed 提供。 */
+    #crmTable thead tr.won-subthead th {
+      position: sticky; top: var(--crm-th1-h, 22px); z-index: 19;
+      font-size: 9px; font-weight: 700; line-height: 11px; padding: 3px 4px;
+      vertical-align: middle; white-space: nowrap;
+      border-top: none; border-bottom: 2px solid #999;
+      background: #f3eaff !important;
+      pointer-events: none;
+    }
+    /* 带排序箭头的二级格才可点（其余格子让鼠标穿透，避免误触 hover 变色） */
+    #crmTable thead tr.won-subthead th.sortable-cell { pointer-events: auto !important; cursor: pointer; }
+    /* 二级行的固定列（本版 0/1 列已 rowspan 到一级行，此处为未来改动兜底） */
+    #crmTable thead tr.won-subthead th.col-fixed,
+    #crmTable thead tr.won-subthead th.col-fixed-2 { z-index: 24; }
+    /* 二级行配色：与原 tbody 伪行口径一一对应（含 hover，保持悬停不变色） */
+    #crmTable thead tr.won-subthead th.won-rmb,
+    #crmTable thead tr.won-subthead th.won-rmb:hover { background:#fde8e8 !important; color:#c0392b !important; }
+    #crmTable thead tr.won-subthead th.won-usd,
+    #crmTable thead tr.won-subthead th.won-usd:hover { background:#e8edf8 !important; color:#2c5fa8 !important; }
+    #crmTable thead tr.won-subthead th.won-vnd,
+    #crmTable thead tr.won-subthead th.won-vnd:hover { background:#f8f4e0 !important; color:#b8860b !important; }
+    #crmTable thead tr.won-subthead th.rate,
+    #crmTable thead tr.won-subthead th.rate:hover { background:#ffd0d0 !important; color:#8a1a1a !important; }
+    #crmTable thead tr.won-subthead th.won-pink,
+    #crmTable thead tr.won-subthead th.won-pink:hover { background:#ffe0e0 !important; color:#8a1f1f !important; }
 
     /* ===== 左侧分组配色 ===== */
     .won-scroll-container thead th.won-cyan  { background:#d9f2f7 !important; color:#1a5c6b !important; }
@@ -13784,8 +13827,9 @@ function _isObserverPos(u){
 //       后加载覆盖同名函数的 html2canvas+jsPDF 旧导出实现，改为真正的 window.print()。
 // 版本命名规则：V<年>.<月>.<日>.<当日序号> / build <年>-<月>-<日>-Z<序号>；
 // 跨天日期必须重新起算（当日序号归 1），否则会出现"日期还是昨天"的错误版本号。
-// 当前：2026-10-29 第 114 版（CRM 切语言白闪治理 CRM-PATCH-TBODY-20261029 + 金额渲染去 Intl 开销）
-const PERM_BUILD = "build 2026-10-30-Z123";  // 版本标记：用于确认浏览器加载的是最新代码（Z123 = HEAD-LOCK 定稿，移除 TEMP-DIAG 诊断浮层）
+// 当前：2026-11-14（CRM 两级表头真合并 CRM-THEAD-ROWSPAN-20261114：二级表头从 tbody 搬进
+//       thead，一级无子列格 rowspan="2" + 分组格 colspan，sticky 偏移改用实测 --crm-th1-h）
+const PERM_BUILD = "build 2026-11-14-Z124";  // 版本标记：用于确认浏览器加载的是最新代码（Z124 = CRM-THEAD-ROWSPAN）
 // 统一身份头：CRM/LOST 等模块的所有请求必须携带，服务端据此写 owner_user_id（记录归属）并按数据范围过滤。
 // 缺失会导致：新建行 owner 为空 → 数据范围匹配退化为 salesperson 文本 → 自己的行（尤其 AGI-GS Internal 符号人行）不可见。
 function authHeaders(extra){

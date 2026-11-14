@@ -210,7 +210,11 @@ function syncCrmColVisibility() {
     if (CRM_NEVER_HIDE_COLS.has(c)) continue;
     var want = !!hidden[c] || (typeof curHiddenFor === 'function' && curHiddenFor(c, 'q'));
     tbl.querySelectorAll('[data-col="' + c + '"]').forEach(function(el) {
-      if (el.tagName === 'TH') return;   // 一级表头绝不随单列隐藏，统一由下方组头逻辑处理
+      // ★ CRM-THEAD-ROWSPAN-20261114：只有【一级】表头格不随单列隐藏（统一由下方组头逻辑
+      //   按 colspan 收缩处理）；二级子表头格已在 thead 内，必须与数据格同步隐藏，
+      //   否则二级表头比数据多出列 → 整表错位。
+      if (el.tagName === 'TH' && el.parentNode && el.parentNode.classList &&
+          el.parentNode.classList.contains('won-thead')) return;
       el.classList.toggle('col-hidden', want);
     });
   }
@@ -226,7 +230,9 @@ function syncCrmColVisibility() {
       if (CRM_NEVER_HIDE_COLS.has(c)) { vis++; return; }
       if (!hidden[c] && !(typeof curHiddenFor === 'function' && curHiddenFor(c, 'q'))) vis++;
     });
-    var th = tbl.querySelector('thead th[data-col="' + first + '"]');
+    // ★ CRM-THEAD-ROWSPAN-20261114：必须显式限定一级行（tr.won-thead）——两级表头
+    //   共用 data-col，不加限定会用 querySelector 撞上二级子表头格。
+    var th = tbl.querySelector('thead tr.won-thead > th[data-col="' + first + '"]');
     if (th) {
       if (vis === 0) th.classList.add('col-hidden');
       else { th.classList.remove('col-hidden'); th.colSpan = vis; th.classList.toggle('hdr-shrink', vis < g.c.length); }
@@ -262,8 +268,9 @@ function injectCrmToggleBtns() {
   var t = T();
   var tbl = document.getElementById('crmTable');
   if (!tbl) return;
+  // ★ CRM-THEAD-ROWSPAN-20261114：折叠按钮只挂在一级表头格上（限定 tr.won-thead）
   CRM_NEVER_HIDE_COLS.forEach(function(c) {
-    tbl.querySelectorAll('thead th[data-col="' + c + '"]').forEach(function(th) {
+    tbl.querySelectorAll('thead tr.won-thead > th[data-col="' + c + '"]').forEach(function(th) {
       var old = th.querySelector('.won-col-toggle');
       if (old) old.remove();
     });
@@ -271,7 +278,7 @@ function injectCrmToggleBtns() {
   CRM_GROUPS.forEach(function(grp) {
     var c = grp.c[0];
     if (CRM_NEVER_HIDE_COLS.has(c)) return;
-    var th = tbl.querySelector('thead th[data-col="' + c + '"]');
+    var th = tbl.querySelector('thead tr.won-thead > th[data-col="' + c + '"]');
     if (!th || th.querySelector('.won-col-toggle')) return;
     var btn = document.createElement('span');
     btn.className = 'won-col-toggle';
@@ -312,7 +319,13 @@ function updateCrmCollapsedBar() {
 }
 
 // ==================== 一级表头 ====================
-// 返回 <tr class="won-thead">...</tr>（不含<thead>标签）
+// ★ CRM-THEAD-ROWSPAN-20261114（用户选定方案 B：真两级合并表头）
+//   本函数返回 <thead> 内的两行（不含 <thead> 标签本身）：
+//     ① <tr class="won-thead">    一级表头：无子列的格子 rowspan="2"，分组格子 colspan="N"
+//     ② <tr class="won-subthead"> 二级表头：只含分组子列（汇率 2 / Q1-Q7 各 3 / PDF 3）
+//   48 列守恒：一级 22 个 rowspan 格（22 列）+ 9 个 colspan 格（2+21+3=26 列）= 48 列，
+//   二级行 26 个格子正好覆盖那 26 列，其余 22 列由一级格纵向跨行覆盖。
+//   ⛔ 二级行必须留在 thead 内：放在 tbody 里无法与一级格做 rowspan 跨行合并。
 function renderCrmThead() {
   var t = T();
   var html = '<tr class="won-thead">';
@@ -326,8 +339,10 @@ function renderCrmThead() {
     var w = '';
     if (i === 0) w = ' style="width:40px;min-width:40px;max-width:40px;"';
     else if (i === 1) w = ' style="width:90px;min-width:90px;max-width:90px;"';
+    // ★ CRM-THEAD-ROWSPAN-20261114：无子列（cs===1）→ rowspan="2" 与二级行纵向合并
+    var rs = (cs === 1) ? ' rowspan="2"' : '';
     var sortHtml = sortable ? ' <span class="sort-indicator" data-col="' + i + '" onclick="sortCrmTable(' + i + ',event)">\u21c5</span>' : '';
-    return '<th class="' + cls + '"' + w + ' colspan="' + cs + '" data-col="' + i + '">' +
+    return '<th class="' + cls + '"' + w + rs + ' colspan="' + cs + '" data-col="' + i + '">' +
            '<span class="th-label">' + label + '</span>' + sortHtml + '</th>';
   };
 
@@ -375,49 +390,46 @@ function renderCrmThead() {
   html += hdr(47, t.crm_action || 'Action',     'won-action-yellow', 1, false);
 
   html += '</tr>';
+  // 二级表头（同属 thead）：只放分组子列，与一级 rowspan/colspan 互补
+  html += renderCrmFakeSubHeaderRow();
   return html;
 }
 
-// ==================== 二级假表头 ====================
-function renderCrmFakeSubHeaderRow() {
+// ==================== 二级表头（thead 第二行） ====================
+// ★ CRM-THEAD-ROWSPAN-20261114：函数名沿用历史命名（多个调用点/守卫引用），
+//   但输出已改为 thead 内的 <tr class="won-subthead"> + <th>，不再是 tbody 伪表头行。
+//   只有"分组列"才在第二行出现：汇率 17-18 / Q1-Q7 20-40 / PDF 42-44（共 26 列）。
+//   其余 22 列的一级格已 rowspan="2" 跨行，第二行若再放格子会多出列 → 整表错位。
+function _crmHasSubCell(i) {
+  return i === 17 || i === 18 || (i >= 20 && i <= 40) || (i >= 42 && i <= 44);
+}
+
+// 二级子表头的 class / 文字（渲染与"切语言只改文字"共用同一套口径，二者绝不分歧）
+function _crmSubHeaderMeta(i) {
   var t = T();
-  var html = '<tr class="fake-header-row">';
+  var cls = 'won-subhdr sortable-cell';
+  var label = '';
+  if (i === 17) { cls += ' rate'; label = 'RMB-VND'; }
+  else if (i === 18) { cls += ' rate'; label = 'USD-VND'; }
+  else if (i >= 20 && i <= 40) {
+    var k = (i - 20) % 3;                       // 0=RMB 1=USD 2=VND
+    if (k === 0) { cls += ' won-rmb'; label = t.crm_rmb || 'RMB'; }
+    else if (k === 1) { cls += ' won-usd'; label = t.crm_usd || 'USD'; }
+    else { cls += ' won-vnd'; label = t.crm_vnd || 'VND'; }
+  }
+  else if (i === 42) { cls += ' won-pink'; label = t.crm_pdf_equip || 'Equip'; }
+  else if (i === 43) { cls += ' won-pink'; label = t.crm_pdf_install || 'Install'; }
+  else if (i === 44) { cls += ' won-pink'; label = t.crm_pdf_both || 'Both'; }
+  return { cls: cls, label: label };
+}
+
+function renderCrmFakeSubHeaderRow() {
+  var html = '<tr class="won-subthead">';
   for (var i = 0; i < 48; i++) {
-    var cls = 'fake-hdr ';
-    var label = '';
-    if      (i>=0 && i<=5)  { cls+='won-cyan'; }
-    else if (i>=6 && i<=8)  { cls+='won-pink'; }
-    else if (i>=9 && i<=11) { cls+='won-blue'; }
-    else if (i>=12 && i<=16){ cls+='won-yellow'; }
-    else if (i===17) { cls+='rate';    label='RMB-VND'; }
-    else if (i===18) { cls+='rate';    label='USD-VND'; }
-    else if (i===20||i===23||i===26||i===29||i===32||i===35||i===38) { cls+='won-rmb'; label=t.crm_rmb || 'RMB'; }
-    else if (i===21||i===24||i===27||i===30||i===33||i===36||i===39) { cls+='won-usd'; label=t.crm_usd || 'USD'; }
-    else if (i===22||i===25||i===28||i===31||i===34||i===37||i===40) { cls+='won-vnd'; label=t.crm_vnd || 'VND'; }
-    else if (i===41) { cls+='won-p1'; }
-    else if (i===42) { cls+='won-pink'; label=t.crm_pdf_equip||'Equip'; }
-    else if (i===43) { cls+='won-pink'; label=t.crm_pdf_install||'Install'; }
-    else if (i===44) { cls+='won-pink'; label=t.crm_pdf_both||'Both'; }
-    else if (i===45) { cls+='won-blue'; }
-    else if (i===46) { cls+='won-blue'; }
-    else if (i===47) { cls+='won-action-yellow'; }
-    // 固定列(0/1)与操作列(47)不参与折叠
-    if (i===0) cls += ' col-fixed col-never-hide';
-    else if (i===1) cls += ' col-fixed-2 col-never-hide';
-    else if (i===47) cls += ' col-never-hide';
-    // 固定列宽度精确锁定，与 .col-fixed-2 的 left:40px 偏移对齐
-    var st = '';
-    if (i===0) st = ' style="width:40px;min-width:40px;max-width:40px;"';
-    else if (i===1) st = ' style="width:90px;min-width:90px;max-width:90px;"';
-    // 可排序的二级子表头：汇率(17,18)、Q1-Q7(20-40)、PDF(42,43,44)
-    var sortable = (i>=17 && i<=18) || (i>=20 && i<=40) || (i>=42 && i<=44);
-    if (sortable) {
-      cls += ' sortable-cell';
-      html += '<td class="' + cls + '"' + st + ' data-col="' + i + '">' + label +
-              ' <span class="sort-indicator" data-col="' + i + '" onclick="sortCrmTable(' + i + ',event)">\u21c5</span></td>';
-    } else {
-      html += '<td class="' + cls + '"' + st + ' data-col="' + i + '">' + label + '</td>';
-    }
+    if (!_crmHasSubCell(i)) continue;
+    var m = _crmSubHeaderMeta(i);
+    html += '<th class="' + m.cls + '" data-col="' + i + '">' + m.label +
+            ' <span class="sort-indicator" data-col="' + i + '" onclick="sortCrmTable(' + i + ',event)">\u21c5</span></th>';
   }
   html += '</tr>';
   return html;
@@ -426,7 +438,8 @@ function renderCrmFakeSubHeaderRow() {
 // ==================== 表体渲染 ====================
 function renderCrmData(list) {
   var t = T();
-  var html = renderCrmFakeSubHeaderRow();
+  // ★ CRM-THEAD-ROWSPAN-20261114：二级表头不再渲染进 tbody（已并进 thead）
+  var html = '';
   list.forEach(function(p, rowIdx) {
     var rowNo = rowIdx + 1;
     html += '<tr class="won-data-row' + (rowIdx % 2 === 1 ? ' zebra-even' : '') + '">';
@@ -576,6 +589,13 @@ function loadCrm(isAuto) {
   updateCrmCollapsedBar();
   // thead 重建后立即按单一事实源恢复列可见性与组头 colspan（含无数据路径）
   if (typeof syncCrmColVisibility === 'function') syncCrmColVisibility();
+  // ★ CRM-THEAD-ROWSPAN-20261114：实测一级表头行高 → 写入 --crm-th1-h，
+  //   二级行 sticky 的 top 靠它定位（视图此刻可见，高度可测；隐藏时跳过）。
+  try { _crmSyncTheadHeight(); } catch (e) {}
+  if (!window.__crmTheadHResizeBound) {
+    window.__crmTheadHResizeBound = true;
+    window.addEventListener('resize', function(){ try { _crmSyncTheadHeight(); } catch (e) {} });
+  }
 
   var emptyRow = '<tr><td colspan="48" style="text-align:center;padding:40px;color:#999">' + ((T().crm_empty) || 'No data') + '</td></tr>';
 
@@ -666,6 +686,7 @@ function updateCrmTheadTextOnly() {
       th.innerHTML = renderCrmThead();
       if (typeof injectCrmToggleBtns === 'function') injectCrmToggleBtns();
       if (typeof syncCrmColVisibility === 'function') syncCrmColVisibility();
+      _crmSyncTheadHeight();
       return;
     }
     // 真损坏（有内容但一个 th[data-col] 都没有）→ 无从打补丁，只能重建自愈。
@@ -675,22 +696,52 @@ function updateCrmTheadTextOnly() {
       th.innerHTML = renderCrmThead();
       if (typeof injectCrmToggleBtns === 'function') injectCrmToggleBtns();
       if (typeof syncCrmColVisibility === 'function') syncCrmColVisibility();
+      _crmSyncTheadHeight();
       return;
     }
     // 期望文案：同一套渲染函数在【游离 thead】里生成（不进文档流，不触发布局/绘制）
     var tmp = document.createElement('thead');
     tmp.innerHTML = renderCrmThead();
-    var newThs = tmp.querySelectorAll('th[data-col]');
-    var oldMap = {};
-    th.querySelectorAll('th[data-col]').forEach(function(el){ oldMap[el.getAttribute('data-col')] = el; });
-    for (var k = 0; k < newThs.length; k++) {
-      var c = newThs[k].getAttribute('data-col');
-      var src = newThs[k].querySelector('.th-label');
-      var old = oldMap[c];
-      if (!old || !src) continue;                       // 结构对不上就跳过，绝不重建
+    // ★ CRM-THEAD-ROWSPAN-20261114：两级表头共用 data-col，必须分行定位
+    //   ① 一级行（tr.won-thead）：只改 .th-label 文字，rowspan/colspan/折叠按钮/
+    //      排序箭头全部原地保留（结构零变更）。
+    var oldPri = {};
+    th.querySelectorAll('tr.won-thead > th[data-col]').forEach(function(el) {
+      oldPri[el.getAttribute('data-col')] = el;
+    });
+    tmp.querySelectorAll('tr.won-thead > th[data-col]').forEach(function(nel) {
+      var old = oldPri[nel.getAttribute('data-col')];
+      var src = nel.querySelector('.th-label');
+      if (!old || !src) return;                     // 结构对不上就跳过，绝不重建
       _crmSetLabelText(_crmTheadLabelNode(old), src.textContent);
-    }
+    });
+    //   ② 二级行（tr.won-subthead）：按 data-col 逐格原地改文字（不解析 HTML、不重建节点）
+    patchCrmFakeHeaderRowTextOnly();
   } catch (e) { console.warn('[crm-lang] thead text sync failed:', e); }
+  try { _crmSyncTheadHeight(); } catch (e) {}
+}
+
+// ★ CRM-THEAD-ROWSPAN-20261114：把【实测】一级表头行高写进 CSS 变量 --crm-th1-h，
+//   二级行 sticky 的 top 用它定位（不再写死 22px）→ 切语言/换字号/换行导致一级行变高时，
+//   二级表头依然严丝合缝贴在一级表头下沿，不会重叠也不会露缝。
+function _crmSyncTheadHeight() {
+  var tbl = document.getElementById('crmTable');
+  var th = document.getElementById('crmThead');
+  if (!tbl || !th) return;
+  var r1 = th.querySelector('tr.won-thead');
+  if (!r1) return;
+  var h = Math.round(r1.getBoundingClientRect().height);
+  if (!h) {
+    // 视图隐藏 / 尚未完成布局 → 高度为 0，保持 CSS 默认值，并在 200ms 后补测一次（只补一次）
+    if (!window.__crmTh1Retry) {
+      window.__crmTh1Retry = true;
+      setTimeout(function() { window.__crmTh1Retry = false; try { _crmSyncTheadHeight(); } catch (e) {} }, 200);
+    }
+    return;
+  }
+  if (tbl.getAttribute('data-th1-h') === String(h)) return;
+  tbl.setAttribute('data-th1-h', String(h));
+  tbl.style.setProperty('--crm-th1-h', h + 'px');
 }
 
 // 表格侧备注补翻兜底（录入侧 rmOnInput 已三语落库；此处处理历史单语数据）。
@@ -749,7 +800,8 @@ function _crmFillMissingRemarks(tb) {
 // 回退：行数/列数/子节点结构对不上（空态行、数据增删、历史脏 DOM）→ 返回 false，
 //   调用方退回原来的整体重建，行为与旧版逐字节一致（安全网，不是主路径）。
 // ==================================================================
-var CRM_PATCH_ATTRS = ['class', 'style', 'colspan', 'data-col', 'href', 'target', 'download', 'onclick', 'title'];
+// rowspan 一并纳入：两级合并表头（CRM-THEAD-ROWSPAN-20261114）的属性同步不能漏掉它
+var CRM_PATCH_ATTRS = ['class', 'style', 'colspan', 'rowspan', 'data-col', 'href', 'target', 'download', 'onclick', 'title'];
 
 function _crmParseFragment(html) {
   // template 内容为惰性文档片段：解析 tr/td 不会被 foster-parenting 打散，也不触发布局/绘制
@@ -833,48 +885,47 @@ function patchCrmTbodyTextOnly(list) {
   return true;
 }
 
-// 二级假表头行：只改标签文字，整行 DOM（含 sticky 定位/排序箭头/列宽/折叠状态）原样保留
-// ★ HEAD-LOCK-20261030：不再以"子节点数量必须一致"为前提——数量对不上时按 data-col 逐格
-//   原地搬文字，绝不整行 outerHTML 重建（重建会瞬间抽掉 sticky 行，用户看到表头闪一下）。
+// 二级表头行（thead 内 tr.won-subthead）：只改标签文字，整行 DOM（含 sticky 定位/
+// 排序箭头/列宽/折叠状态/rowspan 结构）原样保留。
+// ★ CRM-THEAD-ROWSPAN-20261114：不再用 _crmParseFragment 解析渲染结果——
+//   <tr> 在游离 <template> 里会被 HTML 解析器丢弃（fragment 解析的 in-template 模式
+//   不建表格行），旧的解析补丁实际永远失败。这里改为直接按 data-col 从
+//   _crmSubHeaderMeta 取期望文字，零解析、零结构变更。
 function patchCrmFakeHeaderRowTextOnly() {
-  var tb = document.getElementById('crmTbody');
-  if (!tb || typeof renderCrmFakeSubHeaderRow !== 'function') return false;
-  var fake = tb.querySelector('tr.fake-header-row');
-  if (!fake) return false;                              // 无该行 → 交给调用方插入（无任何销毁）
-  var frag = _crmParseFragment(renderCrmFakeSubHeaderRow());
-  var nrow = frag.querySelector('tr.fake-header-row');
-  if (!nrow) return false;
-  var olds = {};
-  Array.prototype.forEach.call(fake.children, function(td){ olds[td.getAttribute('data-col')] = td; });
-  Array.prototype.forEach.call(nrow.children, function(ntd){
-    var old = olds[ntd.getAttribute('data-col')];
-    if (!old) return;
-    // 逐节点搬文字与属性；class 里运行时才有的 col-hidden 由 _crmPatchSyncAttrs 保留
-    _crmPatchTree(old, ntd);
+  var th = document.getElementById('crmThead');
+  if (!th) return false;
+  var row = th.querySelector('tr.won-subthead');
+  if (!row) return false;
+  Array.prototype.forEach.call(row.children, function(cell) {
+    var i = parseInt(cell.getAttribute('data-col'), 10);
+    if (isNaN(i)) return;
+    var m = _crmSubHeaderMeta(i);
+    // class：以计算值为准，保留运行时才有的 col-hidden（列折叠状态由 syncCrmColVisibility 维护）
+    var keepHidden = cell.classList.contains('col-hidden');
+    cell.className = m.cls;
+    if (keepHidden) cell.classList.add('col-hidden');
+    // 文字：第一个文本节点原地改，sort-indicator 子节点一律不动
+    var want = m.label + ' ';
+    var first = cell.firstChild;
+    if (first && first.nodeType === 3) {
+      if (first.nodeValue !== want) first.nodeValue = want;
+    } else {
+      cell.insertBefore(document.createTextNode(want), cell.firstChild || null);
+    }
   });
   return true;
 }
 
 // ==================================================================
-// ★ HEAD-LOCK-20261030（二）：tbody 整体重建时【复用二级表头行节点】
-//   诊断窗里 rebuild=fake-row 的含义 = tr.fake-header-row 被删掉重建，
-//   该 sticky 行瞬间消失 → 用户看到二级表头闪一下/跳一下。
-//   这里在 innerHTML 之前先把旧节点摘出来，重建后原样放回（节点身份不变，
-//   ::sticky / 行高 / 列宽全部沿用），再把文字按当前语言补一遍。
-//   ★ 所有"用字符串整体重排表格"的地方都必须走这里，不要直接 tb.innerHTML=。
+// ★ CRM-THEAD-ROWSPAN-20261114：二级表头行已并进 <thead>，tbody 里只剩数据行，
+//   原先"重建 tbody 时把 tr.fake-header-row 节点摘出来再放回"的复用逻辑不再需要。
+//   保留函数名（loadCrm / applyCrmSort / applyCrmLang 等多处调用）作为 tbody 唯一写入口。
+//   ★ 所有"用字符串整体重排表体"的地方仍然必须走这里，不要直接 tb.innerHTML=。
 // ==================================================================
 function _crmSetTbodyHtml(html) {
   var tb = document.getElementById('crmTbody');
   if (!tb) return;
-  var oldFake = tb.querySelector('tr.fake-header-row');
   tb.innerHTML = html;
-  if (!oldFake) return;
-  var newFake = tb.querySelector('tr.fake-header-row');
-  if (!newFake) { tb.insertBefore(oldFake, tb.firstChild); return; }
-  if (newFake !== oldFake) {
-    newFake.parentNode.replaceChild(oldFake, newFake);
-    if (typeof patchCrmFakeHeaderRowTextOnly === 'function') patchCrmFakeHeaderRowTextOnly();
-  }
 }
 
 // ⛔⛔⛔ 锁死声明（V2026.09.07）：CRM 切语言/表头/数据行渲染历经多次回归修复才稳定，
@@ -958,30 +1009,24 @@ function applyCrmLang() {
   // ⛔ 已锁定实现 —— 用户于 V2026.09.03.34 / PERM_BUILD Z53 验证通过，禁止修改
   //    （若要动此段，必须先取得用户明确同意；任何"优化/简化/重构"都在此禁用）
   //
-  // ★ 假表头行语言守卫（无条件兜底）：二级假表头行（tbody 首行 tr.fake-header-row）
-  //   的 PDF 三子列等标签由 renderCrmFakeSubHeaderRow 按当前语言生成。正常路径下
-  //   visible+hasCache 分支整体重渲染 tbody 时它会随语言更新；但任何其他路径
-  //   （无缓存/未重建/竞态）都会让它残留旧语言 → 一级表头已是新语言、二级还是旧语言
-  //   的"错位"（用户截图 exactly 这个形态）。此处无条件按当前语言重盖这一行，
-  //   数据行零影响；内容已一致时跳过 DOM 操作。
-  //
-  //   为什么必须【无条件】放在分支之外：
-  //   二级假表头行不在 thead 内，不被 updateCrmTheadTextOnly 的文本级更新覆盖，
-  //   唯一的常规更新途径就是"tbody 整体重渲染"。凡是会跳过整体重渲染的条件
-  //   （hasCache 为空、时序竞态、外部直接调 applyCrmLang）都必须由这里兜住。
+  // ★ 二级表头语言守卫（无条件兜底）：二级表头的 PDF 三子列 / RMB / USD / VND
+  //   等标签由 _crmSubHeaderMeta 按当前语言生成。正常路径下 updateCrmTheadTextOnly
+  //   已覆盖它（★ CRM-THEAD-ROWSPAN-20261114 起二级表头已在 thead 内），但任何
+  //   跳过表头文本更新的路径（时序竞态、外部直接调 applyCrmLang）都可能让它残留
+  //   旧语言 → 一级表头已是新语言、二级还是旧语言的"错位"。
+  //   此处无条件按当前语言重盖这一行，数据行零影响；内容已一致时零 DOM 操作。
   //   曾因缺少此守卫出现"一级新语言 / 二级旧语言"的错位（V34 修复，已验证）。
   // ==================================================================
   try {
-    if (tb && typeof renderCrmFakeSubHeaderRow === 'function') {
-      var fake = tb.querySelector('tr.fake-header-row');
-      if (fake) {
+    if (typeof renderCrmFakeSubHeaderRow === 'function') {
+      var subRow = document.querySelector('#crmThead tr.won-subthead');
+      if (subRow) {
         // ★ HEAD-LOCK-20261030：二级表头与一级表头同一规则——【只改文字，绝不重建】。
-        //   整行 DOM（sticky 定位 / 列宽 / 排序箭头 / 折叠状态）原样保留，
-        //   已删除 outerHTML 重建分支（曾造成切语言时该粘性行瞬间消失 → 白闪）。
+        //   整行 DOM（sticky 定位 / 列宽 / 排序箭头 / 折叠状态 / rowspan）原样保留。
         patchCrmFakeHeaderRowTextOnly();
       }
     }
-  } catch (e) { console.warn('[crm-lang] fake-header-row guard failed:', e); }
+  } catch (e) { console.warn('[crm-lang] subthead guard failed:', e); }
 
   // ==================================================================
   // ⛔ 数据行语言一致性守卫（无条件兜底）——V35 新增，根治"省份/BU/备注切语言
@@ -1238,23 +1283,27 @@ function buildCrmExcelData() {
 
 // ==================== CRM 十字高亮逻辑（与 WON 表一致） ====================
 function bindCrmCrossHighlight(){
-  var tbody = document.getElementById('crmTbody'); if(!tbody) return;
+  // ★ CRM-THEAD-ROWSPAN-20261114：二级表头已从 tbody 搬进 thead，
+  //   事件必须挂在整张 <table> 上，否则二级表头的 Q1-Q7 求和气泡、排序悬停全部失效。
+  var tbl = document.getElementById('crmTable');
+  if (!tbl) return;
   if (window.__crmCrossBound) return;
   window.__crmCrossBound = true;
-  tbody.addEventListener('mouseover', onCrmCrossOver);
-  tbody.addEventListener('mouseout', onCrmCrossOut);
+  tbl.addEventListener('mouseover', onCrmCrossOver);
+  tbl.addEventListener('mouseout', onCrmCrossOut);
   // 悬浮显示 Q1-Q7 各币种列总和（自定义气泡，与 WON 表一致）
-  tbody.addEventListener('mouseover', onCrmSumOver);
-  tbody.addEventListener('mouseout', onCrmSumOut);
+  tbl.addEventListener('mouseover', onCrmSumOver);
+  tbl.addEventListener('mouseout', onCrmSumOut);
 }
 
 // ==================== CRM 报价列求和悬浮气泡（Q1-Q7 × RMB/USD/VND） ====================
 var __crmSumTip = null;
 function onCrmSumOver(e){
-  var td = e.target.closest('td');
+  // ★ CRM-THEAD-ROWSPAN-20261114：二级表头是 <th>（thead 内），不能再只认 td
+  var td = e.target.closest('td,th');
   if(!td) return;
   var tr = td.closest('tr');
-  if(!tr || !tr.classList.contains('fake-header-row')) { hideCrmSumTip(); return; }
+  if(!tr || !tr.classList.contains('won-subthead')) { hideCrmSumTip(); return; }
   // 仅 Q1-Q7 的 RMB/USD/VND 子表头 (data-col 20-40) 触发
   var colIdx = parseInt(td.dataset.col, 10);
   if (isNaN(colIdx) || colIdx < 20 || colIdx > 40) { hideCrmSumTip(); return; }
@@ -1286,7 +1335,7 @@ function onCrmSumOver(e){
   tip.style.top = top + 'px';
 }
 function onCrmSumOut(e){
-  var td = e.target.closest('td');
+  var td = e.target.closest('td,th');
   if(!td){ hideCrmSumTip(); return; }
   hideCrmSumTip();
 }
@@ -1295,12 +1344,14 @@ function hideCrmSumTip(){
 }
 
 function onCrmCrossOver(e){
-  var td = e.target.closest('td');
+  // ★ CRM-THEAD-ROWSPAN-20261114：表头格是 <th>，统一用 td,th 取格；
+  //   表头（thead 内两级）一律不参与十字高亮，进入表头即清除数据行高亮。
+  var td = e.target.closest('td,th');
   if(!td) return;
   var tr = td.closest('tr');
   if(!tr) return;
 
-  if(tr.classList.contains('fake-header-row')) {
+  if(tr.classList.contains('won-subthead') || tr.classList.contains('fake-header-row')) {
     clearCrmCross();
     return;
   }
@@ -1312,15 +1363,15 @@ function onCrmCrossOver(e){
   var col=td.dataset.col; if(col===undefined) return;
   tr.querySelectorAll('td').forEach(function(c){ c.classList.add('row-hl'); });
   document.querySelectorAll('#crmTbody td[data-col="' + col + '"]').forEach(function(c){
-    if(c.closest('tr.fake-header-row')) return;
     c.classList.add('col-hl');
     if(c.closest('tr')===tr) c.classList.add('cross-hl');
   });
 }
 
 function onCrmCrossOut(e){
-  var td=e.target.closest('td'); if(!td) return;
-  var tr=td.closest('tr'); if(!tr || tr.classList.contains('fake-header-row')) return;
+  var td=e.target.closest('td,th'); if(!td) return;
+  var tr=td.closest('tr'); if(!tr || tr.closest('thead')) return;
+  if(tr.classList.contains('won-subthead') || tr.classList.contains('fake-header-row')) return;
   var col=td.dataset.col; if(col===undefined) return;
   tr.querySelectorAll('td').forEach(function(c){ c.classList.remove('row-hl'); });
   document.querySelectorAll('#crmTbody td[data-col="' + col + '"]').forEach(function(c){
