@@ -64546,6 +64546,8 @@ function submitAuth() {
  printPdf:    { zh:'打印PDF', en:'Print PDF', vi:'In PDF' }, // ★CC-PRINTPDF-20261106
     copyRow:     { zh:'复制', en:'Copy', vi:'Sao chép' },
     totalAll:    { zh:'总计', en:'Total', vi:'Tổng cộng' },
+    /* ★CC-FOOTSUB-20261114（用户 2026-11-14）：合计行文案 = 水泥漏缝地板价格小计（三语） */
+    totalPriceSub:{ zh:'水泥漏缝地板价格小计', en:'Concrete slatted floor price subtotal', vi:'Tổng giá sàn bê tông' },
     // ★CC-MOLD-20261104：模具需求信息（三语）
     moldSec:     { zh:'模具需求信息', en:'Mold demand information', vi:'Thông tin nhu cầu khuôn' },
     moldNote1:   { zh:'备注：干法工艺，约 10 分钟脱模 ≈', en:'Note: dry-cast, ~10 min per cycle ≈', vi:'Lưu ý: công nghệ khô, ~10 phút/lô ≈' },
@@ -65833,6 +65835,19 @@ function submitAuth() {
     lib_renderCostBody();
   }
   window.ccGridCommit = ccGridCommit;
+  /* ★CC-QTYFMT-20261114（用户 2026-11-14：数量/单元的输入框也要千位分隔符）
+     聚焦时去逗号（方便整段重输），失焦后按千位符回显；解析始终走 ccParseVnd（会剥掉逗号）。 */
+  window.ccUnfmtNum = function(el){
+    try{ if(el) el.value = String(el.value == null ? '' : el.value).replace(/[,\s]/g, ''); }catch(e){}
+  };
+  window.ccFmtNum = function(el){
+    try{
+      if(!el) return;
+      var raw = String(el.value == null ? '' : el.value).replace(/[,\s]/g, '');
+      if(raw === '') { el.value = ''; return; }
+      el.value = ccNum(ccParseVnd(raw));
+    }catch(e){}
+  };
   /* ★CC-PHPLUS-20261113：猪舍「+」后缀按钮（与规格表 slatsPigHouseCell 的 plus/pop 同构）
      点 + 在按钮右侧弹出 slats-suffix-pop：输入 1~4 位后缀 → 生成「6-a」这种值并写回本行。 */
   window.ccHousePlus = function(btn, ev){
@@ -65923,11 +65938,13 @@ function submitAuth() {
   };
   function ccGridRefreshComputed(){
     var specs = (CC_DATA.demand && CC_DATA.demand.specs) || [];
-    var tq = 0, ta = 0;
+    var tq = 0, ta = 0, tsub = 0;
     var set = function(id, txt){ var e = document.getElementById(id); if(e) e.textContent = txt; };
     specs.forEach(function(sp, i){
       var qw = ccRowQtyWhole(sp), sw = ccRowSqmWhole(sp);
       tq += qw; ta += sw;
+      /* ★CC-FOOTSUB-20261114：合计行要显示「小计」列的合计（各猪舍 数量×单价 之和） */
+      tsub += qw * (Number(sp.price) || 0);
       set('ccg_qw_' + i, ccNum(qw));
       set('ccg_su_' + i, ccNum2(ccRowSqmUnit(sp)));
       set('ccg_sw_' + i, ccNum2(sw));
@@ -65940,6 +65957,7 @@ function submitAuth() {
     });
     set('ccg_ft_qty', ccNum(tq));
     set('ccg_ft_area', ccNum(ta));
+    set('ccg_ft_sub', tsub ? ('₫' + ccNum(tsub)) : '');
     set('cc_v_blocks', ccNum(tq));
     set('cc_v_area', ccNum(ta));
   }
@@ -66043,8 +66061,10 @@ function submitAuth() {
         if(ccRowIsHole(sp))  cls.push('ccg-hole-yes');
         body += '<tr data-row="' + ri + '"' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') + '>';
         var grpIds = g.rows.join(',');
-        /* 直接输入：input/select 都挂 ccGridInput（输入即算） + ccGridCommit（离开格子保存并整页刷新） */
-        var inp = function(f, val, kind, grp, w){
+        /* 直接输入：input/select 都挂 ccGridInput（输入即算） + ccGridCommit（离开格子保存并整页刷新）
+           ★CC-QTYFMT-20261114（用户 2026-11-14）：第 6 个参数 fmt=true 时按千位分隔符显示（数量/单元）。
+             聚焦时去掉逗号方便整段改数，失焦/提交后再按千位符回显（解析统一走 ccParseVnd，逗号不影响取值）。 */
+        var inp = function(f, val, kind, grp, w, fmt){
           var at = ' data-i="' + ri + '" data-f="' + f + '"' + (grp ? ' data-grp="' + grpIds + '"' : '');
           if(kind === 'sel'){
             return '<select class="ccg-in ccg-sel"' + at + ' oninput="ccGridInput(this)" onchange="ccGridCommit(this)">' + selOpts(f, val) + '</select>';
@@ -66069,7 +66089,10 @@ function submitAuth() {
           if(kind === 'text'){
             return '<input class="ccg-in ccg-in-txt"' + at + ' value="' + ccEsc2(val == null ? '' : val) + '" oninput="ccGridInput(this)" onchange="ccGridCommit(this)"' + (w ? ' style="width:' + w + '"' : '') + '>';
           }
-          return '<input class="ccg-in ccg-in-num"' + at + ' value="' + (val === 0 || val ? ccRaw(val) : '') + '" inputmode="decimal" oninput="ccGridInput(this)" onchange="ccGridCommit(this)' + '"' + (w ? ' style="width:' + w + '"' : '') + '>';
+          return '<input class="ccg-in ccg-in-num"' + at + ' value="' + (val === 0 || val ? (fmt ? ccNum(val) : ccRaw(val)) : '') + '" inputmode="decimal"'
+            + ' oninput="ccGridInput(this)" onchange="ccGridCommit(this)"'
+            + (fmt ? ' onfocus="ccUnfmtNum(this)" onblur="ccFmtNum(this)"' : '')
+            + (w ? ' style="width:' + w + '"' : '') + '>';
         };
         if(gi === 0){
           var rs = ' rowspan="' + g.rows.length + '"';
@@ -66086,7 +66109,8 @@ function submitAuth() {
                   + '<td class="ccg-merge"' + rs + '>' + inp('hei', hh, 'num', true) + '</td>';
           }
         }
-        body += '<td>' + inp('qty', ccRowQtyUnit(sp), 'num') + '</td>';
+        /* ★CC-QTYFMT-20261114：数量/单元 带千位分隔符 */
+        body += '<td>' + inp('qty', ccRowQtyUnit(sp), 'num', false, null, true) + '</td>';
         body += '<td class="ccg-b" id="ccg_qw_' + ri + '">' + ccNum(ccRowQtyWhole(sp)) + '</td>';
         if(CC_ROW_COLS.sqm){
           body += '<td id="ccg_su_' + ri + '">' + ccNum2(ccRowSqmUnit(sp)) + '</td>';
@@ -66126,20 +66150,28 @@ function submitAuth() {
     if(!specs.length){
       body = '<tr><td colspan="' + cols.length + '" style="text-align:center;color:#888;padding:14px;">' + T('emptySpec') + '</td></tr>';
     }
-    var tQty = 0, tArea = 0;
-    specs.forEach(function(sp){ tQty += ccRowQtyWhole(sp); tArea += ccRowSqmWhole(sp); });
+    var tQty = 0, tArea = 0, tSub = 0;
+    specs.forEach(function(sp){
+      tQty += ccRowQtyWhole(sp); tArea += ccRowSqmWhole(sp);
+      /* ★CC-FOOTSUB-20261114：合计行「小计」列 = 各行 数量/整场 × 单价 之和 */
+      tSub += ccRowQtyWhole(sp) * (Number(sp.price) || 0);
+    });
     var foot = '<tr class="ccg-foot"><td colspan="6" style="text-align:right;font-weight:700;">' + T('totalAll') + '</td>'
       + '<td class="ccg-b">' + ccNum(tQty) + '</td><td></td><td></td><td></td><td class="ccg-b">' + ccNum(tArea) + '</td>'
       + '</tr>';
     /* 表尾合计用简化行：只在关键列放数，其余留空（colspan 由列数决定，避免错位） */
     /* 合计行：colspan 必须覆盖 序号/猪舍/编号/单元/栋数(5) + 长宽高(3)，否则整行错位 */
-    var footCells = '<td colspan="' + (CC_ROW_COLS.dim ? 8 : 5) + '" style="text-align:right;font-weight:700;">' + T('totalAll') + '</td>'
+    /* ★CC-FOOTSUB-20261114（用户 2026-11-14）：合计行文案改为「水泥漏缝地板价格小计」（三语），
+       并把各行「小计」之和落在对应的「小计」列格里 */
+    var footCells = '<td colspan="' + (CC_ROW_COLS.dim ? 8 : 5) + '" style="text-align:right;font-weight:700;">' + T('totalPriceSub') + '</td>'
       + '<td></td><td class="ccg-b" id="ccg_ft_qty">' + ccNum(tQty) + '</td>'
       + (CC_ROW_COLS.sqm ? '<td></td><td class="ccg-b" id="ccg_ft_area">' + ccNum(tArea) + '</td>' : '')
       /* 钢筋组含「钢网层数」一格（★CC-HEADER-LOCK-20261113） */
       + (CC_ROW_COLS.rebar ? '<td></td><td></td><td></td><td></td><td></td>' + (dual ? '<td></td><td></td><td></td><td></td>' : '') : '')
       + (CC_ROW_COLS.solid ? '<td></td>' : '') + (CC_ROW_COLS.hole ? '<td></td>' : '')
-      + (CC_ROW_COLS.price ? '<td></td>' : '') + (CC_ROW_COLS.subtotal ? '<td></td>' : '') + (CC_ROW_COLS.remark ? '<td></td>' : '')
+      + (CC_ROW_COLS.price ? '<td></td>' : '')
+      + (CC_ROW_COLS.subtotal ? '<td class="ccg-b" id="ccg_ft_sub">' + (tSub ? '₫' + ccNum(tSub) : '') + '</td>' : '')
+      + (CC_ROW_COLS.remark ? '<td></td>' : '')
       + '<td class="ccg-op"></td>';
     return '<div class="ccg-wrap">' + toggleHtml
       + '<div class="ccg-scroll"><table class="ccg-tb' + (dual ? ' ccg-dual' : '') + '">' + cg
