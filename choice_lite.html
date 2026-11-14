@@ -64593,6 +64593,8 @@ function submitAuth() {
     moldTypeSolid: { zh:'实心板', en:'solid', vi:'tấm đặc' },
     moldTypeHole:  { zh:'带圆孔', en:'round-hole', vi:'có lỗ tròn' },
     moldCavMix:    { zh:'型腔配比', en:'cavity mix', vi:'tỉ lệ hốc' },
+    moldExtraSet:  { zh:'+{0} 套（省 {1} 天）', en:'+{0} set (saves {1} days)', vi:'+{0} bộ (giảm {1} ngày)' },
+    moldRule20:    { zh:'（加套判据：多开 1 套若能省 ≥20 天就加，否则不加——优先省钱）', en:'(extra set only when it saves ≥20 days — cost first)', vi:'(chỉ thêm bộ khi giảm ≥20 ngày — ưu tiên tiết kiệm)' },
     moldRatioNote: { zh:'按产量比（两规格同时完工）', en:'by output ratio (both finish together)', vi:'theo tỉ lệ sản lượng (hoàn thành cùng lúc)' },
     moldPar:     { zh:'线并行约', en:'lines in parallel ≈', vi:'dây song song ≈' }, // ★CC-MOLDLINES2-20261106：前面拼线数——「N 线并行约 X 天」
    moldDetail:  { zh:'模具明细（每副模具 = 1 个设计）', en:'Mold breakdown (1 mold per design)', vi:'Chi tiết khuôn (1 khuôn = 1 thiết kế)' }, // ★CC-MOLDDETAIL-20261106
@@ -66357,6 +66359,8 @@ function submitAuth() {
       ' <select id="cc_mold_pick" style="padding:2px 8px;border:1px solid #7aa7d4;border-radius:4px;font-size:12px;background:#eaf3fb;">' +
       '<option value="A"' + (pick === 'A' ? ' selected' : '') + '>' + ccT('moldOptA') + '</option>' +
       '<option value="B"' + (pick === 'B' ? ' selected' : '') + '>' + ccT('moldOptB') + '</option></select></span></div>';
+    // ★CC-MOLDSET20-20261114：把「省 ≥20 天才加套」的判据写在页面上，避免以为算错
+    h += '<div style="font-size:11px;color:#b26a00;margin:0 0 6px;">' + ccT('moldRule20') + '</div>';
     // ★CC-PICKDAY-20261104：选中方案工期汇总 + 5%不可控余量（三语，重算时刷新）
     h += '<div id="cc_pick_days" style="font-size:12px;color:#333;font-weight:600;margin:2px 0 8px;line-height:1.7;">…</div>';
     function ccMoldCard(title, calcId, pro, con, grow, bg, cardId){
@@ -67581,21 +67585,48 @@ function submitAuth() {
        一副模具只能挂一条线，所以工期 = 把各设计按"单套日产能"分到各条线的排程完工时间（LPT 最长优先）。
        单套日产能 = 每模块数 × 模/天。 */
     function ccMoldDays(qty, pcsPerCycle){ return (pcsPerCycle > 0) ? Math.ceil(qty / (pcsPerCycle * CPD)) : 0; }
-    /* 多线排程：jobs=[{days}]，最长优先装到最空的那条线，返回最慢线的天数 */
-    function ccMoldSchedule(daysArr){
-      var lines = Math.max(1, LINES), load = [];
-      for(var i = 0; i < lines; i++) load.push(0);
-      daysArr.slice().sort(function(a, b){ return b - a; }).forEach(function(d){
-        var k = 0;
-        for(var j = 1; j < lines; j++){ if(load[j] < load[k]) k = j; }
-        load[k] += d;
+    /* 多线排程：jobs=[{days, sets}]，最长优先；占 sets 条线的活从「第 sets 早空闲的线」开始。
+       ★CC-MOLDSET20-20261114（用户 2026-11-14）：一套模具占 1 条线，2 套可同时占 2 条线 → 该设计工期减半。 */
+    function ccMoldSchedule(jobs){
+      var lines = Math.max(1, LINES), free = [];
+      for(var i = 0; i < lines; i++) free.push(0);
+      jobs.slice().sort(function(a, b){ return b.days - a.days; }).forEach(function(j){
+        var k = Math.min(Math.max(1, j.sets || 1), lines);
+        var order = [];
+        for(var t = 0; t < free.length; t++) order.push(t);
+        order.sort(function(a, b){ return free[a] - free[b]; });
+        var end = free[order[k - 1]] + j.days;
+        for(var q = 0; q < k; q++) free[order[q]] = end;
       });
-      return Math.ceil(Math.max.apply(null, load.length ? load : [0]));
+      return Math.ceil(Math.max.apply(null, free.length ? free : [0]));
+    }
+    /* ★CC-MOLDSET20-20261114：加套判据 —— 多开 1 套模具若能省 ≥20 天就加（否则不动，省钱）。
+       逐轮贪心：每轮试所有设计 +1 套（最多加到「线数」套），取收益最大的；收益 <20 天即停止。 */
+    var CC_MOLD_MIN_GAIN = 20;
+    function ccMoldGreedy(jobs, daysOf){
+      // jobs: [{sets}]，daysOf(job) 返回该 job 在当前 sets 下的工期
+      var base = ccMoldSchedule(jobs.map(function(j){ return { days: daysOf(j), sets: j.sets }; }));
+      for(var guard = 0; guard < 20; guard++){
+        var bestIdx = -1, bestGain = 0, bestMs = base;
+        jobs.forEach(function(j, i){
+          if(j.sets >= LINES) return;
+          j.sets++;
+          var ms = ccMoldSchedule(jobs.map(function(x){ return { days: daysOf(x), sets: x.sets }; }));
+          j.sets--;
+          var gain = base - ms;
+          if(gain > bestGain){ bestGain = gain; bestIdx = i; bestMs = ms; }
+        });
+        if(bestIdx < 0 || bestGain < CC_MOLD_MIN_GAIN) break;
+        jobs[bestIdx].sets++;
+        jobs[bestIdx].gain = bestGain;   // 记下「这一套换来多少天」
+        base = bestMs;
+      }
+      return base;
     }
     designs.forEach(function(d){
       d.pcs = ccMoldPer(d.len, d.wid, false);
       d.singleCap = d.pcs * CPD;
-      d.sets = 1;                          // 1 副模具 / 1 个设计
+      d.sets = 1;                          // 1 副模具 / 1 个设计（是否加套由 20 天判据决定）
       d.days = ccMoldDays(d.qty, d.pcs);
     });
     /* 文案占位符填充：ccMFill('同尺寸合并 {0} 批 · 总产量 {1} 块', 4, '160,000') */
@@ -67672,9 +67703,10 @@ function submitAuth() {
     else{
       // ★CC-MOLDDESIGN-20261114：方案A——每个「去重后的尺寸」一套专用模，按线数复制（底线每线 1 套）
       var CN = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'];
-      // ★CC-MOLDDESIGN4-20261114：每个规格 1 套；工期 = 各设计在 LINES 条线上的完工时间（LPT）
-      var setsA = designs.length;
-      var mkA = ccMoldSchedule(designs.map(function(d){ return d.days; }));
+      // ★CC-MOLDSET20-20261114：起点「每规格 1 套」，再按 20 天判据逐轮加套（只有真省 ≥20 天才加）
+      var mkA = ccMoldGreedy(designs, function(d){ return ccMoldDays(d.qty, d.pcs * d.sets); });
+      designs.forEach(function(d){ d.days = ccMoldDays(d.qty, d.pcs * d.sets); });
+      var setsA = designs.reduce(function(s, d){ return s + d.sets; }, 0);
       // 实际能并行的线数 = min(线数, 套数)：只有 1 套模具时就只能开 1 条线
       var htmlA = ccT('moldSum') + ' ' + setsA + ' ' + ccT('moldSets') + ' · ' + Math.min(LINES, setsA) + ' ' + ccT('moldPar') + ' ' + mkA + ' ' + ccT('moldDaysUnit') +
         ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsA * MPRICE);
@@ -67686,6 +67718,7 @@ function submitAuth() {
           ' · ' + ccT('moldPer') + ' ' + d.pcs + ' ' + ccT('moldPcs') +
           ' · ' + ccMFill(ccT('moldSingleCap'), ccNum(d.singleCap)) +
           ' · ' + ccT('moldNeedDays') + ' ' + d.days + ' ' + ccT('moldDaysUnit') +
+          (d.gain ? ' · <span style="color:#2e7d32;font-weight:700;">' + ccMFill(ccT('moldExtraSet'), d.sets - 1, d.gain) + '</span>' : '') +
           '</div>';
       });
       htmlA += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkA + ' ' + ccT('moldDaysUnit') + '</div>';
@@ -67727,8 +67760,20 @@ function submitAuth() {
         });
         jobsB.push({ kind: 'combo', members: grp, pcs: totCav, days: maxDays, qty: qty, ratio: ratio });
       });
-      var setsB = jobsB.length;
-      var mkB = ccMoldSchedule(jobsB.map(function(j){ return j.days; }));
+      // ★CC-MOLDSET20-20261114：方案B 同样吃「省 20 天才加套」的判据
+      jobsB.forEach(function(j){ j.sets = 1; });
+      function daysOfB(j){
+        if(j.kind === 'solo') return ccMoldDays(j.qty, j.members[0].pcs * j.sets);
+        var mx = 0;
+        j.members.forEach(function(d){ var dd = ccMoldDays(d.qty, d.cav * j.sets); if(dd > mx) mx = dd; });
+        return mx;
+      }
+      var mkB = ccMoldGreedy(jobsB, daysOfB);
+      jobsB.forEach(function(j){
+        j.days = daysOfB(j);
+        if(j.kind === 'combo'){ j.members.forEach(function(d){ d.daysB = ccMoldDays(d.qty, d.cav * j.sets); }); }
+      });
+      var setsB = jobsB.reduce(function(s, j){ return s + j.sets; }, 0);
       var htmlB = ccT('moldSum') + ' ' + setsB + ' ' + ccT('moldSets') + ' · ' + Math.min(LINES, setsB) + ' ' + ccT('moldPar') + ' ' + mkB + ' ' + ccT('moldDaysUnit') +
         ' · ' + ccT('moldCost') + ' ' + ccMoneyHtml(setsB * MPRICE);
       // ★CC-MOLDDESIGN4-20261114：每种类型 1 副模 —— 单规格=整板；多规格=按产量比例开腔
@@ -67738,18 +67783,20 @@ function submitAuth() {
         if(j.kind === 'solo'){
           var d = j.members[0];
           htmlB += '<div style="margin:2px 0 2px 14px;">' + (CN[bi++] || bi) + ' ' + ccMoldSizeTxt(d) + ' ' + ccT('moldDedic') +
-            ' × 1 ' + ccT('moldSets') + ' — ' + ccT('moldPlate1') +
+            ' × ' + j.sets + ' ' + ccT('moldSets') + ' — ' + ccT('moldPlate1') +
             ' · ' + ccMFill(ccT('moldMerge'), ccNum(d.rows), ccNum(d.qty)) +
             ' · ' + ccT('moldPer') + ' ' + d.pcs + ' ' + ccT('moldPcs') +
             ' · ' + ccMFill(ccT('moldSingleCap'), ccNum(d.singleCap)) +
             ' · ' + ccT('moldNeedDays') + ' ' + j.days + ' ' + ccT('moldDaysUnit') +
+            (j.gain ? ' · <span style="color:#2e7d32;font-weight:700;">' + ccMFill(ccT('moldExtraSet'), j.sets - 1, j.gain) + '</span>' : '') +
             '</div>';
           return;
         }
         hasCombo = true;
         var mix = [];
         j.members.forEach(function(d){ mix.push('· ' + d.cav + ' × ' + ccNum(d.len) + '×' + ccNum(d.wid)); });
-        htmlB += '<div style="margin:2px 0 0 14px;">' + (CN[bi++] || bi) + ' ' + ccT('moldCombo') + ' × 1 ' + ccT('moldSets') + ' — <b>' + ccT('moldPlate2') + '</b>：</div>';
+        htmlB += '<div style="margin:2px 0 0 14px;">' + (CN[bi++] || bi) + ' ' + ccT('moldCombo') + ' × ' + j.sets + ' ' + ccT('moldSets') + ' — <b>' + ccT('moldPlate2') + '</b>' +
+          (j.gain ? ' <span style="color:#2e7d32;font-weight:700;">' + ccMFill(ccT('moldExtraSet'), j.sets - 1, j.gain) + '</span>' : '') + '：</div>';
         htmlB += '<div style="margin:2px 0 2px 28px;">' + ccT('moldCavMix') + ' ' + j.pcs + ' ' + ccT('moldPcs') +
           '（' + mix.join('　') + '）· ' + ccT('moldRatioNote') + ' ' + j.ratio.join(':') + '</div>';
         j.members.forEach(function(d){
