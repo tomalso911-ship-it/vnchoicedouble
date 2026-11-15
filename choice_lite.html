@@ -7309,7 +7309,8 @@ var WL_FLOW_IMG = {
       pop.style.left = left + 'px';
       pop.style.top = top + 'px';
       function close(){ if(pop.parentNode) pop.parentNode.removeChild(pop); document.removeEventListener('click', outside); }
-      function outside(e){ if(!pop.contains(e.target) && e.target !== btn){ close(); } }
+      /* ★POPUP-KEEPOPEN-SWEEP-20261115：点语言切换按钮不算"点外面"，否则切语言瞬间确认框自己关掉 */
+      function outside(e){ if(window.__isLangUiClick && window.__isLangUiClick(e)) return; if(!pop.contains(e.target) && e.target !== btn){ close(); } }
       setTimeout(function(){ document.addEventListener('click', outside); }, 0);
       pop.querySelector('.ppc-ok').onclick = function(){ close(); onOk && onOk(); };
       pop.querySelector('.ppc-cancel').onclick = close;
@@ -13001,7 +13002,7 @@ var WL_FLOW_IMG = {
       }
       document.getElementById('tlt_close').addEventListener('click', close);
       document.getElementById('tlt_save').addEventListener('click', save);
-      function outside(e){ if(!overlay || overlay.style.display==='none') return; if(e.target.closest && e.target.closest('.lang-switch, .login-lang-switch, #langSwitch, #loginLangSwitch')) return; if(!pop.contains(e.target) && e.target !== target) close(); }
+      function outside(e){ if(!overlay || overlay.style.display==='none') return; if(e.target.closest && e.target.closest('.lang-switch, .login-lang-switch, #langSwitch, #loginLangSwitch')) return; /* ★LANG-UI-CLICK-20261114 */ if(window.__isLangUiClick && window.__isLangUiClick(e)) return; if(!pop.contains(e.target) && e.target !== target) close(); }
       setTimeout(function(){ document.addEventListener('mousedown', outside); }, 0);
       /* 标准模态框：拖拽、缩放、最大化 */
       if(typeof makeDraggable==='function') makeDraggable('#triLangTextareaOverlay', '.modal', '.modal > h2');
@@ -35516,6 +35517,9 @@ var PROD_EQUIP_FAULT_KB = {
     </div>
     <div style="margin-top:14px;display:flex;gap:10px;">
       <button class="btn btn-primary" onclick="saveSlatsSpec()" id="slatsSpecBtnSave" data-i18n="btnSave">保存</button>
+      <!-- ★CCQ-TRANS-20261115（用户 2026-11-15）：把本表按列名逐一灌入成本核算「需求信息」表 -->
+      <button class="btn" type="button" onclick="slatsTranscribeToCost()" id="slatsSpecBtnTranscribe" data-i18n="slats_transcribe_cost"
+              style="background:#fff;border:1px solid #E53935;color:#E53935;font-weight:600;">转录至成本核算</button>
     </div>
   </div>
 </div>
@@ -36955,6 +36959,15 @@ var I18N = {
     login_err_need:"请输入账号和密码", login_err_fail:"登录失败", login_err_net:"无法连接服务器，请先启动后端。",
     login_fp_btn:"🔒 指纹快速登录", login_footer:"CHOICE SLATS VIET NAM",
     wonTitle:"签约项目", won_province:"省份", won_doc_equip:"项目合同", won_doc_install:"安装合同", won_doc_delete:"删除", won_doc_del_title:"确认删除", won_doc_del_confirm:"确定删除该合同文件？", won_doc_req_note:"项目合同：必须上传", slats_spec_label:"水泥漏缝地板规格", slats_edit_btn:"编辑", slats_view_report_btn:"查看智能报告",
+  /* ★CCQ-TRANS-20261115（用户 2026-11-15）：规格表弹窗「转录至成本核算」按钮 + 三语确认框 */
+  slats_transcribe_cost:"转录至成本核算", slats_trans_title:"转录至成本核算",
+  slats_trans_msg:"将覆盖当前成本核算需求信息表的全部行（单价除外）。确定继续吗？",
+  slats_trans_ok:"确定转录", slats_trans_cancel:"取消",
+  slats_trans_done:"已转录到成本核算（{n} 行）", slats_trans_empty:"没有可转录的有效行（猪舍/尺寸为空的行会跳过）",
+  slats_trans_noperm:"只读模式，无法写入成本核算", slats_trans_loading:"正在读取成本核算数据…",
+  slats_trans_bad_head:"转录已取消：以下行与规格表对不上（请回规格表检查长宽高 / 数量后重新计算再试）",
+  slats_trans_bad_row:"行 {n} · {k}：规格表 {a} / 转录后 {b}",
+  slats_trans_k_qw:"数量/整场", slats_trans_k_su:"平米/单元",
     slats_report_overview:"水泥板使用情况概述表", slats_report_house_distribution:"猪舍分布分析", slats_report_spec_distribution:"水泥板规格分布分析", slats_report_rebar_distribution:"钢筋规格分布分析", slats_report_total:"总计", slats_report_no_data:"暂无水泥漏缝地板规格数据", slats_report_house_desc:"共 {0} 种猪舍类型，累计 {1} 栋", slats_report_spec_desc:"共 {0} 种规格", slats_report_rebar_desc:"共 {0} 种钢筋规格", slats_report_data_no:"序号", slats_report_data_label:"类别", slats_report_data_value:"数值", slats_report_data_pct:"占比", slats_report_no_spec:"未指定规格", slats_report_rebar_col_size:"钢筋尺寸", slats_report_rebar_col_len:"需求长度(m)", slats_report_rebar_col_weight:"需求总量(Tons)", slats_report_rebar_col_pct:"总量占比", slats_report_material_distribution:"水泥/黄砂/石子", slats_report_mat_no:"序号", slats_report_mat_spec:"类别", slats_report_mat_qty:"数量/整场", slats_report_mat_pct:"占比", slats_report_mat_cement:"水泥/吨", slats_report_mat_sand:"黄砂/方（吨）", slats_report_mat_gravel:"石子/方（吨）", slats_report_print_pdf:"打印PDF", slats_unit_pcs:"片", slats_report_summary:"总概括", slats_report_summary_line1:"全场共{0}种房舍类型、{1}栋、{2}个单元；铺设水泥漏缝地板{3}块（{4}种规格），总面积{5}m²，混凝土总体积{6}m³。", slats_report_summary_line2:"材料需求：水泥{0}吨、黄砂{1}方<span class='m3'>（{7}吨）</span>、石子{2}方<span class='m3'>（{8}吨）</span>；钢筋合计{3}吨、总长{4}m；每平米含钢量{5}kg/m²，平均板厚{6}cm。",
     slats_table_no:"序号", slats_table_pig_house:"猪舍", slats_table_house_code:"房舍编号", slats_table_bldg_count:"栋数", slats_table_house_info:"房舍信息",
     slats_table_unit_per_building:"单元\n/栋",
@@ -37775,6 +37788,14 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     login_err_need:"Please enter username and password", login_err_fail:"Login failed", login_err_net:"Cannot connect to server. Please start the backend first.",
     login_fp_btn:"🔒 Fingerprint Login", login_footer:"CHOICE SLATS VIET NAM",
     wonTitle:"Won Projects", won_province:"Province", won_doc_equip:"Project Contract", won_doc_install:"Installation Contract", won_doc_delete:"Delete", won_doc_del_title:"Confirm Delete", won_doc_del_confirm:"Delete this contract file?", won_doc_req_note:"Project Contract: required", slats_spec_label:"Concrete Slats Specifications", slats_edit_btn:"Edit", slats_view_report_btn:"View Smart Report",
+  slats_transcribe_cost:"Transcribe to Cost Accounting", slats_trans_title:"Transcribe to Cost Accounting",
+  slats_trans_msg:"This will overwrite all rows of the cost-accounting demand table (unit prices are kept). Continue?",
+  slats_trans_ok:"Transcribe", slats_trans_cancel:"Cancel",
+  slats_trans_done:"Transcribed to cost accounting ({n} rows)", slats_trans_empty:"No valid rows to transcribe (rows without pig house / dimensions are skipped)",
+  slats_trans_noperm:"Read-only: cannot write to cost accounting", slats_trans_loading:"Loading cost accounting data…",
+  slats_trans_bad_head:"Transcription cancelled: these rows do not match the spec table (check dimensions / quantities, recalculate, then retry)",
+  slats_trans_bad_row:"Row {n} · {k}: spec {a} / transcribed {b}",
+  slats_trans_k_qw:"Qty/farm", slats_trans_k_su:"m²/unit",
     slats_report_overview:"Cement Slats Usage Overview", slats_report_house_distribution:"House Distribution Analysis", slats_report_spec_distribution:"Cement Slats Specification Distribution", slats_report_rebar_distribution:"Rebar Specification Distribution", slats_report_total:"Total", slats_report_no_data:"No concrete slats specification data", slats_report_house_desc:"{0} house types, {1} buildings in total", slats_report_spec_desc:"{0} specifications in total", slats_report_rebar_desc:"{0} rebar specifications in total", slats_report_data_no:"No.", slats_report_data_label:"Category", slats_report_data_value:"Value", slats_report_data_pct:"Proportion", slats_report_no_spec:"Unspecified", slats_report_rebar_col_size:"Rebar Size", slats_report_rebar_col_len:"Required Length(m)", slats_report_rebar_col_weight:"Required Total(Tons)", slats_report_rebar_col_pct:"Weight Proportion", slats_report_material_distribution:"Cement/Sand/Gravel", slats_report_mat_no:"No.", slats_report_mat_spec:"Category", slats_report_mat_qty:"Qty/Farm", slats_report_mat_pct:"Proportion", slats_report_mat_cement:"Cement/T", slats_report_mat_sand:"Sand/m³ (t)", slats_report_mat_gravel:"Gravel/m³ (t)", slats_report_print_pdf:"Print PDF", slats_unit_pcs:"pcs", slats_report_summary:"Overall Summary", slats_report_summary_line1:"The farm has {0} house types, {1} buildings, {2} units; {3} slats ({4} specs) totaling {5} m² with {6} m³ of concrete.", slats_report_summary_line2:"Materials: {0} t cement, {1} m³ sand <span class='m3'>({7} t)</span>, {2} m³ gravel <span class='m3'>({8} t)</span>; rebar {3} t / {4} m; steel content {5} kg/m², average slats thickness {6} cm.",
     slats_table_no:"No.", slats_table_pig_house:"Pig\nHouse", slats_table_house_code:"House\nCode", slats_table_bldg_count:"Bldgs", slats_table_house_info:"House\nInfo",
     slats_table_unit_per_building:"Unit\n/Bldg",
@@ -38598,6 +38619,14 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     login_err_need:"Vui lòng nhập tài khoản và mật khẩu", login_err_fail:"Đăng nhập thất bại", login_err_net:"Không thể kết nối máy chủ. Vui lòng khởi động backend trước.",
     login_fp_btn:"🔒 Đăng nhập vân tay", login_footer:"Hệ thống CHOICE SLATS VIET NAM",
     wonTitle:"Dự Án Thắng", won_province:"Tỉnh", won_doc_equip:"Hợp đồng dự án", won_doc_install:"Hợp đồng lắp đặt", won_doc_delete:"Xóa", won_doc_del_title:"Xác nhận xóa", won_doc_del_confirm:"Xóa hợp đồng này?", won_doc_req_note:"Hợp đồng dự án: bắt buộc tải lên", slats_spec_label:"Thông số kỹ thuật sàn xi măng khe hở", slats_edit_btn:"Sửa", slats_view_report_btn:"Xem báo cáo thông minh",
+  slats_transcribe_cost:"Chuyển sang Kế toán chi phí", slats_trans_title:"Chuyển sang Kế toán chi phí",
+  slats_trans_msg:"Thao tác này sẽ ghi đè toàn bộ dòng của bảng nhu cầu kế toán chi phí (giữ nguyên đơn giá). Tiếp tục?",
+  slats_trans_ok:"Chuyển", slats_trans_cancel:"Hủy",
+  slats_trans_done:"Đã chuyển sang kế toán chi phí ({n} dòng)", slats_trans_empty:"Không có dòng hợp lệ để chuyển (bỏ qua dòng không có chuồng / kích thước)",
+  slats_trans_noperm:"Chế độ chỉ đọc: không thể ghi vào kế toán chi phí", slats_trans_loading:"Đang tải dữ liệu kế toán chi phí…",
+  slats_trans_bad_head:"Đã hủy chuyển dữ liệu: các dòng sau không khớp với bảng thông số (kiểm tra kích thước / số lượng, tính lại rồi thử lại)",
+  slats_trans_bad_row:"Dòng {n} · {k}: bảng gốc {a} / sau khi chuyển {b}",
+  slats_trans_k_qw:"SL/toàn bộ", slats_trans_k_su:"m²/đơn vị",
     slats_report_overview:"Bảng tổng quan sử dụng sàn xi măng", slats_report_house_distribution:"Phân tích phân bổ chuồng heo", slats_report_spec_distribution:"Phân tích phân bổ kích thước sàn xi măng", slats_report_rebar_distribution:"Phân tích phân bổ cỡ thép", slats_report_total:"Tổng cộng", slats_report_no_data:"Chưa có dữ liệu thông số sàn xi măng", slats_report_house_desc:"Có {0} loại chuồng heo, tổng {1} tòa", slats_report_spec_desc:"Có {0} loại kích thước", slats_report_rebar_desc:"Có {0} loại cỡ thép", slats_report_data_no:"STT", slats_report_data_label:"Danh mục", slats_report_data_value:"Giá trị", slats_report_data_pct:"Tỷ lệ", slats_report_no_spec:"Chưa xác định", slats_report_rebar_col_size:"Cỡ thép", slats_report_rebar_col_len:"Chiều dài cần(m)", slats_report_rebar_col_weight:"Tổng lượng cần(Tons)", slats_report_rebar_col_pct:"Tỷ lệ trọng lượng", slats_report_material_distribution:"Xi măng/Cát/Đá", slats_report_mat_no:"STT", slats_report_mat_spec:"Danh mục", slats_report_mat_qty:"SL/Toàn bộ", slats_report_mat_pct:"Tỷ lệ", slats_report_mat_cement:"Xi măng/T", slats_report_mat_sand:"Cát/m³ (tấn)", slats_report_mat_gravel:"Đá/m³ (tấn)", slats_report_print_pdf:"In PDF", slats_unit_pcs:"tấm", slats_report_summary:"Tổng quan", slats_report_summary_line1:"Toàn trại có {0} loại chuồng, {1} tòa, {2} đơn vị; sử dụng {3} tấm sàn ({4} loại), tổng diện tích {5} m², tổng thể tích bê tông {6} m³.", slats_report_summary_line2:"Vật liệu: {0} tấn xi măng, {1} m³ cát <span class='m3'>({7} tấn)</span>, {2} m³ đá <span class='m3'>({8} tấn)</span>; sắt thép {3} tấn / {4} m; hàm lượng thép {5} kg/m², độ dày tấm trung bình {6} cm.",
     slats_table_no:"STT", slats_table_pig_house:"Chuồng\nheo", slats_table_house_code:"Mã\nchuồng", slats_table_bldg_count:"Số tòa", slats_table_house_info:"Thông tin\nchuồng",
     slats_table_unit_per_building:"Đơn vị\n/tòa",
@@ -41851,6 +41880,34 @@ function setLangDebug(lang) {
         if (d && d !== 'none') __langPreserveList.push({type:'style', el:el, display:d});
       });
     } catch(e) {}
+
+    /* ★POPUP-KEEPOPEN-SWEEP-20261115：白名单之外再兜底全量扫一次。
+       规则：此刻可见 + 名字像浮层（overlay/mask/popup/pop-/tip/menu/drawer/lightbox/toast/cal）
+       + 判定为浮动（带 show 类 / 有 inline display / position:fixed|absolute / z-index>=100）
+       → 一律登记，切语言后由 __restoreLangPreserve() 还原。
+       这样新增的浮层（#tb-menu、.cc-util-tip、#apprDrawer、#cmMask、#toast、.ho-calc 等）
+       不必再逐个往白名单里加，也不会出现"新写的弹窗切语言就没了"。 */
+    try {
+      var __seenEl = [];
+      __langPreserveList.forEach(function(it){ if (it.el) __seenEl.push(it.el); });
+      var __FLOAT_RE = /(overlay|mask|popup|popover|pop-|tip|menu|drawer|lightbox|toast|cal)/i;
+      var __allEl = (document.body ? document.body.getElementsByTagName('*') : []);
+      for (var __si = 0; __si < __allEl.length; __si++) {
+        var __el = __allEl[__si];
+        if (!__el || __seenEl.indexOf(__el) >= 0) continue;
+        var __name = (__el.id || '') + ' ' + (typeof __el.className === 'string' ? __el.className : '');
+        if (!__FLOAT_RE.test(__name)) continue;
+        var __cs; try { __cs = getComputedStyle(__el); } catch(e3){ continue; }
+        if (!__cs || __cs.display === 'none' || __cs.visibility === 'hidden' || __cs.opacity === '0') continue;
+        var __d = (__el.style && __el.style.display) || '';
+        var __hasShow = !!(__el.classList && __el.classList.contains('show'));
+        var __isFloat = __hasShow || (__d && __d !== 'none') || __cs.position === 'fixed' ||
+                        __cs.position === 'absolute' || (parseInt(__cs.zIndex, 10) || 0) >= 100;
+        if (!__isFloat) continue;
+        if (__hasShow) __langPreserveList.push({type:'class', el:__el, cls:'show'});
+        if (__d && __d !== 'none') __langPreserveList.push({type:'style', el:__el, display:__d});
+      }
+    } catch(e) {}
   } catch(e) {}
   window.__langPreserveList = __langPreserveList;
 
@@ -42117,6 +42174,10 @@ function setLangDebug(lang) {
       } catch (e) {}
       __restoreLangPreserve();
       try { if (typeof window.applyLangFit === 'function') window.applyLangFit(document.body); } catch (e) {}
+      /* ★POPUP-KEEPOPEN-SWEEP-20261115：同一次点击里，某些"点外面关闭"的处理器
+         可能晚于语言切换执行，会在上面这次还原之后又把浮层关掉。300ms 后再补还原一次
+         （只补"切语言前就开着"的那些节点），保证浮层在视觉上不会闪一下就消失。 */
+      try { setTimeout(function(){ try { __restoreLangPreserve(); } catch(e) {} }, 300); } catch(e) {}
     }, 16);
   } catch (e) { /* 忽略 */ }
 
@@ -45806,6 +45867,7 @@ function openBeneficiaryEditForMain(benIdx){
       // 若此时仍按「点在日历外」处理会把日历误关（表现为无法翻到过去/未来月份）。
       if (e.target && e.target.isConnected === false) return;
       // ★CAL-KEEPOPEN-20261108：点语言切换按钮不算「点外面」，日历要保持展开（切完语言原地重绘）
+      if (window.__isLangUiClick && window.__isLangUiClick(e)) return;
       if (e.target.closest && e.target.closest('#langSwitch, #loginLangSwitch, .lang-switch, .login-lang-switch')) return;
       if (_ccPop && _ccPop.style.display === 'block' && !_ccPop.contains(e.target)) closeCommCal();
     });
@@ -51649,6 +51711,201 @@ function slatsSpecSerialize(){
   });
   return out;
 }
+/* ================================================================================================
+   ★CCQ-TRANS-20261115（用户 2026-11-15）：规格表 → 成本核算「需求信息」转录
+   口径（用户 2026-11-15 逐条确认）：
+     ① 整表【覆盖】成本核算需求信息表的全部行；
+     ② 【不转录单价】—— 按「猪舍 + 房舍编号 + 长 + 宽 + 高」匹配旧行，保留旧行单价（确认框文案写「单价除外」）；
+     ③ 备注一律置空；
+     ④ 双层钢筋网上层/下层两套参数一起转录；
+     ⑤ 没有猪舍且没有长/宽的空行、占位行跳过；
+     ⑥ 转录完自动 switchView → 资料库 → 成本核算。
+   数据通道：本函数只负责「读表 + 映射 + 三语确认」，真正写 CC_DATA 的活由成本核算模块的
+   window.ccTranscribeSpecs(list, cb) 完成（CC_DATA/ccScheduleSave 都在那个闭包里，不越权访问）。
+   ================================================================================================ */
+function tSlatsTrans(k){
+  try{
+    var L = (typeof CUR_LANG !== 'undefined' && CUR_LANG) ? CUR_LANG : 'zh';
+    var I = window.I18N || {};
+    if(I[L] && I[L][k] !== undefined) return I[L][k];
+    if(I.zh && I.zh[k] !== undefined) return I.zh[k];
+  }catch(e){}
+  return k;
+}
+function slatsTransLocalize(){
+  var ov = document.getElementById('slatsTransOverlay');
+  var set = function(id, k){ var e = document.getElementById(id); if(e) e.textContent = tSlatsTrans(k); };
+  if(ov){
+    set('slatsTransTitle', 'slats_trans_title');
+    set('slatsTransMsg', 'slats_trans_msg');
+    set('slatsTransNo', 'slats_trans_cancel');
+    set('slatsTransYes', 'slats_trans_ok');
+  }
+  var btn = document.getElementById('slatsSpecBtnTranscribe');
+  if(btn) btn.textContent = tSlatsTrans('slats_transcribe_cost');
+}
+window.slatsTransClose = function(){
+  var ov = document.getElementById('slatsTransOverlay');
+  if(ov) ov.classList.remove('show');   /* 只隐藏不移除：切语言保活清单还能还原 */
+};
+window.slatsTransConfirmOpen = function(){
+  var old = document.getElementById('slatsTransOverlay');
+  if(old && old.parentNode) old.parentNode.removeChild(old);
+  var ov = document.createElement('div');
+  ov.id = 'slatsTransOverlay';
+  ov.className = 'modal-overlay';
+  ov.setAttribute('onclick', 'if(event.target===this) slatsTransClose()');
+  ov.innerHTML = '<div class="modal" style="width:min(480px,94vw);" onclick="event.stopPropagation()">'
+    + '<h2><span class="mt">🔁 <span id="slatsTransTitle"></span></span>'
+    + '<span class="modal-actions"><button class="close" type="button" onclick="slatsTransClose()">&times;</button></span></h2>'
+    + '<div id="slatsTransMsg" style="padding:2px 2px 14px;line-height:1.75;font-size:13px;color:#333;"></div>'
+    + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+    + '<button class="btn" type="button" id="slatsTransNo" onclick="slatsTransClose()"></button>'
+    + '<button class="btn btn-primary" type="button" id="slatsTransYes" onclick="slatsTransDo()"></button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  slatsTransLocalize();
+  ov.classList.add('show');
+  /* 切语言：只原地换文字，不关闭、不动位置 */
+  if(!window.__slatsTransLangBound){
+    window.__slatsTransLangBound = 1;
+    window.addEventListener('app:langchange', function(){ try{ slatsTransLocalize(); }catch(e){} });
+  }
+};
+window.slatsTransDo = function(){
+  var list = window.__SLATS_TRANS_LIST || [];
+  window.slatsTransClose();
+  if(!list.length) return;
+  if(typeof window.ccTranscribeSpecs !== 'function'){
+    try{ showToast(tSlatsTrans('slats_trans_noperm')); }catch(e){}
+    return;
+  }
+  window.ccTranscribeSpecs(list, function(n){
+    if(n === -1){ try{ showToast(tSlatsTrans('slats_trans_noperm')); }catch(e){} return; }
+    try{ if(typeof closeSlatsSpecModal === 'function') closeSlatsSpecModal(); }catch(e){}
+    try{ if(typeof switchView === 'function') switchView('library'); }catch(e){}
+    try{ if(typeof lib_switchTab === 'function') lib_switchTab('cost'); }catch(e){}
+    try{ if(typeof lib_renderCostBody === 'function') lib_renderCostBody(); }catch(e){}
+    /* ★CC-COLALIGN-20261115：转录成功顺带告知「列已对齐 + 可撤销」（三语在成本核算字典里） */
+    var _doneMsg = tSlatsTrans('slats_trans_done').replace('{n}', n);
+    try{ if(typeof window.ccColAlignHint === 'function'){ var _hint = window.ccColAlignHint(); if(_hint) _doneMsg += ' · ' + _hint; } }catch(e){}
+    try{ showToast(_doneMsg); }catch(e){}
+  });
+};
+/* 宽容数值解析：去掉千位符/货币符/空格/百分号（"1,550"→1550、"1,064"→1064、"67.00"→67） */
+function slatsTransNum(v){
+  if(v === null || v === undefined || v === '') return 0;
+  var s = String(v).replace(/[^0-9.\-]/g, '');
+  if(!s || s === '-' || s === '.') return 0;
+  var n = Number(s);
+  return isFinite(n) ? n : 0;
+}
+/* 钢筋直径归一：规格表存 "φ10"，成本核算下拉 option value 是 '10' */
+function slatsTransDia(v){
+  var s = String(v === null || v === undefined ? '' : v).replace(/[^0-9]/g, '');
+  if(!s) return '';
+  var ok = (typeof SLATS_REBAR_SIZES !== 'undefined') ? SLATS_REBAR_SIZES : ['6','8','10','12'];
+  return (ok.indexOf(s) >= 0) ? s : '';
+}
+function slatsTransFmtNum(v){ try{ return Math.round(Number(v) || 0).toLocaleString('en-US'); }catch(e){ return String(Math.round(Number(v) || 0)); } }
+window.slatsTranscribeToCost = function(){
+  var rows = [];
+  try{ rows = slatsSpecSerialize() || []; }catch(e){ rows = []; }
+  var list = [];
+  /* ★CC-COLALIGN-20261115：先按表体顺序算出「行 → 规格表分组号」。
+     规格表每行带 data-slats-group，连续相同的行属于同一组（与 slatsGroupInfo 同一口径）。
+     slatsSpecSerialize 也是按 tbody 顺序逐行输出的，所以索引一一对应。 */
+  var grpNo = (function(){
+    var out = [];
+    try{
+      var tb = document.getElementById('slatsSpecTable');
+      tb = tb ? tb.querySelector('tbody') : null;
+      if(tb){
+        var last = null, cur = 0;
+        for(var i = 0; i < tb.children.length; i++){
+          var g = tb.children[i].getAttribute('data-slats-group') || '0';
+          if(g !== last){ cur++; last = g; }
+          out.push(cur);
+        }
+      }
+    }catch(e0){}
+    return out;
+  })();
+  rows.forEach(function(r, ri){
+    /* ★CCQ-TRANS-FIX-20261115b（用户 2026-11-15 截图报错）：
+       ① 长/宽/高 必须取 floor_len/floor_wid/floor_hgt（板材尺寸，毫米），
+          【不是】len_per_unit/wid_per_unit/hgt_per_unit（那是猪舍单元尺寸，单位米 → 会变成 66/14/2）；
+       ② 数量/单元 等是带千位符的字符串（"1,064"），Number() 会变 NaN → 必须走 slatsTransNum；
+       ③ 钢筋直径是 "φ10"，成本核算下拉的 option value 是纯数字 '10' → 必须走 slatsTransDia。 */
+    var len = slatsTransNum(r.floor_len), wid = slatsTransNum(r.floor_wid), hei = slatsTransNum(r.floor_hgt);
+    var house = String(r.pig_house == null ? '' : r.pig_house).trim();
+    if(!house && !len && !wid) return;                 /* ⑤ 空行/占位行跳过 */
+    var layers = slatsTransNum(r.mesh_layers) || 1;
+    var dual = (layers === 2);
+    list.push({
+      house: house,
+      code: String(r.house_code == null ? '' : r.house_code).trim(),
+      units: slatsTransNum(r.unit_per_building) || 1,
+      bldgs: slatsTransNum(r.building_count) || 1,
+      len: len, wid: wid, hei: hei,
+      qty: slatsTransNum(r.qty_unit),
+      layers: layers,
+      nl: slatsTransNum(r.bar_len), rL: slatsTransDia(r.rebar_size_len),
+      nw: slatsTransNum(r.bar_wid), rW: slatsTransDia(r.rebar_size_wid),
+      /* ④ 双层：第二套要单独转录；单层则上下层同值（与成本核算侧口径一致） */
+      nl2: dual ? slatsTransNum(r.bar_len2) : slatsTransNum(r.bar_len),
+      rL2: dual ? slatsTransDia(r.rebar_size_len2) : slatsTransDia(r.rebar_size_len),
+      nw2: dual ? slatsTransNum(r.bar_wid2) : slatsTransNum(r.bar_wid),
+      rW2: dual ? slatsTransDia(r.rebar_size_wid2) : slatsTransDia(r.rebar_size_wid),
+      solid: (String(r.solid_slat || '').trim().toUpperCase() === 'YES') ? 'YES' : 'NO',
+      hole:  (String(r.hole_slat  || '').trim().toUpperCase() === 'YES') ? 'YES' : 'NO',
+      /* 仅用于落地前自检 / 分组，不直接写进 CC_DATA（_g 会转成 gid） */
+      _g: grpNo[ri] || 0,
+      _no: ri + 1,
+      _qw: slatsTransNum(r.qty_whole),
+      _su: slatsTransNum(r.sqm_unit)
+    });
+  });
+  if(!list.length){
+    try{ showToast(tSlatsTrans('slats_trans_empty')); }catch(e){}
+    return;
+  }
+  /* ⑥ 落地前自检（用户 2026-11-15：不做单行标红，宁可整批不写）：
+     用转录出来的 长×宽×数量、数量×单元×栋数 复算「平米/单元」「数量/整场」，
+     与规格表自带的 computed 值逐行比对；任一行相对误差 > 2% → 整批取消并提示。
+     这样一旦字段取错/解析失败，就不会把错数据写进成本核算。 */
+  var bad = [];
+  list.forEach(function(x){
+    var gotQw = x.qty * x.units * x.bldgs;
+    var gotSu = (x.len > 0 && x.wid > 0) ? (x.len * x.wid / 1e6 * x.qty) : 0;
+    var rel = function(a, b){
+      var m = Math.max(Math.abs(a), Math.abs(b), 1e-9);
+      return Math.abs(a - b) / m;
+    };
+    var tag = '#' + x._no + ' ' + (x.house || '?') + (x.code ? (' ' + x.code) : '');
+    if(x._qw > 0 && rel(gotQw, x._qw) > 0.02){
+      bad.push(tSlatsTrans('slats_trans_bad_row').replace('{n}', tag).replace('{k}', tSlatsTrans('slats_trans_k_qw'))
+        .replace('{a}', slatsTransFmtNum(x._qw)).replace('{b}', slatsTransFmtNum(gotQw)));
+    }
+    if(x._su > 0 && rel(gotSu, x._su) > 0.02){
+      bad.push(tSlatsTrans('slats_trans_bad_row').replace('{n}', tag).replace('{k}', tSlatsTrans('slats_trans_k_su'))
+        .replace('{a}', slatsTransFmtNum(x._su)).replace('{b}', slatsTransFmtNum(gotSu)));
+    }
+  });
+  if(bad.length){
+    var msg = tSlatsTrans('slats_trans_bad_head') + '\n\n' + bad.slice(0, 8).join('\n')
+            + (bad.length > 8 ? ('\n… (+' + (bad.length - 8) + ')') : '');
+    try{ showAlert(msg); }catch(e){ try{ alert(msg); }catch(e2){} }
+    return;
+  }
+  /* ★CC-COLALIGN-20261115（用户 2026-11-15 选方案 B）：确认框弹出前先把两边表格的列强行对齐——
+     确认框背后的规格表立刻变成「与成本核算表同构」，点「确定转录」后切到成本核算页，列也是一致的。
+     切换前各自存快照，成本核算表的列开关条上会出现「↩ 恢复原列显示」可一键还原。 */
+  try{ if(typeof slatsColStateAlign === 'function') slatsColStateAlign(); }catch(e1){}
+  try{ if(typeof window.ccRowColsAlign === 'function') window.ccRowColsAlign(); }catch(e2){}
+  window.__SLATS_TRANS_LIST = list;
+  slatsTransConfirmOpen();
+};
 /* ★SLATS-SOLID-BOX-20261108：导出规格表 xlsx（服务端 openpyxl 生成，
    实心板?=YES 的行把「单元/栋 → 数量/整场」这一段设置成 Excel 双线边框，
    与页面上看到的双线黑框对应；NO 行保持普通细线）。 */
@@ -53157,6 +53414,52 @@ function slatsToggleColGroup(g){
     if(_rm && _rm.classList.contains('show') && typeof openSlatsReportModal==='function') openSlatsReportModal();
   }catch(e0){}
 }
+/* ==================== ★CC-COLALIGN-20261115（用户 2026-11-15 选方案 B）====================
+   规格表（#slatsSpecTable）侧的「列强行对齐」：点「转录至成本核算」时把 8 组折叠开关
+   强行设成与成本核算表同构的状态，让两张表格式完全一致，便于逐列对账。
+   ★本表 SLATS_COL_STATE 是 true=隐藏（折叠），与成本核算的 CC_ROW_COLS（true=显示）语义相反：
+       house3   true  → 房舍信息只留「单元/栋 + 栋数/整场」（房舍单元长/宽/高 隐藏）
+       rebar    false → 显示钢筋网片配置信息
+       solid    false → 显示 实心板?
+       hole     false → 显示 带圆孔?
+       sqm2     false → 显示 平米/单元 + 平米/整场
+       price    true  → 隐藏 单价
+       subtotal true  → 隐藏 小计
+       remark   true  → 隐藏 备注
+   切换前存快照；成本核算表的「↩ 恢复原列显示」会连带调用 slatsColStateUndoAlign() 还原。 */
+var SLATS_COL_STATE_ALIGN={house3:true, rebar:false, solid:false, hole:false, sqm2:false,
+                           price:true, subtotal:true, remark:true};
+var SLATS_COL_STATE_BEFORE_ALIGN=null;
+function slatsColStateAlign(){
+  var k, diff=false;
+  for(k in SLATS_COL_STATE_ALIGN){
+    if(!SLATS_COL_STATE_ALIGN.hasOwnProperty(k)) continue;
+    if(!!SLATS_COL_STATE[k] !== !!SLATS_COL_STATE_ALIGN[k]){ diff=true; break; }
+  }
+  if(!diff) return false;                       /* 已经一致就不动，别把快照覆盖掉 */
+  if(!SLATS_COL_STATE_BEFORE_ALIGN){
+    SLATS_COL_STATE_BEFORE_ALIGN={};
+    for(k in SLATS_COL_STATE_DEFAULT){ if(SLATS_COL_STATE_DEFAULT.hasOwnProperty(k)) SLATS_COL_STATE_BEFORE_ALIGN[k]=!!SLATS_COL_STATE[k]; }
+  }
+  for(k in SLATS_COL_STATE_ALIGN){ if(SLATS_COL_STATE_ALIGN.hasOwnProperty(k)) SLATS_COL_STATE[k]=!!SLATS_COL_STATE_ALIGN[k]; }
+  slatsSaveColState();
+  try{ slatsApplyColVisibility(); }catch(e1){}   /* 内部已含 slatsRenderColgroup + slatsSyncToggleBtns + fitSlatsSpecTable */
+  try{
+    var _rm=document.getElementById('slatsReportModal');
+    if(_rm && _rm.classList.contains('show') && typeof openSlatsReportModal==='function') openSlatsReportModal();
+  }catch(e2){}
+  return true;
+}
+function slatsColStateUndoAlign(){
+  if(!SLATS_COL_STATE_BEFORE_ALIGN) return false;
+  var snap=SLATS_COL_STATE_BEFORE_ALIGN; SLATS_COL_STATE_BEFORE_ALIGN=null;
+  for(var k in snap){ if(snap.hasOwnProperty(k)) SLATS_COL_STATE[k]=!!snap[k]; }
+  slatsSaveColState();
+  try{ slatsApplyColVisibility(); }catch(e1){}
+  return true;
+}
+window.slatsColStateAlign=slatsColStateAlign;
+window.slatsColStateUndoAlign=slatsColStateUndoAlign;
 function slatsApplyColVisibility(){
   var tbl=document.querySelector('.slats-spec-table'); if(!tbl) return;
   var tb=tbl.querySelector('tbody'); if(!tb) return;
@@ -55804,7 +56107,8 @@ function openTriLangPopover(opts){
   });
   function close(){ pop.remove(); document.removeEventListener('mousedown', outside); if(opts.onClose) opts.onClose(); }
   document.getElementById('tlp_close').addEventListener('click', close);
-  function outside(e){ if(!pop.contains(e.target) && e.target!==target) close(); }
+  /* ★POPUP-KEEPOPEN-SWEEP-20261115：点语言切换按钮不算"点外面"，否则切语言瞬间三语编辑浮层自己关掉 */
+  function outside(e){ if(window.__isLangUiClick && window.__isLangUiClick(e)) return; if(!pop.contains(e.target) && e.target!==target) close(); }
   setTimeout(function(){ document.addEventListener('mousedown', outside); }, 0);
   // 定位
   if(target){
@@ -57269,6 +57573,7 @@ document.addEventListener('click', function(e) {
   if (e.target && e.target.isConnected === false) return;
   if (popup.contains(e.target)) return;
   // ★CAL-KEEPOPEN-20261108：点语言切换按钮不算「点外面」——否则切语言先把日历关掉。
+  if (window.__isLangUiClick && window.__isLangUiClick(e)) return;
   if (e.target && e.target.closest && e.target.closest('#langSwitch, #loginLangSwitch, .lang-switch, .login-lang-switch')) return;
   // 打开后极短时间内的点击通常是 focus/click 顺序导致的“自己关掉自己”，忽略。
   if (Date.now() - cpCalOpenedAt < 120) return;
@@ -65264,6 +65569,23 @@ function submitAuth() {
     var d = CC_LANG[k]; if(!d) return k;
     return d[L] || d.zh;
   }
+  /* ★CC-REBARCLONE-20261115（用户 2026-11-15「钢筋网片块 100% 照规格表」）：
+     表头文案直接复用规格表那套 key（slats_table_bar_len / slats_table_rebar_size_len /
+     slats_table_mm_len / slats_th_ml / slats_up_layer …）。这些 key 只在主 I18N 里，
+     成本核算字典 CC_LANG 里没有 → 先查 CC_LANG，查不到再退回 I18N，再查不到才原样返回。 */
+  function ccTI(k){
+    var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh';
+    var d = CC_LANG[k];
+    if(d) return d[L] || d.zh;
+    try{
+      var I = window.I18N || {};
+      if(I[L] && I[L][k] !== undefined) return I[L][k];
+      if(I.zh && I.zh[k] !== undefined) return I.zh[k];
+    }catch(e){}
+    return k;
+  }
+  /* 表头专用：规格表的 key 里带 "\n"（如「钢筋尺寸/\n长度方向」），HTML 里要换成 <br> 才换行 */
+  function ccTH(k){ return String(ccTI(k)).replace(/\n/g, '<br>'); }
   // ★CC-MACH-PRICE-20261105：机械三表预设行 = 名称键 + 给定默认数量 + 三语单位 + 默认 VND 单价(p，可改)
   var CC_MACH_DEF = {
     mech: [
@@ -65671,6 +65993,16 @@ function submitAuth() {
       '.ccq-log-tb th.ccq-log-th-sort{cursor:pointer;user-select:none;-webkit-user-select:none;white-space:nowrap;}',
       '.ccq-log-tb th.ccq-log-th-sort:hover{background:#ffe1e5;}',
       '.ccq-log-arrow{margin-left:3px;font-size:9px;color:#c62828;}',
+      /* ★CCQ-RECDEL-20261115（用户 2026-11-15）：删除确认浮层——主题红，贴着删除按钮弹出，三语跟随、切语言不消失 */
+      '.ccq-rec-del-pop{position:fixed;z-index:100000;width:250px;max-width:calc(100vw - 16px);display:none;background:#fff;border:1px solid #e6b7bb;border-radius:8px;box-shadow:0 10px 26px rgba(0,0,0,.24);overflow:hidden;font-size:12px;}',
+      '.ccq-rec-del-pop .crd-hd{background:linear-gradient(135deg,#e53935,#c62828);color:#fff;font-weight:700;padding:6px 10px;font-size:12px;letter-spacing:.5px;}',
+      '.ccq-rec-del-pop .crd-msg{padding:10px 12px 8px;line-height:1.65;color:#333;word-break:break-word;}',
+      '.ccq-rec-del-pop .crd-ft{display:flex;gap:8px;justify-content:flex-end;padding:0 12px 10px;}',
+      '.ccq-rec-del-pop .crd-ft button{border-radius:6px;padding:4px 13px;font-size:12px;cursor:pointer;border:1px solid #c62828;line-height:18px;}',
+      '.ccq-rec-del-pop .crd-no{background:#fff;color:#333;border-color:#c9c9c9;}',
+      '.ccq-rec-del-pop .crd-no:hover{background:#f4f4f4;}',
+      '.ccq-rec-del-pop .crd-yes{background:#e53935;border-color:#e53935;color:#fff;font-weight:700;}',
+      '.ccq-rec-del-pop .crd-yes:hover{background:#c62828;border-color:#c62828;}',
       /* ★CCQ-VERFULL-20261115：版本变化分项统计条（勾选框/数量/单价/效率…） */
       '.ccq-hist-stats{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0 6px;padding:5px 8px;background:#f5f8fc;border:1px solid #e3ebf5;border-radius:4px;}',
       '.ccq-hist-stats-k{font-size:11px;font-weight:700;color:#1565c0;margin-right:2px;}',
@@ -65792,6 +66124,11 @@ function submitAuth() {
       '.ccg-tb td.ccg-lo{background:#f4f9ff;}',
       /* ★CC-REBARCELL-20261113：钢筋尺寸(mm) 格 = 数值 + 小号 φ 下拉，横向居中并排 */
       '.ccg-mmcell{padding:0 1px !important;white-space:nowrap;text-align:center;}',
+      /* ★CC-REBARCLONE-20261115：双层表里「层数≠2」的行，下层 6 格 = 禁用灰（保留格子，不可编辑不可点） */
+      '.ccg-tb td.ccg-offcell{background:#f1f3f6 !important;}',
+      /* mm长/mm宽：只读计算列（= 长−9 / 宽−9），浅灰底表示不可输入 */
+      '.ccg-tb td.ccg-mmv{text-align:center;font-size:11px;font-weight:600;color:#37474f;background:#f6f8fa;white-space:nowrap;}',
+      '.ccg-tb input.ccg-offin,.ccg-tb select.ccg-offin{background:#eef1f5 !important;color:#a8b2bd !important;border-color:#e3e7ed !important;cursor:not-allowed;}',
       '.ccg-mmcell>span{font-size:8px;margin-right:1px;letter-spacing:-0.2px;}',
       '.ccg-sel-house{font-size:9px;text-align:center;}',
       /* ★CC-PHPLUS-20261113：猪舍格 = 「+」圆钮在上、下拉在下（照搬规格表 .slats-ph-wrap 结构） */
@@ -66321,6 +66658,49 @@ function submitAuth() {
     lib_renderCostBody();
   }
   window.ccRowToggleCol = ccRowToggleCol;
+  /* ==================== ★CC-COLALIGN-20261115（用户 2026-11-15 选方案 B）====================
+     点规格表弹窗的「转录至成本核算」→ 把本表列强行切成与规格表同构：
+       长宽高 / 平米 / 钢筋网片 / 实心板? / 带圆孔? 显示；单价 / 小计 / 备注 隐藏。
+     ★方案 B（可撤销）：切换前把用户原始偏好存快照，列开关条上出现「↩ 恢复原列显示」，
+       点一下即还原（同时连带还原规格表侧的折叠状态），不会永久改坏用户设置。
+     ★注意本表 CC_ROW_COLS 是 true=显示，规格表 SLATS_COL_STATE 是 true=隐藏，切勿互相整体赋值。
+     ★表尾 运输费/安装费/增值税/含税总价/优惠价 五行按用户要求【保留】。 */
+  var CC_ROW_COLS_ALIGN = { dim:true, rebar:true, solid:true, hole:true, sqm:true, price:false, subtotal:false, remark:false };
+  var CC_ROW_COLS_BEFORE = null;
+  function ccRowColAlignOn(){
+    var keys = Object.keys(CC_ROW_COLS_DEF), i, diff = false;
+    for(i = 0; i < keys.length; i++){ if(!!CC_ROW_COLS[keys[i]] !== !!CC_ROW_COLS_ALIGN[keys[i]]){ diff = true; break; } }
+    if(!diff) return false;                    /* 已对齐：不动快照 */
+    if(!CC_ROW_COLS_BEFORE){
+      CC_ROW_COLS_BEFORE = {};
+      keys.forEach(function(k){ CC_ROW_COLS_BEFORE[k] = !!CC_ROW_COLS[k]; });
+    }
+    keys.forEach(function(k){ if(CC_ROW_COLS_ALIGN.hasOwnProperty(k)) CC_ROW_COLS[k] = !!CC_ROW_COLS_ALIGN[k]; });
+    ccRowColsSave();
+    /* 只重建表体；成本核算页此刻可能是隐藏的，等 lib_switchTab('cost') 再渲染也一致 */
+    try{ if(typeof lib_renderCostBody === 'function') lib_renderCostBody(); }catch(e){}
+    return true;
+  }
+  function ccRowColAlignUndo(){
+    if(!CC_ROW_COLS_BEFORE) return false;
+    var snap = CC_ROW_COLS_BEFORE; CC_ROW_COLS_BEFORE = null;
+    Object.keys(CC_ROW_COLS_DEF).forEach(function(k){ if(snap.hasOwnProperty(k)) CC_ROW_COLS[k] = !!snap[k]; });
+    ccRowColsSave();
+    try{ if(typeof window.slatsColStateUndoAlign === 'function') window.slatsColStateUndoAlign(); }catch(e1){}
+    try{ if(typeof lib_renderCostBody === 'function') lib_renderCostBody(); }catch(e2){}
+    return true;
+  }
+  function ccColAlignUndoHtml(){
+    if(!CC_ROW_COLS_BEFORE) return '';
+    return '<button type="button" class="ccg-tg ccg-tg-undo" onclick="ccRowColAlignUndo()"'
+      + ' style="border-color:#E53935;color:#E53935;" title="' + ccEsc2(ccT('colAlignTip')) + '">'
+      + ccEsc2(ccT('colAlignUndo')) + '</button>';
+  }
+  window.ccRowColsAlign = ccRowColAlignOn;
+  window.ccRowColsUndoAlign = ccRowColAlignUndo;
+  window.ccRowColsHasUndo = function(){ return !!CC_ROW_COLS_BEFORE; };
+  window.ccRowColAlignUndo = ccRowColAlignUndo;
+  window.ccColAlignHint = function(){ return CC_ROW_COLS_BEFORE ? ccT('colAlignHint') : ''; };
   /* ---- 表格列定义：oci -> {key, w(px), on():是否显示, th:表头文字, sub:二级表头} ---- */
   function ccGridCols(dual){
     var T = ccT;
@@ -66339,17 +66719,25 @@ function submitAuth() {
       { k:'sw',   w:72,  th:T('th_sqm'),        sub:T('th_sqmWhole'), cls:'ccg-num ccg-calc', on:'sqm' },
       /* ★CC-HEADER-LOCK-20261113：钢网层数属于「钢筋网片配置信息」组，随该组一起显隐 */
       { k:'lyr',  w:54,  th:T('layers'), on:'rebar' },
-      /* ★CC-REBARW-20261113：钢筋尺寸(mm) 列加宽，保证「1,191 + φ8▾」完整显示；条数列略收窄让位 */
-      { k:'bl',   w:48,  th:T('barsL'),         sub:T('unitPcs'),  cls:'ccg-num', on:'rebar' },
-      { k:'ml',   w:74,  th:T('th_rebarMm'),    sub:T('th_lenDir'), cls:'ccg-num ccg-calc', on:'rebar' },
-      { k:'bw',   w:48,  th:T('barsW'),         sub:T('unitPcs'),  cls:'ccg-num', on:'rebar' },
-      { k:'mw',   w:74,  th:T('th_rebarMm'),    sub:T('th_widDir'), cls:'ccg-num ccg-calc', on:'rebar' }
+      /* ★CC-REBARCLONE-20261115（用户 2026-11-15）：钢筋网片块 100% 照规格表——
+         单层 7 列：钢网层数 | 条/长度方向 | 钢筋尺寸/长度方向 | mm长 | 条/宽度方向 | 钢筋尺寸/宽度方向 | mm宽
+         φ 与 mm 由原来的「挤在一格」拆成两列；mm 列只读（= 长−9 / 宽−9）。
+         表头文案直接复用规格表的 key（ccTI 会退回主 I18N）。 */
+      { k:'bl',   w:44,  th:ccTI('slats_table_bar_len'),        cls:'ccg-num', on:'rebar' },
+      { k:'dl',   w:46,  th:ccTI('slats_table_rebar_size_len'), cls:'ccg-num', on:'rebar' },
+      { k:'ml',   w:52,  th:ccTI('slats_table_mm_len'),         cls:'ccg-num ccg-calc', on:'rebar' },
+      { k:'bw',   w:44,  th:ccTI('slats_table_bar_wid'),        cls:'ccg-num', on:'rebar' },
+      { k:'dw',   w:46,  th:ccTI('slats_table_rebar_size_wid'), cls:'ccg-num', on:'rebar' },
+      { k:'mw',   w:52,  th:ccTI('slats_table_mm_wid'),         cls:'ccg-num ccg-calc', on:'rebar' }
     ];
     if(dual){
-      cols.push({ k:'bl2', w:48, th:T('loLayer')+T('barsL'),  cls:'ccg-num ccg-lo', on:'rebar' });
-      cols.push({ k:'ml2', w:74, th:T('loLayer')+T('th_rebarMm'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
-      cols.push({ k:'bw2', w:48, th:T('loLayer')+T('barsW'),  cls:'ccg-num ccg-lo', on:'rebar' });
-      cols.push({ k:'mw2', w:74, th:T('loLayer')+T('th_rebarMm'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
+      /* 双层：下层再 6 列（条数长 / φ长 / mm长 / 条数宽 / φ宽 / mm宽），与规格表顺序一致 */
+      cols.push({ k:'bl2', w:44, th:ccTI('slats_th_bl'), cls:'ccg-num ccg-lo', on:'rebar' });
+      cols.push({ k:'dl2', w:46, th:ccTI('slats_th_pl'), cls:'ccg-num ccg-lo', on:'rebar' });
+      cols.push({ k:'ml2', w:52, th:ccTI('slats_th_ml'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
+      cols.push({ k:'bw2', w:44, th:ccTI('slats_th_bw'), cls:'ccg-num ccg-lo', on:'rebar' });
+      cols.push({ k:'dw2', w:46, th:ccTI('slats_th_pw'), cls:'ccg-num ccg-lo', on:'rebar' });
+      cols.push({ k:'mw2', w:52, th:ccTI('slats_th_mw'), cls:'ccg-num ccg-calc ccg-lo', on:'rebar' });
     }
     cols.push({ k:'solid', w:56, th:T('solidSlat'), cls:'ccg-center', on:'solid' });
     cols.push({ k:'hole',  w:56, th:T('th_hole'),   cls:'ccg-center', on:'hole' });
@@ -66642,7 +67030,7 @@ function submitAuth() {
     try{
       var dual = ccSpecDualMode();
       var expect = 3 + 2 + (CC_ROW_COLS.dim ? 3 : 0) + 2 + (CC_ROW_COLS.sqm ? 2 : 0)
-        + (CC_ROW_COLS.rebar ? (dual ? 9 : 5) : 0)
+        + (CC_ROW_COLS.rebar ? (dual ? 13 : 7) : 0)
         + (CC_ROW_COLS.solid ? 1 : 0) + (CC_ROW_COLS.hole ? 1 : 0)
         + (CC_ROW_COLS.price ? 1 : 0) + (CC_ROW_COLS.subtotal ? 1 : 0) + (CC_ROW_COLS.remark ? 1 : 0) + 1;
       var actual = ccGridCols(dual).length;
@@ -66863,7 +67251,8 @@ function submitAuth() {
     var h = '<td colspan="' + (CC_ROW_COLS.dim ? 8 : 5) + '" class="ccg-foot-lab">' + lab + '</td>';
     h += '<td></td><td></td>';
     if(CC_ROW_COLS.sqm) h += '<td></td><td></td>';
-    if(CC_ROW_COLS.rebar){ var n = dual ? 9 : 5; for(var i2 = 0; i2 < n; i2++) h += '<td></td>'; }
+    /* ★CC-REBARCLONE-20261115：钢筋组列数 单层 7（层数+条/φ/mm 长宽）、双层 13 */
+    if(CC_ROW_COLS.rebar){ var n = dual ? 13 : 7; for(var i2 = 0; i2 < n; i2++) h += '<td></td>'; }
     if(CC_ROW_COLS.solid) h += '<td></td>';
     if(CC_ROW_COLS.hole)  h += '<td></td>';
     if(CC_ROW_COLS.price) h += '<td></td>';
@@ -66931,7 +67320,7 @@ function submitAuth() {
     try{ if(typeof ccGridHeaderLockCheck === 'function') ccGridHeaderLockCheck(); }catch(e0){}
     /* 列开关按钮条 */
     var tg = [['dim','dimCols'],['rebar','rebarCfg'],['solid','solidSlat'],['hole','th_hole'],['sqm','th_sqm'],['price','th_price'],['subtotal','th_subtotal'],['remark','th_remark']];
-    var toggleHtml = '<div class="ccg-toggles">' + tg.map(function(o){
+    var toggleHtml = '<div class="ccg-toggles">' + ccColAlignUndoHtml() + tg.map(function(o){
       var on = !!CC_ROW_COLS[o[0]];
       return '<button type="button" class="ccg-tg' + (on ? ' on' : '') + '" onclick="ccRowToggleCol(\'' + o[0] + '\')" title="' + T('colToggle') + '">'
         + (on ? '−' : '+') + ' ' + T(o[1]) + '</button>';
@@ -66987,7 +67376,8 @@ function submitAuth() {
       '<th colspan="2">' + T('th_houseInfo') + '</th>' +
       (CC_ROW_COLS.dim ? '<th colspan="3">' + T('specDimTitle') + '</th>' : '') +
       '<th colspan="' + (CC_ROW_COLS.sqm ? 4 : 2) + '">' + T('th_usageTitle') + '</th>' +
-      (CC_ROW_COLS.rebar ? '<th colspan="' + (dual ? 9 : 5) + '">' + T('rebarCfg') + '</th>' : '') +
+      /* ★CC-REBARCLONE-20261115：钢筋网片组 单层 colspan=7（层数+6）、双层 colspan=13（层数+12） */
+      (CC_ROW_COLS.rebar ? '<th colspan="' + (dual ? 13 : 7) + '">' + T('rebarCfg') + '</th>' : '') +
       (CC_ROW_COLS.solid ? '<th rowspan="2">' + T('solidSlat') + '</th>' : '') +
       (CC_ROW_COLS.hole ? '<th rowspan="2">' + T('th_hole') + '</th>' : '') +
       (CC_ROW_COLS.price ? '<th rowspan="2">' + T('th_price') + '</th>' : '') +
@@ -67000,13 +67390,24 @@ function submitAuth() {
       (CC_ROW_COLS.dim ? '<th>' + T('specLen') + '</th><th>' + T('specWid') + '</th><th>' + T('specHei') + '</th>' : '') +
       '<th>' + T('th_qtyUnit') + '</th><th>' + T('th_qtyWhole') + '</th>' +
       (CC_ROW_COLS.sqm ? '<th>' + T('th_sqmUnit') + '</th><th>' + T('th_sqmWhole') + '</th>' : '') +
+      /* ★CC-REBARCLONE-20261115：二级表头与规格表逐格一致——
+         单层：钢网层数 | 条/长度方向 | 钢筋尺寸/长度方向 | mm长 | 条/宽度方向 | 钢筋尺寸/宽度方向 | mm宽
+         双层：钢网层数 | 上层×6（条数长/φ长/mm长/条数宽/φ宽/mm宽） | 下层×6（同序） */
       (CC_ROW_COLS.rebar ?
-        '<th>' + T('layers') + '</th>' +
-        '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('barsL') + '</th>' +
-        '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('th_rebarMm') + '</th>' +
-        '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('barsW') + '</th>' +
-        '<th>' + (dual ? T('upLayer') + '<br>' : '') + T('th_rebarMm') + '</th>' : '') +
-      (dual && CC_ROW_COLS.rebar ? '<th class="ccg-lo">' + T('loLayer') + '<br>' + T('barsL') + '</th><th class="ccg-lo">' + T('loLayer') + '<br>' + T('th_rebarMm') + '</th><th class="ccg-lo">' + T('loLayer') + '<br>' + T('barsW') + '</th><th class="ccg-lo">' + T('loLayer') + '<br>' + T('th_rebarMm') + '</th>' : '') +
+        '<th>' + ccTH('slats_table_mesh_layers') + '</th>' +
+        (dual
+          ? ['bl','pl','ml','bw','pw','mw'].map(function(k){
+              return '<th class="ccg-th-up"><span>' + ccTI('slats_up_layer') + '</span><br><span>' + ccTI('slats_th_' + k) + '</span></th>';
+            }).join('')
+            + ['bl','pl','ml','bw','pw','mw'].map(function(k){
+              return '<th class="ccg-th-lo"><span>' + ccTI('slats_lo_layer') + '</span><br><span>' + ccTI('slats_th_' + k) + '</span></th>';
+            }).join('')
+          : '<th>' + ccTH('slats_table_bar_len') + '</th>'
+            + '<th>' + ccTH('slats_table_rebar_size_len') + '</th>'
+            + '<th>' + ccTH('slats_table_mm_len') + '</th>'
+            + '<th>' + ccTH('slats_table_bar_wid') + '</th>'
+            + '<th>' + ccTH('slats_table_rebar_size_wid') + '</th>'
+            + '<th>' + ccTH('slats_table_mm_wid') + '</th>') : '') +
       '</tr>';
     /* 数据行：按组合并 8 列（序号/猪舍/编号/单元/栋数/长/宽/高） */
     var groups = ccGridGroups(specs), body = '';
@@ -67084,25 +67485,41 @@ function submitAuth() {
           body += '<td class="ccg-b" id="ccg_sw_' + ri + '">' + ccNum2(ccRowSqmWhole(sp)) + '</td>';
         }
         if(CC_ROW_COLS.rebar){
-          /* ★CC-HEADER-LOCK-20261113：钢网层数是「钢筋网片配置信息」组的第一列（与规格表一致） */
+          /* ★CC-REBARCLONE-20261115（用户 2026-11-15）：与规格表逐格同构——
+             φ 独立一列、mm 独立一列（只读，= 长−9 / 宽−9），顺序：条长 | φ长 | mm长 | 条宽 | φ宽 | mm宽。 */
           body += '<td>' + inp('layers', Number(sp.layers) === 2 ? 2 : 1, 'sel') + '</td>';
-          /* ★CC-REBARCELL-20261113：完全照规格表——「钢筋尺寸(mm)」格 = mm 数值 + 紧跟一个小号 φ 下拉
-             （上层/下层同样都有 mm + φ，下层无数据时 mm 留空而不是只剩一个空下拉） */
-          var mmCell = function(id, mmv, f, val, lo){
-            return '<td class="ccg-mmcell' + (lo ? ' ccg-lo' : '') + '">'
-                 + '<span id="' + id + '">' + (mmv ? ccNum(mmv) : '') + '</span>'
-                 + inp(f, val || '', 'sel') + '</td>';
+          var diaCell = function(f, val){
+            return '<td>' + inp(f, val || '', 'sel') + '</td>';
           };
+          var mmCell = function(id, mmv){
+            return '<td class="ccg-mmv"><span id="' + id + '">' + (mmv ? ccNum(mmv) : '') + '</span></td>';
+          };
+          /* 层数≠2 的行：下层 6 格 = 禁用灰（保留格子边框，不可编辑、不可点、不写数据） */
+          var offNum = function(){ return '<input class="ccg-in ccg-in-num ccg-offin" type="text" value="" disabled tabindex="-1">'; };
+          var offSel = function(){ return '<select class="ccg-in ccg-sel ccg-offin" disabled tabindex="-1"><option value="" selected>—</option></select>'; };
           body += '<td>' + inp('nl', Number(sp.nl) || 0, 'num') + '</td>';
-          body += mmCell('ccg_ml_' + ri, ccRowMmLen(sp), 'rL', sp.rL, false);
+          body += diaCell('rL', sp.rL);
+          body += mmCell('ccg_ml_' + ri, ccRowMmLen(sp));
           body += '<td>' + inp('nw', Number(sp.nw) || 0, 'num') + '</td>';
-          body += mmCell('ccg_mw_' + ri, ccRowMmWid(sp), 'rW', sp.rW, false);
+          body += diaCell('rW', sp.rW);
+          body += mmCell('ccg_mw_' + ri, ccRowMmWid(sp));
           if(dual){
             var isLo = Number(sp.layers) === 2;
-            body += '<td class="ccg-lo">' + inp('nl2', isLo ? (Number(sp.nl2) || 0) : 0, 'num') + '</td>';
-            body += mmCell('ccg_ml2_' + ri, isLo ? ccRowMmLen(sp) : 0, 'rL2', sp.rL2, true);
-            body += '<td class="ccg-lo">' + inp('nw2', isLo ? (Number(sp.nw2) || 0) : 0, 'num') + '</td>';
-            body += mmCell('ccg_mw2_' + ri, isLo ? ccRowMmWid(sp) : 0, 'rW2', sp.rW2, true);
+            if(isLo){
+              body += '<td>' + inp('nl2', Number(sp.nl2) || 0, 'num') + '</td>';
+              body += diaCell('rL2', sp.rL2);
+              body += mmCell('ccg_ml2_' + ri, ccRowMmLen(sp));
+              body += '<td>' + inp('nw2', Number(sp.nw2) || 0, 'num') + '</td>';
+              body += diaCell('rW2', sp.rW2);
+              body += mmCell('ccg_mw2_' + ri, ccRowMmWid(sp));
+            } else {
+              body += '<td class="ccg-lo ccg-offcell">' + offNum() + '</td>';
+              body += '<td class="ccg-lo ccg-offcell">' + offSel() + '</td>';
+              body += '<td class="ccg-lo ccg-offcell"></td>';
+              body += '<td class="ccg-lo ccg-offcell">' + offNum() + '</td>';
+              body += '<td class="ccg-lo ccg-offcell">' + offSel() + '</td>';
+              body += '<td class="ccg-lo ccg-offcell"></td>';
+            }
           }
         }
         if(CC_ROW_COLS.solid) body += '<td>' + inp('solid', ccRowIsSolid(sp) ? 'YES' : 'NO', 'sel') + '</td>';
@@ -67135,8 +67552,11 @@ function submitAuth() {
     var footCells = '<td colspan="' + (CC_ROW_COLS.dim ? 8 : 5) + '" class="ccg-foot-lab">' + T('totalPriceSub') + '</td>'
       + '<td></td><td class="ccg-b" id="ccg_ft_qty">' + ccNum(tQty) + '</td>'
       + (CC_ROW_COLS.sqm ? '<td></td><td class="ccg-b" id="ccg_ft_area">' + ccNum(tArea) + '</td>' : '')
-      /* 钢筋组含「钢网层数」一格（★CC-HEADER-LOCK-20261113） */
-      + (CC_ROW_COLS.rebar ? '<td></td><td></td><td></td><td></td><td></td>' + (dual ? '<td></td><td></td><td></td><td></td>' : '') : '')
+      /* 钢筋组含「钢网层数」一格：单层 7 格、双层 13 格（★CC-REBARCLONE-20261115） */
+      + (CC_ROW_COLS.rebar
+          ? '<td></td><td></td><td></td><td></td><td></td><td></td><td></td>'
+            + (dual ? '<td></td><td></td><td></td><td></td><td></td><td></td>' : '')
+          : '')
       + (CC_ROW_COLS.solid ? '<td></td>' : '') + (CC_ROW_COLS.hole ? '<td></td>' : '')
       + (CC_ROW_COLS.price ? '<td></td>' : '')
       + (CC_ROW_COLS.subtotal ? '<td class="ccg-b" id="ccg_ft_sub">' + (tSub ? ccGridMoney(tSub) : '') + '</td>' : '')
@@ -67261,6 +67681,10 @@ function submitAuth() {
       editRow:      { zh:'编辑', en:'Edit', vi:'Sửa' },
       mergeRow:     { zh:'合并到上一组', en:'Merge into group above', vi:'Gộp vào nhóm trên' },
       colToggle:    { zh:'勾选显示列', en:'Show/hide columns', vi:'Chọn cột hiển thị' },
+      /* ★CC-COLALIGN-20261115：转录时强制对齐列显示 + 可撤销 */
+      colAlignUndo: { zh:'↩ 恢复原列显示', en:'↩ Restore columns', vi:'↩ Khôi phục cột' },
+      colAlignTip:  { zh:'撤销本次「转录至成本核算」自动切换的列显示', en:'Undo the column change made by "Transcribe to cost"', vi:'Hoàn tác thay đổi cột do "Chuyển sang dự toán"' },
+      colAlignHint: { zh:'列已按规格表对齐，可点「↩ 恢复原列显示」还原', en:'Columns aligned to the spec table — click "↩ Restore columns" to undo', vi:'Đã căn cột theo bảng quy cách — bấm "↩ Khôi phục cột" để hoàn tác' },
       dimCols:      { zh:'长宽高', en:'L×W×H', vi:'D×R×C' },
       emptySpec:    { zh:'暂无规格行，点右上角「增加行」开始', en:'No spec rows yet — click "Add row"', vi:'Chưa có dòng quy cách — bấm "Thêm dòng"' },
       btnSave:      { zh:'保存', en:'Save', vi:'Lưu' },
@@ -67333,6 +67757,11 @@ function submitAuth() {
       recFillOk:     three('已回填到报价结构', 'Restored into the quotation', 'Đã khôi phục vào báo giá'),
       recDelTip:     three('删除这条记录', 'Delete this record', 'Xóa bản ghi này'),
       recDelOk:      three('已删除该记录', 'Record deleted', 'Đã xóa bản ghi'),
+      /* ★CCQ-RECDEL-20261115（用户 2026-11-15）：删除=删整行（该项目全部版本），先弹确认浮层 */
+      recDelTitle:   three('删除确认', 'Delete confirmation', 'Xác nhận xóa'),
+      recDelMsg:     three('确认删除这一行记录？该项目所有版本的记录都会被清除，且无法恢复。', 'Delete this record row? All versions of this project will be removed and cannot be recovered.', 'Xóa dòng bản ghi này? Tất cả phiên bản của dự án này sẽ bị xóa và không thể khôi phục.'),
+      recDelYes:     three('确认删除', 'Delete', 'Xóa'),
+      recDelAllOk:   three('已删除该行全部记录', 'All records of this row deleted', 'Đã xóa toàn bộ bản ghi của dòng này'),
       /* ★CCQ-VER-20261115（用户 2026-11-15）：版本号自动生成 + 保存前版本变更确认 */
       verAutoTip:    three('版本号由系统自动生成', 'Version number is generated automatically', 'Số phiên bản do hệ thống tự tạo'),
       verTitle:      three('版本更新确认', 'Version update confirmation', 'Xác nhận cập nhật phiên bản'),
@@ -68616,7 +69045,7 @@ function submitAuth() {
         + '<td class="ccq-log-ops">'
         + '<button type="button" class="cc-add ccq-log-hist" title="' + ccEsc2(T('verHistBtn')) + '" onclick="ccQuoteHistoryOpen(' + o.i + ')">📜 ' + ccEsc2(T('verHistBtn')) + '</button>'
         + '<button type="button" class="cc-add" onclick="ccQuoteRecordRestore(' + o.i + ')">↩ ' + T('recFill') + '</button>'
-        + '<button type="button" class="cc-add ccq-log-del" title="' + ccEsc2(T('recDelTip')) + '" onclick="ccQuoteRecordDelete(' + o.i + ')">🗑</button>'
+        + '<button type="button" class="cc-add ccq-log-del" title="' + ccEsc2(T('recDelTip')) + '" onclick="ccQuoteRecordDelete(this, ' + o.i + ')">🗑</button>'
         + '</td></tr>';
     });
     return h + '</tbody></table></div>';
@@ -68710,14 +69139,162 @@ function submitAuth() {
     try{ window.ccQuoteHistoryClose(); }catch(e){}
     if(typeof showToast === 'function') showToast(ccT('recFillOk') + ' V' + ccRecVer(r));
   };
-  window.ccQuoteRecordDelete = function(idx){
+  /* ★CCQ-RECDEL-20261115（用户 2026-11-15）：
+     ① 删除按钮删的是「整行」——该项目（含改名前后被识别为同一项目的）全部版本记录一起清除；
+     ② 删除前必须确认：主题红的确认浮层紧贴删除按钮弹出（右→左→居中，夹在视口内）；
+     ③ 三语；切语言只原地换文字，不关闭、不重定位（坐标存 __CCQ_RECDEL_POS）。 */
+  function ccQuoteRecDelEl(){
+    var p = document.getElementById('ccqRecDelPop');
+    if(p) return p;
+    p = document.createElement('div');
+    p.id = 'ccqRecDelPop';
+    p.className = 'ccq-rec-del-pop';
+    p.innerHTML = '<div class="crd-hd" id="ccqRecDelHd"></div>'
+      + '<div class="crd-msg" id="ccqRecDelMsg"></div>'
+      + '<div class="crd-ft">'
+      +   '<button type="button" class="crd-no" id="ccqRecDelNo"></button>'
+      +   '<button type="button" class="crd-yes" id="ccqRecDelYes"></button>'
+      + '</div>';
+    document.body.appendChild(p);
+    p.querySelector('#ccqRecDelNo').addEventListener('click', function(e){ e.stopPropagation(); window.ccQuoteRecDelCancel(); });
+    p.querySelector('#ccqRecDelYes').addEventListener('click', function(e){ e.stopPropagation(); window.ccQuoteRecDelConfirm(); });
+    return p;
+  }
+  /* 切语言专用：只换文字，绝不重新定位（按钮可能因列宽变化挪过位置） */
+  function ccQuoteRecDelLocalize(){
+    var p = document.getElementById('ccqRecDelPop');
+    if(!p) return;
+    try{
+      var T = ccT, e;
+      e = document.getElementById('ccqRecDelHd');  if(e) e.textContent = T('recDelTitle');
+      e = document.getElementById('ccqRecDelMsg'); if(e) e.textContent = T('recDelMsg');
+      e = document.getElementById('ccqRecDelNo');  if(e) e.textContent = T('verCancel');
+      e = document.getElementById('ccqRecDelYes'); if(e) e.textContent = T('recDelYes');
+    }catch(err){}
+  }
+  window.ccQuoteRecDelCancel = function(){
+    var p = document.getElementById('ccqRecDelPop');
+    if(p) p.style.display = 'none';
+    window.__CCQ_RECDEL_IDX = -1;
+  };
+  window.ccQuoteRecordDelete = function(btn, idx){
     if(!ccCanEdit()){ if(typeof showToast === 'function') showToast(ccT('readonlyTip')); return; }
     var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
-    if(!list[idx]) return;
-    list.splice(idx, 1);
+    if(idx == null || !list[idx]) return;
+    /* 兼容老签名 ccQuoteRecordDelete(idx) */
+    if(typeof btn === 'number' || typeof btn === 'string'){ idx = btn; btn = null; }
+    var p = ccQuoteRecDelEl();
+    window.__CCQ_RECDEL_IDX = Number(idx);
+    ccQuoteRecDelLocalize();
+    p.style.display = 'block';
+    var r = (btn && btn.getBoundingClientRect) ? btn.getBoundingClientRect() : null;
+    var w = p.offsetWidth || 250, hh = p.offsetHeight || 118;
+    var left, top;
+    if(r){
+      if(r.right + 10 + w <= window.innerWidth - 8) left = r.right + 10;          /* 优先右侧 */
+      else if(r.left - 10 - w >= 8) left = r.left - 10 - w;                       /* 其次左侧 */
+      else left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left));       /* 都放不下：对齐按钮 */
+      top = r.top - 8;
+      if(top + hh > window.innerHeight - 8) top = window.innerHeight - hh - 8;
+      if(top < 8) top = 8;
+    }else{
+      left = Math.max(8, (window.innerWidth - w) / 2);
+      top = Math.max(8, (window.innerHeight - hh) / 2);
+    }
+    p.style.left = left + 'px';
+    p.style.top = top + 'px';
+    window.__CCQ_RECDEL_POS = { left: left, top: top };
+    if(!window.__ccqRecDelOutside){
+      window.__ccqRecDelOutside = true;
+      document.addEventListener('click', function(e){
+        var el = document.getElementById('ccqRecDelPop');
+        if(!el || el.style.display === 'none') return;
+        if(el.contains(e.target)) return;
+        if(e.target && e.target.closest && e.target.closest('.ccq-log-del')) return;   /* 再点🗑=重定位，不关 */
+        if(window.__isLangUiClick && window.__isLangUiClick(e)) return;                /* 切语言按钮不算点外面 */
+        window.ccQuoteRecDelCancel();
+      });
+    }
+  };
+  /* 点「确认删除」→ 立即删除整行（该项目全部版本），无二次弹窗 */
+  window.ccQuoteRecDelConfirm = function(){
+    var idx = window.__CCQ_RECDEL_IDX;
+    var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
+    var target = (idx != null && idx >= 0) ? list[idx] : null;
+    window.ccQuoteRecDelCancel();
+    if(!target) return;
+    var keep = [], removed = 0;
+    for(var i = 0; i < list.length; i++){
+      if(ccQuoteSameProjRec(list[i] || {}, target)){ removed++; continue; }
+      keep.push(list[i]);
+    }
+    if(!removed) return;
+    CC_DATA.quoteLog = keep;
     ccScheduleSave();
     ccQuoteLogRefresh();
-    if(typeof showToast === 'function') showToast(ccT('recDelOk'));
+    if(typeof showToast === 'function') showToast(ccT('recDelAllOk'));
+  };
+  /* ★CCQ-TRANS-20261115（用户 2026-11-15）：接收规格表「转录至成本核算」的行，整表覆盖 demand.specs。
+     ① 覆盖全部行；② 单价不转录——按「猪舍+房舍编号+长+宽+高」匹配旧行保留原单价；③ 备注置空；
+     ④ 双层钢筋上/下两套一起写；⑤ 空行在调用方已过滤。
+     ★服务端数据没读回来之前绝不能写（否则用默认空数据把线上存档覆盖掉）→ 先 ccLoad + 轮询 CC_LOADED。 */
+  window.ccTranscribeSpecs = function(list, cb){
+    list = Array.isArray(list) ? list : [];
+    if(!ccCanEdit()){ if(typeof cb === 'function') cb(-1); return; }
+    var doWrite = function(){
+      if(!CC_DATA) CC_DATA = ccDef();
+      if(!CC_DATA.demand) CC_DATA.demand = ccDef().demand;
+      var old = Array.isArray(CC_DATA.demand.specs) ? CC_DATA.demand.specs : [];
+      var keyOf = function(o){
+        return [String((o && o.house) || ''), String((o && o.code) || ''),
+                Number(o && o.len) || 0, Number(o && o.wid) || 0, Number(o && o.hei) || 0].join('|');
+      };
+      var priceMap = {};
+      for(var i = 0; i < old.length; i++){
+        var k = keyOf(old[i]);
+        if(k in priceMap) continue;                        /* 同键只取第一条，保留原有单价 */
+        priceMap[k] = Number(old[i] && old[i].price) || 0;
+      }
+      var out = [];
+      for(var j = 0; j < list.length; j++){
+        var s = list[j] || {}, kk = keyOf(s);
+        out.push({
+          len: Number(s.len) || 0, wid: Number(s.wid) || 0, hei: Number(s.hei) || 0, qty: Number(s.qty) || 0,
+          layers: Number(s.layers) || 1,
+          nl: Number(s.nl) || 0, rL: String(s.rL == null ? '' : s.rL),
+          nw: Number(s.nw) || 0, rW: String(s.rW == null ? '' : s.rW),
+          nl2: Number(s.nl2) || 0, rL2: String(s.rL2 == null ? '' : s.rL2),
+          nw2: Number(s.nw2) || 0, rW2: String(s.rW2 == null ? '' : s.rW2),
+          d2mod: 0, larea: 0,
+          solid: (String(s.solid || '').trim().toUpperCase() === 'YES') ? 'YES' : 'NO',
+          house: String(s.house == null ? '' : s.house),
+          code: String(s.code == null ? '' : s.code),
+          units: (Number(s.units) > 0 ? Number(s.units) : 1),
+          bldgs: (Number(s.bldgs) > 0 ? Number(s.bldgs) : 1),
+          hole: (String(s.hole || '').trim().toUpperCase() === 'YES') ? 'YES' : 'NO',
+          price: priceMap[kk] || 0,     /* ② 单价不转录，沿用旧行 */
+          remark: '',                   /* ③ 备注置空 */
+          /* ★CC-COLALIGN-20261115（用户 2026-11-15「要不要顺手修 gid？要」）：
+             带上规格表的分组号 → 两张表的分组（序号/猪舍/编号/单元/栋数 的 rowspan）完全一致。
+             否则成本核算只能按 猪舍+编号+单元+栋数+长宽高 自动成组，同一猪舍里尺寸不同的行会被
+             拆成多个序号组（如 分娩舍 33-38# 的 1,500×500 与 1,000×500×60），两表看起来仍不一致。 */
+          gid: String(s._g == null ? '' : s._g)
+        });
+      }
+      CC_DATA.demand.specs = out;
+      ccScheduleSave();
+      try{ if(typeof lib_renderCostBody === 'function') lib_renderCostBody(); }catch(e){}
+      if(typeof cb === 'function') cb(out.length);
+    };
+    if(CC_LOADED){ doWrite(); return; }
+    try{ ccLoad(); }catch(e){}
+    var tries = 0;
+    var tick = function(){
+      if(CC_LOADED || tries >= 60){ doWrite(); return; }
+      tries++;
+      setTimeout(tick, 100);
+    };
+    setTimeout(tick, 100);
   };
   /* ★CCQ-SAVEREC-20261115（用户 2026-11-15）：「报价结构」标题行的「保存报价记录」——
      把当前报价单快照追加到 CC_DATA.quoteLog（最多保留 20 条），随 ccScheduleSave 落盘
@@ -68764,6 +69341,8 @@ function submitAuth() {
       var v = window.__CCQ_VER_PEND;
       if(v && document.getElementById('ccqVerOverlay')) ccQuoteVerConfirm(v.oldVer, v.rec || v.lines);
       if(document.getElementById('ccqHistOverlay')) ccQuoteHistoryRender();
+      /* ★CCQ-RECDEL-20261115：删除确认浮层开着时，只原地换文字，不关闭、不重定位 */
+      if(document.getElementById('ccqRecDelPop')) ccQuoteRecDelLocalize();
     }catch(e){}
   };
   window.ccQuoteVerConfirm = function(oldVer, lines){
@@ -68997,7 +69576,13 @@ function submitAuth() {
       ccQuotePushRec(oldVer, ccT('verNoChangeSaved'));
       return;
     }
-    ccQuoteVerConfirm(oldVer, cur);
+    /* ★CCQ-SAVEREC-DIRECT-20261115（用户 2026-11-15：「点一下就直接保存成功、只弹一句已保存提示」）：
+       不再弹「版本变化确认（保存为 V(n+1) / 保留旧版本）」框——直接存成下一版本 V(n+1)，只给一句 toast。
+       注意：window.ccQuoteVerConfirm / ccQuoteVerAgree / ccQuoteVerKeepOld 全部保留，
+       供「📜 查看版本修改记录」等其它入口继续使用，这里只是不再从这里调用。 */
+    var nv = oldVer + 1;
+    d.quote.version = 'V' + nv;
+    ccQuotePushRec(nv, ccT('verSaved') + 'V' + nv);
   };
   /* ★CCQ-GOTO-20261115（用户 2026-11-15）：需求信息表右上角「进入报价格式区域」——
      点一下滚到最下面的「报价结构」，并整块闪一下做定位提示。
@@ -70825,6 +71410,12 @@ function submitAuth() {
         if(f === 'layers' && layRow){
           var now2 = Number(layRow.layers) === 2;
           if(now2 && !layPrev2) ccSpecEnsureDual(layRow); // 切到双层瞬间：上层条数与 φ 直径复制到下层
+          /* ★CC-REBARCLONE-20261115（用户 2026-11-15）：2 → 1 立即清空下层四值，避免隐藏数据残留；
+             d2mod 一并复位，下次再切成 2 时允许按上层重新复制。 */
+          if(!now2 && layPrev2){
+            layRow.nl2 = 0; layRow.rL2 = ''; layRow.nw2 = 0; layRow.rW2 = '';
+            layRow.d2mod = 0;
+          }
           if(layPrevDual !== ccSpecDualMode() || now2 !== layPrev2){
             lib_renderCostBody(); ccScheduleSave(); return; // 表结构变化 → 整表重建（自带重算）
           }
@@ -73104,6 +73695,7 @@ window.cmCalPickToday = cmCalPickToday;
    此时若按「点在日历外」处理会误关日历（表现为无法翻到过去/未来月份）。 */
 document.addEventListener('click',function(e){if(!calPopup||!calPopup.classList.contains('show'))return;if(e.target&&e.target.isConnected===false)return;if(calPopup.contains(e.target))return;
   /* ★CAL-KEEPOPEN-20261108：点语言切换按钮不关日历（切完语言原地刷新文案，保持展开） */
+  if(window.__isLangUiClick&&window.__isLangUiClick(e))return;
   if(e.target.closest&&e.target.closest('#langSwitch, #loginLangSwitch, .lang-switch, .login-lang-switch'))return;
   if(calTarget&&calTarget===e.target)return;closeCalendar();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeCalendar();});
@@ -85032,7 +85624,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     window.__instActiveDel.pos = {left:left, top:top};
     pop.style.left = left + 'px'; pop.style.top = top + 'px';
     function close(){ var p=document.getElementById('instDelConfirmPop'); if(p) p.remove(); document.removeEventListener('click', outside); document.removeEventListener('keydown', esc); window.__instActiveDel = null; }
-    function outside(e){ if(e.target!==btn && !pop.contains(e.target)){ if(e.target.closest && e.target.closest('#langSwitch, #loginLangSwitch, .lang-switch, .login-lang-switch')) return; close(); } }
+    function outside(e){ if(window.__isLangUiClick && window.__isLangUiClick(e)) return; if(e.target!==btn && !pop.contains(e.target)){ if(e.target.closest && e.target.closest('#langSwitch, #loginLangSwitch, .lang-switch, .login-lang-switch')) return; close(); } }
     function esc(e){ if(e.key==='Escape') close(); }
     var okBtn = pop.querySelector('.inst-del-pop-ok');
     var cancelBtn = pop.querySelector('.inst-del-pop-cancel');
