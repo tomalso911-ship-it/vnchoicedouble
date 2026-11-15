@@ -65559,6 +65559,22 @@ function submitAuth() {
       '.ccq-ver-k2{font-weight:800;color:#c62828;margin-bottom:4px;}',
       '.ccq-ver-changes ul{margin:0;padding-left:18px;font-size:12px;line-height:1.8;color:#333;}',
       '.ccq-ver-foot{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid #eee;background:#fafafa;flex-wrap:wrap;}',
+      /* ★CCQ-HIST-20261115：版本修改记录弹窗（三语，随语言切换原地重绘） */
+      '.ccq-log-hist{background:#1a56b0;border-color:#1a56b0;}',
+      '.ccq-hist-modal{width:min(860px,96vw);display:flex;flex-direction:column;max-height:88vh;}',
+      '.ccq-hist-body{padding:10px 16px;overflow:auto;flex:1 1 auto;min-height:0;}',
+      '.ccq-hist-head{font-size:12px;font-weight:800;color:#0b4a8f;background:#eef4fb;border:1px solid #d6e2f0;border-radius:4px;padding:5px 8px;margin:0 0 10px;}',
+      '.ccq-hist-empty{padding:16px;color:#999;font-size:12px;text-align:center;}',
+      '.ccq-hist-item{border:1px solid #e0e6ec;border-left:4px solid #c62828;border-radius:5px;background:#fff;padding:8px 10px;margin:0 0 10px;}',
+      '.ccq-hist-vrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;}',
+      '.ccq-hist-v{font-size:14px;color:#c62828;}',
+      '.ccq-hist-at{font-size:11px;color:#607d8b;}',
+      '.ccq-hist-tag{font-size:11px;color:#0b7a3b;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:3px;padding:0 6px;}',
+      '.ccq-hist-diff{margin:2px 0 6px;padding-left:18px;font-size:12px;line-height:1.8;color:#333;}',
+      '.ccq-hist-none{font-size:12px;color:#90a4ae;margin:2px 0 6px;}',
+      '.ccq-hist-price{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:#37474f;background:#fafbfc;border-top:1px dashed #e0e6ec;padding-top:6px;}',
+      '.ccq-hist-k{font-weight:800;color:#0b4a8f;}',
+      '.ccq-hist-foot{display:flex;justify-content:flex-end;gap:8px;padding:8px 16px;border-top:1px solid #eee;background:#fafafa;}',
       '.ccq-paper{border:1px solid #c9d2dc;background:#fff;padding:12px 14px;margin:10px 0 16px;overflow-x:auto;}',
       /* ★CCQ-TITLECOLOR-20261115（用户 2026-11-15：「这个改成淡绿色的背景」）—— 报价标题条改淡绿底 */
       '.ccq-title-in{display:block;width:100%;box-sizing:border-box;font-size:18px;font-weight:800;color:#0b4a8f;text-align:center;border:1px dashed #c9d2dc;background:#e3f3e3;padding:6px 8px;font-family:inherit;}',
@@ -67180,6 +67196,17 @@ function submitAuth() {
       verArea:       three('总面积', 'Total area', 'Tổng diện tích'),
       verBase:       three('不含税小计', 'Subtotal (excl. VAT)', 'Tạm tính (chưa thuế)'),
       verTotal:      three('含税总价', 'Total (VAT incl.)', 'Tổng đã gồm thuế'),
+      /* ★CCQ-HIST-20261115（用户 2026-11-15）：版本修改记录（所有版本的改动 + 时间 + 价格变化），三语 */
+      verHistBtn:        three('查看版本修改记录', 'Version change history', 'Xem lịch sử phiên bản'),
+      verHistTitle:      three('版本修改记录', 'Version change history', 'Lịch sử thay đổi phiên bản'),
+      verHistEmpty:      three('这个项目还没有保存过版本', 'No version saved for this project yet', 'Dự án này chưa lưu phiên bản nào'),
+      verFirstSave:      three('首次保存', 'First save', 'Lưu lần đầu'),
+      verHistoryChanges: three('相比上一版本的变化', 'Changes vs previous version', 'Thay đổi so với phiên bản trước'),
+      verNoChangePrev:   three('与上一版本相比数据没有变化', 'No change compared with previous version', 'Không thay đổi so với phiên bản trước'),
+      verPriceNow:       three('本版本价格', 'Prices in this version', 'Giá trong phiên bản này'),
+      verVat:            three('增值税', 'VAT', 'Thuế GTGT'),
+      verFeeT:           three('运输费', 'Transport fee', 'Phí vận chuyển'),
+      verFeeI:           three('安装费', 'Installation fee', 'Phí lắp đặt'),
       quoteCustomer: three('客户名称', 'Customer', 'Khách hàng'),
       quoteContent:  three('内容', 'Content', 'Nội dung'),
       quoteBy:       three('报价方', 'Quoted by', 'Bên báo giá'),
@@ -67817,7 +67844,7 @@ function submitAuth() {
                          : (T('verDiffSpecs') + '：' + on + ' → ' + nn));
     }
     if(String(old.fees || '') !== String(now.fees || '')) out.push(T('verDiffFees') + '：' + T('verChanged'));
-    var of = (rec && rec.foot) || {}, nf = ccQuoteFootSnap(), M = function(v){ return ccGridMoney(Number(v) || 0); };
+    var of = (rec && rec.foot) || {}, nf = ccQuoteFootSnap(), M = function(v){ return ccqMoneyStr(v); };
     if(Number(of.qty || 0) !== Number(nf.qty || 0)) out.push(T('verQty') + '：' + ccNum(of.qty || 0) + ' → ' + ccNum(nf.qty || 0));
     if(Number(of.area || 0) !== Number(nf.area || 0)) out.push(T('verArea') + '：' + ccNum2(of.area || 0) + ' → ' + ccNum2(nf.area || 0));
     if(Number(of.base || 0) !== Number(nf.base || 0)) out.push(T('verBase') + '：' + M(of.base) + ' → ' + M(nf.base));
@@ -67841,8 +67868,9 @@ function submitAuth() {
     var h = '<div class="ccq-log-wrap"><div class="ccq-log-head">🗂 ' + T('recListTitle')
       + '<span class="ccq-log-n">' + list.length + '</span></div>';
     if(!list.length) return h + '<div class="ccq-log-empty">' + T('recEmpty') + '</div></div>';
-    h += '<table class="ccq-log-tb"><colgroup><col style="width:23%"><col style="width:23%"><col style="width:11%">'
-      + '<col style="width:8%"><col style="width:14%"><col style="width:21%"></colgroup>'
+    /* ★CCQ-HIST-20261115：操作列多了「查看版本修改记录」→ 重新分配列宽（合计仍 100%） */
+    h += '<table class="ccq-log-tb"><colgroup><col style="width:20%"><col style="width:19%"><col style="width:9%">'
+      + '<col style="width:7%"><col style="width:13%"><col style="width:32%"></colgroup>'
       + '<thead><tr><th>' + T('quoteCustomer') + '</th><th>' + T('quoteContent') + '</th>'
       + '<th>' + T('quoteDate') + '</th><th>' + T('quoteVersion') + '</th>'
       + '<th>' + T('recAt') + '</th><th>' + T('recOps') + '</th></tr></thead><tbody>';
@@ -67854,6 +67882,7 @@ function submitAuth() {
         + '<td class="ccq-log-c">' + ccEsc2('V' + ccRecVer(r)) + '</td>'
         + '<td class="ccq-log-c" style="white-space:nowrap;">' + ccEsc2(ccQuoteAtTxt(r.at)) + '</td>'
         + '<td class="ccq-log-ops">'
+        + '<button type="button" class="cc-add ccq-log-hist" title="' + ccEsc2(T('verHistBtn')) + '" onclick="ccQuoteHistoryOpen(' + i + ')">📜 ' + ccEsc2(T('verHistBtn')) + '</button>'
         + '<button type="button" class="cc-add" onclick="ccQuoteRecordRestore(' + i + ')">↩ ' + T('recFill') + '</button>'
         + '<button type="button" class="cc-add ccq-log-del" title="' + ccEsc2(T('recDelTip')) + '" onclick="ccQuoteRecordDelete(' + i + ')">🗑</button>'
         + '</td></tr>';
@@ -67943,7 +67972,22 @@ function submitAuth() {
     if(note && typeof showToast === 'function') showToast(note);
     return rec;
   }
+  /* ★CCQ-LANGMODAL-20261115（用户 2026-11-15：「这个模态框，没有随三语发生变化」）：
+     弹窗的文案全部由 ccT() 现算并存进 __CCQ_VER_PEND；切换语言时 ccqModalRelocalize()
+     用当前语言原地重绘（内容变、位置不变；不写数据）。 */
+  window.ccqModalRelocalize = function(){
+    try{
+      var v = window.__CCQ_VER_PEND;
+      if(v && document.getElementById('ccqVerOverlay')) ccQuoteVerConfirm(v.oldVer, v.rec || v.lines);
+      if(document.getElementById('ccqHistOverlay')) ccQuoteHistoryRender();
+    }catch(e){}
+  };
   window.ccQuoteVerConfirm = function(oldVer, lines){
+    /* 兼容两种入参：变化项数组（旧调用）或记录对象（语言切换后可重新翻译） */
+    var rec = (lines && !Array.isArray(lines)) ? lines : null;
+    var lis0 = Array.isArray(lines) ? lines : (rec ? ccQuoteDiffLines(rec) : []);
+    window.__CCQ_VER_PEND = { oldVer: oldVer, rec: rec, lines: lis0 };
+    var lines = lis0;
     var old = document.getElementById('ccqVerOverlay');
     if(old && old.parentNode) old.parentNode.removeChild(old);
     var T = ccT;
@@ -67973,7 +68017,115 @@ function submitAuth() {
   window.ccQuoteVerConfirmClose = function(){
     var ov = document.getElementById('ccqVerOverlay');
     if(ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    window.__CCQ_VER_PEND = null;
   };
+  /* ==================== ★CCQ-HIST-20261115 版本修改记录 ====================
+     （用户 2026-11-15：「操作列增加一个按钮"查看版本修改记录"，点击后能看到所有版本在更改后
+       究竟发生了哪些更改和变化？什么时候改的，改了哪些内容，价格怎么变化了！也需要三语，
+       且随系统切换语言」）
+     数据全部来自 CC_DATA.quoteLog（每条记录自带 sig 指纹 / foot 汇总 / at 时间），不新增接口。 */
+  function ccQuoteHistRecs(projKey){
+    var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
+    return list.filter(function(r){ return ccRecKey(r) === projKey; })
+               .sort(function(a, b){ return ccRecVer(a) - ccRecVer(b); });
+  }
+  /* 金额显示：0 也要显示成 ₫0（ccGridMoney(0) 返回空串，历史记录里会看起来像丢数据） */
+  function ccqMoneyStr(v){
+    var n = Number(v) || 0, s = '';
+    try{ s = ccGridMoney(n) || ''; }catch(e){}
+    if(s) return s;
+    var sym = '₫';
+    try{ sym = (ccGridCur() || {}).sym || '₫'; }catch(e){}
+    return sym + '0';
+  }
+  /* 两个版本之间的差异（prev 为空 = 首版） */
+  function ccRecDiffLines(cur, prev){
+    var T = ccT, out = [];
+    var M = function(v){ try{ return ccqMoneyStr(v); }catch(e){ return String(v); } };
+    if(!prev) return out;
+    var cf = (cur && cur.foot) || {}, pf = (prev && prev.foot) || {};
+    var cs = (cur && cur.sig) || {}, ps = (prev && prev.sig) || {};
+    if(String(ps.date || '') !== String(cs.date || '')){
+      out.push(T('verDiffDate') + '：' + (ccQuoteDmy(ps.date) || '—') + ' → ' + (ccQuoteDmy(cs.date) || '—'));
+    }
+    var pn = String(ps.rows || '') ? String(ps.rows).split('#').length : 0;
+    var cn = String(cs.rows || '') ? String(cs.rows).split('#').length : 0;
+    if(pn !== cn) out.push(T('verDiffSpecs') + '：' + pn + ' → ' + cn);
+    else if(String(ps.rows || '') !== String(cs.rows || '')) out.push(T('verDiffSpecsChanged') + '：' + T('verChanged'));
+    if(String(ps.fees || '') !== String(cs.fees || '')) out.push(T('verDiffFees') + '：' + T('verChanged'));
+    if(Number(pf.qty || 0) !== Number(cf.qty || 0)) out.push(T('verQty') + '：' + ccNum(pf.qty || 0) + ' → ' + ccNum(cf.qty || 0));
+    if(Number(pf.area || 0) !== Number(cf.area || 0)) out.push(T('verArea') + '：' + ccNum2(pf.area || 0) + ' → ' + ccNum2(cf.area || 0));
+    if(Number(pf.base || 0) !== Number(cf.base || 0)) out.push(T('verBase') + '：' + M(pf.base) + ' → ' + M(cf.base));
+    if(Number(pf.feeT || 0) !== Number(cf.feeT || 0)) out.push(T('verFeeT') + '：' + M(pf.feeT) + ' → ' + M(cf.feeT));
+    if(Number(pf.feeI || 0) !== Number(cf.feeI || 0)) out.push(T('verFeeI') + '：' + M(pf.feeI) + ' → ' + M(cf.feeI));
+    if(Number(pf.vat || 0) !== Number(cf.vat || 0)) out.push(T('verVat') + '：' + M(pf.vat) + ' → ' + M(cf.vat));
+    if(Number(pf.total || 0) !== Number(cf.total || 0)) out.push(T('verTotal') + '：' + M(pf.total) + ' → ' + M(cf.total));
+    return out;
+  }
+  window.ccQuoteHistoryOpen = function(idx){
+    var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
+    var r = list[idx];
+    window.__CCQ_HIST_KEY = r ? ccRecKey(r) : '';
+    ccQuoteHistoryRender();
+  };
+  window.ccQuoteHistoryClose = function(){
+    var o = document.getElementById('ccqHistOverlay');
+    if(o && o.parentNode) o.parentNode.removeChild(o);
+    window.__CCQ_HIST_KEY = '';
+  };
+  window.ccQuoteHistoryRender = function(){
+    var T = ccT, key = window.__CCQ_HIST_KEY || '';
+    var recs = ccQuoteHistRecs(key);
+    var old = document.getElementById('ccqHistOverlay');
+    var keepTop = 0;
+    if(old){ var b0 = old.querySelector('.ccq-hist-body'); if(b0) keepTop = b0.scrollTop || 0; }
+    if(old && old.parentNode) old.parentNode.removeChild(old);
+    var head = recs.length ? (ccqTriDisp(recs[recs.length - 1].customer) + ' · ' + ccqTriDisp(recs[recs.length - 1].content)) : '';
+    var body = '<div class="ccq-hist-head">📌 ' + ccEsc2(head) + '</div>';
+    if(!recs.length){
+      body += '<div class="ccq-hist-empty">' + ccEsc2(T('verHistEmpty')) + '</div>';
+    }else{
+      for(var i = recs.length - 1; i >= 0; i--){
+        var cur = recs[i], prev = (i > 0) ? recs[i - 1] : null;
+        var diffs = ccRecDiffLines(cur, prev);
+        var foot = (cur && cur.foot) || {};
+        body += '<div class="ccq-hist-item">'
+          + '<div class="ccq-hist-vrow"><b class="ccq-hist-v">V' + ccRecVer(cur) + '</b>'
+          + '<span class="ccq-hist-at">🕒 ' + ccEsc2(ccQuoteAtTxt(cur.at)) + '</span>'
+          + '<span class="ccq-hist-tag">' + ccEsc2(prev ? T('verHistoryChanges') : T('verFirstSave')) + '</span></div>'
+          + (diffs.length
+              ? '<ul class="ccq-hist-diff">' + diffs.map(function(s){ return '<li>' + ccEsc2(s) + '</li>'; }).join('') + '</ul>'
+              : (prev ? '<div class="ccq-hist-none">' + ccEsc2(T('verNoChangePrev')) + '</div>' : ''))
+          + '<div class="ccq-hist-price"><span class="ccq-hist-k">' + ccEsc2(T('verPriceNow')) + '</span>'
+          + '<span>' + ccEsc2(T('verQty')) + '：<b>' + ccNum(foot.qty || 0) + '</b></span>'
+          + '<span>' + ccEsc2(T('verBase')) + '：<b>' + ccqMoneyStr(foot.base) + '</b></span>'
+          + '<span>' + ccEsc2(T('verVat')) + '：<b>' + ccqMoneyStr(foot.vat) + '</b></span>'
+          + '<span>' + ccEsc2(T('verTotal')) + '：<b>' + ccqMoneyStr(foot.total) + '</b></span>'
+          + '</div></div>';
+      }
+    }
+    var ov = document.createElement('div');
+    ov.id = 'ccqHistOverlay';
+    ov.className = 'modal-overlay';
+    ov.setAttribute('data-no-pin', '1');
+    ov.setAttribute('onclick', 'if(event.target===this) ccQuoteHistoryClose()');
+    ov.innerHTML = '<div class="modal ccq-hist-modal">'
+      + '<h2><span class="mt">📜 ' + ccEsc2(T('verHistTitle')) + '</span>'
+      + '<span class="modal-actions"><button class="close" type="button" onclick="ccQuoteHistoryClose()" title="' + ccEsc2(T('verCancel')) + '">&times;</button></span></h2>'
+      + '<div class="ccq-hist-body">' + body + '</div>'
+      + '<div class="ccq-hist-foot"><button type="button" class="cc-add" onclick="ccQuoteHistoryClose()" style="margin:0;background:#78909c;border-color:#78909c;color:#fff;">' + ccEsc2(T('verCancel')) + '</button></div>'
+      + '</div>';
+    document.body.appendChild(ov);
+    ov.classList.add('show');
+    var bd = ov.querySelector('.ccq-hist-body');
+    if(bd && keepTop) bd.scrollTop = keepTop;
+  };
+  /* 语言切换 → 打开着的弹窗原地换语言（不写数据、不动位置） */
+  (function(){
+    if(window.__ccqModalLangBound) return;
+    window.__ccqModalLangBound = true;
+    window.addEventListener('app:langchange', function(){ try{ window.ccqModalRelocalize(); }catch(e){} });
+  })();
   window.ccQuoteVerAgree = function(oldVer){
     window.ccQuoteVerConfirmClose();
     ccQuotePushRec(oldVer + 1, ccT('verSaved') + 'V' + (oldVer + 1));
@@ -68012,7 +68164,7 @@ function submitAuth() {
       ccQuotePushRec(oldVer, ccT('verNoChangeSaved'));
       return;
     }
-    ccQuoteVerConfirm(oldVer, ccQuoteDiffLines(cur));
+    ccQuoteVerConfirm(oldVer, cur);
   };
   /* ★CCQ-GOTO-20261115（用户 2026-11-15）：需求信息表右上角「进入报价格式区域」——
      点一下立即滚到最下面的「报价结构」纸面（#ccq_paper），并整块闪一下做定位提示。 */
