@@ -66135,6 +66135,20 @@ function submitAuth() {
       '.ccq-img-dl{display:inline-block;padding:6px 18px;border-radius:6px;background:#1a56b0;color:#fff;font-size:13px;font-weight:700;text-decoration:none;}',
       /* ★CCQ-PRINTFIX-20261115：临时打印根节点（只用于打印，屏幕上永不显示） */
       '.ccq-print-root{display:none;}',
+      /* ★CCQ-LOGO-20261115（用户 2026-11-15）：报价单 PDF / 图片 每页右上角公司 LOGO。
+         PDF 用「table + thead」实现每页重复页眉（打印时 thead 每页都会重复渲染）；
+         position:fixed 实测在最后一页会被裁掉，已弃用。 */
+      '.ccq-page-logo{display:none;}',
+      '.ccq-page-frame{width:100%;border-collapse:collapse;table-layout:fixed;}',
+      '@media print{'
+        + '.ccq-print-root .ccq-page-frame > thead > tr > th{display:table-cell !important;border:0 !important;background:transparent !important;padding:0 0 3mm 0 !important;text-align:right !important;vertical-align:bottom !important;}'
+        + '.ccq-print-root .ccq-page-frame > tbody > tr{break-inside:auto !important;page-break-inside:auto !important;}'
+        + '.ccq-print-root .ccq-page-frame > tbody > tr > td{border:0 !important;padding:0 !important;vertical-align:top !important;}'
+        + '.ccq-print-root .ccq-page-logo{display:block !important;width:24mm;height:auto;margin-left:auto !important;}'
+        + '.ccq-print-root .ccq-page-logo svg{width:100% !important;height:auto !important;display:block;}'
+        + '}',
+      '.ccq-img-logo{position:absolute;top:6px;right:8px;width:92px;height:auto;z-index:9;pointer-events:none;}',
+      '.ccq-img-logo svg{width:100%;height:auto;display:block;}',
       '.ccq-std{width:100%;border-collapse:collapse;font-size:10px;margin-top:6px;}',
       '.ccq-std th,.ccq-std td{border:1px solid #333;padding:3px 5px;}',
       '.ccq-std thead th{background:#f0f0f0;font-weight:700;}',
@@ -71909,6 +71923,51 @@ function submitAuth() {
     var p = ov.querySelector('.ccq-pv-print'); if(p) p.textContent = ccT('quotePrintBtn');
     var i = ov.querySelector('.ccq-pv-img');   if(i) i.textContent = ccT('quoteImgBtn');
   }
+  /* ★CCQ-LOGO-20261115（用户 2026-11-15）：「预览报价」输出 PDF/图片时，每一页右上角都带公司 LOGO。
+     · 图形直接复用顶栏那张矢量 LOGO（.tb-logo svg，与登录页同一套 GRAPHIC），不引入外部图片、放大不虚；
+     · 打印：LOGO 以 position:fixed 注入打印根节点 → Chrome 打印时会【每一页】重复绘制一次，
+       同时把 @page 上边距加大到 14mm，LOGO 落在页眉白边里，绝不压正文；
+     · 出图片：LOGO 以绝对定位叠在预览正文右上角，截图时被 html2canvas 一起拍进去，截完立刻移除。 */
+  function ccqLogoSvgNode(){
+    var src = document.querySelector('.tb-logo svg') || document.querySelector('.login-logo svg');
+    if(!src) return null;
+    var s = src.cloneNode(true);
+    s.removeAttribute('width'); s.removeAttribute('height');
+    s.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    s.setAttribute('style', 'width:100%;height:auto;display:block;');
+    return s;
+  }
+  function ccqLogoBox(cls){
+    var s = ccqLogoSvgNode(); if(!s) return null;
+    var d = document.createElement('div');
+    d.className = cls;
+    d.setAttribute('aria-hidden', 'true');
+    d.appendChild(s);
+    return d;
+  }
+  window.ccqLogoSvgNode = ccqLogoSvgNode;   /* 供验收探针/调试直接调用 */
+  window.ccqLogoBox = ccqLogoBox;
+  /* ★CCQ-LOGO-20261115：把预览内容 + 每页页眉 LOGO 装进打印根节点。
+     用「一层 table + thead」承载页眉 —— 浏览器打印时 thead 会在【每一页】顶部重复渲染，
+     这是唯一可靠的「每页都有 LOGO」做法（fixed + 负偏移在最后一页会被裁掉，实测不可用）。 */
+  function ccQuoteBuildPrintRoot(root, innerHtml){
+    root.innerHTML = '';
+    var frame = document.createElement('table');
+    frame.className = 'ccq-page-frame';
+    var thead = document.createElement('thead');
+    var trh = document.createElement('tr');
+    var th = document.createElement('th');
+    var lg = ccqLogoBox('ccq-page-logo');
+    if(lg) th.appendChild(lg);
+    trh.appendChild(th); thead.appendChild(trh); frame.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    var trb = document.createElement('tr');
+    var tdb = document.createElement('td');
+    tdb.innerHTML = innerHtml;
+    trb.appendChild(tdb); tbody.appendChild(trb); frame.appendChild(tbody);
+    root.appendChild(frame);
+  }
+  window.ccQuoteBuildPrintRoot = ccQuoteBuildPrintRoot;
   window.ccQuotePreview = function(){
     var src = document.getElementById('ccq_paper');
     if(!src){ return; }
@@ -71977,7 +72036,9 @@ function submitAuth() {
           root.setAttribute('data-no-pin', '1');   /* ★CCQ-PRINTFIX2-20261115 */
           document.body.appendChild(root);
         }
-        root.innerHTML = src.innerHTML;
+        /* ★CCQ-LOGO-20261115：内容 + 每页页眉 LOGO 一起装进打印根节点（thead 每页重复） */
+        try{ ccQuoteBuildPrintRoot(root, src.innerHTML); }
+        catch(e1){ root.innerHTML = src.innerHTML; }
         /* ★CCQ-MONEYFIT-20261115：打印根节点是新的 DOM，重新按内容缩一遍金额列 */
         try { ccQuoteFitMoney(root); } catch(e){}
         if(typeof printModalById === 'function'){ printModalById('ccqPrintRoot'); return; }
@@ -71998,9 +72059,16 @@ function submitAuth() {
     var box = document.getElementById('ccqPreviewBody');
     if(!box) return;
     var shot = function(){
-      var oH = box.style.maxHeight, oO = box.style.overflow, oF = box.style.flex;
+      var oH = box.style.maxHeight, oO = box.style.overflow, oF = box.style.flex, oP = box.style.position;
       box.style.maxHeight = 'none'; box.style.overflow = 'visible'; box.style.flex = '0 0 auto';
-      var back = function(){ box.style.maxHeight = oH; box.style.overflow = oO; box.style.flex = oF; };
+      box.style.position = 'relative';
+      /* ★CCQ-LOGO-20261115：出图前把 LOGO 叠在右上角（截完立刻移除，页面上不留痕） */
+      var lg = null;
+      try{ lg = ccqLogoBox('ccq-img-logo'); if(lg) box.appendChild(lg); }catch(e0){}
+      var back = function(){
+        try{ if(lg && lg.parentNode) lg.parentNode.removeChild(lg); }catch(e1){}
+        box.style.maxHeight = oH; box.style.overflow = oO; box.style.flex = oF; box.style.position = oP;
+      };
       setTimeout(function(){
         html2canvas(box, { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: box.scrollWidth })
           .then(function(cv){ back(); ccQuoteShowImage(cv.toDataURL('image/png')); })
@@ -77449,7 +77517,10 @@ function printModalById(modalId){
     if((modalId === 'slatsReportModal' || modalId === 'slatsSpecModal' || modalId === 'ccqPreviewOverlay' || modalId === 'ccqPrintRoot') && !document.getElementById('print-page-orient')){
       var _pso = document.createElement('style');
       _pso.id = 'print-page-orient';
-      _pso.textContent = '@media print{ @page { size: A4 landscape; margin: 6mm; } }';
+      /* ★CCQ-LOGO-20261115（用户 2026-11-15）：报价单页眉 LOGO 由 thead 承载，
+         这里只给纸面留 8mm 白边（其余弹窗仍是 6mm）。 */
+      var _pgm = (modalId === 'ccqPrintRoot') ? '8mm' : '6mm';
+      _pso.textContent = '@media print{ @page { size: A4 landscape; margin: ' + _pgm + '; } }';
       document.head.appendChild(_pso);
     }
   }catch(e0){}
