@@ -65621,8 +65621,8 @@ function submitAuth() {
     return {
       /* ★CC-FOOTFEE-20261114：需求信息表表尾新增 运输费/安装费(可隐藏)/增值税率，全部存 demand 下 */
       demand:{ months:1, workDays:0, prodDays:0, instDays:0, crew:{ size:5, driver:1, assist:1, indoor:3, perDay:200, groups:2 },
-               /* ★CC-VATZERO-20261114（用户 2026-11-14）：增值税税率默认值 8% → 0%（单价已含税） */
-               feeTransport:0, hideTransport:0, feeInstall:0, hideInstall:0, vatRate:0, cur:'VND',
+               /* ★CC-VAT8-20261115（用户 2026-11-15）：增值税税率默认 8%，可改，最多保留 2 位小数（8.5 / 8.25 均合法） */
+               feeTransport:0, hideTransport:0, feeInstall:0, hideInstall:0, vatRate:8, cur:'VND',
                /* ★CC-DISC-20261114：优惠后的总价 + 该行是否打印（NO=打印不出现） */
                discount:0, discountPrint:'NO',
                /* ★CC-QUOTE-20261115：报价结构表头（报价方 Quoted by 固定，不存这里） */
@@ -65640,7 +65640,7 @@ function submitAuth() {
       },
       opex:{ power:60000000, water:1000000, cons:15000000, dorm:7000000, food:10000000, car:270000000 },
       ind:{ flight:80000000, hotel:18000000, meal:20000000, mkt:500000000 },
-      margin:30, vat:0, mgmtPct:0, // ★CC-DEFVAL2-20261106：利润率 30% / 增值税（★CC-VATZERO2-20261114 默认改 0%）可编辑
+      margin:30, vat:8, mgmtPct:0, // ★CC-DEFVAL2-20261106：利润率 30% / 增值税 8%（★CC-VAT8-20261115 默认 8%，可改、最多 2 位小数）
       vatMig:1,                    // ★CC-VATZERO2-20261114：老存档 vat=8（旧默认）一次性迁移为 0 的标记
       // ★CC-PROVIDE-20261105：行路径 → Choice VN 是否提供；空对象=全部默认 √（兼容旧存档）
       provide:{},
@@ -65695,13 +65695,16 @@ function submitAuth() {
       }
       // ★CC-DEFVAL2-20261106：利润率30/增值税8 默认（可编辑）——存档值非 0 原样保留，0/缺失补默认（与人工预设同策略）
       ['margin','vat','mgmtPct'].forEach(function(k){ if(saved[k] !== undefined && Number(saved[k])) base[k] = Number(saved[k]); }); // ★CC-MGMT：管理费百分比
-      /* ★CC-VATZERO2-20261114（用户 2026-11-14）：报价计算里的「增值税（VAT）」默认 8% → 0%。
-         老存档里存的 8 就是旧默认值 → 一次性迁移成 0；vatMig 标记随存档一起保存，
-         之后用户手动改回 8 不会再被重置（标记已存在就跳过）。 */
-      if(!(saved && Number(saved.vatMig))){
-        if(Number(base.vat) === 8) base.vat = 0;
-        base.vatMig = 1;
+      /* ★CC-VAT8-20261115（用户 2026-11-15）：报价计算「增值税（VAT）」默认值恢复 8%，可改，最多 2 位小数。
+         迁移：上一版默认是 0，老存档里的 0 视作旧默认 → 一次性补成 8（vatMig2 标记随存档保存）；
+         打过标记之后，用户显式保存的 0 会被完整尊重（走下面 else 分支原样读回）。 */
+      if(!(saved && Number(saved.vatMig2))){
+        if(!(Number(base.vat) > 0)) base.vat = 8;
+        base.vatMig2 = 1;
+      } else if(saved.vat !== undefined && saved.vat !== null && saved.vat !== ''){
+        base.vat = Number(saved.vat) || 0;
       }
+      base.vat = ccRate2(base.vat);   // ★CC-VAT8：税率统一最多 2 位小数
       // ★CC-DEFVAL-20261106：人工/运营/间接默认值——存档值为 0/缺失时套预设默认（用户已填非 0 原样保留；与机械预设同策略）
       (function(){
         var DEF2 = ccDef();
@@ -65760,14 +65763,17 @@ function submitAuth() {
         }
         delete base.demand.blocks; delete base.demand.area;
       }
-      /* ★CC-VATZERO-20261114（用户 2026-11-14）：需求信息表增值税税率默认值 8% → 0%。
-         老存档里存的是旧默认 8（用户从没改过），做一次性迁移为 0；迁移标记 vatRateMig 随存档保存，
-         之后再手动填 8 不会被重置。 */
-      if(base.demand && !Number(base.demand.vatRateMig)){
-        base.demand.vatRate = 0;
-        base.demand.vatRateMig = 1;
+      /* ★CC-VAT8-20261115（用户 2026-11-15）：需求信息表增值税税率默认 8%，可改，最多 2 位小数。
+         迁移：上一版默认是 0 → 老存档里的 0/缺失 视作旧默认，一次性补成 8（vatRateMig2 随存档保存）；
+         打过标记之后，用户显式填 0 也会原样读回，不再被重置。 */
+      if(base.demand){
+        if(!Number(base.demand.vatRateMig2)){
+          if(!(Number(base.demand.vatRate) > 0)) base.demand.vatRate = 8;
+          base.demand.vatRateMig2 = 1;
+        }
+        if(base.demand.vatRate === undefined || base.demand.vatRate === null || base.demand.vatRate === '') base.demand.vatRate = 8;
+        base.demand.vatRate = ccRate2(base.demand.vatRate);
       }
-      if(base.demand && (base.demand.vatRate === undefined || base.demand.vatRate === null || base.demand.vatRate === '')) base.demand.vatRate = 0;
       // ★CC-MACH-PRESET-20261105：删除旧的「saved.mach 原样覆盖」逻辑，改由上方预设行骨架合并（否则会覆盖注入的 17/4/3 行）
       // 人工岗位按 k 合并：默认岗位列表始终完整（新增岗位自动补进旧存档），已有数值不丢
       if(saved.labor) ['mgmt','work','inst'].forEach(function(g){
@@ -65796,6 +65802,13 @@ function submitAuth() {
   function ccParseVnd(v){
     var n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
     return isFinite(n) ? n : 0;
+  }
+  /* ★CC-VAT8-20261115（用户 2026-11-15）：税率/百分比统一「最多 2 位小数」——8.5 / 8.25 合法，
+     8.3333 会被收成 8.33，负数按 0 处理。报价计算 VAT 与需求信息表税率共用此口径。 */
+  function ccRate2(v){
+    var n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, ''));
+    if(!isFinite(n) || n < 0) n = 0;
+    return Math.round(n * 100) / 100;
   }
   // ★CC-PROVIDE-20261105：行级「Choice VN 提供吗」状态。缺省/旧存档一律默认 √；× 只记状态，原数量绝不丢
   function ccProv(path){
@@ -67246,7 +67259,7 @@ function submitAuth() {
     var d = (CC_DATA && CC_DATA.demand) || {};
     var showT = !Number(d.hideTransport), showI = !Number(d.hideInstall);
     var feeT = Math.round(Number(d.feeTransport) || 0);
-    var rate = Number(d.vatRate); if(!isFinite(rate) || rate < 0) rate = 0; // ★CC-VATZERO-20261114：默认 0%
+    var rate = ccRate2(d.vatRate); // ★CC-VAT8-20261115：默认 8%，可改，最多 2 位小数
     /* ★CC-INSTFEE-20261114：小计按【剔除安装费】的单价算；安装费 = 含安装单价的小计 − 剔除后的小计，
        所以「显示安装费」和「隐藏安装费（并入单价）」两种状态下的【含税总价完全相等】。 */
     var base = 0, fullSub = 0, qty = 0, area = 0;
@@ -69870,7 +69883,7 @@ function submitAuth() {
       ccSumRow(ccT('totalCost'), 'cc_v_total', 'cc-big') +
       ccSumRow(ccT('margin') + '：<input class="cc-in cc-pct" id="cc_margin" value="' + (Number(CC_DATA.margin) || 0) + '" inputmode="decimal"' + roAttr + '> %', 'cc_v_profit') +
       ccSumRow(ccT('priceNoVat'), 'cc_v_pnovat') +
-      ccSumRow(ccT('vat') + '：<input class="cc-in cc-pct" id="cc_vat" value="' + (Number(CC_DATA.vat) || 0) + '" inputmode="decimal"' + roAttr + '> %', 'cc_v_vat') + // ★CC-VATROW-20261106：增值税行填入三币数值(=未税卖价×税率)
+      ccSumRow(ccT('vat') + '：<input class="cc-in cc-pct" id="cc_vat" value="' + ccRate2(CC_DATA.vat).toFixed(2) + '" inputmode="decimal"' + roAttr + '> %', 'cc_v_vat') + // ★CC-VATROW-20261106：增值税行填入三币数值(=未税卖价×税率) ★CC-VAT8-20261115：默认 8.00、可改、两位小数
       ccSumRow('🧾 ' + ccT('priceVat'), 'cc_v_pvat', 'cc-big') +
       ccSumRow(ccT('perM2'), 'cc_v_m2') +
       (CC_DATA.demand.specs || []).map(function(sp, i){
@@ -71482,7 +71495,7 @@ function submitAuth() {
         layPrev2 = !!layRow && Number(layRow.layers) === 2;
       }
       if(el.id === 'cc_margin'){ CC_DATA.margin = ccParseVnd(el.value); }
-      else if(el.id === 'cc_vat'){ CC_DATA.vat = ccParseVnd(el.value); }
+      else if(el.id === 'cc_vat'){ CC_DATA.vat = ccRate2(el.value); }   // ★CC-VAT8-20261115：最多 2 位小数
       else if(g){
         var v;
         if(f === 'n' || f === 'rL' || f === 'rW' || f === 'rL2' || f === 'rW2' || f === 'solid'){ v = el.value; }
@@ -71582,9 +71595,18 @@ function submitAuth() {
         el.addEventListener('input', function(){
           if(!CC_DATA) return;
           if(id === 'cc_margin') CC_DATA.margin = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || 0;
-          else CC_DATA.vat = parseFloat(String(this.value).replace(/[^0-9.\-]/g, '')) || 0;
+          else CC_DATA.vat = ccRate2(this.value);   // ★CC-VAT8-20261115：增值税率最多 2 位小数
           ccRecalc(); ccScheduleSave();
         });
+        /* ★CC-VAT8-20261115：失焦把 VAT 税率规整成两位小数显示（8 → 8.00，8.5 → 8.50） */
+        if(id === 'cc_vat'){
+          el.addEventListener('blur', function(){
+            if(!CC_DATA) return;
+            CC_DATA.vat = ccRate2(this.value);
+            this.value = ccRate2(CC_DATA.vat).toFixed(2);
+            ccRecalc(); ccScheduleSave();
+          });
+        }
       });
     })();
     // ★CC-FOOTFEE-20261114：表尾「运输费用 / 安装费用 / 增值税税率」输入框直绑（输入即算、失焦格式化；数据存 CC_DATA.demand）
@@ -71625,16 +71647,15 @@ function submitAuth() {
       }
       var rt = document.getElementById('ccg_vat_rate');
       if(rt){
-        rt.addEventListener('focus', function(){ this.value = String(Number(d.vatRate) || 0); try{ this.select(); }catch(e){} });
+        rt.addEventListener('focus', function(){ this.value = String(ccRate2(d.vatRate)); try{ this.select(); }catch(e){} });
         rt.addEventListener('input', function(){
-          var v = Number(String(this.value).replace(/[^0-9.\-]/g, '')); if(!isFinite(v) || v < 0) v = 0;
-          d.vatRate = v;
+          /* ★CC-VAT8-20261115：输入过程不重写输入框内容（否则打不出「8.」），只把值收成最多 2 位小数 */
+          d.vatRate = ccRate2(this.value);
           ccGridRefreshComputed(); ccScheduleSave();
         });
         rt.addEventListener('blur', function(){
-          var v = Number(String(this.value).replace(/[^0-9.\-]/g, '')); if(!isFinite(v) || v < 0) v = 0;
-          d.vatRate = v;
-          this.value = v.toFixed(2);
+          d.vatRate = ccRate2(this.value);
+          this.value = Number(d.vatRate).toFixed(2);   // 失焦规整为两位小数（8.00 / 8.50 / 8.25）
           ccGridRefreshComputed(); ccScheduleSave();
         });
       }
