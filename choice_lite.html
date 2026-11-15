@@ -51808,6 +51808,12 @@ function slatsTransDia(v){
   return (ok.indexOf(s) >= 0) ? s : '';
 }
 function slatsTransFmtNum(v){ try{ return Math.round(Number(v) || 0).toLocaleString('en-US'); }catch(e){ return String(Math.round(Number(v) || 0)); } }
+/* ★CC-COLALIGN-20261115b：自检提示里带 1 位小数，避免出现「spec 2 / transcribed 2」这种
+   「两个数字看着一样却说对不上」的困惑（真实值是 2.16，四舍五入后才都是 2）。 */
+function slatsTransFmtDec(v){
+  var n = Math.round((Number(v) || 0) * 10) / 10;
+  try{ return n.toLocaleString('en-US', { maximumFractionDigits: 1 }); }catch(e){ return String(n); }
+}
 window.slatsTranscribeToCost = function(){
   var rows = [];
   try{ rows = slatsSpecSerialize() || []; }catch(e){ rows = []; }
@@ -51870,9 +51876,15 @@ window.slatsTranscribeToCost = function(){
     try{ showToast(tSlatsTrans('slats_trans_empty')); }catch(e){}
     return;
   }
+  /* ★CC-COLALIGN-20261115（用户 2026-11-15 选方案 B）：【一点按钮就先对齐两边表格】。
+     放在「落盘前自检」之前 —— 否则自检一旦拦下（如 2026-11-15 线上那次），
+     用户看到的就是「点了没反应、列也没变、也没有确定按钮」。
+     自检若真的拦下转录，列仍是已对齐状态，可随时点「↩ 恢复原列显示」还原。 */
+  try{ if(typeof slatsColStateAlign === 'function') slatsColStateAlign(); }catch(e1){}
+  try{ if(typeof window.ccRowColsAlign === 'function') window.ccRowColsAlign(); }catch(e2){}
   /* ⑥ 落地前自检（用户 2026-11-15：不做单行标红，宁可整批不写）：
      用转录出来的 长×宽×数量、数量×单元×栋数 复算「平米/单元」「数量/整场」，
-     与规格表自带的 computed 值逐行比对；任一行相对误差 > 2% → 整批取消并提示。
+     与规格表自带的 computed 值逐行比对；任一行对不上 → 整批取消并提示。
      这样一旦字段取错/解析失败，就不会把错数据写进成本核算。 */
   var bad = [];
   list.forEach(function(x){
@@ -51882,14 +51894,19 @@ window.slatsTranscribeToCost = function(){
       var m = Math.max(Math.abs(a), Math.abs(b), 1e-9);
       return Math.abs(a - b) / m;
     };
+    /* ★CC-COLALIGN-20261115b（线上 bug 修复）：规格表的「平米/单元」是【四舍五入到整数】的
+       显示值（真实 2.16 → 显示 "2"），小面积行（2~6 ㎡）取整误差本身就 >2%，
+       旧逻辑用未取整的 2.16 去比 → 相对误差 7.4% → 整批被误判「字段取错」而取消转录。
+       改为「绝对 1.0 + 相对 2%」双阈值（取整最多差 1）；「数量/整场」是精确整数运算，仍走 2% 相对判定。 */
+    var nearSu = function(a, b){ return Math.abs(a - b) <= Math.max(1, 0.02 * Math.max(Math.abs(a), Math.abs(b))); };
     var tag = '#' + x._no + ' ' + (x.house || '?') + (x.code ? (' ' + x.code) : '');
     if(x._qw > 0 && rel(gotQw, x._qw) > 0.02){
       bad.push(tSlatsTrans('slats_trans_bad_row').replace('{n}', tag).replace('{k}', tSlatsTrans('slats_trans_k_qw'))
         .replace('{a}', slatsTransFmtNum(x._qw)).replace('{b}', slatsTransFmtNum(gotQw)));
     }
-    if(x._su > 0 && rel(gotSu, x._su) > 0.02){
+    if(x._su > 0 && !nearSu(gotSu, x._su)){
       bad.push(tSlatsTrans('slats_trans_bad_row').replace('{n}', tag).replace('{k}', tSlatsTrans('slats_trans_k_su'))
-        .replace('{a}', slatsTransFmtNum(x._su)).replace('{b}', slatsTransFmtNum(gotSu)));
+        .replace('{a}', slatsTransFmtNum(x._su)).replace('{b}', slatsTransFmtDec(gotSu)));
     }
   });
   if(bad.length){
@@ -51898,11 +51915,6 @@ window.slatsTranscribeToCost = function(){
     try{ showAlert(msg); }catch(e){ try{ alert(msg); }catch(e2){} }
     return;
   }
-  /* ★CC-COLALIGN-20261115（用户 2026-11-15 选方案 B）：确认框弹出前先把两边表格的列强行对齐——
-     确认框背后的规格表立刻变成「与成本核算表同构」，点「确定转录」后切到成本核算页，列也是一致的。
-     切换前各自存快照，成本核算表的列开关条上会出现「↩ 恢复原列显示」可一键还原。 */
-  try{ if(typeof slatsColStateAlign === 'function') slatsColStateAlign(); }catch(e1){}
-  try{ if(typeof window.ccRowColsAlign === 'function') window.ccRowColsAlign(); }catch(e2){}
   window.__SLATS_TRANS_LIST = list;
   slatsTransConfirmOpen();
 };
