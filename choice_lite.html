@@ -65711,6 +65711,9 @@ function submitAuth() {
       '.ccq-hist-empty{padding:16px;color:#999;font-size:12px;text-align:center;}',
       '.ccq-hist-item{border:1px solid #e0e6ec;border-left:4px solid #c62828;border-radius:5px;background:#fff;padding:8px 10px;margin:0 0 10px;}',
       '.ccq-hist-vrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;}',
+      /* ★CCQ-HISTFILL-20261115：历史版本「回填此版本」按钮，靠右贴在同一行的版本/时间后面 */
+      '.ccq-hist-fill{margin-left:auto;padding:2px 9px;font-size:11px;background:#1565c0;border-color:#1565c0;color:#fff;white-space:nowrap;}',
+      '.ccq-hist-fill:hover{background:#0d47a1;border-color:#0d47a1;}',
       '.ccq-hist-v{font-size:14px;color:#c62828;}',
       '.ccq-hist-at{font-size:11px;color:#607d8b;}',
       '.ccq-hist-tag{font-size:11px;color:#0b7a3b;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:3px;padding:0 6px;}',
@@ -67343,6 +67346,8 @@ function submitAuth() {
       verTotal:      three('含税总价', 'Total (VAT incl.)', 'Tổng đã gồm thuế'),
       /* ★CCQ-HIST-20261115（用户 2026-11-15）：版本修改记录（所有版本的改动 + 时间 + 价格变化），三语 */
       verHistBtn:        three('查看版本修改记录', 'Version change history', 'Xem lịch sử phiên bản'),
+      /* ★CCQ-HISTFILL-20261115：历史版本里的「回填此版本」按钮（最新版本用列表操作列的回填） */
+      verFillThis:       three('回填此版本', 'Restore this version', 'Khôi phục bản này'),
       verHistTitle:      three('版本修改记录', 'Version change history', 'Lịch sử thay đổi phiên bản'),
       verHistEmpty:      three('这个项目还没有保存过版本', 'No version saved for this project yet', 'Dự án này chưa lưu phiên bản nào'),
       verFirstSave:      three('首次保存', 'First save', 'Lưu lần đầu'),
@@ -68493,15 +68498,81 @@ function submitAuth() {
     if(k === 'at')       return String(r.at || '');
     return '';
   }
+  /* ★CCQ-LOGLATEST-20261115：两条记录是否属于「同一个项目」（列表只留最新一条用）
+     ① 客户+内容 三语键完全相同 → 同一个项目；
+     ② 客户相同，且内容只是被改名过（一方包含另一方、且都不少于 4 字，如
+        「3600头母猪至育肥」 / 「3600头母猪至育肥项目」）→ 也算同一个项目，
+        否则改个名字就会在列表里多留一条旧记录。任一一语命中即可（语言无关）。 */
+  function ccQuoteSameProjRec(a, b){
+    a = a || {}; b = b || {};
+    if(ccRecKey(a) === ccRecKey(b)) return true;
+    /* 名字归一：去空白/标点、大小写、去掉句尾「项目 / project / dự án」、
+       并统一「至 / 到」这类同义写法（用户改名时最常见：3600头母猪至育肥项目 → 3600头母猪到育肥）。 */
+    var norm = function(s){
+      return String(s == null ? '' : s).toLowerCase()
+        .replace(/[\s\-_/\\.,，。、·（）()【】\[\]:：;"'`]/g, '')
+        .replace(/至/g, '到')
+        .replace(/(项目|project|duan|dựán)$/, '');
+    };
+    /* 最长公共子串占比（按较短串归一）：容忍细微改写，但不把「3600头」和「4800头」当成同一项目 */
+    var lcsRatio = function(x, y){
+      x = String(x || ''); y = String(y || '');
+      if(!x || !y) return 0;
+      if(x.length > y.length){ var t = x; x = y; y = t; }
+      var n = x.length, m = y.length;
+      if(!n) return 0;
+      var prev = [], cur = [], i, j;
+      for(j = 0; j <= m; j++) prev[j] = 0;
+      for(i = 1; i <= n; i++){
+        cur = [0];
+        for(j = 1; j <= m; j++){
+          cur[j] = (x.charAt(i - 1) === y.charAt(j - 1)) ? (prev[j - 1] + 1) : Math.max(prev[j], cur[j - 1]);
+        }
+        prev = cur;
+      }
+      return prev[m] / n;
+    };
+    var sameName = function(x, y){
+      var nx = norm(x), ny = norm(y);
+      if(!nx || !ny) return String(x || '').trim() === String(y || '').trim();
+      if(nx === ny) return true;
+      if(nx.length >= 4 && ny.length >= 4 && (nx.indexOf(ny) >= 0 || ny.indexOf(nx) >= 0)) return true;
+      return lcsRatio(nx, ny) >= 0.85;
+    };
+    var anyLang = function(p, q, fn){
+      var L = ['zh', 'en', 'vi'];
+      for(var i = 0; i < L.length; i++){
+        var x = String((p || {})[L[i]] || '').trim(), y = String((q || {})[L[i]] || '').trim();
+        if(!x || !y) continue;
+        if(fn(x, y)) return true;
+      }
+      return false;
+    };
+    var ca = ccqTriNorm(a.customer), cb = ccqTriNorm(b.customer);
+    if(!anyLang(ca, cb, function(x, y){ return x === y; })) return false;   // 客户必须完全一致
+    return anyLang(ccqTriNorm(a.content), ccqTriNorm(b.content), sameName); // 内容相同 / 只是改名
+  }
   function ccQuoteLogHtml(){
-    var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
+    var raw = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
     var T = ccT;
+    /* ★CCQ-LOGLATEST-20261115（用户 2026-11-15）：「同一个项目，只保留最后一个版本的记录」。
+       列表每个项目只显示最新版本那一行（下标 i 仍是 quoteLog 里的真实下标，
+       行内回填/删除/查看版本记录都不受影响）；旧版本仍在「📜 查看版本修改记录」里查看与回填。 */
+    var chosen = [];
+    for(var li = 0; li < raw.length; li++){
+      var hit = -1;
+      for(var cj = 0; cj < chosen.length; cj++){
+        if(ccQuoteSameProjRec(raw[chosen[cj]] || {}, raw[li] || {})){ hit = cj; break; }
+      }
+      if(hit >= 0) chosen[hit] = li; else chosen.push(li);
+    }
+    var list = chosen.sort(function(a, b){ return a - b; });
     var h = '<div class="ccq-log-wrap"><div class="ccq-log-head">🗂 ' + T('recListTitle')
       + '<span class="ccq-log-n">' + list.length + '</span></div>';
     if(!list.length) return h + '<div class="ccq-log-empty">' + T('recEmpty') + '</div></div>';
-    /* 初始顺序：最新在最上面（数组倒序），排序在此基础上进行 */
+    /* 初始顺序：最新在最上面（按真实下标倒序），排序在此基础上进行 */
     var rows = [];
-    for(var i = list.length - 1; i >= 0; i--) rows.push({ i:i, r: list[i] || {} });
+    for(var i = list.length - 1; i >= 0; i--) rows.push({ i: list[i], r: raw[list[i]] || {} });
     var sk = CCQ_LOG_SORT.k, sd = CCQ_LOG_SORT.dir;
     if(sk && sd){
       rows.sort(function(a, b){
@@ -68582,7 +68653,14 @@ function submitAuth() {
   window.ccQuoteRecordRestore = function(idx){
     if(!ccCanEdit()){ if(typeof showToast === 'function') showToast(ccT('readonlyTip')); return; }
     var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
-    var r = list[idx]; if(!r) return;
+    if(!ccQuoteApplyRec(list[idx])) return;
+    if(typeof showToast === 'function') showToast(ccT('recFillOk'));
+  };
+  /* ★CCQ-HISTFILL-20261115（用户 2026-11-15）：「回填」核心 —— 传入记录对象即可恢复当时的全部数据。
+     列表操作列的回填、版本修改记录模态框里各历史版本的「回填」都走这里，保证口径一致。 */
+  function ccQuoteApplyRec(r){
+    if(!r) return false;
+    var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
     var L = (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'zh');
     var snap = ccQuoteDeep(r.snap);
     if(snap && snap.demand){
@@ -68595,7 +68673,9 @@ function submitAuth() {
       q.version = 'V' + ccRecVer(r);
     }else{
       /* 旧格式（没有整份快照）→ 至少把表头四栏恢复 */
-      var qq = CC_DATA.demand.quote;
+      if(!CC_DATA) return false;
+      if(!CC_DATA.demand) CC_DATA.demand = {};
+      var qq = CC_DATA.demand.quote || (CC_DATA.demand.quote = {});
       var cu = ccqTriNorm(r.customer), ct = ccqTriNorm(r.content);
       qq.customerTr = cu; qq.customer = cu[L] || ccqTriDisp(cu);
       qq.contentTr  = ct; qq.content  = ct[L] || ccqTriDisp(ct);
@@ -68606,7 +68686,18 @@ function submitAuth() {
     ccScheduleSave();
     lib_renderCostBody();
     setTimeout(function(){ try{ ccGoQuoteFormat(); }catch(e){} }, 140);
-    if(typeof showToast === 'function') showToast(ccT('recFillOk'));
+    return true;
+  }
+  /* 版本修改记录模态框里：回填某个历史版本（最新版不在模态框里提供，用列表操作列的回填） */
+  window.ccQuoteHistRestore = function(i){
+    if(!ccCanEdit()){ if(typeof showToast === 'function') showToast(ccT('readonlyTip')); return; }
+    var recs = (window.__CCQ_HIST_RECS && window.__CCQ_HIST_RECS.length)
+             ? window.__CCQ_HIST_RECS : ccQuoteHistRecs(window.__CCQ_HIST_KEY || '');
+    var r = recs[Number(i)] || null;
+    if(!r) return;
+    if(!ccQuoteApplyRec(r)) return;
+    try{ window.ccQuoteHistoryClose(); }catch(e){}
+    if(typeof showToast === 'function') showToast(ccT('recFillOk') + ' V' + ccRecVer(r));
   };
   window.ccQuoteRecordDelete = function(idx){
     if(!ccCanEdit()){ if(typeof showToast === 'function') showToast(ccT('readonlyTip')); return; }
@@ -68715,6 +68806,18 @@ function submitAuth() {
     return list.filter(function(r){ return ccRecKey(r) === projKey; })
                .sort(function(a, b){ return ccRecVer(a) - ccRecVer(b); });
   }
+  /* ★CCQ-LOGLATEST-20261115：同一个项目族（含改名前的旧记录）的全部版本，按保存时间升序。
+     列表里只显示最新的那条，但族里的旧记录仍要能在这里看到/回填/删除，不能变成「看不见也删不掉」。 */
+  function ccQuoteHistFamily(r){
+    var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
+    if(!r) return [];
+    return list.filter(function(x){ return ccQuoteSameProjRec(x, r); })
+               .sort(function(a, b){
+                 var ta = String((a && a.at) || ''), tb = String((b && b.at) || '');
+                 if(ta !== tb) return ta < tb ? -1 : 1;
+                 return ccRecVer(a) - ccRecVer(b);
+               });
+  }
   /* 金额显示：0 也要显示成 ₫0（ccGridMoney(0) 返回空串，历史记录里会看起来像丢数据） */
   function ccqMoneyStr(v){
     var n = Number(v) || 0, s = '';
@@ -68763,6 +68866,7 @@ function submitAuth() {
              canEdit: (typeof ccCanEdit === 'function') ? !!ccCanEdit() : null,
              miss: (typeof ccQuoteReqMissing === 'function') ? ccQuoteReqMissing() : null };
   };
+  window.ccQuoteSameProjRec = ccQuoteSameProjRec;   /* 调试/验收用：同项目判定 */
   /* 调试/验收用：读取报价记录列表（探针无法直接访问 IIFE 内的 CC_DATA） */
   window.ccQuoteLogGet = function(){
     try{ return (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : []; }catch(e){ return []; }
@@ -68771,16 +68875,19 @@ function submitAuth() {
     var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
     var r = list[idx];
     window.__CCQ_HIST_KEY = r ? ccRecKey(r) : '';
+    /* 项目族（含改名前的旧记录）按时间升序保存下来，供渲染与回填按下标定位 */
+    window.__CCQ_HIST_RECS = r ? ccQuoteHistFamily(r) : [];
     ccQuoteHistoryRender();
   };
   window.ccQuoteHistoryClose = function(){
     var o = document.getElementById('ccqHistOverlay');
     if(o && o.parentNode) o.parentNode.removeChild(o);
     window.__CCQ_HIST_KEY = '';
+    window.__CCQ_HIST_RECS = null;
   };
   window.ccQuoteHistoryRender = function(){
     var T = ccT, key = window.__CCQ_HIST_KEY || '';
-    var recs = ccQuoteHistRecs(key);
+    var recs = (window.__CCQ_HIST_RECS && window.__CCQ_HIST_RECS.length) ? window.__CCQ_HIST_RECS : ccQuoteHistRecs(key);
     var old = document.getElementById('ccqHistOverlay');
     var keepTop = 0;
     if(old){ var b0 = old.querySelector('.ccq-hist-body'); if(b0) keepTop = b0.scrollTop || 0; }
@@ -68797,10 +68904,16 @@ function submitAuth() {
         var diffs = ditems ? ccRecDiffItemLines(ditems, 200) : ccRecDiffLines(cur, prev);
         var chips = ditems ? ccRecDiffChips(ditems) : '';
         var foot = (cur && cur.foot) || {};
+        /* ★CCQ-HISTFILL-20261115（用户 2026-11-15）：除「最新版本」外，每个历史版本都加「回填」按钮；
+           最新版本不走这里（列表操作列已有 ↩ 回填）。 */
+        var isLatest = (i === recs.length - 1);
         body += '<div class="ccq-hist-item">'
           + '<div class="ccq-hist-vrow"><b class="ccq-hist-v">V' + ccRecVer(cur) + '</b>'
           + '<span class="ccq-hist-at">🕒 ' + ccEsc2(ccQuoteAtTxt(cur.at)) + '</span>'
-          + '<span class="ccq-hist-tag">' + ccEsc2(prev ? T('verHistoryChanges') : T('verFirstSave')) + '</span></div>'
+          + '<span class="ccq-hist-tag">' + ccEsc2(prev ? T('verHistoryChanges') : T('verFirstSave')) + '</span>'
+          + (isLatest ? '' : '<button type="button" class="cc-add ccq-hist-fill" title="' + ccEsc2(T('verFillThis')) + '"'
+              + ' onclick="ccQuoteHistRestore(' + i + ')">↩ ' + ccEsc2(T('verFillThis')) + '</button>')
+          + '</div>'
           + chips
           + (diffs.length
               ? '<ul class="ccq-hist-diff">' + diffs.map(function(s){ return '<li>' + ccEsc2(s) + '</li>'; }).join('') + '</ul>'
