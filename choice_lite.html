@@ -51818,25 +51818,12 @@ window.slatsTranscribeToCost = function(){
   var rows = [];
   try{ rows = slatsSpecSerialize() || []; }catch(e){ rows = []; }
   var list = [];
-  /* ★CC-COLALIGN-20261115：先按表体顺序算出「行 → 规格表分组号」。
-     规格表每行带 data-slats-group，连续相同的行属于同一组（与 slatsGroupInfo 同一口径）。
-     slatsSpecSerialize 也是按 tbody 顺序逐行输出的，所以索引一一对应。 */
-  var grpNo = (function(){
-    var out = [];
-    try{
-      var tb = document.getElementById('slatsSpecTable');
-      tb = tb ? tb.querySelector('tbody') : null;
-      if(tb){
-        var last = null, cur = 0;
-        for(var i = 0; i < tb.children.length; i++){
-          var g = tb.children[i].getAttribute('data-slats-group') || '0';
-          if(g !== last){ cur++; last = g; }
-          out.push(cur);
-        }
-      }
-    }catch(e0){}
-    return out;
-  })();
+  /* ★CC-GROUPBYHOUSE-20261115（用户 2026-11-15 截图：同一猪舍的行必须合并成一格）：
+     分组号按「猪舍 + 房舍编号 + 单元/栋 + 栋数」连续相同来算，与成本核算表的合并规则
+     （ccGridGroupKey）完全一致。
+     ★不能再用规格表的 data-slats-group：那边是按「房舍单元长宽高」成组，口径不一致，
+       会把同一个猪舍拆成一堆单行（序号 1..15 各占一行），正是这次的 bug。 */
+  var _lastGk = null, _grpN = 0;
   rows.forEach(function(r, ri){
     /* ★CCQ-TRANS-FIX-20261115b（用户 2026-11-15 截图报错）：
        ① 长/宽/高 必须取 floor_len/floor_wid/floor_hgt（板材尺寸，毫米），
@@ -51848,6 +51835,10 @@ window.slatsTranscribeToCost = function(){
     if(!house && !len && !wid) return;                 /* ⑤ 空行/占位行跳过 */
     var layers = slatsTransNum(r.mesh_layers) || 1;
     var dual = (layers === 2);
+    /* ★CC-GROUPBYHOUSE-20261115：与成本核算 ccGridGroupKey 同口径的连续分组号 */
+    var _gk = [house, String(r.house_code == null ? '' : r.house_code).trim(),
+               slatsTransNum(r.unit_per_building) || 1, slatsTransNum(r.building_count) || 1].join('|');
+    if(_gk !== _lastGk){ _grpN++; _lastGk = _gk; }
     list.push({
       house: house,
       code: String(r.house_code == null ? '' : r.house_code).trim(),
@@ -51866,7 +51857,7 @@ window.slatsTranscribeToCost = function(){
       solid: (String(r.solid_slat || '').trim().toUpperCase() === 'YES') ? 'YES' : 'NO',
       hole:  (String(r.hole_slat  || '').trim().toUpperCase() === 'YES') ? 'YES' : 'NO',
       /* 仅用于落地前自检 / 分组，不直接写进 CC_DATA（_g 会转成 gid） */
-      _g: grpNo[ri] || 0,
+      _g: _grpN,
       _no: ri + 1,
       _qw: slatsTransNum(r.qty_whole),
       _su: slatsTransNum(r.sqm_unit)
@@ -66760,9 +66751,13 @@ function submitAuth() {
     return cols.filter(function(c){ return !c.on || !!CC_ROW_COLS[c.on]; });
   }
   /* ---- 合并分组：连续相同 groupKey 的行首行给 rowspan，其余行不出这 8 个 td ---- */
+  /* ★CC-GROUPBYHOUSE-20261115（用户 2026-11-15 截图）：分组键【绝不能】再包含 长/宽/高。
+     长宽高从 2026-11-15 起已是「逐行独立」（同一猪舍可以有不同的板材尺寸），
+     把它放进分组键会让同一猪舍的每一行都变成独立组（序号 1,2,3…15 各占一行），
+     与用户要求的「相同猪舍的行合并成一格」相反。
+     正确口径：序号/猪舍/房舍编号/单元·栋/栋数 只按「猪舍 + 房舍编号 + 单元 + 栋数」合并。 */
   function ccGridGroupKey(sp){
-    return [String(sp.house || ''), String(sp.code || ''), ccRowUnits(sp), ccRowBldgs(sp),
-      Number(sp.len) || 0, Number(sp.wid) || 0, Number(sp.hei) || 0].join('|');
+    return [String(sp.house || ''), String(sp.code || ''), ccRowUnits(sp), ccRowBldgs(sp)].join('|');
   }
   /* ★CC-OPCELL-20261113：引入分组号 gid（与规格表 data-slats-group 同一套语义）
      · 有 gid → 按 gid 成组（复制出来的行即使数值相同也独立成组）
