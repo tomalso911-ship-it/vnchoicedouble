@@ -65268,6 +65268,11 @@ function submitAuth() {
     moldExtraSet:  { zh:'+{0} 套（省 {1} 天）', en:'+{0} set (saves {1} days)', vi:'+{0} bộ (giảm {1} ngày)' },
     moldRule20:    { zh:'（加套判据：多开 1 套若能省 ≥20 天就加，否则不加——优先省钱）', en:'(extra set only when it saves ≥20 days — cost first)', vi:'(chỉ thêm bộ khi giảm ≥20 ngày — ưu tiên tiết kiệm)' },
     moldRatioNote: { zh:'按产量比（两规格同时完工）', en:'by output ratio (both finish together)', vi:'theo tỉ lệ sản lượng (hoàn thành cùng lúc)' },
+    /* ★CC-MOLDCAP-20261115（用户 2026-11-15）：方案B 腔数受模板面积硬约束后的三条新文案 */
+    moldRatioApprox: { zh:'按产量比近似分配（受模板面积限制，无法严格同时完工）', en:'approximate output ratio (limited by plate area — cannot finish exactly together)', vi:'phân bổ xấp xỉ theo tỉ lệ sản lượng (giới hạn diện tích khuôn — không xong cùng lúc)' },
+    moldCavLimit:   { zh:'腔数已按模板 3.5×1.5 m 面积封顶', en:'cavity count capped by plate area 3.5×1.5 m', vi:'số hốc đã giới hạn theo diện tích khuôn 3,5×1,5 m' },
+    moldNoFitB:     { zh:'该类型 {0} 个规格拼不进一块模板（每规格 1 腔也要 {1} ㎡ > 5.25 ㎡）→ 全部退回单独开模', en:'{0} specs of this type do not fit one plate (even 1 cavity each needs {1} ㎡ > 5.25 ㎡) → all fall back to dedicated molds', vi:'{0} quy cách loại này không vừa 1 khuôn (mỗi quy cách 1 hốc cũng cần {1} ㎡ > 5,25 ㎡) → tất cả về khuôn riêng' },
+    moldComboWarn:  { zh:'组合 1 套需 {0} 天，不优于各规格单独开模并行（{1} 天）—— 省模具但不省工期', en:'one combined set needs {0} d — not better than dedicated molds in parallel ({1} d): saves molds, not time', vi:'1 bộ ghép cần {0} ngày — không tốt hơn khuôn riêng song song ({1} ngày): tiết kiệm khuôn, không nhanh hơn' },
     moldPar:     { zh:'线并行约', en:'lines in parallel ≈', vi:'dây song song ≈' }, // ★CC-MOLDLINES2-20261106：前面拼线数——「N 线并行约 X 天」
    moldDetail:  { zh:'模具明细（每副模具 = 1 个设计）', en:'Mold breakdown (1 mold per design)', vi:'Chi tiết khuôn (1 khuôn = 1 thiết kế)' }, // ★CC-MOLDDETAIL-20261106
    moldPlate1:  { zh:'单规格整板（1 副模具只出 1 种规格）', en:'single-spec plate (one spec per mold)', vi:'thẻ nguyên 1 quy cách (1 khuôn chỉ ra 1 quy cách)' }, // ★CC-MOLDDETAIL-20261106
@@ -71137,41 +71142,69 @@ function submitAuth() {
       htmlA += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkA + ' ' + ccT('moldDaysUnit') + '</div>';
       if(eMa) eMa.innerHTML = htmlA;
       // ★CC-MOLDDESIGN4-20261114（用户 2026-11-14 四定稿）：方案B —— 每种「类型」只开 1 副模：
-      //   · 该类型有 ≥2 个规格 → 一块板上按【产量比例】开多腔（如 3 个 1,200×600 + 1 个 900×600 = 3:1，
-      //     比例对上后两个规格同时完工，不多开模）；腔数按「模板面积 3.5×1.5 放得下」的最大倍数放大
+      //   · 该类型有 ≥2 个规格 → 一块板上按【产量比例】开多腔，比例对上后各规格同时完工
       //   · 该类型只有 1 个规格 → 直接专用模
+      /* ★CC-MOLDCAP-20261115（用户 2026-11-15「方案B 怎么会 1 天就完工」的根因修复，勿回退）：
+         旧算法 ratio = 产量 ÷ 该类型【最小产量】，scale 从 2 起算、第一次超面积就 break → scale 停在 1，
+         ratio 被原样当成腔数（实测 848 腔 / 9266 腔），产能虚增 200~2300 倍 → 每个规格都算成 1 天。
+         三条硬约束（用户 2026-11-15 确认）：
+           ① 腔数受模板物理面积约束：Σ(腔数 × 单块面积) ≤ 3.5×1.5 = 5.25㎡（每腔只放一块板），
+              且任一规格腔数不得超过「独占模板」的物理腔数 ccMoldPer；
+           ② 连「每规格 1 腔」都放不下 → 该类型不组合，全部退回单独开模；
+           ③ 组合后工期 ≥ 各规格各自单独开模的排程工期 → 标红「不划算」并给出两个数字，
+              绝不再当成「工期最短」推荐（工期一律用真实腔数 × 真实产能计算）。 */
       var byQty = designs.slice().sort(function(a, b){ return b.qty - a.qty; });
       var typeOrder = [];
       byQty.forEach(function(d){ if(typeOrder.indexOf(d.type) < 0) typeOrder.push(d.type); });
-      var PLATE_AREA = 3.5 * 1.5; // 模板基本面
-      var jobsB = [];
+      var PLATE_AREA = 3.5 * 1.5; // 模板基本面 5.25 ㎡
+      var jobsB = [], notesB = [];
+      function ccCavAreaOne(d){ return (Number(d.len) / 1000) * (Number(d.wid) / 1000); }
+      function ccSoloJobB(d){
+        return { kind: 'solo', members: [d], pcs: d.pcs, days: d.days, qty: d.qty, singleCap: d.singleCap };
+      }
+      /* 腔数分配：v = max(1, floor(qty / U))，U = 每腔负责的块数（U 越小 → 腔越多 → 越快、但面积吃紧）。
+         二分找【最小可行 U】= 面积放得下的最多腔数。 */
+      function ccCavAllocB(grp){
+        var oneCav = 0, maxQ = 0;
+        grp.forEach(function(d){ oneCav += ccCavAreaOne(d); if(d.qty > maxQ) maxQ = d.qty; });
+        if(oneCav > PLATE_AREA + 1e-9) return null;   // ② 每规格 1 腔都放不下
+        var lo = 1, hi = Math.max(1, Math.ceil(maxQ)), bestV = null;
+        while(lo <= hi){
+          var u = Math.floor((lo + hi) / 2), area = 0, vs = [];
+          for(var i = 0; i < grp.length; i++){
+            var cap = Math.max(1, Math.floor(Number(grp[i].pcs) || 1));  // ① 兜底：不超过独占模板的物理腔数
+            var v = Math.min(cap, Math.max(1, Math.floor(grp[i].qty / u)));
+            vs.push(v);
+            area += v * ccCavAreaOne(grp[i]);
+          }
+          if(area > PLATE_AREA + 1e-9){ lo = u + 1; }   // 放不下 → 腔要更少
+          else { bestV = vs; hi = u - 1; }              // 放得下 → 试更多腔
+        }
+        return bestV;
+      }
       typeOrder.forEach(function(tk){
         var grp = byQty.filter(function(d){ return d.type === tk; });
-        if(grp.length === 1){
-          var d0 = grp[0];
-          jobsB.push({ kind: 'solo', members: [d0], pcs: d0.pcs, days: d0.days, qty: d0.qty, singleCap: d0.singleCap });
+        if(grp.length === 1){ jobsB.push(ccSoloJobB(grp[0])); return; }
+        var cavs = ccCavAllocB(grp);
+        if(!cavs){                                     // ② 拼不进一块模板 → 全部退回单独开模
+          var needArea = 0;
+          grp.forEach(function(d){ needArea += ccCavAreaOne(d); jobsB.push(ccSoloJobB(d)); });
+          notesB.push({ kind: 'nofit', n: grp.length, area: Math.round(needArea * 100) / 100 });
           return;
-        }
-        var minQ = grp[grp.length - 1].qty || 1;
-        var ratio = grp.map(function(d){ return Math.max(1, Math.round(d.qty / minQ)); });
-        var scale = 1;
-        for(var st = 2; st <= 12; st++){
-          var area = 0;
-          for(var gi = 0; gi < grp.length; gi++){
-            area += ratio[gi] * st * (grp[gi].len / 1000) * (grp[gi].wid / 1000);
-          }
-          if(area > PLATE_AREA - 1e-9) break;
-          scale = st;
         }
         var totCav = 0, qty = 0, maxDays = 0;
         grp.forEach(function(d, i){
-          d.cav = ratio[i] * scale;
+          d.cav = cavs[i];
           totCav += d.cav;
           qty += d.qty;
-          d.daysB = ccMoldDays(d.qty, d.cav);
+          d.daysB = ccMoldDays(d.qty, d.cav);          // 真实产能 = 真实腔数 × 模/天
           if(d.daysB > maxDays) maxDays = d.daysB;
         });
-        jobsB.push({ kind: 'combo', members: grp, pcs: totCav, days: maxDays, qty: qty, ratio: ratio });
+        var exact = grp.every(function(d){ return d.daysB === maxDays; });
+        /* ③ 与「各规格各自单独开模、按线数排程」对比：只做标注，不参与工期计算 */
+        var soloDays = ccMoldSchedule(grp.map(function(d){ return { days: ccMoldDays(d.qty, d.pcs), sets: 1 }; }));
+        jobsB.push({ kind: 'combo', members: grp, pcs: totCav, days: maxDays, qty: qty, exact: exact,
+                     soloDays: soloDays, worse: (maxDays >= soloDays) });
       });
       // ★CC-MOLDSET20-20261114：方案B 同样吃「省 20 天才加套」的判据
       jobsB.forEach(function(j){ j.sets = 1; });
@@ -71184,7 +71217,10 @@ function submitAuth() {
       var mkB = ccMoldGreedy(jobsB, daysOfB);
       jobsB.forEach(function(j){
         j.days = daysOfB(j);
-        if(j.kind === 'combo'){ j.members.forEach(function(d){ d.daysB = ccMoldDays(d.qty, d.cav * j.sets); }); }
+        if(j.kind === 'combo'){
+          j.members.forEach(function(d){ d.daysB = ccMoldDays(d.qty, d.cav * j.sets); });
+          j.worse = (j.days >= j.soloDays);   // ③ 加套后重新判定是否仍「不划算」
+        }
       });
       var setsB = jobsB.reduce(function(s, j){ return s + j.sets; }, 0);
       var htmlB = ccT('moldSum') + ' ' + setsB + ' ' + ccT('moldSets') + ' · ' + Math.min(LINES, setsB) + ' ' + ccT('moldPar') + ' ' + mkB + ' ' + ccT('moldDaysUnit') +
@@ -71211,7 +71247,8 @@ function submitAuth() {
         htmlB += '<div style="margin:2px 0 0 14px;">' + (CN[bi++] || bi) + ' ' + ccT('moldCombo') + ' × ' + j.sets + ' ' + ccT('moldSets') + ' — <b>' + ccT('moldPlate2') + '</b>' +
           (j.gain ? ' <span style="color:#2e7d32;font-weight:700;">' + ccMFill(ccT('moldExtraSet'), j.sets - 1, j.gain) + '</span>' : '') + '：</div>';
         htmlB += '<div style="margin:2px 0 2px 28px;">' + ccT('moldCavMix') + ' ' + j.pcs + ' ' + ccT('moldPcs') +
-          '（' + mix.join('　') + '）· ' + ccT('moldRatioNote') + ' ' + j.ratio.join(':') + '</div>';
+          '（' + mix.join('　') + '）· ' + (j.exact ? ccT('moldRatioNote') : ccT('moldRatioApprox')) +
+          ' · ' + ccT('moldCavLimit') + '</div>';
         j.members.forEach(function(d){
           htmlB += '<div style="margin:2px 0 2px 28px;">· ' + ccMoldSizeTxt(d) +
             '：' + ccT('moldPer') + ' ' + d.cav + ' ' + ccT('moldPcs') +
@@ -71219,8 +71256,14 @@ function submitAuth() {
             ' · ' + ccT('moldNeedDays') + ' ' + d.daysB + ' ' + ccT('moldDaysUnit') + '</div>';
         });
         htmlB += '<div style="margin:0 0 2px 28px;color:#1a56b0;">· ' + ccT('moldNeedDays') + ' ' + j.days + ' ' + ccT('moldDaysUnit') + '</div>';
+        if(j.worse){
+          htmlB += '<div style="margin:0 0 2px 28px;color:#d32f2f;font-weight:700;">⚠ ' + ccMFill(ccT('moldComboWarn'), j.days, j.soloDays) + '</div>';
+        }
       });
-      if(!hasCombo){
+      notesB.forEach(function(nt){
+        htmlB += '<div style="margin:4px 0 2px 14px;color:#d32f2f;font-weight:700;">⚠ ' + ccMFill(ccT('moldNoFitB'), nt.n, nt.area) + '</div>';
+      });
+      if(!hasCombo && !notesB.length){
         htmlB += '<div style="margin:6px 0 0 14px;color:#1a56b0;">· ' + ccT('moldNoCombo') + '</div>';
       }
       htmlB += '<div style="font-weight:700;color:#d32f2f;margin:4px 0 0;border-top:1px dashed #c8ced6;padding-top:4px;">🏁 ' + ccT('moldFin') + '：' + ccT('moldAbout') + ' ' + mkB + ' ' + ccT('moldDaysUnit') + '</div>';
