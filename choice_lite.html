@@ -67798,11 +67798,21 @@ function submitAuth() {
     var m = /(\d+)/.exec(String((r && r.version) == null ? '' : r.version));
     return m ? Math.max(1, parseInt(m[1], 10)) : 1;
   }
+  /* ★CCQ-HIST-KEY-20261115（用户 2026-11-15：「切换语言后变成空值」）：
+     项目键必须【与当前语言无关】。原先用 ccqTriDisp/ccqTriShow（取当前语言文本）拼键 ——
+     中文下打开历史弹窗存下中文键，切到英文后记录按英文文本重算 → 一个都匹配不上 → 弹窗变空。
+     现在改用三语 JSON 拼键（ccqTriNorm 语言无关），保存/去重/回填/历史全用同一把键。 */
+  function ccTriKeyOf(v){
+    try{
+      var o = ccqTriNorm(v);
+      return JSON.stringify([String(o.zh || ''), String(o.en || ''), String(o.vi || '')]);
+    }catch(e){ return ''; }
+  }
   function ccRecKey(r){
-    return String(ccqTriDisp(r && r.customer) || '').trim() + '||' + String(ccqTriDisp(r && r.content) || '').trim();
+    return ccTriKeyOf(r && r.customer) + '\u0002' + ccTriKeyOf(r && r.content);
   }
   function ccQuoteProjKey(){
-    return String(ccqTriShow('customer') || '').trim() + '||' + String(ccqTriShow('content') || '').trim();
+    return ccTriKeyOf(ccqTriObj('customer')) + '\u0002' + ccTriKeyOf(ccqTriObj('content'));
   }
   function ccQuoteDeep(o){ try { return JSON.parse(JSON.stringify(o)); } catch(e){ return null; } }
   function ccQuoteFootSnap(){
@@ -67960,7 +67970,7 @@ function submitAuth() {
     if(!Array.isArray(CC_DATA.quoteLog)) CC_DATA.quoteLog = [];
     /* 同一个（项目 + 版本）只保留最新一份 */
     for(var i = CC_DATA.quoteLog.length - 1; i >= 0; i--){
-      if(ccRecKey(CC_DATA.quoteLog[i]) === rec.projKey && ccRecVer(CC_DATA.quoteLog[i]) === ver){
+      if(ccRecKey(CC_DATA.quoteLog[i]) === ccRecKey(rec) && ccRecVer(CC_DATA.quoteLog[i]) === ver){
         CC_DATA.quoteLog.splice(i, 1);
       }
     }
