@@ -66759,6 +66759,31 @@ function submitAuth() {
   function ccGridGroupKey(sp){
     return [String(sp.house || ''), String(sp.code || ''), ccRowUnits(sp), ccRowBldgs(sp)].join('|');
   }
+  /* ★CC-GIDHEAL-20261115（用户 2026-11-15「仍然没有解决」的根因）：
+     上一版转录把 gid 取自规格表的 data-slats-group（那边按房舍单元尺寸成组），
+     结果每行都被写成 gid = 行号（1,2,3…N）。而 ccGridGid 里 gid 优先级高于合并键，
+     所以即使合并键已经正确，同一猪舍的行也永远合不上（序号 1..15 各占一行）。
+     判据（指纹很明确）：每一行的 gid 恰好等于「行号 + 1」→ 判定为那次写坏的数据，全部清空 gid，
+     让它们按 猪舍+房舍编号+单元+栋数 自动合并。
+     用户手动点「复制」产生的 gid 不会严格等于行号（复制行 gid 取 max+1），不会误伤。 */
+  function ccHealSpecGids(){
+    var sp = (CC_DATA && CC_DATA.demand && CC_DATA.demand.specs) || [];
+    if(sp.length < 2) return false;
+    var first = sp[0] && sp[0].gid;
+    if(first === null || first === undefined || String(first) === '') return false;  /* 本来没 gid，无需治 */
+    if(!isFinite(Number(first))) return false;
+    /* 指纹 = gid 逐行【严格递增且互不相同】（= 每行一个组号）。
+       正常数据一个组有多行 → gid 必有重复 → 不会命中；
+       用户点「复制」新增的行 gid 取 max+1 且插在原行后面，后面的行仍是旧 gid → 也不递增 → 不会误伤。 */
+    for(var i = 1; i < sp.length; i++){
+      var a = sp[i - 1] && sp[i - 1].gid, b = sp[i] && sp[i].gid;
+      if(b === null || b === undefined || String(b) === '') return false;
+      if(!(Number(b) > Number(a))) return false;
+    }
+    for(var j = 0; j < sp.length; j++) sp[j].gid = '';
+    try{ if(typeof console !== 'undefined') console.log('[cc-gid-heal] 已清掉 ' + sp.length + ' 行逐行 gid（上一版转录遗留）'); }catch(e0){}
+    return true;
+  }
   /* ★CC-OPCELL-20261113：引入分组号 gid（与规格表 data-slats-group 同一套语义）
      · 有 gid → 按 gid 成组（复制出来的行即使数值相同也独立成组）
      · 无 gid（历史数据）→ 退回「按字段值连续相同」成组，视觉完全不变 */
@@ -67321,6 +67346,8 @@ function submitAuth() {
   /* ---- 需求信息表（新） ---- */
   function ccGridHtml(){
     var T = ccT;
+    /* ★CC-GIDHEAL-20261115：渲染前先治掉上一版转录遗留的「逐行 gid」 */
+    try{ ccHealSpecGids(); }catch(e0){}
     var specs = (CC_DATA && CC_DATA.demand && CC_DATA.demand.specs) || [];
     var dual = ccSpecDualMode();
     var cols = ccGridCols(dual);
@@ -68092,39 +68119,51 @@ function submitAuth() {
               + '<th>' + T('loLayer') + T('barsW') + '</th><th>' + T('loLayer') + T('ccqDiaW') + '</th>' : '')
       + '</tr>';
     var tb = '';
-    (d.specs || []).forEach(function(sp, i){
-      var mmL = ccRowMmLen(sp), mmW = ccRowMmWid(sp);
-      tb += '<tr>'
-        + '<td>' + (i + 1) + '</td>'
-        /* ★CCQ-HOUSENAME-20261115（用户 2026-11-15：「猪舍这一列为什么变成数字，应该是猪舍名称」）：
-           规格表里猪舍存的是 1..15 的代码，报价单必须显示对应语言下的猪舍名称。 */
-        + '<td>' + ccEsc2(ccQuoteHouseName(sp.house)) + '</td>'
-        + '<td>' + ccEsc2(sp.code || '') + '</td>'
-        + '<td>' + ccNum(ccRowUnits(sp)) + '</td>'
-        + '<td>' + ccNum(ccRowBldgs(sp)) + '</td>'
-        + '<td class="ccq-n">' + ccNum(sp.len) + '</td>'
-        + '<td class="ccq-n">' + ccNum(sp.wid) + '</td>'
-        + '<td class="ccq-n">' + ccNum(sp.hei) + '</td>'
-        + '<td class="ccq-n">' + ccNum(sp.qty) + '</td>'
-        + '<td class="ccq-n">' + ccNum(ccRowQtyWhole(sp)) + '</td>'
-        + '<td class="ccq-n">' + ccNum2(ccRowSqmUnit(sp)) + '</td>'
-        + '<td class="ccq-n">' + ccNum2(ccRowSqmWhole(sp)) + '</td>'
-        + '<td>' + (Number(sp.layers) || '') + '</td>'
-        + '<td class="ccq-n">' + ccNum(sp.nl) + '</td>'
-        + '<td class="ccq-n">' + (mmL ? ccNum(mmL) + ' <i>ø' + ccEsc2(sp.rL || '') + '</i>' : '') + '</td>'
-        + '<td class="ccq-n">' + ccNum(sp.nw) + '</td>'
-        + '<td class="ccq-n">' + (mmW ? ccNum(mmW) + ' <i>ø' + ccEsc2(sp.rW || '') + '</i>' : '') + '</td>';
-      if(dual){
-        tb += '<td class="ccq-n">' + ccNum(sp.nl2) + '</td>'
-            + '<td class="ccq-n">' + (Number(sp.layers) === 2 && mmL ? ccNum(mmL) + ' <i>ø' + ccEsc2(sp.rL2 || '') + '</i>' : '') + '</td>'
-            + '<td class="ccq-n">' + ccNum(sp.nw2) + '</td>'
-            + '<td class="ccq-n">' + (Number(sp.layers) === 2 && mmW ? ccNum(mmW) + ' <i>ø' + ccEsc2(sp.rW2 || '') + '</i>' : '') + '</td>';
-      }
-      tb += '<td>' + (ccRowIsSolid(sp) ? 'YES' : 'NO') + '</td>'
-          + '<td>' + (ccRowIsHole(sp) ? 'YES' : 'NO') + '</td>'
-          + '<td class="ccq-money" id="ccq_p_' + i + '">' + ccGridMoney(ccSpecBlockPrice(sp)) + '</td>'
-          + '<td class="ccq-money" id="ccq_s_' + i + '">' + ccGridMoney(ccRowQtyWhole(sp) * ccSpecBlockPrice(sp)) + '</td>'
-          + '<td>' + ccEsc2(sp.remark || '') + '</td></tr>';
+    /* ★CC-QUOTE-GROUP-20261115（用户 2026-11-15「相同猪舍的行需要合并」）：
+       报价单纸面同样按「猪舍 + 房舍编号 + 单元 + 栋数」合并 序号/猪舍/房舍编号/单元/栋数 五列
+       （与成本核算表 ccGridGroupKey 完全同一口径），不再每行重复一遍序号与猪舍。
+       ccq_p_/ccq_s_ 的 id 仍用【绝对行号 i】，金额同步逻辑不受影响。 */
+    var qNo = 0;
+    ccGridGroups(d.specs || []).forEach(function(g){
+      qNo++;
+      var rs = ' rowspan="' + g.rows.length + '"';
+      g.rows.forEach(function(i, gi){
+        var sp = (d.specs || [])[i] || {};
+        var mmL = ccRowMmLen(sp), mmW = ccRowMmWid(sp);
+        tb += '<tr>';
+        if(gi === 0){
+          tb += '<td' + rs + '>' + qNo + '</td>'
+            /* ★CCQ-HOUSENAME-20261115（用户 2026-11-15：「猪舍这一列为什么变成数字，应该是猪舍名称」）：
+               规格表里猪舍存的是 1..15 的代码，报价单必须显示对应语言下的猪舍名称。 */
+            + '<td' + rs + '>' + ccEsc2(ccQuoteHouseName(sp.house)) + '</td>'
+            + '<td' + rs + '>' + ccEsc2(sp.code || '') + '</td>'
+            + '<td' + rs + '>' + ccNum(ccRowUnits(sp)) + '</td>'
+            + '<td' + rs + '>' + ccNum(ccRowBldgs(sp)) + '</td>';
+        }
+        tb += '<td class="ccq-n">' + ccNum(sp.len) + '</td>'
+          + '<td class="ccq-n">' + ccNum(sp.wid) + '</td>'
+          + '<td class="ccq-n">' + ccNum(sp.hei) + '</td>'
+          + '<td class="ccq-n">' + ccNum(sp.qty) + '</td>'
+          + '<td class="ccq-n">' + ccNum(ccRowQtyWhole(sp)) + '</td>'
+          + '<td class="ccq-n">' + ccNum2(ccRowSqmUnit(sp)) + '</td>'
+          + '<td class="ccq-n">' + ccNum2(ccRowSqmWhole(sp)) + '</td>'
+          + '<td>' + (Number(sp.layers) || '') + '</td>'
+          + '<td class="ccq-n">' + ccNum(sp.nl) + '</td>'
+          + '<td class="ccq-n">' + (mmL ? ccNum(mmL) + ' <i>ø' + ccEsc2(sp.rL || '') + '</i>' : '') + '</td>'
+          + '<td class="ccq-n">' + ccNum(sp.nw) + '</td>'
+          + '<td class="ccq-n">' + (mmW ? ccNum(mmW) + ' <i>ø' + ccEsc2(sp.rW || '') + '</i>' : '') + '</td>';
+        if(dual){
+          tb += '<td class="ccq-n">' + ccNum(sp.nl2) + '</td>'
+              + '<td class="ccq-n">' + (Number(sp.layers) === 2 && mmL ? ccNum(mmL) + ' <i>ø' + ccEsc2(sp.rL2 || '') + '</i>' : '') + '</td>'
+              + '<td class="ccq-n">' + ccNum(sp.nw2) + '</td>'
+              + '<td class="ccq-n">' + (Number(sp.layers) === 2 && mmW ? ccNum(mmW) + ' <i>ø' + ccEsc2(sp.rW2 || '') + '</i>' : '') + '</td>';
+        }
+        tb += '<td>' + (ccRowIsSolid(sp) ? 'YES' : 'NO') + '</td>'
+            + '<td>' + (ccRowIsHole(sp) ? 'YES' : 'NO') + '</td>'
+            + '<td class="ccq-money" id="ccq_p_' + i + '">' + ccGridMoney(ccSpecBlockPrice(sp)) + '</td>'
+            + '<td class="ccq-money" id="ccq_s_' + i + '">' + ccGridMoney(ccRowQtyWhole(sp) * ccSpecBlockPrice(sp)) + '</td>'
+            + '<td>' + ccEsc2(sp.remark || '') + '</td></tr>';
+      });
     });
     if(!tb) tb = '<tr><td colspan="' + nCols + '" style="padding:14px;color:#999;">—</td></tr>';
     /* 表尾（与主表口径一致：小计(不含税) → 运输费/安装费(显示时) → 增值税(税率同步) → 含税总价 → 优惠后总价） */
