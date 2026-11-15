@@ -7656,14 +7656,17 @@ def api_approval_create():
     if persist not in ("persistent", "single-use"):
         persist = "persistent"
     target_id = (data.get("target_id") or "").strip()
+    # ★RC-2STAGE-20261115：收货单两级审批都必须按 target_id（收货单号）去重。
+    #   二级审批用 PROD-RECEIPT-F，若仍按“区块”去重，同一采购经理连续通过第 2、3 张
+    #   收货单时会被判成“该操作已存在待审批请求”→ 只有第 1 张能生成最终审批，
+    #   另两张收货单卡在 pending_final 永远无人可审（线上 BUG）。
+    _by_target = (persist == "single-use" or block_id in ("PROD-RECEIPT", "PROD-RECEIPT-F"))
     dup_sql = (
         "SELECT 1 FROM approval_requests WHERE requester=? AND block_id=? AND status='pending' AND persist=?"
-        + (" AND target_id=?"
-           if (persist == "single-use" or block_id == "PROD-RECEIPT")
-           else "")
+        + (" AND target_id=?" if _by_target else "")
     )
     dup_params = (requester, block_id, persist)
-    if persist == "single-use" or block_id == "PROD-RECEIPT":
+    if _by_target:
         dup_params += (target_id,)
     dup = conn.execute(dup_sql, dup_params).fetchone()
     if dup:
@@ -8349,6 +8352,23 @@ def api_approval_resolve(rid):
     if row["status"] != "pending":
         conn.close(); return jsonify({"ok": False, "msg": "已处理"}), 409
     approvers = _norm_approver_list(json.loads(row["approvers"]) if row["approvers"] else [], conn)
+    # ★RC-BUYER-ONLY-20261115：收货单第 1 级（采购经理核实，payload.stage=buyer）只能由采购经理操作；
+    # tom/cuong/james 同步可见但禁止审批（前端已隐藏按钮，这里做服务端硬拦截，防止绕过界面调接口）。
+    if (row["block_id"] or "") == "PROD-RECEIPT":
+        try:
+            _pl_first = json.loads(row["payload"] or "{}")
+        except Exception:
+            _pl_first = {}
+        if (_pl_first.get("stage") or "buyer") == "buyer":
+            # ★自读一份审批人，不依赖后面才赋值的 approvers（位置前置也不会 UnboundLocalError）
+            _ap0 = _norm_approver_list(json.loads(row["approvers"]) if row["approvers"] else [], conn)
+            _trio = {"tom", "cuong", "james"}
+            _buyers = [str(a) for a in _ap0 if str(a).lower() not in _trio]
+            if not _buyers:
+                _buyers = [str(a) for a in _ap0 if str(a).lower() == "thienly"]
+            if _buyers and str(resolver).lower() not in {b.lower() for b in _buyers}:
+                conn.close()
+                return jsonify({"ok": False, "msg": "该单需由采购经理核实，其他审批人只能查看"}), 403
     # 校验 resolver 是否是指定审批人，或审批人已离职且 resolver 是其代理人
     allowed = (resolver in approvers) or _is_full_access(resolver)
     if not allowed:

@@ -4671,6 +4671,12 @@ window.__finShakeReport = function (ms) {
       <div class="appr-toolbar">
         <span class="appr-count" id="apprCount"></span>
         <span class="appr-hint" id="apprHint"></span>
+        <!-- ★APPR-BATCH-DEL-20261115：tom/管理员右键进入批量选择后出现 -->
+        <div class="appr-selbar" id="apprSelBar">
+          <span class="appr-sel-count" id="apprSelCount"></span>
+          <button type="button" class="appr-sel-del" id="apprSelDelBtn" onclick="apprBatchDelete()"></button>
+          <button type="button" class="appr-sel-cancel" id="apprSelCancelBtn" onclick="apprExitSelMode()"></button>
+        </div>
       </div>
 
       <div class="appr-table-wrap" id="apprTableWrap">
@@ -7090,7 +7096,7 @@ var WL_FLOW_IMG = {
         sec_inbound:'入库（采购直录）', sec_inbound_hist:'入库记录', thr_qty2:'数量', lbl_note:'备注', lbl_edit_note:'编辑备注', btn_inbound:'入库', sec_outbound:'出库', btn_outbound:'出库', thr_type:'类型', type_in:'入库', type_out:'出库',
         sec_mat_req:'材料需求（按规格自动计算，指导采购）', kpi_cement:'水泥', kpi_sand:'黄砂', kpi_gravel:'石子', thr_material:'材料', thr_demand:'需求(吨)', thr_gap:'缺口', not_created:'未建物资',
         note_d:'注：需求按规格体积折算标准板(1500×600×70)后，套用水泥24.4/黄砂22.6/石子68 kg·每标准板计算，与系统“智能报告”完全一致。',
-        sec_receipt:'收货确认', sec_receipt_list:'已提交收货单', lang_zh:'中文', lang_en:'English', lang_vi:'Tiếng Việt', lbl_newly_added_specs:'本次新增规格', btn_show_all_added_specs:'显示全部新增规格', btn_show_current_mat_specs:'只显示当前材料新增规格', th_added_mat:'材料', th_added_spec_zh:'增加的规格-中文', th_added_spec_en:'增加的规格-英文', th_added_spec_vi:'增加的规格-越南文', toast_no_auth_del:'无权限删除', lbl_arr_date:'到货日期', lbl_material:'材料', lbl_floor_spec:'当前生产的地板规格', lbl_supplier:'供应商', lbl_plate:'车牌', lbl_location:'库位', lbl_for_house:'用于猪舍', lbl_unit_price:'每吨单价', lbl_total_vnd:'总价(VND)', lbl_price_rmb:'折合RMB', lbl_price_usd:'折合USD', lbl_photos:'收货照片', btn_upload_photos:'上传照片', btn_choose_photos:'选择照片', lbl_no_photos_selected:'暂无已选照片', lbl_no_photos_chosen:'未选择照片', err_photo_type:'只能上传图片文件，不支持文档或其它格式', btn_view:'查看', btn_add_photo:'增加', btn_remove_photo:'移除', btn_submit_receipt:'提交收货单', btn_confirm_receipt:'采购确认', status_pending:'待采购确认', status_confirmed:'已确认入库', receipt_empty:'暂无收货单', btn_show_more_receipts:'显示剩余 {n} 条', btn_hide_more_receipts:'收起', tri_lang_no_existing:'暂无已有规格', tri_lang_no_added:'暂无新增规格', lbl_existing_specs:'已有规格（系统默认·锁定）', op_created_by:'录入人', lbl_for_house2:'采购物资用于生产下面猪舍的水泥地板', sec_receipt_lines:'收货明细', sec_receipt_list:'已提交收货单', btn_add_line:'+ 添加一行', lbl_spec:'规格', lbl_unit:'单位', lbl_price_vnd:'单价(VND)', lbl_price_rmb:'单价(RMB)', lbl_price_usd:'单价(USD)', lbl_sub_vnd:'小计(VND)', lbl_sub_rmb:'小计(RMB)', lbl_sub_usd:'小计(USD)', lbl_note:'备注', lbl_op:'操作', lbl_edit_spec:'编辑规格', lbl_existing_specs:'已有规格（已锁定）', hint_spec_lines:'每行一个规格，空行忽略', toast_spec_saved:'规格已保存', toast_spec_cleared:'已清空规格', editable:'可编辑', auto_translate:'自动翻译', tri_lang_clear:'清空三语', receipt_no_line:'暂未添加明细行', lbl_total:'合计', toast_line_req:'请填全每行 材料/规格/数量/单价', toast_floor_req:'请选择当前生产的地板规格', submit_warn:'请检查提交明细是否正确，确认后提交采购确认，确认完毕后本次入库流程结束！', appr_title_PROD_RECEIPT:'收货单审批', appr_content_PROD_RECEIPT:'厂长提交的原料收货单，请核对明细后通过（可修改数量/单价/规格），通过后自动入库。', toast_sent_approve:'已提交采购经理审批', toast_appr_exists:'已有待处理的审批，请勿重复提交', status_returned:'已驳回', status_need_edit:'待重新填写', btn_reedit_receipt:'重新填写', toast_receipt_need_edit:'收货单已返回，请修改后重新提交', btn_del_receipt:'删除', del_receipt_confirm:'确定删除该条收货单信息及附带的照片吗？', toast_receipt_deleted:'收货单已删除', btn_edit:'编辑', btn_confirm:'确认', btn_cancel:'取消', sync_all_confirm:'将把本浏览器内所有现场工厂数据与材料规格上传到服务器，供全体用户共享。确定吗？', sync_all_done:'已上传 {n} 个现场工厂到服务器',
+        sec_receipt:'收货确认', sec_receipt_list:'已提交收货单', lang_zh:'中文', lang_en:'English', lang_vi:'Tiếng Việt', lbl_newly_added_specs:'本次新增规格', lbl_newly_added_mats:'本次新增材料', btn_add_mat_receipt:'新增材料', lbl_existing_mats:'已有材料（系统默认·锁定）', th_added_mat_zh:'增加的材料-中文', th_added_mat_en:'增加的材料-英文', th_added_mat_vi:'增加的材料-越南文', toast_mat_saved:'材料已保存', status_pending_final:'待最终审批', appr_title_PROD_RECEIPT_F:'收货单最终审批', appr_content_PROD_RECEIPT_F:'采购经理已核实并确认通过，请最终审批（通过后本次采购入库结束）。', lbl_aprr_stage:'审批级别', lbl_aprr_stage_buyer:'第1级：采购经理核实（可改单价/备注）', lbl_aprr_stage_final:'第2级：最终审批（只读）', toast_passed_to_final:'采购经理已经通过，下一步提交管理层最后审批！', toast_final_done:'该批次收货最终完成！', rc_buyer_only_hint:'本单由采购经理核实，其他审批人只能查看，不能操作。', rc_buyer_only_short:'仅采购经理可操作', btn_show_all_added_specs:'显示全部新增规格', btn_show_current_mat_specs:'只显示当前材料新增规格', th_added_mat:'材料', th_added_spec_zh:'增加的规格-中文', th_added_spec_en:'增加的规格-英文', th_added_spec_vi:'增加的规格-越南文', toast_no_auth_del:'无权限删除', lbl_arr_date:'到货日期', lbl_material:'材料', lbl_floor_spec:'当前生产的地板规格', lbl_supplier:'供应商', lbl_plate:'车牌', lbl_location:'库位', lbl_for_house:'用于猪舍', lbl_unit_price:'每吨单价', lbl_total_vnd:'总价(VND)', lbl_price_rmb:'折合RMB', lbl_price_usd:'折合USD', lbl_photos:'收货照片', btn_upload_photos:'上传照片', btn_choose_photos:'选择照片', lbl_no_photos_selected:'暂无已选照片', lbl_no_photos_chosen:'未选择照片', err_photo_type:'只能上传图片文件，不支持文档或其它格式', btn_view:'查看', btn_add_photo:'增加', btn_remove_photo:'移除', btn_submit_receipt:'提交收货单', btn_confirm_receipt:'采购确认', status_pending:'待采购确认', status_confirmed:'已确认入库', receipt_empty:'暂无收货单', btn_show_more_receipts:'显示剩余 {n} 条', btn_hide_more_receipts:'收起', tri_lang_no_existing:'暂无已有规格', tri_lang_no_added:'暂无新增规格', lbl_existing_specs:'已有规格（系统默认·锁定）', op_created_by:'录入人', lbl_for_house2:'采购物资用于生产下面猪舍的水泥地板', sec_receipt_lines:'收货明细', sec_receipt_list:'已提交收货单', btn_add_line:'+ 添加一行', lbl_spec:'规格', lbl_unit:'单位', lbl_price_vnd:'单价(VND)', lbl_price_rmb:'单价(RMB)', lbl_price_usd:'单价(USD)', lbl_sub_vnd:'小计(VND)', lbl_sub_rmb:'小计(RMB)', lbl_sub_usd:'小计(USD)', lbl_note:'备注', lbl_op:'操作', lbl_edit_spec:'编辑规格', lbl_existing_specs:'已有规格（已锁定）', hint_spec_lines:'每行一个规格，空行忽略', toast_spec_saved:'规格已保存', toast_spec_cleared:'已清空规格', editable:'可编辑', auto_translate:'自动翻译', tri_lang_clear:'清空三语', receipt_no_line:'暂未添加明细行', lbl_total:'合计', toast_line_req:'请填全每行 材料/规格/数量/单价', toast_floor_req:'请选择当前生产的地板规格', submit_warn:'请仔细检查收货明细是否正确，确认后提交至采购经理做进一步确认！（注：单价由采购经理最终确认）', appr_title_PROD_RECEIPT:'收货单审批', appr_content_PROD_RECEIPT:'厂长提交的原料收货单，请核对明细后通过（可修改数量/单价/规格）；核实通过后转最终审批，最终审批通过才入库。', toast_sent_approve:'已提交采购经理审批', toast_appr_exists:'已有待处理的审批，请勿重复提交', status_returned:'已驳回', status_need_edit:'待重新填写', btn_reedit_receipt:'重新填写', toast_receipt_need_edit:'收货单已返回，请修改后重新提交', btn_del_receipt:'删除', del_receipt_confirm:'确定删除该条收货单信息及附带的照片吗？', toast_receipt_deleted:'收货单已删除', btn_edit:'编辑', btn_confirm:'确认', btn_cancel:'取消', sync_all_confirm:'将把本浏览器内所有现场工厂数据与材料规格上传到服务器，供全体用户共享。确定吗？', sync_all_done:'已上传 {n} 个现场工厂到服务器',
         sec_daily:'每日生产 / 盘点', kpi_total_demand:'总需求数量', kpi_total_produced:'累计生产数量', kpi_completion_rate:'生产完成率', lbl_daily_common:'公共信息', lbl_specs_qty:'规格产量（片）', pe_spec_legend:'进度条 = 已生产 / 当前已选猪舍需求；数字 = 已产 / 需求；悬停卡片可查看该规格的项目总需求', pe_line_summary:'已选 {0} 个猪舍 · {1} 种规格 · 需求 {2} 片 · 已产 {4} 片 · 待产 {5} 片', pe_spec_row_summary:'<span class="pe-stat-demand">需求：{0} 片</span> · <span class="pe-stat-prod">已产：{2} 片</span> · {3}', pe_spec_subtotal_stat:'<span class="pe-stat-demand">总需求：{0} 片</span> · <span class="pe-stat-prod">总生产：{2} 片</span> · {3}', receipt_spec_summary:'已选 {0} 个猪舍 · {1} 种规格 · 需求 {2} 片 · 已产 {4} 片 · 待产 {5} 片', lbl_spec_proj_total:'该规格的项目总需求', chip_real:'该栋真实生产', chip_spec_all:'该尺寸全部', btn_add_spec:'+ 产出规格', btn_add_mat:'+ 耗料', btn_save_prod:'保存当日生产', btn_auto_hist:'自动补录历史产出', auto_hist_confirm:'将清空 31-08 至今的每日产出并重新随机灌入，确定吗？', toast_auto_hist:'已自动补录历史产出', sec_history:'历史产出', prod_lbl_photos:'生产照片', prod_lbl_upload_photos:'上传生产照片', prod_lbl_photos_view:'查看生产照片', prod_stats_title:'生产统计 & 曲线图', lbl_demand:'总需求量', lbl_produced:'当前生产总量', lbl_gap:'缺口量', lbl_remaining:'待产', lbl_overprod:'超产', th_house_names:'用于猪舍的名称', th_share_rank:'占比/排名', chart_bar:'规格需求 vs 已生产（柱状对比）', chart_prod_per_spec:'各规格每日产量（片）', chart_weather:'天气（温度/湿度）与总产量（片）', lbl_total_prod:'总产量', stat_demand_pct:'总需求是{0}片，占比{1}%', stat_est_finish:'按照该平均生产效率预计{0}天完成生产，预计生产完成日期是{1}', stat_tet_note:'（备注：包含春节放假休息{0}天）', stat_no_tet:'（备注：生产期间没有春节假期）', stat_due:'约定的项目交期是：{0}', stat_install_gap:'中间间隔{0}天完成全部的安装和验收工作', stat_due_late:'，晚于项目交期，需要和客户沟通，重新调证交付日期！', thr_good:'良品', thr_bad:'不良', thr_mat_used:'耗料', lbl_spec:'规格', lbl_good2:'良品', lbl_bad2:'不良', btn_x:'×', lbl_mat_name:'耗料名称', thr_operation:'操作', op_out:'出库', op_in:'入库', op_qty:'数量', op_date:'日期', confirm_dup_out_title:'重复出库记录', confirm_dup_out_msg:'你出库的猪舍名和尺寸已经有记录了，请重新编辑现有记录的出库数量！', confirm_dup_out_ok:'编辑现有记录', op_party_out:'去向（猪舍/客户）', op_party_in:'来源（猪舍/供应商）', op_note:'备注', op_target:'操作对象', op_save:'保存', op_cancel:'取消', toast_op_saved:'操作已保存', sec_outbound_records:'出库记录表', sec_outbound_analysis:'出库记录分析', sub_outbound_table_analysis:'表格分析', sub_outbound_curve_analysis:'曲线分析', thr_out_qty_spec:'出库量', thr_out_subtotal:'小计', wx_label:'天气', chart_outbound_daily:'每日出库数量曲线图', thr_out_date:'日期', thr_out_qty:'出库量', thr_out_from_house:'用于哪个猪场', thr_out_spec:'出库水泥板的规格', thr_out_area:'送往区域', thr_out_to_house:'出库后移动至猪舍',thr_out_installed_qty:'移至猪舍后<br>安装数量', btn_view_area_dist:'查看猪舍在区域里面的分布', btn_start_record_install:'开始记录安装', bldg_label:'{0}栋', op_lines_seq:'当日出库次数', op_line_qty:'单次出库量', op_from_house:'出库房舍', op_from_spec:'出库规格', op_to_house:'出库移动至猪舍及猪舍编号', op_add_line:'增加行', op_recorder:'填表人', lbl_no_records:'暂无出库记录', op_edit:'编辑', op_copy:'复制', op_delete:'删除', confirm_delete_record:'确定删除这条出库记录吗？', slats_table_bldg_count:'房舍数量',
         sec_finished:'成品库存（水泥漏缝地板，按规格）', kpi_prod_in:'累计生产入库', kpi_out2:'累计出库', kpi_balance:'结余', kpi_need_prod:'仍需生产数量', kpi_out_rate:'出库率', kpi_not_out:'尚未出库数量', thr_total_demand:'需求总数', thr_produced:'生产入库（生产总量）', thr_need_prod:'仍需生产数量', thr_prod_completion_ratio:'生产完成比率', thr_out3:'出库', thr_balance2:'结余', empty_finished:'暂无成品。请在「每日生产」录入产出后自动累计。', sec_stock_out:'生产库存及出库明细', thr_out_house:'出库/转移至猪舍待安装', thr_return_stock:'返回库存', thr_actual_stock:'实际库存', thr_actual_out:'实际出库数量', thr_prod_completion_rate:'生产完成率', thr_out_rate:'出库率', btn_hide_zero_prod:'隐藏生产数量为0的行', btn_restore_all_data:'恢复全部数据', sec_demand_vs_prod:'地板需求 v.s 实际产量明细表', th_demand_by_house:'按猪舍汇总', th_demand_by_spec:'按规格汇总', th_spec_list:'规格清单', thr_pct:'占比', thr_rank:'排名', sec_line_daily:'各条生产线每日生产详细', empty_line_daily:'暂无每日生产线产出记录', warn_overprod_title:'注意：以下规格的水泥板实际产量已超过需求量', warn_overprod_desc:'请及时调整生产计划，避免库存积压。', warn_overprod_tip:'实际产量超过需求：已生产 {produced} / 需求 {demand}',
         sec_equip:'设备台账与高价值工具等级表', sec_line_config:'水泥漏缝地板生产线配置说明', sec_equip_fault:'生产线设备配置清单&故障报备', lbl_shared_units:'公用几台（水泥筒仓/三仓）', opt_shared_1:'一套', opt_shared_2:'二套', lbl_grade:'等级', lbl_maint:'保养说明', btn_add_equip:'添加设备/工具', thr_grade2:'等级', thr_maint2:'保养', sec_fault:'设备故障记录', lbl_equip:'设备', lbl_down:'停机(h)', lbl_reason:'原因', lbl_repair:'维修', btn_add_fault:'记录故障', thr_down2:'停机(h)', thr_reason2:'原因', thr_repair2:'维修', eq_sec:'工段', eq_name_zh:'设备名称（中文）', eq_english:'English', eq_viet:'Tiếng Việt', eq_common:'公用的设备', eq_fac:'厂', eq_line:'线', eq_shared_line:'公用', eq_report_fault:'设备故障报备', eq_fault_title:'设备故障报备', eq_record_empty:'暂无故障报备记录', eq_del_fault:'删除', wx_label:'天气', th_report_equip:'报修设备', th_fault_reason:'故障描述', th_cause_analysis:'原因分析', th_solution:'解决方案', th_down_hours:'停机时间<br>（小时）', th_hazard_level:'危害等级', lbl_edit_cause:'编辑原因分析', lbl_edit_hazard:'编辑危害等级', btn_pick_fault:'选择故障', lbl_change:'更改', tip_change_fault:'点击更改故障', lbl_pick_fault_title:'选择故障描述', eq_no_preset:'该设备暂无预置故障', btn_confirm:'确认', warn_pick_fault:'请先选择一条故障描述',
@@ -7122,7 +7128,7 @@ var WL_FLOW_IMG = {
         sec_inbound:'Inbound (direct purchase log)', sec_inbound_hist:'Inbound records', thr_qty2:'Qty', lbl_note:'Remark', lbl_edit_note:'Edit Remark', btn_inbound:'Receive', sec_outbound:'Outbound', btn_outbound:'Issue', thr_type:'Type', type_in:'Inbound',         type_out:'Outbound',
         sec_mat_req:'Material demand (auto by spec, guides purchasing)', kpi_cement:'Cement', kpi_sand:'Sand', kpi_gravel:'Gravel', thr_material:'Material', thr_demand:'Demand (tons)', thr_gap:'Gap', not_created:'not created',
         note_d:'Note: demand = spec volume converted to standard slats (1500×600×70), using cement 24.4 / sand 22.6 / gravel 68 kg per standard slats; identical to system "Smart Report".',
-        sec_receipt:'Goods Receipt', sec_receipt_list:'Submitted Receipts', lang_zh:'Chinese', lang_en:'English', lang_vi:'Vietnamese', lbl_newly_added_specs:'Newly added specs', btn_show_all_added_specs:'Show all custom specs', btn_show_current_mat_specs:'Show current material specs only', th_added_mat:'Material', th_added_spec_zh:'Added spec - Chinese', th_added_spec_en:'Added spec - English', th_added_spec_vi:'Added spec - Vietnamese', toast_no_auth_del:'Unauthorized to delete', lbl_arr_date:'Receipt date', lbl_material:'Material', lbl_floor_spec:'Current floor specs', lbl_supplier:'Supplier', lbl_plate:'License plate', lbl_location:'Location', lbl_for_house:'For house(s)', lbl_unit_price:'Unit price (VND)', lbl_total_vnd:'Total (VND)', lbl_price_rmb:'≈ RMB', lbl_price_usd:'≈ USD', lbl_photos:'Photos', btn_upload_photos:'Upload', btn_choose_photos:'Choose Photos', lbl_no_photos_selected:'No photos selected', lbl_no_photos_chosen:'No photos chosen', err_photo_type:'Only image files are allowed; documents or other formats are not supported', btn_view:'View', btn_add_photo:'Add', btn_remove_photo:'Remove', btn_submit_receipt:'Submit receipt', btn_confirm_receipt:'Confirm', status_pending:'Pending confirmation', status_confirmed:'Confirmed / stocked', receipt_empty:'No receipts yet', btn_show_more_receipts:'Show {n} more', btn_hide_more_receipts:'Collapse', tri_lang_no_existing:'No existing specs', tri_lang_no_added:'No added specs', lbl_existing_specs:'Existing specs (system default · locked)', op_created_by:'Created by', lbl_for_house2:'Materials for pig-house cement floor', sec_receipt_lines:'Receipt lines', sec_receipt_list:'Submitted receipts', btn_add_line:'+ Add line', lbl_spec:'Spec', lbl_unit:'Unit', lbl_price_vnd:'Unit price (VND)', lbl_price_rmb:'Unit price (RMB)', lbl_price_usd:'Unit price (USD)', lbl_sub_vnd:'Subtotal (VND)', lbl_sub_rmb:'Subtotal (RMB)', lbl_sub_usd:'Subtotal (USD)', lbl_note:'Note', lbl_op:'Op', lbl_edit_spec:'Edit spec', lbl_existing_specs:'Existing specs (locked)', editable:'Editable', auto_translate:'Auto-translate', tri_lang_clear:'Clear all languages', hint_spec_lines:'One spec per line, blank ignored', toast_spec_saved:'Spec saved', toast_spec_cleared:'Specs cleared', receipt_no_line:'No lines added', lbl_total:'Total', toast_line_req:'Fill material/spec/qty/price for each line', toast_floor_req:'Select current floor specs', submit_warn:'Please check the details. After confirmation it will be sent for procurement approval; the inbound process ends once approved.', appr_title_PROD_RECEIPT:'Goods Receipt Approval', appr_content_PROD_RECEIPT:'Raw material receipt submitted by plant manager. Verify and approve (you may edit qty/price/spec); on approval it is auto-stocked.', toast_sent_approve:'Sent to procurement manager for approval', toast_appr_exists:'An approval for this is already pending, please do not resubmit', status_returned:'Returned', status_need_edit:'Pending re-fill', btn_reedit_receipt:'Re-fill', toast_receipt_need_edit:'Receipt returned; please edit and resubmit', btn_del_receipt:'Delete', del_receipt_confirm:'Delete this receipt and its attached photos?', toast_receipt_deleted:'Receipt deleted', btn_edit:'Edit', btn_confirm:'Confirm', btn_cancel:'Cancel', sync_all_confirm:'Upload all on-site factory data & material specs from this browser to the server for sharing with all users. Continue?', sync_all_done:'Uploaded {n} factories to server',
+        sec_receipt:'Goods Receipt', sec_receipt_list:'Submitted Receipts', lang_zh:'Chinese', lang_en:'English', lang_vi:'Vietnamese', lbl_newly_added_specs:'Newly added specs', lbl_newly_added_mats:'Newly added materials', btn_add_mat_receipt:'Add material', lbl_existing_mats:'Existing materials (system default · locked)', th_added_mat_zh:'Added material - Chinese', th_added_mat_en:'Added material - English', th_added_mat_vi:'Added material - Vietnamese', toast_mat_saved:'Material saved', status_pending_final:'Pending final approval', appr_title_PROD_RECEIPT_F:'Goods receipt final approval', appr_content_PROD_RECEIPT_F:'The purchasing manager has verified and approved. Please give the final approval (after approval this purchase receipt is closed).', lbl_aprr_stage:'Approval stage', lbl_aprr_stage_buyer:'Stage 1: purchasing manager verification (price/note editable)', lbl_aprr_stage_final:'Stage 2: final approval (read-only)', toast_passed_to_final:'The purchasing manager has approved — next step: final approval by management!', toast_final_done:'This receipt batch is now fully completed!', rc_buyer_only_hint:'This request is verified by the purchasing manager; other approvers can only view it.', rc_buyer_only_short:'Purchasing manager only', btn_show_all_added_specs:'Show all custom specs', btn_show_current_mat_specs:'Show current material specs only', th_added_mat:'Material', th_added_spec_zh:'Added spec - Chinese', th_added_spec_en:'Added spec - English', th_added_spec_vi:'Added spec - Vietnamese', toast_no_auth_del:'Unauthorized to delete', lbl_arr_date:'Receipt date', lbl_material:'Material', lbl_floor_spec:'Current floor specs', lbl_supplier:'Supplier', lbl_plate:'License plate', lbl_location:'Location', lbl_for_house:'For house(s)', lbl_unit_price:'Unit price (VND)', lbl_total_vnd:'Total (VND)', lbl_price_rmb:'≈ RMB', lbl_price_usd:'≈ USD', lbl_photos:'Photos', btn_upload_photos:'Upload', btn_choose_photos:'Choose Photos', lbl_no_photos_selected:'No photos selected', lbl_no_photos_chosen:'No photos chosen', err_photo_type:'Only image files are allowed; documents or other formats are not supported', btn_view:'View', btn_add_photo:'Add', btn_remove_photo:'Remove', btn_submit_receipt:'Submit receipt', btn_confirm_receipt:'Confirm', status_pending:'Pending confirmation', status_confirmed:'Confirmed / stocked', receipt_empty:'No receipts yet', btn_show_more_receipts:'Show {n} more', btn_hide_more_receipts:'Collapse', tri_lang_no_existing:'No existing specs', tri_lang_no_added:'No added specs', lbl_existing_specs:'Existing specs (system default · locked)', op_created_by:'Created by', lbl_for_house2:'Materials for pig-house cement floor', sec_receipt_lines:'Receipt lines', sec_receipt_list:'Submitted receipts', btn_add_line:'+ Add line', lbl_spec:'Spec', lbl_unit:'Unit', lbl_price_vnd:'Unit price (VND)', lbl_price_rmb:'Unit price (RMB)', lbl_price_usd:'Unit price (USD)', lbl_sub_vnd:'Subtotal (VND)', lbl_sub_rmb:'Subtotal (RMB)', lbl_sub_usd:'Subtotal (USD)', lbl_note:'Note', lbl_op:'Op', lbl_edit_spec:'Edit spec', lbl_existing_specs:'Existing specs (locked)', editable:'Editable', auto_translate:'Auto-translate', tri_lang_clear:'Clear all languages', hint_spec_lines:'One spec per line, blank ignored', toast_spec_saved:'Spec saved', toast_spec_cleared:'Specs cleared', receipt_no_line:'No lines added', lbl_total:'Total', toast_line_req:'Fill material/spec/qty/price for each line', toast_floor_req:'Select current floor specs', submit_warn:'Please carefully check that the receipt details are correct. After confirmation it will be sent to the purchasing manager for further confirmation! (Note: unit prices are finally confirmed by the purchasing manager.)', appr_title_PROD_RECEIPT:'Goods Receipt Approval', appr_content_PROD_RECEIPT:'Raw material receipt submitted by plant manager. Verify and approve (you may edit qty/price/spec); after verification it goes to final approval, and only the final approval stocks it.', toast_sent_approve:'Sent to procurement manager for approval', toast_appr_exists:'An approval for this is already pending, please do not resubmit', status_returned:'Returned', status_need_edit:'Pending re-fill', btn_reedit_receipt:'Re-fill', toast_receipt_need_edit:'Receipt returned; please edit and resubmit', btn_del_receipt:'Delete', del_receipt_confirm:'Delete this receipt and its attached photos?', toast_receipt_deleted:'Receipt deleted', btn_edit:'Edit', btn_confirm:'Confirm', btn_cancel:'Cancel', sync_all_confirm:'Upload all on-site factory data & material specs from this browser to the server for sharing with all users. Continue?', sync_all_done:'Uploaded {n} factories to server',
         sec_daily:'Daily Production / Inventory', kpi_total_demand:'Total demand', kpi_total_produced:'Cumulative produced', kpi_completion_rate:'Completion rate', lbl_daily_common:'Common', lbl_specs_qty:'Output qty (pcs)', pe_spec_legend:'Bar = produced / selected-house demand; number = produced / demand; hover a card to see that spec’s project total', pe_line_summary:'{0} house(s) · {1} spec(s) · demand {2} pcs · produced {4} pcs · remaining {5} pcs', pe_spec_row_summary:'<span class="pe-stat-demand">Demand: {0} pcs</span> · <span class="pe-stat-prod">Produced: {2} pcs</span> · {3}', pe_spec_subtotal_stat:'<span class="pe-stat-demand">Total demand: {0} pcs</span> · <span class="pe-stat-prod">Total produced: {2} pcs</span> · {3}', receipt_spec_summary:'{0} house(s) · {1} spec(s) · demand {2} pcs · produced {4} pcs · remaining {5} pcs', lbl_spec_proj_total:'This spec’s project total demand', chip_real:'Real (this house)', chip_spec_all:'This spec total', btn_add_spec:'+ Output spec', btn_add_mat:'+ Material used', btn_save_prod:'Save daily production', btn_auto_hist:'Auto-fill History Output', auto_hist_confirm:'This will clear daily output from 31-08 to today and re-randomize. Continue?', toast_auto_hist:'History output auto-filled', sec_history:'Historical output', prod_lbl_photos:'Production Photos', prod_lbl_upload_photos:'Upload Production Photos', prod_lbl_photos_view:'View Production Photos', prod_stats_title:'Production Stats & Charts', lbl_demand:'Total Demand', lbl_produced:'Produced', lbl_gap:'Gap', lbl_remaining:'remaining', lbl_overprod:'over', th_house_names:'House Name(s)', th_share_rank:'Share / Rank', chart_bar:'Spec Demand vs Produced (bar)', chart_prod_per_spec:'Daily Output per Spec (pcs)', chart_weather:'Weather (Temp/Humidity) & Total Output (pcs)', lbl_total_prod:'Total Output', stat_demand_pct:'Total demand: {0} pcs, share {1}%', stat_est_finish:'At this average efficiency, estimated {0} days to finish, completion date {1}', stat_tet_note:'(Note: includes {0} Spring Festival holidays)', stat_no_tet:'(Note: no Spring Festival holidays during production)', stat_due:'Agreed project due date: {0}', stat_install_gap:'{0} days between for installation & acceptance', stat_due_late:', later than due date; please discuss with client to adjust delivery date!', thr_good:'Good', thr_bad:'Defect', thr_mat_used:'Material used', lbl_spec:'Spec', lbl_good2:'Good', lbl_bad2:'Defect', btn_x:'×', lbl_mat_name:'Material name', thr_operation:'Operation', op_out:'Outbound', op_in:'Inbound', op_qty:'Quantity', op_date:'Date', confirm_dup_out_title:'Duplicate Outbound Record', confirm_dup_out_msg:'An outbound record for this house and slats size already exists. Please edit the existing record quantity instead!', confirm_dup_out_ok:'Edit Existing Record', op_party_out:'Destination (house/client)', op_party_in:'Source (house/supplier)', op_note:'Remark', op_target:'Target', op_save:'Save', op_cancel:'Cancel', toast_op_saved:'Operation saved', sec_outbound_records:'Outbound Records', sec_outbound_analysis:'Outbound Record Analysis', sub_outbound_table_analysis:'Table Analysis', sub_outbound_curve_analysis:'Curve Analysis', thr_out_qty_spec:'Outbound Qty', thr_out_subtotal:'Subtotal', wx_label:'Weather', chart_outbound_daily:'Daily Outbound Quantity Curve', thr_out_date:'Date', thr_out_qty:'Outbound Qty', thr_out_from_house:'For Which Farm', thr_out_spec:'Slat Spec', thr_out_area:'Delivery Area', thr_out_to_house:'Moved to House',thr_out_installed_qty:'Installed qty<br>after move to house', btn_view_area_dist:'View House Distribution by Area', btn_start_record_install:'Start Recording Installation', bldg_label:'Building {0}', op_lines_seq:'Daily outbound #', op_line_qty:'Single Qty', op_from_house:'From House', op_from_spec:'Slat Spec', op_to_house:'Moved to House & No.', op_add_line:'Add Row', op_recorder:'Recorder', lbl_no_records:'No outbound records', op_edit:'Edit', op_copy:'Copy', op_delete:'Delete', confirm_delete_record:'Delete this outbound record?', slats_table_bldg_count:'House Qty',
         sec_finished:'Finished Goods Stock (concrete slatted floor, by spec)', kpi_prod_in:'Cumulative produced inbound', kpi_out2:'Cumulative outbound', kpi_balance:'Balance', kpi_need_prod:'Still need to produce', kpi_out_rate:'Outbound rate', kpi_not_out:'Not yet outbound', thr_total_demand:'Total Demand', thr_produced:'Produced inbound (Total production)', thr_need_prod:'Still need to produce', thr_prod_completion_ratio:'Completion ratio', thr_out3:'Outbound', thr_balance2:'Balance', empty_finished:'No finished goods yet. They accumulate automatically after you enter output in "Daily Production".', sec_stock_out:'Production stock & outbound details', thr_out_house:'Issue/Transfer to house (pending install)', thr_return_stock:'Return to stock', thr_actual_stock:'Actual stock', thr_actual_out:'Actual issued qty', thr_prod_completion_rate:'Completion', thr_out_rate:'Outbound rate', btn_hide_zero_prod:'Hide rows with 0 production', btn_restore_all_data:'Restore all data', sec_demand_vs_prod:'Floor Demand vs Actual Production Detail', th_demand_by_house:'By Pig House', th_demand_by_spec:'By Spec', th_spec_list:'Spec List', thr_pct:'Share', thr_rank:'Rank', sec_line_daily:'Daily Production Detail by Production Line', empty_line_daily:'No daily line output recorded', warn_overprod_title:'Attention: The following floor plate specifications have exceeded demand', warn_overprod_desc:'Please adjust the production plan in time to avoid inventory backlog.', warn_overprod_tip:'Production exceeded demand: Produced {produced} / Demand {demand}',
         sec_equip:'Equipment ledger & high-value tool grade table', sec_line_config:'Concrete Slatted Floor Production Line Configuration Guide', sec_equip_fault:'Production Line Equipment Config List & Failure Report', lbl_shared_units:'Shared units (cement silo / aggregate bin)', opt_shared_1:'1 set', opt_shared_2:'2 sets', lbl_grade:'Grade', lbl_maint:'Maintenance note', btn_add_equip:'Add equipment/tool', thr_grade2:'Grade', thr_maint2:'Maintenance', sec_fault:'Equipment failure log', lbl_equip:'Equipment', lbl_down:'Downtime(h)', lbl_reason:'Reason', lbl_repair:'Repair', btn_add_fault:'Log failure', thr_down2:'Downtime(h)', thr_reason2:'Reason', thr_repair2:'Repair', eq_sec:'Section', eq_name_zh:'Equipment (Chinese)', eq_english:'English', eq_viet:'Tiếng Việt', eq_common:'Common equipment', eq_fac:'Factory ', eq_line:'Line ', eq_shared_line:'Common', eq_report_fault:'Equipment Failure Report', eq_fault_title:'Equipment Failure Report', eq_record_empty:'No failure report yet', eq_del_fault:'Delete', wx_label:'Weather', th_report_equip:'Equipment to repair', th_fault_reason:'Fault description', th_cause_analysis:'Root cause analysis', th_solution:'Solution', th_down_hours:'Downtime<br>(hours)', th_hazard_level:'Hazard level', lbl_edit_cause:'Edit root cause analysis', lbl_edit_hazard:'Edit hazard level', btn_pick_fault:'Select fault', lbl_change:'Change', tip_change_fault:'Click to change fault', lbl_pick_fault_title:'Select fault description', eq_no_preset:'No preset faults for this equipment', btn_confirm:'Confirm', warn_pick_fault:'Please select a fault description first',
@@ -7154,7 +7160,7 @@ var WL_FLOW_IMG = {
         sec_inbound:'Nhập kho (ghi mua trực tiếp)', sec_inbound_hist:'Lịch sử nhập kho', thr_qty2:'SL', lbl_note:'Ghi chú', lbl_edit_note:'Chỉnh sửa ghi chú', btn_inbound:'Nhập', sec_outbound:'Xuất kho', btn_outbound:'Xuất', thr_type:'Loại', type_in:'Nhập', type_out:'Xuất',
         sec_mat_req:'Nhu cầu vật liệu (tự động theo quy cách, hướng dẫn mua)', kpi_cement:'Xi măng', kpi_sand:'Cát', kpi_gravel:'Sỏi', thr_material:'Vật liệu', thr_demand:'Nhu cầu (tấn)', thr_gap:'Thiếu hụt', not_created:'chưa tạo',
         note_d:'Lưu ý: nhu cầu = thể tích quy cách quy đổi tấm chuẩn (1500×600×70), dùng xi măng 24.4 / cát 22.6 / sỏi 68 kg mỗi tấm chuẩn; hoàn toàn khớp "Báo cáo thông minh" hệ thống.',
-        sec_receipt:'Xác nhận nhập hàng', sec_receipt_list:'Phiếu nhập đã gửi', lang_zh:'Tiếng Trung', lang_en:'Tiếng Anh', lang_vi:'Tiếng Việt', lbl_newly_added_specs:'Quy cách mới thêm', btn_show_all_added_specs:'Hiển thị tất cả quy cách mới', btn_show_current_mat_specs:'Chỉ hiện quy cách của vật liệu này', th_added_mat:'Vật liệu', th_added_spec_zh:'Quy cách thêm - Tiếng Trung', th_added_spec_en:'Quy cách thêm - Tiếng Anh', th_added_spec_vi:'Quy cách thêm - Tiếng Việt', toast_no_auth_del:'Không có quyền xóa', lbl_arr_date:'Ngày nhận hàng', lbl_material:'Vật liệu', lbl_floor_spec:'Quy cách sàn đang SX', lbl_supplier:'Nhà cung cấp', lbl_plate:'Biển số xe', lbl_location:'Vị trí kho', lbl_for_house:'Dùng cho chuồng', lbl_unit_price:'Đơn giá (VND)', lbl_total_vnd:'Tổng (VND)', lbl_price_rmb:'≈ RMB', lbl_price_usd:'≈ USD', lbl_photos:'Ảnh', btn_upload_photos:'Tải ảnh', btn_choose_photos:'Chọn ảnh', lbl_no_photos_selected:'Chưa chọn ảnh', lbl_no_photos_chosen:'Chưa chọn ảnh', err_photo_type:'Chỉ cho phép tệp ảnh; không hỗ trợ tài liệu hay định dạng khác', btn_view:'Xem', btn_add_photo:'Thêm', btn_remove_photo:'Xóa', btn_submit_receipt:'Gửi phiếu', btn_confirm_receipt:'Xác nhận', status_pending:'Chờ xác nhận', status_confirmed:'Đã xác nhận/nhập', receipt_empty:'Chưa có phiếu', btn_show_more_receipts:'Hiển thị thêm {n}', btn_hide_more_receipts:'Thu gọn', tri_lang_no_existing:'Chưa có quy cách đã có', tri_lang_no_added:'Chưa có quy cách mới', op_created_by:'Người nhập', lbl_for_house2:'Vật tư dùng SX sàn xi măng cho chuồng', sec_receipt_lines:'Chi tiết nhận hàng', sec_receipt_list:'Phiếu đã gửi', btn_add_line:'+ Thêm dòng', lbl_spec:'Quy cách', lbl_unit:'Đơn vị', lbl_price_vnd:'Đơn giá (VND)', lbl_price_rmb:'Đơn giá (RMB)', lbl_price_usd:'Đơn giá (USD)', lbl_sub_vnd:'Thành tiền (VND)', lbl_sub_rmb:'Thành tiền (RMB)', lbl_sub_usd:'Thành tiền (USD)', lbl_note:'Ghi chú', lbl_op:'Thao tác', lbl_edit_spec:'Sửa quy cách', lbl_existing_specs:'Quy cách đã có (khóa)', editable:'Có thể sửa', auto_translate:'Tự động dịch', tri_lang_clear:'Xóa cả 3 ngôn ngữ', hint_spec_lines:'Mỗi dòng một quy cách, bỏ qua dòng trống', toast_spec_saved:'Đã lưu quy cách', toast_spec_cleared:'Đã xóa quy cách', receipt_no_line:'Chưa có dòng', lbl_total:'Tổng', toast_line_req:'Điền vật liệu/quy cách/số lượng/đơn giá mỗi dòng', toast_floor_req:'Chọn quy cách sàn đang SX', submit_warn:'Vui lòng kiểm tra chi tiết. Sau khi xác nhận sẽ gửi duyệt thu mua; quy trình nhập kho kết thúc khi được duyệt.', appr_title_PROD_RECEIPT:'Duyệt phiếu nhận hàng', appr_content_PROD_RECEIPT:'Phiếu nhận vật tư trưởng xưởng gửi. Kiểm tra và duyệt (có thể sửa SL/đơn giá/quy cách); khi duyệt tự động nhập kho.', toast_sent_approve:'Đã gửi trưởng thu mua duyệt', toast_appr_exists:'Đã có yêu cầu đang chờ duyệt, vui lòng không gửi lại', status_returned:'Bị trả lại', status_need_edit:'Chờ điền lại', btn_reedit_receipt:'Điền lại', toast_receipt_need_edit:'Phiếu đã được trả lại; vui lòng sửa và gửi lại', btn_del_receipt:'Xóa', del_receipt_confirm:'Xóa phiếu nhận hàng này cùng các ảnh đính kèm?', toast_receipt_deleted:'Đã xóa phiếu nhận hàng', btn_edit:'Sửa', btn_confirm:'Xác nhận', btn_ok:'Đồng ý', btn_cancel:'Hủy', sync_all_confirm:'Tải tất cả dữ liệu nhà máy & quy cách vật tư từ trình duyệt này lên máy chủ để chia sẻ cho mọi người. Tiếp tục?', sync_all_done:'Đã tải {n} nhà máy lên máy chủ',
+        sec_receipt:'Xác nhận nhập hàng', sec_receipt_list:'Phiếu nhập đã gửi', lang_zh:'Tiếng Trung', lang_en:'Tiếng Anh', lang_vi:'Tiếng Việt', lbl_newly_added_specs:'Quy cách mới thêm', lbl_newly_added_mats:'Vật tư mới thêm', btn_add_mat_receipt:'Thêm vật tư', lbl_existing_mats:'Vật tư có sẵn (mặc định · khóa)', th_added_mat_zh:'Vật tư thêm - Trung', th_added_mat_en:'Vật tư thêm - Anh', th_added_mat_vi:'Vật tư thêm - Việt', toast_mat_saved:'Đã lưu vật tư', status_pending_final:'Chờ phê duyệt cuối', appr_title_PROD_RECEIPT_F:'Phê duyệt cuối phiếu nhập', appr_content_PROD_RECEIPT_F:'Trưởng bộ phận mua hàng đã kiểm tra và đồng ý. Vui lòng phê duyệt cuối (sau khi duyệt, việc nhập kho mua hàng kết thúc).', lbl_aprr_stage:'Cấp phê duyệt', lbl_aprr_stage_buyer:'Cấp 1: Trưởng mua hàng kiểm tra (sửa được đơn giá/ghi chú)', lbl_aprr_stage_final:'Cấp 2: Phê duyệt cuối (chỉ đọc)', toast_passed_to_final:'Trưởng bộ phận mua hàng đã duyệt — bước tiếp theo: phê duyệt cuối của ban quản lý!', toast_final_done:'Lô nhập hàng này đã hoàn tất!', rc_buyer_only_hint:'Phiếu này do trưởng bộ phận mua hàng xác nhận; người duyệt khác chỉ được xem.', rc_buyer_only_short:'Chỉ trưởng mua hàng', btn_show_all_added_specs:'Hiển thị tất cả quy cách mới', btn_show_current_mat_specs:'Chỉ hiện quy cách của vật liệu này', th_added_mat:'Vật liệu', th_added_spec_zh:'Quy cách thêm - Tiếng Trung', th_added_spec_en:'Quy cách thêm - Tiếng Anh', th_added_spec_vi:'Quy cách thêm - Tiếng Việt', toast_no_auth_del:'Không có quyền xóa', lbl_arr_date:'Ngày nhận hàng', lbl_material:'Vật liệu', lbl_floor_spec:'Quy cách sàn đang SX', lbl_supplier:'Nhà cung cấp', lbl_plate:'Biển số xe', lbl_location:'Vị trí kho', lbl_for_house:'Dùng cho chuồng', lbl_unit_price:'Đơn giá (VND)', lbl_total_vnd:'Tổng (VND)', lbl_price_rmb:'≈ RMB', lbl_price_usd:'≈ USD', lbl_photos:'Ảnh', btn_upload_photos:'Tải ảnh', btn_choose_photos:'Chọn ảnh', lbl_no_photos_selected:'Chưa chọn ảnh', lbl_no_photos_chosen:'Chưa chọn ảnh', err_photo_type:'Chỉ cho phép tệp ảnh; không hỗ trợ tài liệu hay định dạng khác', btn_view:'Xem', btn_add_photo:'Thêm', btn_remove_photo:'Xóa', btn_submit_receipt:'Gửi phiếu', btn_confirm_receipt:'Xác nhận', status_pending:'Chờ xác nhận', status_confirmed:'Đã xác nhận/nhập', receipt_empty:'Chưa có phiếu', btn_show_more_receipts:'Hiển thị thêm {n}', btn_hide_more_receipts:'Thu gọn', tri_lang_no_existing:'Chưa có quy cách đã có', tri_lang_no_added:'Chưa có quy cách mới', op_created_by:'Người nhập', lbl_for_house2:'Vật tư dùng SX sàn xi măng cho chuồng', sec_receipt_lines:'Chi tiết nhận hàng', sec_receipt_list:'Phiếu đã gửi', btn_add_line:'+ Thêm dòng', lbl_spec:'Quy cách', lbl_unit:'Đơn vị', lbl_price_vnd:'Đơn giá (VND)', lbl_price_rmb:'Đơn giá (RMB)', lbl_price_usd:'Đơn giá (USD)', lbl_sub_vnd:'Thành tiền (VND)', lbl_sub_rmb:'Thành tiền (RMB)', lbl_sub_usd:'Thành tiền (USD)', lbl_note:'Ghi chú', lbl_op:'Thao tác', lbl_edit_spec:'Sửa quy cách', lbl_existing_specs:'Quy cách đã có (khóa)', editable:'Có thể sửa', auto_translate:'Tự động dịch', tri_lang_clear:'Xóa cả 3 ngôn ngữ', hint_spec_lines:'Mỗi dòng một quy cách, bỏ qua dòng trống', toast_spec_saved:'Đã lưu quy cách', toast_spec_cleared:'Đã xóa quy cách', receipt_no_line:'Chưa có dòng', lbl_total:'Tổng', toast_line_req:'Điền vật liệu/quy cách/số lượng/đơn giá mỗi dòng', toast_floor_req:'Chọn quy cách sàn đang SX', submit_warn:'Vui lòng kiểm tra kỹ chi tiết nhận hàng đã đúng chưa, sau khi xác nhận sẽ gửi trưởng bộ phận mua hàng xác nhận tiếp! (Lưu ý: đơn giá do trưởng mua hàng xác nhận cuối cùng.)', appr_title_PROD_RECEIPT:'Duyệt phiếu nhận hàng', appr_content_PROD_RECEIPT:'Phiếu nhận vật tư trưởng xưởng gửi. Kiểm tra và duyệt (có thể sửa SL/đơn giá/quy cách); sau khi xác nhận sẽ chuyển sang phê duyệt cuối, chỉ khi phê duyệt cuối mới nhập kho.', toast_sent_approve:'Đã gửi trưởng thu mua duyệt', toast_appr_exists:'Đã có yêu cầu đang chờ duyệt, vui lòng không gửi lại', status_returned:'Bị trả lại', status_need_edit:'Chờ điền lại', btn_reedit_receipt:'Điền lại', toast_receipt_need_edit:'Phiếu đã được trả lại; vui lòng sửa và gửi lại', btn_del_receipt:'Xóa', del_receipt_confirm:'Xóa phiếu nhận hàng này cùng các ảnh đính kèm?', toast_receipt_deleted:'Đã xóa phiếu nhận hàng', btn_edit:'Sửa', btn_confirm:'Xác nhận', btn_ok:'Đồng ý', btn_cancel:'Hủy', sync_all_confirm:'Tải tất cả dữ liệu nhà máy & quy cách vật tư từ trình duyệt này lên máy chủ để chia sẻ cho mọi người. Tiếp tục?', sync_all_done:'Đã tải {n} nhà máy lên máy chủ',
         sec_daily:'Sản xuất hàng ngày / Kiểm kê', kpi_total_demand:'Tổng nhu cầu', kpi_total_produced:'Tổng sản lượng', kpi_completion_rate:'Tỷ lệ hoàn thành', lbl_daily_common:'Chung', lbl_specs_qty:'Sản lượng (tấm)', pe_spec_legend:'Thanh tiến độ = đã SX / nhu cầu chuồng đã chọn; số = đã SX / nhu cầu; rê chuột để xem tổng dự án của quy cách này', pe_line_summary:'{0} chuồng · {1} quy cách · nhu cầu {2} tấm · đã SX {4} tấm · còn lại {5} tấm', pe_spec_row_summary:'<span class="pe-stat-demand">Nhu cầu: {0} tấm</span> · <span class="pe-stat-prod">Đã SX: {2} tấm</span> · {3}', pe_spec_subtotal_stat:'<span class="pe-stat-demand">Tổng nhu cầu: {0} tấm</span> · <span class="pe-stat-prod">Tổng đã SX: {2} tấm</span> · {3}', receipt_spec_summary:'{0} chuồng · {1} quy cách · nhu cầu {2} tấm · đã SX {4} tấm · còn lại {5} tấm', lbl_spec_proj_total:'Tổng dự án của quy cách này', chip_real:'Thực tế chuồng này', chip_spec_all:'Tổng quy cách này', btn_add_spec:'+ Quy cách đầu ra', btn_add_mat:'+ Vật liệu dùng', btn_save_prod:'Lưu SX ngày', btn_auto_hist:'Tự động điền lịch sử SX', auto_hist_confirm:'Thao tác sẽ xóa dữ liệu sản xuất từ 31-08 đến nay và điền ngẫu nhiên lại. Tiếp tục?', toast_auto_hist:'Đã tự động điền lịch sử SX', sec_history:'Sản lượng lịch sử', prod_lbl_photos:'Ảnh sản xuất', prod_lbl_upload_photos:'Tải ảnh sản xuất', prod_lbl_photos_view:'Xem ảnh sản xuất', prod_stats_title:'Thống kê SX & Biểu đồ', lbl_demand:'Tổng nhu cầu', lbl_produced:'Đã SX', lbl_gap:'Thiếu hụt', lbl_remaining:'còn lại', lbl_overprod:'vượt', th_house_names:'Tên chuồng sử dụng', th_share_rank:'Tỷ lệ / Hạng', chart_bar:'Nhu cầu vs Đã SX (cột)', chart_prod_per_spec:'Sản lượng ngày theo quy cách (tấm)', chart_weather:'Thời tiết (Nhiệt/Ẩm) & Tổng SX (tấm)', lbl_total_prod:'Tổng SX', stat_demand_pct:'Tổng nhu cầu: {0} tấm, chiếm {1}%', stat_est_finish:'Với năng suất trung bình này, dự kiến hoàn thành sau {0} ngày, ngày hoàn thành dự kiến {1}', stat_tet_note:'(Ghi chú: bao gồm {0} ngày nghỉ Tết Nguyên Đán)', stat_no_tet:'(Ghi chú: không có ngày nghỉ Tết Nguyên Đán trong thời gian sản xuất)', stat_due:'Hạn giao hàng dự án đã thỏa thuận: {0}', stat_install_gap:'Cách {0} ngày để hoàn tất lắp đặt và nghiệm thu', stat_due_late:', trễ hơn hạn giao hàng; cần trao đổi với khách để điều chỉnh ngày giao!', thr_good:'Tốt', thr_bad:'Lỗi', thr_mat_used:'Vật liệu dùng', lbl_spec:'Quy cách', lbl_good2:'Tốt', lbl_bad2:'Lỗi', btn_x:'×', lbl_mat_name:'Tên vật liệu', thr_operation:'Thao tác', op_out:'Xuất kho', op_in:'Nhập kho', op_qty:'Số lượng', op_date:'Ngày', confirm_dup_out_title:'Bản ghi xuất kho trùng', confirm_dup_out_msg:'Đã có bản ghi xuất kho cho chuồng và kích thước tấm này. Vui lòng sửa số lượng của bản ghi hiện có!', confirm_dup_out_ok:'Sửa bản ghi hiện có', op_party_out:'Nơi đến (chuồng/khách)', op_party_in:'Nguồn (chuồng/nhà cung cấp)', op_note:'Ghi chú', op_target:'Đối tượng', op_save:'Lưu', op_cancel:'Hủy', toast_op_saved:'Đã lưu thao tác', sec_outbound_records:'Sổ ghi nhận xuất kho', sec_outbound_analysis:'Phân tích ghi nhận xuất kho', sub_outbound_table_analysis:'Phân tích bảng', sub_outbound_curve_analysis:'Phân tích đường cong', thr_out_qty_spec:'SL xuất', thr_out_subtotal:'Tổng', wx_label:'Thời tiết', chart_outbound_daily:'Biểu đồ số lượng xuất kho hàng ngày', thr_out_date:'Ngày', thr_out_qty:'SL xuất', thr_out_from_house:'Dùng cho trại nào', thr_out_spec:'Quy cách sàn', thr_out_area:'Khu vực giao', thr_out_to_house:'Chuyển đến chuồng',thr_out_installed_qty:'SL lắp đặt<br>sau khi chuyển chuồng', btn_view_area_dist:'Xem phân bổ chuồng theo khu vực', btn_start_record_install:'Bắt đầu ghi lắp đặt', bldg_label:'Chuồng {0}', op_lines_seq:'Số lần xuất trong ngày', op_line_qty:'SL mỗi lần', op_from_house:'Chuồng xuất', op_from_spec:'Quy cách xuất', op_to_house:'Chuyển đến chuồng & số', op_add_line:'Thêm dòng', op_recorder:'Người ghi', lbl_no_records:'Chưa có ghi nhận xuất kho', op_edit:'Sửa', op_copy:'Sao chép', op_delete:'Xóa', confirm_delete_record:'Xóa ghi nhận xuất kho này?', slats_table_bldg_count:'Số lượng chuồng',
         sec_finished:'Kho thành phẩm (sàn khe hở bê tông, theo quy cách)', kpi_prod_in:'Tổng SX nhập kho', kpi_out2:'Tổng xuất kho', kpi_balance:'Tồn', kpi_need_prod:'Còn cần sản xuất', kpi_out_rate:'Tỷ lệ xuất kho', kpi_not_out:'Chưa xuất kho', thr_total_demand:'Tổng nhu cầu', thr_produced:'Nhập kho SX (Tổng sản lượng)', thr_need_prod:'Còn cần sản xuất', thr_prod_completion_ratio:'Tỷ lệ HT SX', thr_out3:'Xuất kho', thr_balance2:'Tồn', empty_finished:'Chưa có thành phẩm. Tự động cộng dồn sau khi nhập đầu ra tại "Sản xuất hàng ngày".', sec_stock_out:'Chi tiết tồn kho & xuất kho sản xuất', thr_out_house:'Xuất/Chuyển đến chuồng chờ lắp đặt', thr_return_stock:'Trả lại kho', thr_actual_stock:'Tồn kho thực tế', thr_actual_out:'Số lượng xuất thực tế', thr_prod_completion_rate:'Tỷ lệ HT SX', thr_out_rate:'Tỷ lệ xuất kho', btn_hide_zero_prod:'Ẩn dòng có sản lượng bằng 0', btn_restore_all_data:'Khôi phục tất cả dữ liệu', sec_demand_vs_prod:'Bảng chi tiết nhu cầu vs sản lượng thực tế sàn', th_demand_by_house:'Theo chuồng', th_demand_by_spec:'Theo quy cách', th_spec_list:'Danh sách quy cách', thr_pct:'Tỷ lệ', thr_rank:'Hạng', sec_line_daily:'Chi tiết sản xuất hàng ngày theo dây chuyền', empty_line_daily:'Chưa có dữ liệu sản xuất theo dây chuyền', warn_overprod_title:'Chú ý: Các kích thước tấm xi măng sau đã vượt quá nhu cầu', warn_overprod_desc:'Vui lòng điều chỉnh kế hoạch sản xuất kịp thời để tránh tồn kho.', warn_overprod_tip:'Sản lượng vượt nhu cầu: Đã SX {produced} / Nhu cầu {demand}',
         sec_equip:'Sổ thiết bị & bảng cấp công cụ giá trị cao', sec_line_config:'Hướng dẫn cấu hình dây chuyền sản xuất sàn khe hở bê tông', sec_equip_fault:'Danh sách cấu hình thiết bị dây chuyền & báo cáo sự cố', lbl_shared_units:'Số bộ dùng chung (silô xi măng / khoang chứa cốt liệu)', opt_shared_1:'1 bộ', opt_shared_2:'2 bộ', lbl_grade:'Cấp', lbl_maint:'Ghi chú bảo trì', btn_add_equip:'Thêm thiết bị/công cụ', thr_grade2:'Cấp', thr_maint2:'Bảo trì', sec_fault:'Nhật ký sự cố thiết bị', lbl_equip:'Thiết bị', lbl_down:'Dừng (h)', lbl_reason:'Nguyên nhân', lbl_repair:'Sửa chữa', btn_add_fault:'Ghi sự cố', thr_down2:'Dừng (h)', thr_reason2:'Nguyên nhân', thr_repair2:'Sửa chữa', eq_sec:'Công đoạn', eq_name_zh:'Tên thiết bị (Trung)', eq_english:'English', eq_viet:'Tiếng Việt', eq_common:'Thiết bị dùng chung', eq_fac:'Xưởng ', eq_line:'Dây chuyền ', eq_shared_line:'Dùng chung', eq_report_fault:'Báo cáo sự cố thiết bị', eq_fault_title:'Báo cáo sự cố thiết bị', eq_record_empty:'Chưa có báo cáo sự cố', eq_del_fault:'Xóa', wx_label:'Thờitiết', th_report_equip:'Thiết bị báo sửa', th_fault_reason:'Mô tả sự cố', th_cause_analysis:'Phân tích nguyên nhân', th_solution:'Giải pháp', th_down_hours:'Thờigian<br>dừng (giờ)', th_hazard_level:'Mức độ nguy hiểm', lbl_edit_cause:'Chỉnh sửa phân tích nguyên nhân', lbl_edit_hazard:'Chỉnh sửa mức độ nguy hiểm', btn_pick_fault:'Chọn sự cố', lbl_change:'Đổi', tip_change_fault:'Nhấn để đổi sự cố', lbl_pick_fault_title:'Chọn mô tả sự cố', eq_no_preset:'Thiết bị này chưa có sự cố định sẵn', btn_confirm:'Xác nhận', warn_pick_fault:'Vui lòng chọn một mô tả sự cố',
@@ -7972,6 +7978,7 @@ var WL_FLOW_IMG = {
       var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : '';
       if(!me) return;
       if(typeof PROD_RC_MATS==='undefined') return;
+      try { prod_pullCustomMatsFromServer(); } catch(e) {}
       PROD_RC_MATS.forEach(function(m){
         fetch('/api/prod-kv/'+encodeURIComponent('prod_specs_'+m)+'?me='+encodeURIComponent(me))
           .then(function(r){ return r.ok ? r.json() : null; })
@@ -7982,6 +7989,19 @@ var WL_FLOW_IMG = {
           })
           .catch(function(){});
       });
+    }
+    // ★RC-ADDMAT-20261115：自定义材料（新增材料）同样从服务端回读，保证全员看到同一份材料表
+    function prod_pullCustomMatsFromServer(){
+      var me = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : '';
+      if(!me) return;
+      fetch('/api/prod-kv/'+encodeURIComponent('prod_mats_custom')+'?me='+encodeURIComponent(me))
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(d){
+          if(d && d.ok && d.data){
+            try { localStorage.setItem('prod_mats_custom', JSON.stringify(d.data)); } catch(e){}
+          }
+        })
+        .catch(function(){});
     }
     // 进入生产模块时自动把本机本地数据迁移到服务端（替代手动"同步全部到服务器"按钮）：
     // 服务端为空时把本地作为种子上传，保证 tom 的本地数据对全员可见，无需人工点击。
@@ -10821,23 +10841,43 @@ var WL_FLOW_IMG = {
       try{ _rcSub = (typeof prodRcSubmittedReceipt === 'function') ? prodRcSubmittedReceipt() : null; }catch(e){}
       var _rcPurge = false;
       if(_rcSub){
-        if(_rcSub.status === 'confirmed'){ _rcPurge = true; }   /* 已确认移交 → 无条件收尾 */
-        else {
-          /* ★RC-AUTOCLEAR-20261110c：待审批(pending) 也算「已提交、工作已完成」。
-             但只有当本地草稿内容就是这张已提交的单时才作废 —— 用户已经改过/新录的内容必须保留。 */
-          try{
-            var _d0 = prodRcDraftLocal();
-            if(!_d0 || !_d0.rows || !_d0.rows.length) _rcPurge = true;
-            else if(typeof prodRcRowsLikeReceipt === 'function' && prodRcRowsLikeReceipt(prodRcDraftRows(_d0), _rcSub)) _rcPurge = true;
-          }catch(e){}
-        }
+        /* ★RC-DRAFT-KEEP-20261115（用户 2026-11-15 需求：保存的草稿刷新后必须还在）：
+           「已提交」的判定必须看【草稿内容本身】是否就是那张已提交的单，
+           绝不能再按「最新一张单是 confirmed 就无条件清草稿」——
+           旧写法 `if(_rcSub.status==='confirmed') _rcPurge=true;` 会让用户
+           上一单已入库时，新录并点「保存」的草稿一刷新就被清掉（现象：保存成功 → 刷新全丢）。
+           规则统一为：
+             · 没草稿 / 草稿没有明细      → 作废（没有内容可保留）
+             · 草稿内容 == 已提交(pending/confirmed)那张单 → 作废（这一单已经提交过了）
+             · 草稿内容 != 已提交那张单    → 保留（这是用户新录、还没提交的内容） */
+        try{
+          var _d0 = prodRcDraftLocal();
+          if(!_d0 || !_d0.rows || !_d0.rows.length) _rcPurge = true;
+          else if(typeof prodRcRowsLikeReceipt === 'function' && prodRcRowsLikeReceipt(prodRcDraftRows(_d0), _rcSub)) _rcPurge = true;
+        }catch(e){}
       }
       if(_rcPurge){
         try{ prodRcClearDraft(); }catch(e){}
         try{ localStorage.removeItem(prodRcDraftKey()); }catch(e){}
-        prodRcRows = [];
-        try{ if(PROD_CUR) delete prodRcRowsByPid[PROD_CUR]; }catch(e){}
-        try{ var _pb0 = el('pd_photos'); if(_pb0) _pb0.value = '[]'; }catch(e){}
+        /* ★RC-REEDIT-20261115（用户 2026-11-15：点「重新填写」数据没有回填）：
+           绝不能无条件清空内存行。prod_reeditReceipt 刚把被返回的单载进 prodRcRows 并移出列表，
+           此时列表里最新的一条往往是上一张 confirmed/pending 单 → 旧代码在这里直接
+           `prodRcRows = []` 把刚载入的明细抹掉（现象：只有日期/照片回填，明细全空）。
+           规则：只有「内存行本身为空」或「内存行就是那张已提交单的内容」才清；否则保留。 */
+        var _rowsNow = prodRcRows || [];
+        var _rowsFilled = false;
+        try{ _rowsFilled = _rowsNow.some(function(r){ return r && (r.material || r.spec || r.qty || r.priceVnd); }); }catch(e){}
+        var _matchSub = false;
+        try{ _matchSub = !!(_rcSub && typeof prodRcRowsLikeReceipt==='function' && prodRcRowsLikeReceipt(_rowsNow, _rcSub)); }catch(e){}
+        /* ★RC-REEDIT-20261115b：刚点过「重新填写」的这一次渲染，无条件保留载入的明细
+           （哪怕它正好和上一张已提交单内容相同），否则用户改单时会看到空表单。 */
+        var _reeditKeep = false;
+        try{ _reeditKeep = !!(window.__rcReeditAt && (Date.now() - window.__rcReeditAt) < 15000); }catch(e){}
+        if(!_reeditKeep && (!_rowsFilled || _matchSub)){
+          prodRcRows = [];
+          try{ if(PROD_CUR) delete prodRcRowsByPid[PROD_CUR]; }catch(e){}
+          try{ var _pb0 = el('pd_photos'); if(_pb0) _pb0.value = '[]'; }catch(e){}
+        }
       }
       /* ★RC-DRAFT-20261110：本会话内存里没有明细时，用上次点「保存」存下的草稿回填（刷新/重新登录不丢输入） */
       PROD_RC_DRAFT_RESTORED = null;
@@ -10886,7 +10926,7 @@ var WL_FLOW_IMG = {
         /* ★RC-AUTOCLEAR-20261110c：手动兜底 —— 一键清空上一单残留（明细+照片引用+日期归今天），随时可用 */
         + '<button class="prod-btn" type="button" onclick="prodRcClearAllNow()" title="'+({zh:'清空收货明细与照片，准备下一单',en:'Clear lines and photos, start a new receipt',vi:'Xóa dòng hàng và ảnh, bắt đầu phiếu mới'})[(typeof CUR_LANG!=='undefined'&&CUR_LANG)||'zh']+'">'+({zh:'清空',en:'Clear',vi:'Xóa'})[(typeof CUR_LANG!=='undefined'&&CUR_LANG)||'zh']+'</button>'
         + '<button class="prod-btn" type="button" data-i18n="btn_save_receipt_draft" onclick="prodRcDraftSave()" style="margin-left:auto">'+pt('btn_save_receipt_draft')+'</button>'
-        + '<span id="pd_build_tag" title="收货明细版本标记：看不到这行字说明浏览器还在跑旧页面" style="font-size:10px;color:#aaa;letter-spacing:.5px">RC-20261110c-autoclear</span>'
+        + '<span id="pd_build_tag" title="收货明细版本标记：看不到这行字说明浏览器还在跑旧页面" style="font-size:10px;color:#aaa;letter-spacing:.5px">RC-20261115-draftkeep</span>'
         + '</div>';
       h += '<div id="pd_rows" class="rc-lines"></div><div id="pd_foot" class="rc-foot-bar"></div>';
 
@@ -11881,7 +11921,98 @@ var WL_FLOW_IMG = {
       'HP钢筋φ6':['吨','公斤'], 'VY钢筋φ6':['吨','公斤'], 'HP钢筋φ8':['吨','公斤'], 'VY钢筋φ8':['吨','公斤'], 'HP钢筋φ10':['吨','公斤'], 'VY钢筋φ10':['吨','公斤'], 'HP钢筋φ12':['吨','公斤'], 'VY钢筋φ12':['吨','公斤'],
       '黄砂':['立方米','吨'], '黄石水泥':['罐','吨','公斤'], '黄海水泥':['罐','吨','公斤'], '石子':['立方米','吨']
     };
-    function prodRcAllowedUnits(m){ return PROD_RC_UNIT_BY_MAT[m] || PROD_RC_UNITS.slice(); }
+    /* ★RC-ADDMAT-20261115（用户 2026-11-15）：材料列下拉底部「新增材料」。
+       自定义材料与自定义规格同构：三语数组对象 [{zh,en,vi,createdBy,createdAt}]，
+       localStorage + /api/prod-kv 双写（全体用户共享）。系统默认材料始终锁定、不可删。 */
+    var PROD_RC_ADD_MAT = '::ADD_MAT::';
+    var PROD_RC_MAT_KV = 'prod_mats_custom';
+    var PROD_RC_MAT_BASE = ['HP钢筋φ6','HP钢筋φ8','HP钢筋φ10','HP钢筋φ12','VY钢筋φ6','VY钢筋φ8','VY钢筋φ10','VY钢筋φ12','黄砂','黄石水泥','黄海水泥','石子'];
+    function prodRcLoadCustomMats(){
+      try{
+        var v = localStorage.getItem(PROD_RC_MAT_KV);
+        if(!v) return [];
+        var parsed = JSON.parse(v), out = [];
+        if(Array.isArray(parsed)){
+          out = parsed.map(function(o){
+            if(o && typeof o==='object' && ('zh' in o)) return {zh:o.zh||'', en:o.en||'', vi:o.vi||'', createdBy:o.createdBy||'', createdAt:o.createdAt||''};
+            return {zh:String(o==null?'':o), en:'', vi:'', createdBy:'', createdAt:''};
+          });
+        }
+        return out.filter(function(o){ return o.zh && PROD_RC_MAT_BASE.indexOf(o.zh)===-1; });
+      }catch(e){}
+      return [];
+    }
+    function prodRcSaveCustomMats(arr){
+      if(!Array.isArray(arr)) return;
+      try{ localStorage.setItem(PROD_RC_MAT_KV, JSON.stringify(arr)); }catch(e){}
+      var me = prodRcCurUser();
+      if(me){ try{ fetch('/api/prod-kv/'+encodeURIComponent(PROD_RC_MAT_KV), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ requester:me, data:arr }) }); }catch(e){} }
+    }
+    function prodRcIsCustomMat(m){ if(!m) return false; return prodRcLoadCustomMats().some(function(o){ return o.zh === m; }); }
+    /* 材料下拉的全部选项（系统默认 + 自定义，按中文去重） */
+    function prodRcMatsAll(){
+      var out = PROD_RC_MAT_BASE.slice();
+      prodRcLoadCustomMats().forEach(function(o){ if(o.zh && out.indexOf(o.zh)===-1) out.push(o.zh); });
+      return out;
+    }
+    /* 单位历史：系统单位 + 历史录入过的单位（已提交收货单 / 当前明细 / 本地记录），按使用次数降序。
+       新增材料时「单位」下拉直接给出全部历史记录。 */
+    function prodRcUnitHistory(){
+      var cnt = {}, ord = [];
+      function push(u){
+        if(!u) return;
+        u = String(u);
+        if(!cnt[u]){ cnt[u] = 0; ord.push(u); }
+        cnt[u]++;
+      }
+      PROD_RC_UNITS.forEach(push);
+      try{
+        var arr = [];
+        try{ arr = JSON.parse(localStorage.getItem('prod_units_used') || '[]') || []; }catch(e){}
+        (arr || []).forEach(push);
+        /* 本项目 + 所有现场工厂（跨项目）历史收货单 / 入库 / 出库里用过的单位 */
+        var seenF = {};
+        function scanFactory(f){
+          if(!f || !f.materials || seenF[f.id || 'x']) return;
+          seenF[f.id || 'x'] = 1;
+          (f.materials.receipts || []).forEach(function(rc){
+            (rc && rc.rows || []).forEach(function(rw){ if(rw && rw.unit) push(rw.unit); });
+          });
+          ['inbound','outbound'].forEach(function(k){
+            (f.materials[k] || []).forEach(function(rw){ if(rw && rw.unit) push(rw.unit); });
+          });
+        }
+        try{ scanFactory((typeof prod_get==='function') ? prod_get(PROD_CUR) : null); }catch(e){}
+        try{
+          for(var li=0; li<localStorage.length; li++){
+            var lk = localStorage.key(li);
+            if(!lk || lk.indexOf('prod_factory_') !== 0) continue;
+            try{ scanFactory(JSON.parse(localStorage.getItem(lk))); }catch(e){}
+          }
+        }catch(e){}
+      }catch(e){}
+      (prodRcRows||[]).forEach(function(rw){ if(rw && rw.unit) push(rw.unit); });
+      var idx = {};
+      ord.forEach(function(u,i){ idx[u] = i; });
+      ord.sort(function(a,b){
+        if((cnt[b]||0) !== (cnt[a]||0)) return (cnt[b]||0) - (cnt[a]||0);
+        return idx[a] - idx[b];
+      });
+      return ord;
+    }
+    function prodRcRememberUnit(u){
+      if(!u) return;
+      try{
+        var arr = JSON.parse(localStorage.getItem('prod_units_used') || '[]') || [];
+        if(arr.indexOf(u) === -1){ arr.push(u); localStorage.setItem('prod_units_used', JSON.stringify(arr)); }
+      }catch(e){}
+    }
+    /* 可选单位：系统材料沿用原有映射；新增（自定义）材料给全部历史单位 */
+    function prodRcAllowedUnits(m){
+      if(m && PROD_RC_UNIT_BY_MAT[m]) return PROD_RC_UNIT_BY_MAT[m].slice();
+      if(m && typeof prodRcIsCustomMat==='function' && prodRcIsCustomMat(m)) return prodRcUnitHistory();
+      return PROD_RC_UNITS.slice();
+    }
     /* 默认单位：水泥=吨，钢筋=公斤（可改）；默认越南盾单价（灰字可改） */
     function prodRcDefUnit(m){
       if(m==='黄石水泥' || m==='黄海水泥') return '吨';
@@ -12061,7 +12192,15 @@ var WL_FLOW_IMG = {
       if(lang==='zh' || !val) return val;
       var d = kind==='mat' ? PROD_RC_MATS_TR : (kind==='unit' ? PROD_RC_UNITS_TR : PROD_RC_SPECS_TR);
       var t = d && d[val];
-      return (t && t[lang]) ? t[lang] : val;
+      if(t && t[lang]) return t[lang];
+      /* ★RC-ADDMAT-20261115：用户新增的材料（不在硬编码表里）走自定义三语字典 */
+      if(kind==='mat' && typeof prodRcLoadCustomMats==='function'){
+        var cm = prodRcLoadCustomMats();
+        for(var i=0;i<cm.length;i++){
+          if(cm[i].zh === val && cm[i][lang]) return cm[i][lang];
+        }
+      }
+      return val;
     }
     /* 规格下拉里的「新增规格」占位选项值；不会存到 row.spec */
     var PROD_RC_ADD_SPEC = '::ADD_SPEC::';
@@ -12118,6 +12257,20 @@ var WL_FLOW_IMG = {
     function prodRcCurUser(){
       var u = (typeof authUser!=='undefined' && authUser && authUser.username) ? authUser.username : '';
       return u ? String(u).trim() : '';
+    }
+    /* ★RC-2STAGE-20261115：收货单一级审批人 = 采购经理（thienly）；二级 = tom/cuong/james */
+    var PROD_RC_L2_BLOCK = 'PROD-RECEIPT-F';
+    function prodRcBuyerApprovers(){
+      var out = [];
+      try{
+        if(typeof usersData!=='undefined' && usersData){
+          usersData.forEach(function(u){
+            if(u && u.active!==false && u.position==='采购经理' && u.username && out.indexOf(u.username)<0) out.push(u.username);
+          });
+        }
+      }catch(e){}
+      if(!out.length) out = ['thienly'];
+      return out;
     }
     function prodRcIsAdmin(){
       var me = prodRcCurUser().toLowerCase();
@@ -12182,7 +12335,9 @@ var WL_FLOW_IMG = {
         var last=prodRcRows[prodRcRows.length-1];
         var pv=parseFloat(String(last.priceVnd).replace(/[^0-9.\-]/g,''))||0;
         var qv=parseFloat(String(last.qty).replace(/[^0-9.\-]/g,''))||0;
-        if(!last.material||!last.spec||!qv||!pv){ prod_toast(pt('toast_line_req')||'请填全上一行 材料/规格/数量/单价'); return; }
+        /* ★RC-ADDMAT-20261115：单价允许为 0（新增材料默认 0），只要求填了数字 */
+        var pvEmpty = String(last.priceVnd==null?'':last.priceVnd).trim()==='';
+        if(!last.material||!last.spec||!qv||pvEmpty){ prod_toast(pt('toast_line_req')||'请填全上一行 材料/规格/数量/单价'); return; }
       }
       var m = PROD_RC_MATS[0];
       var sp=prodRcSpecsAll(m).zh[0]||'';
@@ -12203,7 +12358,9 @@ var WL_FLOW_IMG = {
       var qv=parseFloat(String(row.qty).replace(/[^0-9.\-]/g,''))||0;
       var subV=pv*qv;
       var subR=r.rmb? (subV/r.rmb):0, subU=r.usd? (subV/r.usd):0;
-      var matOpts='<option value="" '+(!row.material?'selected':'')+'>--</option>'+PROD_RC_MATS.map(function(m){return '<option value="'+prod_esc(m)+'"'+(m===row.material?' selected':'')+'>'+prod_esc(prodRcTr('mat', m))+'</option>';}).join('');
+      /* ★RC-ADDMAT-20261115：材料下拉 = 系统默认 + 用户新增（prodRcMatsAll），底部固定「新增材料」 */
+      var matOpts='<option value="" '+(!row.material?'selected':'')+'>--</option>'+prodRcMatsAll().map(function(m){return '<option value="'+prod_esc(m)+'"'+(m===row.material?' selected':'')+'>'+prod_esc(prodRcTr('mat', m))+'</option>';}).join('')
+        +'<option value="'+PROD_RC_ADD_MAT+'">'+prod_esc(pt('btn_add_mat_receipt')||'新增材料')+'</option>';
       var allSpecs=row.material ? prodRcSpecsAll(row.material) : {zh:[],en:[],vi:[]};
       var spOpts=(row.spec?'':'<option value="" selected>--</option>')+allSpecs.zh.map(function(s){
         return '<option value="'+prod_esc(s)+'"'+(s===row.spec?' selected':'')+'>'+prod_esc(prodRcSpecDisplay(row.material, s))+'</option>';
@@ -12215,12 +12372,12 @@ var WL_FLOW_IMG = {
       var priceDef=prodRcDefPriceVnd(row.material, row.spec, row.unit);
       var priceIsDef=priceDef && String(row.priceVnd)===String(priceDef);
       return '<div class="rc-line-card" data-idx="'+idx+'">'
-        + '<div class="rc-col rc-col-mat">'+L('lbl_material')+'<select onchange="prodRcSet('+idx+',\'material\',this.value);prodRcRefreshSpec('+idx+')">'+matOpts+'</select></div>'
+        + '<div class="rc-col rc-col-mat">'+L('lbl_material')+'<select onchange="prodRcMatChange('+idx+',this)">'+matOpts+'</select></div>'
         + '<div class="rc-col rc-col-spec">'+L('lbl_spec')+'<div class="rc-spec-row"><select id="pd_spec_'+idx+'" onchange="prodRcSpecChange('+idx+',this)">'+spOpts+'</select>'
           + '<button type="button" class="mini-pen" data-i18n-title="lbl_edit_spec" title="'+prod_esc(pt('lbl_edit_spec'))+'" onclick="prodRcEditSpecsTri('+idx+',this)">✎</button></div></div>'
         + '<div class="rc-col rc-col-unit">'+L('lbl_unit')+'<select onchange="prodRcSet('+idx+',\'unit\',this.value)">'+unOpts+'</select></div>'
         + '<div class="rc-col rc-col-qty">'+L('thr_qty2')+'<input class="rc-num" inputmode="decimal" value="'+prod_esc(row.qty?prodRcFmtDec(row.qty):'')+'" oninput="prodRcSet('+idx+',\'qty\',this.value)" onfocus="prodRcQtyFocus(this)" onblur="prodRcQtyBlur(this,'+idx+')"></div>'
-        + '<div class="rc-col rc-col-pv">'+L('lbl_price_vnd')+'<input class="rc-num'+(priceIsDef?' prod-def-input':'')+'" inputmode="decimal" value="'+prod_esc(row.priceVnd? prodFormatMoneyDec(row.priceVnd,'VND'):'')+'" oninput="prodRcSet('+idx+',\'priceVnd\',this.value)" onfocus="prodRcPriceFocus(this)" onblur="prodRcPriceBlur(this,'+idx+')"></div>'
+        + '<div class="rc-col rc-col-pv">'+L('lbl_price_vnd')+'<input class="rc-num'+(priceIsDef?' prod-def-input':'')+'" inputmode="decimal" value="'+prod_esc(prodRcPriceTxt(row.priceVnd))+'" oninput="prodRcSet('+idx+',\'priceVnd\',this.value)" onfocus="prodRcPriceFocus(this)" onblur="prodRcPriceBlur(this,'+idx+')"></div>'
         + '<div class="rc-col rc-col-pr">'+L('lbl_price_rmb')+'<input id="pd_pr_'+idx+'" class="rc-num" value="'+prod_esc(r.rmb? prodFormatMoney(pv/r.rmb,'RMB'):'')+'" readonly></div>'
         + '<div class="rc-col rc-col-pu">'+L('lbl_price_usd')+'<input id="pd_pu_'+idx+'" class="rc-num" value="'+prod_esc(r.usd? prodFormatMoney(pv/r.usd,'USD'):'')+'" readonly></div>'
         + '<div class="rc-col rc-col-sv">'+L('lbl_sub_vnd')+'<input id="pd_sv_'+idx+'" class="rc-num" value="'+prod_esc(subV? prodFormatMoney(subV,'VND'):'')+'" readonly></div>'
@@ -12229,6 +12386,14 @@ var WL_FLOW_IMG = {
         + '<div class="rc-col rc-col-note">'+L('lbl_note')+'<input class="rc-note-input" value="'+prod_esc(prodRcNoteVal(row))+'" readonly onclick="prodRcEditNote('+idx+')" onfocus="prodRcEditNote('+idx+')"></div>'
         + '<div class="rc-col rc-col-del"><button type="button" class="mini-btn del" data-i18n-title="btn_del" onclick="prodRcDel('+idx+')" title="'+prod_esc(pt('btn_del'))+'">🗑</button></div>'
         + '</div>';
+    }
+    /* ★RC-ADDMAT-20261115：单价 0 必须显示成 0（不能因为 0 是 falsy 被渲染成空） */
+    function prodRcPriceTxt(v){
+      if(v === null || v === undefined || v === '') return '';
+      var n = parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+      if(!isFinite(n)) return '';
+      if(n === 0) return '0';
+      return prodFormatMoneyDec(v, 'VND');
     }
     function prodRcComputeRow(idx){
       var row=prodRcRows[idx]; if(!row) return;
@@ -12250,6 +12415,7 @@ var WL_FLOW_IMG = {
       if(key==='priceVnd'||key==='qty'){ prodRcComputeRow(idx); prodReceiptRenderFoot(); }
       else if(key==='unit'){
         var row = prodRcRows[idx];
+        prodRcRememberUnit(row.unit);   /* ★RC-ADDMAT-20261115：记住用过的单位，供新增材料的单位历史下拉 */
         var dp=prodRcDefPriceVnd(row.material, row.spec, row.unit);
         if(dp) row.priceVnd=dp;
         prodReceiptRenderRows();
@@ -12261,6 +12427,79 @@ var WL_FLOW_IMG = {
         prodReceiptRenderRows(); prodReceiptRenderFoot();
       }
       prodRcRowsByPid[PROD_CUR]=prodRcRows.slice();
+    }
+    /* ★RC-ADDMAT-20261115（用户 2026-11-15）：材料下拉变更处理。
+       选中底部「新增材料」→ 三语弹窗（先清空三语再录入并自动翻译）；保存后：
+       ① 该行材料 = 新材料；② 规格清空并【自动弹出「新增规格」】继续录入；
+       ③ 单位下拉立即给出全部历史单位；④ 单价自动为 0（允许保存、允许提交收货单）。 */
+    function prodRcMatChange(idx, sel){
+      if(!prodRcRows[idx] || !sel) return;
+      if(sel.value === PROD_RC_ADD_MAT){
+        var prevMat = prodRcRows[idx].material;
+        sel.value = prevMat || '';   /* 弹窗期间下拉先回原值，避免显示占位项 */
+        prodRcAddMaterialTri(idx, sel, function onCancel(){
+          if(prodRcRows[idx]){ prodRcRows[idx].material = prevMat; prodRcRowsByPid[PROD_CUR]=prodRcRows.slice(); }
+          prodReceiptRenderRows();
+        });
+      } else {
+        var prevSelMat = prodRcRows[idx].material;
+        prodRcSet(idx, 'material', sel.value);
+        prodRcRefreshSpec(idx);
+        /* ★RC-ADDMAT-20261115：新增（自定义）材料没有默认单价 → 切过来时单价归 0（可手改） */
+        if(sel.value !== prevSelMat && prodRcRows[idx] && prodRcIsCustomMat(sel.value)){
+          prodRcRows[idx].priceVnd = 0;
+          prodReceiptRenderRows();
+          prodRcRowsByPid[PROD_CUR] = prodRcRows.slice();
+        }
+      }
+    }
+    function prodRcAddMaterialTri(idx, btn, onCancel){
+      openTriLangTextareaPopover({
+        kind: 'mat',
+        target: btn,
+        title: pt('btn_add_mat_receipt') || '新增材料',
+        values: {zh:'',en:'',vi:''},
+        onCancel: onCancel,
+        onSave: function(v){
+          var L = window.CUR_LANG || 'zh';
+          var newObj = {
+            zh: v.zh.split('\n').map(function(s){return s.trim();}).filter(Boolean),
+            en: v.en.split('\n').map(function(s){return s.trim();}).filter(Boolean),
+            vi: v.vi.split('\n').map(function(s){return s.trim();}).filter(Boolean)
+          };
+          var n = newObj[L].length;
+          ['zh','en','vi'].forEach(function(l){ while(newObj[l].length < n) newObj[l].push(''); });
+          var me = prodRcCurUser(), ts = prodTimeNow();
+          var custom = prodRcLoadCustomMats();
+          newObj.zh.forEach(function(z,i){
+            if(!z) return;
+            if(custom.some(function(o){ return (o.zh||'') === z; })) return;
+            custom.push({zh:z, en:newObj.en[i]||'', vi:newObj.vi[i]||'', createdBy:me, createdAt:ts});
+          });
+          prodRcSaveCustomMats(custom);
+          var picked = newObj.zh[0] || '';
+          if(prodRcRows[idx] && picked){
+            var row = prodRcRows[idx];
+            row.material = picked;
+            row.spec = '';        /* 新材料没有预置规格 → 下面自动弹出「新增规格」 */
+            row.unit = '';        /* 单位下拉自动列出全部历史单位，渲染时选中第一个 */
+            row.priceVnd = 0;     /* 单价自动为 0（可改），不被任何默认单价覆盖 */
+            prodReceiptRenderRows();
+            prodRcRowsByPid[PROD_CUR] = prodRcRows.slice();
+            prod_toast(pt('toast_mat_saved') || '材料已保存');
+            /* 规格列自动跳出「新增规格」三语弹窗（allowLocked=true：新材料本来就允许追加规格） */
+            setTimeout(function(){
+              try{
+                var pen = document.querySelector('#pd_rows .rc-line-card[data-idx="'+idx+'"] .mini-pen');
+                prodRcEditSpecsTri(idx, pen, true, function(){ prodReceiptRenderRows(); });
+              }catch(e){}
+            }, 80);
+          } else {
+            prodReceiptRenderRows();
+            prod_toast(pt('toast_mat_saved') || '材料已保存');
+          }
+        }
+      });
     }
     /* 规格下拉变更处理：选中「新增规格」占位项时打开三语弹窗追加自定义规格；
        未保存关闭则恢复原先选中的规格；保存后弹窗 onSave 已自动选中新规格并渲染 */
@@ -12516,9 +12755,12 @@ var WL_FLOW_IMG = {
     function prodRcRestoreDraftPost(){
       /* ★RC-AUTOCLEAR-20261110c：上一单已提交（pending/confirmed）且内容就是它 → 服务端草稿也不要拉回来 */
       try{
+        /* ★RC-DRAFT-KEEP-20261115：只有【草稿本身就是那张已提交的单】才不回填；
+           上一单已 confirmed 但草稿是新录的内容 → 必须继续回填（否则保存的草稿刷新后丢） */
         var _rs2 = (typeof prodRcSubmittedReceipt === 'function') ? prodRcSubmittedReceipt() : null;
-        if(_rs2 && (_rs2.status === 'confirmed' ||
-           (typeof prodRcRowsLikeReceipt === 'function' && prodRcRowsLikeReceipt(prodRcRows || [], _rs2)))){
+        var _d2 = prodRcDraftLocal();
+        if(_rs2 && _d2 && _d2.rows && _d2.rows.length &&
+           typeof prodRcRowsLikeReceipt === 'function' && prodRcRowsLikeReceipt(prodRcDraftRows(_d2), _rs2)){
           PROD_RC_DRAFT_RESTORED = null; return;
         }
       }catch(e){}
@@ -12535,6 +12777,11 @@ var WL_FLOW_IMG = {
           .then(function(j){
             var sd = (j && j.ok) ? j.data : null;
             if(!sd || !sd.rows || !sd.rows.length) return;
+            /* ★RC-DRAFT-KEEP-20261115：服务端草稿若就是那张已提交的单，不拉回来 */
+            try{
+              var _rsv = (typeof prodRcSubmittedReceipt === 'function') ? prodRcSubmittedReceipt() : null;
+              if(_rsv && typeof prodRcRowsLikeReceipt === 'function' && prodRcRowsLikeReceipt(prodRcDraftRows(sd), _rsv)) return;
+            }catch(e){}
             var local = prodRcDraftLocal();
             if(local && (local.savedAt||0) >= (sd.savedAt||0)) return;          /* 本地更新，不覆盖 */
             var stillBlank = !prodRcRows.some(function(r){ return r && (r.material || r.qty || r.priceVnd); });
@@ -12747,23 +12994,36 @@ var WL_FLOW_IMG = {
       var vals = opts.values || {zh:'',en:'',vi:''};
       var existing = opts.existing || {zh:[],en:[],vi:[]};
       var material = opts.material || '';
+      /* ★RC-ADDMAT-20261115：kind='mat' → 同一个三语弹窗用于「新增材料」（无材料前缀、无“显示全部”按钮，
+         存档键换成 prod_mats_custom）；默认 kind='spec' 保持原有「新增规格」行为完全不变。 */
+      var kind = opts.kind === 'mat' ? 'mat' : 'spec';
+      var isMat = kind === 'mat';
       var L = window.CUR_LANG || 'zh';
       var THEME = '#E53935';
       var st = { cleared: false, auto: {}, timer: null };
       var saved = false;
-      var customList = prodRcLoadCustom(material);
+      function loadCustom(){ return isMat ? prodRcLoadCustomMats() : prodRcLoadCustom(material); }
+      function saveCustom(arr){ if(isMat) prodRcSaveCustomMats(arr); else prodRcSaveCustom(material, arr); }
+      var customList = loadCustom();
       var showAllCustom = false;
       var allCustomList = [];
       function loadAllCustomSpecs(){
         var out = [];
-        PROD_RC_MATS.forEach(function(m){
+        if(isMat){
+          prodRcLoadCustomMats().forEach(function(o){
+            out.push({material:'', matIdx:-1, zh:o.zh||'', en:o.en||'', vi:o.vi||'', createdBy:o.createdBy||'', createdAt:o.createdAt||''});
+          });
+          return out;
+        }
+        var mats = (typeof prodRcMatsAll === 'function') ? prodRcMatsAll() : PROD_RC_MATS;
+        mats.forEach(function(m){
           var list = prodRcLoadCustom(m);
           list.forEach(function(o, i){
             out.push({material:m, matIdx:i, zh:o.zh||'', en:o.en||'', vi:o.vi||'', createdBy:o.createdBy||'', createdAt:o.createdAt||''});
           });
         });
         out.sort(function(a,b){
-          if(a.material !== b.material) return PROD_RC_MATS.indexOf(a.material) - PROD_RC_MATS.indexOf(b.material);
+          if(a.material !== b.material) return mats.indexOf(a.material) - mats.indexOf(b.material);
           return (a.zh||'').localeCompare(b.zh||'');
         });
         return out;
@@ -12797,15 +13057,15 @@ var WL_FLOW_IMG = {
       function rightColumn(){
         return '<div style="flex:0 0 65%;min-width:420px;display:flex;flex-direction:column;background:#fff;">'
           + '<div id="tlt_right_header" style="padding:8px 12px;font-weight:700;font-size:13px;color:#333;border-bottom:1px solid #f1f1f1;background:#fafafa;display:flex;justify-content:space-between;align-items:center;">'
-          + '<span>'+prod_esc(pt('lbl_newly_added_specs'))+'</span>'
-          + '<button type="button" id="tlt_show_all" style="font-size:11px;padding:2px 8px;background:#fff;border:1px solid #ddd;border-radius:4px;cursor:pointer;">'+prod_esc(pt('btn_show_all_added_specs'))+'</button>'
+          + '<span>'+prod_esc(isMat ? (pt('lbl_newly_added_mats')||'本次新增材料') : pt('lbl_newly_added_specs'))+'</span>'
+          + (isMat ? '' : '<button type="button" id="tlt_show_all" style="font-size:11px;padding:2px 8px;background:#fff;border:1px solid #ddd;border-radius:4px;cursor:pointer;">'+prod_esc(pt('btn_show_all_added_specs'))+'</button>')
           + '</div>'
           + '<div id="tlt_added_list" style="flex:1;overflow:auto;padding:8px 12px;min-height:180px;"></div>'
           + '</div>';
       }
       pop.innerHTML = '<h2 id="tlt_header" style="display:flex;align-items:center;justify-content:space-between;padding-right:72px;overflow:hidden;">'
         + '<div style="flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-right:58px;">'
-        + '<span id="tlt_title_prefix">'+prod_esc(pt('lbl_edit_spec'))+'</span>'
+        + '<span id="tlt_title_prefix">'+prod_esc(isMat ? (pt('btn_add_mat_receipt')||'新增材料') : pt('lbl_edit_spec'))+'</span>'
         + '<span id="tlt_title_mat" style="font-weight:400;">'+prod_esc(material ? ' ('+prodRcTr('mat', material)+')' : '')+'</span></div>'
         + '<button type="button" id="tlt_close" class="close" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;position:static;">×</button></h2>'
         + '<div id="tlt_body" style="display:flex;flex:1;min-height:0;overflow:hidden;">'
@@ -12820,9 +13080,14 @@ var WL_FLOW_IMG = {
       ['zh','en','vi'].forEach(function(l){ var ta=document.getElementById('tlt_'+l); if(ta) ta.value = vals[l] || ''; });
       function renderExistingList(){
         var el = document.getElementById('tlt_existing_list'); if(!el) return;
-        var def = (typeof PROD_RC_SPEC_DEF!=='undefined' && PROD_RC_SPEC_DEF[material]) ? PROD_RC_SPEC_DEF[material] : [];
-        var chips = def.map(function(s){ return '<span style="display:inline-block;background:#f1f1f1;color:#555;padding:2px 8px;border-radius:4px;font-size:11px;white-space:nowrap;border:1px solid #e0e0e0;">'+prod_esc(s)+'<span style="margin-left:4px;color:#bbb;font-size:10px;">(锁定)</span></span>'; }).join('');
-        el.innerHTML = '<div id="tlt_existing_label" style="font-size:11px;color:#888;margin-bottom:4px;">'+prod_esc(pt('lbl_existing_specs'))+'</div>'
+        var def = isMat
+          ? (typeof PROD_RC_MAT_BASE!=='undefined' ? PROD_RC_MAT_BASE : PROD_RC_MATS)
+          : ((typeof PROD_RC_SPEC_DEF!=='undefined' && PROD_RC_SPEC_DEF[material]) ? PROD_RC_SPEC_DEF[material] : []);
+        var chips = def.map(function(s){
+          var txt = isMat ? prodRcTr('mat', s) : s;
+          return '<span style="display:inline-block;background:#f1f1f1;color:#555;padding:2px 8px;border-radius:4px;font-size:11px;white-space:nowrap;border:1px solid #e0e0e0;">'+prod_esc(txt)+'<span style="margin-left:4px;color:#bbb;font-size:10px;">(锁定)</span></span>';
+        }).join('');
+        el.innerHTML = '<div id="tlt_existing_label" style="font-size:11px;color:#888;margin-bottom:4px;">'+prod_esc(isMat ? (pt('lbl_existing_mats')||'已有材料（系统默认·锁定）') : pt('lbl_existing_specs'))+'</div>'
           + (chips ? '<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:80px;overflow-y:auto;">'+chips+'</div>'
                    : '<div style="font-size:11px;color:#bbb;">'+prod_esc(pt('tri_lang_no_existing'))+'</div>');
       }
@@ -12835,17 +13100,17 @@ var WL_FLOW_IMG = {
         }
         var isAdmin = prodRcIsAdmin();
         var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#fafafa;">'
-          + '<th style="text-align:left;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(pt('th_added_mat'))+'</th>'
-          + '<th style="text-align:left;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(pt('th_added_spec_zh'))+'</th>'
-          + '<th style="text-align:left;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(pt('th_added_spec_en'))+'</th>'
-          + '<th style="text-align:left;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(pt('th_added_spec_vi'))+'</th>'
+          + (isMat ? '' : '<th style="text-align:left;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(pt('th_added_mat'))+'</th>')
+          + '<th style="text-align:left;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(isMat ? (pt('th_added_mat_zh')||'增加的材料-中文') : pt('th_added_spec_zh'))+'</th>'
+          + '<th style="text-align:left;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(isMat ? (pt('th_added_mat_en')||'增加的材料-英文') : pt('th_added_spec_en'))+'</th>'
+          + '<th style="text-align:left;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(isMat ? (pt('th_added_mat_vi')||'增加的材料-越南文') : pt('th_added_spec_vi'))+'</th>'
           + '<th style="text-align:left;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(pt('op_created_by')||'录入人')+'</th>'
           + (isAdmin ? '<th style="text-align:center;padding:4px;border:1px solid #e0e0e0;white-space:nowrap;">'+prod_esc(pt('op_actions'))+'</th>' : '')
           + '</tr></thead><tbody>';
         list.forEach(function(item, idx){
           var rowMat = showAllCustom ? item.material : material;
           html += '<tr data-idx="'+idx+'" '+(showAllCustom?'':'style="cursor:pointer;"')+'>'
-            + '<td style="padding:4px;border:1px solid #e0e0e0;">'+prod_esc(prodRcTr('mat', rowMat))+'</td>'
+            + (isMat ? '' : '<td style="padding:4px;border:1px solid #e0e0e0;">'+prod_esc(prodRcTr('mat', rowMat))+'</td>')
             + '<td style="padding:4px;border:1px solid #e0e0e0;">'+prod_esc(item.zh)+'</td>'
             + '<td style="padding:4px;border:1px solid #e0e0e0;">'+prod_esc(item.en)+'</td>'
             + '<td style="padding:4px;border:1px solid #e0e0e0;">'+prod_esc(item.vi)+'</td>'
@@ -12879,8 +13144,8 @@ var WL_FLOW_IMG = {
             if(allowed.indexOf(me) === -1){ prod_toast(pt('toast_no_auth_del')||'无权限删除'); return; }
             var mat = btn.getAttribute('data-mat') || material;
             var matIdx = parseInt(btn.getAttribute('data-mat-idx'),10);
-            var arr = prodRcLoadCustom(mat);
-            if(showAllCustom){
+            var arr = (isMat || !mat) ? loadCustom() : prodRcLoadCustom(mat);
+            if(showAllCustom && !isMat){
               if(isNaN(matIdx) || !arr[matIdx]) return;
               arr.splice(matIdx,1);
             } else {
@@ -12888,10 +13153,10 @@ var WL_FLOW_IMG = {
               if(isNaN(idx) || !customList[idx]) return;
               arr.splice(idx,1);
             }
-            prodRcSaveCustom(mat, arr);
-            if(showAllCustom){ allCustomList = loadAllCustomSpecs(); }
-            else { customList = prodRcLoadCustom(material); }
-            all = prodRcSpecsAll(material);
+            if(isMat) saveCustom(arr); else prodRcSaveCustom(mat, arr);
+            if(showAllCustom && !isMat){ allCustomList = loadAllCustomSpecs(); }
+            else { customList = loadCustom(); }
+            if(!isMat) all = prodRcSpecsAll(material);
             prodReceiptRenderRows();
             renderAddedSpecs();
             renderExistingList();
@@ -12900,7 +13165,8 @@ var WL_FLOW_IMG = {
       }
       renderExistingList();
       renderAddedSpecs();
-      document.getElementById('tlt_show_all').addEventListener('click', function(){
+      var showAllBtnInit = document.getElementById('tlt_show_all');
+      if(showAllBtnInit) showAllBtnInit.addEventListener('click', function(){
         showAllCustom = !showAllCustom;
         if(showAllCustom){ allCustomList = loadAllCustomSpecs(); }
         this.textContent = pt(showAllCustom ? 'btn_show_current_mat_specs' : 'btn_show_all_added_specs');
@@ -12921,13 +13187,13 @@ var WL_FLOW_IMG = {
         var newL = window.CUR_LANG || 'zh';
         if(newL !== L){ L = newL; setEditable(); }
         var titlePrefix = document.getElementById('tlt_title_prefix');
-        if(titlePrefix) titlePrefix.textContent = pt('lbl_edit_spec');
+        if(titlePrefix) titlePrefix.textContent = isMat ? (pt('btn_add_mat_receipt')||'新增材料') : pt('lbl_edit_spec');
         var titleMat = document.getElementById('tlt_title_mat');
         if(titleMat && material) titleMat.textContent = ' (' + prodRcTr('mat', material) + ')';
         var rightHeader = document.getElementById('tlt_right_header');
         if(rightHeader){
           var labelSpan = rightHeader.querySelector('span');
-          if(labelSpan) labelSpan.textContent = pt('lbl_newly_added_specs');
+          if(labelSpan) labelSpan.textContent = isMat ? (pt('lbl_newly_added_mats')||'本次新增材料') : pt('lbl_newly_added_specs');
         }
         var showAllBtn = document.getElementById('tlt_show_all');
         if(showAllBtn) showAllBtn.textContent = pt(showAllCustom ? 'btn_show_current_mat_specs' : 'btn_show_all_added_specs');
@@ -12985,13 +13251,13 @@ var WL_FLOW_IMG = {
         ['zh','en','vi'].forEach(function(l){ while(newObj[l].length < n) newObj[l].push(''); });
         var me = prodRcCurUser();
         var ts = prodTimeNow();
-        var custom = prodRcLoadCustom(material);
+        var custom = loadCustom();
         newObj.zh.forEach(function(z,i){ if(!z) return; if(custom.some(function(o){return (o.zh||'')===z;})) return; custom.push({zh:z, en:newObj.en[i]||'', vi:newObj.vi[i]||'', createdBy:me, createdAt:ts}); });
-        prodRcSaveCustom(material, custom);
-        customList = prodRcLoadCustom(material);
+        saveCustom(custom);
+        customList = loadCustom();
         saved = true;  // 标记已保存，关闭时不再触发 onCancel
         if(opts.onSave) opts.onSave(v);
-        all = prodRcSpecsAll(material);
+        if(!isMat) all = prodRcSpecsAll(material);
         prodReceiptRenderRows();
         renderAddedSpecs();
         renderExistingList();
@@ -13112,7 +13378,9 @@ var WL_FLOW_IMG = {
       for(var i=0;i<prodRcRows.length;i++){ var rw=prodRcRows[i];
         var pv=parseFloat(String(rw.priceVnd).replace(/[^0-9.\-]/g,''))||0;
         var qv=parseFloat(String(rw.qty).replace(/[^0-9.\-]/g,''))||0;
-        if(!rw.material||!rw.spec||!qv||!pv){ prod_toast(pt('toast_line_req')||'请填全每行 材料/规格/数量/单价'); return; }
+        /* ★RC-ADDMAT-20261115：单价允许为 0（新增材料默认单价 0 也允许提交收货单） */
+        var pvEmpty = String(rw.priceVnd==null?'':rw.priceVnd).trim()==='';
+        if(!rw.material||!rw.spec||!qv||pvEmpty){ prod_toast(pt('toast_line_req')||'请填全每行 材料/规格/数量/单价'); return; }
       }
       var errEl=document.getElementById('pd_submit_err'); if(errEl) errEl.style.display='none';
       prodModalConfirm(pt('submit_warn'), prodConfirmSubmitReceipt, 'submit_warn');
@@ -13153,11 +13421,9 @@ var WL_FLOW_IMG = {
       try{ prodRcClearDraft(); }catch(e){}
       prod_renderTab('D');
       _finish();
-      // 审批人 = 采购经理 + tom/cuong/james 三人组（三人任一点击即结束该申请，效率同等）
-      var _tri = (typeof TRI_APPROVERS!=='undefined' && TRI_APPROVERS) ? TRI_APPROVERS.slice() : ['tom','cuong','james'];
-      var approvers = (typeof usersData!=='undefined'&&usersData)? usersData.filter(function(u){return u.active!==false && u.position==='采购经理';}).map(function(u){return u.username;}) : [];
-      _tri.forEach(function(a){ if(approvers.indexOf(a)<0) approvers.push(a); });
-      var payload = JSON.stringify({project:PROD_CUR, receiptId:rid, date:date, floors:floors, houses:houses, photos:photos, rows:rows});
+      /* ★RC-2STAGE-20261115：一级审批只发采购经理（thienly）；通过后才由前端发起二级审批 */
+      var approvers = prodRcBuyerApprovers();
+      var payload = JSON.stringify({project:PROD_CUR, receiptId:rid, date:date, floors:floors, houses:houses, photos:photos, rows:rows, stage:'buyer'});
       var sendAppr = function(){
         fetch('/api/approval-requests', { method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ requester:(authUser&&authUser.username)||'', requester_name:(authUser&&authUser.real_name)||'', block_id:'PROD-RECEIPT', block_name:pt('sec_receipt'), title:pt('appr_title_PROD_RECEIPT')||pt('sec_receipt'), action_name:'', approvers:approvers, content:pt('appr_content_PROD_RECEIPT')||'', target_id:String(rid), persist:'persistent', payload:payload })
@@ -13222,6 +13488,8 @@ var WL_FLOW_IMG = {
       });
       if(!prodRcRows.length) prodRcRows.push({material:'',spec:'',unit:'',priceVnd:'',qty:'',note:''});
       prodRcRowsByPid[PROD_CUR] = prodRcRows.slice();
+      /* ★RC-REEDIT-20261115b：告诉紧随其后的 D 页渲染「这是重新填写载入的数据，别清掉」 */
+      try{ window.__rcReeditAt = Date.now(); }catch(e){}
       // 原单移出列表（记墓碑，避免同步时被合并回来）
       f.materials.receipts = (f.materials.receipts||[]).filter(function(r){ return r.id!==rid; });
       f.materials.receiptsDeleted = f.materials.receiptsDeleted||[];
@@ -13229,6 +13497,9 @@ var WL_FLOW_IMG = {
       prod_save(f);
       prod_renderTab('D');
       setTimeout(function(){
+        /* ★RC-REEDIT-20261115：重渲染后再刷一次明细，确保载入的行一定落在 DOM 上 */
+        try{ if(PROD_CUR && !prodRcRows.length) prodRcRows = (prodRcRowsByPid[PROD_CUR]||[]).slice(); }catch(e){}
+        try{ prodReceiptRenderRows(); }catch(e){}
         var de = el('pd_arr_date'); if(de && rec.date) de.value = ymdToDmy(rec.date);
         var fl = {}; (rec.floors||[]).forEach(function(x){ fl[String(x)]=1; });
         document.querySelectorAll('.pd_floor').forEach(function(c){ c.checked = !!fl[String(c.value)]; });
@@ -13244,8 +13515,9 @@ var WL_FLOW_IMG = {
     function prodReceiptCardHtml(r, idx, opts){
       opts = opts || {};
       var statusKey = r.status==='confirmed' ? 'status_confirmed'
+                    : (r.status==='pending_final' ? 'status_pending_final'
                     : (r.status==='returned' ? 'status_returned'
-                    : (r.status==='need_edit' ? 'status_need_edit' : 'status_pending'));
+                    : (r.status==='need_edit' ? 'status_need_edit' : 'status_pending')));
       var _badge = r.status==='confirmed' ? 'ok'
                  : (r.status==='returned' ? 'rej'          /* 已驳回：红色填充（BADGE-REJ-RED-20261026） */
                  : (r.status==='need_edit' ? 'warn' : 'pend'));
@@ -19698,6 +19970,9 @@ var PROD_EQUIP_FAULT_KB = {
               var card = sel.closest('.rc-line-card');
               var matSel = card ? card.querySelector('.rc-col-mat select') : null;
               txt = prodRcSpecDisplay(matSel ? matSel.value : '', opts[o].value);
+            } else if(kind==='mat' && opts[o].value === '::ADD_MAT::'){
+              /* ★RC-ADDMAT-20261115：占位项跟着语言走，不能露出内部值 */
+              txt = pt('btn_add_mat_receipt') || '新增材料';
             } else {
               txt = prodRcTr(kind, opts[o].value);
             }
@@ -35102,6 +35377,21 @@ var PROD_EQUIP_FAULT_KB = {
   table.appr-table tbody tr:nth-child(odd)  { background:#ffffff; }
   table.appr-table tbody tr:hover { background:#fff9c4; }
   .appr-col-no { width:54px; text-align:center; }
+  /* ★APPR-BATCH-DEL-20261115：右键进入「批量选择」态 —— 复选框列 + 选中行高亮 + 删除栏 */
+  table.appr-table th.appr-col-sel, table.appr-table td.appr-col-sel { width:40px; text-align:center; padding-left:6px; padding-right:6px; }
+  table.appr-table td.appr-col-sel input.appr-sel-cb { width:15px; height:15px; cursor:pointer; accent-color:#d23b3b; }
+  table.appr-table thead th.appr-col-sel input.appr-sel-cb { width:15px; height:15px; cursor:pointer; accent-color:#d23b3b; }
+  table.appr-table tbody tr.appr-row-sel { background:#ffe3e3 !important; }
+  table.appr-table tbody tr.appr-row-sel:hover { background:#ffd6d6 !important; }
+  .appr-selbar { display:none; align-items:center; gap:8px; margin-left:auto; }
+  .appr-selbar.on { display:flex; }
+  .appr-selbar .appr-sel-count { font-size:12px; font-weight:600; color:#b08968; }
+  .appr-selbar button { border:none; border-radius:16px; padding:6px 16px; font-size:12px; font-weight:600; cursor:pointer; }
+  .appr-sel-del { background:#d23b3b; color:#fff; box-shadow:0 2px 8px rgba(211,47,47,.3); }
+  .appr-sel-del:hover { background:#b93232; }
+  .appr-sel-del:disabled { background:#eee; color:#bbb; cursor:not-allowed; box-shadow:none; }
+  .appr-sel-cancel { background:#f3ece3; color:#666; }
+  .appr-sel-cancel:hover { background:#e8ddd4; color:#444; }
   .appr-col-action { width:150px; text-align:center; }
   table.appr-table td.appr-col-action { white-space:nowrap; }
   .appr-cell-title { font-weight:600; color:#333; }
@@ -37437,6 +37727,8 @@ var I18N = {
              appr_ctx_delete:"删除该审批", appr_del_confirm:"确定删除该审批单？删除后不可恢复。",
              appr_deleted:"已删除", appr_del_deny:"仅管理员、总经理、副总经理可删除审批",
              appr_confirm_ok:"确认", appr_confirm_cancel:"取消",
+             appr_sel_count:"已选 {n} 条", appr_sel_delete:"删除所选", appr_sel_cancel:"取消选择",
+             appr_batch_confirm:"确定删除选中的 {n} 条审批单？删除后不可恢复。", appr_batch_deleted:"已删除 {n} 条",
              usr_delegate:"离职代理", usr_delegate_ph:"（选中的在职人员将接管其数据与待办）",
              users_title:"用户与授权",
              users_add_btn:"+ 新增用户",
@@ -38266,6 +38558,8 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
              appr_ctx_delete:"Delete approval", appr_del_confirm:"Delete this approval? This cannot be undone.",
              appr_deleted:"Deleted", appr_del_deny:"Only admins, GMs and deputy GMs can delete",
              appr_confirm_ok:"Confirm", appr_confirm_cancel:"Cancel",
+             appr_sel_count:"{n} selected", appr_sel_delete:"Delete selected", appr_sel_cancel:"Cancel selection",
+             appr_batch_confirm:"Delete the {n} selected approval records? This cannot be undone.", appr_batch_deleted:"{n} record(s) deleted",
              usr_delegate:"Off-boarding delegate", usr_delegate_ph:"(selected active user will take over data & todos)",
              users_title:"User & Authorization",
              users_add_btn:"+ Add User",
@@ -39097,6 +39391,8 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
              appr_ctx_delete:"Xóa phê duyệt", appr_del_confirm:"Xóa yêu cầu phê duyệt này? Không thể hoàn tác.",
              appr_deleted:"Đã xóa", appr_del_deny:"Chỉ quản trị, tổng giám đốc, phó tổng giám đốc mới xóa được",
              appr_confirm_ok:"Xác nhận", appr_confirm_cancel:"Hủy bỏ",
+             appr_sel_count:"Đã chọn {n} bản ghi", appr_sel_delete:"Xóa mục đã chọn", appr_sel_cancel:"Bỏ chọn",
+             appr_batch_confirm:"Xóa {n} yêu cầu phê duyệt đã chọn? Không thể hoàn tác.", appr_batch_deleted:"Đã xóa {n} bản ghi",
              usr_delegate:"Ủy nhiệm nghỉ việc", usr_delegate_ph:"(người đang làm việc được chọn sẽ tiếp quản dữ liệu & việc cần làm)",
              users_title:"Người dùng & Ủy quyền",
              users_add_btn:"+ Thêm người dùng",
@@ -48263,10 +48559,16 @@ function finishSingleUse(bid, target_id, approved, msg){
 var APPROVAL_SORT = { key:'created_at', dir:'desc' };
 var APPROVAL_FILTERS = {};  // { 列key: 过滤文本 }
 
+/* ★APPR-BATCH-DEL-20261115（用户 2026-11-15）：tom / 管理员在审批中心【右键】→
+   进入批量选择态（每行出现复选框），勾选多条后出现「删除所选」按钮 → 批量删除。
+   权限沿用 canDeleteApproval()（tom 或 管理员/总经理/副总经理/总裁），服务端 DELETE 接口同样校验。 */
+var APPR_SEL_MODE = false;
+var APPR_SEL_IDS = {};      // { id: true }
+
 // 列定义：key 对应数据字段
 function apprColumns(){
   var t = (function(){var _x=T();return _x?_x.empty||_x:{}})();
-  return [
+  var cols = [
     { key:'_no',        label:t.appr_col_no,        sortable:false, filterable:false, cls:'appr-col-no' },
     { key:'requester',  label:t.appr_col_requester, sortable:true,  filterable:true },
     { key:'created_at', label:t.appr_col_time,      sortable:true,  filterable:true },
@@ -48277,6 +48579,11 @@ function apprColumns(){
     { key:'resolved_at',label:t.appr_col_resolved,  sortable:true,  filterable:true },
     { key:'_action',    label:t.appr_col_action,    sortable:false, filterable:false, cls:'appr-col-action' }
   ];
+  /* ★APPR-BATCH-DEL-20261115：批量选择态在最前面加复选框列（表头全选 + 行内勾选） */
+  if (APPR_SEL_MODE){
+    cols.unshift({ key:'_sel', label:'', sortable:false, filterable:false, cls:'appr-col-sel' });
+  }
+  return cols;
 }
 
 function apprSortValue(x, key){
@@ -48306,13 +48613,15 @@ function apprTranslateTitle(x){
     return tail ? (head + '：' + tail) : (head || raw || '-');
   }
   // 生产收货单审批：标题按当前系统语言重建（入库时固化的中文快照不直接显示）
-  if (bid === 'PROD-RECEIPT' && typeof pt === 'function') {
-    var _pt1 = pt('appr_title_PROD_RECEIPT');
-    if (_pt1 && _pt1 !== 'appr_title_PROD_RECEIPT') return _pt1;
+  if ((bid === 'PROD-RECEIPT' || bid === 'PROD-RECEIPT-F') && typeof pt === 'function') {
+    var _tk = (bid === 'PROD-RECEIPT-F') ? 'appr_title_PROD_RECEIPT_F' : 'appr_title_PROD_RECEIPT';
+    var _pt1 = pt(_tk);
+    if (_pt1 && _pt1 !== _tk) return _pt1;
   }
   // block_id → i18n key 映射
   var map = {
     'PROD-RECEIPT':'appr_title_PROD_RECEIPT',
+    'PROD-RECEIPT-F':'appr_title_PROD_RECEIPT_F',
     'APP-L3':'appr_title_APP_L3',
     'PWD-FORGET':'appr_title_PWD_FORGET',
     'CRM-E1':'perm_name_CRM_E1', 'WON-E1':'perm_name_WON_E1', 'LOST-E1':'perm_name_LOST_E1',
@@ -48336,9 +48645,10 @@ function apprTranslateContent(x){
   var t = (function(){var _x=T();return _x?_x.empty||_x:{}})();
   var raw = (x.content || '').trim();
   // 生产收货单审批：内容按当前系统语言重建（不显示创建时固化的中文快照）
-  if ((x.block_id || '').trim() === 'PROD-RECEIPT' && typeof pt === 'function') {
-    var _pc = pt('appr_content_PROD_RECEIPT');
-    if (_pc && _pc !== 'appr_content_PROD_RECEIPT') return _pc;
+  if (((x.block_id || '').trim() === 'PROD-RECEIPT' || (x.block_id || '').trim() === 'PROD-RECEIPT-F') && typeof pt === 'function') {
+    var _ck = ((x.block_id || '').trim() === 'PROD-RECEIPT-F') ? 'appr_content_PROD_RECEIPT_F' : 'appr_content_PROD_RECEIPT';
+    var _pc = pt(_ck);
+    if (_pc && _pc !== _ck) return _pc;
   }
   if ((x.block_id || '').trim() === 'PWD-FORGET' && raw.indexOf('申请重置登录密码') >= 0) {
     var who = (x.requester_name || x.requester || '').trim();
@@ -48407,6 +48717,7 @@ function renderApprovals(){
   if (APPROVAL_ITEMS.length === 0){
     listEl.innerHTML = '';
     headEl.innerHTML = '';
+    APPR_SEL_MODE = false; APPR_SEL_IDS = {}; apprSyncSelBar();
     if (wrapEl) wrapEl.style.display='none';
     if (emptyEl){ emptyEl.style.display='block'; var et=document.getElementById('apprEmptyText'); if(et) et.textContent=t.appr_empty||'暂无审批事项'; }
     return;
@@ -48417,6 +48728,11 @@ function renderApprovals(){
   // 头部（标签 + 排序箭头 + 过滤输入）
   var cols = apprColumns();
   headEl.innerHTML = '<tr>' + cols.map(function(c){
+    /* ★APPR-BATCH-DEL-20261115：复选框列 → 表头全选 */
+    if (c.key === '_sel'){
+      return '<th class="appr-col-sel"><input type="checkbox" class="appr-sel-cb" id="apprSelAll" '
+        + 'onclick="event.stopPropagation()" onchange="apprSelectAll(this.checked)" title="" /></th>';
+    }
     var sortMark = '';
     if (c.sortable){
       var arrow = APPROVAL_SORT.key===c.key ? (APPROVAL_SORT.dir==='asc' ? '▲' : '▼') : '↕';
@@ -48448,26 +48764,53 @@ function renderApprovals(){
     return 0;
   });
 
+  /* ★APPR-BATCH-DEL-20261115：清掉已不存在的选中 id（删除/切换作用域后不残留） */
+  if (APPR_SEL_MODE){
+    var _alive = {};
+    rows.forEach(function(x){ _alive[String(x.id)] = true; });
+    Object.keys(APPR_SEL_IDS).forEach(function(k){ if (!_alive[k]) delete APPR_SEL_IDS[k]; });
+  }
+
   if (rows.length === 0){
     listEl.innerHTML = '<tr><td colspan="'+cols.length+'" style="text-align:center;color:#999;padding:30px">'+(t.appr_no_result||'无匹配结果')+'</td></tr>';
+    apprSyncSelBar();
     return;
   }
 
   listEl.innerHTML = rows.map(function(x, i){
+    var _selOn = APPR_SEL_MODE && !!APPR_SEL_IDS[String(x.id)];
     var approvers = parseApprovers(x);
     var avHtml = approvers.map(function(a){ return '<span class="appr-avatar"><span class="dot"></span>'+(userNameById(a)||a)+'</span>'; }).join('');
     var canResolve = x.status === 'pending';
+    /* ★RC-BUYER-ONLY-20261115：第 1 级（采购经理核实）对 tom/cuong/james 只读——按钮不渲染 */
+    var _isRcRow = (x.block_id==='PROD-RECEIPT' || x.block_id==='PROD-RECEIPT-F');
+    var _rcLocked = canResolve && _isRcRow && !prodApprCanAct(x, prodApprReceiptPayloadSafe(x));
+    var _rcLockedHtml = _rcLocked
+      ? '<span class="appr-badge" title="'+escapeHtml(prodApprTxt('rc_buyer_only_hint','本单由采购经理核实，其他审批人只能查看，不能操作。'))+'" '
+        + 'style="background:#eef1f5;color:#5b6b7c;border-color:#d7dee7">'+escapeHtml(prodApprTxt('rc_buyer_only_short','仅采购经理可操作'))+'</span>'
+      : '';
     var persistBadge = (x.persist === 'single-use')
       ? ' <span class="appr-persist-badge persist-single">'+escapeHtml(t.appr_single_use||'单次生效')+'</span>'
       : (x.persist === 'persistent' ? ' <span class="appr-persist-badge persist-persistent">'+escapeHtml(t.appr_persistent||'持续生效')+'</span>' : '');
-    var opHtml = canResolve
-      ? '<span class="appr-op" onclick="event.stopPropagation()">'+
-          '<button class="appr-mini approve" onclick="resolveApproval('+x.id+',\'approve\')">'+(t.appr_approve||'通过')+'</button>'+
-          '<button class="appr-mini reject" onclick="resolveApproval('+x.id+',\'reject\')">'+(t.appr_reject||'拒绝')+'</button>'+
-          (x.block_id==='PROD-RECEIPT' ? '<button class="appr-mini" style="background:#f0ad4e;border-color:#eea236" onclick="prodApprReceiptResolve('+x.id+',\'return\')">'+(t.appr_return||'返回重新填写')+'</button>' : '')+
-        '</span>'
-      : '<span class="appr-badge '+statusBadgeClass(x.status)+'">'+statusText(x.status)+'</span>';
-    return '<tr onclick="openApprovalDetail('+x.id+')" oncontextmenu="apprRowContext(event,'+x.id+')">'+
+    var opHtml = _rcLocked
+      ? _rcLockedHtml
+      : (canResolve
+      ? ((x.block_id==='PROD-RECEIPT' || x.block_id==='PROD-RECEIPT-F')
+          ? '<span class="appr-op" onclick="event.stopPropagation()">'+
+              '<button class="appr-mini approve" onclick="prodApprReceiptResolve('+x.id+',\'approve\')">'+(t.appr_approve||'通过')+'</button>'+
+              '<button class="appr-mini reject" onclick="prodApprReceiptResolve('+x.id+',\'reject\')">'+(t.appr_reject||'拒绝')+'</button>'+
+              '<button class="appr-mini" style="background:#f0ad4e;border-color:#eea236" onclick="prodApprReceiptResolve('+x.id+',\'return\')">'+(t.appr_return||'返回重新填写')+'</button>'+
+            '</span>'
+          : '<span class="appr-op" onclick="event.stopPropagation()">'+
+              '<button class="appr-mini approve" onclick="resolveApproval('+x.id+',\'approve\')">'+(t.appr_approve||'通过')+'</button>'+
+              '<button class="appr-mini reject" onclick="resolveApproval('+x.id+',\'reject\')">'+(t.appr_reject||'拒绝')+'</button>'+
+            '</span>')
+      : '<span class="appr-badge '+statusBadgeClass(x.status)+'">'+statusText(x.status)+'</span>');
+    return '<tr data-appr-id="'+x.id+'" class="'+(_selOn?'appr-row-sel':'')+'" '
+      + 'onclick="'+(APPR_SEL_MODE ? ('apprToggleSelRow('+x.id+',event)') : ('openApprovalDetail('+x.id+')'))+'" '
+      + 'oncontextmenu="apprRowContext(event,'+x.id+')">'+
+      (APPR_SEL_MODE ? '<td class="appr-col-sel"><input type="checkbox" class="appr-sel-cb" '+(_selOn?'checked ':'')
+        +'onclick="event.stopPropagation()" onchange="apprSetSel('+x.id+',this.checked)"></td>' : '')+
       '<td class="appr-col-no">'+(i+1)+'</td>'+
       '<td>'+escapeHtml(userNameById(x.requester)||x.requester||'-')+'</td>'+
       '<td>'+escapeHtml(x.created_at||'-')+'</td>'+
@@ -48479,6 +48822,7 @@ function renderApprovals(){
       '<td class="appr-col-action">'+opHtml+'</td>'+
     '</tr>';
   }).join('');
+  apprSyncSelBar();
 }
 
 function apprToggleSort(key){
@@ -48519,26 +48863,115 @@ function canDeleteApproval(){
 
 // 右键菜单
 var APPR_CTX_ID = null;
+/* ★APPR-BATCH-DEL-20261115（用户 2026-11-15）：右键不再弹单人菜单，
+   而是进入【批量选择态】：每行出现复选框（当前行自动勾选），勾选多条后
+   工具栏出现「删除所选」按钮 → 批量删除。仅 tom / 管理员可用。 */
 function apprRowContext(e, id){
   e.preventDefault();
   if (!canDeleteApproval()){ showToast(T().empty.appr_del_deny || '无权限'); return; }
   APPR_CTX_ID = id;
-  var menu = document.getElementById('apprCtxMenu');
-  if (!menu) return;
-  var t = (function(){var _x=T();return _x?_x.empty||_x:{}})();
-  var ctxLabel = menu.querySelector('.appr-ctx-label');
-  if (ctxLabel) ctxLabel.textContent = (userNameById(APPROVAL_BY_ID[id] && APPROVAL_BY_ID[id].requester) || (APPROVAL_BY_ID[id] && APPROVAL_BY_ID[id].requester) || '') + ' · #' + id;
-  var ctxItem = menu.querySelector('.appr-ctx-item span[data-i18n]');
-  if (ctxItem) ctxItem.textContent = t.appr_ctx_delete || '删除该审批';
-  menu.style.display = 'block';
-  var mw = menu.offsetWidth, mh = menu.offsetHeight;
-  var x = e.clientX, y = e.clientY;
-  if (x + mw > window.innerWidth) x = window.innerWidth - mw - 8;
-  if (y + mh > window.innerHeight) y = window.innerHeight - mh - 8;
-  menu.style.left = x + 'px';
-  menu.style.top = y + 'px';
+  closeApprCtx();
+  APPR_SEL_MODE = true;
+  APPR_SEL_IDS[String(id)] = true;
+  renderApprovals();
+  apprSyncSelBar();
 }
 function closeApprCtx(){ var m=document.getElementById('apprCtxMenu'); if(m) m.style.display='none'; }
+
+// ---- 批量选择 / 批量删除 ----
+function apprSelList(){
+  return Object.keys(APPR_SEL_IDS).filter(function(k){ return !!APPR_SEL_IDS[k]; });
+}
+function apprSelTxt(key, dft){
+  var t = (function(){var _x=T();return _x?_x.empty||_x:{}})();
+  return t[key] || dft;
+}
+function apprSyncSelBar(){
+  var bar = document.getElementById('apprSelBar');
+  var cntEl = document.getElementById('apprSelCount');
+  var delBtn = document.getElementById('apprSelDelBtn');
+  var cxlBtn = document.getElementById('apprSelCancelBtn');
+  if (!bar) return;
+  var n = apprSelList().length;
+  if (!APPR_SEL_MODE){
+    bar.classList.remove('on');
+    return;
+  }
+  bar.classList.add('on');
+  if (cntEl) cntEl.textContent = apprSelTxt('appr_sel_count', '已选 {n} 条').replace('{n}', n);
+  if (delBtn){
+    delBtn.textContent = apprSelTxt('appr_sel_delete', '删除所选');
+    delBtn.disabled = (n === 0);
+  }
+  if (cxlBtn) cxlBtn.textContent = apprSelTxt('appr_sel_cancel', '取消选择');
+  // 表头全选复选框状态同步（部分选中 → 不勾选）
+  var all = document.getElementById('apprSelAll');
+  if (all){
+    var total = document.querySelectorAll('#apprList tr[data-appr-id]').length;
+    all.checked = (total > 0 && n >= total);
+    all.indeterminate = (n > 0 && n < total);
+  }
+}
+function apprSetSel(id, on){
+  if (on) APPR_SEL_IDS[String(id)] = true; else delete APPR_SEL_IDS[String(id)];
+  var tr = document.querySelector('#apprList tr[data-appr-id="'+id+'"]');
+  if (tr) tr.classList.toggle('appr-row-sel', !!on);
+  apprSyncSelBar();
+}
+function apprToggleSelRow(id, e){
+  if (e) e.stopPropagation();
+  var on = !APPR_SEL_IDS[String(id)];
+  var tr = document.querySelector('#apprList tr[data-appr-id="'+id+'"]');
+  var cb = tr ? tr.querySelector('input.appr-sel-cb') : null;
+  if (cb) cb.checked = on;
+  apprSetSel(id, on);
+}
+function apprSelectAll(on){
+  var trs = document.querySelectorAll('#apprList tr[data-appr-id]');
+  APPR_SEL_IDS = {};
+  [].forEach.call(trs, function(tr){
+    var id = tr.getAttribute('data-appr-id');
+    if (on) APPR_SEL_IDS[String(id)] = true;
+    var cb = tr.querySelector('input.appr-sel-cb');
+    if (cb) cb.checked = !!on;
+    tr.classList.toggle('appr-row-sel', !!on);
+  });
+  apprSyncSelBar();
+}
+function apprExitSelMode(){
+  APPR_SEL_MODE = false;
+  APPR_SEL_IDS = {};
+  renderApprovals();
+  apprSyncSelBar();
+}
+function apprBatchDelete(){
+  var ids = apprSelList();
+  if (!ids.length) return;
+  var t = (function(){var _x=T();return _x?_x.empty||_x:{}})();
+  apprShowConfirm(function(tt){
+    return ((tt && tt.appr_batch_confirm) || '确定删除选中的 {n} 条审批单？删除后不可恢复。').replace('{n}', ids.length);
+  }, function(){
+    var me = (authUser && authUser.username) || '';
+    var okN = 0, failN = 0;
+    var chain = Promise.resolve();
+    ids.forEach(function(id){
+      chain = chain.then(function(){
+        return fetch('/api/approval-requests/'+id+'?username='+encodeURIComponent(me), { method:'DELETE' })
+          .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); })
+          .then(function(d){ if (d && d.ok) okN++; else failN++; })
+          .catch(function(){ failN++; });
+      });
+    });
+    chain.then(function(){
+      if (okN) showToast((( t.appr_batch_deleted) || '已删除 {n} 条').replace('{n}', okN));
+      if (failN) showToast(T().toast_del_fail || '删除失败');
+      APPR_SEL_IDS = {};
+      apprExitSelMode();
+      loadApprovals();
+      refreshPendBadge();
+    });
+  });
+}
 // 自定义确认对话框（替代 window.confirm，橙色主题，居中，三语）
 var _apprConfirmCb = null;
 function apprShowConfirm(msg, onOk){
@@ -48677,7 +49110,7 @@ function openApprovalDetail(id){
         if (x.block_id==='USR-D1' && x.payload) return '<div class="appr-field"><div class="appr-field-label"><span class="ic">🔀</span>'+((T().empty&&T().empty.usr_diff_title)||'权限变更对比')+'</div><div class="usr-diff-box">'+renderUsrPermDiffCard(JSON.parse(x.payload))+'</div></div>';
         if (x.block_id==='USR-D2' && x.payload) return '<div class="appr-field"><div class="appr-field-label"><span class="ic">🧑‍💼</span>'+((T().empty&&T().empty.usr_add_card_title)||'新增用户申请')+'</div><div class="usr-diff-box">'+renderUsrAddCard(JSON.parse(x.payload))+'</div></div>';
         if (x.block_id==='USR-D3' && x.payload) return '<div class="appr-field"><div class="appr-field-label"><span class="ic">🗑️</span>'+((T().empty&&T().empty.usr_del_card_title)||'删除用户申请')+'</div><div class="usr-diff-box">'+renderUsrDelCard(JSON.parse(x.payload))+'</div></div>';
-        if (x.block_id==='PROD-RECEIPT' && x.payload) { try{ return '<div class="appr-field"><div class="appr-field-label"><span class="ic">📦</span>'+((typeof pt==='function')?pt('sec_receipt'):((T().empty&&T().empty.sec_receipt)||'收货单'))+'</div><div class="usr-diff-box">'+prodApprReceiptHtml(JSON.parse(x.payload))+'</div></div>'; }catch(e){} }
+        if ((x.block_id==='PROD-RECEIPT' || x.block_id==='PROD-RECEIPT-F') && x.payload) { try{ return '<div class="appr-field"><div class="appr-field-label"><span class="ic">📦</span>'+((typeof pt==='function')?pt('sec_receipt'):((T().empty&&T().empty.sec_receipt)||'收货单'))+'</div><div class="usr-diff-box">'+prodApprReceiptHtml(JSON.parse(x.payload), x.block_id)+'</div></div>'; }catch(e){} }
       }catch(e){}
       return '';
     })()+
@@ -48690,13 +49123,21 @@ function openApprovalDetail(id){
       '<div class="appr-field-value">'+(x.persist==='single-use' ? '<span class="persist-badge persist-single">'+escapeHtml(t.appr_single_use||'单次生效')+'</span>' : (x.persist==='persistent' ? '<span class="persist-badge persist-persistent">'+escapeHtml(t.appr_persistent||'持续生效')+'</span>' : (t.appr_effect_none||'默认'))) + (x.target_id ? ' <span style="color:#888">#'+escapeHtml(x.target_id)+'</span>' : '')+'</div></div>'+
     (x.resolver ? '<div class="appr-field"><div class="appr-field-label"><span class="ic">🧑‍⚖️</span>'+(t.appr_resolved_by||'审批人')+'</div><div class="appr-field-value">'+escapeHtml(x.resolver_name||x.resolver)+'</div></div>' : '')+
     (x.resolved_at ? '<div class="appr-field"><div class="appr-field-label"><span class="ic">⏱️</span>'+(t.appr_resolved_at||'审批时间')+'</div><div class="appr-field-value">'+escapeHtml(x.resolved_at)+'</div></div>' : '')+
-    (canResolve ? (x.block_id==='PROD-RECEIPT'
+    (function(){
+      /* ★RC-BUYER-ONLY-20261115：第 1 级（采购经理核实）对 tom/cuong/james 只读，只显示提示条 */
+      var _isRc = (x.block_id==='PROD-RECEIPT' || x.block_id==='PROD-RECEIPT-F');
+      if(canResolve && _isRc && !prodApprCanAct(x, prodApprReceiptPayloadSafe(x))){
+        return '<div class="appr-actions"><div style="width:100%;padding:8px 10px;border-radius:6px;background:#eef1f5;color:#5b6b7c;'
+          + 'font-size:12px;line-height:1.6">'+escapeHtml(prodApprTxt('rc_buyer_only_hint','本单由采购经理核实，其他审批人只能查看，不能操作。'))+'</div></div>';
+      }
+      return canResolve ? ((_isRc)
         ? '<div class="appr-actions"><button class="appr-btn approve" onclick="prodApprReceiptResolve('+x.id+',\'approve\')">'+(t.appr_approve||'通过')+'</button>'
           + '<button class="appr-btn reject" onclick="prodApprReceiptResolve('+x.id+',\'reject\')">'+(t.appr_reject||'拒绝')+'</button>'
           + '<button class="appr-btn" style="background:#f0ad4e;border-color:#eea236" onclick="prodApprReceiptResolve('+x.id+',\'return\')">'+(t.appr_return||'返回重新填写')+'</button></div>'
         : '<div class="appr-actions"><button class="appr-btn approve" onclick="resolveApproval('+x.id+',\'approve\')">'+(t.appr_approve||'通过')+'</button>'
           + '<button class="appr-btn reject" onclick="resolveApproval('+x.id+',\'reject\')">'+(t.appr_reject||'拒绝')+'</button></div>')
-      : '');
+      : '';
+    })();
   document.getElementById('apprDrawer').classList.add('open');
   document.getElementById('apprDrawerMask').classList.add('show');
   // 审批详情渲染后，补算收货单明细的小计/合计（innerHTML 不会执行内联脚本，故在此触发）
@@ -48735,10 +49176,12 @@ function resolveApproval(id, action){
       var req = (APPROVAL_BY_ID && APPROVAL_BY_ID[id]) || {};
       if (action==='approve' && (req.persist||'persistent')==='persistent' && typeof reloadSession === 'function'){ reloadSession(true); }
       // 收货单审批：从列表快捷按钮通过/驳回时，同样要回写收货单状态（入库/已驳回）
-      if (req.block_id==='PROD-RECEIPT'){
+      if (req.block_id==='PROD-RECEIPT' || req.block_id==='PROD-RECEIPT-F'){
         var _pl=null; try{ _pl=JSON.parse(req.payload||'{}'); }catch(e){}
         if(_pl && _pl.receiptId){
-          if(action==='approve'){ prodApprApplyInbound(_pl); }
+          /* ★RC-2STAGE-20261115：一级通过 → 转二级；二级通过 → 才入库 */
+          var _stage = prodApprReceiptStage(req, _pl);
+          if(action==='approve'){ if(_stage==='final'){ prodApprApplyInbound(_pl); } else { prodApprPassToFinal(_pl); } }
           else if(action==='return'){ prodApprMarkNeedEdit(_pl); }
           else { prodApprMarkReturned(_pl); }
         }
@@ -48748,21 +49191,40 @@ function resolveApproval(id, action){
   }).catch(function(){ showToast(T().toast_op_fail||'Operation failed'); });
 }
 /* ===== PROD-RECEIPT 审批：采购经理可改数量/单价/规格后通过（入库），或驳回 ===== */
-function prodApprReceiptHtml(pl){
+function prodApprReceiptHtml(pl, blockId){
   if(!pl || !pl.rows) return '';
   var t=(typeof pt==='function')?pt:function(k){return k;};
+  /* ★RC-2STAGE-20261115：一级（采购经理）可改规格/数量/单价/备注；二级（最终审批）只读核对 */
+  var isFinal = (blockId === 'PROD-RECEIPT-F') || (pl && pl.stage === 'final');
   var rowsHtml = pl.rows.map(function(rw,i){
+    if(isFinal){
+      return '<tr>'
+        + '<td>'+prod_esc(prodRcTr('mat', rw.material))+'</td>'
+        + '<td>'+prod_esc((typeof prodRcSpecDisplay==='function')?prodRcSpecDisplay(rw.material, rw.spec):rw.spec)+'</td>'
+        + '<td>'+prod_esc(prodRcTr('unit', rw.unit))+'</td>'
+        + '<td style="text-align:right;color:#2E7D32">'+prod_esc(prodFormatMoney(rw.priceVnd,'VND'))+'</td>'
+        + '<td style="text-align:right">'+prod_esc(prodQtyTxt(rw.qty))+'</td>'
+        + '<td id="apr_rc_'+i+'_sv" style="text-align:right"></td>'
+        + '<td id="apr_rc_'+i+'_sr" style="text-align:right"></td>'
+        + '<td id="apr_rc_'+i+'_su" style="text-align:right"></td>'
+        + '<td>'+prod_esc(prodRcNoteVal(rw))+'</td></tr>';
+    }
     return '<tr>'
       + '<td>'+prod_esc(prodRcTr('mat', rw.material))+'</td>'
       + '<td><input id="apr_rc_'+i+'_spec" value="'+prod_esc((typeof prodRcSpecDisplay==='function')?prodRcSpecDisplay(rw.material, rw.spec):rw.spec)+'" style="width:90px"></td>'
       + '<td>'+prod_esc(prodRcTr('unit', rw.unit))+'</td>'
-      + '<td><input id="apr_rc_'+i+'_price" value="'+prod_esc(rw.priceVnd)+'" style="width:80px;color:#2E7D32" oninput="prodApprReceiptRecompute()"></td>'
+      /* ★APPR-RC-PRICEFMT-20261115：单价显示千位分隔符 + 货币符号（₫1,700,000），失焦时再规范化一次；
+         解析侧（prodApprReceiptRecompute / prodApprReceiptResolve）已用 replace(/[^0-9.\-]/g,'') 去符号，安全 */
+      + '<td><input id="apr_rc_'+i+'_price" value="'+prod_esc((typeof prodRcPriceTxt==='function')?prodRcPriceTxt(rw.priceVnd):rw.priceVnd)+'" style="width:104px;color:#2E7D32" oninput="prodApprReceiptRecompute()" onblur="prodApprRcPriceBlur(this)"></td>'
       + '<td><input id="apr_rc_'+i+'_qty" value="'+prod_esc(prodQtyTxt(rw.qty))+'" style="width:70px" oninput="prodApprReceiptRecompute()"></td>'
       + '<td id="apr_rc_'+i+'_sv" style="text-align:right"></td>'
       + '<td id="apr_rc_'+i+'_sr" style="text-align:right"></td>'
       + '<td id="apr_rc_'+i+'_su" style="text-align:right"></td>'
-      + '<td>'+prod_esc(prodRcNoteVal(rw))+'</td></tr>';
+      + '<td><input id="apr_rc_'+i+'_note" value="'+prod_esc(prodRcNoteVal(rw))+'" style="width:110px"></td></tr>';
   }).join('');
+  var stageBanner = '<div style="margin:0 0 6px;font-size:12px;font-weight:700;color:'+(isFinal?'#1565c0':'#E53935')+';">'
+    + prod_esc(isFinal ? (t('lbl_aprr_stage_final')||'第2级：最终审批（只读）') : (t('lbl_aprr_stage_buyer')||'第1级：采购经理核实（可改单价/备注）'))
+    + '</div>';
   var floorsHtml = (pl.floors && pl.floors.length) ? '<div><span>'+t('lbl_floor_spec')+'</span>：'+prod_esc(pl.floors.join('、'))+'</div>' : '';
   var housesHtml = (pl.houses && pl.houses.length) ? '<div><span>'+t('lbl_for_house2')+'</span>：'+prod_esc(pl.houses.join('、'))+'</div>' : '';
   var photosArr = Array.isArray(pl.photos) ? pl.photos : [];
@@ -48771,7 +49233,7 @@ function prodApprReceiptHtml(pl){
         return '<a href="/uploads/'+encodeURIComponent(p)+'" onclick="event.preventDefault();win_imgLightbox(this.getAttribute(\'href\'));return false;"><img src="/uploads/'+encodeURIComponent(p)+'" class="thumb"></a>';
       }).join('')+'</div>'
     : '';
-  return floorsHtml + housesHtml
+  return stageBanner + floorsHtml + housesHtml
     + '<table class="prod-table"><thead><tr><th>'+t('lbl_material')+'</th><th>'+t('lbl_spec')+'</th><th>'+t('lbl_unit')+'</th><th>'+t('lbl_price_vnd')+'</th><th>'+t('thr_qty2')+'</th><th>'+t('lbl_sub_vnd')+'</th><th>'+t('lbl_sub_rmb')+'</th><th>'+t('lbl_sub_usd')+'</th><th>'+t('lbl_note')+'</th></tr></thead><tbody>'+rowsHtml
     + '<tr class="rc-total"><td colspan="5"><b>'+t('thr_total2')+'</b></td><td id="apr_rc_total_v" style="text-align:right"></td><td id="apr_rc_total_r" style="text-align:right"></td><td id="apr_rc_total_u" style="text-align:right"></td><td></td></tr>'
     + '</tbody></table>'
@@ -48783,8 +49245,8 @@ function prodApprReceiptRecompute(){
   var r=prodGetRates(); var totV=0,totR=0,totU=0;
   for(var i=0;i<200;i++){
     var pvEl=document.getElementById('apr_rc_'+i+'_price'); if(!pvEl) break;
-    var pv=parseFloat(String(pvEl.value||'').replace(/[^0-9.\-]/g,''))||0;
-    var pqEl=document.getElementById('apr_rc_'+i+'_qty'); var pq=parseFloat(String((pqEl?pqEl.value:'0')||'').replace(/[^0-9.\-]/g,''))||0;
+    var pv=prodApprNum(pvEl.value);
+    var pqEl=document.getElementById('apr_rc_'+i+'_qty'); var pq=prodApprNum(pqEl?pqEl.value:'0');
     var subV=pv*pq; var subR=r.rmb?subV/r.rmb:0; var subU=r.usd?subV/r.usd:0;
     totV+=subV; totR+=subR; totU+=subU;
     var sv=document.getElementById('apr_rc_'+i+'_sv'); if(sv) sv.innerHTML=subV?prodMoneySpan(subV,'VND'):'';
@@ -48795,22 +49257,131 @@ function prodApprReceiptRecompute(){
   var tr=document.getElementById('apr_rc_total_r'); if(tr) tr.innerHTML=prodMoneySpan(totR,'RMB');
   var tu=document.getElementById('apr_rc_total_u'); if(tu) tu.innerHTML=prodMoneySpan(totU,'USD');
 }
+/* ★APPR-RC-PRICEFMT-20261115：审批里「单价(VND)」失焦后按千位分隔符 + ₫ 重新显示（如 ₫1,700,000）。
+   只改显示，不改数值：解析一律走 replace(/[^0-9.\-]/g,'')，所以带符号/逗号不会算错。 */
+function prodApprRcPriceBlur(el){
+  if(!el) return;
+  try{
+    var raw = String(el.value==null?'':el.value).replace(/[^0-9.\-]/g,'');
+    el.value = (raw==='') ? '' : ((typeof prodRcPriceTxt==='function') ? prodRcPriceTxt(raw) : raw);
+  }catch(e){}
+  try{ prodApprReceiptRecompute(); }catch(e){}
+}
+/* ★RC-2STAGE-20261115：判断这条审批属于第几级（一级 buyer / 二级 final） */
+function prodApprReceiptStage(x, pl){
+  if(x && String(x.block_id||'') === 'PROD-RECEIPT-F') return 'final';
+  if(x && String(x.block_id||'') === 'PROD-RECEIPT' && pl && pl.stage === 'final') return 'final';
+  if(pl && pl.stage === 'final') return 'final';
+  return 'buyer';
+}
+/* ===== ★RC-BUYER-ONLY-20261115（用户 2026-11-15 需求）=====
+   两张单级的操作权：
+     · 第 1 级（PROD-RECEIPT / stage=buyer）→ 只有【采购经理】能审批；
+       tom/cuong/james 会同步收到并看到这张单，但按钮必须不激活，只能查看。
+     · 第 2 级（PROD-RECEIPT-F / stage=final）→ tom/cuong/james 任一人通过即生效。 */
+var PROD_APPR_TRIO = ['tom','cuong','james'];
+function prodApprIsTrio(u){ return PROD_APPR_TRIO.indexOf(String(u||'').toLowerCase()) >= 0; }
+/* 第 1 级可操作人 = 该审批单审批人里去掉三人组（即采购经理）；为空则回落 thienly */
+function prodApprBuyerUsers(list){
+  var out = (list||[]).filter(function(u){ return u && !prodApprIsTrio(u); })
+                     .map(function(u){ return String(u).toLowerCase(); });
+  if(!out.length) out = ['thienly'];
+  return out;
+}
+function prodApprReceiptPayloadSafe(x){
+  try{ return JSON.parse((x&&x.payload)||'{}'); }catch(e){ return {}; }
+}
+/* ★APPR-AMOUNT-NUM-20261115（用户 2026-11-15 要求修复）：
+   两级审批里金额/数量既可能是数字，也可能是「₫1,450,000」「1.450.000」「1,250」这类带货币符号/千分位的字符串。
+   以前直接写 `+rw.priceVnd` / `parseFloat(v.replace(/[^0-9.\-]/g,''))`：
+     - 带 '.' 千分位的越南写法（1.450.000）会被 parseFloat 当成 1.45；
+     - 字段缺失/输入框没渲染时得到 undefined → NaN → 0；
+   结果就是「第 2 级通过、入库后」收货单卡片上 单价(VND)/合计(VND) 变成 ₫0（RMB/USD 因为保留了提交时的值仍然正确）。
+   统一走这个容错解析：去掉 ₫¥$ 空格等非数字字符，按「最后出现的符号当小数点」规则还原。 */
+function prodApprNum(v){
+  if(v === null || v === undefined) return 0;
+  if(typeof v === 'number') return isFinite(v) ? v : 0;
+  var s = String(v).trim();
+  if(!s) return 0;
+  s = s.replace(/[^0-9.,\-]/g, '');
+  if(!s || s === '-' || s === '.' || s === ',') return 0;
+  var hasDot = s.indexOf('.') >= 0, hasComma = s.indexOf(',') >= 0;
+  if(hasDot && hasComma){
+    var last = Math.max(s.lastIndexOf('.'), s.lastIndexOf(','));
+    s = s.slice(0, last).replace(/[.,]/g, '') + '.' + s.slice(last + 1).replace(/[.,]/g, '');
+  } else if(hasDot || hasComma){
+    var ch = hasDot ? '.' : ',';
+    var parts = s.split(ch);
+    if(parts.length > 2){
+      s = parts.join('');                                   /* 1.450.000 / 1,450,000 → 千分位 */
+    } else if(parts[1] && parts[1].length === 3 && parts[0] && parts[0].replace('-','').length <= 3){
+      s = parts.join('');                                   /* 1,450 → 1450 */
+    } else {
+      s = (parts[0] || '0') + '.' + (parts[1] || '0');       /* 2,5 → 2.5 */
+    }
+  }
+  var n = parseFloat(s);
+  return isFinite(n) ? n : 0;
+}
+function prodApprCanAct(x, pl){
+  if(!x || x.status !== 'pending') return false;
+  var bid = String(x.block_id||'');
+  if(bid !== 'PROD-RECEIPT' && bid !== 'PROD-RECEIPT-F') return true;
+  if(!pl) pl = prodApprReceiptPayloadSafe(x);
+  var stage = prodApprReceiptStage(x, pl);
+  if(stage === 'final') return true;             /* 二级：三人组任一 */
+  var me = String((typeof authUser!=='undefined' && authUser && authUser.username)||'').toLowerCase();
+  return prodApprBuyerUsers(parseApprovers(x)).indexOf(me) >= 0;
+}
+/* 取三语文案：优先生产语包 pt()，再退全局 T()，最后回落中文默认值 */
+function prodApprTxt(k, dflt){
+  try{ if(typeof pt === 'function'){ var v = pt(k); if(v && v !== k) return v; } }catch(e){}
+  try{
+    var T0 = (typeof T === 'function') ? T() : null;
+    var d = (T0 && (T0.empty || T0)) || {};
+    if(d[k]) return d[k];
+  }catch(e){}
+  return dflt || k;
+}
+/* 弹「提示框」：优先用页面上的全局 alert 层，退化为 toast */
+function prodApprPop(msg){
+  try{ if(typeof showAlert === 'function'){ showAlert(msg); return; } }catch(e){}
+  try{ if(typeof showToast === 'function'){ showToast(msg); return; } }catch(e){}
+}
 function prodApprReceiptResolve(id, action){
   var x = APPROVAL_BY_ID[id]; if(!x) return;
   var t=(typeof pt==='function')?pt:function(k){return k;};
   var pl=null; try{ pl=JSON.parse(x.payload||'{}'); }catch(e){ pl={}; }
+  var stage = prodApprReceiptStage(x, pl);
+  /* ★RC-BUYER-ONLY-20261115：第 1 级（采购经理核实）不允许 tom/cuong/james 操作 */
+  if(!prodApprCanAct(x, pl)){
+    showToast(prodApprTxt('rc_buyer_only_hint','本单由采购经理核实，其他审批人只能查看，不能操作。'));
+    return;
+  }
   if(action==='approve'){
     var rates=prodGetRates();
     pl.rows=(pl.rows||[]).map(function(rw,i){
-      var g=function(suf){ var elx=document.getElementById('apr_rc_'+i+'_'+suf); return elx?elx.value:rw[suf]; };
-      var priceVnd=parseFloat(String(g('price')).replace(/[^0-9.\-]/g,''))||0;
-      var qty=parseFloat(String(g('qty')).replace(/[^0-9.\-]/g,''))||0;
+      /* ★APPR-AMOUNT-NUM-20261115：输入框不存在 / 为空时必须回落到载荷本身（旧代码回落键写成 rw['price']，
+         而载荷里存的是 priceVnd，取到 undefined → 单价被算成 0，入库后卡片显示 ₫0）。 */
+      var g=function(suf){
+        var elx=document.getElementById('apr_rc_'+i+'_'+suf);
+        if(elx && String(elx.value||'').trim() !== '') return elx.value;
+        if(suf==='price') return rw.priceVnd;
+        if(suf==='qty') return rw.qty;
+        return rw[suf];
+      };
+      var priceVnd=prodApprNum(g('price'));
+      var qty=prodApprNum(g('qty'));
+      var noteEl=document.getElementById('apr_rc_'+i+'_note');
+      var note = noteEl ? noteEl.value : (rw.note||'');
+      var noteTr = noteEl ? {zh:note, en:note, vi:note} : (rw.noteTr||{zh:'',en:'',vi:''});
       var subV=priceVnd*qty;
       // 有汇率时按当前汇率算；无汇率时保留原单里的 RMB/USD，避免被覆盖成 0
       var subR=rates.rmb?+(subV/rates.rmb).toFixed(2):(+(rw.subRmb||0));
       var subU=rates.usd?+(subV/rates.usd).toFixed(2):(+(rw.subUsd||0));
-      return {material:rw.material, spec:String(g('spec')), unit:rw.unit, priceVnd:priceVnd, qty:qty, note:rw.note||'', noteTr:rw.noteTr||{zh:'',en:'',vi:''}, subVnd:Math.round(subV), subRmb:subR, subUsd:subU};
+      return {material:rw.material, spec:String(g('spec')), unit:rw.unit, priceVnd:priceVnd, qty:qty, note:note, noteTr:noteTr, subVnd:Math.round(subV), subRmb:subR, subUsd:subU};
     });
+    pl.stage = stage;
   }
   var me=(authUser&&authUser.username)||'';
   function sendResolve(act, note){
@@ -48819,13 +49390,17 @@ function prodApprReceiptResolve(id, action){
       .then(function(r){ return r.json().catch(function(){ return {ok:false}; }); });
   }
   function finish(){
-    if(action==='approve' && pl && pl.receiptId){ prodApprApplyInbound(pl); }
-    else if(action==='return' && pl && pl.receiptId){ prodApprMarkNeedEdit(pl); }
-    else if(action==='reject' && pl && pl.receiptId){ prodApprMarkReturned(pl); }
-    showToast(action==='approve' ? (t('toast_sent_approve')||'已通过')
-            : action==='return' ? (t('toast_receipt_need_edit')||'已返回重新填写')
-            : (t('appr_rejected')||'已驳回'));
+    /* ★RC-BUYER-ONLY-20261115：两级审批各自的完成提示框（三语） */
+    var _popMsg = '';
+    if(action==='approve' && pl && pl.receiptId){
+      if(stage === 'final'){ prodApprApplyInbound(pl); _popMsg = prodApprTxt('toast_final_done','该批次收货最终完成！'); }
+      else { prodApprPassToFinal(pl); _popMsg = prodApprTxt('toast_passed_to_final','采购经理已经通过，下一步提交管理层最后审批！'); }
+    }
+    else if(action==='return' && pl && pl.receiptId){ prodApprMarkNeedEdit(pl); showToast(t('toast_receipt_need_edit')||'已返回重新填写'); }
+    else if(action==='reject' && pl && pl.receiptId){ prodApprMarkReturned(pl); showToast(t('appr_rejected')||'已驳回'); }
+    else { showToast(action==='approve' ? (t('toast_sent_approve')||'已通过') : (t('appr_rejected')||'已驳回')); }
     closeApprovalDetail(); loadApprovals(); refreshPendBadge();
+    if(_popMsg){ setTimeout(function(){ try{ prodApprPop(_popMsg); }catch(e){} }, 80); }
   }
   sendResolve(action, '').then(function(d){
     if(d && d.ok){ finish(); return; }
@@ -48895,6 +49470,45 @@ function prodApprSaveFactory(pid, f){
   try{ PROD_MEM[pid]=f; }catch(_){}
   return prod_save(f);
 }
+/* ★RC-2STAGE-20261115：一级（采购经理）通过 → 收货单置「待最终审批」+ 发起二级审批（tom/cuong/james）
+   注意：这一级【不】写入 materials.inbound，真正入库发生在二级最终通过时。 */
+function prodApprPassToFinal(pl){
+  var pid=pl.project; if(!pid) return;
+  var me=(authUser&&authUser.username)||'';
+  var tp=(typeof pt==='function')?pt:function(k){return k;};
+  prodApprLoadFactory(pid, function(f){
+    if(f){
+      var rec=prodApprEnsureReceipt(f, pl);
+      var r=prodGetRates();
+      rec.rows=(pl.rows||[]).map(function(rw){
+        /* ★APPR-AMOUNT-NUM-20261115：统一容错解析并写回数值，避免卡片显示 ₫0 */
+        rw.priceVnd=prodApprNum(rw.priceVnd); rw.qty=prodApprNum(rw.qty);
+        var subV=rw.priceVnd*rw.qty; rw.subVnd=Math.round(subV);
+        rw.subRmb=r.rmb?+(subV/r.rmb).toFixed(2):(+(rw.subRmb||0));
+        rw.subUsd=r.usd?+(subV/r.usd).toFixed(2):(+(rw.subUsd||0));
+        return rw;
+      });
+      rec.status='pending_final';
+      rec.buyerCheckedBy=me;
+      rec.buyerCheckedAt=(typeof prodTimeNow==='function')?prodTimeNow():'';
+      if(pl.date) rec.date=pl.date;
+      if(pl.floors && pl.floors.length) rec.floors=pl.floors;
+      if(pl.houses && pl.houses.length) rec.houses=pl.houses;
+      prodApprSaveFactory(pid, f);
+      if(PROD_CUR===pid && typeof prod_renderTab==='function') prod_renderTab('D');
+    }
+    var tri=(typeof TRI_APPROVERS!=='undefined'&&TRI_APPROVERS)?TRI_APPROVERS.slice():['tom','cuong','james'];
+    var payload=JSON.stringify({project:pid, receiptId:pl.receiptId, date:pl.date, floors:pl.floors, houses:pl.houses, photos:pl.photos, rows:pl.rows, stage:'final'});
+    fetch('/api/approval-requests',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ requester:me, requester_name:(authUser&&authUser.real_name)||'', block_id:'PROD-RECEIPT-F', block_name:tp('sec_receipt'), title:tp('appr_title_PROD_RECEIPT_F')||tp('sec_receipt'), action_name:'', approvers:tri, content:tp('appr_content_PROD_RECEIPT_F')||'', target_id:String(pl.receiptId||''), persist:'persistent', payload:payload })
+    }).then(function(res){ return res.json().catch(function(){ return {ok:false}; }); }).then(function(d){
+      if(d && d.ok){ showToast(tp('toast_passed_to_final')||'已通过，已提交最终审批'); }
+      else { showToast((d&&d.msg)||'提交最终审批失败'); }
+      if(typeof loadApprovals==='function') loadApprovals();
+      if(typeof refreshPendBadge==='function') refreshPendBadge();
+    }).catch(function(){ showToast('提交最终审批失败'); });
+  });
+}
 function prodApprApplyInbound(pl){
   var pid=pl.project; if(!pid) return;
   prodApprLoadFactory(pid, function(f){
@@ -48902,7 +49516,9 @@ function prodApprApplyInbound(pl){
     var rec=prodApprEnsureReceipt(f, pl);
     var r=prodGetRates();
     rec.rows = (pl.rows||[]).map(function(rw){
-      var subV=(+rw.priceVnd||0)*(+rw.qty||0); rw.subVnd=Math.round(subV);
+      /* ★APPR-AMOUNT-NUM-20261115：入库时同样容错解析，并把结果写回 rows（卡片直接读这两个字段） */
+      rw.priceVnd = prodApprNum(rw.priceVnd); rw.qty = prodApprNum(rw.qty);
+      var subV = rw.priceVnd * rw.qty; rw.subVnd = Math.round(subV);
       // 有汇率时按当前汇率重算；无汇率时保留提交时已有的 RMB/USD，避免被覆盖成 0
       rw.subRmb = r.rmb ? +(subV/r.rmb).toFixed(2) : (+(rw.subRmb||0));
       rw.subUsd = r.usd ? +(subV/r.usd).toFixed(2) : (+(rw.subUsd||0));
@@ -49061,7 +49677,7 @@ function renderDrawer(){
             <button class="btn-pass" onclick="resolveReq(${r.id},'approve')">${t.user_approve_pass||'通过'}</button>
             <button class="btn-reject" onclick="resolveReq(${r.id},'reject')">${t.user_approve_reject||'驳回'}</button>
           </div>` : `<div class="ra" style="color:#888;">${statusTxt}</div>`;
-        const bnDisp = (r.block_id==='PROD-RECEIPT' && typeof pt==='function') ? pt('sec_receipt') : (r.block_name||r.block_id);
+        const bnDisp = ((r.block_id==='PROD-RECEIPT'||r.block_id==='PROD-RECEIPT-F') && typeof pt==='function') ? pt('sec_receipt') : (r.block_name||r.block_id);
         return `<div class="req-item">
           <div class="rt">${bnDisp} <span style="font-weight:400;color:#999;font-size:11px;">(${r.block_id})</span> ${persistTxt}</div>
           <div class="rm">${t.user_approve_requester_label||'发起人'}：${rname}</div>
@@ -49089,10 +49705,11 @@ function resolveReq(reqId,action){
       if (action==='approve' && (req.persist||'persistent')==='persistent' && typeof reloadSession === 'function') reloadSession(true);
       // 收货单审批：个人页快捷通过/驳回同样回写收货单状态（入库/已驳回）
       const _src = (req && req.block_id) ? req : ((window.PROFILE_REQ_BY_ID && PROFILE_REQ_BY_ID[reqId]) || null);
-      if (_src && _src.block_id==='PROD-RECEIPT'){
+      if (_src && (_src.block_id==='PROD-RECEIPT' || _src.block_id==='PROD-RECEIPT-F')){
         let _pl=null; try{ _pl=JSON.parse(_src.payload||'{}'); }catch(e){}
         if(_pl && _pl.receiptId){
-          if(action==='approve'){ prodApprApplyInbound(_pl); }
+          const _stg = prodApprReceiptStage(_src, _pl);
+          if(action==='approve'){ if(_stg==='final'){ prodApprApplyInbound(_pl); } else { prodApprPassToFinal(_pl); } }
           else if(action==='return'){ prodApprMarkNeedEdit(_pl); }
           else { prodApprMarkReturned(_pl); }
         }
@@ -78036,7 +78653,11 @@ function _doExportOverviewPDF(){
   /* ===== 兜底：为所有未在 injectMaxBtn 中覆盖的模态框补齐 □ 最大化 与 × 关闭按钮 ===== */
   (function() {
     var patches = [
-      {id:'apprConfirmOverlay', box:'#apprConfirmDialog'},
+      /* ★MODAL-CTRL-SIBLING-20261115：这里【不能】写 {id:'apprConfirmOverlay', box:'#apprConfirmDialog'}。
+         #apprConfirmDialog 与 #apprConfirmOverlay 是【兄弟节点】（不是父子），ov.querySelector 取不到 →
+         旧代码退化成 box=overlay（全屏 fixed），.modal-actions 的 position:absolute;top:50%;right:16px
+         就把 □ 和 × 绝对定位到屏幕中间偏右，看起来"飞出了模态框"（用户 2026-11-15 报障）。
+         删除确认框本身只有「确认/取消」两个按钮、没有标题栏，不需要最大化/关闭 chrome。 */
       {id:'commAmtLockOverlay', box:'.comm-lock-box'},
       {id:'benDoneOverlay', box:'.comm-lock-box'},
       {id:'benReactOverlay', box:'.comm-lock-box'},
@@ -78073,8 +78694,16 @@ function _doExportOverviewPDF(){
     function ensureControls(p) {
       var ov = document.getElementById(p.id);
       if (!ov) return;
-      var box = p.box ? ov.querySelector(p.box) : ov;
-      if (!box) box = ov;
+      var box;
+      if (p.box) {
+        /* ★MODAL-CTRL-SIBLING-20261115：内层盒子必须在 overlay 内部才能注入。
+           取不到就【放弃】（绝不再退化成 box=overlay）——否则 □/× 会被 .modal-actions
+           的 absolute;top:50%;right:16px 定位到全屏 overlay 的中右侧，看着像"按钮跑出模态框"。 */
+        box = ov.querySelector(p.box);
+        if (!box) return;
+      } else {
+        box = ov;
+      }
       if (box.getAttribute('data-modal-ctrl')) return;
       // 防止与 injectMaxBtn（按 BOX_SEL 批量注入）重复处理同一盒子，避免双容器/双按钮错位
       if (box.querySelector('.mmax-btn')) { box.setAttribute('data-modal-ctrl', '1'); return; }
