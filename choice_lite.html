@@ -66444,6 +66444,14 @@ function submitAuth() {
     if(f === 'units' || f === 'bldgs') v = Math.max(1, Math.round(Number(v) || 1));
     /* ★CC-CUR-20261114：单价输入按当前显示货币 → 反算回越南盾存储 */
     if(f === 'price') v = Math.round(ccGridToVnd(el.value));
+    /* ★CC-DIMSPLIT-20261115：长宽高已经改为逐行独立 —— 第一次改尺寸时先把本组「钉」上 gid，
+       否则历史数据（无 gid，按字段值成组）一改尺寸分组键就变，整组会被拆成两组（序号/猪舍重复显示）。 */
+    if((f === 'len' || f === 'wid' || f === 'hei')
+       && (specs[i].gid === undefined || specs[i].gid === null || String(specs[i].gid) === '')){
+      var _gk = ccGridGid(specs[i]), _gc = 0;
+      specs.forEach(function(s){ if(ccGridGid(s) === _gk) _gc++; });
+      if(_gc > 1){ try{ ccGridPinGroup(specs, i); }catch(e){} }
+    }
     var ids = String(el.getAttribute('data-grp') || '').split(',');
     if(CC_GRID_MERGED.indexOf(f) >= 0 && ids.length > 1){
       ids.forEach(function(k){ if(specs[Number(k)]) specs[Number(k)][f] = v; });
@@ -67052,18 +67060,21 @@ function submitAuth() {
           var rs = ' rowspan="' + g.rows.length + '"';
           /* ★CC-IDX-20261113：序号恢复正常数字（去掉 ⓘ 角标，只显示 1、2、3…） */
           body += '<td class="ccg-idx"' + rs + '>' + no + '</td>';
-          /* 合并列必须带 data-grp：改一格要同步整组（猪舍/编号/单元/栋数/长/宽/高） */
+          /* 合并列必须带 data-grp：改一格要同步整组（猪舍/编号/单元/栋数） */
           body += '<td class="ccg-merge ccg-house"' + rs + '>' + inp('house', sp.house, 'house', true) + '</td>';
           body += '<td class="ccg-merge"' + rs + '>' + inp('code', sp.code, 'text', true) + '</td>';
           body += '<td class="ccg-merge"' + rs + '>' + inp('units', ccRowUnits(sp), 'num', true) + '</td>';
           body += '<td class="ccg-merge"' + rs + '>' + inp('bldgs', ccRowBldgs(sp), 'num', true) + '</td>';
-          if(CC_ROW_COLS.dim){
-            /* ★CC-DIMFMT-20261114（用户 2026-11-14：长宽高的数值也要千位符）：1,250 / 600 / 60
-               与「数量/单元」同一套：聚焦去逗号、失焦/提交按千位符回显，解析仍走 ccParseVnd */
-            body += '<td class="ccg-merge"' + rs + '>' + inp('len', l, 'num', true, null, true) + '</td>'
-                  + '<td class="ccg-merge"' + rs + '>' + inp('wid', w, 'num', true, null, true) + '</td>'
-                  + '<td class="ccg-merge"' + rs + '>' + inp('hei', hh, 'num', true, null, true) + '</td>';
-          }
+        }
+        /* ★CC-DIMSPLIT-20261115（用户 2026-11-15：「合并出一行后，尺寸这里也要增加一行，表示尺寸是不同的」）：
+           长/宽/高 从「整组 rowspan 合并」改为【每行各自一格】——
+           同一组内上层/下层、实心/带孔可以有不同的长宽高，改一行不再连带改整组（不带 data-grp）。
+           分组仍然由 gid 维持（见 ccGridInput 里首次改尺寸时先钉住 gid），序号/猪舍/单元/栋数照旧合并。 */
+        if(CC_ROW_COLS.dim){
+          /* ★CC-DIMFMT-20261114：长宽高数值带千位符：1,250 / 600 / 60（聚焦去逗号、失焦按千位回显） */
+          body += '<td>' + inp('len', l, 'num', false, null, true) + '</td>'
+                + '<td>' + inp('wid', w, 'num', false, null, true) + '</td>'
+                + '<td>' + inp('hei', hh, 'num', false, null, true) + '</td>';
         }
         /* ★CC-QTYFMT-20261114：数量/单元 带千位分隔符 */
         body += '<td>' + inp('qty', ccRowQtyUnit(sp), 'num', false, null, true) + '</td>';
