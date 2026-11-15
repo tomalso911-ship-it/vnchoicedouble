@@ -2331,6 +2331,11 @@ window.__finShakeReport = function (ms) {
     body.printing-cost #lib-cost-body #ccq_goto_btn,
     body.printing-cost #lib-cost-body #cc_print_btn,
     body.printing-cost #lib-cost-body .ccq-log-wrap{display:none !important;}
+    /* ★CC-PRINT-SCOPE-20261115（用户 2026-11-15）：打印【不要】报价结构（报价单纸面 + 保存记录/预览报价那行），
+       也【不要】报价记录列表（#ccq_log_host）。只留需求信息表 / 规格表 / 钢筋汇总 / 模具需求。 */
+    body.printing-cost #lib-cost-body .ccq-sec-row,
+    body.printing-cost #lib-cost-body #ccq_paper,
+    body.printing-cost #lib-cost-body #ccq_log_host{display:none !important;}
     html,body{height:auto !important;overflow:visible !important;}
     #lib-cost-body,#lib-cost-body *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}
     @page { size: A4 landscape; margin: 8mm; } /* ★CC-PRINTPDF2-20261106：默认横向纸面 */
@@ -55076,11 +55081,134 @@ function ptTranslateViaMyMemory(text, target) {
     });
 }
 
+/* ★PT-FARMTERM-20261115（用户 2026-11-15）：猪场类型的【专业术语】三语互译。
+   背景：报价「客户名称 / 项目名称(内容)」交给机器翻译时会把
+         "3600头母猪至育肥项目" 吞成 "3,600 sows" / "3.600 con heo nái"
+         （丢掉"至育肥""项目"，不是行业说法）。这类结构化短语改为【确定性翻译】，命中就不走机器翻译。
+   术语口径（用户给定，勿改）：
+     母猪场（只有母猪）  Sow farm (breeding only / sow-only)   | Trang trại nái (chỉ nuôi nái)
+     保育到育肥猪场      Nursery-to-finish farm                | Trang trại nuôi từ cai sữa đến xuất chuồng
+     断奶至育肥猪场      Wean-to-finish farm                   | Trang trại từ cai sữa đến xuất chuồng
+     纯育肥猪场          Finishing-only farm / Fattening farm  | Trang trại nuôi thịt thuần túy
+     母猪至育肥（简称）  Farrow-to-finish                      | Từ nái đến xuất chuồng
+     一条龙猪场（简称）  Closed-loop / Integrated farm         | Trang trại khép kín
+     3600头母猪至育肥猪场 3,600-sow farrow-to-finish farm      | Trang trại 3.600 nái nuôi từ sinh sản đến xuất chuồng */
+var PT_FARM_ZH = {
+  fts:        /^(?:\d[\d,\.]*\s*头)?\s*(?:后备)?母猪\s*(?:至|到|-|—)\s*育肥\s*(?:猪场|场|项目)?$/,
+  nursery:    /^(?:\d[\d,\.]*\s*头)?\s*保育\s*(?:至|到|-|—)\s*育肥\s*(?:猪场|场|项目)?$/,
+  wean:       /^(?:\d[\d,\.]*\s*头)?\s*断奶\s*(?:至|到|-|—)?\s*育肥\s*(?:猪场|场|项目)?$/,
+  finishOnly: /^纯育肥\s*(?:猪场|场|项目)?$/,
+  closed:     /^(?:一条龙|自繁自养)\s*(?:猪场|场|项目)?$/,
+  sowOnly:    /^(?:\d[\d,\.]*\s*头)?\s*(?:后备)?母猪场(?:\s*\([^()]*\))?\s*(?:项目)?$/,
+  finish:     /^育肥\s*(?:猪场|场|项目)?$/
+};
+
+function ptNumFmt(n, target) {
+  var s = String(n == null ? '' : n).replace(/[^\d]/g, '');
+  if (!s) return '';
+  var d = (target === 'vi') ? '.' : ',';
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, d);
+}
+
+/* 解析任意语言的猪场类型短语 → {term, cnt, project}；不是这类短语返回 null */
+function ptFarmParse(text) {
+  var raw = String(text == null ? '' : text).trim();
+  if (!raw || raw.length > 80) return null;
+  var s = raw.replace(/[（(]/g, '(').replace(/[）)]/g, ')').replace(/\s+/g, ' ').trim();
+  var term = '';
+  var order = ['fts', 'nursery', 'wean', 'finishOnly', 'closed', 'sowOnly', 'finish'], i;
+  for (i = 0; i < order.length; i++) {
+    if (PT_FARM_ZH[order[i]] && PT_FARM_ZH[order[i]].test(s)) { term = order[i]; break; }
+  }
+  if (!term) {
+    /* 英文/越南文一律【整句匹配】（anchor + 可选结尾括号补充），
+       避免任意长句里出现 "sow farm" 就被整句替换掉、丢掉其余信息。 */
+    var PAR = '(?:\\s*\\([^()]*\\))?$';
+    if (new RegExp('^(?:\\d[\\d,\\.]*[-\\s]*sows?[\\s-]+)?farrow[\\s-]*to[\\s-]*finish(?:\\s+(?:farm|project))?' + PAR, 'i').test(s)) term = 'fts';
+    else if (new RegExp('^nursery[\\s-]*to[\\s-]*finish(?:\\s+(?:farm|project))?' + PAR, 'i').test(s)) term = 'nursery';
+    else if (new RegExp('^wean(?:ing)?[\\s-]*to[\\s-]*finish(?:\\s+(?:farm|project))?' + PAR, 'i').test(s)) term = 'wean';
+    else if (new RegExp('^(?:finishing[\\s-]*only|fattening)(?:\\s+farm)?' + PAR, 'i').test(s)) term = 'finishOnly';
+    else if (new RegExp('^(?:sow[\\s-]*farm|breeding[\\s-]*(?:only|sow[\\s-]*farm))' + PAR, 'i').test(s)) term = 'sowOnly';
+    else if (new RegExp('^(?:closed[\\s-]*loop|integrated[\\s-]*farm)' + PAR, 'i').test(s)) term = 'closed';
+    else if (new RegExp('^(?:trang\\s*trại|dự\\s*án)\\s*(?:\\d[\\d,\\.]*\\s*)?nái\\s*nuôi\\s*từ\\s*sinh\\s*sản\\s*đến\\s*xuất\\s*chuồng' + PAR, 'i').test(s)) term = 'fts';
+    else if (new RegExp('^từ\\s*nái\\s*đến\\s*xuất\\s*chuồng' + PAR, 'i').test(s)) term = 'fts';
+    else if (new RegExp('^(?:trang\\s*trại|dự\\s*án)\\s*nái\\s*\\(?chỉ\\s*nuôi\\s*nái\\)?' + PAR, 'i').test(s)) term = 'sowOnly';
+    else if (new RegExp('^(?:trang\\s*trại|dự\\s*án)\\s*nuôi\\s*thịt\\s*thuần\\s*túy' + PAR, 'i').test(s)) term = 'finishOnly';
+    else if (new RegExp('^(?:trang\\s*trại|dự\\s*án)\\s*khép\\s*kín' + PAR, 'i').test(s)) term = 'closed';
+    else if (new RegExp('^(?:trang\\s*trại|dự\\s*án)\\s*(?:nuôi\\s*)?(?:từ\\s*)?cai\\s*sữa\\s*đến\\s*xuất\\s*chuồng' + PAR, 'i').test(s)) term = 'wean';
+  }
+  if (!term) return null;
+  var m = s.match(/(\d[\d,\.]*)/);
+  var cnt = m ? m[1].replace(/[^\d]/g, '') : '';
+  return { term: term, cnt: cnt, project: /项目|project|dự án/i.test(s) };
+}
+
+/* 按专业术语拼出目标语言 */
+function ptFarmCompose(p, target) {
+  if (!p) return '';
+  var c = p.cnt || '';
+  var cEn = c ? ptNumFmt(c, 'en') : '';
+  var cVi = c ? ptNumFmt(c, 'vi') : '';
+  var proj = !!p.project;
+  if (target === 'en') {
+    if (p.term === 'fts') return c ? (cEn + '-sow farrow-to-finish ' + (proj ? 'project' : 'farm'))
+                                   : (proj ? 'Farrow-to-finish project' : 'Farrow-to-finish');
+    if (p.term === 'nursery') return 'Nursery-to-finish ' + (proj ? 'project' : 'farm');
+    if (p.term === 'wean') return 'Wean-to-finish ' + (proj ? 'project' : 'farm');
+    if (p.term === 'finishOnly') return 'Finishing-only farm / Fattening farm';
+    if (p.term === 'sowOnly') return c ? (cEn + '-sow farm (breeding only / sow-only)') : 'Sow farm (breeding only / sow-only)';
+    if (p.term === 'closed') return 'Closed-loop / Integrated farm';
+    if (p.term === 'finish') return 'Fattening farm';
+  } else if (target === 'vi') {
+    var head = proj ? 'Dự án' : 'Trang trại';
+    if (p.term === 'fts') return c ? (head + ' ' + cVi + ' nái nuôi từ sinh sản đến xuất chuồng') : 'Từ nái đến xuất chuồng';
+    if (p.term === 'nursery') return head + ' nuôi từ cai sữa đến xuất chuồng';
+    if (p.term === 'wean') return head + ' từ cai sữa đến xuất chuồng';
+    if (p.term === 'finishOnly') return 'Trang trại nuôi thịt thuần túy';
+    if (p.term === 'sowOnly') return c ? (head + ' ' + cVi + ' nái (chỉ nuôi nái)') : 'Trang trại nái (chỉ nuôi nái)';
+    if (p.term === 'closed') return 'Trang trại khép kín';
+    if (p.term === 'finish') return 'Trang trại vỗ béo';
+  } else if (target === 'zh') {
+    var suf = proj ? '项目' : '猪场';
+    if (p.term === 'fts') return c ? (c + '头母猪至育肥' + suf) : '母猪至育肥';
+    if (p.term === 'nursery') return '保育到育肥' + suf;
+    if (p.term === 'wean') return '断奶至育肥' + suf;
+    if (p.term === 'finishOnly') return '纯育肥' + suf;
+    if (p.term === 'sowOnly') return c ? (c + '头母猪场') : '母猪场（只有母猪）';
+    if (p.term === 'closed') return '一条龙' + suf;
+    if (p.term === 'finish') return '育肥' + suf;
+  }
+  return '';
+}
+
+/* 命中专业术语 → 直接返回；否则返回 ''（继续走机器翻译） */
+function ptFarmExact(text, target) {
+  try { return ptFarmCompose(ptFarmParse(text), target) || ''; } catch (e) { return ''; }
+}
+
+/* 机器译文后处理：把常见的不规范写法统一成行业写法（不改变语义，只做归一） */
+function ptFarmFix(text, target) {
+  var s = String(text == null ? '' : text);
+  if (!s) return s;
+  if (target === 'en') {
+    s = s.replace(/farrow\s*to\s*finish/gi, 'farrow-to-finish')
+         .replace(/nursery\s*to\s*finish/gi, 'nursery-to-finish')
+         .replace(/wean(?:ing)?\s*to\s*finish/gi, 'wean-to-finish');
+  } else if (target === 'vi') {
+    s = s.replace(/trại heo/gi, 'trang trại')
+         .replace(/heo con cai sữa/gi, 'heo cai sữa');
+  }
+  return s;
+}
+
 // 客户端翻译缓存：同一段文本+目标语言只请求一次（同页面生命周期内），
 // 显著降低三语输入框连续触发时的 API 压力。
 window.__ptCache = window.__ptCache || {};
 function ptTranslateText(text, target) {
   if (!text || !target) return Promise.resolve('');
+  /* ★PT-FARMTERM-20261115：猪场类型短语走专业术语表，不进机器翻译 */
+  var exact = ptFarmExact(text, target);
+  if (exact) return Promise.resolve(exact);
   var key = target + '\u0000' + text;
   if (window.__ptCache[key]) return Promise.resolve(window.__ptCache[key]);
   // ★ 统一策略：Google 仅走 Worker/Flask 中转 → MyMemory → Libre。
@@ -55089,7 +55217,7 @@ function ptTranslateText(text, target) {
   return ptTranslateViaGoogle(text, target)
     .catch(function(){ return ptTranslateViaMyMemory(text, target); })
     .catch(function(){ return ptTranslateViaLibre(text, detected, target); })
-    .then(function(res){ if (res) window.__ptCache[key] = res; return res; })
+    .then(function(res){ res = ptFarmFix(res, target); if (res) window.__ptCache[key] = res; return res; })
     .catch(function(){ return ''; });
 }
 
@@ -64745,6 +64873,7 @@ function submitAuth() {
      查看=只读，编辑=可修改（自动保存），三人组/超管恒可编辑。 */
   var CC_KEY = 'cost_calc_v1';
   var CC_DATA = null, CC_LOADED = false, CC_DIRTY = false, CC_SAVE_T = null;
+  var CC_FROM_CACHE = false;   /* ★CC-FLASH-20261115：当前 CC_DATA 来自本地快照（服务器版本还没回来） */
   // ★CC-MGMT-FOLD-20261109（用户 2026-11-09）：骨料成本/其他成本/管理费计算基数三行默认折叠；
   //   状态只存会话内存（切语言/重算后保持），不写盘、不改动任何成本数据。
   var CC_MGMT_OPEN = false;
@@ -65534,6 +65663,21 @@ function submitAuth() {
       '.ccq-log-tb td.ccq-log-ops{text-align:center;white-space:nowrap;}',
       '.ccq-log-tb .cc-add{margin:0 2px;padding:2px 7px;font-size:11px;}',
       '.ccq-log-del{background:#e53935;border-color:#e53935;}',
+      /* ★CCQ-LOOK-20261115（用户 2026-11-15）：主表白色底 + 淡粉色斑马线 + 鼠标悬停淡黄色十字高亮 */
+      '.ccq-log-tb tbody td{background:#fff;}',
+      '.ccq-log-tb tbody tr:nth-child(even) td{background:#fff2f5;}',
+      '.ccq-log-tb tbody td.ccq-x-hl{background:#fff59d !important;}',
+      /* 表头三态排序：点一次升序 → 再点降序 → 再点恢复初始顺序 */
+      '.ccq-log-tb th.ccq-log-th-sort{cursor:pointer;user-select:none;-webkit-user-select:none;white-space:nowrap;}',
+      '.ccq-log-tb th.ccq-log-th-sort:hover{background:#ffe1e5;}',
+      '.ccq-log-arrow{margin-left:3px;font-size:9px;color:#c62828;}',
+      /* ★CCQ-VERFULL-20261115：版本变化分项统计条（勾选框/数量/单价/效率…） */
+      '.ccq-hist-stats{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:4px 0 6px;padding:5px 8px;background:#f5f8fc;border:1px solid #e3ebf5;border-radius:4px;}',
+      '.ccq-hist-stats-k{font-size:11px;font-weight:700;color:#1565c0;margin-right:2px;}',
+      '.ccq-hist-chip{font-size:11px;line-height:16px;padding:1px 7px;border-radius:9px;background:#e8f0fe;color:#174ea6;white-space:nowrap;}',
+      '.ccq-hist-chip-sum{background:#fff3e0;color:#b26a00;font-weight:700;}',
+      '.ccq-ver-stats{margin:0 0 6px;}',
+      '.ccq-ver-list li{word-break:break-word;}',
       /* ★CCQ-TRIMODAL-20261115（用户 2026-11-15）：报价表里只有一个框（显示当前语言值），点开模态框录入三语 */
       '.ccq-tri-box{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:26px;padding:3px 8px;border:1px solid #d8e0e8;border-radius:4px;background:#fff;cursor:pointer;}',
       '.ccq-tri-box:hover{border-color:#1a56b0;background:#f7fbff;}',
@@ -67170,6 +67314,7 @@ function submitAuth() {
       recEmpty:      three('暂无记录，点击「保存报价记录」新增一条', 'No records yet. Click "Save quotation record" to add one.', 'Chưa có bản ghi. Nhấn "Lưu bản báo giá" để thêm.'),
       recAt:         three('保存时间', 'Saved at', 'Thời gian lưu'),
       recOps:        three('操作', 'Actions', 'Thao tác'),
+      recSortTip:    three('点击排序：升序 → 降序 → 恢复初始顺序', 'Click to sort: ascending → descending → original order', 'Nhấn để sắp xếp: tăng → giảm → thứ tự ban đầu'),
       recFill:       three('回填', 'Restore', 'Khôi phục'),
       recFillOk:     three('已回填到报价结构', 'Restored into the quotation', 'Đã khôi phục vào báo giá'),
       recDelTip:     three('删除这条记录', 'Delete this record', 'Xóa bản ghi này'),
@@ -67207,6 +67352,55 @@ function submitAuth() {
       verVat:            three('增值税', 'VAT', 'Thuế GTGT'),
       verFeeT:           three('运输费', 'Transport fee', 'Phí vận chuyển'),
       verFeeI:           three('安装费', 'Installation fee', 'Phí lắp đặt'),
+      /* ★CCQ-ROWDIFF-20261115（用户 2026-11-15：「增加信息：删除（或者增加了）了什么房舍，什么规格的板材」） */
+      verRemoved:        three('删除', 'Removed', 'Đã xóa'),
+      verAdded:          three('新增', 'Added', 'Thêm mới'),
+      verPcs:            three('块', 'pcs', 'tấm'),
+      /* ★CCQ-VERFULL-20261115（用户 2026-11-15）：版本间「全部输入」变化监测 + 分项统计
+         （勾选框 / 数量·人数 / 单价·金额 / 效率·工期 / 规格表 / 文字·数值） */
+      verStatTitle:      three('本次变化统计', 'Change summary', 'Tổng hợp thay đổi'),
+      verCatChk:         three('勾选框', 'Checkboxes', 'Ô chọn'),
+      verCatQty:         three('数量/人数', 'Qty / headcount', 'Số lượng / người'),
+      verCatPrice:       three('单价/金额', 'Price / amount', 'Đơn giá / số tiền'),
+      verCatEff:         three('效率/工期', 'Efficiency / days', 'Hiệu suất / số ngày'),
+      verCatSpec:        three('规格表', 'Spec table', 'Bảng quy cách'),
+      verCatNum:         three('其他数值', 'Other values', 'Giá trị khác'),
+      verCatText:        three('文字/日期', 'Text / dates', 'Văn bản / ngày'),
+      verProvided:       three('提供 √', 'Provided √', 'Cung cấp √'),
+      verNotProvided:    three('不提供 ×', 'Not provided ×', 'Không cung cấp ×'),
+      verMoreItems:      three('… 另有 {0} 项未全部显示', '… {0} more items not shown', '… còn {0} mục chưa hiển thị'),
+      verTotalItems:     three('共 {0} 项变化', '{0} changes in total', 'Tổng {0} thay đổi'),
+      verSecCalc:        three('计算参数', 'Calculation settings', 'Thông số tính toán'),
+      verSecDemand:      three('需求信息/效率', 'Requirement / efficiency', 'Thông tin yêu cầu / hiệu suất'),
+      verSecSpec:        three('规格表', 'Spec table', 'Bảng quy cách'),
+      verSecPlan:        three('计划日期', 'Planned dates', 'Ngày kế hoạch'),
+      effSize:           three('每组人数', 'Workers per crew', 'Số người mỗi tổ'),
+      effDriver:         three('每组司机', 'Drivers per crew', 'Tài xế mỗi tổ'),
+      effAssist:         three('每组随车员', 'Assistants per crew', 'Phụ xe mỗi tổ'),
+      effIndoor:         three('厂内安装工', 'In-house installers', 'Công nhân lắp trong xưởng'),
+      effPerDay:         three('每人每天安装效率（块）', 'Slabs per worker per day', 'Tấm mỗi người mỗi ngày'),
+      effGroups:         three('安装小组数', 'Installation crews', 'Số tổ lắp đặt'),
+      verInstDays:       three('安装项目天数', 'Installation days', 'Số ngày lắp đặt'),
+      verFeeTransport:   three('运输费', 'Transport fee', 'Phí vận chuyển'),
+      verFeeInstall:     three('安装费', 'Installation fee', 'Phí lắp đặt'),
+      verDiscount:       three('优惠', 'Discount', 'Chiết khấu'),
+      verVatRate:        three('增值税率（%）', 'VAT rate (%)', 'Thuế GTGT (%)'),
+      verMgmtPct:        three('管理费（%）', 'Management fee (%)', 'Phí quản lý (%)'),
+      verMargin:         three('利润率（%）', 'Profit margin (%)', 'Tỷ lệ lợi nhuận (%)'),
+      verDeprYears:      three('设备折旧年限', 'Depreciation period', 'Thời gian khấu hao'),
+      verDepositDate:    three('定金日期', 'Deposit date', 'Ngày đặt cọc'),
+      verDepositPct:     three('定金比例（%）', 'Deposit (%)', 'Tỷ lệ đặt cọc (%)'),
+      verProdPct:        three('生产款比例（%）', 'Production payment (%)', 'Tỷ lệ thanh toán sản xuất (%)'),
+      verInstPct:        three('安装款比例（%）', 'Installation payment (%)', 'Tỷ lệ thanh toán lắp đặt (%)'),
+      verSignDate:       three('签约日期', 'Signing date', 'Ngày ký hợp đồng'),
+      verFactoryEnd:     three('工厂承建结束日', 'Factory completion', 'Ngày hoàn thành nhà xưởng'),
+      verInstPlan:       three('预计安装日期', 'Planned installation date', 'Ngày lắp đặt dự kiến'),
+      verHideShow:       three('是否打印', 'Print visibility', 'Hiển thị khi in'),
+      verPrintYes:       three('打印', 'printed', 'in'),
+      verPrintNo:        three('不打印', 'not printed', 'không in'),
+      verSpecRowN:       three('规格第 {0} 行', 'Spec row {0}', 'Dòng quy cách {0}'),
+      verSpecUnits:      three('单元（栋）数', 'Units / buildings', 'Số đơn vị (tòa)'),
+      verSpecBldgs:      three('栋数/整场', 'Buildings per farm', 'Số tòa / cả trại'),
       quoteCustomer: three('客户名称', 'Customer', 'Khách hàng'),
       quoteContent:  three('内容', 'Content', 'Nội dung'),
       quoteBy:       three('报价方', 'Quoted by', 'Bên báo giá'),
@@ -67660,10 +67854,15 @@ function submitAuth() {
     document.body.appendChild(ov);
     ov.classList.add('show');
     ccQuoteTriBind();
+    /* ★CCQ-TRI-FILL-20261115：打开时补齐空的另外两语（重开就能看到译文） */
+    setTimeout(function(){ try{ ccqTriFillMissing(field); }catch(e){} }, 260);
   };
   window.ccQuoteTriClose = function(){
     var ov = document.getElementById('ccqTriOverlay');
     if(ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    /* ★CCQ-TRI-FILL-20261115：关掉前把还没翻完/空着的补齐，避免「显示该语言时是空白」 */
+    try{ ccqTriFillMissing('customer'); }catch(e){}
+    try{ ccqTriFillMissing('content'); }catch(e){}
     ccQuoteTriSyncBox('customer');
     ccQuoteTriSyncBox('content');
   };
@@ -67723,15 +67922,56 @@ function submitAuth() {
     ccQuoteTriSyncBox(field);   // 报价表里的「一个框」跟着更新
     ccqTriTranslate(field, lang, v);
   };
+  /* ★CCQ-TRI-PERSIST-20261115（用户 2026-11-15：「客户名称输入中文后没自动翻译」）：
+     旧写法把译文只写进 DOM（document.getElementById(..._en/_vi)），一旦用户输完立刻点「完成」，
+     弹窗被移除 → 800ms 防抖到点时 box 为 null → 直接 return → 译文永久丢失（重开还是空的）。
+     现在：① 先写数据模型（ccqTriObj）再顺手刷新 DOM（有就写、没有也照样存）；
+           ② 源是否变化以数据模型为准，不再依赖输入框是否存在；
+           ③ 翻译返回空（接口偶发失败）自动重试 2 次。 */
+  function ccqTriApply(field, lang, text, attempt){
+    attempt = attempt || 1;
+    var src = String(text || '').trim();
+    if(!src) return;
+    CCQ_TRI_LANGS.forEach(function(t){
+      if(t === lang) return;
+      var o = ccqTriObj(field);
+      var autoV = ccqTriAuto[field][t] || '';
+      var box = document.getElementById('ccq_' + field + '_' + t);
+      var cur = box ? String(box.value || '').trim() : String(o[t] || '').trim();
+      if(cur && cur !== autoV) return;                     // 人工改过 → 不覆盖
+      ptTranslateText(src, t).then(function(res){
+        if(!res){
+          if(attempt < 3) setTimeout(function(){ ccqTriApply(field, lang, text, attempt + 1); }, 1800);
+          return;
+        }
+        var o2 = ccqTriObj(field);
+        if(String(o2[lang] || '').trim() !== src) return;   // 源已变 → 丢弃旧译文
+        var auto2 = ccqTriAuto[field][t] || '';
+        var cur2 = String(o2[t] || '').trim();
+        var b2 = document.getElementById('ccq_' + field + '_' + t);
+        if(b2) cur2 = String(b2.value || '').trim();
+        if(cur2 && cur2 !== auto2) return;                  // 期间被人工填写 → 不覆盖
+        o2[t] = res;
+        ccqTriAuto[field][t] = res;
+        if(b2) b2.value = res;
+        CC_DATA.demand.quote[field] = ccqTriShow(field);
+        ccScheduleSave();
+        ccQuoteTriSyncBox(field);
+      }).catch(function(){});
+    });
+  }
   function ccqTriTranslate(field, lang, text){
     if(ccqTriTimer[field]){ clearTimeout(ccqTriTimer[field]); ccqTriTimer[field] = null; }
     var others = CCQ_TRI_LANGS.filter(function(l){ return l !== lang; });
     if(!String(text || '').trim()){
       /* 源被清空 → 只清掉「自动翻译来的」另外两语，人工改过的不动 */
       others.forEach(function(t){
-        var box = document.getElementById('ccq_' + field + '_' + t); if(!box) return;
-        if(box.value && box.value === ccqTriAuto[field][t]){
-          box.value = ''; ccqTriAuto[field][t] = ''; ccqTriObj(field)[t] = '';
+        var o = ccqTriObj(field);
+        var autoV = ccqTriAuto[field][t] || '';
+        var box = document.getElementById('ccq_' + field + '_' + t);
+        if((o[t] && o[t] === autoV) || (box && box.value && box.value === autoV)){
+          o[t] = ''; ccqTriAuto[field][t] = '';
+          if(box) box.value = '';
         }
       });
       ccScheduleSave();
@@ -67740,22 +67980,58 @@ function submitAuth() {
     if(typeof navigator !== 'undefined' && navigator.onLine === false) return;
     if(typeof ptTranslateText !== 'function') return;
     ccqTriTimer[field] = setTimeout(function(){
-      others.forEach(function(t){
-        var box = document.getElementById('ccq_' + field + '_' + t); if(!box) return;
-        var cur = String(box.value || '').trim();
-        if(cur && cur !== ccqTriAuto[field][t]) return;      // 人工改过 → 不覆盖
-        ptTranslateText(text, t).then(function(res){
-          if(!res) return;
-          var src = document.getElementById('ccq_' + field + '_' + lang);
-          if(!src || src.value !== text) return;             // 源已变 → 丢弃旧译文
-          box.value = res;
-          ccqTriAuto[field][t] = res;
-          ccqTriObj(field)[t] = res;
-          ccScheduleSave();
-        }).catch(function(){});
-      });
+      ccqTriTimer[field] = null;
+      ccqTriApply(field, lang, text, 1);
     }, 800);
   }
+  /* ★CCQ-TRI-FILL-20261115：打开/关闭弹窗时补齐空着的另外两语。
+     防止「接口偶发失败 / 用户打字太快」导致某种语言的格子永远空着（跟随系统语言时就会显示空白）。 */
+  function ccqTriFillMissing(field){
+    if(typeof ptTranslateText !== 'function') return;
+    if(typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    var o = ccqTriObj(field);
+    var L = (typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'zh');
+    var srcLang = '', srcTxt = '';
+    [L, 'zh', 'en', 'vi'].forEach(function(l){
+      if(srcLang) return;
+      var v = String(o[l] || '').trim();
+      if(v){ srcLang = l; srcTxt = v; }
+    });
+    if(!srcLang || !srcTxt) return;
+    CCQ_TRI_LANGS.forEach(function(t){
+      if(t === srcLang) return;
+      if(String(ccqTriObj(field)[t] || '').trim()) return;
+      ptTranslateText(srcTxt, t).then(function(res){
+        if(!res) return;
+        var o2 = ccqTriObj(field);
+        if(String(o2[t] || '').trim()) return;
+        if(String(o2[srcLang] || '').trim() !== srcTxt) return;
+        o2[t] = res;
+        ccqTriAuto[field][t] = res;
+        var b = document.getElementById('ccq_' + field + '_' + t);
+        if(b) b.value = res;
+        CC_DATA.demand.quote[field] = ccqTriShow(field);
+        ccScheduleSave();
+        ccQuoteTriSyncBox(field);
+      }).catch(function(){});
+    });
+  }
+  window.ccqTriFillMissing = ccqTriFillMissing;
+  window.ccQuoteTriApply = ccqTriApply;   /* 验收/调试用：不依赖弹窗是否打开 */
+  /* 调试/验收用出口（探针无法直接访问 IIFE 内的 CC_DATA） */
+  window.ccQuoteTriState = function(field){
+    var o = ccqTriObj(field);
+    return { zh:String(o.zh || ''), en:String(o.en || ''), vi:String(o.vi || '') };
+  };
+  window.ccQuoteTriSet = function(field, zh, en, vi){
+    var o = ccqTriObj(field);
+    o.zh = String(zh == null ? '' : zh);
+    o.en = String(en == null ? '' : en);
+    o.vi = String(vi == null ? '' : vi);
+    ccqTriAuto[field] = {};
+    CC_DATA.demand.quote[field] = ccqTriShow(field);
+    return ccqTriShow(field);
+  };
   /* 必填校验：客户名称 / 项目名称(内容) / 日期 / 版本号 */
   function ccQuoteReqMissing(){
     var q = (CC_DATA && CC_DATA.demand && CC_DATA.demand.quote) || {};
@@ -67832,6 +68108,10 @@ function submitAuth() {
                      Number(d.vatRate) || 0, Number(d.mgmtPct) || 0, Number(d.margin) || 0 ].join('|') };
   }
   function ccQuoteSameAs(rec){
+    /* ★CCQ-VERFULL-20261115：有快照就按「全部输入」判断是否真的没变 ——
+       只改勾选框 / 只改效率、只改某行数量（总价没动）也必须算作新版本，不能再判成「无变化」。 */
+    var items = ccQuoteDiffItems(rec);
+    if(items) return items.length === 0;
     var old = (rec && rec.sig) || {}, now = ccQuoteSig();
     var of = rec && rec.foot || {}, nf = ccQuoteFootSnap();
     if(String(old.date || '') !== String(now.date || '')) return false;
@@ -67840,8 +68120,326 @@ function submitAuth() {
     if(Number(of.total || 0) !== Number(nf.total || 0)) return false;
     return true;
   }
+  /* ==================== ★CCQ-ROWDIFF-20261115 房舍 / 板材规格 的增删明细 ====================
+     （用户 2026-11-15：「增加信息：删除（或者增加了）了什么房舍，什么规格的板材」）
+     sig.rows 每行格式：house|code|units|bldgs|len|wid|hei|qty|layers|… 用 '#' 连接。
+     行标识 = 房舍 + 编号 + 长×宽×高 + 网层数：只在旧记录 → 删除；只在新 → 新增；都有但数量不同 → 数量变化。 */
+  function ccRowsOfStr(s){
+    if(!s) return [];
+    return String(s).split('#').map(function(line){
+      var a = String(line).split('|'), num = function(i){ var v = Number(a[i]); return isFinite(v) ? v : 0; };
+      return { house:String(a[0] || ''), code:String(a[1] || ''), units:num(2), bldgs:num(3),
+               len:num(4), wid:num(5), hei:num(6), qty:num(7), layers:num(8) };
+    });
+  }
+  function ccRowIdent(r){
+    return [r.house, r.code, r.len, r.wid, r.hei, r.layers].join('~');
+  }
+  function ccRowSpecTxt(r){
+    var d = [];
+    if(r.len > 0) d.push(ccNum(r.len));
+    if(r.wid > 0) d.push(ccNum(r.wid));
+    if(r.hei > 0) d.push(ccNum(r.hei));
+    return d.length ? (d.join('×') + ' mm') : '—';
+  }
+  function ccRowTotalQty(r){
+    var q = Number(r.qty) || 0, u = Number(r.units) || 0, b = Number(r.bldgs) || 0;
+    return q * (u > 0 ? u : 1) * (b > 0 ? b : 1);
+  }
+  /* 全空行（没填房舍/编号/尺寸/数量）不参与增删明细，避免出现「新增：— · — · 0 块」这类噪音 */
+  function ccRowIsBlank(r){
+    return !String(r.house || '').trim() && !String(r.code || '').trim()
+        && !(r.len > 0) && !(r.wid > 0) && !(r.qty > 0);
+  }
+  function ccRowDiffLines(curRowsStr, prevRowsStr){
+    var T = ccT, out = [];
+    var prev = {}, cur = {};
+    ccRowsOfStr(prevRowsStr).forEach(function(r){ if(!ccRowIsBlank(r)) prev[ccRowIdent(r)] = r; });
+    ccRowsOfStr(curRowsStr).forEach(function(r){ if(!ccRowIsBlank(r)) cur[ccRowIdent(r)] = r; });
+    var label = function(r){
+      var name = '';
+      try{ name = ccQuoteHouseName(r.house) || ''; }catch(e){}
+      if(!name) name = r.house || '—';
+      if(r.code) name += ' / ' + r.code;
+      return name + ' · ' + ccRowSpecTxt(r);
+    };
+    var qtyTxt = function(r){ return ccNum(ccRowTotalQty(r)) + ' ' + T('verPcs'); };
+    Object.keys(prev).forEach(function(k){
+      if(cur[k]) return;
+      out.push('➖ ' + T('verRemoved') + '：' + label(prev[k]) + ' · ' + qtyTxt(prev[k]));
+    });
+    Object.keys(cur).forEach(function(k){
+      if(prev[k]) return;
+      out.push('➕ ' + T('verAdded') + '：' + label(cur[k]) + ' · ' + qtyTxt(cur[k]));
+    });
+    Object.keys(cur).forEach(function(k){
+      var r = cur[k], o = prev[k];
+      if(!o) return;
+      var q1 = ccRowTotalQty(o), q2 = ccRowTotalQty(r);
+      if(Math.abs(q1 - q2) < 0.0001) return;
+      out.push('✎ ' + label(r) + '：' + ccNum(q1) + ' → ' + ccNum(q2) + ' ' + T('verPcs'));
+    });
+    return out;
+  }
+  /* ==================== ★CCQ-VERFULL-20261115 版本间「全部输入」变化监测 ====================
+     （用户 2026-11-15：「我需要完全监测版本之间的变化，包括所有勾选框的选择变化情况，
+       还有人工的输入和效率的输入情况，都需要做不同版本之间的统计」）
+     数据源：quoteLog 每条记录都带 snap = 保存当时的整份 CC_DATA 快照 → 直接两两对比快照，
+     逐项列出：勾选框 / 数量·人数 / 单价·金额 / 效率·工期 / 规格表 / 其他数值 / 文字·日期，
+     并按分类做统计条。★只读快照，绝不改动任何业务数据。 */
+  var CCV_CAT_ORDER = ['chk', 'qty', 'price', 'eff', 'spec', 'num', 'text'];
+  var CCV_CAT_KEY = { chk:'verCatChk', qty:'verCatQty', price:'verCatPrice', eff:'verCatEff',
+                      spec:'verCatSpec', num:'verCatNum', text:'verCatText' };
+  var CCV_CAT_ICON = { chk:'☑', qty:'🔢', price:'₫', eff:'⏱', spec:'📐', num:'⚙', text:'✎' };
+  function ccvCatName(cat){ return ccvTxt(CCV_CAT_KEY[cat] || 'verCatNum'); }
+  function ccvCap(s){ s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+  /* 取快照（记录对象或裸快照都行）；不是合法快照返回 null */
+  function ccvSnap(recOrSnap){
+    if(!recOrSnap || typeof recOrSnap !== 'object') return null;
+    var s = recOrSnap.snap || recOrSnap;
+    if(!s || typeof s !== 'object' || !s.demand) return null;
+    return s;
+  }
+  /* 取三语文案；键不存在时回退（避免界面上露出 mSilo 这种键名） */
+  function ccvTxt(k, fb){
+    var s = '';
+    try{ s = ccT(k) || ''; }catch(e){}
+    if(!s || s === k) return fb || String(k || '');
+    return s;
+  }
+  function ccvNum(v){ var n = Number(v); return isFinite(n) ? ccNum2(n) : '—'; }
+  function ccvMoney(v){ try{ return ccqMoneyStr(Number(v) || 0); }catch(e){ return ccvNum(v); } }
+  function ccvStr(v){ v = (v == null) ? '' : String(v); return v === '' ? '—' : v; }
+  function ccvProvVal(map, path){
+    if(!map || !Object.prototype.hasOwnProperty.call(map, path)) return 1;
+    var v = map[path];
+    return (v === 0 || v === false || v === '0' || v === 'no') ? 0 : 1;
+  }
+  /* 「Choice VN 提供吗」路径 → 人话（行名取快照里的行，不依赖当前页面状态） */
+  function ccvProvLabel(path, snapA, snapB){
+    var a = String(path || '').split('.');
+    var rowAt = function(arr, i){ return (Array.isArray(arr) && arr[i]) ? arr[i] : null; };
+    var row;
+    if(a[0] === 'mach'){
+      var g = a[1], gi = Number(a[2]) || 0;
+      row = rowAt(snapB && snapB.mach && snapB.mach[g], gi) || rowAt(snapA && snapA.mach && snapA.mach[g], gi);
+      return ccvTxt('d1' + ({mech:'1', veh:'2', tools:'3'}[g] || '1')) + ' · ' +
+        (row ? (row.k ? ccvTxt(row.k) : String(row.n || ('#' + (gi + 1)))) : ('#' + (gi + 1)));
+    }
+    if(a[0] === 'labor'){
+      var lg = a[1], li = Number(a[2]) || 0;
+      row = rowAt(snapB && snapB.labor && snapB.labor[lg], li) || rowAt(snapA && snapA.labor && snapA.labor[lg], li);
+      return ccvTxt(({mgmt:'d31', work:'d32', inst:'d33'}[lg] || 'dir3')) + ' · ' +
+        (row && row.k ? ccvTxt(row.k) : ('#' + (li + 1)));
+    }
+    if(a[0] === 'agg')  return ccvTxt('dir2') + ' · ' + ccvTxt(a[1]);
+    if(a[0] === 'opex') return ccvTxt('d34') + ' · ' + ccvTxt('op' + ccvCap(a[1]));
+    if(a[0] === 'ind')  return ccvTxt('dir4') + ' · ' + ccvTxt('ind' + ccvCap(a[1]));
+    return String(path || '');
+  }
+  /* 两个快照的逐项差异 → [{cat,label,from,to}]；任一侧没有快照返回 null（调用方回退旧逻辑） */
+  function ccRecDiffItems(curRec, prevRec){
+    var B = ccvSnap(curRec), A = prevRec ? ccvSnap(prevRec) : null;
+    if(!B || !A) return null;
+    var items = [], T = ccT;
+    var add = function(cat, label, from, to){ items.push({ cat:cat, label:String(label || ''), from:String(from == null ? '' : from), to:String(to == null ? '' : to) }); };
+    /* 报价日期：记录自带 sig.date（ISO）。两边都有 sig 才比，避免与调用方的日期比较重复 */
+    var sgA = (prevRec && prevRec.sig) || null, sgB = (curRec && curRec.sig) || null;
+    if(sgA && sgB && String(sgA.date || '') !== String(sgB.date || '')){
+      var dmy2 = function(v){ try{ return v ? (ccQuoteDmy(v) || String(v)) : '—'; }catch(e){ return String(v || '—'); } };
+      add('text', T('verDiffDate'), dmy2(sgA.date), dmy2(sgB.date));
+    }
+    var cmp = function(cat, label, a, b, kind){
+      if(kind === 'money'){ if(Math.abs((Number(a) || 0) - (Number(b) || 0)) < 0.0001) return; add(cat, label, ccvMoney(a), ccvMoney(b)); return; }
+      if(kind === 'num'){ if(Math.abs((Number(a) || 0) - (Number(b) || 0)) < 0.0001) return; add(cat, label, ccvNum(a), ccvNum(b)); return; }
+      var sa = (a == null ? '' : String(a)), sb = (b == null ? '' : String(b));
+      if(sa === sb) return;
+      add(cat, label, sa === '' ? '—' : sa, sb === '' ? '—' : sb);
+    };
+    /* ① 勾选框（所有路径的并集；缺省视为 √ 提供） */
+    var pa = A.provide || {}, pb = B.provide || {}, seen = {};
+    Object.keys(pa).forEach(function(k){ seen[k] = 1; });
+    Object.keys(pb).forEach(function(k){ seen[k] = 1; });
+    Object.keys(seen).sort().forEach(function(k){
+      var va = ccvProvVal(pa, k), vb = ccvProvVal(pb, k);
+      if(va === vb) return;
+      add('chk', ccvProvLabel(k, A, B) + ' · Choice VN ' + ccvTxt('provideQ'),
+          va ? T('verProvided') : T('verNotProvided'),
+          vb ? T('verProvided') : T('verNotProvided'));
+    });
+    /* ② 机械三表：数量 / 单价 / 自定义名称 */
+    ['mech','veh','tools'].forEach(function(g){
+      var ra = (A.mach && A.mach[g]) || [], rb = (B.mach && B.mach[g]) || [];
+      var sec = ccvTxt('d1' + ({mech:'1', veh:'2', tools:'3'}[g]));
+      var n = Math.max(ra.length, rb.length);
+      for(var i = 0; i < n; i++){
+        var x = ra[i] || {}, y = rb[i] || {};
+        var rn = (y.k || x.k) ? ccvTxt(y.k || x.k) : String(y.n || x.n || ('#' + (i + 1)));
+        var nm = sec + ' · ' + rn;
+        cmp('qty', nm + ' · ' + ccvTxt('qty'), x.qty, y.qty, 'num');
+        cmp('price', nm + ' · ' + ccvTxt('unitPrice'), x.price, y.price, 'money');
+        cmp('text', nm + ' · ' + ccvTxt('name'), x.n, y.n, 'text');
+      }
+    });
+    /* ③ 骨料 */
+    var agA = A.agg || {}, agB = B.agg || {};
+    Object.keys(agB).forEach(function(k){
+      if(!agA[k]) return;
+      var nm = ccvTxt('dir2') + ' · ' + ccvTxt(k);
+      cmp('qty', nm + ' · ' + ccvTxt('qty'), agA[k].qty, agB[k].qty, 'num');
+      cmp('price', nm + ' · ' + ccvTxt('unitPrice'), agA[k].price, agB[k].price, 'money');
+    });
+    /* ④ 人工：人数 / 日薪 */
+    ['mgmt','work','inst'].forEach(function(g){
+      var ra = (A.labor && A.labor[g]) || [], rb = (B.labor && B.labor[g]) || [];
+      var sec = ccvTxt(({mgmt:'d31', work:'d32', inst:'d33'}[g]));
+      var n = Math.max(ra.length, rb.length);
+      for(var i = 0; i < n; i++){
+        var x = ra[i] || {}, y = rb[i] || {};
+        var nm = sec + ' · ' + ccvTxt(y.k || x.k);
+        cmp('qty', nm + ' · ' + ccvTxt('qty'), x.qty, y.qty, 'num');
+        cmp('price', nm + ' · ' + ccvTxt('mSalary'), x.sal, y.sal, 'money');
+      }
+    });
+    /* ⑤ 运营费用 */
+    Object.keys(B.opex || {}).forEach(function(f){
+      cmp('price', ccvTxt('d34') + ' · ' + ccvTxt('op' + ccvCap(f)), (A.opex || {})[f], (B.opex || {})[f], 'money');
+    });
+    /* ⑥ 间接成本 */
+    Object.keys(B.ind || {}).forEach(function(f){
+      cmp('price', ccvTxt('dir4') + ' · ' + ccvTxt('ind' + ccvCap(f)), (A.ind || {})[f], (B.ind || {})[f], 'money');
+    });
+    /* ⑦ 计算参数 */
+    var calcSec = ccvTxt('verSecCalc');
+    cmp('num', calcSec + ' · ' + ccvTxt('verMargin'),  A.margin,  B.margin,  'num');
+    cmp('num', calcSec + ' · ' + ccvTxt('verVatRate'), A.vat,     B.vat,     'num');
+    cmp('num', calcSec + ' · ' + ccvTxt('verMgmtPct'), A.mgmtPct, B.mgmtPct, 'num');
+    cmp('num', calcSec + ' · ' + ccvTxt('verDeprYears'), (A.depr || {}).years, (B.depr || {}).years, 'num');
+    /* ⑧ 需求信息 + 效率/工期输入 */
+    var dA = A.demand || {}, dB = B.demand || {}, demSec = ccvTxt('verSecDemand');
+    cmp('eff', demSec + ' · ' + ccvTxt('months'),   dA.months,   dB.months,   'num');
+    cmp('eff', demSec + ' · ' + ccvTxt('workDays'), dA.workDays, dB.workDays, 'num');
+    cmp('eff', demSec + ' · ' + ccvTxt('prodDays'), dA.prodDays, dB.prodDays, 'num');
+    cmp('eff', demSec + ' · ' + ccvTxt('verInstDays'), dA.instDays, dB.instDays, 'num');
+    var cA = dA.crew || {}, cB = dB.crew || {};
+    cmp('eff', demSec + ' · ' + ccvTxt('effSize'),   cA.size,   cB.size,   'num');
+    cmp('eff', demSec + ' · ' + ccvTxt('effDriver'), cA.driver, cB.driver, 'num');
+    cmp('eff', demSec + ' · ' + ccvTxt('effAssist'), cA.assist, cB.assist, 'num');
+    cmp('eff', demSec + ' · ' + ccvTxt('effIndoor'), cA.indoor, cB.indoor, 'num');
+    cmp('eff', demSec + ' · ' + ccvTxt('effPerDay'), cA.perDay, cB.perDay, 'num');
+    cmp('eff', demSec + ' · ' + ccvTxt('effGroups'), cA.groups, cB.groups, 'num');
+    cmp('num', demSec + ' · ' + ccvTxt('verFeeTransport'), dA.feeTransport, dB.feeTransport, 'money');
+    cmp('num', demSec + ' · ' + ccvTxt('verFeeInstall'),   dA.feeInstall,   dB.feeInstall,   'money');
+    cmp('num', demSec + ' · ' + ccvTxt('verDiscount'),     dA.discount,     dB.discount,     'money');
+    cmp('num', demSec + ' · ' + ccvTxt('verVatRate'),      dA.vatRate,      dB.vatRate,      'num');
+    var prn = function(v){ return Number(v) ? ccT('verPrintYes') : ccT('verPrintNo'); };
+    cmp('text', demSec + ' · ' + ccvTxt('verFeeTransport') + ' · ' + ccvTxt('verHideShow'), prn(dA.hideTransport), prn(dB.hideTransport), 'text');
+    cmp('text', demSec + ' · ' + ccvTxt('verFeeInstall')   + ' · ' + ccvTxt('verHideShow'), prn(dA.hideInstall),   prn(dB.hideInstall),   'text');
+    cmp('text', demSec + ' · ' + ccvTxt('verDiscount')     + ' · ' + ccvTxt('verHideShow'),
+        (String(dA.discountPrint || 'NO').toUpperCase() === 'NO' ? ccT('verPrintNo') : ccT('verPrintYes')),
+        (String(dB.discountPrint || 'NO').toUpperCase() === 'NO' ? ccT('verPrintNo') : ccT('verPrintYes')), 'text');
+    /* ⑨ 规格表（按行逐列比较；行数变化也会列出） */
+    var spA = Array.isArray(dA.specs) ? dA.specs : [], spB = Array.isArray(dB.specs) ? dB.specs : [];
+    var specSec = ccvTxt('verSecSpec');
+    var specRowLabel = function(s, i){
+      s = s || {};
+      var d = [];
+      if(Number(s.len)) d.push(ccNum(s.len));
+      if(Number(s.wid)) d.push(ccNum(s.wid));
+      if(Number(s.hei)) d.push(ccNum(s.hei));
+      var nm = String(s.house || '').trim() || (ccT('verSpecRowN') || 'Spec {0}').replace('{0}', String(i + 1));
+      if(String(s.code || '').trim()) nm += ' / ' + String(s.code).trim();
+      return specSec + ' · ' + nm + (d.length ? (' · ' + d.join('×') + ' mm') : '');
+    };
+    var SPEC_FIELDS = [
+      ['qty', ccvTxt('qty'), 'num'], ['len', ccvTxt('specLen'), 'num'], ['wid', ccvTxt('specWid'), 'num'],
+      ['hei', ccvTxt('specHei'), 'num'], ['units', ccvTxt('verSpecUnits'), 'num'], ['bldgs', ccvTxt('verSpecBldgs'), 'num'],
+      ['layers', ccvTxt('layers'), 'num'],
+      /* ★配筋输入也是「人工输入」，逐项列出（nl/barsL 纵向条数、nw/barsW 横向条数、rL/rW 直径） */
+      ['nl', ccvTxt('barsL'), 'num'], ['rL', ccvTxt('rDiaL'), 'text'],
+      ['nw', ccvTxt('barsW'), 'num'], ['rW', ccvTxt('rDiaW'), 'text'],
+      ['price', ccvTxt('unitPrice'), 'money'], ['remark', ccvTxt('remark', 'Remark'), 'text']
+    ];
+    var spN = Math.max(spA.length, spB.length);
+    for(var si = 0; si < spN; si++){
+      var sA0 = spA[si], sB0 = spB[si];
+      if(!sA0 && sB0){ add('spec', '➕ ' + ccT('verAdded'), '—', specRowLabel(sB0, si)); continue; }
+      if(sA0 && !sB0){ add('spec', '➖ ' + ccT('verRemoved'), specRowLabel(sA0, si), '—'); continue; }
+      SPEC_FIELDS.forEach(function(f){
+        var a0 = sA0[f[0]], b0 = sB0[f[0]];
+        if(f[2] === 'text'){ if(String(a0 || '') === String(b0 || '')) return; }
+        cmp(f[2], specRowLabel(sB0, si) + ' · ' + f[1], a0, b0, f[2]);
+      });
+    }
+    /* ⑩ 计划日期 / 现金流参数 */
+    var plA = A.plan || {}, plB = B.plan || {}, planSec = ccvTxt('verSecPlan');
+    var dmy = function(v){ try{ return v ? (ccQuoteDmy(v) || v) : '—'; }catch(e){ return v || '—'; } };
+    cmp('text', planSec + ' · ' + ccvTxt('verSignDate'),   dmy(plA.sign),      dmy(plB.sign),      'text');
+    cmp('text', planSec + ' · ' + ccvTxt('verFactoryEnd'), dmy(plA.factoryEnd), dmy(plB.factoryEnd), 'text');
+    cmp('text', planSec + ' · ' + ccvTxt('verInstPlan'),   dmy(plA.instDate),  dmy(plB.instDate),  'text');
+    var csA = A.cash || {}, csB = B.cash || {}, cashSec = ccvTxt('cfTitle');
+    cmp('text', cashSec + ' · ' + ccvTxt('verDepositDate'), dmy(csA.depositDate), dmy(csB.depositDate), 'text');
+    cmp('num', cashSec + ' · ' + ccvTxt('verDepositPct'), csA.depositPct, csB.depositPct, 'num');
+    cmp('num', cashSec + ' · ' + ccvTxt('verProdPct'),    csA.prodPct,    csB.prodPct,    'num');
+    cmp('num', cashSec + ' · ' + ccvTxt('verInstPct'),    csA.instPct,    csB.instPct,    'num');
+    return items;
+  }
+  /* 当前页面的快照（与保存记录时的 snap 同构） */
+  function ccQuoteCurSnap(){
+    var cp = ccQuoteDeep(CC_DATA);
+    if(!cp) return null;
+    try{ delete cp.quoteLog; }catch(e){}
+    try{ delete cp.vatMig; }catch(e){}       // 老存档迁移标记，不是用户输入
+    try{ delete cp.demand.cur; }catch(e){}   // 展示货币：只是显示偏好
+    try{ delete cp.demand.quote; }catch(e){} // 客户/内容/版本号：语言切换会改，不算数据变化（日期单独比）
+    try{ delete cp.cash.cur; }catch(e){}
+    return cp;
+  }
+  function ccQuoteDiffItems(rec){
+    var cur = ccQuoteCurSnap();
+    if(!cur || !ccvSnap(rec)) return null;
+    var items = ccRecDiffItems({ snap: cur }, rec);
+    if(!items) return null;
+    /* 日期单独比（quote 段整体被排除） */
+    var qd = (CC_DATA && CC_DATA.demand && CC_DATA.demand.quote) || {};
+    var od = (rec && rec.sig) || {};
+    if(String(od.date || '') !== String(qd.date || '')){
+      items.unshift({ cat:'text', label: ccT('verDiffDate'), from: ccQuoteDmy(od.date) || '—', to: ccQuoteDmy(qd.date) || '—' });
+    }
+    return items;
+  }
+  function ccRecDiffStats(items){
+    var st = {};
+    (items || []).forEach(function(it){ st[it.cat] = (st[it.cat] || 0) + 1; });
+    return st;
+  }
+  function ccRecDiffItemLine(it){
+    return (CCV_CAT_ICON[it.cat] || '•') + ' ' + it.label + '：' + it.from + ' → ' + it.to;
+  }
+  function ccRecDiffItemLines(items, cap){
+    cap = cap || 150;
+    var list = items || [], out = list.slice(0, cap).map(ccRecDiffItemLine);
+    if(list.length > cap) out.push(String(ccT('verMoreItems') || '').replace('{0}', String(list.length - cap)));
+    return out;
+  }
+  /* 分项统计条（每类几项 + 合计） */
+  function ccRecDiffChips(items){
+    var st = ccRecDiffStats(items), parts = [];
+    CCV_CAT_ORDER.forEach(function(c){ if(st[c]) parts.push(ccvCatName(c) + ' ' + st[c]); });
+    if(!parts.length) return '';
+    return '<div class="ccq-hist-stats"><span class="ccq-hist-stats-k">' + ccEsc2(ccT('verStatTitle')) + '</span>'
+      + parts.map(function(s){ return '<span class="ccq-hist-chip">' + ccEsc2(s) + '</span>'; }).join('')
+      + '<span class="ccq-hist-chip ccq-hist-chip-sum">'
+      + ccEsc2(String(ccT('verTotalItems') || '{0}').replace('{0}', String((items || []).length))) + '</span></div>';
+  }
+  window.ccRecDiffItems = ccRecDiffItems;
+  window.ccQuoteDiffItems = ccQuoteDiffItems;
+  window.ccRecDiffChips = ccRecDiffChips;
   /* 变更清单（三语，按当前语言拼） */
   function ccQuoteDiffLines(rec){
+    /* ★CCQ-VERFULL-20261115：有整份快照就逐项比对（勾选框/人工输入/效率输入全覆盖），否则回退旧口径 */
+    var full = ccQuoteDiffItems(rec);
+    if(full) return ccRecDiffItemLines(full, 200);
     var T = ccT, out = [], old = (rec && rec.sig) || {}, now = ccQuoteSig();
     if(String(old.date || '') !== String(now.date || '')){
       out.push(T('verDiffDate') + '：' + (ccQuoteDmy(old.date) || '—') + ' → ' + (ccQuoteDmy(now.date) || '—'));
@@ -67852,6 +68450,8 @@ function submitAuth() {
       /* ★CCQ-VER-20261115：行数没变时不要写成「规格行数 3 → 3」（数量变了但行数相同的场景） */
       out.push(on === nn ? (T('verDiffSpecsChanged') + '：' + T('verChanged'))
                          : (T('verDiffSpecs') + '：' + on + ' → ' + nn));
+      /* ★CCQ-ROWDIFF-20261115：紧接着列出删除了 / 新增了哪个房舍、哪个规格的板材、多少块 */
+      out = out.concat(ccRowDiffLines(now.rows, old.rows));
     }
     if(String(old.fees || '') !== String(now.fees || '')) out.push(T('verDiffFees') + '：' + T('verChanged'));
     var of = (rec && rec.foot) || {}, nf = ccQuoteFootSnap(), M = function(v){ return ccqMoneyStr(v); };
@@ -67872,38 +68472,110 @@ function submitAuth() {
     var p = function(n){ return ('0' + n).slice(-2); };
     return p(dd.getDate()) + '/' + p(dd.getMonth() + 1) + '/' + dd.getFullYear() + ' ' + p(dd.getHours()) + ':' + p(dd.getMinutes());
   }
+  /* ★CCQ-LOGSORT-20261115（用户 2026-11-15）：报价记录列表表头【三态排序】
+     点一次 = 升序，再点 = 降序，再点 = 恢复初始（初始 = 最新记录在最上面）。
+     只排展示顺序，行内的回填/删除仍按原始索引（data 里的 list 下标）执行。 */
+  var CCQ_LOG_SORT = { k:'', dir:0 };   // dir: 0=初始 1=升序 2=降序
+  window.ccQuoteLogSort = function(k){
+    if(CCQ_LOG_SORT.k !== k){ CCQ_LOG_SORT.k = k; CCQ_LOG_SORT.dir = 1; }
+    else {
+      CCQ_LOG_SORT.dir = (CCQ_LOG_SORT.dir + 1) % 3;
+      if(!CCQ_LOG_SORT.dir) CCQ_LOG_SORT.k = '';
+    }
+    ccQuoteLogRefresh();
+  };
+  function ccQuoteLogSortVal(r, k){
+    r = r || {};
+    if(k === 'customer') return String(ccqTriDisp(r.customer) || '');
+    if(k === 'content')  return String(ccqTriDisp(r.content) || '');
+    if(k === 'date')     return String(r.date || '');
+    if(k === 'version')  return Number(ccRecVer(r)) || 0;
+    if(k === 'at')       return String(r.at || '');
+    return '';
+  }
   function ccQuoteLogHtml(){
     var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
     var T = ccT;
     var h = '<div class="ccq-log-wrap"><div class="ccq-log-head">🗂 ' + T('recListTitle')
       + '<span class="ccq-log-n">' + list.length + '</span></div>';
     if(!list.length) return h + '<div class="ccq-log-empty">' + T('recEmpty') + '</div></div>';
+    /* 初始顺序：最新在最上面（数组倒序），排序在此基础上进行 */
+    var rows = [];
+    for(var i = list.length - 1; i >= 0; i--) rows.push({ i:i, r: list[i] || {} });
+    var sk = CCQ_LOG_SORT.k, sd = CCQ_LOG_SORT.dir;
+    if(sk && sd){
+      rows.sort(function(a, b){
+        var x = ccQuoteLogSortVal(a.r, sk), y = ccQuoteLogSortVal(b.r, sk), c;
+        if(sk === 'version') c = x - y;
+        else c = String(x).localeCompare(String(y), undefined, { numeric:true, sensitivity:'base' });
+        return sd === 2 ? -c : c;
+      });
+    }
+    var th = function(k, label){
+      var act = (CCQ_LOG_SORT.k === k && CCQ_LOG_SORT.dir);
+      var ar = act ? (CCQ_LOG_SORT.dir === 1 ? '▲' : '▼') : '';
+      return '<th class="ccq-log-th-sort" title="' + ccEsc2(T('recSortTip')) + '"'
+        + ' onclick="ccQuoteLogSort(\'' + k + '\')">' + label
+        + (ar ? '<span class="ccq-log-arrow">' + ar + '</span>' : '') + '</th>';
+    };
     /* ★CCQ-HIST-20261115：操作列多了「查看版本修改记录」→ 重新分配列宽（合计仍 100%） */
     h += '<table class="ccq-log-tb"><colgroup><col style="width:20%"><col style="width:19%"><col style="width:9%">'
       + '<col style="width:7%"><col style="width:13%"><col style="width:32%"></colgroup>'
-      + '<thead><tr><th>' + T('quoteCustomer') + '</th><th>' + T('quoteContent') + '</th>'
-      + '<th>' + T('quoteDate') + '</th><th>' + T('quoteVersion') + '</th>'
-      + '<th>' + T('recAt') + '</th><th>' + T('recOps') + '</th></tr></thead><tbody>';
-    for(var i = list.length - 1; i >= 0; i--){
-      var r = list[i] || {};
+      + '<thead><tr>' + th('customer', T('quoteCustomer')) + th('content', T('quoteContent'))
+      + th('date', T('quoteDate')) + th('version', T('quoteVersion'))
+      + th('at', T('recAt')) + '<th>' + T('recOps') + '</th></tr></thead><tbody>';
+    rows.forEach(function(o){
+      var r = o.r;
       h += '<tr><td>' + ccEsc2(ccqTriDisp(r.customer) || '—') + '</td>'
         + '<td>' + ccEsc2(ccqTriDisp(r.content) || '—') + '</td>'
         + '<td class="ccq-log-d">' + ccEsc2(ccQuoteDmy(r.date) || '—') + '</td>'
         + '<td class="ccq-log-c">' + ccEsc2('V' + ccRecVer(r)) + '</td>'
         + '<td class="ccq-log-c" style="white-space:nowrap;">' + ccEsc2(ccQuoteAtTxt(r.at)) + '</td>'
         + '<td class="ccq-log-ops">'
-        + '<button type="button" class="cc-add ccq-log-hist" title="' + ccEsc2(T('verHistBtn')) + '" onclick="ccQuoteHistoryOpen(' + i + ')">📜 ' + ccEsc2(T('verHistBtn')) + '</button>'
-        + '<button type="button" class="cc-add" onclick="ccQuoteRecordRestore(' + i + ')">↩ ' + T('recFill') + '</button>'
-        + '<button type="button" class="cc-add ccq-log-del" title="' + ccEsc2(T('recDelTip')) + '" onclick="ccQuoteRecordDelete(' + i + ')">🗑</button>'
+        + '<button type="button" class="cc-add ccq-log-hist" title="' + ccEsc2(T('verHistBtn')) + '" onclick="ccQuoteHistoryOpen(' + o.i + ')">📜 ' + ccEsc2(T('verHistBtn')) + '</button>'
+        + '<button type="button" class="cc-add" onclick="ccQuoteRecordRestore(' + o.i + ')">↩ ' + T('recFill') + '</button>'
+        + '<button type="button" class="cc-add ccq-log-del" title="' + ccEsc2(T('recDelTip')) + '" onclick="ccQuoteRecordDelete(' + o.i + ')">🗑</button>'
         + '</td></tr>';
-    }
+    });
     return h + '</tbody></table></div>';
   }
+  /* ★CCQ-LOOK-20261115：鼠标悬停整行整列「十字高亮」（淡黄），离开即撤 */
+  function ccQuoteLogHoverBind(){
+    var host = document.getElementById('ccq_log_host');
+    if(!host || host.__ccqHoverBound) return;
+    host.__ccqHoverBound = true;
+    var clear = function(tb){
+      var pr = tb.querySelectorAll('td.ccq-x-hl');
+      for(var i = 0; i < pr.length; i++) pr[i].classList.remove('ccq-x-hl');
+    };
+    host.addEventListener('mousemove', function(ev){
+      var tb = host.querySelector('.ccq-log-tb'); if(!tb) return;
+      var t = ev.target;
+      var td = (t && t.closest) ? t.closest('td') : null;
+      clear(tb);
+      if(!td || !tb.contains(td)) return;
+      var tr = td.parentNode;
+      var cells = tr.children, idx = -1, j;
+      for(j = 0; j < cells.length; j++){ if(cells[j] === td){ idx = j; break; } }
+      if(idx < 0) return;
+      var body = tb.tBodies[0]; if(!body) return;
+      for(var k = 0; k < body.rows.length; k++){
+        var c = body.rows[k].cells[idx];
+        if(c) c.classList.add('ccq-x-hl');
+      }
+      for(j = 0; j < cells.length; j++) cells[j].classList.add('ccq-x-hl');
+    });
+    host.addEventListener('mouseleave', function(){
+      var tb = host.querySelector('.ccq-log-tb'); if(tb) clear(tb);
+    });
+  }
+  window.ccQuoteLogHoverBind = ccQuoteLogHoverBind;
   /* 只刷新记录列表区域（不动整页、不重排输入框） */
   function ccQuoteLogRefresh(){
     var host = document.getElementById('ccq_log_host');
     if(!host) return;
     try { host.innerHTML = ccQuoteLogHtml(); } catch(e){}
+    try { ccQuoteLogHoverBind(); } catch(e){}   /* ★CCQ-LOOK-20261115：重绘后重新挂十字高亮 */
   }
   /* ★CCQ-VER-20261115（用户 2026-11-15）：「回填」必须把这条记录当时的【全部数据】都恢复回来
      （规格表 / 单价 / 费用 / 折扣 / 税率 / 利润 / 模具 / 计划…），不只是表头四栏。 */
@@ -67995,7 +68667,10 @@ function submitAuth() {
   window.ccQuoteVerConfirm = function(oldVer, lines){
     /* 兼容两种入参：变化项数组（旧调用）或记录对象（语言切换后可重新翻译） */
     var rec = (lines && !Array.isArray(lines)) ? lines : null;
-    var lis0 = Array.isArray(lines) ? lines : (rec ? ccQuoteDiffLines(rec) : []);
+    /* ★CCQ-VERFULL-20261115：保存前确认框也展示「全部输入」的逐项变化 + 分项统计 */
+    var vitems = rec ? ccQuoteDiffItems(rec) : null;
+    var lis0 = Array.isArray(lines) ? lines
+             : (vitems ? ccRecDiffItemLines(vitems, 200) : (rec ? ccQuoteDiffLines(rec) : []));
     window.__CCQ_VER_PEND = { oldVer: oldVer, rec: rec, lines: lis0 };
     var lines = lis0;
     var old = document.getElementById('ccqVerOverlay');
@@ -68013,7 +68688,8 @@ function submitAuth() {
       + '<div class="ccq-ver-body">'
       + '<div class="ccq-ver-row"><span class="ccq-ver-k">' + ccEsc2(T('verCurrent')) + '</span><b>V' + oldVer + '</b>'
       + '<span class="ccq-ver-arrow">→</span><span class="ccq-ver-k">' + ccEsc2(T('verNext')) + '</span><b class="ccq-ver-new">V' + (oldVer + 1) + '</b></div>'
-      + '<div class="ccq-ver-changes"><div class="ccq-ver-k2">' + ccEsc2(T('verChanges')) + '</div><ul>' + lis + '</ul></div>'
+      + (vitems ? ccRecDiffChips(vitems) : '')
+      + '<div class="ccq-ver-changes"><div class="ccq-ver-k2">' + ccEsc2(T('verChanges')) + '</div><ul class="ccq-ver-list">' + lis + '</ul></div>'
       + '</div>'
       + '<div class="ccq-ver-foot">'
       + '<button type="button" class="cc-add" onclick="ccQuoteVerConfirmClose()" style="margin:0;background:#78909c;border-color:#78909c;color:#fff;">' + ccEsc2(T('verCancel')) + '</button>'
@@ -68050,6 +68726,11 @@ function submitAuth() {
   }
   /* 两个版本之间的差异（prev 为空 = 首版） */
   function ccRecDiffLines(cur, prev){
+    /* ★CCQ-VERFULL-20261115：两条记录都带快照 → 逐项比对全部输入 */
+    if(prev){
+      var fitems = ccRecDiffItems(cur, prev);
+      if(fitems) return ccRecDiffItemLines(fitems, 200);
+    }
     var T = ccT, out = [];
     var M = function(v){ try{ return ccqMoneyStr(v); }catch(e){ return String(v); } };
     if(!prev) return out;
@@ -68062,6 +68743,8 @@ function submitAuth() {
     var cn = String(cs.rows || '') ? String(cs.rows).split('#').length : 0;
     if(pn !== cn) out.push(T('verDiffSpecs') + '：' + pn + ' → ' + cn);
     else if(String(ps.rows || '') !== String(cs.rows || '')) out.push(T('verDiffSpecsChanged') + '：' + T('verChanged'));
+    /* ★CCQ-ROWDIFF-20261115：房舍 / 板材规格的增删明细（历史弹窗同样显示） */
+    out = out.concat(ccRowDiffLines(cs.rows, ps.rows));
     if(String(ps.fees || '') !== String(cs.fees || '')) out.push(T('verDiffFees') + '：' + T('verChanged'));
     if(Number(pf.qty || 0) !== Number(cf.qty || 0)) out.push(T('verQty') + '：' + ccNum(pf.qty || 0) + ' → ' + ccNum(cf.qty || 0));
     if(Number(pf.area || 0) !== Number(cf.area || 0)) out.push(T('verArea') + '：' + ccNum2(pf.area || 0) + ' → ' + ccNum2(cf.area || 0));
@@ -68072,6 +68755,18 @@ function submitAuth() {
     if(Number(pf.total || 0) !== Number(cf.total || 0)) out.push(T('verTotal') + '：' + M(pf.total) + ' → ' + M(cf.total));
     return out;
   }
+  /* 调试/验收用：报价表头状态（探针无法直接访问 IIFE 内的 CC_DATA） */
+  window.ccQuoteDbg = function(){
+    var q = (CC_DATA && CC_DATA.demand && CC_DATA.demand.quote) || {};
+    return { hasData: !!CC_DATA, date: String(q.date || ''), ver: String(q.version || ''),
+             customer: String(ccqTriShow('customer') || ''), content: String(ccqTriShow('content') || ''),
+             canEdit: (typeof ccCanEdit === 'function') ? !!ccCanEdit() : null,
+             miss: (typeof ccQuoteReqMissing === 'function') ? ccQuoteReqMissing() : null };
+  };
+  /* 调试/验收用：读取报价记录列表（探针无法直接访问 IIFE 内的 CC_DATA） */
+  window.ccQuoteLogGet = function(){
+    try{ return (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : []; }catch(e){ return []; }
+  };
   window.ccQuoteHistoryOpen = function(idx){
     var list = (CC_DATA && Array.isArray(CC_DATA.quoteLog)) ? CC_DATA.quoteLog : [];
     var r = list[idx];
@@ -68097,12 +68792,16 @@ function submitAuth() {
     }else{
       for(var i = recs.length - 1; i >= 0; i--){
         var cur = recs[i], prev = (i > 0) ? recs[i - 1] : null;
-        var diffs = ccRecDiffLines(cur, prev);
+        /* ★CCQ-VERFULL-20261115：两条记录都有快照 → 逐项比对全部输入（勾选框/人工输入/效率） */
+        var ditems = prev ? ccRecDiffItems(cur, prev) : null;
+        var diffs = ditems ? ccRecDiffItemLines(ditems, 200) : ccRecDiffLines(cur, prev);
+        var chips = ditems ? ccRecDiffChips(ditems) : '';
         var foot = (cur && cur.foot) || {};
         body += '<div class="ccq-hist-item">'
           + '<div class="ccq-hist-vrow"><b class="ccq-hist-v">V' + ccRecVer(cur) + '</b>'
           + '<span class="ccq-hist-at">🕒 ' + ccEsc2(ccQuoteAtTxt(cur.at)) + '</span>'
           + '<span class="ccq-hist-tag">' + ccEsc2(prev ? T('verHistoryChanges') : T('verFirstSave')) + '</span></div>'
+          + chips
           + (diffs.length
               ? '<ul class="ccq-hist-diff">' + diffs.map(function(s){ return '<li>' + ccEsc2(s) + '</li>'; }).join('') + '</ul>'
               : (prev ? '<div class="ccq-hist-none">' + ccEsc2(T('verNoChangePrev')) + '</div>' : ''))
@@ -68177,16 +68876,53 @@ function submitAuth() {
     ccQuoteVerConfirm(oldVer, cur);
   };
   /* ★CCQ-GOTO-20261115（用户 2026-11-15）：需求信息表右上角「进入报价格式区域」——
-     点一下立即滚到最下面的「报价结构」纸面（#ccq_paper），并整块闪一下做定位提示。 */
+     点一下滚到最下面的「报价结构」，并整块闪一下做定位提示。
+     ★CCQ-GOTO-TOP-20261115b（用户 2026-11-15 截图要求「完全按这个位置停下来」）：
+       停靠点 = 「报价结构」标题行（含 保存报价记录 / 预览报价 两个按钮）的顶边，
+       且必须让到固定顶栏 #topbar（position:fixed;height:40px）的下沿之下，
+       所以不能用 scrollIntoView(block:'start') —— 那样元素顶边贴视口 0，
+       标题行会被顶栏压住、看起来"跳过头了"。这里自己算滚动量。 */
   window.ccGoQuoteFormat = function(){
-    var p = document.getElementById('ccq_paper');
-    if(!p) return;
-    try { p.scrollIntoView({ behavior:'smooth', block:'start' }); }
-    catch(e){ try { p.scrollIntoView(); } catch(e2){} }
-    p.classList.remove('ccq-flash');
-    void p.offsetWidth;
-    p.classList.add('ccq-flash');
-    setTimeout(function(){ try { p.classList.remove('ccq-flash'); } catch(e){} }, 1700);
+    var paper = document.getElementById('ccq_paper');
+    if(!paper) return;
+    var secRow = paper.previousElementSibling;
+    if(!secRow || !/ccq-sec-row/.test(String(secRow.className || ''))){
+      secRow = document.querySelector('.ccq-sec-row');
+    }
+    var target = secRow || paper;
+    /* 固定/粘性顶栏的下沿（隐藏/零高时按 0）= 允许的顶部让位。
+       用实测高度判断可见性（不认 .hidden 类，免得被别处样式重新显示时算错）。 */
+    var gap = 0;
+    try{
+      var tb = document.getElementById('topbar');
+      if(tb && tb.getBoundingClientRect().height > 1){
+        var tpos = getComputedStyle(tb).position;
+        if(tpos === 'fixed' || tpos === 'sticky'){
+          gap = Math.max(0, Math.round(tb.getBoundingClientRect().bottom));
+        }
+      }
+    }catch(e){}
+    /* 找最近的纵向可滚动祖先；没有就滚 window（桌面版整页滚动） */
+    var sc = null, n = target.parentNode;
+    while(n && n.nodeType === 1 && n !== document.body && n !== document.documentElement){
+      var cs;
+      try{ cs = getComputedStyle(n); }catch(e){ break; }
+      if(/(auto|scroll|overlay)/.test(String(cs.overflowY || '')) && n.scrollHeight > n.clientHeight + 2){ sc = n; break; }
+      n = n.parentNode;
+    }
+    var top;
+    if(sc){
+      top = Math.max(0, sc.scrollTop + (target.getBoundingClientRect().top - sc.getBoundingClientRect().top) - gap);
+      try{ sc.scrollTo({ top: top, behavior:'smooth' }); }catch(e){ sc.scrollTop = top; }
+    }else{
+      var cur = window.pageYOffset || document.documentElement.scrollTop || 0;
+      top = Math.max(0, cur + target.getBoundingClientRect().top - gap);
+      try{ window.scrollTo({ top: top, behavior:'smooth' }); }catch(e){ window.scrollTo(0, top); }
+    }
+    paper.classList.remove('ccq-flash');
+    void paper.offsetWidth;
+    paper.classList.add('ccq-flash');
+    setTimeout(function(){ try { paper.classList.remove('ccq-flash'); } catch(e){} }, 1700);
   };
   /* ★CCQ-HOUSENAME-20261115：猪舍代码(1..15 / '1-2' 带后缀) → 当前语言的猪舍名称 */
   function ccQuoteHouseName(v){
@@ -69878,12 +70614,17 @@ function submitAuth() {
   }
   function ccScheduleSave(){
     if(!ccCanEdit()) return;
+    /* ★CC-FLASH-20261115：数据还是本地快照（服务器版本尚未回来）时【绝不回写服务器】，
+       否则刚打开页面就把旧快照推回去，等于用旧数据覆盖别人刚改的内容。 */
+    if(!CC_LOADED && CC_FROM_CACHE) return;
+    if(!CC_DATA) return;   /* 还没拿到任何数据时绝不 PUT，免得把存档写成空 */
     CC_DIRTY = true;
     var st = document.getElementById('cc_savest');
     if(st){ st.textContent = ccT('saving'); st.style.color = '#e65100'; }
     if(CC_SAVE_T) clearTimeout(CC_SAVE_T);
     CC_SAVE_T = setTimeout(function(){
       try{
+        ccCacheWrite();   /* ★CC-FLASH-20261115：本地快照跟上最新数据，下次打开不再闪空表 */
         fetch('/api/prod-kv/' + encodeURIComponent(CC_KEY), { method:'PUT', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ requester: ccMe(), data: CC_DATA }) })
           .then(function(r){ return r.json(); })
@@ -70265,28 +71006,59 @@ function submitAuth() {
       }
     };
   }
+  /* ★CC-FLASH-20261115（用户 2026-11-15：点开「成本核算」会瞬间闪出"总块数 0 / 一行空表"再恢复）：
+     本地快照只用于「先画后校」——打开页面先用上次的数据占位，服务器数据一到就覆盖，绝不作为事实源。 */
+  var CC_CACHE_KEY = 'cc_cache_v1';
+  function ccCacheWrite(){
+    try{ if(CC_DATA) localStorage.setItem(CC_CACHE_KEY, JSON.stringify(CC_DATA)); }catch(e){}
+  }
+  function ccCacheRead(){
+    try{
+      var s = localStorage.getItem(CC_CACHE_KEY);
+      if(!s) return null;
+      var o = JSON.parse(s);
+      return (o && typeof o === 'object') ? ccMerge(o) : null;
+    }catch(e){ return null; }
+  }
   function ccLoad(){
     if(CC_LOADED){ ccRecalc(); return; }
+    var settle = function(){
+      CC_FROM_CACHE = false;
+      /* ★CC-FLASH-20261115：服务器无数据/请求失败时必须退回默认空数据并真的渲染出来，
+         否则「加载中」占位会一直挂着（至少不影响录入）。 */
+      if(!CC_DATA) CC_DATA = ccDef();
+      if(!CC_DIRTY && LIB_TAB === 'cost') lib_renderCostBody();
+      else ccRecalc();
+    };
     try{
       fetch('/api/prod-kv/' + encodeURIComponent(CC_KEY) + '?me=' + encodeURIComponent(ccMe()))
         .then(function(r){ return r.json(); })
         .then(function(j){
           CC_LOADED = true;
-          if(j && j.ok && j.data){ CC_DATA = ccMerge(j.data); }
-          if(!CC_DIRTY && LIB_TAB === 'cost') lib_renderCostBody();
-          else ccRecalc();
+          /* ★CC-FLASH-20261115：已经在快照上改过（CC_DIRTY）就别用服务器版本盖掉用户正在输入的内容 */
+          if(j && j.ok && j.data && !CC_DIRTY){ CC_DATA = ccMerge(j.data); ccCacheWrite(); }
+          settle();
         })
-        .catch(function(){ CC_LOADED = true; });
-    }catch(e){ CC_LOADED = true; }
+        .catch(function(){ CC_LOADED = true; settle(); });
+    }catch(e){ CC_LOADED = true; settle(); }
   }
   // ★CC-PRINTPDF-20261106：打印成本核算页——按页面当前实际状态打印（收缩的块保持收缩，绝不强行展开）；打印完自动摘掉 body 标记
   function ccPrintPdf(){
     /* ★CCQ-MONEYFIT-20261115：打印前重新按内容缩一遍金额列字号 */
     try { ccQuoteFitMoney(); } catch(e){}
     document.body.classList.add('printing-cost');
-    var done = function(){ document.body.classList.remove('printing-cost'); window.removeEventListener('afterprint', done); };
+    /* ★CC-PRINT-SCOPE-20261115（用户 2026-11-15）：旧代码在 window.print() 后固定 1500ms 就摘掉
+       printing-cost，而 Chrome 生成打印预览经常超过 1.5s → 预览拿到的是"已摘掉过滤"的页面，
+       于是报价结构、报价记录列表又被打印出来。改成：只认 afterprint；兜底放到 5 分钟，
+       并且页面重新获得焦点时（打印窗口关闭）再兜底清理。 */
+    var done = function(){
+      document.body.classList.remove('printing-cost');
+      window.removeEventListener('afterprint', done);
+      clearTimeout(fallback);
+    };
+    var fallback = setTimeout(done, 300000);
     window.addEventListener('afterprint', done);
-    setTimeout(function(){ try{ window.print(); }catch(e){} setTimeout(done, 1500); }, 60);
+    setTimeout(function(){ try{ window.print(); }catch(e){ done(); } }, 60);
   }
   window.ccPrintPdf = ccPrintPdf; // ★CC-PRINTPDF-FIX-20261106：闭包内函数必须显式挂全局，内联 onclick 才能调到（否则 ReferenceError: ccPrintPdf is not defined）
 
@@ -70439,7 +71211,21 @@ function submitAuth() {
   window.ccQuoteShowImage = ccQuoteShowImage;
   function lib_renderCostBody(){
     var host = document.getElementById('lib-cost-body'); if(!host) return;
-    if(!CC_DATA) CC_DATA = ccDef();
+    /* ★CC-FLASH-20261115（用户 2026-11-15：极短时间闪出"总块数 0 / 一行空表"再恢复原样）：
+       旧代码 `if(!CC_DATA) CC_DATA = ccDef();` 先拿默认空数据渲染一屏，等 /api/prod-kv 回来再重绘，
+       用户看到的就是"数据被清空"的假象。现在：
+         ① 有本地快照 → 先用快照渲染（和上次看到的一致），服务器数据一到再无声覆盖；
+         ② 连快照都没有（首次使用/换浏览器）→ 只显示「加载中」，绝不渲染空报价表。 */
+    if(!CC_DATA){
+      var __ccCache = ccCacheRead();
+      if(__ccCache){ CC_DATA = __ccCache; CC_FROM_CACHE = true; }
+      else{
+        var __ld = { zh:'加载中…', en:'Loading…', vi:'Đang tải…' }[(typeof CUR_LANG !== 'undefined' ? CUR_LANG : 'zh')] || 'Loading…';
+        host.innerHTML = '<div style="padding:40px 10px;text-align:center;color:#888;font-size:13px;">⏳ ' + __ld + '</div>';
+        ccLoad();
+        return;
+      }
+    }
     /* ★LANG-KEEPSCROLL2-20261115（用户 2026-11-15）：
        innerHTML 整块重建会让页面高度瞬间归零 → 浏览器把 window.scrollTop 夹到 0，
        切语言/勾选/换币种后会"弹回最上面再闪回来"。现在重绘【前】先锁高度（文档 min-height +
@@ -70452,6 +71238,8 @@ function submitAuth() {
     ccBind();
     /* ★CCQ-TRILANG-20261115：客户名称/内容三语框的锁定状态（未点「清空三语」→ 全锁死） */
     try { ccQuoteTriBind(); } catch(e){}
+    /* ★CCQ-LOOK-20261115：报价记录列表的鼠标十字高亮（整页重绘后重新绑定） */
+    try { ccQuoteLogHoverBind(); } catch(e){}
     ccRecalc();
     /* ★CC-SPECGRID2-20261113：渲染后按容器宽度等比缩放整表（不出现底部横向滚动条），窗口变化时重算 */
     setTimeout(ccGridFit, 30);
