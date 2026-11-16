@@ -355,6 +355,44 @@ html body th.mfix-cell-over {
   html body .modal > h2 { padding-right: 52px !important; }
 }
 
+/* ★M-CLOSEBTN-20261116（用户要求）：模态框【自带的顶部关闭按钮】必须点得到、点得关。
+   ① 标题栏抬到内容层之上，绝对定位的 × 不会被正文/滚动内容盖住；
+   ② 关闭按钮命中区域放大到 34×34，并强制 pointer-events:auto（防止父级被禁用）；
+   ③ .modal-actions 容器跟随标题栏垂直居中，永远固定在右上角。 */
+html body .modal > h2,
+html body .modal > .modal-head,
+html body .modal > header {
+  position: relative !important;
+  z-index: 20 !important;
+}
+html body .modal .modal-actions {
+  position: absolute !important;
+  top: 50% !important;
+  right: 8px !important;
+  transform: translateY(-50%) !important;
+  z-index: 30 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+html body .modal .modal-actions > button,
+html body .modal .mmax-close,
+html body .modal .mmax-btn,
+html body .modal > h2 > button.close,
+html body .modal-overlay > .modal > .close,
+html body .modal-overlay > .close {
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 0 6px !important;
+  pointer-events: auto !important;
+  z-index: 31 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
 /* 通用"关闭"浮动按钮：JS 在检测到弹窗层时创建（★M-CLOSEFAB-20261116）
    —— 网页的 × 是 absolute，内容一滚就没了；这个永远钉在顶栏下方右上角。 */
 html body #mfix-close-fab {
@@ -438,6 +476,64 @@ html body .mfix-pdf-body {
 }
 html body .mfix-pdf-cv { display: block !important; background: #fff !important; }
 html body .mfix-pdf-msg { color: #bbb !important; font-size: 13px !important; padding: 24px 12px !important; text-align: center !important; }
+
+/* ---------- 8. 竖屏：生产「工厂概况」强制单行表单改为自动换行（★M-PORTRAIT-20261116） ----------
+   网页（choice_lite.html 5846-5874）写的是：
+     .prod-form.prod-form-nowrap{flex-wrap:nowrap !important;overflow-x:hidden !important}
+     .prod-form.prod-form-nowrap > .prod-field{flex:1 1 0 !important;min-width:0 !important}
+   桌面 1400px 宽时各字段各分 1/N，没问题；但 412px 竖屏上 7 个字段各分约 0px →
+   标签被压成一列竖字（"项目交期""现场地址"…就是竖着的一串单字），输入框宽度为 0 完全看不见。
+   这里在竖屏下改成"两列自动换行 + 输入框占满字段"，只在 APK 注入，网页源码不动。 */
+@media (orientation: portrait) and (max-width: 900px) {
+  html body .prod-form.prod-form-nowrap,
+  html body .prod-form-nowrap {
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    gap: 8px 10px !important;
+    align-items: flex-end !important;
+  }
+  html body .prod-form.prod-form-nowrap > .prod-field,
+  html body .prod-form-nowrap > .prod-field {
+    flex: 1 1 calc(50% - 6px) !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+  /* 地址 / 交期 这类长字段独占一行 */
+  html body .prod-form.prod-form-nowrap > .prod-field.addr-field,
+  html body .prod-form-nowrap > .prod-field.addr-field,
+  html body .prod-form.prod-form-nowrap > .prod-field.due-field,
+  html body .prod-form-nowrap > .prod-field.due-field {
+    flex: 1 1 100% !important;
+  }
+  html body .prod-form.prod-form-nowrap > .prod-field > label,
+  html body .prod-form-nowrap > .prod-field > label {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.25 !important;
+  }
+  html body .prod-form.prod-form-nowrap > .prod-field > input,
+  html body .prod-form.prod-form-nowrap > .prod-field > select,
+  html body .prod-form.prod-form-nowrap > .prod-field > textarea,
+  html body .prod-form-nowrap > .prod-field > input,
+  html body .prod-form-nowrap > .prod-field > select,
+  html body .prod-form-nowrap > .prod-field > textarea {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  /* 「保存」按钮独占一行、加大命中区域 */
+  html body .prod-form-nowrap > .prod-btn {
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    min-height: 40px !important;
+  }
+}
 
 /* ★兜底：网页用 .hidden 隐藏顶栏（登录页）时，本文件里的 display 覆盖不得把它顶出来 */
 html body #topbar.hidden { display: none !important; }

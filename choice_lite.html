@@ -75993,15 +75993,27 @@ function openProjectReport(id, reuseWin, forceLang) {
   var rpt = function(k){ if(RPT_I18N[_Lrpt] && RPT_I18N[_Lrpt][k]!==undefined) return RPT_I18N[_Lrpt][k]; if(dic[k]!==undefined) return dic[k]; return k; };
   var _rptEsc = function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
 
-  // 先同步打开窗口并写过渡页（防弹窗拦截 + 避免闪烁）
-  var _rptWin = (reuseWin && !reuseWin.closed) ? reuseWin : window.open('', '_blank');
-  if (!_rptWin) { showAlert(rpt('rpt_popup_blocked')); return; }
+  /* ★RPT-INLINE-20261116（用户反馈：手机 APK 里综合报告点 × 关不掉）——
+     根因：报告整天写进 window.open 出来的独立文档，关闭只靠 onclick="window.close()"。
+     Android WebView（APK 壳）里 window.open 拿不到真正独立、可被脚本关闭的窗口，
+     window.close() 变成空操作；语言按钮依赖的 window.opener 同样为 null（点了没反应）。
+     修复：移动端（或弹窗被拦截）不再开新窗口，改为在主页面的 #rptOverlay 浮层里渲染，
+     关闭走 closeProjectReport()、语言按钮直接调 window.__rptSetLang，彻底不依赖 opener / close。 */
+  var _rptMobileUA = /Android|iPhone|iPad|iPod|Mobile|Silk|Windows Phone/i.test(navigator.userAgent || '');
+  var _rptWin = null;
+  if (!_rptMobileUA) {
+    _rptWin = (reuseWin && !reuseWin.closed) ? reuseWin : window.open('', '_blank');
+    if (_rptWin === window || (_rptWin && _rptWin.closed)) _rptWin = null;
+  }
+  var _rptInline = !_rptWin;
+  if (!_rptInline) {
   window.__rptWinMap = window.__rptWinMap || {};
   window.__rptWinMap[id] = _rptWin;
   var _loadingDoc = '<!DOCTYPE html><html lang="'+_Lrpt+'"><head><meta charset="utf-8"><title>'+_rptEsc(rpt('rpt_title'))+'</title><style>'+PROJECT_REPORT_CSS+RPT_CSS_EXTRA+'</style></head><body><div class="rpt-loading">'+rpt('rpt_loading')+'</div></body></html>';
   _rptWin.document.open();
   _rptWin.document.write(_loadingDoc);
   _rptWin.document.close();
+  }
 
   function _buildDoc(htmlBody){
     var _rptTitle=_rptEsc('📊 '+rpt('rpt_title')+' · '+(p.contract_no||'')+' · '+(p.customer||''));
@@ -76014,6 +76026,41 @@ function openProjectReport(id, reuseWin, forceLang) {
     var _closeBtn='<button type="button" class="rpt-btn rpt-btn-outline rpt-close" onclick="window.close()" title="'+_rptEsc(rpt('rpt_close'))+'" aria-label="'+_rptEsc(rpt('rpt_close'))+'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4l6 6M10 4l-6 6"/></svg></button>';
     var _modal='<div class="rpt-modal"><div class="rpt-head"><div class="rpt-head-left"><h3>'+_rptHead+'</h3><span>'+_rptSub+'</span></div><div class="rpt-head-actions">'+_langBtns+_closeBtn+'</div></div><div class="rpt-body">'+htmlBody+'</div><div class="rpt-foot"><span>'+_rptFoot+'</span><div><button class="rpt-btn rpt-btn-outline" onclick="window.print()">🖨 '+_rptEsc(rpt('rpt_print'))+'</button></div></div></div>';
     return '<!DOCTYPE html><html lang="'+_Lrpt+'"><head><meta charset="utf-8"><title>'+_rptTitle+'</title><style>'+PROJECT_REPORT_CSS+RPT_CSS_EXTRA+'</style></head><body>'+_modal+'</body></html>';
+  }
+
+  /* ★RPT-INLINE-20261116：页内浮层渲染（移动端 / 弹窗被拦截时用）。
+     头部语言按钮 + 关闭按钮全部在主页面内触发，不再依赖 window.opener / window.close。 */
+  function _rptLangBtn(l){
+    return '<button type="button" class="rpt-btn rpt-lang'+(_Lrpt===l?' rpt-lang-active':'')+'" onclick="window.__rptSetLang&&window.__rptSetLang(\''+l+'\','+id+')">'+_rptEsc(rpt('rpt_lang_'+l))+'</button>';
+  }
+  function _rptPaintInline(htmlBody){
+    var ov = document.getElementById('rptOverlay');
+    if (!ov) return;
+    /* 打开报告前先收掉输入法/焦点，否则手机上软键盘会把报告底部按钮挡住。 */
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+    if (!document.getElementById('rptInlineStyle')) {
+      var st = document.createElement('style');
+      st.id = 'rptInlineStyle';
+      /* 注意：PROJECT_REPORT_CSS 开头带 body{...} 规则（给独立报告窗口用的），
+         注入主页面时必须剥掉，否则会改掉整个 App 的 body 背景与内边距。 */
+      st.textContent = String(PROJECT_REPORT_CSS || '').replace(/^\s*body\s*\{[^}]*\}\s*/i, '') + RPT_CSS_EXTRA;
+      document.head.appendChild(st);
+    }
+    var head = '<div class="rpt-head"><div class="rpt-head-left"><h3>'+_rptEsc(rpt('rpt_title'))+'</h3>'
+             + '<span>'+_rptEsc((p.contract_no||'')+' · '+(p.customer||''))+'</span></div>'
+             + '<div class="rpt-head-actions">'+_rptLangBtn('zh')+_rptLangBtn('en')+_rptLangBtn('vi')
+             + '<button type="button" class="rpt-btn rpt-btn-outline" style="padding:6px 10px;line-height:1;font-size:13px;" onclick="closeProjectReport()" title="'+_rptEsc(rpt('rpt_close'))+'" aria-label="'+_rptEsc(rpt('rpt_close'))+'">✕</button></div></div>';
+    var foot = '<div class="rpt-foot"><span>'+_rptEsc(rpt('rpt_title')+' · '+(p.contract_no||''))+'</span>'
+             + '<div><button type="button" class="rpt-btn rpt-btn-outline" onclick="printModalById(\'rptOverlay\')">🖨 '+_rptEsc(rpt('rpt_print'))+'</button> '
+             + '<button type="button" class="rpt-btn rpt-btn-primary" onclick="closeProjectReport()">'+_rptEsc(rpt('rpt_close'))+'</button></div></div>';
+    ov.innerHTML = '<div class="rpt-modal">'+head+'<div class="rpt-body">'+htmlBody+'</div>'+foot+'</div>';
+    /* ★手机上顶栏是 fixed + z-index:1200、高度 134px（两行导航），而 .rpt-overlay 默认 top:56px / z-index:1100，
+       导致报告头部被顶栏盖住、× 按钮的点击也被顶栏吃掉（点了没反应）。这里改成整屏覆盖并压过顶栏。 */
+    ov.style.top = '0px';
+    ov.style.zIndex = '3000';
+    ov.style.display = 'flex';
+    ov.classList.add('show');
+    ov.scrollTop = 0;
   }
 
   function _render(f){
@@ -76154,6 +76201,8 @@ html+='<div class="rpt-row"><span class="k">'+rpt('rpt_incoterm')+'</span><span 
     }
     html+='</div>';
 
+    // 页内浮层模式（移动端）：直接渲染到主页面浮层，关闭/切语言都在页面内完成
+    if (_rptInline) { _rptPaintInline(html); return; }
     // 一次性写完整文档（覆盖过渡页，不闪）
     _rptWin.document.open();
     _rptWin.document.write(_buildDoc(html));

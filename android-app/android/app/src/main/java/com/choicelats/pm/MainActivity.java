@@ -28,7 +28,7 @@ public class MainActivity extends BridgeActivity {
 
     /** ★改了 assets/mobile-fix.css 或 mobile-fix.js 必须同步改这里，
      *  否则页面里旧的 __mfixVer 残留会让新样式不生效。 */
-    private static final String FIX_VER = "M-APK-BACKPDF-CELLFIT-20261116e";
+    private static final String FIX_VER = "M-APK-PORTRAIT-GANTT-20261116i";
     private static final long POLL_MS = 600L;
 
     private long lastBackAt = 0L;

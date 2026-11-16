@@ -7,7 +7,7 @@
 (() => {
   // ★注意：不要在这里写 window.__mfixVer —— 那是 MainActivity 的注入版本守卫，
   //   被 JS 覆盖会让守卫永远不匹配，导致 600ms 一次无限重复注入。
-  const VER = 'M-APK-BACKPDF-CELLFIT-20261116d';
+  const VER = 'M-APK-PORTRAIT-GANTT-20261116i';
   if (window.__mfix) { window.__mfix.rescan(true); return 'rescan'; }
 
   // 网页已经做过横滑 / 固定列 / 带 colgroup 的表：保持原样
@@ -210,9 +210,71 @@
       for (let i = layers.length - 1; i >= 0; i--) {
         if (closeLayer(layers[i])) return 1;
       }
+      /* ★M-BACK-VIEW-20261116（用户要求）：没有弹窗可关时，交给网页自己的
+         「返回上一层视图」逻辑（switchView 历史 / gotoPrevView）。
+         返回 1 = 网页已经退了一层，Java 不再 goBack 也不退出 App。 */
+      if (typeof window.__handleBack === 'function') {
+        const consumed = window.__handleBack();
+        if (consumed) return 1;
+      }
     } catch (e) { }
     return 0;
   };
+
+  /* =====================================================================
+     ★M-CLOSEBTN-20261116（用户要求）：模态框【自带的顶部关闭按钮】点了必须能关。
+     失败原因（手机上很常见）：
+       ① 按钮被内容层/遮罩盖住，tap 落到了别人身上（pointer-events / z-index 问题）；
+       ② 按钮 onclick 里调的函数不存在或抛错，视觉上"点了没反应"；
+       ③ 弹窗只把自己 display:none，overlay 还留着。
+     这里做三件事：
+       A) 捕获阶段识别"关闭按钮"（class 含 close / 文本 ×✕✗ / title|aria-label 含关闭·close·đóng），
+          点完 350ms 后若弹窗还在，就强制关掉它（closeLayer 兜底）；
+       B) 把按钮的命中区域放大到至少 34×34（CSS 侧配合 pointer-events:auto）；
+       C) 关不掉时给出明确提示，不再让用户"点了没反应"。
+     ===================================================================== */
+  const CLOSE_TXT_RE = /^[×✕✗✖╳xX]$/;
+  const CLOSE_ATTR_RE = /(关闭|關閉|close|đóng|dong|hủy|huy)/i;
+
+  function looksCloseBtn(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const cls = (el.className || '').toString();
+    if (/close/i.test(cls)) return true;
+    const t = (el.textContent || '').trim();
+    if (CLOSE_TXT_RE.test(t)) return true;
+    const at = (el.getAttribute('title') || '') + ' ' + (el.getAttribute('aria-label') || '');
+    if (at.trim() && CLOSE_ATTR_RE.test(at)) return true;
+    const oc = el.getAttribute('onclick') || '';
+    if (/close/i.test(oc)) return true;
+    return false;
+  }
+
+  function layerOf(el) {
+    let n = el, best = null;
+    while (n && n !== document.body) {
+      try {
+        if (n.matches && n.matches('[class*="overlay"],[class*="Overlay"],[class*="modal"],[class*="Modal"]')) {
+          const cs = getComputedStyle(n);
+          if (cs.position === 'fixed' || cs.position === 'absolute') best = n;
+        }
+      } catch (e) { }
+      n = n.parentElement;
+    }
+    return best;
+  }
+
+  document.addEventListener('click', function (e) {
+    const tgt = e.target;
+    const btn = (tgt && tgt.closest) ? tgt.closest('button, .close, .mmax-close, [onclick], [role="button"]') : null;
+    if (!btn || !looksCloseBtn(btn)) return;
+    const layer = layerOf(btn);
+    if (!layer) return;
+    setTimeout(function () {
+      try {
+        if (isVisible(layer)) closeLayer(layer);
+      } catch (err) { }
+    }, 350);
+  }, true);
 
   /* =====================================================================
      ★M-CLOSEFAB-20261116：顶栏高度 → CSS 变量；有弹窗时给一个永远点得到的 ✕
@@ -262,6 +324,67 @@
   }
 
   setInterval(function () { try { syncCloseFab(); } catch (e) { } }, 700);
+
+  /* =====================================================================
+     ★M-GANTT-PORTRAIT-20261116（用户 2026-11-16 竖屏截图）：
+     「安装管理 → 安装计划详细安排」整页跑在 #instGanttFrame 这个 iframe 里，
+     父页面的 mobile-fix.css 完全管不到它 —— 竖屏下：排程参数 8 个字段被
+     flex:1 1 auto 压成一条条竖字、标题两行挤在一起、表格列被裁在右边。
+     这里往 iframe 文档里补一份窄屏样式（网页源码不动）。
+     ===================================================================== */
+  const GANTT_CSS = [
+    "@media (max-width:900px){",
+    "html .page{padding:6px 8px 16px}",
+    "html .hdr{display:block;margin-bottom:4px}",
+    "html .hdr h1{font-size:14px;line-height:1.3;overflow-wrap:break-word;word-break:normal}",
+    "html .hdr .sub{display:block;font-size:11px;margin-top:2px}",
+    "html .hdr-btns{margin-left:0 !important;margin-top:6px !important;display:flex !important;gap:8px !important}",
+    "html .hdr-btns .btn{flex:1 1 auto !important;padding:8px 10px !important}",
+    "html .card{padding:10px !important;margin-top:10px !important}",
+    "html .card h2{font-size:12px !important;flex-wrap:wrap !important;line-height:1.45 !important}",
+    "html .row.params-row{flex-wrap:wrap !important;gap:8px !important;align-items:flex-end !important}",
+    "html .params-row .fld{flex:1 1 calc(50% - 8px) !important;min-width:130px !important}",
+    "html .params-row .fld label{white-space:normal !important;overflow:visible !important;text-overflow:clip !important;text-align:left !important;font-size:10.5px !important;line-height:1.25 !important}",
+    "html .params-row .fld input,html .params-row .fld select{width:100% !important;min-width:0 !important}",
+    "html .params-row .btn{flex:1 1 calc(50% - 8px) !important;white-space:normal !important;padding:8px 6px !important}",
+    "html .layout{height:auto !important;flex-direction:column !important}",
+    "html .splitter{display:none !important}",
+    "html .tbl-wrap{width:100% !important;max-height:38vh !important;overflow:auto !important;border-right:0 !important;border-bottom:1px solid #cfd8dc !important;-webkit-overflow-scrolling:touch !important}",
+    "html .chart-wrap{min-height:280px !important;max-height:60vh !important;overflow:auto !important;-webkit-overflow-scrolling:touch !important}",
+    /* 表格/甘特都比屏幕宽：给一条看得见的细横滑条，提示"这里能左右滑" */
+    "html .tbl-wrap,html .chart-wrap{touch-action:pan-x pan-y}",
+    "html .tbl-wrap::-webkit-scrollbar,html .chart-wrap::-webkit-scrollbar{height:8px;width:8px}",
+    "html .tbl-wrap::-webkit-scrollbar-thumb,html .chart-wrap::-webkit-scrollbar-thumb{background:rgba(0,0,0,.35);border-radius:4px}",
+    "html .tbl-wrap::-webkit-scrollbar-track,html .chart-wrap::-webkit-scrollbar-track{background:rgba(0,0,0,.06)}",
+    "html .cfg.open{width:100% !important}",
+    "html .cards-wrap{overflow-x:auto !important;-webkit-overflow-scrolling:touch !important}",
+    "html .loadgrid{grid-template-columns:1fr !important}",
+    "html table.zt{font-size:11px !important}",
+    "html .delivery-label{flex:0 0 96px !important}",
+    "}"
+  ].join("\n");
+
+  function injectGanttCss() {
+    const fr = document.getElementById('instGanttFrame');
+    if (!fr) return 0;
+    let doc = null;
+    try { doc = fr.contentDocument || (fr.contentWindow && fr.contentWindow.document); } catch (e) { doc = null; }
+    if (!doc || !doc.head) return 0;
+    if (doc.getElementById('mfix-gantt-css')) return 0;
+    const st = doc.createElement('style');
+    st.id = 'mfix-gantt-css';
+    st.textContent = GANTT_CSS;
+    doc.head.appendChild(st);
+    return 1;
+  }
+  window.__mfixGantt = injectGanttCss;
+  setInterval(function () { try { injectGanttCss(); } catch (e) { } }, 700);
+  document.addEventListener('load', function (e) {
+    try {
+      const t = e.target;
+      if (t && t.id === 'instGanttFrame') injectGanttCss();
+    } catch (err) { }
+  }, true);
   window.addEventListener('resize', syncTopbarHeight);
   document.addEventListener('app:langchange', syncTopbarHeight);
 
