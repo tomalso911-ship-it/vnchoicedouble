@@ -26,7 +26,9 @@ import java.io.InputStream;
  */
 public class MainActivity extends BridgeActivity {
 
-    private static final String FIX_VER = "M-APK-LAYOUT-20261108c";
+    /** ★改了 assets/mobile-fix.css 或 mobile-fix.js 必须同步改这里，
+     *  否则页面里旧的 __mfixVer 残留会让新样式不生效。 */
+    private static final String FIX_VER = "M-APK-BACKPDF-CELLFIT-20261116d";
     private static final long POLL_MS = 600L;
 
     private long lastBackAt = 0L;
@@ -129,13 +131,37 @@ public class MainActivity extends BridgeActivity {
     /* 说明：BridgeActivity 的 onResume/onPause/onDestroy 不是 public/protected，
        不能覆写；轮询常驻（600ms 一次极轻量的版本号检查）即可。 */
 
-    /** ★M-APP-20261019：返回键行为 ——
-     *  1) 页面还能后退（打开过弹窗/子页）→ 后退一页，不退出；
+    /** ★M-BACK-20261116：返回键行为 ——
+     *  0) 先问页面 window.__mfixBack()：有弹窗/图片/PDF 预览开着就先关掉（返回 1），
+     *     手机上很多弹窗关不掉，这一条是"能用"的关键；
+     *  1) 页面还能后退（打开过子页）→ 后退一页，不退出；
      *  2) 已在最上层 → 1.5 秒内再按一次才退出（防止现场误触直接退出 App）。 */
     @Override
     public void onBackPressed() {
+        final android.webkit.WebView wv = (getBridge() != null) ? getBridge().getWebView() : null;
+        if (wv == null) {
+            doNativeBack(null);
+            return;
+        }
         try {
-            android.webkit.WebView wv = (getBridge() != null) ? getBridge().getWebView() : null;
+            wv.evaluateJavascript(
+                    "(function(){try{return window.__mfixBack?window.__mfixBack():0}catch(e){return 0}})()",
+                    new android.webkit.ValueCallback<String>() {
+                        @Override
+                        public void onReceiveValue(String value) {
+                            // value 形如 "1" / "0"；"1" = 页面已经关掉了最上层弹窗
+                            if (value != null && value.trim().startsWith("1")) return;
+                            doNativeBack(wv);
+                        }
+                    });
+        } catch (Exception ignore) {
+            doNativeBack(wv);
+        }
+    }
+
+    /** 页面没弹窗可关时的原生后退：能回上一页就回，否则双击退出。 */
+    private void doNativeBack(android.webkit.WebView wv) {
+        try {
             if (wv != null && wv.canGoBack()) {
                 wv.goBack();
                 return;

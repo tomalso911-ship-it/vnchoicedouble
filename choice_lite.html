@@ -995,6 +995,10 @@ window.__finShakeReport = function (ms) {
            安卓 APK（M8）会做系统级锁定，体验最彻底。
      ===================================================== -->
 <style>
+  /* ★WRAP-RULE-20261116（锁死，勿改）：表格/窄列里禁止使用 overflow-wrap:anywhere 与
+     word-break:break-word（后者是前者的旧别名）。两者会把单元格的 min-content 宽度压到 1 个字，
+     表格自动布局遂把列压成一条竖线，中文变成「一字一行 → 一堆竖条」（生产"工厂概览"实测）。
+     统一只用 overflow-wrap:break-word：仅在整词放不下时才断，不改变 min-content 宽度。 */
   #rotate-gate {
     position: fixed; inset: 0; z-index: 2147483647;
     display: none;
@@ -1691,7 +1695,7 @@ window.__finShakeReport = function (ms) {
     .pm-view-overlay.show { display:flex; }
     .pm-view-box { background:white; border-radius:14px; padding:22px 24px 18px; width:440px; max-width:92vw; box-shadow:0 10px 40px rgba(0,0,0,.28); position:relative; }
     .pm-view-box .pmv-title { font-size:15px; font-weight:700; color:#E53935; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
-    .pm-view-box .pmv-body { font-size:13px; line-height:1.7; color:#333; white-space:pre-wrap; word-break:break-word; background:#fcfcfd; border:1px solid #eef1f4; border-radius:8px; padding:12px 14px; max-height:50vh; overflow-y:auto; }
+    .pm-view-box .pmv-body { font-size:13px; line-height:1.7; color:#333; white-space:pre-wrap; word-break:normal; background:#fcfcfd; border:1px solid #eef1f4; border-radius:8px; padding:12px 14px; max-height:50vh; overflow-y:auto; }
     .pm-view-box .pmv-close { position:absolute; top:12px; right:14px; cursor:pointer; font-size:20px; color:#999; line-height:1; }
     .pm-view-box .pmv-close:hover { color:#333; }
     .pm-view-box .pmv-ok { display:block; margin:14px auto 0; padding:6px 26px; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; background:#E53935; color:white; transition:background .15s; }
@@ -1843,7 +1847,7 @@ window.__finShakeReport = function (ms) {
     .detail-view-box .dv-title { font-size:11px; font-weight:700; color:#E53935; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
     .detail-view-box .dv-close { position:absolute; top:12px; right:14px; cursor:pointer; font-size:20px; color:#999; line-height:1; }
     .detail-view-box .dv-close:hover { color:#333; }
-    .detail-view-box .dv-body { font-size:13px; line-height:1.8; color:#333; white-space:pre-wrap; word-break:break-word; background:#fcfcfd; border:1px solid #eef1f4; border-radius:8px; padding:14px 16px; max-height:50vh; overflow-y:auto; min-height:60px; }
+    .detail-view-box .dv-body { font-size:13px; line-height:1.8; color:#333; white-space:pre-wrap; word-break:normal; background:#fcfcfd; border:1px solid #eef1f4; border-radius:8px; padding:14px 16px; max-height:50vh; overflow-y:auto; min-height:60px; }
     .detail-view-box .dv-body .dv-empty { color:#bbb; font-style:italic; }
     .detail-view-box .dv-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:14px; }
     .detail-view-box .dv-btn { padding:6px 20px; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all .15s; }
@@ -2005,7 +2009,7 @@ window.__finShakeReport = function (ms) {
     .cp-table { table-layout:fixed;width:100%;min-width:720px;border-collapse:collapse;font-size:11px; }
     .cp-table th, .cp-table td {
       border:1px solid #e0e0e0;padding:3px 4px;vertical-align:middle;
-      white-space:normal;overflow-wrap:anywhere;word-break:break-word;overflow:hidden;box-sizing:border-box;
+      white-space:normal;overflow-wrap:break-word;word-break:normal;overflow:hidden;box-sizing:border-box;
     }
     .cp-table thead th { background:#FDECEA;color:#E53935;font-weight:700;text-align:center;position:sticky;top:0;font-size:11px;z-index:1; }
     .cp-table tbody tr:nth-child(even) td { background:#fdf8f1; }
@@ -3132,7 +3136,7 @@ window.__finShakeReport = function (ms) {
   /* 受益人支付明细表：绿色表头 + 行内输入框/下拉占满单元格 */
   #benPaymentTable { font-size:11px; width:100%; table-layout:fixed; border-collapse:collapse; min-width:1200px; }
   #benPaymentTable thead th { background:#1e9e6a !important; color:#fff !important; border-color:#1e9e6a !important; }
-  #benPaymentTable th, #benPaymentTable td { padding:6px 4px; min-width:50px; word-break:break-word; vertical-align:middle; }
+  #benPaymentTable th, #benPaymentTable td { padding:6px 4px; min-width:50px; word-break:normal; vertical-align:middle; }
   #benPaymentTable th { white-space:normal; line-height:1.3; }
   #benPaymentTable td { white-space:nowrap; }
   #benPaymentTable td { padding:2px; }
@@ -4168,7 +4172,7 @@ window.__finShakeReport = function (ms) {
   /* 资料库 · 就近确认气泡（主打色） */
   .libconfirm-ov{position:fixed;inset:0;z-index:4200;background:transparent;pointer-events:none;}
   .libconfirm{position:absolute;pointer-events:auto;background:#fff;border:2px solid #E53935;border-radius:11px;box-shadow:0 14px 34px rgba(0,0,0,.28);padding:14px 16px;min-width:215px;max-width:320px;animation:libCtxIn .12s ease;}
-  .libconfirm .lc-msg{font-size:13.5px;color:#2b3648;line-height:1.5;margin-bottom:12px;word-break:break-word;}
+  .libconfirm .lc-msg{font-size:13.5px;color:#2b3648;line-height:1.5;margin-bottom:12px;word-break:normal;}
   .libconfirm .lc-btns{display:flex;justify-content:flex-end;gap:8px;}
   .libconfirm .lc-ok{background:#E53935;color:#fff;border:1px solid #E53935;border-radius:7px;padding:6px 18px;cursor:pointer;font-size:13px;font-weight:700;}
   .libconfirm .lc-ok:hover{background:#c62828;}
@@ -4843,7 +4847,7 @@ window.__finShakeReport = function (ms) {
       .wl-flow-title{font-size:15px;font-weight:700;color:#263238;margin-bottom:4px;}
       .wl-flow-sub{font-size:12px;color:#607d8b;line-height:1.4;}
       /* ★WL-GOTO-STOCKOUT-20261108：长标题卡片（如「成品移至特定区域及特定房舍」）自动换行、不撑破卡片 */
-      .wl-flow-card .wl-flow-title{line-height:1.25;overflow-wrap:anywhere;word-break:break-word;}
+      .wl-flow-card .wl-flow-title{line-height:1.25;overflow-wrap:break-word;word-break:normal;}
       /* ★WL-FASTENTRY-20261108：宽卡（05/06-速录，占两格）+ 横幅实景图 + 加长编号胶囊 */
       .wl-flow-card.wl-flow-wide{grid-column:span 2;}
       @media (max-width:640px){.wl-flow-card.wl-flow-wide{grid-column:span 1;}}
@@ -5868,7 +5872,7 @@ var WL_FLOW_IMG = {
          日历弹窗 #cpCalPopup 是 body 下的 position:fixed 顶层元素，不受 overflow:hidden 影响。 */
       .prod-form.prod-form-nowrap > .prod-field{overflow:hidden !important;}
       .prod-form.prod-form-nowrap > .prod-field > label{
-        white-space:normal !important;word-break:break-word;overflow-wrap:anywhere;line-height:1.15;
+        white-space:normal !important;word-break:normal;overflow-wrap:break-word;line-height:1.15;
       }
       .prod-form.prod-form-nowrap > .prod-field > input,
       .prod-form.prod-form-nowrap > .prod-field > select,
@@ -5929,7 +5933,7 @@ var WL_FLOW_IMG = {
       .inst-gantt-header{display:flex;align-items:center;font-size:12px;font-weight:700;color:#455a64;border-bottom:1px solid #e0e0e0;padding:6px 0;margin-bottom:4px;}
       .inst-gantt-row{display:flex;align-items:center;margin:5px 0;font-size:12px;}
       .inst-gantt-no{flex:0 0 36px;text-align:center;color:#607d8b;}
-      .inst-gantt-item{flex:0 0 170px;color:#263238;padding-right:10px;line-height:1.25;word-break:break-word;}
+      .inst-gantt-item{flex:0 0 170px;color:#263238;padding-right:10px;line-height:1.25;word-break:normal;}
       .inst-gantt .inst-gantt-track{flex:1;position:relative;height:20px;background:#fafafa;border-radius:4px;min-width:0;overflow:visible;}
       .inst-gantt .inst-gantt-bar{top:3px;height:14px;}
       .inst-gantt .inst-gantt-note{top:18px;}
@@ -5996,8 +6000,8 @@ var WL_FLOW_IMG = {
       .prod-table th,.prod-table td{border:1px solid #eee;padding:5px 6px;text-align:left;}
       .prod-table.prod-stockout{table-layout:fixed;}
       .prod-table.prod-stockout th,.prod-table.prod-stockout td{border-color:#333;}
-      .prod-table.prod-stockout th{white-space:normal;word-break:break-word;}
-      .prod-table.prod-stockout td{white-space:normal;word-break:break-word;overflow:hidden;}
+      .prod-table.prod-stockout th{white-space:normal;word-break:normal;}
+      .prod-table.prod-stockout td{white-space:normal;word-break:normal;overflow:hidden;}
       .prod-table.prod-stockout .pe-col-no{width:44px;min-width:44px;white-space:nowrap;}
       .prod-table.prod-stockout .pe-col-rate{width:56px;min-width:56px;}
       .prod-table.prod-stockout .pe-demand-row{width:66px;min-width:66px;text-align:center;}
@@ -6095,8 +6099,8 @@ var WL_FLOW_IMG = {
       .prod-op-weather{display:flex;gap:10px;flex:0 0 auto;}
       .prod-op-weather .prod-wx-card{min-width:130px;}
       .pe-op-table{width:100%;table-layout:fixed;border-collapse:collapse;margin:8px 0 4px;}
-      .pe-op-table th{background:#f3f6fa;font-size:12px;padding:6px 8px;text-align:center;color:#2c3e50;white-space:normal;word-break:break-word;}
-      .pe-op-table td{border:1px solid #e6eaee;padding:4px 6px;font-size:13px;vertical-align:middle;white-space:normal;word-break:break-word;overflow:hidden;}
+      .pe-op-table th{background:#f3f6fa;font-size:12px;padding:6px 8px;text-align:center;color:#2c3e50;white-space:normal;word-break:normal;}
+      .pe-op-table td{border:1px solid #e6eaee;padding:4px 6px;font-size:13px;vertical-align:middle;white-space:normal;word-break:normal;overflow:hidden;}
       .pe-op-table input.pe-op-qty{width:100%;box-sizing:border-box;}
       .pe-op-table select.pe-op-dest{width:100%;max-width:none;box-sizing:border-box;}
       .pe-op-add{margin:4px 0 14px;}
@@ -6248,12 +6252,12 @@ var WL_FLOW_IMG = {
       .plc-table{margin:0;}
       .prod-table.plc-table th, .prod-table.plc-table td{border:1px solid #333;}
       .plc-table thead th{position:sticky;top:0;background:#f7f9f4;z-index:2;box-shadow:inset 0 -1px 0 #eee;}
-      .prod-table td{white-space:normal;word-break:break-word;}
+      .prod-table td{white-space:normal;word-break:normal;}
       .prod-table tbody tr:nth-child(even){background:#fafafa;}
       .prod-table tbody tr:hover{background:#f0f4ff;}
       .pc-labor-hist{table-layout:fixed;width:100%;font-size:10px;}
-      .pc-labor-hist th{font-size:9px;padding:2px 3px;line-height:1.1;white-space:normal;word-break:break-word;text-align:center;vertical-align:middle;}
-      .pc-labor-hist td{padding:2px 3px;font-size:10px;line-height:1.2;word-break:break-word;vertical-align:top;}
+      .pc-labor-hist th{font-size:9px;padding:2px 3px;line-height:1.1;white-space:normal;word-break:normal;text-align:center;vertical-align:middle;}
+      .pc-labor-hist td{padding:2px 3px;font-size:10px;line-height:1.2;word-break:normal;vertical-align:top;}
       .pc-labor-hist .pc-col-no{width:40px;white-space:nowrap;word-break:normal;text-align:center;}
       .pc-labor-hist .pc-col-date{width:76px;white-space:nowrap;word-break:normal;}
       .pc-labor-hist .pc-col-zone{width:36px;white-space:nowrap;word-break:normal;text-align:center;vertical-align:middle;}
@@ -6393,7 +6397,7 @@ var WL_FLOW_IMG = {
       .inst-kpi-mk{color:#888;font-size:10px;margin-bottom:1px;white-space:nowrap;}
       .inst-kpi-mv{font-weight:600;color:#333;white-space:nowrap;font-size:12px;}
       .inst-kpi-title{font-size:12px;color:#666;line-height:1.25;margin-bottom:5px;min-height:24px;display:flex;align-items:center;justify-content:center;}
-      .inst-kpi-value{font-size:18px;font-weight:700;color:#d32f2f;line-height:1.1;word-break:break-word;}
+      .inst-kpi-value{font-size:18px;font-weight:700;color:#d32f2f;line-height:1.1;word-break:normal;}
       .inst-kpi-sub{font-size:11px;color:#888;margin-top:3px;}
       .inst-kpi-rate{color:#1f6feb;font-weight:600;}
       .pc-sort-ind{display:inline-flex;flex-direction:column;line-height:0.78;margin-left:3px;vertical-align:middle;}
@@ -6407,10 +6411,10 @@ var WL_FLOW_IMG = {
       .pe-hist .pe-col-date{width:56px;white-space:nowrap;}
       .pe-hist .pe-col-holiday{width:28px;}
       .pe-hist .pe-col-rec{max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-      .pe-hist .pe-col-wx-am,.pe-hist .pe-col-wx-pm{width:54px;font-size:8px;line-height:1.1;white-space:normal;word-break:break-word;}
+      .pe-hist .pe-col-wx-am,.pe-hist .pe-col-wx-pm{width:54px;font-size:8px;line-height:1.1;white-space:normal;word-break:normal;}
       .pe-hist .pe-col-total{width:46px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       .pe-hist .pe-col-act{width:54px;white-space:nowrap;padding:1px 1px;}
-      .pe-hist .pe-vth, .pe-stats .pe-vth{white-space:normal;height:auto;line-height:1.05;vertical-align:bottom;text-align:center;padding:1px 0;font-size:8.3px;letter-spacing:0;max-width:40px;word-break:break-word;}
+      .pe-hist .pe-vth, .pe-stats .pe-vth{white-space:normal;height:auto;line-height:1.05;vertical-align:bottom;text-align:center;padding:1px 0;font-size:8.3px;letter-spacing:0;max-width:40px;word-break:normal;}
       .pe-hist .pe-vth .v1, .pe-stats .pe-vth .v1{display:block;font-weight:700;}
       .pe-hist .pe-vth .v2, .pe-stats .pe-vth .v2{display:block;color:#667;margin-top:1px;}
       .pe-stats .pe-vth{font-size:14px;padding:6px 6px;max-width:120px;line-height:1.25;}
@@ -6628,7 +6632,7 @@ var WL_FLOW_IMG = {
       .prod-report-sum{margin:0 0 12px;padding:10px 12px;background:#f7f9fc;border:1px solid #e3e9f2;border-left:3px solid #E53935;border-radius:8px;}
       /* ★PROD-RPT-SUM-RED-20261108：用户要求总览标题与正文一律红色（原来是灰标题 + 深灰正文） */
       .prod-report-sum-t{font-size:12px;font-weight:700;color:#E53935;margin-bottom:5px;letter-spacing:.2px;}
-      .prod-report-sum-p{font-size:13px;line-height:1.8;color:#E53935;word-break:break-word;}
+      .prod-report-sum-p{font-size:13px;line-height:1.8;color:#E53935;word-break:normal;}
       .prod-report-sum-p b{color:#E53935;font-weight:700;}
       /* 收货单/审批里的照片缩略图（否则原图全尺寸展示，页面被撑爆） */
       .photo-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
@@ -6760,8 +6764,8 @@ var WL_FLOW_IMG = {
       .prod-eq-plus.prod-eq-plus-common:hover{background:#F9A825;color:#fff;}
       .prod-equip-fault{margin-top:6px;width:100%;table-layout:fixed;box-sizing:border-box;min-width:0;border-collapse:collapse;}
       .prod-equip-fault th,.prod-equip-fault td{box-sizing:border-box;}
-      .prod-equip-fault th{padding:3px 2px;white-space:normal;word-break:break-word;overflow-wrap:anywhere;line-height:1.2;text-align:center;vertical-align:middle;font-size:11px;}
-      .prod-equip-fault td{padding:3px 2px;vertical-align:middle;word-break:break-word;overflow-wrap:anywhere;font-size:12px;border-top:1px solid #000;border-bottom:1px solid #000;}
+      .prod-equip-fault th{padding:3px 2px;white-space:normal;word-break:normal;overflow-wrap:break-word;line-height:1.2;text-align:center;vertical-align:middle;font-size:11px;}
+      .prod-equip-fault td{padding:3px 2px;vertical-align:middle;word-break:normal;overflow-wrap:break-word;font-size:12px;border-top:1px solid #000;border-bottom:1px solid #000;}
       .prod-equip-fault input.peq-inp{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:4px;padding:2px 3px;font-size:12px;background:#fff;}
       .prod-equip-fault input.peq-inp:focus{border-color:#2196F3;outline:none;}
       .prod-equip-fault input.peq-inp-num{text-align:center;}
@@ -6790,14 +6794,14 @@ var WL_FLOW_IMG = {
       /* 故障描述可点击选择预置故障 */
       .prod-equip-fault .peq-reason-cell{vertical-align:middle;cursor:pointer;padding:2px 3px;min-height:22px;}
       .prod-equip-fault .peq-reason-cell.peq-click:hover{background:#e3f2fd;}
-      .prod-equip-fault .peq-reason-txt{font-size:11px;line-height:1.25;word-break:break-word;overflow-wrap:anywhere;}
+      .prod-equip-fault .peq-reason-txt{font-size:11px;line-height:1.25;word-break:normal;overflow-wrap:break-word;}
       .prod-equip-fault .peq-reason-change{display:inline-block;margin-top:2px;font-size:9px;color:#2196F3;border:1px solid #2196F3;border-radius:3px;padding:0 3px;line-height:1.4;}
       .prod-equip-fault .peq-reason-empty{text-align:center;}
       .prod-equip-fault .peq-pick-btn{display:inline-block;font-size:10px;padding:2px 6px;border:1px dashed #2196F3;border-radius:4px;color:#2196F3;background:#fff;}
-      .prod-equip-fault .peq-tri-cell{font-size:11px;line-height:1.25;word-break:break-word;overflow-wrap:anywhere;}
+      .prod-equip-fault .peq-tri-cell{font-size:11px;line-height:1.25;word-break:normal;overflow-wrap:break-word;}
       .prod-equip-fault .peq-tri-cell.peq-tri-has{background:#e8f5e9;}
       .prod-equip-fault .peq-cause-cell.peq-tri-has{background:#fce4ec;}
-      .prod-equip-fault .peq-haz-cell{font-size:11px;text-align:center;word-break:break-word;overflow-wrap:anywhere;}
+      .prod-equip-fault .peq-haz-cell{font-size:11px;text-align:center;word-break:normal;overflow-wrap:break-word;}
       .prod-equip-fault .peq-haz-cell.peq-haz-has{background:#fff3e0;font-weight:600;color:#e65100;}
       .prod-equip-fault .peq-haz-cell.peq-haz-high{background:#ffcdd2 !important;color:#c62828 !important;}
       .prod-equip-fault .peq-haz-cell.peq-haz-low{background:#e1f5fe !important;color:#0277bd !important;}
@@ -6806,7 +6810,7 @@ var WL_FLOW_IMG = {
       .prod-equip-fault th.peq-sort-th{cursor:pointer;padding:3px 2px;vertical-align:middle;}
       .prod-equip-fault .peq-sort-wrap{display:flex;align-items:center;justify-content:center;width:100%;}
       .prod-equip-fault .peq-sort-head{display:flex;align-items:center;justify-content:center;gap:3px;flex-wrap:nowrap;}
-      .prod-equip-fault .peq-sort-label{text-align:center;word-break:break-word;overflow-wrap:anywhere;line-height:1.2;}
+      .prod-equip-fault .peq-sort-label{text-align:center;word-break:normal;overflow-wrap:break-word;line-height:1.2;}
       .prod-equip-fault .peq-sort-arrow{font-size:9px;color:#999;flex:0 0 auto;line-height:1;}
       .prod-equip-fault .peq-sort-arrow.active{color:#1565c0;font-weight:700;}
       /* 选择故障弹窗 */
@@ -6817,7 +6821,7 @@ var WL_FLOW_IMG = {
       .peq-pick-item:hover{background:#f0f4ff;border-color:#2196F3;}
       .peq-pick-item input[type=radio]{margin-top:3px;flex:0 0 auto;}
       .peq-pick-code{flex:0 0 64px;font-weight:600;color:#1565c0;font-size:11px;padding-top:1px;}
-      .peq-pick-reason{font-size:12px;line-height:1.3;word-break:break-word;}
+      .peq-pick-reason{font-size:12px;line-height:1.3;word-break:normal;}
       .peq-pick-sub{color:#888;font-size:10px;}
       .peq-pick-actions{display:flex;justify-content:flex-end;gap:10px;padding:10px 14px;border-top:1px solid #eee;background:#fff;flex-shrink:0;margin-top:auto;}
       .prod-equip-fault .cp-date-input-wrapper input.peq-inp-date{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:4px;padding:2px 3px;font-size:11px;cursor:pointer;text-align:center;}
@@ -20292,7 +20296,7 @@ var PROD_EQUIP_FAULT_KB = {
       /* ★BLDG-FIT-20261110（用户 2026-11-10）：顶部预留 28px —— 角标(1→10) + 进度条(11→16) + 百分比(18→26) 三层，
          房舍名从 28px 起排，语言切换/长名字换行时不会再和上面的文字压在一起。
          高度由脚本 inst_bldgFitHeights() 统一按「最需要的那一格」设置，保证同一区所有格子等高。 */
-      .inst-bldg{width:64px;min-height:68px;padding:28px 4px 20px;background:#f4f6f2;border:1px solid #d6dcd2;border-radius:6px;font-size:11px;line-height:1.25;text-align:center;cursor:pointer;user-select:none;box-sizing:border-box;display:flex;align-items:flex-end;justify-content:center;word-break:break-word;position:relative;}
+      .inst-bldg{width:64px;min-height:68px;padding:28px 4px 20px;background:#f4f6f2;border:1px solid #d6dcd2;border-radius:6px;font-size:11px;line-height:1.25;text-align:center;cursor:pointer;user-select:none;box-sizing:border-box;display:flex;align-items:flex-end;justify-content:center;word-break:normal;position:relative;}
       .inst-bldg:hover{border-color:#E53935;}
       .inst-bldg-sel{outline:3px solid #E53935;outline-offset:1px;}
       .inst-bldg-sel::after{content:'✓';position:absolute;top:2px;right:3px;font-size:13px;line-height:1;font-weight:bold;}
@@ -35279,7 +35283,7 @@ var PROD_EQUIP_FAULT_KB = {
   #commonPerm .cperm-group,
   #commonPerm .cperm-rows { max-width:100%; overflow-x:hidden; }
   #commonPerm .cperm-row { min-width:0; max-width:100%; overflow:hidden; }
-  #commonPerm .cperm-name { min-width:0; overflow:hidden; overflow-wrap:anywhere; }
+  #commonPerm .cperm-name { min-width:0; overflow:hidden; overflow-wrap:break-word; }
   #commonPerm .cperm-sel { min-width:0; width:172px; flex:0 0 172px; box-sizing:border-box; }
   .modal-body.perm-nohscroll { overflow-x:hidden !important; overflow-y:auto !important; }
   /* 用户与权限管理审批卡片（前后对比/新增/删除） */
@@ -35960,7 +35964,7 @@ var PROD_EQUIP_FAULT_KB = {
 /* ★SLATS-SOLID-COL-20261109（用户 2026-11-09）：操作列左侧「实心板?」三语表头单行完整显示、
    YES/NO 下拉醒目；黄色左边界把这一列与前面的钢筋列分开。选 YES 的整行红字仍由 slats-solid-hl 负责。 */
 /* ★SLATS-COLW-20261113：列宽减半后表头允许折成两行；顶部留 16px 避开右上角折叠钮 */
-.slats-spec-table thead th.slats-th-solid { white-space:normal; word-break:break-word; line-height:1.15; font-size:9px; font-weight:700; letter-spacing:.2px; padding:16px 1px 4px; }
+.slats-spec-table thead th.slats-th-solid { white-space:normal; word-break:normal; line-height:1.15; font-size:9px; font-weight:700; letter-spacing:.2px; padding:16px 1px 4px; }
 .slats-spec-table thead th.slats-th-solid,
 .slats-spec-table tbody td.slats-td-solid { border-left:2px solid #FFC400; }
 .slats-spec-table tbody td.slats-td-solid select[data-prefix="slats_solid_"] { font-weight:700; background:#fff8e1; }
@@ -35968,7 +35972,7 @@ var PROD_EQUIP_FAULT_KB = {
 .slats-col-toggle{position:absolute;top:2px;right:2px;display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;padding:0;border:1px solid rgba(255,255,255,.9);border-radius:50%;background:rgba(255,255,255,.22);color:#fff;font-size:11px;font-weight:700;line-height:1;cursor:pointer;z-index:5;}
 .slats-col-toggle:hover{background:#fff;color:#C62828;}
 .slats-spec-table .slats-col-hidden{display:none !important;}
-.slats-spec-table thead th.slats-th-hole{white-space:normal;word-break:break-word;line-height:1.15;font-size:9px;font-weight:700;padding:16px 1px 4px;}
+.slats-spec-table thead th.slats-th-hole{white-space:normal;word-break:normal;line-height:1.15;font-size:9px;font-weight:700;padding:16px 1px 4px;}
 .slats-spec-table thead th.slats-th-hole,
 .slats-spec-table tbody td.slats-td-hole{border-left:2px solid #8E24AA;}
 .slats-spec-table tbody td.slats-td-hole select[data-prefix="slats_hole_"]{font-weight:700;background:#f3e5f5;color:#6A1B9A;}
@@ -36065,7 +36069,7 @@ var PROD_EQUIP_FAULT_KB = {
 #slatsReportOverview { overflow: hidden; }
 #slatsReportOverview .slats-report-table { table-layout: fixed; }
 #slatsReportOverview .slats-report-table th,
-#slatsReportOverview .slats-report-table td { padding: 4px 3px; font-size: 10px; line-height: 1.4; word-break: break-word; white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+#slatsReportOverview .slats-report-table td { padding: 4px 3px; font-size: 10px; line-height: 1.4; word-break: normal; white-space: normal; overflow-wrap: break-word; vertical-align: top; }
 /* ★SLATS-RPT-VLINE-20261113（用户 2026-11-13「垂直的网格线统一使用黑色」）：
    概述表的垂直分隔线全部改成黑色实线，水平线保持浅灰 #e8e8e8，
    否则整表会变成密集黑网格把 1,550 / ₫8,169,672 这类数值糊住。
@@ -36615,7 +36619,7 @@ var PROD_EQUIP_FAULT_KB = {
   #crmReportModal .crm-rep-grid, #lostReportModal .crm-rep-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px 18px; background:#f8f9fa; border:1px solid #eef1f4; border-radius:8px; padding:12px 14px; }
   #crmReportModal .crm-rep-field, #lostReportModal .crm-rep-field { display:flex; align-items:flex-start; min-width:0; }
   #crmReportModal .crm-rep-label, #lostReportModal .crm-rep-label { flex:0 0 auto; color:#7f8c8d; font-size:12px; margin-right:6px; white-space:nowrap; }
-  #crmReportModal .crm-rep-value, #lostReportModal .crm-rep-value { flex:1 1 auto; font-weight:600; color:#2c3e50; font-size:13px; word-break:break-word; text-align:right; }
+  #crmReportModal .crm-rep-value, #lostReportModal .crm-rep-value { flex:1 1 auto; font-weight:600; color:#2c3e50; font-size:13px; word-break:normal; text-align:right; }
   #crmReportModal .crm-rep-price-title, #lostReportModal .crm-rep-price-title { font-size:13px; font-weight:700; color:#2c3e50; margin:18px 0 8px; }
   #crmReportModal .crm-rep-table, #lostReportModal .crm-rep-table { width:100%; border-collapse:collapse; font-size:12px; border-radius:6px; overflow:hidden; }
   #crmReportModal .crm-rep-table th, #lostReportModal .crm-rep-table th { background:#E53935; color:#fff; padding:7px 10px; text-align:center; border:1px solid #C62828; font-size:12px; letter-spacing:0.5px; white-space:nowrap; }
@@ -36843,7 +36847,30 @@ var PROD_EQUIP_FAULT_KB = {
     .page-header .prod-sub,
     .page-header > span{
       display:block; width:100% !important; min-width:0 !important; margin:2px 0 0;
-      white-space:normal !important; overflow-wrap:anywhere; word-break:break-word;
+      white-space:normal !important; overflow-wrap:break-word; word-break:normal;
+    }
+
+    /* 9-b) ★WON-BTN-1ROW-20261116（用户要求）：「+ Thắng Mới / Xuất Excel」两个按钮
+         与「RMB / USD / VND」三颗币种胶囊必须处在【同一行】，胶囊不允许掉到第二行。
+         做法：按钮组与胶囊组都不换行，并收紧字号/内边距/间距把总宽压进视口
+         （只收紧、不 nowrap 撑宽 —— 否则又会把布局视口从 390 撑到 594px）。 */
+    #view-won .header-btns{
+      flex-wrap:nowrap !important; margin-left:auto !important;
+      gap:4px !important; min-width:0;
+    }
+    /* 按钮不压缩、不裁字：整组宽度固定，放不下时由 .page-header 把「标题」挤到上一行，
+       按钮组与胶囊组一起整体换行（但两者之间绝不分开）。 */
+    #view-won .header-btns .btn-action{
+      flex:0 0 auto;
+      padding:5px 8px !important; font-size:10px !important;
+      white-space:nowrap;
+    }
+    #view-won .cur-toggles{
+      flex:0 0 auto; margin-left:0 !important; gap:3px !important;
+    }
+    #view-won .cur-toggles .cur-pill{
+      flex:0 0 auto; padding:5px 8px !important;
+      font-size:10.5px !important; border-width:1px !important;
     }
 
     /* 11) ★BD-MOBILE-20261022（用户要求）：看板卡片手机端全部展开成整行
@@ -46853,7 +46880,7 @@ function renderUsers(){
     '#usrCtxPop .uc-item.uc-disabled{color:#8c8c8c;cursor:not-allowed}',
     '#usrCtxPop .uc-item.uc-disabled:hover{background:transparent;color:#8c8c8c}',
     '#usrCtxPop .uc-sep{height:1px;background:#c7c7c7;border-top:1px solid #fff;margin:3px 2px}',
-    '#usrCtxPop .uc-msg{padding:9px 11px;line-height:1.6;color:#333;word-break:break-word}',
+    '#usrCtxPop .uc-msg{padding:9px 11px;line-height:1.6;color:#333;word-break:normal}',
     '#usrCtxPop .uc-ft{display:flex;gap:6px;justify-content:flex-end;padding:5px 9px 8px}',
     '#usrCtxPop .uc-btn{min-width:72px;padding:4px 10px;border:1px solid #7a7a7a;',
     'background:linear-gradient(#fff,#e7e7e7);color:#222;font:12px "Segoe UI",Tahoma,Arial,sans-serif;cursor:pointer}',
@@ -66519,8 +66546,8 @@ function submitAuth() {
       '.cc-tb-spec td.cc-offcell input.cc-in.cc-offin{background:#eceff3 !important;color:#9aa3ad !important;border:1px solid #dfe4ea !important;}',
       // ★CC-DUAL-NOHSCROLL-20261104：双层表 18 列固定布局自适应容器宽度，绝不出现横向滚动条
       '.cc-tb-spec.cc-dual{table-layout:fixed;width:100%;min-width:0;}',
-      '.cc-tb-spec.cc-dual th{white-space:normal;overflow-wrap:anywhere;word-break:break-all;font-size:11px;line-height:1.3;padding:3px 2px;text-align:center;}',
-      '.cc-tb-spec.cc-dual td{padding:2px 2px;font-size:11px;overflow-wrap:anywhere;overflow:hidden;}',
+      '.cc-tb-spec.cc-dual th{white-space:normal;overflow-wrap:break-word;word-break:break-all;font-size:11px;line-height:1.3;padding:3px 2px;text-align:center;}',
+      '.cc-tb-spec.cc-dual td{padding:2px 2px;font-size:11px;overflow-wrap:break-word;overflow:hidden;}',
       '.cc-tb-spec.cc-dual .cc-in,.cc-tb-spec.cc-dual select.cc-in{width:100%;min-width:0;padding:2px 2px;font-size:11px;}',
       '.cc-tb-spec.cc-dual .cc-subcell{font-size:11px;padding-right:2px;}',
       '.cc-tb-spec.cc-dual .cc-icn{margin:0 1px;padding:1px 2px;}',
@@ -66534,12 +66561,12 @@ function submitAuth() {
       '.cc-tb-spec td.cc-solid-cell select.cc-sel-solid{font-weight:700;background:#fff8e1;}',
       '.cc-tb tfoot td{font-weight:700;background:#f2f4f7;white-space:nowrap;}',
       // ★CC-MACH-PRESET-20261105：预设设备名（三语只读）允许自动换行，避免长英文撑宽表格
-      '.cc-tb td.cc-machname{padding:3px 6px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;}',
+      '.cc-tb td.cc-machname{padding:3px 6px;line-height:1.35;white-space:normal;overflow-wrap:break-word;}',
       // ★CC-NOCOL-20261105：序号列居中、固定窄宽
       '.cc-tb td.cc-no{width:44px;text-align:center;font-weight:600;color:#444;white-space:nowrap;}',
       // ★CC-MACH-UNIT-20261105：数量默认值灰色 + 字号加大一号；单位列居中窄宽
       '.cc-tb input.cc-in.cc-qty{color:#777 !important;font-size:14px !important;}',
-      '.cc-tb td.cc-unit{width:60px;text-align:center;overflow-wrap:anywhere;}',
+      '.cc-tb td.cc-unit{width:60px;text-align:center;overflow-wrap:break-word;}',
       // ★CC-SUBTRI-20261105：表尾小计三币改蓝(¥)/红($)/绿(₫)配色，识别度更高（颜色由 ccRecalc 内联设置）；非货币小计(块数)仍红加粗
       '.cc-tb tfoot td#cc_v_blocks_ft{color:#d32f2f !important;font-weight:700 !important;}',
       '.cc-icn{border:1px solid #d9dee5;background:#fff;border-radius:8px;cursor:pointer;padding:3px 5px;line-height:0;vertical-align:middle;margin:0 2px;}',
@@ -66555,11 +66582,11 @@ function submitAuth() {
       '.ccg-tb{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px;background:#fff;transform-origin:top left;}',
       '.ccg-tb th,.ccg-tb td{border:1px solid #e7e7e7;padding:0 2px;text-align:center;white-space:nowrap;overflow:hidden;vertical-align:middle;height:23px;font-variant-numeric:tabular-nums;}',
       /* ★CC-COLPCT-20261113：表头字体大一号(9px)，宽度不够就换行、始终左右居中 */
-      '.ccg-tb thead th{background:linear-gradient(135deg,#E53935,#C62828);color:#fff;font-weight:700;font-size:9px;line-height:1.25;padding:3px 1px;white-space:normal;word-break:break-word;text-align:center;vertical-align:middle;}',
+      '.ccg-tb thead th{background:linear-gradient(135deg,#E53935,#C62828);color:#fff;font-weight:700;font-size:9px;line-height:1.25;padding:3px 1px;white-space:normal;word-break:normal;text-align:center;vertical-align:middle;}',
       '.ccg-tb thead th.ccg-lo{background:#b8d3f0;color:#0d3b6f;}',
       '.ccg-tb tbody tr:nth-child(even) td{background:#fbfdff;}',
       '.ccg-tb .ccg-b{font-weight:700;color:#d32f2f;}',
-      '.ccg-tb .ccg-remark{text-align:left;white-space:normal;word-break:break-word;}',
+      '.ccg-tb .ccg-remark{text-align:left;white-space:normal;word-break:normal;}',
       '.ccg-tb .ccg-op{white-space:nowrap;}',
       '.ccg-tb tr.ccg-solid-yes td{color:#ff0000 !important;font-weight:700 !important;}',
       '.ccg-tb tr.ccg-hole-yes td{color:#7B1FA2 !important;font-weight:700 !important;background:#faf2fd !important;}',
@@ -66617,7 +66644,7 @@ function submitAuth() {
       '.ccq-log-n{color:#666;font-weight:600;margin-left:6px;}',
       '.ccq-log-empty{padding:14px 10px;color:#999;font-size:12px;}',
       '.ccq-log-tb{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;}',
-      '.ccq-log-tb th,.ccq-log-tb td{border:1px solid #dbe3ea;padding:4px 6px;vertical-align:middle;word-break:break-word;}',
+      '.ccq-log-tb th,.ccq-log-tb td{border:1px solid #dbe3ea;padding:4px 6px;vertical-align:middle;word-break:normal;}',
       '.ccq-log-tb th{background:#f5f7fa;color:#333;font-weight:700;}',
       '.ccq-log-tb td.ccq-log-c,.ccq-log-tb td.ccq-log-d{text-align:center;white-space:nowrap;}',
       '.ccq-log-tb td.ccq-log-ops{text-align:center;white-space:nowrap;}',
@@ -66634,7 +66661,7 @@ function submitAuth() {
       /* ★CCQ-RECDEL-20261115（用户 2026-11-15）：删除确认浮层——主题红，贴着删除按钮弹出，三语跟随、切语言不消失 */
       '.ccq-rec-del-pop{position:fixed;z-index:100000;width:250px;max-width:calc(100vw - 16px);display:none;background:#fff;border:1px solid #e6b7bb;border-radius:8px;box-shadow:0 10px 26px rgba(0,0,0,.24);overflow:hidden;font-size:12px;}',
       '.ccq-rec-del-pop .crd-hd{background:linear-gradient(135deg,#e53935,#c62828);color:#fff;font-weight:700;padding:6px 10px;font-size:12px;letter-spacing:.5px;}',
-      '.ccq-rec-del-pop .crd-msg{padding:10px 12px 8px;line-height:1.65;color:#333;word-break:break-word;}',
+      '.ccq-rec-del-pop .crd-msg{padding:10px 12px 8px;line-height:1.65;color:#333;word-break:normal;}',
       '.ccq-rec-del-pop .crd-ft{display:flex;gap:8px;justify-content:flex-end;padding:0 12px 10px;}',
       '.ccq-rec-del-pop .crd-ft button{border-radius:6px;padding:4px 13px;font-size:12px;cursor:pointer;border:1px solid #c62828;line-height:18px;}',
       '.ccq-rec-del-pop .crd-no{background:#fff;color:#333;border-color:#c9c9c9;}',
@@ -66647,7 +66674,7 @@ function submitAuth() {
       '.ccq-hist-chip{font-size:11px;line-height:16px;padding:1px 7px;border-radius:9px;background:#e8f0fe;color:#174ea6;white-space:nowrap;}',
       '.ccq-hist-chip-sum{background:#fff3e0;color:#b26a00;font-weight:700;}',
       '.ccq-ver-stats{margin:0 0 6px;}',
-      '.ccq-ver-list li{word-break:break-word;}',
+      '.ccq-ver-list li{word-break:normal;}',
       /* ★CCQ-TRIMODAL-20261115（用户 2026-11-15）：报价表里只有一个框（显示当前语言值），点开模态框录入三语 */
       '.ccq-tri-box{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:26px;padding:3px 8px;border:1px solid #d8e0e8;border-radius:4px;background:#fff;cursor:pointer;}',
       '.ccq-tri-box:hover{border-color:#1a56b0;background:#f7fbff;}',
@@ -66705,7 +66732,7 @@ function submitAuth() {
       '.ccq-date{width:auto;min-width:140px;}',
       '.ccq-printonly{display:none;}',
       '.ccq-tb{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px;background:#fff;color:#111;}',
-      '.ccq-tb th,.ccq-tb td{border:1px solid #333;padding:2px 3px;text-align:center;word-break:break-word;line-height:1.3;vertical-align:middle;}',
+      '.ccq-tb th,.ccq-tb td{border:1px solid #333;padding:2px 3px;text-align:center;word-break:normal;line-height:1.3;vertical-align:middle;}',
       '.ccq-tb thead th{background:linear-gradient(135deg,#E53935,#C62828);color:#fff;font-weight:700;font-size:8.5px;}',
       '.ccq-tb td.ccq-n{text-align:right;}',
       /* ★CCQ-MONEYFIT-20261115：金额一律不换行，超宽时由 ccQuoteFitMoney() 自动缩字号 */
@@ -66839,7 +66866,7 @@ function submitAuth() {
       // ★CC-GRAYDAYS-20261104：生产/安装项目天数为自动计算、不可编辑，唯独这两个保持灰底
       '#cc_prod_days,#cc_inst_days_top{background:#eef2f7 !important;}',
       // ★CC-PROVIDE-20261105：最右「Choice VN 提供吗」列 —— 窄列换行、√/× 方框、× 行红色 0 + 整行删除线（× 单元格除外）
-      '.cc-tb th.cc-prov-th{width:78px;min-width:64px;white-space:normal;overflow-wrap:anywhere;font-size:11px;line-height:1.25;text-align:center;}',
+      '.cc-tb th.cc-prov-th{width:78px;min-width:64px;white-space:normal;overflow-wrap:break-word;font-size:11px;line-height:1.25;text-align:center;}',
       '.cc-tb td.cc-prov{text-align:center;width:78px;padding:2px;}',
       '.cc-prov-lbl{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;position:relative;}',
       '.cc-prov-lbl input.cc-chk{position:absolute;opacity:0;width:1px;height:1px;margin:0;}',
@@ -66877,7 +66904,7 @@ function submitAuth() {
       // ★CC-PROVIDE-NOHSCROLL-20261105：新增列后窄屏(<=1199px)改用固定布局，保证所有列可见且绝不撑出横向滚动条
       '@media (max-width:1199px){',
       '.cc-tb:not(.cc-tb-spec){table-layout:fixed;width:100%;}',
-      '.cc-tb:not(.cc-tb-spec) th,.cc-tb:not(.cc-tb-spec) td{overflow-wrap:anywhere;word-break:break-all;overflow:hidden;}',
+      '.cc-tb:not(.cc-tb-spec) th,.cc-tb:not(.cc-tb-spec) td{overflow-wrap:break-word;word-break:break-all;overflow:hidden;}',
       '.cc-tb:not(.cc-tb-spec) .cc-subcell{white-space:normal;}',
       '.cc-tb:not(.cc-tb-spec) th.cc-prov-th,.cc-tb:not(.cc-tb-spec) td.cc-prov{min-width:0;width:46px;font-size:10px;padding:2px 1px;}',
       '.cc-tb:not(.cc-tb-spec) .cc-prov-sym{width:18px;height:18px;line-height:16px;font-size:13px;}',
@@ -66885,7 +66912,7 @@ function submitAuth() {
       // ★CC-GANTT-20261108：阶段表下方甘特图（纯 CSS，无第三方库；只做版式呈现）
       '.cc-gantt{margin-top:6px;border:1px solid #000;background:#fff;font-size:12px;overflow:hidden;font-variant-numeric:tabular-nums;}',
       '.cc-gantt-head,.cc-gantt-row{display:flex;align-items:stretch;width:100%;}',
-      '.cc-gantt-lab{flex:0 0 150px;width:150px;box-sizing:border-box;padding:3px 6px;border-right:1px solid #000;display:flex;align-items:center;font-weight:600;color:#1a3c6e;line-height:1.25;overflow-wrap:anywhere;}',
+      '.cc-gantt-lab{flex:0 0 150px;width:150px;box-sizing:border-box;padding:3px 6px;border-right:1px solid #000;display:flex;align-items:center;font-weight:600;color:#1a3c6e;line-height:1.25;overflow-wrap:break-word;}',
       '.cc-gantt-row .cc-gantt-lab,.cc-gantt-row .cc-gantt-track{border-bottom:1px solid #e3e8ef;}',
       '.cc-gantt-head .cc-gantt-lab{background:#ffff00;justify-content:center;font-size:11px;border-bottom:1px solid #000;}',
       '.cc-gantt-head .cc-gantt-track{background:#ffff00;height:30px;border-bottom:1px solid #000;}',
@@ -73241,7 +73268,7 @@ function submitAuth() {
   function lib_viewText(url, body){
     fetch(url).then(function(r){ return r.text(); }).then(function(t){
       var pre = document.createElement('pre');
-      pre.style.cssText = 'margin:0;padding:20px 24px;background:#fff;min-height:100%;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:#222;box-sizing:border-box;';
+      pre.style.cssText = 'margin:0;padding:20px 24px;background:#fff;min-height:100%;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:normal;color:#222;box-sizing:border-box;';
       pre.textContent = t;
       body.innerHTML = ''; body.appendChild(pre);
     }).catch(function(){ lib_viewFail(body); });
@@ -75865,7 +75892,7 @@ var RPT_I18N = {
 var RPT_CSS_EXTRA = '.rpt-loading{padding:60px 20px;text-align:center;color:#888;font-size:14px;}'
   + '.rpt-kpi-row{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 10px;}'
   + '.rpt-kpi{flex:1 1 160px;min-width:140px;background:#f7f9fb;border:1px solid #e3e9ef;border-radius:8px;padding:10px 12px;box-sizing:border-box;}'
-  + '.rpt-kpi-v{font-size:18px;font-weight:700;color:#D32F2F;line-height:1.25;word-break:break-word;}'
+  + '.rpt-kpi-v{font-size:18px;font-weight:700;color:#D32F2F;line-height:1.25;word-break:normal;}'
   + '.rpt-kpi-l{font-size:11px;color:#667;margin-top:3px;}'
   + '.rpt-fx{font-size:11px;color:#888;font-weight:400;}'
   + '.rpt-sub{font-size:12px;font-weight:700;color:#444;margin:8px 0 4px;}'
@@ -79379,7 +79406,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;user-select:none !imp
 /* 横道图自绘 tooltip（替代原生 title，保证内容可见） */
 .ig-tip{position:fixed;display:none;z-index:9999;max-width:360px;background:#263238;color:#fff;
   font-size:11px;line-height:1.55;padding:8px 10px;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.4);
-  pointer-events:none;white-space:pre-line;word-break:break-word}
+  pointer-events:none;white-space:pre-line;word-break:normal}
 .bar::after{content:'';position:absolute;right:0;top:0;bottom:0;width:7px;background:transparent;z-index:4}
 .bar:hover::after{background:rgba(255,255,255,.42)}
 .bar-seg{position:absolute;top:0;height:100%;border-radius:0;pointer-events:none}
@@ -87005,7 +87032,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
       white-space: normal !important;
       overflow: visible !important;
       text-overflow: clip !important;
-      word-break: break-word !important;
+      word-break: normal !important;
       text-align: center !important;
     }
     .tb-item.active { padding: 3px 1px !important; margin: 0 !important; border-radius: 12px !important; }
@@ -87075,7 +87102,7 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     col { width: auto !important; }
     table th, table td {
       white-space: normal !important;
-      word-break: break-word !important;
+      word-break: normal !important;
       overflow-wrap: break-word !important;
       font-size: 11px !important;
       padding: 4px 6px !important;
@@ -87094,8 +87121,8 @@ window.ganttSetLang=function(lang){ window.CUR_LANG=lang; try{ if(window.parent 
     .receipt-card .prod-table th,
     .receipt-card .prod-table td {
       white-space: normal !important;
-      word-break: break-word !important;
-      overflow-wrap: anywhere !important;
+      word-break: normal !important;
+      overflow-wrap: break-word !important;
       font-size: 11px !important;
       padding: 4px 4px !important;
     }

@@ -1,136 +1,440 @@
-/* ===== CHOICE SLATS 手机版修复 v4（仅 APK 注入，不改网页源码） ===== */
+/* ===== CHOICE SLATS 手机版修复 v6（仅 APK 注入，不改网页源码） =====
+   说明：网页 /lite 自带 rwd-fix-20261025（顶栏分两行、收货单表可横滑），
+   本文件只在它无法覆盖的地方补漏，绝不反向破坏它已修好的效果。
 
-/* ---------- 1. 表格：恢复「桌面级」自然列宽 + 容器可横滑 ---------- */
-/* 说明：带 colgroup 的、被硬锁的表格由 JS 打上 .mfix-keep，此处的 :not() 会跳过它们 */
+   v6 重点（2026-11-16）：
+   1) 顶栏标签【允许换行】而不是 nowrap —— 越南语全称很长（"Quản lý tài chính"），
+      nowrap 会把两端切掉（就是之前出现的 "ng điều khi" 残字）。
+   2) 网页在横屏矮屏有 `table{table-layout:fixed;width:100%}`，会把宽表压成一列十几像素。
+      这里用更高优先级改回桌面自然列宽 + 卡片内横滑。
+   3) 二级页签（生产 A~H / 安装 A~C / 财务）一行横滑，不再被右边界裁掉。
+   4) 弹窗全宽、内部可滚动，底部按钮点得到。
+   5) 触控目标 ≥ 34px（表格内小图标按钮除外）。 */
+
+html body { -webkit-text-size-adjust: 100% !important; }
+
+/* ---------- 1. 表格：桌面自然列宽 + 容器内横滑（不再压成一屏） ---------- */
 html body table:not(.mfix-keep) {
   table-layout: auto !important;
-  width: auto !important;
+  width: max-content !important;
   min-width: 100% !important;
+  max-width: none !important;
 }
 html body table:not(.mfix-keep) th,
 html body table:not(.mfix-keep) td {
   white-space: normal !important;
   word-break: normal !important;
-  overflow-wrap: normal !important;
+  overflow-wrap: break-word !important;
+  /* 长备注列不要无限拉宽整表；短列仍按内容自然宽度 */
+  max-width: 320px;
 }
 html body table:not(.mfix-keep) td button,
-html body table:not(.mfix-keep) td a,
+html body table:not(.mfix-keep) td a.btn,
 html body table:not(.mfix-keep) td .btn { white-space: nowrap !important; }
 
-/* 原本被强制 overflow-x:hidden 的宽表容器，恢复横向滑动 */
+/* 网页已经自己做过横滑/固定列的表：保持原样，别被上面的通用规则改宽 */
+html body .won-scroll-container > table,
+html body .receipt-card .prod-table,
+html body .usr-diff-box .prod-table {
+  width: max-content !important;
+  min-width: 100% !important;
+  table-layout: auto !important;
+}
+html body .won-scroll-container th,
+html body .won-scroll-container td,
+html body .receipt-card .prod-table th,
+html body .receipt-card .prod-table td,
+html body .usr-diff-box .prod-table th,
+html body .usr-diff-box .prod-table td {
+  white-space: nowrap !important;
+  max-width: none;
+}
+html body .won-scroll-container { overflow: auto !important; }
+
+/* 滚动容器：JS 会补 .mfix-scroll；自带 scroll 类的容器也给上触摸惯性 */
+html body .mfix-scroll,
 html body .won-scroll-container,
 html body .appr-table-wrap,
-html body .users-table-wrap {
+html body .users-table-wrap,
+html body .rc-body {
   overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
-}
-
-/* 按钮/页签行：换行显示，避免右侧按钮被裁掉 */
-html body .fin-tabs, html body .fin-toolbar { flex-wrap: wrap !important; overflow: visible !important; }
-
-/* ---------- 2. 顶栏：字号不再被压到 8px、标签不再被撑宽 ---------- */
-html body #topbar .tb-label {
-  min-width: 0 !important;
-  width: auto !important;
-  font-size: inherit !important;
-}
-html body #topbar .tb-item { font-size: 12px !important; }
-
-/* 横屏：顶栏一行（与电脑版同款） */
-@media (orientation: landscape) and (max-height: 640px) {
-  html body #topbar {
-    height: 44px !important; min-height: 44px !important;
-    flex-wrap: nowrap !important; padding: 0 8px !important;
-    gap: 8px !important; align-items: center !important;
-  }
-  html body #topbar .tb-logo { display: none !important; }
-  html body #topbar .tb-menu {
-    display: flex !important; flex: 1 1 auto !important;
-    width: auto !important; min-width: 0 !important;
-    overflow-x: auto !important; overflow-y: hidden !important;
-    align-items: center !important; gap: 4px !important; padding: 0 !important;
-  }
-  html body #topbar .tb-menu::-webkit-scrollbar { height: 0; }
-  html body #topbar .tb-item {
-    flex: 0 0 auto !important; width: auto !important; height: 30px !important;
-    min-height: 0 !important; white-space: nowrap !important;
-    font-size: 12px !important; font-weight: 600 !important;
-    padding: 4px 8px !important; line-height: 1.1 !important;
-    display: inline-flex !important; align-items: center !important; justify-content: center !important;
-  }
-  html body #topbar .tb-label { display: inline-block !important; white-space: nowrap !important; }
-  html body #topbar .tb-item.active { padding: 4px 10px !important; margin: 0 !important; border-radius: 16px !important; }
-  html body #topbar .tb-right {
-    flex: 0 0 auto !important; width: auto !important;
-    flex-wrap: nowrap !important; gap: 4px !important;
-  }
-  html body .app-body { margin-top: 48px !important; }
-}
-
-/* 竖屏：导航 5 列 × N 行 + 右侧控件单独一行（不重叠、不被裁） */
-@media (orientation: portrait) and (max-width: 900px) {
-  html body #topbar {
-    height: auto !important; min-height: 0 !important;
-    flex-wrap: wrap !important; align-items: center !important;
-    padding: 4px 6px !important; gap: 4px !important;
-  }
-  html body #topbar .tb-logo { display: none !important; }
-  html body #topbar .tb-menu {
-    display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-    flex: 1 1 100% !important; width: 100% !important; min-width: 0 !important;
-    gap: 4px !important; overflow: visible !important; padding: 0 !important;
-  }
-  html body #topbar .tb-item {
-    width: 100% !important; min-width: 0 !important; height: 28px !important;
-    flex: none !important; white-space: nowrap !important;
-    overflow: hidden !important; text-overflow: ellipsis !important;
-    font-size: 11px !important; font-weight: 600 !important;
-    padding: 2px !important; line-height: 1.1 !important;
-    display: inline-flex !important; align-items: center !important; justify-content: center !important;
-  }
-  html body #topbar .tb-item.active { padding: 2px !important; margin: 0 !important; border-radius: 14px !important; }
-  html body #topbar .tb-label {
-    display: block !important; min-width: 0 !important;
-    white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
-  }
-  html body #topbar .tb-right {
-    flex: 1 1 100% !important; width: 100% !important;
-    justify-content: flex-end !important; flex-wrap: nowrap !important; gap: 6px !important;
-  }
-}
-
-/* ---------- 2.5 图标 / 按钮 / 徽标不被 flex 挤扁（emoji、svg、操作图标） ---------- */
-html body button,
-html body a.btn,
-html body .btn,
-html body .prod-op,
-html body .inst-photo-count,
-html body .mfix-topbar button { flex-shrink: 0 !important; }
-html body img,
-html body svg { flex-shrink: 0 !important; }
-html body .mfix-scroll td button,
-html body .mfix-scroll td a { flex: 0 0 auto !important; }
-
-/* ---------- 3. 通用：被裁掉的横向内容改成可横滑 ---------- */
-html body .mfix-scroll {
-  overflow-x: auto !important;
+  overflow-y: visible;
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-x: contain;
   touch-action: pan-x pan-y;
   max-width: 100% !important;
 }
-html body .mfix-scroll::-webkit-scrollbar { height: 6px; }
-html body .mfix-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .28); border-radius: 3px; }
-
-/* ---------- 4. 宽表容器露出细横滑条，提示「这里还能往右滑」 ---------- */
-html body .mfix-scroll::-webkit-scrollbar,
-html body div:has(> table)::-webkit-scrollbar,
-html body div:has(> div > table)::-webkit-scrollbar { height: 8px; }
-html body .mfix-scroll::-webkit-scrollbar-thumb,
-html body div:has(> table)::-webkit-scrollbar-thumb,
-html body div:has(> div > table)::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, .3);
-  border-radius: 4px;
+/* 细横滑条：提示"这里还能往右滑"
+   ★不要用 div:has(> table) 之类 :has() 选择器：这个页面有 8 万多节点且高频改 DOM，
+     :has() 会让每次改动都触发全量 style 失效计算，低端机/模拟器上会卡到 ANR。 */
+html body .mfix-scroll::-webkit-scrollbar { height: 8px; }
+html body .mfix-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, .3); border-radius: 4px;
 }
-html body .mfix-scroll::-webkit-scrollbar-track,
-html body div:has(> table)::-webkit-scrollbar-track { background: rgba(0, 0, 0, .06); }
+html body .mfix-scroll::-webkit-scrollbar-track { background: rgba(0, 0, 0, .06); }
+
+/* ---------- 2. 二级页签：一行横滑 ---------- */
+html body #prod-tabs,
+html body #inst-tabs,
+html body #fin-tabs,
+html body #wl-tabs,
+html body #appr-tabs,
+html body .prod-tabs,
+html body .fin-tabs {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  gap: 6px !important;
+  max-width: 100% !important;
+}
+html body #prod-tabs::-webkit-scrollbar,
+html body #inst-tabs::-webkit-scrollbar,
+html body #fin-tabs::-webkit-scrollbar,
+html body #wl-tabs::-webkit-scrollbar { height: 6px; }
+html body #prod-tabs::-webkit-scrollbar-thumb,
+html body #inst-tabs::-webkit-scrollbar-thumb,
+html body #fin-tabs::-webkit-scrollbar-thumb,
+html body #wl-tabs::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, .32); border-radius: 3px;
+}
+html body #prod-tabs > *,
+html body #inst-tabs > *,
+html body #fin-tabs > *,
+html body #wl-tabs > * { flex: 0 0 auto !important; white-space: nowrap !important; }
+
+/* 工具栏：换行而不是被裁 */
+html body .fin-toolbar,
+html body .fin-toolbar2 { flex-wrap: wrap !important; overflow: visible !important; }
+
+/* ---------- 3. 触控目标 ---------- */
+html body button,
+html body a.btn,
+html body .btn {
+  min-height: 34px;
+  flex-shrink: 0 !important;
+}
+/* 表格单元格里的图标按钮保持紧凑（否则整表被撑爆） */
+html body table button,
+html body table .btn { min-height: 0 !important; }
+html body img, html body svg { flex-shrink: 0 !important; }
+
+/* ---------- 4. 弹窗/抽屉：手机上占满宽度、内容可滚 ---------- */
+html body .modal,
+html body .appr-drawer,
+html body .crm-modal,
+html body .prod-modal {
+  max-width: 100vw !important;
+  width: 100% !important;
+  border-radius: 0 !important;
+  max-height: calc(100vh - 12px) !important;
+  overflow-y: auto !important;
+}
+html body .modal .modal-body,
+html body .appr-drawer .appr-drawer-body { max-height: none !important; }
+/* 弹窗标题栏的红色渐变条在手机上不要额外负边距（贴着屏幕边） */
+html body .modal > h2 { padding-left: 12px !important; padding-right: 12px !important; }
+
+/* ---------- 5. 顶栏 ---------- */
+/* ★关键：标签一律允许换行，绝不 nowrap + 裁切（否则越南语全称只剩中间几个字） */
+html body #topbar .tb-label {
+  min-width: 0 !important;
+  width: auto !important;
+  font-size: inherit !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  word-break: break-word !important;
+}
+
+/* 横屏（矮屏）：压成一行，靠换行而不是横滑 */
+@media (orientation: landscape) and (max-height: 640px) {
+  /* ★网页把 #topbar 设成 display:grid（列 auto 1fr auto），这里必须先改回 flex，
+     否则 flex-wrap / flex-basis 全部无效，导航和右侧控件会挤在同一行。
+     ★必须 :not(.hidden)，否则 !important 会把登录页的 #topbar.hidden 顶显出来。 */
+  html body #topbar:not(.hidden) {
+    display: flex !important;
+    height: auto !important;
+    min-height: 40px !important;
+    flex-wrap: nowrap !important;
+    padding: 2px 8px !important;
+    gap: 8px !important;
+    align-items: center !important;
+  }
+  html body #topbar .tb-logo { display: none !important; }
+  html body #topbar .tb-menu {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    align-items: stretch !important;
+    gap: 3px !important;
+    padding: 0 !important;
+    order: 0 !important;
+  }
+  html body #topbar .tb-item {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 40px !important;
+    padding: 3px 3px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  html body #topbar .tb-item.active { padding: 3px 3px !important; margin: 0 !important; border-radius: 12px !important; }
+  html body #topbar .tb-right {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    order: 0 !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+  html body #topbar .tb-user-role,
+  html body #topbar .lang-switch-label { display: none !important; }
+  html body #topbar .tb-right button { min-height: 32px !important; min-width: 32px !important; padding: 2px 6px !important; }
+  html body .app-body { margin-top: 46px !important; }
+}
+
+/* 横屏窄机（≤720 宽）：再降一档字号，保证 10 个导航都在一行内 */
+@media (orientation: landscape) and (max-height: 640px) and (max-width: 720px) {
+  html body #topbar .tb-item { font-size: 10px !important; padding: 2px 2px !important; }
+}
+
+/* 竖屏：5 列 × 2 行，标签可换行，高度自适应 */
+@media (orientation: portrait) and (max-width: 900px) {
+  /* ★同上：网页的 #topbar 是 display:grid(auto 1fr auto)，必须先改成单列 grid，
+     导航才能独占一整行、右侧控件落到第二行（否则只有 265px 宽，挤成一团）。
+     ★必须 :not(.hidden)，否则 !important 会把登录页的 #topbar.hidden 顶显出来。 */
+  html body #topbar:not(.hidden) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    align-items: center !important;
+    padding: 4px 6px !important;
+    gap: 4px !important;
+  }
+  html body #topbar .tb-logo { display: none !important; }
+  html body #topbar .tb-menu {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 4px !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    order: 1 !important;
+  }
+  html body #topbar .tb-item {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 40px !important;
+    flex: none !important;
+    padding: 4px 2px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    line-height: 1.15 !important;
+    text-align: center !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  html body #topbar .tb-item.active { padding: 4px 2px !important; margin: 0 !important; border-radius: 14px !important; }
+  /* 右侧控件：强制一行（放不下就自己横滑），别把顶栏撑到 180px 高。
+     ★网页里 .tb-right 是 grid（2 列），不改成 flex 的话 flex-wrap/direction 全无效。 */
+  html body #topbar .tb-right {
+    display: flex !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    order: 2 !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 5px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+  html body #topbar .tb-right::-webkit-scrollbar { height: 0; }
+  html body #topbar .tb-user-role,
+  html body #topbar .lang-switch-label { display: none !important; }
+  html body #topbar .tb-right button { min-height: 32px !important; min-width: 30px !important; padding: 2px 6px !important; font-size: 11px !important; }
+  html body #topbar .tb-user { flex: 0 0 auto !important; gap: 4px !important; }
+  html body #topbar .tb-user-avatar { width: 26px !important; height: 26px !important; line-height: 26px !important; font-size: 12px !important; }
+  html body #topbar .tb-user-name { max-width: 70px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+}
+
+/* ---------- 5.5 单元格不许"撑出格子"（★M-CELLFIT-20261116） ----------
+   ★这里只能用 overflow-wrap:break-word，绝不能用 anywhere / word-break:break-word：
+     它俩会把 min-content 降到 1 个字符，在固定列宽的表里会让文字一列一个竖字
+     （生产"工厂概览"表实测会变成一堆竖线）。break-word 只在整词放不下时才断，
+     不影响列宽计算，配合下面的子元素约束即可保证按钮/图标不越界。 */
+html body table th,
+html body table td {
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
+}
+html body table td > div,
+html body table td > span,
+html body table td > p,
+html body table th > div {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+html body table td img,
+html body table td svg,
+html body table td canvas,
+html body table th img,
+html body table th svg {
+  max-width: 100% !important;
+  height: auto !important;
+}
+/* 单元格里的按钮/图标组：允许压缩、允许换行，绝不横着顶出去 */
+html body table td button,
+html body table td .btn,
+html body table td a.btn {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 2px 5px !important;
+}
+html body table td > div[style*="display: flex"],
+html body table td > div[style*="display:flex"] {
+  flex-wrap: wrap !important;
+}
+/* 诊断用：window.__mfixFitCells() 会把越界单元格标上这个类 */
+html body td.mfix-cell-over,
+html body th.mfix-cell-over {
+  outline: 1px dashed #ff9800 !important;
+  outline-offset: -2px !important;
+}
+
+/* ---------- 6. 弹窗：关闭按钮永远够得到（★M-BACK-20261116） ----------
+   网页 .modal 是 position:fixed; top:66px + overflow:auto，手机上图省的一半在屏幕外，
+   而 .close 是 absolute，会跟着内容滚走 → 用户"根本关不掉"。 */
+@media (max-width: 900px), (orientation: landscape) and (max-height: 640px) {
+  /* 弹窗从顶栏下沿开始：网页写死 top:56px，手机顶栏是 130+ px，标题会被顶栏盖住 */
+  html body .modal-overlay {
+    top: var(--mfix-topbar-h, 56px) !important;
+    padding: 6px !important;
+    align-items: stretch !important;
+  }
+  html body .modal {
+    top: 0 !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+    max-height: 100% !important;
+    width: 100% !important;
+  }
+  html body .modal > h2 { padding-right: 52px !important; }
+}
+
+/* 通用"关闭"浮动按钮：JS 在检测到弹窗层时创建（★M-CLOSEFAB-20261116）
+   —— 网页的 × 是 absolute，内容一滚就没了；这个永远钉在顶栏下方右上角。 */
+html body #mfix-close-fab {
+  position: fixed !important;
+  top: calc(var(--mfix-topbar-h, 56px) + 8px) !important;
+  right: 10px !important;
+  z-index: 2147483100 !important;
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  min-height: 46px !important;
+  padding: 0 !important;
+  border: 2px solid rgba(255, 255, 255, .85) !important;
+  border-radius: 50% !important;
+  background: rgba(0, 0, 0, .55) !important;
+  color: #fff !important;
+  font-size: 22px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .4) !important;
+}
+
+/* ---------- 7. 附件预览（★M-PDF-20261116，JS 动态创建） ---------- */
+html body .mfix-pdf-ov {
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+  z-index: 2147483000 !important;
+  background: #141414 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+html body .mfix-pdf-head {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 8px !important;
+  background: #1b1b1b !important;
+  color: #fff !important;
+  border-bottom: 1px solid #333 !important;
+  flex: 0 0 auto !important;
+}
+html body .mfix-pdf-name {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  font-size: 12px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+html body .mfix-pdf-btn {
+  flex: 0 0 auto !important;
+  width: 40px !important; height: 40px !important;
+  min-height: 40px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background: #2c2c2c !important;
+  color: #fff !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+html body .mfix-pdf-page {
+  flex: 0 0 auto !important;
+  font-size: 12px !important;
+  min-width: 56px !important;
+  text-align: center !important;
+}
+html body .mfix-pdf-body {
+  flex: 1 1 auto !important;
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 8px !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+}
+html body .mfix-pdf-cv { display: block !important; background: #fff !important; }
+html body .mfix-pdf-msg { color: #bbb !important; font-size: 13px !important; padding: 24px 12px !important; text-align: center !important; }
+
+/* ★兜底：网页用 .hidden 隐藏顶栏（登录页）时，本文件里的 display 覆盖不得把它顶出来 */
+html body #topbar.hidden { display: none !important; }
+
