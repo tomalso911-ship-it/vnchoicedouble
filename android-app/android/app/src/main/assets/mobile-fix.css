@@ -139,7 +139,11 @@ html body .appr-drawer .appr-drawer-body { max-height: none !important; }
 html body .modal > h2 { padding-left: 12px !important; padding-right: 12px !important; }
 
 /* ---------- 5. 顶栏 ---------- */
-/* ★关键：标签一律允许换行，绝不 nowrap + 裁切（否则越南语全称只剩中间几个字） */
+/* ★关键：标签一律允许换行，绝不 nowrap + 裁切（否则越南语全称只剩中间几个字）
+   ★WRAP-RULE-20261116：这里只能用 word-break:normal（不能用 break-word / anywhere）。
+     break-word 是 overflow-wrap:anywhere 的旧别名，会把 min-content 压到 1 个字符，
+     实测能让顶栏/表格塌成一条竖线；normal 下越南语仍有空格可断、中文本身就能断。
+     横屏 818×388 / 竖屏 412×818 实机对比：顶栏高度 60/134 与改前完全一致，无横向溢出。 */
 html body #topbar .tb-label {
   min-width: 0 !important;
   width: auto !important;
@@ -147,7 +151,7 @@ html body #topbar .tb-label {
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: clip !important;
-  word-break: break-word !important;
+  word-break: normal !important;
 }
 
 /* 横屏（矮屏）：压成一行，靠换行而不是横滑 */
@@ -190,7 +194,7 @@ html body #topbar .tb-label {
     white-space: normal !important;
     overflow: visible !important;
     text-overflow: clip !important;
-    word-break: break-word !important;
+    word-break: normal !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -257,7 +261,7 @@ html body #topbar .tb-label {
     white-space: normal !important;
     overflow: visible !important;
     text-overflow: clip !important;
-    word-break: break-word !important;
+    word-break: normal !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
