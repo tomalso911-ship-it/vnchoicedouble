@@ -28843,6 +28843,36 @@ var PROD_EQUIP_FAULT_KB = {
         return bar;
       } catch(e){ return null; }
     };
+    /* ★★FIN-HSCROLL-ORPHAN-20261117（用户 2026-11-17 截图：签约项目页面上凭空浮着两条水平滚动条）★★
+       根因：这两条 Excel 风格横滑条是【财务 univer_container】和【股东权益 equity_container】各自的
+       (id = fin-hscroll-<容器 id>)，挂在 body 上、position:fixed + z-index:9999。
+       全文件只有 makeHScroll() 会写它们的 display，而 makeHScroll 只在财务/权益的 400ms 轮询里被调用：
+           if (!__viewActive('equity')) return;   ← 切走视图后直接 return
+       于是切到「签约项目」之后，没有任何代码再把 display 设回 none，
+       条子就永久停在最后一次 layout 的坐标（那个位置正是已隐藏的财务表格原位置）→ 看起来像凭空多出两条滚动条。
+       这里加一个与视图无关的守卫：容器不可见（所在 .view 非 active，或尺寸为 0）就统一藏掉。
+       只做显隐，不参与拖动/滚动逻辑，不影响 check_hscroll_lock.py 的 7 条不变量。 */
+    /* 只在「切视图」时做一次（不新增常驻 setInterval —— PERF-IDLE-LOCK ⑨ 把常驻轮询总数钉死了）。
+       只负责「藏」，显示仍然交给 makeHScroll，避免和它抢状态。 */
+    window.fin_hscrollHideOrphans = function(){
+      try {
+        var bars = document.querySelectorAll('.fin-hscroll');
+        for (var _i = 0; _i < bars.length; _i++){
+          var _b = bars[_i];
+          if (!_b || !_b.id || _b.id.indexOf('fin-hscroll-') !== 0) continue;
+          var _c = document.getElementById(_b.id.slice('fin-hscroll-'.length));
+          var _show = false;
+          if (_c){
+            var _vw = _c.closest ? _c.closest('.view') : null;
+            if (!(_vw && !_vw.classList.contains('active'))){
+              var _rr = _c.getBoundingClientRect();
+              _show = _rr.width > 20 && _rr.height > 20;
+            }
+          }
+          if (!_show && _b.style.display !== 'none') _b.style.display = 'none';
+        }
+      } catch(e){}
+    };
     function fin_patchCommandService(coreMod){
     try {
       if (!coreMod || !finUniver || typeof finUniver.__getInjector !== 'function') return false;
@@ -60206,6 +60236,11 @@ function switchView(name) {
   for (var i = 0; i < views.length; i++) {
     views[i].classList.toggle('active', views[i].id === ('view-' + name));
   }
+  /* ★★FIN-HSCROLL-ORPHAN-20261117：财务/股东权益的 Excel 横滑条挂在 body 上（fixed + z-index 9999），
+     只有 makeHScroll() 会写 display；切走视图后那两处 400ms 轮询被 __viewActive 门控直接 return，
+     再没人隐藏它们 → 条子永久停在原财务表格的位置，飘到「签约项目」等页面上（用户 2026-11-17 截图）。
+     这里在视图切换、.active 已落定之后同步藏一次。 */
+  try { if (window.fin_hscrollHideOrphans) window.fin_hscrollHideOrphans(); } catch (e) {}
   var items = document.querySelectorAll('#tbMenu .tb-item');
   for (var j = 0; j < items.length; j++) {
     items[j].classList.toggle('active', items[j].getAttribute('data-view') === name);
