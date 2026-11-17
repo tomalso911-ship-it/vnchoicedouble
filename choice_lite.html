@@ -68691,9 +68691,29 @@ function submitAuth() {
     if(!q.version) q.version = '01';
     var fs = ccFootState();
     var dual = !!ccSpecDualMode();
-    var rebarN = dual ? 9 : 5;
-    var nCols = 17 + rebarN;                       // 单层 22 列 / 双层 26 列
+    /* ★CCQ-FOLLOWGRID-20261116（用户 2026-11-16 两张截图）：
+       报价单纸面的【列、顺序、两级表头、显隐】必须 100% 跟随上面的录入表 ——
+       同一套 ccGridCols() 定义（含 CC_ROW_COLS 的钢筋/平米/实心板/带圆孔/单价/小计/备注开关），
+       纸面只比录入表少一列「操作」（纸面不打印操作列）。
+       以前纸面是硬编码 22/26 列：录入表关掉「钢筋网片/平米/实心板/带圆孔/小计/备注」之后，
+       纸面照样全打出来，两边列对不上（用户就是拿这两张图对比的）。 */
+    var RC = (typeof CC_ROW_COLS === 'object' && CC_ROW_COLS) ? CC_ROW_COLS : {};
+    var pcols = ccGridCols(dual).filter(function(c){ return c.k !== 'op'; });
+    var nCols = pcols.length;
+    var pIdx = {};
+    pcols.forEach(function(c, i){ pIdx[c.k] = i; });
     var rep = function(n){ var s = ''; for(var i = 0; i < n; i++) s += '<td></td>'; return s; };
+    /* 两级表头分组（与录入表 ccg 的 thead 完全同构） */
+    var PGRP = { units:'houseInfo', bldgs:'houseInfo',
+                 len:'dim', wid:'dim', hei:'dim',
+                 qu:'qty', qw:'qty', su:'qty', sw:'qty',
+                 lyr:'rebar', bl:'rebar', dl:'rebar', ml:'rebar', bw:'rebar', dw:'rebar', mw:'rebar',
+                 bl2:'rebar', dl2:'rebar', ml2:'rebar', bw2:'rebar', dw2:'rebar', mw2:'rebar' };
+    var PGRP_LBL = { houseInfo:T('th_houseInfo'), dim:T('specDimTitle'), qty:T('th_usageTitle'), rebar:T('rebarCfg') };
+    var PTH1_LBL = { idx:T('ccqNo'), house:T('th_house'), code:T('th_houseCode'),
+                     solid:T('solidSlat'), hole:T('th_hole'), price:T('th_price'),
+                     sub:T('th_subtotal'), remark:T('th_remark') };
+    var PMERGED = { idx:1, house:1, code:1, units:1, bldgs:1 };
     /* ★CCQ-EDITFIX-20261115（用户 2026-11-15：「可编辑的部分，好像无法进入编辑，另外日期选择器没有的」）：
        本文件里 ro 沿用历史命名 = 「可编辑(canEdit)」而不是只读（ccPlanHtml 也是 ro?'':' disabled'），
        这里原先写成 ro ? ' disabled' : '' 刚好写反 —— 能编辑时把输入框全禁用了。 */
@@ -68735,43 +68755,89 @@ function submitAuth() {
     /* ★CCQ-MONEYFIT-20261115（用户 2026-11-15：「打印报价，价格小计列，也需要自动调整宽度，
        使得数据都在单元格里面」）：单价/小计列加宽，其余列相应收窄；再配合 ccQuoteFitMoney()
        在渲染/打印前按实际内容把超标单元格的字号自动缩小。 */
-    var hd = '<colgroup>'
-      + '<col style="width:3%"><col style="width:7%"><col style="width:5%">'
-      + '<col style="width:3.8%"><col style="width:3.8%">'
-      + '<col style="width:5.2%"><col style="width:5.2%"><col style="width:5%">'
-      + '<col style="width:5%"><col style="width:5.4%"><col style="width:5%"><col style="width:5.4%">'
-      + (dual ? '<col style="width:4.2%"><col style="width:4%"><col style="width:4.8%"><col style="width:4%"><col style="width:4.8%">'
-                + '<col style="width:4%"><col style="width:4.8%"><col style="width:4%"><col style="width:4.8%">'
-              : '<col style="width:4.2%"><col style="width:4%"><col style="width:4.8%"><col style="width:4%"><col style="width:4.8%">')
-      + '<col style="width:3.8%"><col style="width:3.8%"><col style="width:9.6%"><col style="width:11.4%"><col style="width:5.6%">'
-      + '</colgroup>';
-    var th1 = '<tr>'
-      + '<th rowspan="2">' + T('ccqNo') + '</th>'
-      + '<th rowspan="2">' + T('th_house') + '</th>'
-      + '<th rowspan="2">' + T('th_houseCode') + '</th>'
-      + '<th colspan="2">' + T('ccqHouseInfo') + '</th>'
-      + '<th colspan="3">' + T('ccqDim') + '</th>'
-      + '<th colspan="4">' + T('ccqQtyGroup') + '</th>'
-      + '<th colspan="' + rebarN + '">' + T('rebarCfg') + '</th>'
-      + '<th rowspan="2">' + T('solidSlat') + '</th>'
-      + '<th rowspan="2">' + T('th_hole') + '</th>'
-      + '<th rowspan="2">' + T('th_price') + '</th>'
-      + '<th rowspan="2">' + T('th_subtotal') + '</th>'
-      + '<th rowspan="2">' + T('th_remark') + '</th></tr>';
-    var th2 = '<tr>'
-      + '<th>' + T('th_unitsShort') + '</th><th>' + T('th_bldgs') + '</th>'
-      + '<th>' + T('specLen') + '</th><th>' + T('specWid') + '</th><th>' + T('specHei') + '</th>'
-      + '<th>' + T('th_qtyUnit') + '</th><th>' + T('th_qtyWhole') + '</th><th>' + T('th_sqmUnit') + '</th><th>' + T('th_sqmWhole') + '</th>'
-      + '<th>' + T('layers') + '</th>'
-      + '<th>' + T('barsL') + '</th><th>' + T('ccqDiaL') + '</th><th>' + T('barsW') + '</th><th>' + T('ccqDiaW') + '</th>'
-      + (dual ? '<th>' + T('loLayer') + T('barsL') + '</th><th>' + T('loLayer') + T('ccqDiaL') + '</th>'
-              + '<th>' + T('loLayer') + T('barsW') + '</th><th>' + T('loLayer') + T('ccqDiaW') + '</th>' : '')
-      + '</tr>';
+    /* 列宽按录入表同一套权重（ccGridCols 的 w）归一化成百分比 → 两边比例一致、整表恒等于容器宽 */
+    var _tW = pcols.reduce(function(s, c){ return s + (c.w || 40); }, 0) || 1;
+    var hd = '<colgroup>' + pcols.map(function(c){
+      return '<col class="ccq-col ccq-col-' + c.k + '" style="width:' + ((c.w || 40) / _tW * 100).toFixed(3) + '%">';
+    }).join('') + '</colgroup>';
+    /* 二级表头文案：必须与录入表 ccg 的 thead 逐格一致（同一批 i18n key） */
+    var _PRB2 = { bl:'bl', dl:'pl', ml:'ml', bw:'bw', dw:'pw', mw:'mw',
+                  bl2:'bl', dl2:'pl', ml2:'ml', bw2:'bw', dw2:'pw', mw2:'mw' };
+    var _PRB1 = { bl:'slats_table_bar_len', dl:'slats_table_rebar_size_len', ml:'slats_table_mm_len',
+                  bw:'slats_table_bar_wid', dw:'slats_table_rebar_size_wid', mw:'slats_table_mm_wid' };
+    var _PTH2 = { units:T('th_unitsShort'), bldgs:T('th_bldgs'),
+                  len:T('specLen'), wid:T('specWid'), hei:T('specHei'),
+                  qu:T('th_qtyUnit'), qw:T('th_qtyWhole'),
+                  su:T('th_sqmUnit'), sw:T('th_sqmWhole'),
+                  lyr:ccTH('slats_table_mesh_layers') };
+    var pTh2 = function(k){
+      if(_PRB2[k]){
+        var _lo = String(k).slice(-1) === '2';
+        if(dual){
+          return '<span class="ccq-th-' + (_lo ? 'lo' : 'up') + '">'
+            + ccTI(_lo ? 'slats_lo_layer' : 'slats_up_layer') + '</span><br><span>'
+            + ccTI('slats_th_' + _PRB2[k]) + '</span>';
+        }
+        return ccTH(_PRB1[k] || '');
+      }
+      return _PTH2.hasOwnProperty(k) ? _PTH2[k] : '';
+    };
+    /* 两级表头：分组列合并成一级表头（colspan），非分组列 rowspan=2 */
+    var th1 = '<tr>', th2 = '<tr>';
+    for(var _ci = 0; _ci < pcols.length; _ci++){
+      var _c = pcols[_ci], _g = PGRP[_c.k];
+      if(_g){
+        var _prevG = _ci > 0 ? PGRP[pcols[_ci - 1].k] : null;
+        if(_prevG !== _g){
+          var _span = 0;
+          for(var _cj = _ci; _cj < pcols.length && PGRP[pcols[_cj].k] === _g; _cj++) _span++;
+          th1 += '<th colspan="' + _span + '">' + PGRP_LBL[_g] + '</th>';
+        }
+        th2 += '<th>' + pTh2(_c.k) + '</th>';
+      } else {
+        th1 += '<th rowspan="2">' + (PTH1_LBL[_c.k] || _c.th) + '</th>';
+      }
+    }
+    th1 += '</tr>'; th2 += '</tr>';
     var tb = '';
     /* ★CC-QUOTE-GROUP-20261115（用户 2026-11-15「相同猪舍的行需要合并」）：
        报价单纸面同样按「猪舍 + 房舍编号 + 单元 + 栋数」合并 序号/猪舍/房舍编号/单元/栋数 五列
        （与成本核算表 ccGridGroupKey 完全同一口径），不再每行重复一遍序号与猪舍。
        ccq_p_/ccq_s_ 的 id 仍用【绝对行号 i】，金额同步逻辑不受影响。 */
+    /* 单元格取值：键名与录入表 ccGridCols 一一对应（同一份数据、同一种格式） */
+    var pcVal = function(k, sp, mmL, mmW){
+      switch(k){
+        /* ★CCQ-HOUSENAME-20261115：规格表里猪舍存的是 1..15 的代码，报价单必须显示对应语言的猪舍名称 */
+        case 'house':  return ccEsc2(ccQuoteHouseName(sp.house));
+        case 'code':   return ccEsc2(sp.code || '');
+        case 'units':  return ccNum(ccRowUnits(sp));
+        case 'bldgs':  return ccNum(ccRowBldgs(sp));
+        case 'len':    return ccNum(sp.len);
+        case 'wid':    return ccNum(sp.wid);
+        case 'hei':    return ccNum(sp.hei);
+        case 'qu':     return ccNum(sp.qty);
+        case 'qw':     return ccNum(ccRowQtyWhole(sp));
+        case 'su':     return ccNum2(ccRowSqmUnit(sp));
+        case 'sw':     return ccNum2(ccRowSqmWhole(sp));
+        case 'lyr':    return String(Number(sp.layers) || '');
+        case 'bl':     return ccNum(sp.nl);
+        case 'dl':     return ccEsc2(sp.rL || '');
+        case 'ml':     return ccNum(mmL);
+        case 'bw':     return ccNum(sp.nw);
+        case 'dw':     return ccEsc2(sp.rW || '');
+        case 'mw':     return ccNum(mmW);
+        case 'bl2':    return ccNum(sp.nl2);
+        case 'dl2':    return (Number(sp.layers) === 2) ? ccEsc2(sp.rL2 || '') : '';
+        case 'ml2':    return (Number(sp.layers) === 2) ? ccNum(mmL) : '';
+        case 'bw2':    return ccNum(sp.nw2);
+        case 'dw2':    return (Number(sp.layers) === 2) ? ccEsc2(sp.rW2 || '') : '';
+        case 'mw2':    return (Number(sp.layers) === 2) ? ccNum(mmW) : '';
+        case 'solid':  return ccRowIsSolid(sp) ? 'YES' : 'NO';
+        case 'hole':   return ccRowIsHole(sp) ? 'YES' : 'NO';
+        case 'remark': return ccEsc2(sp.remark || '');
+        default:       return '';
+      }
+    };
     var qNo = 0;
     ccGridGroups(d.specs || []).forEach(function(g){
       qNo++;
@@ -68780,50 +68846,51 @@ function submitAuth() {
         var sp = (d.specs || [])[i] || {};
         var mmL = ccRowMmLen(sp), mmW = ccRowMmWid(sp);
         tb += '<tr>';
-        if(gi === 0){
-          tb += '<td' + rs + '>' + qNo + '</td>'
-            /* ★CCQ-HOUSENAME-20261115（用户 2026-11-15：「猪舍这一列为什么变成数字，应该是猪舍名称」）：
-               规格表里猪舍存的是 1..15 的代码，报价单必须显示对应语言下的猪舍名称。 */
-            + '<td' + rs + '>' + ccEsc2(ccQuoteHouseName(sp.house)) + '</td>'
-            + '<td' + rs + '>' + ccEsc2(sp.code || '') + '</td>'
-            + '<td' + rs + '>' + ccNum(ccRowUnits(sp)) + '</td>'
-            + '<td' + rs + '>' + ccNum(ccRowBldgs(sp)) + '</td>';
+        for(var _ri = 0; _ri < pcols.length; _ri++){
+          var _k = pcols[_ri].k;
+          if(PMERGED[_k]){
+            /* 序号/猪舍/房舍编号/单元/栋数：同组只在首行出一个带 rowspan 的格 */
+            if(gi === 0) tb += '<td' + rs + '>' + (_k === 'idx' ? qNo : pcVal(_k, sp, mmL, mmW)) + '</td>';
+            continue;
+          }
+          if(_k === 'price'){
+            tb += '<td class="ccq-money" id="ccq_p_' + i + '">' + ccGridMoney(ccSpecBlockPrice(sp)) + '</td>';
+            continue;
+          }
+          if(_k === 'sub'){
+            tb += '<td class="ccq-money" id="ccq_s_' + i + '">' + ccGridMoney(ccRowQtyWhole(sp) * ccSpecBlockPrice(sp)) + '</td>';
+            continue;
+          }
+          var _num = (_k === 'len' || _k === 'wid' || _k === 'hei' || _k === 'qu' || _k === 'qw'
+                   || _k === 'su' || _k === 'sw' || _k === 'bl' || _k === 'ml' || _k === 'bw'
+                   || _k === 'mw' || _k === 'bl2' || _k === 'ml2' || _k === 'bw2' || _k === 'mw2'
+                   || _k === 'units' || _k === 'bldgs');
+          tb += '<td' + (_num ? ' class="ccq-n"' : '') + '>' + pcVal(_k, sp, mmL, mmW) + '</td>';
         }
-        tb += '<td class="ccq-n">' + ccNum(sp.len) + '</td>'
-          + '<td class="ccq-n">' + ccNum(sp.wid) + '</td>'
-          + '<td class="ccq-n">' + ccNum(sp.hei) + '</td>'
-          + '<td class="ccq-n">' + ccNum(sp.qty) + '</td>'
-          + '<td class="ccq-n">' + ccNum(ccRowQtyWhole(sp)) + '</td>'
-          + '<td class="ccq-n">' + ccNum2(ccRowSqmUnit(sp)) + '</td>'
-          + '<td class="ccq-n">' + ccNum2(ccRowSqmWhole(sp)) + '</td>'
-          + '<td>' + (Number(sp.layers) || '') + '</td>'
-          + '<td class="ccq-n">' + ccNum(sp.nl) + '</td>'
-          + '<td class="ccq-n">' + (mmL ? ccNum(mmL) + ' <i>ø' + ccEsc2(sp.rL || '') + '</i>' : '') + '</td>'
-          + '<td class="ccq-n">' + ccNum(sp.nw) + '</td>'
-          + '<td class="ccq-n">' + (mmW ? ccNum(mmW) + ' <i>ø' + ccEsc2(sp.rW || '') + '</i>' : '') + '</td>';
-        if(dual){
-          tb += '<td class="ccq-n">' + ccNum(sp.nl2) + '</td>'
-              + '<td class="ccq-n">' + (Number(sp.layers) === 2 && mmL ? ccNum(mmL) + ' <i>ø' + ccEsc2(sp.rL2 || '') + '</i>' : '') + '</td>'
-              + '<td class="ccq-n">' + ccNum(sp.nw2) + '</td>'
-              + '<td class="ccq-n">' + (Number(sp.layers) === 2 && mmW ? ccNum(mmW) + ' <i>ø' + ccEsc2(sp.rW2 || '') + '</i>' : '') + '</td>';
-        }
-        tb += '<td>' + (ccRowIsSolid(sp) ? 'YES' : 'NO') + '</td>'
-            + '<td>' + (ccRowIsHole(sp) ? 'YES' : 'NO') + '</td>'
-            + '<td class="ccq-money" id="ccq_p_' + i + '">' + ccGridMoney(ccSpecBlockPrice(sp)) + '</td>'
-            + '<td class="ccq-money" id="ccq_s_' + i + '">' + ccGridMoney(ccRowQtyWhole(sp) * ccSpecBlockPrice(sp)) + '</td>'
-            + '<td>' + ccEsc2(sp.remark || '') + '</td></tr>';
+        tb += '</tr>';
       });
     });
     if(!tb) tb = '<tr><td colspan="' + nCols + '" style="padding:14px;color:#999;">—</td></tr>';
-    /* 表尾（与主表口径一致：小计(不含税) → 运输费/安装费(显示时) → 增值税(税率同步) → 含税总价 → 优惠后总价） */
+    /* 表尾（与主表口径一致：小计(不含税) → 运输费/安装费(显示时) → 增值税(税率同步) → 含税总价 → 优惠后总价）
+       ★CCQ-FOLLOWGRID-20261116：金额列固定在「小计」列（该列被隐藏时落到最后一列），跨列数按可见列动态算 */
+    var subAt = pIdx.hasOwnProperty('sub') ? pIdx.sub : (nCols - 1);
     var footRow = function(cls, labelHtml, moneyHtml, moneyId){
-      return '<tr class="' + cls + '"><td colspan="8" class="ccq-fl">' + labelHtml + '</td>'
-        + rep(nCols - 10) + '<td class="ccq-fm"' + (moneyId ? ' id="' + moneyId + '"' : '') + '>' + (moneyHtml || '') + '</td><td></td></tr>';
+      return '<tr class="' + cls + '"><td colspan="' + subAt + '" class="ccq-fl">' + labelHtml + '</td>'
+        + '<td class="ccq-fm"' + (moneyId ? ' id="' + moneyId + '"' : '') + '>' + (moneyHtml || '') + '</td>'
+        + rep(nCols - subAt - 1) + '</tr>';
     };
-    var tf = '<tr class="ccq-subrow"><td colspan="8" class="ccq-fl">' + T('totalPriceSub') + '</td>'
-      + '<td></td><td class="ccq-fc">' + ccNum(fs.qty) + '</td><td></td><td class="ccq-fc">' + ccNum2(fs.area) + '</td>'
-      + rep(rebarN + 3)
-      + '<td class="ccq-fm" id="ccq_base_amt">' + ccGridMoney(fs.base) + '</td><td></td></tr>';
+    var tf = '', _valAt = [];
+    ['qu', 'su', 'sub'].forEach(function(k){ if(pIdx.hasOwnProperty(k)) _valAt.push(pIdx[k]); });
+    var _firstVal = _valAt.length ? Math.min.apply(null, _valAt) : (nCols - 1);
+    tf += '<tr class="ccq-subrow"><td colspan="' + _firstVal + '" class="ccq-fl">' + T('totalPriceSub') + '</td>';
+    for(var _fi = _firstVal; _fi < nCols; _fi++){
+      var _fk = pcols[_fi].k;
+      if(_fk === 'qu') tf += '<td class="ccq-fc">' + ccNum(fs.qty) + '</td>';
+      else if(_fk === 'su') tf += '<td class="ccq-fc">' + ccNum2(fs.area) + '</td>';
+      else if(_fk === 'sub') tf += '<td class="ccq-fm" id="ccq_base_amt">' + ccGridMoney(fs.base) + '</td>';
+      else tf += '<td></td>';
+    }
+    tf += '</tr>';
     if(fs.showT) tf += footRow('ccq-feerow' + (fs.feeT ? '' : ' ccq-zero'), ccT('feeTransport'), ccGridMoney(fs.feeT), 'ccq_tpt_amt');
     if(fs.showI) tf += footRow('ccq-feerow' + (fs.feeI ? '' : ' ccq-zero'), ccT('feeInstall'), ccGridMoney(fs.feeI), 'ccq_ins_amt');
     tf += footRow('ccq-vatrow', ccT('vat') + ' · ' + ccT('vatRateLbl') + ' <b id="ccq_vat_rate">' + Number(fs.rate).toFixed(2) + '</b> %', ccGridMoney(fs.vat), 'ccq_vat_amt');
