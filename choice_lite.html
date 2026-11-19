@@ -4208,6 +4208,16 @@ window.__finShakeReport = function (ms) {
 
 <body>
 
+<script>
+/* ★LIB-TAB-RACE-20261118（用户 2026-11-18 报错截图：Uncaught ReferenceError: lib_switchTab is not defined）：
+   资料库的三个页签在文档前部（约 L30225）就已经渲染出来、可点击了，但真正的 window.lib_switchTab
+   直到文档末尾（约 L73520 的资料库脚本块）才定义。整个页面 4.5MB，解析/执行期间用户点页签必然 ReferenceError。
+   这里先放一个「排队占位」：早期点击只记录页码，绝不报错；真正的函数定义好后立即补跑一次（见该脚本块尾部）。 */
+window.lib_switchTab = window.lib_switchTab || function (k) {
+  (window.__libPendingTabQ = window.__libPendingTabQ || []).push(k);
+};
+</script>
+
 <!-- ==================== 登录界面 ==================== -->
 <div id="loginPage">
   <div class="login-card">
@@ -66647,12 +66657,19 @@ function submitAuth() {
       /* 必填未填时的红框提示 */
       '.ccq-req-err{border-color:#e53935 !important;background:#ffecec !important;}',
       /* ★CCQ-RECLIST-20261115（用户 2026-11-15）：报价结构最下方的「报价记录列表/回填」 */
-      '.ccq-log-wrap{margin:16px 0 6px;border:1px solid #c9d2dc;background:#fff;}',
+      /* ★CCQ-LOGFIT-20261118：窗口很窄时表格不再硬挤（挤到按钮被裁），改为容器内横向滚动 */
+      '.ccq-log-wrap{margin:16px 0 6px;border:1px solid #c9d2dc;background:#fff;overflow-x:auto;}',
+      '.ccq-log-tb{min-width:840px;}',
       '.ccq-log-head{padding:6px 10px;background:#fdecea;border-bottom:1px solid #c9d2dc;font-weight:800;font-size:12px;color:#c62828;}',
       '.ccq-log-n{color:#666;font-weight:600;margin-left:6px;}',
       '.ccq-log-empty{padding:14px 10px;color:#999;font-size:12px;}',
       '.ccq-log-tb{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;}',
       '.ccq-log-tb th,.ccq-log-tb td{border:1px solid #dbe3ea;padding:4px 6px;vertical-align:middle;word-break:break-word;}',
+      /* ★CCQ-LOGFIT-20261118（用户 2026-11-18：「内容列有文字重叠」）：
+         长客户名/长内容会把文字溢出到相邻单元格，两段文字叠在一起看不清。
+         这里强制：允许换行 + 超长无空格串也断行 + 溢出裁剪 + 固定行高（防行与行叠字）。
+         被截断时鼠标悬停看全文（渲染时已给客户名称/内容两列写入 title）。 */
+      '.ccq-log-tb td{white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.45;overflow:hidden;}',
       '.ccq-log-tb th{background:#f5f7fa;color:#333;font-weight:700;}',
       '.ccq-log-tb td.ccq-log-c,.ccq-log-tb td.ccq-log-d{text-align:center;white-space:nowrap;}',
       '.ccq-log-tb td.ccq-log-ops{text-align:center;white-space:nowrap;}',
@@ -68596,9 +68613,10 @@ function submitAuth() {
       ccqR1:  three('本报价按现场生产单价计算，价格已按上表所列税率包含增值税（VAT）。',
                     'This quotation covers on-site production only; VAT is included at the rate shown in the table above.',
                     'Báo giá này được tính bằng đơn giá sản xuất tại chỗ. Giá đã bao gồm thuế VAT theo thuế suất ghi trong bảng trên.'),
-      ccqR2:  three('生产将在指定的施工现场进行，DABACO 负责提供以下基础设施和公用设施：',
-                    'Production shall take place at the designated job site. DABACO shall be responsible for providing the following infrastructure and utilities:',
-                    'Việc sản xuất sẽ diễn ra tại địa điểm làm việc được chỉ định. DABACO chịu trách nhiệm cung cấp các cơ sở hạ tầng và tiện ích sau:'),
+      /* ★CCQ-OWNER-20261118（用户 2026-11-18：「把 DABACO 改成业主」）：备注第 2 条不再写死客户名 */
+      ccqR2:  three('生产将在指定的施工现场进行，业主负责提供以下基础设施和公用设施：',
+                    'Production shall take place at the designated job site. The Owner shall be responsible for providing the following infrastructure and utilities:',
+                    'Việc sản xuất sẽ diễn ra tại địa điểm làm việc được chỉ định. Chủ đầu tư chịu trách nhiệm cung cấp các cơ sở hạ tầng và tiện ích sau:'),
       ccqR2a: three('- 平整场地，面积不小于 5000 平方米。',
                     '- A level land area of no less than 5,000 m².',
                     '- Mặt bằng không nhỏ hơn 5000m².'),
@@ -68697,7 +68715,35 @@ function submitAuth() {
       'Choice 公司将负责把生产设备运至施工现场；水费由业主提供，电费由 Choice 公司承担。',
       'Choice will be responsible for transporting the slat production equipment to the job site; the water charge is provided by the owner, while the electricity charge is borne by Choice.',
       'Công ty Choice sẽ chịu trách nhiệm vận chuyển thiết bị sản xuất đến công trường; tiền nước do chủ đầu tư cung cấp, tiền điện do Công ty Choice chi trả.');
-  }
+      }
+      /* ★CCQ-PROVNOTE-20261118（用户 2026-11-18）：「直接成本 · #2 生产骨料」里把某材料标成 ×（业主提供）
+      之后，备注里必须写清楚哪些材料由 Choice 提供、哪些由业主提供。
+      · 依据就是每行最右「Choice VN 提供吗?」的状态（ccProv('agg.键')，0 = 由业主提供）；
+      · 某材料行被删掉（CC_DATA.agg 里没有该键）→ 两边都不出现；
+      · 全部 √（都由 Choice 提供）→ 返回空，不改变原有 3 条备注的输出。 */
+      function ccQuoteProvNote(){
+      var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh';
+      var T3 = function(zh, en, vi){ return L === 'en' ? en : (L === 'vi' ? vi : zh); };
+      var SEP = (L === 'en' || L === 'vi') ? ', ' : '、';
+      var KEYS = ['sand', 'cement', 'stone', 'r6', 'r8', 'r10', 'r12'];
+      var mine = [], theirs = [];
+      KEYS.forEach(function(k){
+      var it = (typeof CC_DATA !== 'undefined' && CC_DATA && CC_DATA.agg) ? CC_DATA.agg[k] : null;
+      if(!it) return;                                  // 该材料行已被删除
+      var nm = ccT(k);
+      if(ccProv('agg.' + k)) mine.push(nm); else theirs.push(nm);
+      });
+      if(!theirs.length && !mine.length) return '';
+      if(!theirs.length) return '';                      // 全部由 Choice 提供 → 不加这一条
+      var out = '';
+      if(mine.length){
+      out += T3('其中由 Choice 提供的材料：', 'Materials provided by Choice: ', 'Vật liệu do Choice cung cấp: ')
+      + mine.join(SEP) + T3('。 ', '. ', '. ');
+      }
+      out += T3('由业主提供的材料：', 'Materials provided by the owner: ', 'Vật liệu do chủ đầu tư cung cấp: ')
+      + theirs.join(SEP) + T3('。', '.', '.');
+      return out;
+      }
   /* ★CCQ-PHOTO-20261115（用户 2026-11-15）：「公司介绍」下方 4 张照片 = 用户提供的照片，直接内嵌锁死。
      mat=材料堆场 / line=生产线 / store1、store2=成品堆放区；改照片只能改这里的 base64，页面上没有上传口。 */
   var CCQ_PHOTOS = {
@@ -68790,7 +68836,38 @@ function submitAuth() {
     /* ★CCQ-MONEYFIT-20261115（用户 2026-11-15：「打印报价，价格小计列，也需要自动调整宽度，
        使得数据都在单元格里面」）：单价/小计列加宽，其余列相应收窄；再配合 ccQuoteFitMoney()
        在渲染/打印前按实际内容把超标单元格的字号自动缩小。 */
-    /* 列宽按录入表同一套权重（ccGridCols 的 w）归一化成百分比 → 两边比例一致、整表恒等于容器宽 */
+    /* ★CCQ-SUBFIT-20261118（用户 2026-11-18：「小计列需要自动调整宽度，使得数据在列宽范围内」）：
+       列宽改成跟随录入表权重后，小计列只剩 ~6%，₫11,981,304,300 这种十几位数字直接冲出格子。
+       这里沿用录入表同一套算法（CC-SUBWIDTH-20261114）：
+         ① 按本报价里最长的金额串估算所需像素（ccGridMoneyPx，9px 粗体数字约 5.9px/字符 + 内边距）；
+         ② 反算成列权重（其它列等比让位）→ 整表仍严格等于容器宽，不产生横向滚动条；
+         ③ 单价列按小计列的 0.8 倍一起撑开。
+       渲染后 ccQuoteFitMoney() 仍会把个别超标的单元格字号再缩一档，双保险。 */
+    (function(){
+      var subC = null, priceC = null;
+      pcols.forEach(function(c){ if(c.k === 'sub') subC = c; else if(c.k === 'price') priceC = c; });
+      if(!subC && !priceC) return;
+      var need = 130;
+      try { if(typeof ccGridMoneyPx === 'function') need = Math.max(need, ccGridMoneyPx()); } catch(e){}
+      var tw = 0;
+      pcols.forEach(function(c){ tw += (c.w || 40); });
+      var target = 0;
+      try { var _pp = document.getElementById('ccq_paper'); if(_pp) target = _pp.clientWidth || 0; } catch(e){}
+      if(!target) target = Math.max(760, Math.min(1500, (window.innerWidth || 1200) - 60));
+      var fit = function(c, needPx){
+        var curPx = (c.w || 40) / (tw || 1) * target;
+        if(curPx >= needPx || needPx >= target * 0.6) return;
+        var others = (tw || 1) - (c.w || 40);
+        var next = Math.ceil(needPx * others / Math.max(1, target - needPx));
+        if(next > (c.w || 40)){
+          tw += next - (c.w || 40);
+          c.w = next;
+        }
+      };
+      if(subC) fit(subC, need);
+      if(priceC) fit(priceC, Math.max(90, Math.round(need * 0.8)));
+    })();
+    /* 列宽按录入表同一套权重（ccGridCols 的 w，已按金额串撑开）归一化成百分比 → 整表恒等于容器宽 */
     var _tW = pcols.reduce(function(s, c){ return s + (c.w || 40); }, 0) || 1;
     var hd = '<colgroup>' + pcols.map(function(c){
       return '<col class="ccq-col ccq-col-' + c.k + '" style="width:' + ((c.w || 40) / _tW * 100).toFixed(3) + '%">';
@@ -68938,7 +69015,10 @@ function submitAuth() {
     h += '<div class="ccq-remark"><div class="ccq-h4">' + T('ccqRemarks') + '</div>'
       + '<p>1. ' + T('ccqR1') + '</p>'
       + '<p>2. ' + T('ccqR2') + '</p><ul class="ccq-ul"><li>' + T('ccqR2a') + '</li><li>' + T('ccqR2b') + '</li></ul>'
-      + '<p>3. ' + ccQuoteR3() + '</p></div>'; /* ★CCQ-UTILNOTE-20261115：跟随 3.4 水电勾选状态 */
+      + '<p>3. ' + ccQuoteR3() + '</p>'
+      /* ★CCQ-PROVNOTE-20261118：骨料里标了 ×（业主提供）时，单独列出双向清单 */
+      + (function(){ var pn = ccQuoteProvNote(); return pn ? ('<p>4. ' + pn + '</p>') : ''; })()
+      + '</div>'; /* ★CCQ-UTILNOTE-20261115：跟随 3.4 水电勾选状态 */
 
     /* ---- ④ 公司介绍 Introduction + 质量标准 ---- */
     h += '<div class="ccq-h4">' + T('ccqIntro') + '</div><p class="ccq-p">' + T('ccqI1') + '</p>';
@@ -69834,8 +69914,12 @@ function submitAuth() {
       + th('at', T('recAt')) + '<th>' + T('recOps') + '</th></tr></thead><tbody>';
     rows.forEach(function(o){
       var r = o.r;
-      h += '<tr><td>' + ccEsc2(ccqTriDisp(r.customer) || '—') + '</td>'
-        + '<td>' + ccEsc2(ccqTriDisp(r.content) || '—') + '</td>'
+      /* ★CCQ-LOGFIT-20261118：客户名称/内容可能很长，单元格里换行显示，溢出裁掉；
+         同时把全文写进 title，鼠标悬停即可看到完整文字（不再与相邻列文字重叠）。 */
+      var _cuTxt = ccEsc2(ccqTriDisp(r.customer) || '—');
+      var _ctTxt = ccEsc2(ccqTriDisp(r.content) || '—');
+      h += '<tr><td title="' + _cuTxt + '">' + _cuTxt + '</td>'
+        + '<td title="' + _ctTxt + '">' + _ctTxt + '</td>'
         + '<td class="ccq-log-d">' + ccEsc2(ccQuoteDmy(r.date) || '—') + '</td>'
         + '<td class="ccq-log-c">' + ccEsc2('V' + ccRecVer(r)) + '</td>'
         + '<td class="ccq-log-c" style="white-space:nowrap;">' + ccEsc2(ccQuoteAtTxt(r.at)) + '</td>'
@@ -72738,6 +72822,20 @@ function submitAuth() {
     var a = document.getElementById('ccqPreviewOverlay'); if(a) a.classList.remove('show');
     var b = document.getElementById('ccqImgOverlay');     if(b) b.classList.remove('show');
   };
+  /* ★CCQ-PV-LANG-20261118（用户 2026-11-18：「这个模态框打开后，不能随系统语言自动切换」）：
+     预览弹窗的内容是打开那一瞬间从 #ccq_paper cloneNode 的静态快照，切语言后不会自己变。
+     切语言时成本页会整块重绘纸面（lib_refresh(true)），这里等它重绘完再重新克隆一次；
+     60ms / 420ms 各补一次，覆盖 rAF 与延时重绘；弹窗已关就什么都不做。 */
+  window.addEventListener('app:langchange', function(){
+    var redo = function(){
+      var ov = document.getElementById('ccqPreviewOverlay');
+      if(!ov || !ov.classList.contains('show')) return;
+      try { window.ccQuotePreviewLabels(); } catch(e){}
+      try { window.ccQuotePreview(); } catch(e){}
+    };
+    setTimeout(redo, 60);
+    setTimeout(redo, 420);
+  });
   /* ★CCQ-PRINTFIX-20261115（用户 2026-11-15：「打印报价单预览时右侧滚动条滑不动、只能看到一页」）：
      不再直接打印预览弹窗本体（弹窗是 92vh 的 flex + overflow 容器，进打印快照后内容被裁成一页）。
      改为把预览内容整块搬进一个【纯 block 的临时打印根节点 #ccqPrintRoot】（直接挂 body），
@@ -73499,6 +73597,14 @@ function submitAuth() {
       lib_loadFiles();
     }
   };
+
+  /* ★LIB-TAB-RACE-20261118：文档开头（<body> 后）放的排队占位 —— 页面加载期间用户点的页签
+     会暂存在 window.__libPendingTabQ，这里定义完成后补跑最后一次点击。 */
+  if (window.__libPendingTabQ && window.__libPendingTabQ.length) {
+    var __libPT = window.__libPendingTabQ[window.__libPendingTabQ.length - 1];
+    window.__libPendingTabQ = [];
+    try { window.lib_switchTab(__libPT); } catch (e) {}
+  }
 
   window.lib_loadProjects = function(){
     libApi('/api/library/projects').then(function(data){
