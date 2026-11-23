@@ -41712,11 +41712,7 @@ function wonDetailLinkCell(p, field, labelKey) {
     perm_p_inst_B:         { zh: 'B 安装计划详细安排', en: 'B Installation schedule', vi: 'B Lịch lắp đặt chi tiết' },
     perm_p_inst_C:         { zh: 'C 人工-天气-安装量', en: 'C Labor / weather / volume', vi: 'C Nhân công / thời tiết / khối lượng' },
     perm_p_lib:            { zh: '独立项目资料', en: 'Project documents', vi: 'Tài liệu dự án' },
-    // ★LIB-SALES-CONTRACT-20261019：4.2 改名「合同文档」，并新增资料库里的「销售合同」文件夹文案
     perm_p_contract:       { zh: '合同文档', en: 'Contract documents', vi: 'Tài liệu hợp đồng' },
-    /* ★PERM-SALES-CONTRACT-20261123：4.3 显示销售合同文件夹（三语，三态下拉，完全接管「销售合同」文件夹） */
-    perm_p_sales_contract: { zh: '显示销售合同文件夹', en: 'Show Sales Contract folder', vi: 'Hiện thư mục Hợp đồng bán hàng' },
-    lib_sales_contract:    { zh: '销售合同', en: 'Sales Contract', vi: 'Hợp đồng bán hàng' },
     perm_p_whole:          { zh: '整个项目', en: 'Whole project', vi: 'Toàn dự án' },
     // 用户与授权（USR-*，沿用旧决策值 hide/company/allow）
     perm_g_usr:            { zh: '用户与授权', en: 'Users & Authorization', vi: 'Người dùng & phân quyền' },
@@ -43586,7 +43582,7 @@ var SYS_COMMON_DEF = { dashboard:'view', won_list:'view', won_btn_add:'hide', wo
   // ★PERM-V2-APP-PROJ-20261019：approval 已迁到按项目授权（默认 hide）
 var SYS_PROJ_DEF = { wl_daily:'view', wl_mywork:'view', prod_A:'view', prod_B:'view', prod_C:'view', prod_D:'view',
   prod_D_receipt:'hide', prod_E:'view', prod_H:'view', prod_F:'view', inst_A:'view', inst_B:'view', inst_C:'view',
-  lib:'view', contract:'hide', sales_contract:'hide', approval:'hide' };
+  lib:'view', contract:'hide', approval:'hide' };
 function _myPermsObj(){
   try{
     var p = (authUser && authUser.perms) ? authUser.perms : {};
@@ -47398,7 +47394,7 @@ window.__PERM_TPL_PROJ = {
   prod_D_receipt:{decision:'approve', approvers:['thuong']},
   prod_E:'edit', prod_H:'edit', prod_F:'edit',
   inst_A:'edit', inst_B:'edit', inst_C:'edit',
-  lib:'view', contract:'view', sales_contract:'hide', approval:'edit'
+  lib:'view', contract:'view', approval:'edit'
 };
 function permTplClone(){
   return JSON.parse(JSON.stringify(window.__PERM_TPL_PROJ || {}));
@@ -47895,9 +47891,7 @@ var PROJ_PERM_DEFS = [
   ]},
   { mod:'perm_g_library', rows:[
       {k:'lib',      n:'独立项目资料', o:['hide','view','edit'], d:'view'},
-      {k:'contract', n:'合同文档', o:['hide','view','edit'], d:'hide'},
-      /* ★PERM-SALES-CONTRACT-20261123：新项完全接管「销售合同」文件夹（隐藏=不显示 / 查看=只看下载 / 编辑=可上传删除） */
-      {k:'sales_contract', n:'显示销售合同文件夹', o:['hide','view','edit'], d:'hide'}
+      {k:'contract', n:'合同文档', o:['hide','view','edit'], d:'hide'}
   ]},
   { mod:'perm_g_approval', rows:[
       {k:'approval', n:'审批中心（编辑 = 可处理本项目相关审批）', o:['hide','view','edit'], d:'hide'}
@@ -65489,10 +65483,8 @@ function submitAuth() {
     return fetch(path, opts).then(function(r){ return r.json().catch(function(){ return {ok:false, error:'network'} }); });
   }
   // 编辑权限：tom / cuong / james 恒可；其余按「按项目授权」：
-  //   普通项目资料 = lib 项，合同文档 / 销售合同文件夹 = contract 项（edit 才能上传、删除）。
-  //   ★LIB-SALES-CONTRACT-20261019
+  //   普通项目资料 = lib 项，合同文档 = contract 项（edit 才能上传、删除）。
   var LIB_EDIT_USERS = ['tom', 'admin', 'cuong', 'james'];
-  var LIB_SALES_DIR = '销售合同';           // 固定内部路径（界面按语言显示）
   /* ★PERM-CONTRACT-FOLDER-20261123：合同文档 = 虚拟文件夹，由 4.2 contract 项按项目独立控制；
      空占位行(filename='')不再作为散落卡片显示，真实合同文件归入本文件夹。 */
   var LIB_CONTRACT_DIR = '合同文档';        // 固定内部路径（界面按语言显示标签，内部路径恒定）
@@ -65500,10 +65492,6 @@ function submitAuth() {
   var LIB_COST_DIR = '成本核算';            // 固定内部路径（界面按语言显示标签，内部路径恒定）
   function _libMe(){ return (typeof authUser !== 'undefined' && authUser && authUser.username ? String(authUser.username) : '').toLowerCase(); }
   function _libTriAdmin(){ return LIB_EDIT_USERS.indexOf(_libMe()) >= 0; }
-  function lib_inSalesDir(p){
-    var n = lib_normPath(p === undefined ? LIB_CWD : p);
-    return n === LIB_SALES_DIR || n.indexOf(LIB_SALES_DIR + '/') === 0;
-  }
   function lib_inCostDir(p){
     var n = lib_normPath(p === undefined ? LIB_CWD : p);
     return n === LIB_COST_DIR || n.indexOf(LIB_COST_DIR + '/') === 0;
@@ -65530,10 +65518,8 @@ function submitAuth() {
   function lib_scopeKey(){
     if (LIB_TAB === 'cost') return 'lib_cost';
     if (LIB_TAB !== 'project' || !LIB_PROJECT_ID) return null;
-    /* ★PERM-CONTRACT-FOLDER-20261123：合同文档文件夹由 4.2 contract 项控制（按项目独立）
-       ★PERM-SALES-CONTRACT-20261123：销售合同文件夹由 sales_contract 项全权控制 */
-    if (lib_inContractDir()) return 'contract';
-    return lib_inSalesDir() ? 'sales_contract' : 'lib';
+    /* ★PERM-CONTRACT-FOLDER-20261123：合同文档文件夹由 4.2 contract 项控制（按项目独立） */
+    return lib_inContractDir() ? 'contract' : 'lib';
   }
   function lib_scopeLvForKey(k){
     if (k === 'lib_cost') return lib_costLv();
@@ -65546,13 +65532,12 @@ function submitAuth() {
     if (!k) return _libTriAdmin() ? 'edit' : 'hide';
     return lib_scopeLvForKey(k);
   }
-  // 单个文件级别：合同占位 → contract；销售合同目录 → sales_contract；成本核算目录 → lib_cost；其它 → lib
-  // ★PERM-SALES-CONTRACT-20261123：销售合同文件夹完全脱离 contract，改走 sales_contract
+  // 单个文件级别：合同占位/合同文档 → contract；成本核算目录 → lib_cost；其它 → lib
   function lib_fileKey(f){
     if (!f) return 'lib';
     if (lib_isContractFile(f)) return 'contract';
     if (lib_inCostDir(lib_relPath(f))) return 'lib_cost';
-    return lib_inSalesDir(lib_relPath(f)) ? 'sales_contract' : 'lib';
+    return 'lib';
   }
   function lib_fileCanEdit(f){
     if (_libTriAdmin()) return true;
@@ -65618,7 +65603,7 @@ function submitAuth() {
   }
 
   // ★LIB-PERM-CARD-20261019：资料库项目卡片必须按权限过滤 ——
-  //   ① 「整个项目=隐藏」→ 卡片不出现；② lib / contract / sales_contract 三项都为 hide（未授权默认即 hide）
+  //   ① 「整个项目=隐藏」→ 卡片不出现；② lib / contract 两项都为 hide（未授权默认即 hide）
   //   → 进项目后文件夹列表本来就为空，卡片也不应出现。任一模块可看（view/edit）才展示。
   function lib_canSeeProject(pid){
     try{
@@ -65626,7 +65611,7 @@ function submitAuth() {
     }catch(e){}
     try{
       if (typeof permLvProj === 'function'){
-        return permLvProj(pid, 'lib') !== 'hide' || permLvProj(pid, 'contract') !== 'hide' || permLvProj(pid, 'sales_contract') !== 'hide';
+        return permLvProj(pid, 'lib') !== 'hide' || permLvProj(pid, 'contract') !== 'hide';
       }
     }catch(e){}
     return true;
@@ -65815,21 +65800,6 @@ function submitAuth() {
         files.push(f);
       }
     });
-    // ★PERM-SALES-CONTRACT-20261123：项目根目录固定显示「销售合同」文件夹（三语显示名，内部路径固定），
-    //   即使还没有上传任何文件也显示；★由 sales_contract 项控制显示（不再走 contract）。
-    try{
-      if (LIB_TAB === 'project' && LIB_PROJECT_ID && depth === 0){
-        var _ck = (typeof permLvProj === 'function') ? permLvProj(LIB_PROJECT_ID, 'sales_contract') : (_libTriAdmin() ? 'edit' : 'hide');
-        if (_libTriAdmin() || _ck !== 'hide'){
-          if (!map[LIB_SALES_DIR]){
-            map[LIB_SALES_DIR] = { type:'folder', name: LIB_SALES_DIR,
-                                   label: (typeof _permTr === 'function' ? _permTr('lib_sales_contract', '销售合同') : '销售合同'),
-                                   path: LIB_SALES_DIR, count:0, size:0, modified:'', uploader:'', virtual:true };
-            order.push(LIB_SALES_DIR);
-          }
-        }
-      }
-    }catch(e){}
     /* ★PERM-CONTRACT-FOLDER-20261123：4.2 合同文档=查看/编辑 才显示「合同文档」文件夹（按当前项目独立判定）
        占位行(filename='')永不显示；真实合同文件已在上归入本文件夹。 */
     try{
@@ -73323,8 +73293,8 @@ function submitAuth() {
     var menu = document.createElement('div');
     menu.className = 'lib-ctx'; menu.id = 'lib-ctx';
     var items = '<div class="cx-item" onclick="lib_closeCtx();lib_openDir(\'' + lib_jsarg(path) + '\')">📂 ' + lt('lib_open_folder') + '</div>';
-    // ★LIB-SALES-CONTRACT-20261019：「销售合同」文件夹按 contract 权限判定能否删除
-    var _dirEditable = _libTriAdmin() || (lib_inSalesDir(path) ? lib_scopeLvForKey('sales_contract') === 'edit' : lib_canEdit());
+    // ★PERM-CONTRACT-FOLDER-20261123：「合同文档」文件夹按 contract 权限判定能否删除
+    var _dirEditable = _libTriAdmin() || (lib_inContractDir(path) ? lib_scopeLvForKey('contract') === 'edit' : lib_canEdit());
     if(_dirEditable){
       if(LIB_SEL.length > 1){
         items += '<div class="cx-sep"></div>' +

@@ -161,8 +161,6 @@ PERM_TPL_PROJ = {
     "prod_E": "edit", "prod_H": "edit", "prod_F": "edit",
     "inst_A": "edit", "inst_B": "edit", "inst_C": "edit",
     "lib": "view", "contract": "view",
-    # ★PERM-SALES-CONTRACT-20261123：新项默认 hide，由一次性迁移按角色预置（可管理员手改）
-    "sales_contract": "hide",
     "approval": "edit",
 }
 
@@ -204,14 +202,9 @@ NEW_USER_DEFAULT_PERMS = {
 
 
 def _new_user_default_perms(conn, position=""):
-    """新用户标准权限：common 沿用固化快照；projects / proj_default 一律用唯一模板。
-    ★PERM-SALES-CONTRACT-20261123：新权限按职位预置（可后改）。"""
+    """新用户标准权限：common 沿用固化快照；projects / proj_default 一律用唯一模板。"""
     perms = json.loads(json.dumps(NEW_USER_DEFAULT_PERMS))
     perms["projects"] = _perm_tpl_projects(conn)
-    lv = _sales_contract_default("", position)
-    if isinstance(perms.get("proj_default"), dict):
-        perms["proj_default"]["sales_contract"] = lv
-    # ★PERM-SALES-CONTRACT-GRANT-20261123：项目级不写默认值（避免 shadow 授权），仅在 proj_default
     return perms
 
 
@@ -230,16 +223,11 @@ def _is_blank_perms(p):
 def _perm_tpl_ensure_user(perms, conn, position=""):
     """新用户落库前兜底：projects 全量覆盖为「所有项目各一份模板」；
     common / 旧区块 / lib_file_overrides 原样沿用（q6：只换 projects）。
-    前端授权面板可能未加载完（projects 空）或仍是旧缓存（只 17/19），此处统一收口。
-    ★PERM-SALES-CONTRACT-20261123：新权限按职位预置（可后改）。"""
+    前端授权面板可能未加载完（projects 空）或仍是旧缓存（只 17/19），此处统一收口。"""
     if not isinstance(perms, dict) or _is_blank_perms(perms):
         return _new_user_default_perms(conn, position)
     perms["projects"] = _perm_tpl_projects(conn)
     perms["proj_default"] = _perm_tpl_clone()
-    lv = _sales_contract_default("", position)
-    if isinstance(perms.get("proj_default"), dict):
-        perms["proj_default"]["sales_contract"] = lv
-    # ★PERM-SALES-CONTRACT-GRANT-20261123：项目级不写默认值（避免 shadow 授权），仅在 proj_default
     return perms
 
 
@@ -296,111 +284,6 @@ def _migrate_perm_tpl_all(c):
     except Exception as _e:
         # 绝不因迁移失败阻断服务启动；标记未写入 → 下次启动自动重试
         print("[PERM-TPL] 一次性回填失败（不阻断启动）: %s" % _e)
-
-
-# ★PERM-SALES-CONTRACT-20261123：新权限「显示销售合同文件夹」一次性角色预置（可管理员后改）
-SALES_CONTRACT_MIGRATION_KEY = "sys_sales_contract_perm_20261123_v1"
-# ★PERM-SALES-CONTRACT-GRANT-20261123：v1 把角色预置同时写进了每个项目的 override，
-#   会在项目级形成「隐藏」硬影子（管理员若改全局模板，仍被项目级 hide 盖住）。
-#   v2 把「与角色默认值相同」的项目级 sales_contract 清掉 → 默认值只留 proj_default，
-#   项目级一旦被管理员单独授权(view/edit)就是干净覆盖、必然生效；已手改成不同值的一律保留。
-SALES_CONTRACT_GRANT_KEY = "sys_sales_contract_grant_20261123_v2"
-# admin / james / cuong / tom = 编辑；生产总监 / 观察者 / 总经理 / 副总经理 / 财务经理 = 查看；其余隐藏
-_SALES_EDIT_USERS = ("admin", "james", "cuong", "tom")
-_SALES_VIEW_POSITIONS = ("生产总监", "观察者", "总经理", "副总经理", "财务经理")
-
-
-def _sales_contract_default(username, position):
-    """按用户名 / 职位给出 sales_contract 的预置级别（管理员可在权限面板手改）。"""
-    u = (username or "").strip().lower()
-    if u in _SALES_EDIT_USERS:
-        return "edit"
-    pos = (position or "").strip()
-    if pos in _SALES_VIEW_POSITIONS:
-        return "view"
-    return "hide"
-
-
-def _migrate_sales_contract_perm(c):
-    """一次性：给所有用户的 proj_default 写入 sales_contract 角色预置值。
-    ★PERM-SALES-CONTRACT-GRANT-20261123：默认值【只放 proj_default】，不再逐项目写 override，
-    这样管理员在任何项目里单独授权(view/edit)就是干净覆盖、绝不会被项目级 hide 影子盖住。"""
-    import json as _json
-    try:
-        if c.execute("SELECT 1 FROM prod_kv WHERE k=?", (SALES_CONTRACT_MIGRATION_KEY,)).fetchone():
-            return
-        n = 0
-        for r in c.execute("SELECT id, username, position, perms FROM users").fetchall():
-            try:
-                raw = _json.loads(r["perms"]) if r["perms"] else {}
-            except Exception:
-                raw = {}
-            if not isinstance(raw, dict):
-                raw = {}
-            lv = _sales_contract_default(r["username"], r["position"])
-            tpl = raw.get("proj_default") if isinstance(raw.get("proj_default"), dict) else {}
-            tpl["sales_contract"] = lv
-            raw["proj_default"] = tpl
-            c.execute("UPDATE users SET perms=? WHERE id=?",
-                      (_json.dumps(raw, ensure_ascii=False), r["id"]))
-            try:
-                bump_perm_version((r["username"] or "").strip().lower())
-            except Exception:
-                pass
-            n += 1
-        c.execute("INSERT OR REPLACE INTO prod_kv (k, data, updated_by, updated_at) "
-                  "VALUES (?, ?, 'system', datetime('now','localtime'))",
-                  (SALES_CONTRACT_MIGRATION_KEY, _json.dumps({"users": n})))
-        print("[PERM-SALES-CONTRACT] 一次性角色预置完成（仅 proj_default）：%d 个用户" % n)
-    except Exception as _e:
-        print("[PERM-SALES-CONTRACT] 预置失败（不阻断启动）: %s" % _e)
-
-
-def _migrate_sales_contract_grant(c):
-    """★PERM-SALES-CONTRACT-GRANT-20261123 一次性修复：
-    清掉 v1 写到【每个项目 override】里的 sales_contract 影子值（仅当它 == 角色默认值，
-    即那不是管理员手改的授权）。清理后：
-      · 默认级别来自 proj_default（角色预置）；
-      · 管理员一旦在某项目单独设为 view/edit，就是唯一显式覆盖，必然生效；
-      · 已手改成与默认值不同的项目一律保留。"""
-    import json as _json
-    try:
-        if c.execute("SELECT 1 FROM prod_kv WHERE k=?", (SALES_CONTRACT_GRANT_KEY,)).fetchone():
-            return
-        n_user = n_ov = 0
-        for r in c.execute("SELECT id, username, position, perms FROM users").fetchall():
-            try:
-                raw = _json.loads(r["perms"]) if r["perms"] else {}
-            except Exception:
-                raw = {}
-            if not isinstance(raw, dict):
-                raw = {}
-            lv = _sales_contract_default(r["username"], r["position"])
-            changed = False
-            tpl = raw.get("proj_default") if isinstance(raw.get("proj_default"), dict) else {}
-            tpl["sales_contract"] = lv   # 确保默认仍在
-            raw["proj_default"] = tpl
-            prjs = raw.get("projects") if isinstance(raw.get("projects"), dict) else {}
-            for ov in prjs.values():
-                if isinstance(ov, dict) and ov.get("sales_contract") == lv:
-                    del ov["sales_contract"]
-                    n_ov += 1
-                    changed = True
-            if changed or "projects" not in raw:
-                raw["projects"] = prjs
-                c.execute("UPDATE users SET perms=? WHERE id=?",
-                          (_json.dumps(raw, ensure_ascii=False), r["id"]))
-                try:
-                    bump_perm_version((r["username"] or "").strip().lower())
-                except Exception:
-                    pass
-            n_user += 1
-        c.execute("INSERT OR REPLACE INTO prod_kv (k, data, updated_by, updated_at) "
-                  "VALUES (?, ?, 'system', datetime('now','localtime'))",
-                  (SALES_CONTRACT_GRANT_KEY, _json.dumps({"users": n_user, "overrides_cleared": n_ov})))
-        print("[PERM-SALES-CONTRACT] 授权影子清理完成：%d 个用户 / %d 个项目级默认值" % (n_user, n_ov))
-    except Exception as _e:
-        print("[PERM-SALES-CONTRACT] 授权影子清理失败（不阻断启动）: %s" % _e)
 
 
 def _is_full_access(username):
@@ -694,8 +577,6 @@ def row_to_dict(row):
 CONTRACT_NAME = "合同-Contract-Hợp đồng"
 # ★PERM-CONTRACT-FOLDER-20261123：「合同文档」虚拟文件夹（4.2 contract 项按项目独立控制）
 CONTRACT_DIR = "合同文档"
-# ★LIB-SALES-CONTRACT-20261019：「销售合同」自由上传文件夹（固定内部路径，界面按语言显示名称）
-SALES_CONTRACT_DIR = "销售合同"
 # ★LIB-COST-20261104：资料库「成本核算」子标签 = 公用资料存储下的固定根目录；
 #   写操作（上传/删除/重命名）按公共模块权限 lib_cost（hide/view/edit）判定，三人组恒可。
 COST_DIR = "成本核算"
@@ -1406,11 +1287,6 @@ def init_db():
     # ★PERM-TPL-ALL-20261110：一次性把全部普通用户的所有项目授权覆盖为 thuong「001」模板
     #   （prod_kv 标记，只跑一次；init_db 末尾的 conn.commit() 负责落盘）
     _migrate_perm_tpl_all(c)
-
-    # ★PERM-SALES-CONTRACT-20261123：新权限「显示销售合同文件夹」按角色一次性预置（prod_kv 标记，只跑一次）
-    _migrate_sales_contract_perm(c)
-    # ★PERM-SALES-CONTRACT-GRANT-20261123：清掉项目级 hide 影子，保证被授权后一定能看到
-    _migrate_sales_contract_grant(c)
 
     # ===================== 资料库文件索引表 =====================
     c.execute("""
@@ -6552,7 +6428,8 @@ def _lib_contract_ctx(row):
             return True
     except (IndexError, KeyError):
         pass
-    return nm == CONTRACT_DIR or nm.startswith(CONTRACT_DIR + "/")
+    return (nm == CONTRACT_DIR or nm.startswith(CONTRACT_DIR + "/")
+            or nm == "销售合同" or nm.startswith("销售合同/"))
 
 
 def _lib_file_visible(row):
@@ -6577,7 +6454,8 @@ def _lib_file_visible(row):
 
 def _lib_can_edit_proj(project_id, is_contract=False, is_sales=False):
     """项目资料写权限：三人组/管理员始终可；否则按新权限是否 edit。
-    ★PERM-SALES-CONTRACT-20261123：销售合同文件夹走 sales_contract，与合同占位(contract)彻底分开。"""
+    ★PERM-CONTRACT-FOLDER-20261123：合同占位/合同文档（含历史销售合同路径）统一走 contract。
+    is_sales 保留仅为兼容旧调用签名，权限判定一律归入 contract。"""
     u = _lib_user()
     if not u:
         return False
@@ -6587,7 +6465,7 @@ def _lib_can_edit_proj(project_id, is_contract=False, is_sales=False):
         return False
     conn = get_db()
     try:
-        key = "sales_contract" if is_sales else ("contract" if is_contract else "lib")
+        key = "contract" if (is_contract or is_sales) else "lib"
         return can_edit(conn, u, project_id=project_id, key=key)
     except Exception:
         return False
@@ -6665,11 +6543,8 @@ def library_upload():
     if is_contract and project_id is None:
         return jsonify({"error": "contract slot requires project"}), 400
     paths = request.form.getlist("paths") or []
-    # ★LIB-SALES-CONTRACT-20261019：上传到「销售合同」文件夹 → 按 contract 权限（view 不可上传）
-    _paths_contract = any(str(pp or "").replace("\\", "/").strip() == SALES_CONTRACT_DIR
-                          or str(pp or "").replace("\\", "/").strip().startswith(SALES_CONTRACT_DIR + "/")
-                          for pp in paths)
     # ★PERM-CONTRACT-FOLDER-20261123：上传到「合同文档」文件夹 → 按 contract 项（按项目独立，view 不可上传）
+    #   （历史「销售合同」路径也归入合同文档，统一按 contract 判定）
     _paths_contract_doc = any(str(pp or "").replace("\\", "/").strip() == CONTRACT_DIR
                               or str(pp or "").replace("\\", "/").strip().startswith(CONTRACT_DIR + "/")
                               for pp in paths)
@@ -6690,8 +6565,8 @@ def library_upload():
         elif not _lib_can_edit():
             return jsonify({"error": "forbidden"}), 403
     else:
-        # ★PERM-SALES-CONTRACT-20261123：销售合同文件夹走 sales_contract；合同占位/合同文档文件夹走 contract
-        if not _lib_can_edit_proj(project_id, bool(is_contract or _paths_contract_doc), bool(_paths_contract)):
+        # ★PERM-CONTRACT-FOLDER-20261123：合同占位/合同文档文件夹走 contract；其余项目资料走 lib
+        if not _lib_can_edit_proj(project_id, bool(is_contract or _paths_contract_doc)):
             return jsonify({"error": "forbidden"}), 403
     uploaded = []
     for idx, f in enumerate(files):
@@ -6764,13 +6639,12 @@ def library_delete(fid):
         is_contract = bool(row["is_contract"])
     except (IndexError, KeyError):
         is_contract = False
-    # ★PERM-V2-20261018：合同占位按「合同文档」edit 删除；★PERM-SALES-CONTRACT-20261123：
-    #   销售合同文件夹下文件改按「显示销售合同文件夹」edit 删除；项目资料按「独立项目资料」edit；公用资料锁三人组。
+    # ★PERM-V2-20261018 / PERM-CONTRACT-FOLDER-20261123：合同占位、合同文档文件夹（含历史「销售合同」路径）
+    #   一律按「合同文档」contract=edit 删除；项目资料按「独立项目资料」edit；公用资料锁三人组。
     _nm_del = str((row["original_name"] if "original_name" in row.keys() else "") or "").replace("\\", "/")
-    _is_sales_del = _nm_del == SALES_CONTRACT_DIR or _nm_del.startswith(SALES_CONTRACT_DIR + "/")
-    # ★PERM-CONTRACT-FOLDER-20261123：合同文档文件夹内文件也按 contract 项删除（按项目独立）
-    _is_contract_del = _nm_del == CONTRACT_DIR or _nm_del.startswith(CONTRACT_DIR + "/")
-    _is_contract_ctx = bool(is_contract) or _is_sales_del or _is_contract_del
+    _is_contract_del = (_nm_del == CONTRACT_DIR or _nm_del.startswith(CONTRACT_DIR + "/")
+                        or _nm_del == "销售合同" or _nm_del.startswith("销售合同/"))
+    _is_contract_ctx = bool(is_contract) or _is_contract_del
     if row["project_id"] is None:
         # ★LIB-COST-20261104：「成本核算/」目录下的文件按公共权限 lib_cost 判定（三人组恒可）
         _nm_cost = _nm_del == COST_DIR or _nm_del.startswith(COST_DIR + "/")
@@ -6783,7 +6657,7 @@ def library_delete(fid):
             conn.close()
             return jsonify({"error": "forbidden"}), 403
     else:
-        if not _lib_can_edit_proj(row["project_id"], bool(is_contract or _is_contract_del), bool(_is_sales_del)):
+        if not _lib_can_edit_proj(row["project_id"], bool(is_contract or _is_contract_del)):
             conn.close()
             return jsonify({"error": "forbidden"}), 403
     conn.execute("DELETE FROM library_files WHERE id=?", (fid,))
@@ -8905,9 +8779,7 @@ SYS_PROJ_DEFAULTS = {
     "prod_E": "view", "prod_H": "view", "prod_F": "view",
     "inst_A": "view", "inst_B": "view", "inst_C": "view",
     "lib": "view",              # 资料库：独立项目资料（整项目）
-    "contract": "hide",         # 资料库：合同占位文档（★用户 2026-10-18 定：默认隐藏）
-    # ★PERM-SALES-CONTRACT-20261123：显示销售合同文件夹（默认隐藏，角色预置见 _migrate_sales_contract_perm）
-    "sales_contract": "hide",
+    "contract": "hide",         # 资料库：合同文档（★用户 2026-10-18 定：默认隐藏）
     "approval": "hide",         # 审批中心（★PERM-V2-APP-PROJ-20261019：从公共模块迁来，默认隐藏）
 }
 
@@ -8982,10 +8854,6 @@ def _apply_new_project_perm_template(conn, pid):
         st = _split_perms(raw)
         st["projects"][str(pid)] = _perm_tpl_clone()
         st["proj_default"] = _perm_tpl_clone()
-        # ★PERM-SALES-CONTRACT-GRANT-20261123：新建项目 DEFAULT 只放 proj_default（按角色），
-        #   项目级不写 sales_contract —— 管理员一旦单独授权(view/edit)就是干净覆盖，绝无 hide 影子
-        _sc = _sales_contract_default(row["username"], row["position"])
-        st["proj_default"]["sales_contract"] = _sc
         raw2 = {
             "blocks": st["blocks"],
             "common": st["common"],
@@ -9060,13 +8928,13 @@ def lib_file_level(conn, username, file_row):
     except Exception:
         return ("hide", [])
     # ★PERM-CONTRACT-20261110：取消超户恒全放开，一律按库里存储值
-    # ★PERM-SALES-CONTRACT-20261123：合同占位(is_contract=1)走 contract；
-    #   「销售合同」文件夹下的文件改走 sales_contract 项（不再受合同文档控制）。
+    # ★PERM-CONTRACT-FOLDER-20261123：合同占位、合同文档虚拟文件夹（含历史「销售合同」路径）
+    #   一律走 contract 项（按项目独立）；其余走 lib。
     _nm = str(row.get("original_name") or "").replace("\\", "/")
-    _is_sales_ctx = _nm == SALES_CONTRACT_DIR or _nm.startswith(SALES_CONTRACT_DIR + "/")
-    # ★PERM-CONTRACT-FOLDER-20261123：合同文档虚拟文件夹内文件也走 contract（按项目独立）
-    _is_contract_ctx = bool(row.get("is_contract")) or _nm == CONTRACT_DIR or _nm.startswith(CONTRACT_DIR + "/")
-    key = "sales_contract" if _is_sales_ctx else ("contract" if _is_contract_ctx else "lib")
+    _is_contract_ctx = (bool(row.get("is_contract")) or _nm == CONTRACT_DIR
+                        or _nm.startswith(CONTRACT_DIR + "/")
+                        or _nm == "销售合同" or _nm.startswith("销售合同/"))
+    key = "contract" if _is_contract_ctx else "lib"
     default_level = "hide"   # ★PROJ-HIDE-DEF-20261019：与 proj_level 一致，未授权 = 隐藏
     st = load_perms(conn, username)
     ov = st["lib_file_overrides"].get(str(row.get("id")), None)
