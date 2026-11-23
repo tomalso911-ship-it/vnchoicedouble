@@ -538,3 +538,87 @@ html body .mfix-pdf-msg { color: #bbb !important; font-size: 13px !important; pa
 /* ★兜底：网页用 .hidden 隐藏顶栏（登录页）时，本文件里的 display 覆盖不得把它顶出来 */
 html body #topbar.hidden { display: none !important; }
 
+/* ---------- 9. 竖屏巡检 20261120：横向滚动要有"可滑"的视觉提示 ----------
+   竖屏逐页巡检发现：签约 / 审批 / 用户 / 收货单的宽表都能横向滑动，
+   但 WebView 默认把滚动条藏起来，用户看到的是"右边一列被切掉"，不知道可以滑。
+   这里只给这些【已经确认是横滑容器】的元素显示 8px 细条，不改表格列宽、不改任何网页代码。 */
+@media (orientation: portrait) and (max-width: 900px) {
+  html body .mfix-scroll,
+  html body .won-scroll-container,
+  html body .appr-table-wrap,
+  html body .users-table-wrap,
+  html body .rc-body {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(0, 0, 0, .42) rgba(0, 0, 0, .06) !important;
+  }
+  html body .won-scroll-container::-webkit-scrollbar,
+  html body .appr-table-wrap::-webkit-scrollbar,
+  html body .users-table-wrap::-webkit-scrollbar,
+  html body .rc-body::-webkit-scrollbar {
+    height: 8px !important;
+    display: block !important;
+  }
+  html body .won-scroll-container::-webkit-scrollbar-thumb,
+  html body .appr-table-wrap::-webkit-scrollbar-thumb,
+  html body .users-table-wrap::-webkit-scrollbar-thumb,
+  html body .rc-body::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, .38) !important;
+    border-radius: 4px !important;
+  }
+  html body .won-scroll-container::-webkit-scrollbar-track,
+  html body .appr-table-wrap::-webkit-scrollbar-track,
+  html body .users-table-wrap::-webkit-scrollbar-track,
+  html body .rc-body::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, .06) !important;
+  }
+}
+
+/* ---------- 10. 横屏巡检 20261120（只作用横屏，不碰网页版） ----------
+   问题1：网页弹窗自带右上角 ×，APK 注入的 #mfix-close-fab 灰色大叉又压在它旁边，
+         横屏下两个关闭按钮叠在一起（截图：新建签约 / 审批详情）。
+         横屏原生关闭键已经足够大，这里把注入的大叉隐藏；关不掉时用安卓返回键。
+   问题2：签约 / 审批宽表横滑没有可见滚动条，右侧列被切掉时看不出能滑。 */
+@media (orientation: landscape) and (max-width: 900px) {
+  html body #mfix-close-fab { display: none !important; }
+  html body .mfix-scroll,
+  html body .won-scroll-container,
+  html body .appr-table-wrap,
+  html body .users-table-wrap,
+  html body .rc-body {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(0, 0, 0, .42) rgba(0, 0, 0, .06) !important;
+  }
+  html body .won-scroll-container::-webkit-scrollbar,
+  html body .appr-table-wrap::-webkit-scrollbar,
+  html body .users-table-wrap::-webkit-scrollbar,
+  html body .rc-body::-webkit-scrollbar {
+    height: 8px !important;
+    display: block !important;
+  }
+  html body .won-scroll-container::-webkit-scrollbar-thumb,
+  html body .appr-table-wrap::-webkit-scrollbar-thumb,
+  html body .users-table-wrap::-webkit-scrollbar-thumb,
+  html body .rc-body::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, .38) !important;
+    border-radius: 4px !important;
+  }
+}
+
+/* 横屏登录卡（818×388 CSS 视口）：网页自带 @media(max-height:380px) 才会隐藏副标题/页脚，
+   388px 刚好差 8px 没命中 → 「重置密码 / 忘记密码」被截在屏幕外。
+   这里只在横屏且高度 ≤440px 时再压缩一点，保证四个按钮全部可见。 */
+@media (orientation: landscape) and (max-height: 440px) and (max-width: 900px) {
+  html body .login-card { padding: 8px 20px 8px !important; }
+  html body .login-logo { width: 42px !important; height: 42px !important; margin: 0 auto 4px !important; }
+  html body .login-sub { display: none !important; }
+  html body .login-title { font-size: 16px !important; }
+  html body .login-field { margin-bottom: 6px !important; }
+  html body .login-field label { font-size: 11px !important; margin-bottom: 2px !important; }
+  html body .login-field input { height: 28px !important; font-size: 12px !important; padding: 0 10px !important; }
+  html body .login-btn { height: 30px !important; font-size: 13px !important; margin-top: 2px !important; }
+  html body .login-links { margin-top: 6px !important; gap: 8px !important; }
+  html body .login-link { font-size: 11px !important; padding: 3px 2px !important; }
+  html body .login-error { min-height: 0 !important; margin-top: 2px !important; font-size: 11px !important; }
+  html body .login-footer { display: none !important; }
+}
+

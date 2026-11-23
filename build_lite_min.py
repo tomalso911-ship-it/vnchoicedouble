@@ -255,8 +255,42 @@ def build():
 
     result = ''.join(out)
 
-    with io.open(DST, 'w', encoding='utf-8', newline='') as f:
+    # ★LITE-MIN-ATOMIC-20261116：先写 .tmp 再原子替换。
+    #   直接原地写 DST 时，若上传/写入被中断（scp 半截、进程被杀），
+    #   会留下「前半段是新的、后半段是旧的」的错位文件 —— 实测导致
+    #   `Uncaught SyntaxError: missing ) after argument list`，整页脚本全废。
+    tmp = DST + '.tmp'
+    with io.open(tmp, 'w', encoding='utf-8', newline='') as f:
         f.write(result)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+
+    # 产物健康检查：大小比例合理 + 尾部是 </html>（防截断/错位）
+    ok = True
+    try:
+        ss = os.path.getsize(SRC)
+        ms = os.path.getsize(tmp)
+        if ms < ss * 0.6 or ms > ss * 1.05:
+            ok = False
+        with io.open(tmp, 'r', encoding='utf-8', errors='replace') as f:
+            f.seek(max(0, ms - 4096))
+            if '</html>' not in f.read().lower():
+                ok = False
+    except OSError:
+        ok = False
+
+    if not ok:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        print('[build_lite_min] 产物健康检查失败，已丢弃 .tmp（保留旧产物/回退源文件）')
+        return 1
+
+    os.replace(tmp, DST)
 
     a = os.path.getsize(SRC)
     b = os.path.getsize(DST)

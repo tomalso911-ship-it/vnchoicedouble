@@ -2265,7 +2265,9 @@ window.__finShakeReport = function (ms) {
     .print-target.ccq-print-root{ display:block !important; position:static !important; inset:auto !important;
       width:100% !important; max-width:100% !important; height:auto !important; max-height:none !important;
       overflow:visible !important; flex:none !important; margin:0 !important; padding:0 !important;
-      background:#fff !important; box-shadow:none !important; transform:none !important; }
+      background:#fff !important; box-shadow:none !important; transform:none !important;
+      /* ★CCQ-PRINTFIT-20261119：屏幕上用 visibility:hidden 藏起来（保留布局供量身），打印时必须还原可见 */
+      visibility:visible !important; }
     .ccq-print-root .ccq-paper{ border:0 !important; padding:0 !important; margin:0 !important;
       height:auto !important; max-height:none !important; overflow:visible !important; }
     .ccq-print-root .ccq-pv-toolbar, .ccq-print-root button{ display:none !important; }
@@ -2274,6 +2276,21 @@ window.__finShakeReport = function (ms) {
     .ccq-print-root table{ page-break-inside:auto; break-inside:auto; }
     .ccq-print-root tr, .ccq-print-root .ccq-pics > div{ page-break-inside:avoid; break-inside:avoid; }
     .ccq-tb tr.ccq-zero{ display:none !important; }
+    /* ★CCQ-PRINTALIGN-20261119（用户 2026-11-19：「打印预览里备注/正文的对齐方式要和预览弹窗一模一样」）：
+       打印根节点把整张纸面塞进了 <table class="ccq-page-frame"> 的 <td>，
+       而全站规则 table td{ text-align:center !important } 会让纸面里所有段落/备注/清单变成居中
+       （预览弹窗里的纸面在 <div> 里，所以是左对齐）→ 预览与 PDF 对不上。
+       这里把「承载格」恢复成左对齐，并显式声明正文各块左对齐、标题居中，与预览完全一致。 */
+    .ccq-print-root .ccq-page-frame > tbody > tr > td{ text-align:left !important; }
+    .ccq-print-root .ccq-remark,
+    .ccq-print-root .ccq-remark p,
+    .ccq-print-root .ccq-remark li,
+    .ccq-print-root .ccq-p,
+    .ccq-print-root .ccq-h4{ text-align:left !important; }
+    .ccq-print-root .ccq-title-txt,
+    .ccq-print-root .ccq-title-in{ text-align:center !important; }
+    .ccq-print-root .ccq-ul{ margin:2px 0 4px 20px !important; padding:0 !important; list-style:disc outside !important; }
+    .ccq-print-root .ccq-ul > li{ text-align:left !important; }
 
     /* ★CC-PRINTSEL-20261114（用户 2026-11-14：「打印PDF，请消除那些单元格里面向下的箭头」）：
        打印时把表内所有 <select>（猪舍 / 钢网层数 / 钢筋φ / 实心板 / 带圆孔）的
@@ -66802,8 +66819,13 @@ function submitAuth() {
       '.ccq-img-wrap img{display:block;margin:0 auto;max-width:100%;height:auto;}',
       '.ccq-img-foot{padding:8px 0 2px;text-align:center;flex:0 0 auto;}',
       '.ccq-img-dl{display:inline-block;padding:6px 18px;border-radius:6px;background:#1a56b0;color:#fff;font-size:13px;font-weight:700;text-decoration:none;}',
-      /* ★CCQ-PRINTFIX-20261115：临时打印根节点（只用于打印，屏幕上永不显示） */
-      '.ccq-print-root{display:none;}',
+      /* ★CCQ-PRINTFIX-20261115：临时打印根节点（只用于打印，屏幕上永不显示）
+         ★CCQ-PRINTFIT-20261119（用户 2026-11-19：「打印 PDF 里很多文字溢出到单元格外面，要和预览一模一样」）：
+         原来是 display:none —— ccQuoteFitMoney() 量到的 clientWidth 全是 0，金额格一次都没缩过字号，
+         打印时数字就横向压进隔壁格（预览是可见的，所以预览正常、PDF 花掉）。
+         改成【移出屏幕但仍参与布局】并固定为 A4 横向的可用宽度（297mm − 8mm×2 = 281mm ≈ 1062px），
+         自适应量到的就是真实打印宽度。 */
+      '.ccq-print-root{display:block;position:fixed;left:-30000px;top:0;width:1062px;height:auto;max-height:none;overflow:visible;visibility:hidden;pointer-events:none;z-index:-1;}',
       /* ★CCQ-LOGO-20261115（用户 2026-11-15）：报价单 PDF / 图片 每页右上角公司 LOGO。
          PDF 用「table + thead」实现每页重复页眉（打印时 thead 每页都会重复渲染）；
          position:fixed 实测在最后一页会被裁掉，已弃用。 */
@@ -66821,8 +66843,13 @@ function submitAuth() {
       '.ccq-std{width:100%;border-collapse:collapse;font-size:10px;margin-top:6px;}',
       '.ccq-std th,.ccq-std td{border:1px solid #333;padding:3px 5px;}',
       '.ccq-std thead th{background:#f0f0f0;font-weight:700;}',
-      '.ccq-std td{vertical-align:top;line-height:1.5;}',
-      '.ccq-std td.ccq-std-l{text-align:left;}',
+      /* ★CCQ-PRINTALIGN-20261119（用户 2026-11-19）：「质量标准表的对齐方式要整齐」：
+         全站规则 table td{ text-align:center !important } 会压过原来没有 !important 的 .ccq-std-l，
+         导致「Datas / The range can accept」整片居中、多行说明参差不齐。
+         这里显式左对齐正文、表头保持居中（预览与 PDF 用同一套规则，永远一致）。 */
+      '.ccq-std td{vertical-align:top;line-height:1.5;text-align:left !important;}',
+      '.ccq-std td.ccq-std-l{text-align:left !important;}',
+      '.ccq-std th{text-align:center !important;}',
       '.ccg-eye{border:1px solid #e0b0a8;background:#fff;color:#c62828;border-radius:5px;font-size:10px;line-height:1;padding:1px 5px;cursor:pointer;}',
       '.ccg-eye:hover{background:#ffebee;}',
       '.ccg-tb td.ccg-lo{background:#f4f9ff;}',
@@ -66840,7 +66867,13 @@ function submitAuth() {
       '.ccg-tb td.ccg-house .slats-ph-wrap{gap:3px;height:auto;}',
       '.ccg-tb td.ccg-house .slats-suffix-plus{width:16px;height:16px;font-size:12px;line-height:1;padding:0;}',
       /* ★CC-REBARW-20261113：φ 下拉文字缩小到 7px、宽度 36px，让 "φ10" 与箭头都完整可见 */
-      '.ccg-mmcell>.ccg-sel{width:36px !important;height:16px !important;min-height:0 !important;font-size:7px !important;padding:0 0 0 1px !important;border:1px solid #cfd8e3;background:#fff;border-radius:3px;box-sizing:border-box;text-align-last:center;}',
+      /* ★CC-SELNOARROW-20261119（用户 2026-11-19）：「钢筋下拉看不全 / 不要下箭头，只要一个框，点一下才出下拉内容」：
+         appearance:none 去掉原生箭头（箭头原本吃掉 36px 里的一半，把 φ8 顶出格子）；
+         去掉箭头后宽度还给文字，字号回到 8px，φ6/φ8/φ10/φ12 都能完整显示。 */
+      '.ccg-mmcell>.ccg-sel{width:38px !important;height:17px !important;min-height:0 !important;font-size:8px !important;padding:0 !important;border:1px solid #cfd8e3;background:#fff;border-radius:3px;box-sizing:border-box;text-align:center;text-align-last:center;-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:none;}',
+      /* 同一套「只留框、不留箭头」用于成本表里其余格内下拉（猪舍 / 层数 / 实心板 / 带圆孔） */
+      '.ccg-tb select.ccg-sel{-webkit-appearance:none;-moz-appearance:none;appearance:none;background-image:none;padding:0;text-align:center;text-align-last:center;}',
+      '.ccg-tb select.ccg-sel::-ms-expand{display:none;}',
       '.ccg-in{width:100%;border:1px solid transparent;background:transparent;font-size:9px;text-align:center;color:inherit;font-family:inherit;padding:1px 0;outline:none;box-sizing:border-box;}',
       '.ccg-in:hover{border-color:#cfe0f5;background:#fff;}',
       '.ccg-in:focus{border-color:#1a73e8;background:#fff;}',
@@ -68721,15 +68754,40 @@ function submitAuth() {
       · 依据就是每行最右「Choice VN 提供吗?」的状态（ccProv('agg.键')，0 = 由业主提供）；
       · 某材料行被删掉（CC_DATA.agg 里没有该键）→ 两边都不出现；
       · 全部 √（都由 Choice 提供）→ 返回空，不改变原有 3 条备注的输出。 */
+      /* ★CCQ-PROVNOTE-FIX-20261119（用户 2026-11-19：备注写「钢筋 φ6 由 Choice 提供」，
+         但「#2 生产骨料」表里根本没有 φ6 这一行）：
+         根因：φ6/φ8/φ10/φ12 四行是按【上方规格表实际选用的钢筋直径】自动隐藏的
+         （CC-AGG-HIDE-20261104：ccRecalc 里算出 usedDia → tr[data-aggd] 设 display:none）；
+         而上一版备注用写死的 7 个键遍历 CC_DATA.agg（重算后这 4 个键恒存在），
+         被隐藏的 φ6 就被当成「Choice 提供」写进备注 → 与用户看到的表格不一致。
+         修法：备注复算同一套 usedDia，只统计表里【真正显示】的行。 */
+      function ccAggUsedDia(){
+      var u = {};
+      var dual = (typeof ccSpecDualMode === 'function') ? ccSpecDualMode() : false;
+      var specs = (typeof CC_DATA !== 'undefined' && CC_DATA && CC_DATA.demand && CC_DATA.demand.specs) || [];
+      specs.forEach(function(sp){
+      if(!sp) return;
+      if(sp.rL) u[String(sp.rL)] = 1;
+      if(sp.rW) u[String(sp.rW)] = 1;
+      if(dual && (Number(sp.layers) || 0) === 2){
+      if(sp.rL2) u[String(sp.rL2)] = 1;
+      if(sp.rW2) u[String(sp.rW2)] = 1;
+      }
+      });
+      return u;
+      }
       function ccQuoteProvNote(){
       var L = (typeof CUR_LANG !== 'undefined') ? CUR_LANG : 'zh';
       var T3 = function(zh, en, vi){ return L === 'en' ? en : (L === 'vi' ? vi : zh); };
       var SEP = (L === 'en' || L === 'vi') ? ', ' : '、';
       var KEYS = ['sand', 'cement', 'stone', 'r6', 'r8', 'r10', 'r12'];
+      var DIA = { r6:'6', r8:'8', r10:'10', r12:'12' };
+      var used = ccAggUsedDia();
       var mine = [], theirs = [];
       KEYS.forEach(function(k){
       var it = (typeof CC_DATA !== 'undefined' && CC_DATA && CC_DATA.agg) ? CC_DATA.agg[k] : null;
       if(!it) return;                                  // 该材料行已被删除
+      if(DIA[k] && !used[DIA[k]]) return;              // φ 行被规格表自动隐藏 → 备注与表格保持一致，绝不提
       var nm = ccT(k);
       if(ccProv('agg.' + k)) mine.push(nm); else theirs.push(nm);
       });
@@ -70530,22 +70588,31 @@ function submitAuth() {
     }catch(e){}
     return s;
   }
-  /* ★CCQ-MONEYFIT-20261115：金额格按实际内容自动缩字号，保证数字完整落在单元格里 */
+  /* ★CCQ-MONEYFIT-20261115：金额格按实际内容自动缩字号，保证数字完整落在单元格里
+     ★CCQ-PRINTFIT-20261119（用户 2026-11-19：「打印 PDF 很多文字都溢出到单元格外面了，要和预览一模一样」）：
+     ① 范围从「只有金额格」扩到 表头 th + 全部 td —— 长表头、普通数字同样会压到隔壁格；
+     ② 缩字下限 6px → 5px，并跑两轮（第一轮缩完字号后换行位置会变，可能还需再缩）；
+     ③ 打印根节点已改成「移出屏幕但仍按 A4 横向宽度布局」，本函数量到的就是真实打印宽度。 */
   function ccQuoteFitMoney(root){
     var host = root || document.getElementById('ccq_paper');
     if(!host || !host.querySelectorAll) return;
-    var cells = host.querySelectorAll('table.ccq-tb td.ccq-money, table.ccq-tb td.ccq-fm, table.ccq-tb td.ccq-fc');
-    for(var i = 0; i < cells.length; i++){
-      var c = cells[i];
-      c.style.fontSize = '';
-      var cs = getComputedStyle(c);
-      var base = parseFloat(cs.fontSize) || 9;
-      var avail = c.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
-      if(avail <= 2) continue;
-      var need = c.scrollWidth;
-      if(need > avail){
-        var fs = Math.max(6, Math.floor(base * avail / need * 100) / 100);
-        c.style.fontSize = fs + 'px';
+    var cells = host.querySelectorAll('table.ccq-tb th, table.ccq-tb td');
+    var i, j, c, cs, base, avail, need, fs;
+    for(i = 0; i < cells.length; i++){ try{ cells[i].style.fontSize = ''; }catch(e0){} }
+    for(var pass = 0; pass < 2; pass++){
+      for(j = 0; j < cells.length; j++){
+        c = cells[j];
+        cs = getComputedStyle(c);
+        base = parseFloat(cs.fontSize) || 9;
+        if(base <= 5.05) continue;
+        var pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+        avail = c.clientWidth - pl - pr;
+        if(avail <= 2) continue;
+        need = c.scrollWidth - pl - pr;
+        if(need > avail + 1){
+          fs = Math.max(5, Math.floor(base * avail / need * 100) / 100);
+          if(fs < base) c.style.fontSize = fs + 'px';
+        }
       }
     }
   }

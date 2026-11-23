@@ -7,7 +7,7 @@
 (() => {
   // ★注意：不要在这里写 window.__mfixVer —— 那是 MainActivity 的注入版本守卫，
   //   被 JS 覆盖会让守卫永远不匹配，导致 600ms 一次无限重复注入。
-  const VER = 'M-APK-PORTRAIT-GANTT-20261116i';
+  const VER = 'M-APK-LAND-AUDIT-20261120b';
   if (window.__mfix) { window.__mfix.rescan(true); return 'rescan'; }
 
   // 网页已经做过横滑 / 固定列 / 带 colgroup 的表：保持原样
@@ -124,11 +124,25 @@
   window.addEventListener('orientationchange', () => { rescan(true); setTimeout(() => rescan(true), 350); });
   document.addEventListener('app:langchange', () => rescan(true));
 
+  /* ★M-PORTRAIT-SCROLLRESET-20261120（竖屏巡检）：顶部按钮切换页面时，
+     宽表会保留上一页的横向滚动位置——例如从签约点开别的页面再回来，
+     屏幕只剩右侧「人员 / 操作」几列，看起来像内容丢了。
+     这里只在【竖屏】把已确认的横滑容器 scrollLeft 归零；不动纵向滚动、不改网页代码。 */
+  function resetPortraitScroll() {
+    try {
+      if (!matchMedia('(orientation: portrait)').matches || innerWidth > 900) return;
+      const sels = '.mfix-scroll,.won-scroll-container,.appr-table-wrap,.users-table-wrap,.rc-body';
+      for (const e of document.querySelectorAll(sels)) {
+        if (e.scrollLeft) e.scrollLeft = 0;
+      }
+    } catch (err) { }
+  }
+
   if (typeof window.switchView === 'function') {
     const sv = window.switchView;
     window.switchView = function () {
       const r = sv.apply(this, arguments);
-      setTimeout(() => rescan(true), 120);
+      setTimeout(() => { resetPortraitScroll(); rescan(true); }, 120);
       setTimeout(() => rescan(true), 900);
       return r;
     };

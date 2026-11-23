@@ -6947,29 +6947,130 @@ LITE_SRC = os.path.join(BASE_DIR, "choice_lite.html")
 LITE_MIN = os.path.join(BASE_DIR, "choice_lite.min.html")
 
 
+# ★LITE-MIN-GUARD-20261116：压缩产物体检 + 「只认自己构建出来的那一份」。
+#   背景：上传中断/半截写会把 min 写成「前半段新的 + 后半段旧的」错位文件，
+#         浏览器直接 `Uncaught SyntaxError: missing ) after argument list`，整页脚本全废。
+#   做法（三层）：
+#     ① 启动时无条件用源文件重建一次（build_lite_min.py 内部原子写 + 自检）；
+#     ② 记下这份产物的 md5（_LITE_MIN_BUILT），只有 md5 完全一致的 min 才允许对外服务；
+#     ③ 另加廉价体检（大小比例 / 头尾结构 / 关键标记），任何一项不过 → 回退源文件。
+#   代价：启动多约 4~6 秒；换来「永远不可能把错位产物发给浏览器」。
+_LITE_MIN_OK_CACHE = {"key": None, "ok": False}
+_LITE_MIN_BUILT = {"md5": None, "size": 0}
+
+
+def _file_md5(path):
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _lite_min_ok():
+    try:
+        key = (os.path.getmtime(LITE_MIN), os.path.getsize(LITE_MIN))
+    except OSError:
+        return False
+    if _LITE_MIN_OK_CACHE.get("key") == key:
+        return _LITE_MIN_OK_CACHE.get("ok", False)
+    ok = False
+    try:
+        ss = os.path.getsize(LITE_SRC)
+        ms = key[1]
+        if ss <= 0 or ms < ss * 0.6 or ms > ss * 1.05:
+            ok = False
+        elif _LITE_MIN_BUILT.get("md5") is None:
+            # 本次进程没成功构建过产物 → 一律不信任磁盘上的 min
+            ok = False
+        elif _LITE_MIN_BUILT.get("size") != ms:
+            ok = False
+        else:
+            with open(LITE_MIN, "rb") as f:
+                head = f.read(2048).lower()
+                f.seek(max(0, ms - 2048))
+                tail = f.read(2048).lower()
+            ok = ((b"<html" in head or b"<!doctype" in head) and b"</html>" in tail)
+            if ok:
+                with open(LITE_MIN, "rb") as f:
+                    body = f.read()
+                ok = (body.count(b'id="loginVer"') >= 1
+                      and body.count(b"</script>") >= 10
+                      and b"function switchView" in body)
+            # ★最关键的一层：必须是本进程构建出的那份字节（错位/半截一律不等）
+            if ok and _file_md5(LITE_MIN) != _LITE_MIN_BUILT.get("md5"):
+                ok = False
+    except OSError:
+        ok = False
+    _LITE_MIN_OK_CACHE["key"] = key
+    _LITE_MIN_OK_CACHE["ok"] = ok
+    return ok
+
+
 def _lite_serve_path():
-    """优先服务压缩产物 choice_lite.min.html；产物缺失或比源文件旧时回退源文件。"""
+    """优先服务压缩产物 choice_lite.min.html；产物缺失/过期/体检不过则回退源文件。"""
     try:
         if (os.path.exists(LITE_MIN) and os.path.getsize(LITE_MIN) > 0
-                and os.path.getmtime(LITE_MIN) >= os.path.getmtime(LITE_SRC)):
+                and os.path.getmtime(LITE_MIN) >= os.path.getmtime(LITE_SRC)
+                and _lite_min_ok()):
             return LITE_MIN
     except OSError:
         pass
     return LITE_SRC
 
 
-def _lite_build_min_if_stale():
-    """启动时若压缩产物缺失/过期则重建（失败则静默回退源文件）。"""
+def _lite_src_stable(wait_seconds=3.0):
+    """源文件是否已经「落稳」（最近 wait_seconds 秒内没被改过，且读到的字节数 == stat size）。
+    防止在上传过程中被读到半截内容而生成错位产物。"""
     try:
-        if os.path.exists(LITE_MIN) and os.path.getmtime(LITE_MIN) >= os.path.getmtime(LITE_SRC):
+        st1 = os.stat(LITE_SRC)
+        if time.time() - st1.st_mtime < wait_seconds:
+            return False
+        with open(LITE_SRC, "rb") as f:
+            n = 0
+            while True:
+                chunk = f.read(1 << 20)
+                if not chunk:
+                    break
+                n += len(chunk)
+        return n == st1.st_size
+    except OSError:
+        return False
+
+
+def _lite_build_min_if_stale():
+    """启动时【无条件】重建压缩产物并记录其 md5（失败则静默回退源文件）。"""
+    try:
+        # 源文件可能正在上传：最多等 30 秒让它落稳
+        for _ in range(10):
+            if _lite_src_stable(3.0):
+                break
+            time.sleep(3)
+        if not _lite_src_stable(3.0):
+            # 一直不稳定 → 不构建，直接服务源文件（内容正确，只是没压缩）
+            _LITE_MIN_BUILT["md5"] = None
             return
         import subprocess
         import sys as _sys
         subprocess.run([_sys.executable, os.path.join(BASE_DIR, "build_lite_min.py")],
                        cwd=BASE_DIR, timeout=300,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if not os.path.exists(LITE_MIN):
+            _LITE_MIN_BUILT["md5"] = None
+            return
+        _LITE_MIN_BUILT["md5"] = _file_md5(LITE_MIN)
+        _LITE_MIN_BUILT["size"] = os.path.getsize(LITE_MIN)
+        _LITE_MIN_OK_CACHE["key"] = None
+        if not _lite_min_ok():
+            # 自检不过 → 删掉产物，强制回退源文件
+            try:
+                os.remove(LITE_MIN)
+            except OSError:
+                pass
+            _LITE_MIN_BUILT["md5"] = None
+            _LITE_MIN_OK_CACHE["key"] = None
     except Exception:
-        pass
+        _LITE_MIN_BUILT["md5"] = None
 
 
 # ===== /lite 响应压缩缓存（Brotli 优先）★BROTLI-20261107 =====
