@@ -38004,6 +38004,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
     lost_ov_sec_total:"合计", lost_report_title:"失败项目报告", lostTitle:"失败项目", lostView:"查看", lostEdit:"编辑",
     btnAddLost:"+ 新建失败项目", btnExportLostExcel:"📊 导出 Excel",
     confirmDelMsg:"确定删除该项目？", addm_uploading:"上传中…",
+    won_del_pwd_title:"删除密码验证", won_del_pwd_tip:"请输入删除密码后继续", won_del_pwd_ph:"输入密码", won_del_pwd_wrong:"密码错误，请重试", won_del_pwd_ok:"确定", won_del_pwd_cancel:"取消",
     pmv_zh:"中文", pmv_en:"英文", pmv_vi:"越南文",
     user_admin_invalid:"管理员总数必须在 2-4 人之间，且必须包含 tom", user_admin_save_fail:"保存失败",
     won_pdf_equip:"设备报价", won_pdf_install:"安装报价", won_pdf_both:"设备&安装报价",
@@ -38839,6 +38840,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
     lost_ov_sec_total:"Total", lost_report_title:"Failed Project Report", lostTitle:"Failed Projects", lostView:"View", lostEdit:"Edit",
     btnAddLost:"+ New Failed", btnExportLostExcel:"📊 Export Excel",
     confirmDelMsg:"Delete this project?", addm_uploading:"Uploading…",
+    won_del_pwd_title:"Delete password", won_del_pwd_tip:"Enter the delete password to continue", won_del_pwd_ph:"Enter password", won_del_pwd_wrong:"Incorrect password, please try again", won_del_pwd_ok:"OK", won_del_pwd_cancel:"Cancel",
     pmv_zh:"Chinese", pmv_en:"English", pmv_vi:"Vietnamese",
     user_admin_invalid:"Total admins must be 2-4 and must include tom", user_admin_save_fail:"Save failed",
     won_pdf_equip:"Equipment Quote", won_pdf_install:"Installation Quote", won_pdf_both:"Equipment & Installation Quote",
@@ -39670,6 +39672,7 @@ crm_yes:"Có", crm_no_yes:"Không", lostRestore:"Chuyển về Dự án Tiềm n
     lost_ov_sec_total:"Tổng", lost_report_title:"Báo cáo dự án thất bại", lostTitle:"Dự án thất bại", lostView:"Xem", lostEdit:"Sửa",
     btnAddLost:"+ Thêm thất bại", btnExportLostExcel:"📊 Xuất Excel",
     confirmDelMsg:"Xóa dự án này?", addm_uploading:"Đang tải lên…",
+    won_del_pwd_title:"Mật khẩu xóa", won_del_pwd_tip:"Nhập mật khẩu xóa để tiếp tục", won_del_pwd_ph:"Nhập mật khẩu", won_del_pwd_wrong:"Mật khẩu không đúng, vui lòng thử lại", won_del_pwd_ok:"Xác nhận", won_del_pwd_cancel:"Hủy",
     pmv_zh:"Tiếng Trung", pmv_en:"Tiếng Anh", pmv_vi:"Tiếng Việt",
     user_admin_invalid:"Tổng số quản trị viên phải từ 2-4 người và phải bao gồm tom", user_admin_save_fail:"Lưu thất bại",
     won_pdf_equip:"Báo giá thiết bị", won_pdf_install:"Báo giá lắp đặt", won_pdf_both:"Báo giá thiết bị & lắp đặt",
@@ -55908,8 +55911,57 @@ function showDelConfirm(title, msg, onConfirm){
   }
 }
 
+/* ★WON-DEL-PWD-20261123：删除签约项目前先过密码 can-delete（三语，随语言原地刷新文字），
+   密码正确才弹出原有橙色确认框；点外面/取消不进入删除流程。 */
+function wonDelPwdLocalize(){
+  var t = T();
+  var title = el('wonDelPwdTitle'); if(title) title.textContent = t.won_del_pwd_title || '删除密码验证';
+  var tip = el('wonDelPwdTip'); if(tip) tip.textContent = t.won_del_pwd_tip || '请输入删除密码后继续';
+  var ph = el('wonDelPwdInput'); if(ph) ph.placeholder = t.won_del_pwd_ph || '输入密码';
+  var ok = el('wonDelPwdOk'); if(ok) ok.textContent = t.won_del_pwd_ok || '确定';
+  var cancel = el('wonDelPwdCancel'); if(cancel) cancel.textContent = t.won_del_pwd_cancel || '取消';
+  var errEl = el('wonDelPwdErr');
+  if(errEl && errEl.style.display !== 'none' && errEl.textContent) errEl.textContent = t.won_del_pwd_wrong || '密码错误，请重试';
+}
+function showWonDelPwd(okCb){
+  var ov = el('wonDelPwdOverlay');
+  if(!ov){ if(okCb) okCb(); return; }
+  wonDelPwdLocalize();
+  var inp = el('wonDelPwdInput'); var errEl = el('wonDelPwdErr');
+  if(inp) inp.value = '';
+  if(errEl){ errEl.style.display='none'; errEl.textContent=''; }
+  ov.style.display='flex';
+  window.__wonDelPwdLast = { okCb: okCb };
+  var submit = function(){
+    var t = T();
+    if(!inp || String(inp.value).trim() !== 'can-delete'){
+      if(errEl){ errEl.textContent = t.won_del_pwd_wrong || '密码错误，请重试'; errEl.style.display='block'; }
+      if(inp){ inp.value=''; try{ inp.focus(); }catch(e){} }
+      return;
+    }
+    ov.style.display='none';
+    if(errEl){ errEl.style.display='none'; errEl.textContent=''; }
+    if(okCb) okCb();
+  };
+  var ok = el('wonDelPwdOk'); var cancel = el('wonDelPwdCancel');
+  if(ok) ok.onclick = submit;
+  if(cancel) cancel.onclick = function(){ ov.style.display='none'; };
+  ov.onclick = function(e){ if(e.target===ov) ov.style.display='none'; };
+  if(inp) inp.onkeydown = function(e){ if(e.key==='Enter'){ e.preventDefault(); submit(); } };
+  setTimeout(function(){ if(inp){ try{ inp.focus(); }catch(e){} } }, 30);
+  if(!window.__wonDelPwdRefreshBound){
+    window.__wonDelPwdRefreshBound = true;
+    window.registerLangRefresh(function(){
+      var o = el('wonDelPwdOverlay');
+      if(o && (o.style.display==='flex' || getComputedStyle(o).display==='flex')) wonDelPwdLocalize();
+    });
+  }
+}
+window.showWonDelPwd = showWonDelPwd;
+
 function delWon(id){
   var t = T();
+  showWonDelPwd(function(){
   showCrmOrangeConfirm(
     function(t){ return t.confirmDelTitle || 'Confirm Delete'; },
     function(t){ return t.confirmDelMsg || 'Delete this won project?'; },
@@ -55922,6 +55974,7 @@ function delWon(id){
       .catch(function(){ showSaveOk('删除失败：无法连接服务器'); loadWon(); });
     });
   }, { persist: 'single-use' });
+  });
 }
 
 function exportWonToExcel() { var t=T(); if(!permGuard('WON-E1')) return; if(!globalWonData||globalWonData.length===0){ showAlert(t.noData); return; } openExportConfirm(); }
@@ -76040,6 +76093,23 @@ window.CommissionModal={open:open,close:close,applyLang:applyLang,addPayRow:addP
   </div>
 </div>
 
+<!-- ===== 签约项目删除密码验证弹窗（三语，随语言切换原地刷新文字） ===== -->
+<div class="won-del-pwd-overlay" id="wonDelPwdOverlay" style="display:none;position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:1150;justify-content:center;align-items:center;padding:10px 12px;">
+  <div class="won-del-pwd-box" style="background:white;border-radius:14px;padding:24px 26px 20px;width:340px;max-width:92vw;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.28);">
+    <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:#E53935;margin-bottom:12px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:24px;height:24px;"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+    </div>
+    <div id="wonDelPwdTitle" data-i18n="won_del_pwd_title" style="font-size:15px;font-weight:700;color:#E53935;margin-bottom:6px;">删除密码验证</div>
+    <div id="wonDelPwdTip" data-i18n="won_del_pwd_tip" style="font-size:12px;color:#666;line-height:1.6;margin-bottom:14px;">请输入删除密码后继续</div>
+    <input id="wonDelPwdInput" type="password" autocomplete="off" data-i18n-attr="placeholder:won_del_pwd_ph" placeholder="输入密码" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;text-align:center;">
+    <div id="wonDelPwdErr" style="display:none;color:#E53935;font-size:12px;margin-top:8px;min-height:16px;"></div>
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:18px;">
+      <button type="button" id="wonDelPwdCancel" data-i18n="won_del_pwd_cancel" style="padding:7px 26px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;background:#f0f0f0;color:#555;">取消</button>
+      <button type="button" id="wonDelPwdOk" data-i18n="won_del_pwd_ok" style="padding:7px 26px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;background:#E53935;color:white;box-shadow:0 2px 8px rgba(211,47,47,.35);">确定</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 项目综合报告模态框（三语） ===== -->
 <div class="rpt-overlay" id="rptOverlay" style="display:none;position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(30,30,50,.5);z-index:1100;justify-content:center;align-items:flex-start;padding:10px 10px 24px 10px;overflow-y:auto;">
   <div class="rpt-modal" data-mmax-btn="1" style="background:white;border-radius:14px;width:100%;max-width:1000px;box-shadow:0 12px 40px rgba(211,47,47,.22);overflow:hidden;animation:rptPop .25s ease;">
@@ -78728,7 +78798,7 @@ function _doExportOverviewPDF(){
       '#commAmtReqOverlay', '#commissionAddModalOverlay',
       '#beneficiaryModalOverlay', '#authModalOverlay', '#crmMoveToLostModal',
       '#addmSummaryOverlay', '#addendumModal', '#addmAlertOverlay',
-      '#delConfirmOverlay', '#crmCloseConfirmOverlay', '#crmOrangeConfirmOverlay', '#rptOverlay'
+      '#delConfirmOverlay', '#crmCloseConfirmOverlay', '#crmOrangeConfirmOverlay', '#rptOverlay', '#wonDelPwdOverlay'
     ];
 
     function isVisible(el) {
