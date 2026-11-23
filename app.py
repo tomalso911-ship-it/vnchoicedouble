@@ -211,9 +211,7 @@ def _new_user_default_perms(conn, position=""):
     lv = _sales_contract_default("", position)
     if isinstance(perms.get("proj_default"), dict):
         perms["proj_default"]["sales_contract"] = lv
-    for ov in (perms.get("projects") or {}).values():
-        if isinstance(ov, dict):
-            ov["sales_contract"] = lv
+    # ★PERM-SALES-CONTRACT-GRANT-20261123：项目级不写默认值（避免 shadow 授权），仅在 proj_default
     return perms
 
 
@@ -241,9 +239,7 @@ def _perm_tpl_ensure_user(perms, conn, position=""):
     lv = _sales_contract_default("", position)
     if isinstance(perms.get("proj_default"), dict):
         perms["proj_default"]["sales_contract"] = lv
-    for ov in (perms.get("projects") or {}).values():
-        if isinstance(ov, dict):
-            ov["sales_contract"] = lv
+    # ★PERM-SALES-CONTRACT-GRANT-20261123：项目级不写默认值（避免 shadow 授权），仅在 proj_default
     return perms
 
 
@@ -304,6 +300,11 @@ def _migrate_perm_tpl_all(c):
 
 # ★PERM-SALES-CONTRACT-20261123：新权限「显示销售合同文件夹」一次性角色预置（可管理员后改）
 SALES_CONTRACT_MIGRATION_KEY = "sys_sales_contract_perm_20261123_v1"
+# ★PERM-SALES-CONTRACT-GRANT-20261123：v1 把角色预置同时写进了每个项目的 override，
+#   会在项目级形成「隐藏」硬影子（管理员若改全局模板，仍被项目级 hide 盖住）。
+#   v2 把「与角色默认值相同」的项目级 sales_contract 清掉 → 默认值只留 proj_default，
+#   项目级一旦被管理员单独授权(view/edit)就是干净覆盖、必然生效；已手改成不同值的一律保留。
+SALES_CONTRACT_GRANT_KEY = "sys_sales_contract_grant_20261123_v2"
 # admin / james / cuong / tom = 编辑；生产总监 / 观察者 / 总经理 / 副总经理 / 财务经理 = 查看；其余隐藏
 _SALES_EDIT_USERS = ("admin", "james", "cuong", "tom")
 _SALES_VIEW_POSITIONS = ("生产总监", "观察者", "总经理", "副总经理", "财务经理")
@@ -321,8 +322,9 @@ def _sales_contract_default(username, position):
 
 
 def _migrate_sales_contract_perm(c):
-    """一次性：给所有用户的 proj_default 与每个项目写入 sales_contract 角色预置值。
-    已有显式值不覆盖（只补缺），管理员后续手改永久生效；prod_kv 打标记只跑一次。"""
+    """一次性：给所有用户的 proj_default 写入 sales_contract 角色预置值。
+    ★PERM-SALES-CONTRACT-GRANT-20261123：默认值【只放 proj_default】，不再逐项目写 override，
+    这样管理员在任何项目里单独授权(view/edit)就是干净覆盖、绝不会被项目级 hide 影子盖住。"""
     import json as _json
     try:
         if c.execute("SELECT 1 FROM prod_kv WHERE k=?", (SALES_CONTRACT_MIGRATION_KEY,)).fetchone():
@@ -337,14 +339,8 @@ def _migrate_sales_contract_perm(c):
                 raw = {}
             lv = _sales_contract_default(r["username"], r["position"])
             tpl = raw.get("proj_default") if isinstance(raw.get("proj_default"), dict) else {}
-            prjs = raw.get("projects") if isinstance(raw.get("projects"), dict) else {}
-            # 该键全新，直接写入角色预置值（模板里虽已带 hide，但一次性迁移要按角色覆盖成最终值）
             tpl["sales_contract"] = lv
-            for ov in prjs.values():
-                if isinstance(ov, dict):
-                    ov["sales_contract"] = lv
             raw["proj_default"] = tpl
-            raw["projects"] = prjs
             c.execute("UPDATE users SET perms=? WHERE id=?",
                       (_json.dumps(raw, ensure_ascii=False), r["id"]))
             try:
@@ -355,9 +351,56 @@ def _migrate_sales_contract_perm(c):
         c.execute("INSERT OR REPLACE INTO prod_kv (k, data, updated_by, updated_at) "
                   "VALUES (?, ?, 'system', datetime('now','localtime'))",
                   (SALES_CONTRACT_MIGRATION_KEY, _json.dumps({"users": n})))
-        print("[PERM-SALES-CONTRACT] 一次性角色预置完成：%d 个用户" % n)
+        print("[PERM-SALES-CONTRACT] 一次性角色预置完成（仅 proj_default）：%d 个用户" % n)
     except Exception as _e:
         print("[PERM-SALES-CONTRACT] 预置失败（不阻断启动）: %s" % _e)
+
+
+def _migrate_sales_contract_grant(c):
+    """★PERM-SALES-CONTRACT-GRANT-20261123 一次性修复：
+    清掉 v1 写到【每个项目 override】里的 sales_contract 影子值（仅当它 == 角色默认值，
+    即那不是管理员手改的授权）。清理后：
+      · 默认级别来自 proj_default（角色预置）；
+      · 管理员一旦在某项目单独设为 view/edit，就是唯一显式覆盖，必然生效；
+      · 已手改成与默认值不同的项目一律保留。"""
+    import json as _json
+    try:
+        if c.execute("SELECT 1 FROM prod_kv WHERE k=?", (SALES_CONTRACT_GRANT_KEY,)).fetchone():
+            return
+        n_user = n_ov = 0
+        for r in c.execute("SELECT id, username, position, perms FROM users").fetchall():
+            try:
+                raw = _json.loads(r["perms"]) if r["perms"] else {}
+            except Exception:
+                raw = {}
+            if not isinstance(raw, dict):
+                raw = {}
+            lv = _sales_contract_default(r["username"], r["position"])
+            changed = False
+            tpl = raw.get("proj_default") if isinstance(raw.get("proj_default"), dict) else {}
+            tpl["sales_contract"] = lv   # 确保默认仍在
+            raw["proj_default"] = tpl
+            prjs = raw.get("projects") if isinstance(raw.get("projects"), dict) else {}
+            for ov in prjs.values():
+                if isinstance(ov, dict) and ov.get("sales_contract") == lv:
+                    del ov["sales_contract"]
+                    n_ov += 1
+                    changed = True
+            if changed or "projects" not in raw:
+                raw["projects"] = prjs
+                c.execute("UPDATE users SET perms=? WHERE id=?",
+                          (_json.dumps(raw, ensure_ascii=False), r["id"]))
+                try:
+                    bump_perm_version((r["username"] or "").strip().lower())
+                except Exception:
+                    pass
+            n_user += 1
+        c.execute("INSERT OR REPLACE INTO prod_kv (k, data, updated_by, updated_at) "
+                  "VALUES (?, ?, 'system', datetime('now','localtime'))",
+                  (SALES_CONTRACT_GRANT_KEY, _json.dumps({"users": n_user, "overrides_cleared": n_ov})))
+        print("[PERM-SALES-CONTRACT] 授权影子清理完成：%d 个用户 / %d 个项目级默认值" % (n_user, n_ov))
+    except Exception as _e:
+        print("[PERM-SALES-CONTRACT] 授权影子清理失败（不阻断启动）: %s" % _e)
 
 
 def _is_full_access(username):
@@ -1364,6 +1407,8 @@ def init_db():
 
     # ★PERM-SALES-CONTRACT-20261123：新权限「显示销售合同文件夹」按角色一次性预置（prod_kv 标记，只跑一次）
     _migrate_sales_contract_perm(c)
+    # ★PERM-SALES-CONTRACT-GRANT-20261123：清掉项目级 hide 影子，保证被授权后一定能看到
+    _migrate_sales_contract_grant(c)
 
     # ===================== 资料库文件索引表 =====================
     c.execute("""
@@ -8905,9 +8950,9 @@ def _apply_new_project_perm_template(conn, pid):
         st = _split_perms(raw)
         st["projects"][str(pid)] = _perm_tpl_clone()
         st["proj_default"] = _perm_tpl_clone()
-        # ★PERM-SALES-CONTRACT-20261123：新建项目也按角色预置 sales_contract（不沿用模板的 hide）
+        # ★PERM-SALES-CONTRACT-GRANT-20261123：新建项目 DEFAULT 只放 proj_default（按角色），
+        #   项目级不写 sales_contract —— 管理员一旦单独授权(view/edit)就是干净覆盖，绝无 hide 影子
         _sc = _sales_contract_default(row["username"], row["position"])
-        st["projects"][str(pid)]["sales_contract"] = _sc
         st["proj_default"]["sales_contract"] = _sc
         raw2 = {
             "blocks": st["blocks"],
