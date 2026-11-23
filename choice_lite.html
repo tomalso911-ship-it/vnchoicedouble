@@ -52849,14 +52849,14 @@ function openSlatsReportModal(){
   var matMap={}; // 水泥板规格 -> {长,宽,高,数量/整场}（智能统计实际出现的规格）
   var totalBuildings=0, totalQty=0, totalSqm=0;
   rows.forEach(function(r){
+    /* ★SLATS-RPT-SELFUSE-ALL-20261123（用户 2026-11-23 追加）：智能报告里所有关联统计都要算上自留备用(13)——
+       猪舍分布分析、规格分布、钢筋用量、水泥/黄砂/石子、数量/平米总计。
+       与上一版的区别：不再在循环开头 return，而是让它走完整汇总；
+       仅「栋数、单元数」两项仍按原规则排除四类特殊房舍（那 5 个字段实际值=1、界面透明显示）。 */
+    var _specialSelfUse=false;
     if(slatsIsSpecialHouse(r.pig_house)){
-      /* ★SLATS-RPT-SELFUSE-TOTAL-20261123：自留备用只补进「数量/整场 + 平米/整场」总计，
-         不进入猪舍/规格/钢筋分布，也不计入栋数、单元数（该行 5 个字段仍是透明的实际值 1）。 */
-      if(_isSelfUseHouse(r.pig_house)){
-        totalQty+=slatsParseNum(r.qty_whole);
-        totalSqm+=slatsParseNum(r.sqm_whole);
-      }
-      return; // 其余三类特殊房舍仍按原规则：不计入报告任何总数/分布
+      if(!_isSelfUseHouse(r.pig_house)) return; // 过道(12)/其他房舍(14)/其他用途(15)仍完全排除
+      _specialSelfUse=true;
     }
     var phKey=String(r.pig_house||'');
     var hc=String(r.house_code||'');
@@ -52885,7 +52885,8 @@ function openSlatsReportModal(){
       _rbl('rebar_size_len2','bar_len2','floor_len',100);
       _rbl('rebar_size_wid2','bar_wid2','floor_wid',80);
     }
-    totalBuildings+=bc; totalQty+=qty; totalSqm+=sqm;
+    if(!_specialSelfUse) totalBuildings+=bc; // 栋数仍排除四类特殊房舍
+    totalQty+=qty; totalSqm+=sqm;
   });
 
   // 栋数/单元数按组去重统计（每组只算一次，避免组内多规格行重复累加）
@@ -53070,7 +53071,9 @@ function openSlatsReportModal(){
   var houseTypeSet={};
   var totalVol=0, matCem=0, matSand=0, matGrav=0;
   rows.forEach(function(r){
-    if(slatsIsSpecialHouse(r.pig_house)) return; // 四类特殊房舍不计入房舍类型数
+    /* ★SLATS-RPT-SELFUSE-ALL-20261123：自留备用(13)也是实际铺设的房舍，计入房舍类型数；
+       过道/其他房舍/其他用途仍不计入。栋数/单元数不受影响（仍用 totalBldgGroups/totalUnits）。 */
+    if(slatsIsSpecialHouse(r.pig_house) && !_isSelfUseHouse(r.pig_house)) return;
     houseTypeSet[String(r.pig_house||'')]=true;
   });
   matRows.forEach(function(o){
