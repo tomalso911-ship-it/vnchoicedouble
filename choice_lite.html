@@ -71811,7 +71811,10 @@ function submitAuth() {
         ccSpecN++;
         var gs = Object.keys(grp).map(function(k){ return grp[k]; });
         if(!gs.length) gs = [{ dia: '—', mm: [], bars: 0, len: 0, ton: 0 }];
-        ccRRows.push({ dim: ccNum(l) + '×' + ccNum(w) + '×' + ccNum(h3), groups: gs, ton: rTon, len: rLen, bars: rBars });
+        /* ★CC-SUM-SOLIDHOLE-20261123：钢筋汇总的规格沿用需求表录入的实心板/带圆孔标记，
+           与智能报告同一口径（ccRowIsSolid/ccRowIsHole），供汇总规格文字套黄框/紫字星标 */
+        ccRRows.push({ dim: ccNum(l) + '×' + ccNum(w) + '×' + ccNum(h3), groups: gs, ton: rTon, len: rLen, bars: rBars,
+                       solid: ccRowIsSolid(sp), hole: ccRowIsHole(sp), sp: sp });
       }
     });
     // ★CC-WASTE-20261104：生产浪费 + 运输损失 → 水泥/黄砂/石子统一上浮 5%（吨与方同步）
@@ -72399,8 +72402,19 @@ function submitAuth() {
       var s1 = ccTpl('ccSumSpec', [ccSpecN, ccNum(blocks), ccNum(area), f2(ccVol)]);
       var s2 = ccTpl('ccSumMat', [f2(ccCem), f2(ccSand), f1(ccSand / 1.45), f2(ccGrav), f1(ccGrav / 1.5)]) + ccT('ccSumWaste');
       var s3 = '<b>' + ccT('ccSumRebar') + '</b>';
+      /* ★CC-SUM-SOLIDHOLE-20261123：汇总规格文字沿用智能报告同款实心板黄框 / 带圆孔紫字星标。
+         按成本核算需求表逐行录入的 solid/hole 判定（r.solid/r.hole），与全局尺寸口径无关。
+         用内联样式复刻（同 #FFC400 黄框 / #7B1FA2 紫字 / #8E24AA 小星星），不套 slats-* class，
+         避免全站 slatsSolidSweep/slatsHoleSweep 按尺寸二次包裹或重复打点。 */
+      var ccSumSpecDim = function(r){
+        var dim = r.dim;
+        if(r.solid) dim = '<span style="border:2px solid #FFC400;padding:0 3px;display:inline-block;line-height:1.2;box-sizing:border-box;border-radius:2px;">' + dim + '</span>';
+        if(r.hole) dim = '<span style="position:relative;display:inline-block;color:#7B1FA2;font-weight:700;">' + dim
+                       + '<span style="position:absolute;top:-5px;right:-6px;width:7px;height:7px;border-radius:50%;background:#8E24AA;border:1px solid #fff;box-shadow:0 0 0 1px #8E24AA;"></span></span>';
+        return dim;
+      };
       ccRRows.forEach(function(r){
-        s3 += '<div style="padding-left:16px;font-weight:600;">' + ccTpl('ccSumRSpec', [r.dim]) + '</div>';
+        s3 += '<div data-solid-managed="1" data-hole-managed="1" style="padding-left:16px;font-weight:600;">' + ccTpl('ccSumRSpec', [ccSumSpecDim(r)]) + '</div>';
         r.groups.forEach(function(g){
           s3 += '<div style="padding-left:32px;">' + ccTpl('ccSumRDet', [
             g.dia, g.mm.length ? g.mm.map(ccNum).join(' / ') : '—', ccNum(g.bars), ccNum(g.len), f2(g.ton)
