@@ -65468,6 +65468,9 @@ function submitAuth() {
   //   ★LIB-SALES-CONTRACT-20261019
   var LIB_EDIT_USERS = ['tom', 'admin', 'cuong', 'james'];
   var LIB_SALES_DIR = '销售合同';           // 固定内部路径（界面按语言显示）
+  /* ★PERM-CONTRACT-FOLDER-20261123：合同文档 = 虚拟文件夹，由 4.2 contract 项按项目独立控制；
+     空占位行(filename='')不再作为散落卡片显示，真实合同文件归入本文件夹。 */
+  var LIB_CONTRACT_DIR = '合同文档';        // 固定内部路径（界面按语言显示标签，内部路径恒定）
   // ★LIB-COST-20261104：成本核算 = 公用资料存储下的固定根目录（复用 library_files 表与整套 UI）
   var LIB_COST_DIR = '成本核算';            // 固定内部路径（界面按语言显示标签，内部路径恒定）
   function _libMe(){ return (typeof authUser !== 'undefined' && authUser && authUser.username ? String(authUser.username) : '').toLowerCase(); }
@@ -65479,6 +65482,16 @@ function submitAuth() {
   function lib_inCostDir(p){
     var n = lib_normPath(p === undefined ? LIB_CWD : p);
     return n === LIB_COST_DIR || n.indexOf(LIB_COST_DIR + '/') === 0;
+  }
+  function lib_inContractDir(p){
+    var n = lib_normPath(p === undefined ? LIB_CWD : p);
+    return n === LIB_CONTRACT_DIR || n.indexOf(LIB_CONTRACT_DIR + '/') === 0;
+  }
+  /* ★PERM-CONTRACT-FOLDER-20261123：合同文档文件（is_contract=1 或位于虚拟文件夹内） */
+  function lib_isContractFile(f){
+    if(!f) return false;
+    if(f.is_contract) return true;
+    return lib_inContractDir(lib_relPath(f));
   }
   // cost 标签页内的 LIB_CWD 是【相对成本核算根目录】的路径；与后端/存储打交道时用绝对路径
   function lib_cwdAbs(){
@@ -65492,7 +65505,9 @@ function submitAuth() {
   function lib_scopeKey(){
     if (LIB_TAB === 'cost') return 'lib_cost';
     if (LIB_TAB !== 'project' || !LIB_PROJECT_ID) return null;
-    /* ★PERM-SALES-CONTRACT-20261123：销售合同文件夹改由 sales_contract 项全权控制 */
+    /* ★PERM-CONTRACT-FOLDER-20261123：合同文档文件夹由 4.2 contract 项控制（按项目独立）
+       ★PERM-SALES-CONTRACT-20261123：销售合同文件夹由 sales_contract 项全权控制 */
+    if (lib_inContractDir()) return 'contract';
     return lib_inSalesDir() ? 'sales_contract' : 'lib';
   }
   function lib_scopeLvForKey(k){
@@ -65510,7 +65525,7 @@ function submitAuth() {
   // ★PERM-SALES-CONTRACT-20261123：销售合同文件夹完全脱离 contract，改走 sales_contract
   function lib_fileKey(f){
     if (!f) return 'lib';
-    if (f.is_contract) return 'contract';
+    if (lib_isContractFile(f)) return 'contract';
     if (lib_inCostDir(lib_relPath(f))) return 'lib_cost';
     return lib_inSalesDir(lib_relPath(f)) ? 'sales_contract' : 'lib';
   }
@@ -65520,6 +65535,14 @@ function submitAuth() {
     if (k === 'lib_cost') return lib_costLv() === 'edit';
     if (!LIB_PROJECT_ID) return false;
     return (typeof permLvProj === 'function') ? permLvProj(LIB_PROJECT_ID, k) === 'edit' : false;
+  }
+  /* ★PERM-CONTRACT-FOLDER-20261123：合同文档「查看」只能预览，禁止下载（编辑才可下载） */
+  function lib_canDownload(f){
+    if (_libTriAdmin()) return true;
+    if (lib_isContractFile(f)){
+      return !!LIB_PROJECT_ID && (typeof permLvProj === 'function') && permLvProj(LIB_PROJECT_ID, 'contract') === 'edit';
+    }
+    return true;
   }
   function lib_canEdit(){
     return lib_scopeLv() === 'edit';
@@ -65730,6 +65753,8 @@ function submitAuth() {
     if(q){
       var hit = [];
       (LIB_FILES||[]).forEach(function(f){
+        /* ★PERM-CONTRACT-FOLDER-20261123：空合同占位不出现在任何视图（含搜索） */
+        if(f.is_contract && !f.filename) return;
         if(lib_relPath(f).toLowerCase().indexOf(q) >= 0) hit.push(f);
       });
       return { folders: [], files: lib_sortFiles(hit), search: true };
@@ -65737,7 +65762,12 @@ function submitAuth() {
     var cwdParts = lib_pathParts(lib_cwdAbs()), depth = cwdParts.length;
     var files = [], map = {}, order = [];
     (LIB_FILES||[]).forEach(function(f){
+      /* ★PERM-CONTRACT-FOLDER-20261123：未上传的合同占位(filename='')不再作为散落文件卡片显示 */
+      if (f.is_contract && !f.filename) return;
       var parts = lib_pathParts(lib_relPath(f));
+      /* ★PERM-CONTRACT-FOLDER-20261123：真实合同文件(is_contract=1 且有 filename)统一归入虚拟文件夹
+         （占位行 original_name 无路径前缀，需合成 合同文档/ 前缀，才能在根目录与文件夹内都正确显示） */
+      if (f.is_contract && (parts.length === 0 || parts[0] !== LIB_CONTRACT_DIR)) parts = [LIB_CONTRACT_DIR].concat(parts);
       var fname = parts.pop();
       if(!fname || parts.length < depth) return;
       var match = true;
@@ -65775,6 +65805,21 @@ function submitAuth() {
         }
       }
     }catch(e){}
+    /* ★PERM-CONTRACT-FOLDER-20261123：4.2 合同文档=查看/编辑 才显示「合同文档」文件夹（按当前项目独立判定）
+       占位行(filename='')永不显示；真实合同文件已在上归入本文件夹。 */
+    try{
+      if (LIB_TAB === 'project' && LIB_PROJECT_ID && depth === 0){
+        var _contractLv = (typeof permLvProj === 'function') ? permLvProj(LIB_PROJECT_ID, 'contract') : 'hide';
+        if (_libTriAdmin() || _contractLv === 'view' || _contractLv === 'edit'){
+          if (!map[LIB_CONTRACT_DIR]){
+            map[LIB_CONTRACT_DIR] = { type:'folder', name: LIB_CONTRACT_DIR,
+              label: (typeof _permTr === 'function' ? _permTr('perm_p_contract', '合同文档') : '合同文档'),
+              path: LIB_CONTRACT_DIR, count:0, size:0, modified:'', uploader:'', virtual:true };
+            order.push(LIB_CONTRACT_DIR);
+          }
+        }
+      }
+    }catch(e){}
     var folders = order.map(function(k){ return map[k]; });
     folders.sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); });
     return { folders: folders, files: lib_sortFiles(files), search: false };
@@ -65783,6 +65828,10 @@ function submitAuth() {
   function lib_filesUnder(path){
     var pre = lib_normPath(path) + '/';
     if (LIB_TAB === 'cost') pre = lib_joinPath(LIB_COST_DIR, path) + '/';
+    /* ★PERM-CONTRACT-FOLDER-20261123：合同文档虚拟文件夹内的合同文件(original_name 无路径前缀) */
+    if (lib_inContractDir(path)){
+      return (LIB_FILES||[]).filter(function(f){ return f.is_contract && !!f.filename; });
+    }
     return (LIB_FILES||[]).filter(function(f){ return lib_relPath(f).indexOf(pre) === 0; });
   }
   function lib_crumbHtml(){
@@ -65926,7 +65975,7 @@ function submitAuth() {
         '<td>' + libBytes(f.size) + '</td>' +
         '<td onclick="event.stopPropagation()">' +
         '<button class="lib-act-btn" onclick="lib_view(' + f.id + ')">' + lt('lib_view') + '</button>' +
-        '<button class="lib-act-btn" onclick="lib_download(' + f.id + ')">' + lt('lib_download') + '</button>';
+        (lib_canDownload(f) ? '<button class="lib-act-btn" onclick="lib_download(' + f.id + ')">' + lt('lib_download') + '</button>' : '');
       // ★LIB-SALES-CONTRACT-20261019：删除按「该文件所属项」判定（合同文档 view 不能删）；
       //   ★LIB-COST-20261104：重命名在成本核算页放开给 lib_cost=edit 的用户
       if(_libTriAdmin() || (LIB_TAB === 'cost' && lib_fileCanEdit(f))){
@@ -73440,8 +73489,11 @@ function submitAuth() {
     var menu = document.createElement('div');
     menu.className = 'lib-ctx'; menu.id = 'lib-ctx';
     var items = '<div class="cx-item" onclick="lib_closeCtx();lib_view(' + id + ')">📖 ' + lt('lib_view') + '</div>' +
-      '<div class="cx-item" onclick="lib_closeCtx();lib_open(' + id + ')">📂 ' + lt('lib_open') + '</div>' +
-      '<div class="cx-item" onclick="lib_closeCtx();lib_download(' + id + ')">⬇ ' + lt('lib_download') + '</div>';
+      '<div class="cx-item" onclick="lib_closeCtx();lib_open(' + id + ')">📂 ' + lt('lib_open') + '</div>';
+    /* ★PERM-CONTRACT-FOLDER-20261123：合同文档 view 只能预览，右键不显示下载 */
+    if (lib_canDownload(lib_fileById(id))) {
+      items += '<div class="cx-item" onclick="lib_closeCtx();lib_download(' + id + ')">⬇ ' + lt('lib_download') + '</div>';
+    }
     // ★LIB-SALES-CONTRACT-20261019：删除按文件所属项判权（合同文档 view 只能看/下载）
     var _fctx = lib_fileById(id);
     var _ceCtx = lib_fileCanEdit(_fctx);
@@ -73470,6 +73522,8 @@ function submitAuth() {
     var f = lib_fileById(id);
     var prev = ['pdf','jpg','jpeg','png','gif','webp'];
     if(f && prev.indexOf(lib_ext(f.original_name||f.filename)) >= 0) lib_preview(id);
+    /* ★PERM-CONTRACT-FOLDER-20261123：合同文档 view 不能下载，非预览格式改走在线阅览 */
+    else if(f && !lib_canDownload(f)) lib_view(id);
     else lib_download(id);
   };
 
@@ -73532,7 +73586,9 @@ function submitAuth() {
     var nm = f.original_name || f.filename || '';
     window.__libViewId = id;
     if(title) title.textContent = nm;
-    var dl = document.getElementById('libviewDl'); if(dl) dl.textContent = lt('lib_download');
+    /* ★PERM-CONTRACT-FOLDER-20261123：合同文档 view 只能预览，阅览器内隐藏下载按钮 */
+    var dl = document.getElementById('libviewDl');
+    if(dl){ dl.textContent = lt('lib_download'); dl.style.display = lib_canDownload(f) ? '' : 'none'; }
     var cl = document.getElementById('libviewClose'); if(cl) cl.textContent = lt('lib_close');
     var mb = document.getElementById('libviewMax');
     if(mb){ mb.textContent = lt('lib_maximize'); mb.classList.remove('libview-max-on'); mb.title = lt('lib_maximize'); }
@@ -73958,6 +74014,8 @@ function submitAuth() {
   };
 
   window.lib_download = function(id){
+    /* ★PERM-CONTRACT-FOLDER-20261123：合同文档 view 只能预览，前端硬拦下载 */
+    if(!lib_canDownload(lib_fileById(id))){ showToast(lt('lib_forbidden_op')); return; }
     window.open('/api/library/files/' + id + '/download?dl=1', '_blank');
   };
 

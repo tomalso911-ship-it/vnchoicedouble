@@ -692,6 +692,8 @@ def row_to_dict(row):
 
 # 合同占位文档名称：三语写死，不随语言切换
 CONTRACT_NAME = "合同-Contract-Hợp đồng"
+# ★PERM-CONTRACT-FOLDER-20261123：「合同文档」虚拟文件夹（4.2 contract 项按项目独立控制）
+CONTRACT_DIR = "合同文档"
 # ★LIB-SALES-CONTRACT-20261019：「销售合同」自由上传文件夹（固定内部路径，界面按语言显示名称）
 SALES_CONTRACT_DIR = "销售合同"
 # ★LIB-COST-20261104：资料库「成本核算」子标签 = 公用资料存储下的固定根目录；
@@ -6538,6 +6540,21 @@ LIB_BLOCKED_EXT = {".exe", ".bat", ".cmd", ".com", ".scr", ".msi", ".sh", ".js",
 # 合同占位名称 CONTRACT_NAME 与 _seed_contract_docs 定义在 init_db 之前（见 PERM-V2 区块）
 
 
+def _lib_contract_ctx(row):
+    """★PERM-CONTRACT-FOLDER-20261123：是否合同文档文件（占位/虚拟文件夹内）。
+    合同文档「查看」只允许预览，不允许下载；编辑才允许下载。"""
+    try:
+        nm = str(row["original_name"] or "").replace("\\", "/")
+    except (IndexError, KeyError):
+        nm = ""
+    try:
+        if bool(row["is_contract"]):
+            return True
+    except (IndexError, KeyError):
+        pass
+    return nm == CONTRACT_DIR or nm.startswith(CONTRACT_DIR + "/")
+
+
 def _lib_file_visible(row):
     """当前请求用户对该文件是否可见：
     公用资料（project_id IS NULL）恒可见；独立项目资料 / 合同占位 按新版权限判定（hide = 不可见）。"""
@@ -6652,6 +6669,10 @@ def library_upload():
     _paths_contract = any(str(pp or "").replace("\\", "/").strip() == SALES_CONTRACT_DIR
                           or str(pp or "").replace("\\", "/").strip().startswith(SALES_CONTRACT_DIR + "/")
                           for pp in paths)
+    # ★PERM-CONTRACT-FOLDER-20261123：上传到「合同文档」文件夹 → 按 contract 项（按项目独立，view 不可上传）
+    _paths_contract_doc = any(str(pp or "").replace("\\", "/").strip() == CONTRACT_DIR
+                              or str(pp or "").replace("\\", "/").strip().startswith(CONTRACT_DIR + "/")
+                              for pp in paths)
     # 门控：公用资料写仍锁三人组（硬代码）；项目资料写按新权限判定；
     #   ★LIB-COST-20261104：上传到「成本核算/」目录 → 按「资料-成本核算」edit 权限判定（三人组恒可）
     _paths_cost = any(str(pp or "").replace("\\", "/").strip() == COST_DIR
@@ -6669,8 +6690,8 @@ def library_upload():
         elif not _lib_can_edit():
             return jsonify({"error": "forbidden"}), 403
     else:
-        # ★PERM-SALES-CONTRACT-20261123：销售合同文件夹走 sales_contract；合同占位仍走 contract
-        if not _lib_can_edit_proj(project_id, bool(is_contract), bool(_paths_contract)):
+        # ★PERM-SALES-CONTRACT-20261123：销售合同文件夹走 sales_contract；合同占位/合同文档文件夹走 contract
+        if not _lib_can_edit_proj(project_id, bool(is_contract or _paths_contract_doc), bool(_paths_contract)):
             return jsonify({"error": "forbidden"}), 403
     uploaded = []
     for idx, f in enumerate(files):
@@ -6747,7 +6768,9 @@ def library_delete(fid):
     #   销售合同文件夹下文件改按「显示销售合同文件夹」edit 删除；项目资料按「独立项目资料」edit；公用资料锁三人组。
     _nm_del = str((row["original_name"] if "original_name" in row.keys() else "") or "").replace("\\", "/")
     _is_sales_del = _nm_del == SALES_CONTRACT_DIR or _nm_del.startswith(SALES_CONTRACT_DIR + "/")
-    _is_contract_ctx = bool(is_contract) or _is_sales_del
+    # ★PERM-CONTRACT-FOLDER-20261123：合同文档文件夹内文件也按 contract 项删除（按项目独立）
+    _is_contract_del = _nm_del == CONTRACT_DIR or _nm_del.startswith(CONTRACT_DIR + "/")
+    _is_contract_ctx = bool(is_contract) or _is_sales_del or _is_contract_del
     if row["project_id"] is None:
         # ★LIB-COST-20261104：「成本核算/」目录下的文件按公共权限 lib_cost 判定（三人组恒可）
         _nm_cost = _nm_del == COST_DIR or _nm_del.startswith(COST_DIR + "/")
@@ -6760,7 +6783,7 @@ def library_delete(fid):
             conn.close()
             return jsonify({"error": "forbidden"}), 403
     else:
-        if not _lib_can_edit_proj(row["project_id"], bool(is_contract), bool(_is_sales_del)):
+        if not _lib_can_edit_proj(row["project_id"], bool(is_contract or _is_contract_del), bool(_is_sales_del)):
             conn.close()
             return jsonify({"error": "forbidden"}), 403
     conn.execute("DELETE FROM library_files WHERE id=?", (fid,))
@@ -6806,13 +6829,22 @@ def library_rename(fid):
 @app.route("/api/library/files/<int:fid>/download")
 def library_download(fid):
     conn = get_db()
-    row = conn.execute("SELECT filename, original_name FROM library_files WHERE id=?", (fid,)).fetchone()
+    row = conn.execute("SELECT id, filename, original_name, is_contract, project_id FROM library_files WHERE id=?", (fid,)).fetchone()
     conn.close()
     if not row:
         return jsonify({"error": "not found"}), 404
     # ★PERM-V2-20261018：独立项目资料 / 合同占位 按授权可见，不可见一律拒绝
     if not _lib_file_visible(row):
         return jsonify({"error": "forbidden"}), 403
+    # ★PERM-CONTRACT-FOLDER-20261123：合同文档「查看」只能预览，下载必须 contract=edit（三人组恒可）
+    if _lib_contract_ctx(row) and not _lib_can_edit():
+        _c = get_db()
+        try:
+            _dlv, _da = lib_file_level(_c, _lib_user(), row)
+        finally:
+            _c.close()
+        if _dlv != "edit":
+            return jsonify({"error": "forbidden"}), 403
     # ★PERM-V2-20261018：合同占位（filename=''）尚无实体文件，下载需友好报错而不是 500
     if not row["filename"]:
         return jsonify({"error": "合同占位尚未上传文件"}), 409
@@ -9032,7 +9064,9 @@ def lib_file_level(conn, username, file_row):
     #   「销售合同」文件夹下的文件改走 sales_contract 项（不再受合同文档控制）。
     _nm = str(row.get("original_name") or "").replace("\\", "/")
     _is_sales_ctx = _nm == SALES_CONTRACT_DIR or _nm.startswith(SALES_CONTRACT_DIR + "/")
-    key = "sales_contract" if _is_sales_ctx else ("contract" if bool(row.get("is_contract")) else "lib")
+    # ★PERM-CONTRACT-FOLDER-20261123：合同文档虚拟文件夹内文件也走 contract（按项目独立）
+    _is_contract_ctx = bool(row.get("is_contract")) or _nm == CONTRACT_DIR or _nm.startswith(CONTRACT_DIR + "/")
+    key = "sales_contract" if _is_sales_ctx else ("contract" if _is_contract_ctx else "lib")
     default_level = "hide"   # ★PROJ-HIDE-DEF-20261019：与 proj_level 一致，未授权 = 隐藏
     st = load_perms(conn, username)
     ov = st["lib_file_overrides"].get(str(row.get("id")), None)
