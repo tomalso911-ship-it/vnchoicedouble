@@ -53354,8 +53354,10 @@ function _slatsRenderDistTable(containerId, dataMap, total, unit, t){
   var label=t.slats_report_data_label||'类别';
   var value=t.slats_report_data_value||'数值';
   var pct=t.slats_report_data_pct||'占比';
+  var totalLbl=t.slats_report_total||'总计';
   var arr=Object.keys(dataMap).map(function(k){ return {k:k, v:dataMap[k], p:total?((dataMap[k]/total)*100).toFixed(1):0}; });
   arr.sort(function(a,b){ return b.v - a.v; });
+  var sumV=arr.reduce(function(s,o){ return s+(Number(o.v)||0); },0);
   var html='<table class="slats-report-table"><thead><tr>'+
     '<th data-i18n="slats_report_data_no">'+no+'</th>'+
     '<th data-i18n="slats_report_data_label">'+label+'</th>'+
@@ -53365,7 +53367,9 @@ function _slatsRenderDistTable(containerId, dataMap, total, unit, t){
   arr.forEach(function(o, i){
     html+='<tr><td>'+(i+1)+'</td><td>'+o.k+'</td><td>'+slatsFmtNum(o.v,0)+(unit||'')+'</td><td>'+o.p+'%</td></tr>';
   });
-  html+='</tbody></table>';
+  html+='</tbody><tfoot><tr class="slats-report-total">'+
+    '<td colspan="2">'+totalLbl+'</td><td>'+slatsFmtNum(sumV,0)+(unit||'')+'</td><td>'+(total?(sumV/total*100).toFixed(1):'0.0')+'%</td>'+
+    '</tr></tfoot></table>';
   container.innerHTML=html;
 }
 // 钢筋每米重量(kg/m)：φ6=0.222 φ8=0.395 φ10=0.617 φ12=0.888
