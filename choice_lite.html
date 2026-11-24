@@ -62172,6 +62172,15 @@ var BOARD_HOLIDAYS = [
   { from:'2027-09-15', days:3, cn:1, color:'#2bcbba', zh:'中秋节',     en:'Mid-Autumn',         vi:'Tết Trung thu' },
   { from:'2027-10-01', days:7, cn:1, color:'#1e90ff', zh:'中国国庆节', en:'National Day (CN)',  vi:'Quốc khánh TQ' }
 ];
+/* ★BD-CULTURE-DAY-20261124（用户 2026-11-24 指定）：越南新增公共假期「文化节」= 每年 11/24，往后每年都有。
+   直接展开进 BOARD_HOLIDAYS：日历整格着色、图例、下一个大假、甘特非工作日等全部沿用现有逻辑自动生效，
+   不改动任何既有渲染/查找代码；展开到 2100 年以覆盖“以后每一年”。 */
+(function(){
+  for (var _cy = 2026; _cy <= 2100; _cy++) {
+    BOARD_HOLIDAYS.push({ from:_cy+'-11-24', days:1, vn:1, color:'#e84393',
+      zh:'文化节', en:'Culture Day', vi:'Ngày Văn hóa' });
+  }
+})();
 function bdDateAdd(ymd, n){ var d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return d; }
 function bdYmd(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
 // 展开为「日期 -> 假日」映射（覆盖整个假期的每一天）
