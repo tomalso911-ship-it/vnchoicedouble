@@ -62227,6 +62227,10 @@ function bdToggleHolLegend(btn){
   var wrap = document.getElementById('bdHolLegendWrap');
   if(!wrap || !btn) return;
   var collapsed = wrap.classList.toggle('collapsed');
+  /* ★BD-HOL-LEGEND-LANG-20261124（用户 2026-11-24）：记住展开/折叠状态，
+     切换语言(会经 loadDashboard→boardRenderCalendar 整块重建)后仍保持原状态，不自动收缩。 */
+  window.__bdHolLegendOpen = !collapsed;
+  try { localStorage.setItem('bdHolLegendOpen', collapsed ? '0' : '1'); } catch(e){}
   btn.innerText = collapsed ? '⌄' : '⌃';
   btn.setAttribute('aria-label', collapsed ? '展开' : '折叠');
 }
@@ -62256,9 +62260,13 @@ function boardRenderCalendar(sec, year, month) {
   // 当年假期颜色图例：每种假日一个颜色 + 放假天数（默认折叠，只显示一行）
   var yearHols = (BOARD_HOLIDAYS||[]).filter(function(h){ return String(h.from).slice(0,4) === String(year); })
                   .sort(function(a,b){ return a.from < b.from ? -1 : 1; });
+  /* ★BD-HOL-LEGEND-LANG-20261124：按持久化的展开状态渲染（默认折叠）；
+     切语言重渲染后仍是用户上次的展开/折叠状态，不再自动收缩。 */
+  var _holOpen = (window.__bdHolLegendOpen === true);
+  try { if (localStorage.getItem('bdHolLegendOpen') === '1') _holOpen = true; } catch(e){}
   html += '<div class="bd-hol-legend-header"><span>'+i18nVal('bd_hol_legend','假日图例')+'</span>'
-       +  '<button type="button" class="bd-hol-toggle" id="bdHolToggle" onclick="bdToggleHolLegend(this)" aria-label="展开">⌄</button></div>';
-  html += '<div class="bd-hol-legend-wrap collapsed" id="bdHolLegendWrap"><div class="bd-hol-legend">'+yearHols.map(function(h){
+       +  '<button type="button" class="bd-hol-toggle" id="bdHolToggle" onclick="bdToggleHolLegend(this)" aria-label="'+(_holOpen?'折叠':'展开')+'">'+(_holOpen?'⌃':'⌄')+'</button></div>';
+  html += '<div class="bd-hol-legend-wrap'+(_holOpen?'':' collapsed')+'" id="bdHolLegendWrap"><div class="bd-hol-legend">'+yearHols.map(function(h){
     return '<span class="bd-hol-chip"><i style="background:'+h.color+'"></i>'
          + escBd(bdHolName(h)) + ' ' + (h.days||1) + i18nVal('bd_hol_days','天') + '</span>';
   }).join('')+'</div></div>';
