@@ -3466,14 +3466,17 @@ window.__finShakeReport = function (ms) {
 .bd-kpi-t { font-size:12px; color:#aab4c0; margin-top:6px; }
 .bd-clock-time { font-size:32px; font-weight:800; color:#39e6ff; letter-spacing:1px; font-variant-numeric:tabular-nums; }
 .bd-clock-date { font-size:13px; color:#aab4c0; margin-top:2px; }
-/* ★BD-WX-GRID-20261127：天气行改为 5 列网格（省份/温度/天气/湿度/风力），
-   每列固定宽度 → 温度、天气、湿度、风力严格竖向一条直线对齐；行间距加大更美观。 */
-.bd-wx-list { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
-.bd-wx-chip { display:grid; grid-template-columns:112px 54px 66px 104px 92px; align-items:center;
-              column-gap:8px; border-radius:8px; padding:7px 10px; font-size:12px; color:#eceff2; }
-.bd-wx-chip .wx-col { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* ★BD-WX-GRID-20261127 / FIX2：天气行 5 列网格（省份/温度/天气/湿度/风力）严格竖向对齐。
+   ★根因修复：原用固定 px 列宽合计 470px > 天气卡内容宽 292px → 溢出卡片；三语下更长更糟。
+   改用弹性 fr 填满容器 + min-width:0 + 省略号，任何语言都不溢出、列仍对齐。
+   湿度/风力改为「数值 + 短单位」两行紧凑排版，省下的宽度给省份名。 */
+.bd-wx-list { display:flex; flex-direction:column; gap:11px; margin-top:10px; }
+.bd-wx-chip { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,0.6fr) minmax(0,0.8fr) minmax(0,0.85fr) minmax(0,0.8fr);
+              align-items:center; column-gap:3px; border-radius:8px; padding:6px 7px; font-size:11px; color:#eceff2; box-sizing:border-box; }
+.bd-wx-chip .wx-col { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.25; }
 .bd-wx-chip .wx-prov { color:#39e6ff; font-weight:700; }
 .bd-wx-chip .wx-temp, .bd-wx-chip .wx-hum, .bd-wx-chip .wx-wind { font-variant-numeric:tabular-nums; }
+.bd-wx-chip .wx-hum i, .bd-wx-chip .wx-wind i { display:block; font-style:normal; font-size:9px; color:#8fb0cf; font-weight:400; }
 .bd-wx-chip b { color:#39e6ff; font-weight:700; }
 .bd-map { grid-column:span 12; min-height:480px; }
 .bd-cal { grid-column:span 4; }
@@ -36949,8 +36952,8 @@ var PROD_EQUIP_FAULT_KB = {
     /* ★BD-MERGE-PROG-20261127：合并卡 5 列（序号/项目/省份/生产进度/安装进度）在窄屏下的列宽 */
     .bd-t10-head.bd-t10-5, .bd-t10-row.bd-t10-5{ grid-template-columns:22px 1fr 50px 64px 64px; }
     .bd-t10-row.bd-t10-5 .bd-t10-prog{ font-size:9px; }
-    /* ★BD-WX-GRID-20261127：窄屏天气行 5 列缩小但保持逐列对齐 */
-    .bd-wx-chip{ grid-template-columns:66px 40px 48px 74px 64px !important; column-gap:4px !important; padding:6px 6px !important; font-size:10px !important; }
+    /* ★BD-WX-GRID-20261127 / FIX2：窄屏沿用弹性列(不固定px)，仅缩字号/间距，保持不溢出且逐列对齐 */
+    .bd-wx-chip{ column-gap:2px !important; padding:5px 5px !important; font-size:10px !important; }
     /* 12) 现场图片卡放大（手机上单列独占，默认 160px 太小） */
     .bd-row3 .bd-ph{ min-height:440px !important; }
     .bd-row3 .bd-ph .bd-ph-body{ min-height:400px; }
@@ -61708,16 +61711,17 @@ function boardRenderWx(el, items) {
     var hum = (c && c.relative_humidity_2m != null) ? Math.round(c.relative_humidity_2m) + '%' : null;
     var windLv = (c && c.wind_speed_10m != null) ? bdBeaufort(c.wind_speed_10m) : null;
     var txt = i18nVal(bdWxKey(c ? c.weather_code : null), '—');
-    /* ★BD-WX-GRID-20261127：拆成 5 个固定列（省份/温度/天气/湿度/风力），
-       配合 .bd-wx-chip 的 grid 列宽，使各行同字段严格竖向对齐；三语文案随 i18n 联动。 */
-    var humTxt = (hum != null) ? escBd(i18nVal('bd_wx_hum', '湿度') + ' ' + hum) : '—';
-    var windTxt = (windLv != null) ? escBd(i18nVal('bd_wx_wind', '风力') + ' ' + windLv + i18nVal('bd_wx_wind_unit', '级')) : '—';
+    /* ★BD-WX-GRID-20261127 / FIX2：拆成 5 列（省份/温度/天气/湿度/风力）严格竖向对齐。
+       湿度/风力用「数值 + 小标签」上下两行，窄列里三语都能完整显示且不溢出；title 保留完整文案。 */
+    var humLbl = i18nVal('bd_wx_hum', '湿度'), windLbl = i18nVal('bd_wx_wind', '风力');
+    var humTxt = (hum != null) ? escBd(hum) : '—';
+    var windTxt = (windLv != null) ? escBd(windLv + i18nVal('bd_wx_wind_unit', '级')) : '—';
     return '<span class="bd-wx-chip">'
-      + '<span class="wx-col wx-prov">' + escBd(bdName3(p)) + '</span>'
+      + '<span class="wx-col wx-prov" title="' + escBd(bdName3(p)) + '">' + escBd(bdName3(p)) + '</span>'
       + '<span class="wx-col wx-temp">' + escBd(temp) + '</span>'
-      + '<span class="wx-col wx-cond">' + escBd(txt) + '</span>'
-      + '<span class="wx-col wx-hum">' + humTxt + '</span>'
-      + '<span class="wx-col wx-wind">' + windTxt + '</span>'
+      + '<span class="wx-col wx-cond" title="' + escBd(txt) + '">' + escBd(txt) + '</span>'
+      + '<span class="wx-col wx-hum" title="' + escBd(humLbl + ' ' + humTxt) + '">' + humTxt + '<i>' + escBd(humLbl) + '</i></span>'
+      + '<span class="wx-col wx-wind" title="' + escBd(windLbl + ' ' + windTxt) + '">' + windTxt + '<i>' + escBd(windLbl) + '</i></span>'
       + '</span>';
   }).join('');
   el.innerHTML = html || '<span class="bd-loading">' + i18nVal('bd_no_data', '暂无数据') + '</span>';
