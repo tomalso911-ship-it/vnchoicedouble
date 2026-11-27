@@ -3466,8 +3466,14 @@ window.__finShakeReport = function (ms) {
 .bd-kpi-t { font-size:12px; color:#aab4c0; margin-top:6px; }
 .bd-clock-time { font-size:32px; font-weight:800; color:#39e6ff; letter-spacing:1px; font-variant-numeric:tabular-nums; }
 .bd-clock-date { font-size:13px; color:#aab4c0; margin-top:2px; }
-.bd-wx-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-.bd-wx-chip { border-radius:8px; padding:4px 8px; font-size:11px; color:#eceff2; }
+/* ★BD-WX-GRID-20261127：天气行改为 5 列网格（省份/温度/天气/湿度/风力），
+   每列固定宽度 → 温度、天气、湿度、风力严格竖向一条直线对齐；行间距加大更美观。 */
+.bd-wx-list { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
+.bd-wx-chip { display:grid; grid-template-columns:112px 54px 66px 104px 92px; align-items:center;
+              column-gap:8px; border-radius:8px; padding:7px 10px; font-size:12px; color:#eceff2; }
+.bd-wx-chip .wx-col { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bd-wx-chip .wx-prov { color:#39e6ff; font-weight:700; }
+.bd-wx-chip .wx-temp, .bd-wx-chip .wx-hum, .bd-wx-chip .wx-wind { font-variant-numeric:tabular-nums; }
 .bd-wx-chip b { color:#39e6ff; font-weight:700; }
 .bd-map { grid-column:span 12; min-height:480px; }
 .bd-cal { grid-column:span 4; }
@@ -36943,6 +36949,8 @@ var PROD_EQUIP_FAULT_KB = {
     /* ★BD-MERGE-PROG-20261127：合并卡 5 列（序号/项目/省份/生产进度/安装进度）在窄屏下的列宽 */
     .bd-t10-head.bd-t10-5, .bd-t10-row.bd-t10-5{ grid-template-columns:22px 1fr 50px 64px 64px; }
     .bd-t10-row.bd-t10-5 .bd-t10-prog{ font-size:9px; }
+    /* ★BD-WX-GRID-20261127：窄屏天气行 5 列缩小但保持逐列对齐 */
+    .bd-wx-chip{ grid-template-columns:66px 40px 48px 74px 64px !important; column-gap:4px !important; padding:6px 6px !important; font-size:10px !important; }
     /* 12) 现场图片卡放大（手机上单列独占，默认 160px 太小） */
     .bd-row3 .bd-ph{ min-height:440px !important; }
     .bd-row3 .bd-ph .bd-ph-body{ min-height:400px; }
@@ -61700,10 +61708,17 @@ function boardRenderWx(el, items) {
     var hum = (c && c.relative_humidity_2m != null) ? Math.round(c.relative_humidity_2m) + '%' : null;
     var windLv = (c && c.wind_speed_10m != null) ? bdBeaufort(c.wind_speed_10m) : null;
     var txt = i18nVal(bdWxKey(c ? c.weather_code : null), '—');
-    var parts = ['<b>' + escBd(bdName3(p)) + '</b> ' + temp + ' ' + escBd(txt)];
-    if (hum != null) parts.push(i18nVal('bd_wx_hum', '湿度') + ' ' + hum);
-    if (windLv != null) parts.push(i18nVal('bd_wx_wind', '风力') + ' ' + windLv + i18nVal('bd_wx_wind_unit', '级'));
-    return '<span class="bd-wx-chip">' + parts.join(' · ') + '</span>';
+    /* ★BD-WX-GRID-20261127：拆成 5 个固定列（省份/温度/天气/湿度/风力），
+       配合 .bd-wx-chip 的 grid 列宽，使各行同字段严格竖向对齐；三语文案随 i18n 联动。 */
+    var humTxt = (hum != null) ? escBd(i18nVal('bd_wx_hum', '湿度') + ' ' + hum) : '—';
+    var windTxt = (windLv != null) ? escBd(i18nVal('bd_wx_wind', '风力') + ' ' + windLv + i18nVal('bd_wx_wind_unit', '级')) : '—';
+    return '<span class="bd-wx-chip">'
+      + '<span class="wx-col wx-prov">' + escBd(bdName3(p)) + '</span>'
+      + '<span class="wx-col wx-temp">' + escBd(temp) + '</span>'
+      + '<span class="wx-col wx-cond">' + escBd(txt) + '</span>'
+      + '<span class="wx-col wx-hum">' + humTxt + '</span>'
+      + '<span class="wx-col wx-wind">' + windTxt + '</span>'
+      + '</span>';
   }).join('');
   el.innerHTML = html || '<span class="bd-loading">' + i18nVal('bd_no_data', '暂无数据') + '</span>';
 }
