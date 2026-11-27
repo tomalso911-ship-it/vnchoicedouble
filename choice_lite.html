@@ -62108,33 +62108,43 @@ function boardRenderMapEcharts(body, agg) {
         /* ★BD-PROV-LINK-20261127：圆点数据由 bdProvPts() 生成，选中省份变亮紫并放大 */
         data: bdProvPts() },
       { name:'leaderLines', type:'lines', coordinateSystem:'geo', geoIndex:0, zlevel:3,
+        /* ★BD-PROV-LINK-FIX2-20261127：引线从圆点中心起始且 zlevel 更高，会抢走圆点的点击命中
+           （实测 click 回调收到的是 leaderLines 而不是 projects）→ 设为 silent 让事件穿透到圆点 */
+        silent: true,
         symbol: ['none','none'], lineStyle:{ color:'#9fb3c8', width:1, opacity:0.7 },
         data: linesData },
+      /* ★BD-PROV-LINK-FIX2-20261127：标签层同样 silent，避免拦截圆点点击（纯展示文字无需交互） */
       { name:'rightLabels', type:'scatter', coordinateSystem:'geo', geoIndex:0, zlevel:4,
-        symbolSize:0,
+        silent:true, symbolSize:0,
         label:{ show:true, position:'right', align:'left', fontSize:9, fontWeight:'bold',
                 formatter:function(p){ return p.name + (p.value[2] ? ' · '+p.value[2] : ''); } },
         data: rightLabels },
       { name:'leftLabels', type:'scatter', coordinateSystem:'geo', geoIndex:0, zlevel:4,
-        symbolSize:0,
+        silent:true, symbolSize:0,
         label:{ show:true, position:'left', align:'right', fontSize:9, fontWeight:'bold',
                 formatter:function(p){ return p.name + (p.value[2] ? ' · '+p.value[2] : ''); } },
         data: leftLabels },
       { name:'inLabels', type:'scatter', coordinateSystem:'geo', geoIndex:0, zlevel:4,
-        symbolSize:0,
+        silent:true, symbolSize:0,
         label:{ show:true, position:'top', align:'center', fontSize:9, fontWeight:'bold',
                 formatter:function(p){ return p.name; } },
         data: inLabels }
     ]
   });
-  /* ★BD-PROV-LINK-20261127：点地图上的项目省圆点 → 对应表格行变紫（反向联动）；再点同一个取消 */
+  /* ★BD-PROV-LINK-20261127 / FIX2：点地图上项目省圆点 → 对应表格行变紫（反向联动）；再点同一个取消。
+     先取 data.prov；没有则用点到的省份名(p.name 可能是中文/英文/越文)反查标准越文省名，
+     这样即便点的是省份色块(geo)也能正确选中。 */
   try {
     chart.off('click');
     chart.on('click', function(p){
-      if (p && p.seriesName === 'projects' && p.data && p.data.prov) {
-        window.__bdSelProv = (window.__bdSelProv === p.data.prov) ? '' : p.data.prov;
-        bdRefreshProvSelection();
+      if (!p) return;
+      var prov = (p.data && p.data.prov) || '';
+      if (!prov && p.name && typeof vnProvinceByKey === 'function') {
+        var _pr = vnProvinceByKey(p.name); if (_pr) prov = _pr.vi;
       }
+      if (!prov) return;
+      window.__bdSelProv = (window.__bdSelProv === prov) ? '' : prov;
+      bdRefreshProvSelection();
     });
   } catch(e){}
   if (!window.__bdMapResize) {
