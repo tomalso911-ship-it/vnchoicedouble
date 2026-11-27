@@ -3457,6 +3457,9 @@ window.__finShakeReport = function (ms) {
 .bd-top10 { grid-column:span 3; }
 .bd-clock { grid-column:span 3; }
 .bd-prodprog { grid-column:span 3; }
+/* ★BD-MERGE-PROG-20261127：生产进度 + 安装进度 合并为一张卡（占 6 列 = 原两卡之和），5 列布局 */
+.bd-progboth { grid-column:span 6; }
+.bd-t10-head.bd-t10-5, .bd-t10-row.bd-t10-5 { grid-template-columns:34px 1fr 80px 92px 92px; }
 .bd-kpi-body { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
 .bd-kpi-cell { border-radius:10px; padding:14px; text-align:center; }
 .bd-kpi-v { font-size:24px; font-weight:800; color:#39e6ff; }
@@ -3605,7 +3608,8 @@ window.__finShakeReport = function (ms) {
 .bd-t10-row.bd-click { cursor:pointer; }
 .bd-t10-row.bd-click:hover { background:rgba(255,255,255,0.05); }
 /* 进度条（生产/安装进度 TOP10） */
-.bd-progress-bar { height:8px; background:rgba(255,255,255,0.15); border-radius:4px; overflow:hidden; position:relative; }
+/* ★BD-MERGE-PROG-20261127：进度胶囊条加白色外框，更显眼 */
+.bd-progress-bar { height:8px; background:rgba(255,255,255,0.15); border-radius:4px; overflow:hidden; position:relative; box-shadow:0 0 0 1.5px #fff; }
 .bd-progress-fill { height:100%; background:linear-gradient(90deg,#00e5ff,#39e6ff); border-radius:4px; }
 .bd-progress-txt { display:block; font-size:10px; color:#39e6ff; margin-top:2px; text-align:right; }
 /* 轮播：纯 CSS 横向滚动，滚动时不再产生网络请求 */
@@ -36936,6 +36940,9 @@ var PROD_EQUIP_FAULT_KB = {
     .bd-t10-head{ grid-template-columns:36px 1fr 96px; }
     /* ★BD-PROV-LINK-20261127：生产进度 4 列（序号/项目/省份/进度）在窄屏下的列宽 */
     .bd-t10-head.bd-t10-4, .bd-t10-row.bd-t10-4{ grid-template-columns:28px 1fr 66px 82px; }
+    /* ★BD-MERGE-PROG-20261127：合并卡 5 列（序号/项目/省份/生产进度/安装进度）在窄屏下的列宽 */
+    .bd-t10-head.bd-t10-5, .bd-t10-row.bd-t10-5{ grid-template-columns:22px 1fr 50px 64px 64px; }
+    .bd-t10-row.bd-t10-5 .bd-t10-prog{ font-size:9px; }
     /* 12) 现场图片卡放大（手机上单列独占，默认 160px 太小） */
     .bd-row3 .bd-ph{ min-height:440px !important; }
     .bd-row3 .bd-ph .bd-ph-body{ min-height:400px; }
@@ -37758,7 +37765,7 @@ var I18N = {
  bd_map_title:"项目分布地图（越南）", bd_cal_title:"日历（中越法定假日）", bd_cal_today:"回到当天",
  bd_mon:"一", bd_tue:"二", bd_wed:"三", bd_thu:"四", bd_fri:"五", bd_sat:"六", bd_sun:"日",
  bd_hol_vn:"越南", bd_hol_cn:"中国",
- bd_top10_title:"生产进度", bd_t10_name:"项目", bd_t10_prov:"省份", bd_t10_amt:"合同金额(VND)", bd_t10_prog:"生产进度", bd_t10_prog2:"安装进度",
+ bd_top10_title:"生产进度", bd_t10_name:"项目", bd_t10_prov:"省份", bd_progboth_title:"生产进度 & 安装进度", bd_t10_amt:"合同金额(VND)", bd_t10_prog:"生产进度", bd_t10_prog2:"安装进度",
  bd_no_data:"暂无数据", bd_pending_short:"待接入", bd_pending:"（待接入：数据模块未就绪）",
  bd_prog_title:"项目进度 / 生产进度", bd_photo_title:"现场图片", bd_worker_title:"安装人数", bd_prod_title:"生产人数",
  bd_fx_title:"汇率", bd_fx_cny_vnd:"人民币 → 越南盾", bd_fx_usd_vnd:"美元 → 越南盾", bd_fx_usd_cny:"美元 → 人民币", bd_fx_range:"区间",
@@ -38589,7 +38596,7 @@ crm_yes:"是", crm_no_yes:"否", lostRestore:"转回至潜在项目", lostRestor
  bd_map_title:"Project Map (Vietnam)", bd_cal_title:"Calendar (CN/VN Public Holidays)", bd_cal_today:"Today",
  bd_mon:"Mon", bd_tue:"Tue", bd_wed:"Wed", bd_thu:"Thu", bd_fri:"Fri", bd_sat:"Sat", bd_sun:"Sun",
  bd_hol_vn:"Vietnam", bd_hol_cn:"China",
- bd_top10_title:"Production Progress", bd_t10_name:"Project", bd_t10_prov:"Province", bd_t10_amt:"Contract Amount (VND)", bd_t10_prog:"Production Progress", bd_t10_prog2:"Installation Progress",
+ bd_top10_title:"Production Progress", bd_t10_name:"Project", bd_t10_prov:"Province", bd_progboth_title:"Production & Installation Progress", bd_t10_amt:"Contract Amount (VND)", bd_t10_prog:"Production Progress", bd_t10_prog2:"Installation Progress",
  bd_no_data:"No data", bd_pending_short:"Pending", bd_pending:"(Pending: data module not ready)",
  bd_prog_title:"Project Progress / Production Progress", bd_photo_title:"Site Photos", bd_worker_title:"Installation Workers", bd_prod_title:"Production Workers",
  bd_fx_title:"Exchange Rates", bd_fx_cny_vnd:"CNY → VND", bd_fx_usd_vnd:"USD → VND", bd_fx_usd_cny:"USD → CNY", bd_fx_range:"Range",
@@ -39423,7 +39430,7 @@ crm_yes:"Yes", crm_no_yes:"No", lostRestore:"Restore to Prospect", lostRestoreTi
  bd_map_title:"Bản đồ dự án (Việt Nam)", bd_cal_title:"Lịch (Ngày lễ VN & TQ)", bd_cal_today:"Hôm nay",
  bd_mon:"T2", bd_tue:"T3", bd_wed:"T4", bd_thu:"T5", bd_fri:"T6", bd_sat:"T7", bd_sun:"CN",
  bd_hol_vn:"Việt Nam", bd_hol_cn:"Trung Quốc",
- bd_top10_title:"Tiến độ sản xuất", bd_t10_name:"Dự án", bd_t10_prov:"Tỉnh", bd_t10_amt:"Giá trị HĐ (VND)", bd_t10_prog:"Tiến độ sản xuất", bd_t10_prog2:"Tiến độ lắp đặt",
+ bd_top10_title:"Tiến độ sản xuất", bd_t10_name:"Dự án", bd_t10_prov:"Tỉnh", bd_progboth_title:"Tiến độ sản xuất & lắp đặt", bd_t10_amt:"Giá trị HĐ (VND)", bd_t10_prog:"Tiến độ sản xuất", bd_t10_prog2:"Tiến độ lắp đặt",
  bd_no_data:"Không có dữ liệu", bd_pending_short:"Chờ tích hợp", bd_pending:"(Chờ tích hợp: mô-đun dữ liệu chưa sẵn sàng)",
  bd_prog_title:"Tiến độ dự án / Tiến độ sản xuất", bd_photo_title:"Hình ảnh công trường", bd_worker_title:"Số người lắp đặt", bd_prod_title:"Số người sản xuất",
  bd_fx_title:"Tỷ giá hối đoái", bd_fx_cny_vnd:"CNY → VND", bd_fx_usd_vnd:"USD → VND", bd_fx_usd_cny:"USD → CNY", bd_fx_range:"Khoảng",
@@ -60791,8 +60798,7 @@ function renderBoardShell() {
   return ''
   + '<div class="bd-grid">'
   +   '<div class="bd-card bd-total" id="bdTotal"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_total_title','项目总数 / 建成 · 在建')+'</span></div><div class="bd-kpi-body" id="bdTotalBody"><span class="bd-loading">…</span></div></div>'
-  +   '<div class="bd-card bd-top10" id="bdTop10"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_top10_title','TOP10 项目进度')+'</span></div><div class="bd-top10-body" id="bdTop10Body"><span class="bd-loading">…</span></div></div>'
-  +   '<div class="bd-card bd-prodprog" id="bdProdProg"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_prodprog_title','安装进度')+'</span></div><div class="bd-ph-body">'+i18nVal('bd_pending','（待接入：数据模块未就绪）')+'</div></div>'
+  +   '<div class="bd-card bd-top10 bd-progboth" id="bdTop10"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_progboth_title','生产进度 & 安装进度')+'</span></div><div class="bd-top10-body" id="bdTop10Body"><span class="bd-loading">…</span></div></div>'
   +   '<div class="bd-card bd-clock" id="bdClock"><div class="bd-card-h"><span class="bd-dot"></span><span>'+i18nVal('bd_clock_title','日期 · 时间 · 天气')+'</span></div><div class="bd-clock-time" id="bdClockTime">--:--:--</div><div class="bd-clock-date" id="bdClockDate"></div><div class="bd-wx-list" id="bdWxBody"><span class="bd-loading">…</span></div></div>'
   // ★ 锁定布局（2026-09-28）：项目分布地图 + 现场图片 + 日历 必须放在同一行（bd-row3），
   //   三卡等宽（repeat(3,1fr)）。仅调整外壳 Grid，地图绘制逻辑（boardRenderMapEcharts）不可改动。
@@ -61349,19 +61355,41 @@ function bdProgRow(r, i, withProv){
       + '<span class="bd-progress-txt">'+r.rate.toFixed(1)+'%</span>'
     + '</span></div>';
 }
-// 第一张：生产进度 TOP10（按生产完成率排序，进度=已生产/总需求）
+/* ★BD-MERGE-PROG-20261127：生产进度 + 安装进度合并表（5 列：序号/项目/省份/生产进度/安装进度）。
+   同一项目同一行：左侧共享项目名与省份，右侧两列分别显示生产、安装进度。 */
+function bdProgHeadBoth(){
+  return '<div class="bd-t10-head bd-t10-5"><span>#</span><span>'+i18nVal('bd_t10_name','项目')+'</span>'
+    + '<span>'+i18nVal('bd_t10_prov','省份')+'</span>'
+    + '<span>'+i18nVal('bd_t10_prog','生产进度')+'</span>'
+    + '<span>'+i18nVal('bd_t10_prog2','安装进度')+'</span></div>';
+}
+function bdProgRowBoth(r, i){
+  var p1 = Math.min(100, Math.max(0, r.prodRate || 0));
+  var p2 = Math.min(100, Math.max(0, r.instRate || 0));
+  var provCell = '<span class="bd-t10-prov" data-prov="'+escBd(r.prov||'')+'" title="'+escBd(r.provName||'')+'" onclick="bdPickProv(this)">'+escBd(r.provName||'—')+'</span>';
+  return '<div class="bd-t10-row bd-t10-5"'+(r.prov?' data-prov="'+escBd(r.prov)+'"':'')+'>'
+    + '<span class="bd-t10-rank">'+(i+1)+'</span>'
+    + '<span class="bd-t10-name" title="'+escBd(r.name)+'">'+escBd(r.name)+'</span>'
+    + provCell
+    + '<span class="bd-t10-prog"><div class="bd-progress-bar"><div class="bd-progress-fill" style="width:'+p1+'%"></div></div>'
+      + '<span class="bd-progress-txt">'+((r.prodRate||0).toFixed(1))+'%</span></span>'
+    + '<span class="bd-t10-prog"><div class="bd-progress-bar"><div class="bd-progress-fill" style="width:'+p2+'%"></div></div>'
+      + '<span class="bd-progress-txt">'+((r.instRate||0).toFixed(1))+'%</span></span>'
+    + '</div>';
+}
+// 合并卡：生产进度 & 安装进度（按生产完成率排序取前 10）
 function boardRenderTop10(list) {
   var body = document.getElementById('bdTop10Body'); if (!body) return;
   var rows = (list||[]).map(function(p){
     var f = (typeof prod_get === 'function') ? prod_get(p.id) : null;
-    var pr = (typeof boardProjectProgress === 'function') ? boardProjectProgress(f) : { demand:0, produced:0, prodRate:0 };
+    var pr = (typeof boardProjectProgress === 'function') ? boardProjectProgress(f) : { prodRate:0, instRate:0 };
     /* ★BD-PROV-LINK-20261127：取项目省份（越文标准省名 prov 用于地图联动，provName 三语显示） */
     var pv = (typeof vnProvinceByKey === 'function') ? vnProvinceByKey(p.province) : null;
-    return { p:p, name: bdProjName(p), rate: pr.prodRate, demand: pr.demand, produced: pr.produced,
+    return { p:p, name: bdProjName(p), prodRate: pr.prodRate || 0, instRate: pr.instRate || 0,
              prov: pv ? pv.vi : '', provName: pv ? bdName3(pv) : (p.province || '') };
-  }).sort(function(a,b){ return b.rate - a.rate; }).slice(0,10);
+  }).sort(function(a,b){ return b.prodRate - a.prodRate; }).slice(0,10);
   if (!rows.length) { body.innerHTML = '<div class="bd-loading">'+i18nVal('bd_no_data','暂无数据')+'</div>'; return; }
-  body.innerHTML = bdProgHead('bd_t10_prog', true) + rows.map(function(r,i){ return bdProgRow(r,i,true); }).join('');
+  body.innerHTML = bdProgHeadBoth() + rows.map(function(r,i){ return bdProgRowBoth(r,i); }).join('');
   /* ★BD-PROV-LINK-20261127：重建后恢复与地图一致的紫色选中高亮（切语言/刷新时保持） */
   if (typeof bdRefreshProvSelection === 'function') bdRefreshProvSelection();
 }
@@ -61395,9 +61423,12 @@ function bdRefreshProvSelection(){
     var on = !!sel && rows[i].getAttribute('data-prov') === sel;
     if (on) rows[i].classList.add('bd-row-sel'); else rows[i].classList.remove('bd-row-sel');
   }
-  var chart = window.__bdMapChart;
-  if (chart && typeof chart.isDisposed === 'function' && !chart.isDisposed()) {
-    try { chart.setOption({ series: [{ name:'projects', data: bdProvPts() }] }); } catch(e){}
+  /* ★BD-PROV-LINK-FIX-20261127：原先用 chart.setOption 局部合并 projects 的 data，
+     实测会残留旧点高亮/按 index 错位（点一个点却多个变紫、且不恢复）。
+     改为【整图重建】：只用当前 __bdSelProv 生成数据重画，保证只有被选中的一个圆点变紫、其余立即恢复青色。 */
+  var mbody = window.__bdMapBody;
+  if (mbody && window.__bdAgg && typeof boardRenderMapEcharts === 'function') {
+    try { boardRenderMapEcharts(mbody, window.__bdAgg); } catch(e){}
   }
 }
 function bdPickProv(el){
@@ -61809,6 +61840,8 @@ function boardRenderMapEcharts(body, agg) {
   var outline0 = window.__vnOutlineFeatures || [];
   if (!feats0.length || !outline0.length) throw new Error('map data not ready');
   if (!body || !body.clientWidth || !body.clientHeight) throw new Error('map body not visible');
+  /* ★BD-PROV-LINK-FIX-20261127：缓存地图容器，供省份联动整图重建使用 */
+  window.__bdMapBody = body;
 
   /* ★BD-MAP-READY-20261108：页面上不止一处会加载图表库（vendor/chart.umd.min.js 等），
      一旦 window.echarts 被替换成新实例，之前 registerMap 注册的边界就丢了
